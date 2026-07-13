@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from orb.application.dto.queries import ListMachinesQuery
+from orb.application.dto.queries import GetMachineQuery, ListMachinesQuery
 from orb.application.machine.commands import UpdateMachineStatusCommand
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.ports.query_bus_port import QueryBusPort
@@ -87,9 +87,35 @@ class StartMachinesOrchestrator(OrchestratorBase[StartMachinesInput, StartMachin
                     message=f"Cannot resolve active provider: {exc}",
                 )
 
+        # Fetch per-machine coordinates so provider-specific strategies (e.g.
+        # k8s) can resolve the workload controller and the archived
+        # replicas_before_stop value rather than defaulting to bare pod names
+        # and the acquire-time replica count.  Machines whose details cannot
+        # be fetched are attempted with the bare machine_id only.
+        machine_provider_data: dict[str, dict] = {}
+        for mid in machine_ids:
+            try:
+                dto = await self._query_bus.execute(GetMachineQuery(machine_id=mid))
+                if dto is not None:
+                    machine_provider_data[mid] = {
+                        "provider_data": dto.provider_data or {},
+                        "provider_api": dto.provider_api or "",
+                        "resource_id": dto.resource_id or "",
+                        "request_id": dto.request_id or "",
+                    }
+            except Exception as exc:
+                self._logger.warning(
+                    "StartMachinesOrchestrator: could not fetch machine %s details: %s",
+                    mid,
+                    exc,
+                )
+
         provider_op = ProviderOperation(
             operation_type=ProviderOperationType.START_INSTANCES,
-            parameters={"instance_ids": machine_ids},
+            parameters={
+                "instance_ids": machine_ids,
+                "machine_coordinates": machine_provider_data,
+            },
         )
         command = ExecuteProviderOperationCommand(
             operation=provider_op, strategy_override=strategy_override

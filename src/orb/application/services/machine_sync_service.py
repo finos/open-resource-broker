@@ -208,6 +208,7 @@ class MachineSyncService:
             image_id=processed_data.get("image_id", "unknown"),
             price_type=processed_data.get("price_type"),
             status=MachineStatus(processed_data.get("status", "pending")),
+            status_reason=processed_data.get("status_reason"),
             private_ip=processed_data.get("private_ip"),
             public_ip=processed_data.get("public_ip"),
             private_dns_name=processed_data.get("private_dns_name"),
@@ -273,7 +274,10 @@ class MachineSyncService:
                 existing = existing_by_id.get(machine_id)
 
                 if existing:
-                    # Check if machine needs update (including DNS, name, and price_type fields)
+                    # Check if machine needs update (including DNS, name, price_type,
+                    # and instance_type — k8s pods synced while pending get
+                    # "k8s/<api>" which must be refreshed once the pod is scheduled
+                    # and the real node instance type is known).
                     needs_update = (
                         existing.status != provider_machine.status
                         or existing.private_ip != provider_machine.private_ip
@@ -282,6 +286,7 @@ class MachineSyncService:
                         or existing.private_dns_name != provider_machine.private_dns_name
                         or existing.public_dns_name != provider_machine.public_dns_name
                         or existing.price_type != provider_machine.price_type
+                        or str(existing.instance_type) != str(provider_machine.instance_type)
                         or existing.tags != provider_machine.tags
                         or existing.subnet_id != provider_machine.subnet_id
                         or existing.security_group_ids != provider_machine.security_group_ids
@@ -306,6 +311,7 @@ class MachineSyncService:
                         machine_data["private_dns_name"] = provider_machine.private_dns_name
                         machine_data["public_dns_name"] = provider_machine.public_dns_name
                         machine_data["price_type"] = provider_machine.price_type
+                        machine_data["instance_type"] = provider_machine.instance_type
                         # status_reason normalisation:
                         #   - On reaching a terminal status (TERMINATED), in-flight
                         #     reasons like "Termination in progress" are stale.

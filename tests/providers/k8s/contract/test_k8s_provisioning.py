@@ -7,7 +7,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
-from orb.providers.k8s.domain.template.k8s_template import K8sResourceQuantities, K8sTemplate
+from orb.providers.k8s.domain.template.k8s_template_aggregate import (
+    K8sResourceQuantities,
+    K8sTemplate,
+)
 from orb.providers.k8s.utilities.pod_spec import make_pod_name
 from tests.providers.contract.base_provisioning_contract import BaseProvisioningContract
 from tests.providers.k8s.contract.conftest import (

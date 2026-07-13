@@ -25,6 +25,7 @@ back to the typed spec builders in :mod:`orb.providers.k8s.utilities`.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Optional
 
 from orb.domain.base.ports.configuration_port import ConfigurationPort
@@ -33,11 +34,11 @@ from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.utilities.common.deep_merge import deep_merge
 from orb.providers.base.native_spec_protocol import NativeSpecServiceProtocol
 from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.domain.template.k8s_template import (
+from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     K8sTemplate,
     upcast_to_k8s_template,
 )
-from orb.providers.k8s.exceptions.k8s_errors import K8sError
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 
 # Supported per-API spec keys; each corresponds to a directory under
 # ``providers/k8s/specs/`` containing a ``default.json`` Jinja template.
@@ -202,6 +203,93 @@ class K8sNativeSpecService:
     # Internals
     # ------------------------------------------------------------------
 
+    def _resolve_resource_name(self, request: Request, api_type: str) -> str:
+        """Compute the configured resource name for the native-spec path.
+
+        Both the typed-builder path (handlers calling make_*_name) and the
+        native-spec path (Jinja templates using ``{{ resource_name }}``) must
+        produce the **same** name so that release/status lookups via
+        ``provider_data["<kind>_name"]`` work regardless of which path was used.
+
+        Delegates to the same make_*_name utilities the typed-builder handlers
+        use, passing the naming config from the provider config when available.
+        """
+        from orb.providers.k8s.utilities.deployment_spec import make_deployment_name
+        from orb.providers.k8s.utilities.job_spec import make_job_name
+        from orb.providers.k8s.utilities.pod_spec import make_pod_name
+        from orb.providers.k8s.utilities.statefulset_spec import make_statefulset_name
+
+        naming = getattr(self._k8s_config, "naming", None) if self._k8s_config is not None else None
+        rid = str(request.request_id)
+
+        key = api_type.lower()
+        if key == "pod":
+            # For the native-spec path a single Pod-0 name is produced; the
+            # per-pod loop in K8sPodHandler overrides with the per-seq name.
+            return make_pod_name(rid, 0, naming=naming)
+        if key == "deployment":
+            return make_deployment_name(rid, naming=naming)
+        if key == "statefulset":
+            return make_statefulset_name(rid, naming=naming)
+        if key == "job":
+            return make_job_name(rid, naming=naming)
+        # Fallback for unknown api_types: use the request_id prefix directly.
+        safe = rid.replace("-", "")
+        return f"orb-{safe[:8]}"
+
+    def _resolve_native_spec_path(self, spec_path: str) -> str:
+        """Resolve a native_spec_path to an absolute filesystem path.
+
+        Resolution order:
+        1. Absolute paths are used as-is.
+        2. Relative paths are resolved against
+           ``K8sProviderConfig.native_spec_base_path`` when set.
+        3. Otherwise resolved against the current working directory.
+
+        After resolution the path is checked for existence (raises
+        :class:`K8sError` when missing) and, when a base is configured,
+        path traversal outside the base is rejected.
+
+        Args:
+            spec_path: The ``native_spec_path`` value from the template.
+
+        Returns:
+            Absolute path string suitable for :meth:`render_spec_from_file`.
+
+        Raises:
+            K8sError: when the resolved path does not exist or when it
+                traverses outside the configured ``native_spec_base_path``.
+        """
+        raw = Path(spec_path)
+        base_str = getattr(self._k8s_config, "native_spec_base_path", None)
+
+        if raw.is_absolute():
+            resolved = raw.resolve()
+        elif base_str is not None:
+            resolved = (Path(base_str) / raw).resolve()
+        else:
+            resolved = (Path.cwd() / raw).resolve()
+
+        # Guard against path traversal when a base directory is configured.
+        if base_str is not None:
+            base_resolved = Path(base_str).resolve()
+            try:
+                resolved.relative_to(base_resolved)
+            except ValueError:
+                raise K8sError(
+                    f"native_spec_path {spec_path!r} resolves to {resolved!s} which is "
+                    f"outside the configured native_spec_base_path {base_str!r}.  "
+                    "Path traversal is not permitted."
+                )
+
+        if not resolved.exists():
+            raise K8sError(
+                f"native_spec_path {spec_path!r} resolved to {resolved!s} but the file "
+                "does not exist.  Ensure the path is correct and the file is readable."
+            )
+
+        return str(resolved)
+
     def _process(
         self,
         template: Any,
@@ -214,8 +302,9 @@ class K8sNativeSpecService:
 
         When the escape hatch is disabled, returns ``None`` so the caller
         falls back to the typed builder path.  A warning is logged when
-        ``native_spec`` is set on the template but the flag is disabled, so
-        operators are not silently surprised by the bypass.
+        ``native_spec`` or ``native_spec_path`` is set on the template but
+        the flag is disabled, so operators are not silently surprised by the
+        bypass.
 
         When enabled:
 
@@ -225,6 +314,11 @@ class K8sNativeSpecService:
           is also set, it is ignored with a warning — ``native_spec`` is a
           full-replacement intent and layering a partial override on top of it
           would produce undefined behaviour.
+        * If ``K8sTemplate.native_spec_path`` is set (and ``native_spec`` is
+          not), the file at the resolved path is Jinja-rendered and used as the
+          override dict — the same deep-merge-onto-default pipeline applies.
+          When both ``native_spec`` and ``native_spec_path`` are set, inline
+          ``native_spec`` wins and a warning is logged.
         * Otherwise, render the default Jinja template and return it directly.
 
         The rendered dict is validated to carry ``apiVersion`` and ``kind``
@@ -233,12 +327,13 @@ class K8sNativeSpecService:
 
         Raises:
             K8sError: when the final rendered dict is missing ``apiVersion``
-                or ``kind``.
+                or ``kind``, when the spec file is not found, or when path
+                traversal outside the base directory is attempted.
         """
         k8s_template = upcast_to_k8s_template(template)
 
         if not self.is_native_spec_enabled():
-            if k8s_template.native_spec:
+            if k8s_template.native_spec or k8s_template.native_spec_path:
                 self.native_spec_service.logger.warning(
                     "native_spec is set on template %r but native_spec_enabled=False; "
                     "falling back to the typed K8sTemplate path",
@@ -246,13 +341,21 @@ class K8sNativeSpecService:
                 )
             return None
 
-        context = self._build_k8s_context(k8s_template, request, namespace=namespace)
+        context = self._build_k8s_context(
+            k8s_template, request, namespace=namespace, api_type=api_type
+        )
 
         # Always render the default first so operators can submit a
         # partial override (e.g. only ``spec.containers[0].resources``).
         default_spec = self.render_default_spec(api_type, context)
 
         if k8s_template.native_spec:
+            if k8s_template.native_spec_path:
+                self.native_spec_service.logger.warning(
+                    "Both native_spec and native_spec_path are set on template %r; "
+                    "inline native_spec takes precedence and native_spec_path will be ignored",
+                    k8s_template.template_id,
+                )
             if k8s_template.pod_spec_override:
                 self.native_spec_service.logger.warning(
                     "Both native_spec and pod_spec_override are set on template %r; "
@@ -260,6 +363,15 @@ class K8sNativeSpecService:
                     k8s_template.template_id,
                 )
             rendered_override = self.render_spec(k8s_template.native_spec, context)
+            result = deep_merge(default_spec, rendered_override)
+            _validate_api_version_and_kind(result, k8s_template.template_id)
+            return result
+
+        if k8s_template.native_spec_path:
+            resolved_path = self._resolve_native_spec_path(k8s_template.native_spec_path)
+            rendered_override = self.spec_renderer.render_spec_from_file(  # type: ignore[attr-defined]
+                resolved_path, context
+            )
             result = deep_merge(default_spec, rendered_override)
             _validate_api_version_and_kind(result, k8s_template.template_id)
             return result
@@ -272,6 +384,7 @@ class K8sNativeSpecService:
         request: Request,
         *,
         namespace: str,
+        api_type: str = "pod",
     ) -> dict[str, Any]:
         """Build the kubernetes-specific Jinja context.
 
@@ -306,7 +419,18 @@ class K8sNativeSpecService:
         merged_labels: dict[str, str] = dict(operator_labels)
         merged_labels.update(system_labels)
 
+        env_list = k8s_template.resolve_env_api_list() or []
+        volume_mounts = list(k8s_template.volume_mounts or [])
+        volumes_list = k8s_template.resolve_volumes_api_list() or []
+        tolerations_list = k8s_template.resolve_tolerations_api_list() or []
+
+        # Compute the configured resource name once so both the metadata.name
+        # field and any template references to {{ resource_name }} are consistent
+        # with the typed-builder path.
+        resource_name = self._resolve_resource_name(request, api_type)
+
         return {
+            "resource_name": resource_name,
             "request_id": str(request.request_id),
             "requested_count": replicas,
             "replicas": replicas,
@@ -326,8 +450,16 @@ class K8sNativeSpecService:
             "resource_limits": resource_limits,
             "command": list(k8s_template.command or []),
             "args": list(k8s_template.args or []),
+            "env": env_list,
+            "volume_mounts": volume_mounts,
+            "volumes": volumes_list,
+            "tolerations": tolerations_list,
             "has_command": bool(k8s_template.command),
             "has_args": bool(k8s_template.args),
+            "has_env": bool(env_list),
+            "has_volume_mounts": bool(volume_mounts),
+            "has_volumes": bool(volumes_list),
+            "has_tolerations": bool(tolerations_list),
             "has_resource_requests": bool(resource_requests),
             "has_resource_limits": bool(resource_limits),
             "has_node_selector": bool(k8s_template.node_selector),

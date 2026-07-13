@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from orb.providers.k8s.exceptions.k8s_errors import K8sError
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 from orb.providers.k8s.services.discovery_models import (
     KubeContextInfo,
     NamespaceInfo,

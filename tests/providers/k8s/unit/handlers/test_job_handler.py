@@ -40,10 +40,14 @@ def _make_request(
     request_id: str | None = None,
     job_name: str | None = None,
     namespace: str = "orb-test",
+    parallelism: int | None = None,
 ) -> Request:
     provider_data: dict[str, Any] = {"namespace": namespace}
     if job_name:
         provider_data["job_name"] = job_name
+    # Mirror the shape written by acquire_hosts: always include parallelism so
+    # the release guard can confirm full-vs-partial release.
+    provider_data["parallelism"] = parallelism if parallelism is not None else requested_count
     return Request(
         request_id=RequestId(value=request_id or f"req-{uuid.uuid4()}"),
         request_type=RequestType.ACQUIRE,
@@ -213,20 +217,24 @@ async def test_acquire_hosts_parallelism_floors_at_one() -> None:
 
 @pytest.mark.asyncio
 async def test_release_hosts_deletes_whole_job_with_background_propagation() -> None:
+    """Full release (machine_ids == parallelism) deletes the Job with background propagation."""
     batch_v1 = MagicMock()
     batch_v1.delete_namespaced_job.return_value = SimpleNamespace()
     client = _make_client(batch_v1=batch_v1)
     handler = _make_handler(client=client)
 
+    # Full release: 3 machine_ids match parallelism=3.
     request = _make_request(
         requested_count=3,
         job_name="orb-deadbeef",
         namespace="orb-test",
+        parallelism=3,
     )
 
-    # Even when called with a partial machine_ids list, the whole Job
-    # is deleted — selective release is not supported for Jobs.
-    await handler.release_hosts(["orb-deadbeef-pod1"], request.provider_data)
+    await handler.release_hosts(
+        ["orb-deadbeef-pod1", "orb-deadbeef-pod2", "orb-deadbeef-pod3"],
+        request.provider_data,
+    )
 
     batch_v1.delete_namespaced_job.assert_called_once()
     kwargs = batch_v1.delete_namespaced_job.call_args.kwargs
@@ -237,6 +245,9 @@ async def test_release_hosts_deletes_whole_job_with_background_propagation() -> 
 
 @pytest.mark.asyncio
 async def test_release_hosts_full_release_lists_all_machine_ids() -> None:
+    """Passing all machine_ids (matching parallelism) triggers whole-Job delete."""
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
+
     batch_v1 = MagicMock()
     batch_v1.delete_namespaced_job.return_value = SimpleNamespace()
     client = _make_client(batch_v1=batch_v1)
@@ -246,12 +257,25 @@ async def test_release_hosts_full_release_lists_all_machine_ids() -> None:
         requested_count=3,
         job_name="orb-deadbeef",
         namespace="orb-test",
+        parallelism=3,
     )
 
     await handler.release_hosts(["pod-a", "pod-b", "pod-c"], request.provider_data)
 
     # Whole-Job delete; the controller cascade-deletes the pods.
     batch_v1.delete_namespaced_job.assert_called_once()
+
+    # Partial release (only 1 of 3) must now be refused.
+    request_partial = _make_request(
+        requested_count=3,
+        job_name="orb-deadbeef",
+        namespace="orb-test",
+        parallelism=3,
+    )
+    with pytest.raises(K8sError, match="selective release refused"):
+        await handler.release_hosts(["pod-a"], request_partial.provider_data)
+    # The delete must NOT have been called for the partial case.
+    assert batch_v1.delete_namespaced_job.call_count == 1  # only from the full release above
 
 
 @pytest.mark.asyncio
@@ -267,7 +291,49 @@ async def test_release_hosts_empty_machine_ids_is_noop() -> None:
 
 
 @pytest.mark.asyncio
+async def test_release_hosts_resolves_parallelism_from_live_job_when_absent() -> None:
+    """Full release with absent parallelism resolves it via live read_namespaced_job.
+
+    Regression test: a return request that stamps only ``job_name`` (no
+    ``parallelism``) in provider_data must NOT be wrongly refused.  The
+    handler must read the live Job spec and use its ``spec.parallelism``
+    to confirm the caller is releasing the full Job.
+    """
+    from types import SimpleNamespace
+
+    batch_v1 = MagicMock()
+    # Mock the live read to return a Job with parallelism=2.
+    batch_v1.read_namespaced_job.return_value = SimpleNamespace(
+        spec=SimpleNamespace(parallelism=2, completions=2),
+        status=SimpleNamespace(active=0, succeeded=2, failed=0, conditions=[]),
+    )
+    batch_v1.delete_namespaced_job.return_value = SimpleNamespace()
+    client = _make_client(batch_v1=batch_v1)
+    handler = _make_handler(client=client)
+
+    # provider_data has job_name but NO parallelism — as a return request
+    # that only stamps the job identity, not the full acquire-time context.
+    provider_data = {
+        "request_id": "req-live-resolve",
+        "namespace": "orb-test",
+        "job_name": "orb-deadbeef",
+        # 'parallelism' intentionally absent
+    }
+
+    await handler.release_hosts(["pod-1", "pod-2"], provider_data)
+
+    # The live read was called to resolve parallelism.
+    batch_v1.read_namespaced_job.assert_called_once()
+    # The whole Job was deleted.
+    batch_v1.delete_namespaced_job.assert_called_once()
+    delete_kwargs = batch_v1.delete_namespaced_job.call_args.kwargs
+    assert delete_kwargs["name"] == "orb-deadbeef"
+    assert delete_kwargs["propagation_policy"] == "Background"
+
+
+@pytest.mark.asyncio
 async def test_release_hosts_job_already_gone_is_best_effort() -> None:
+    """Full release of an already-gone Job is a no-op (404 is best-effort)."""
     from kubernetes.client.exceptions import ApiException
 
     batch_v1 = MagicMock()
@@ -277,7 +343,8 @@ async def test_release_hosts_job_already_gone_is_best_effort() -> None:
     handler = _make_handler(client=client)
     handler._max_retries = 1
 
-    request = _make_request(job_name="orb-deadbeef")
+    # Must use parallelism=1 so machine_ids=["pod-x"] counts as a full release.
+    request = _make_request(job_name="orb-deadbeef", requested_count=1, parallelism=1)
     # Must not raise — Job evaporated, treat as success.
     await handler.release_hosts(["pod-x"], request.provider_data)
 
@@ -434,7 +501,10 @@ def test_get_example_templates_returns_job_example() -> None:
     example = examples[0]
     assert example.provider_api == "Job"
     assert example.provider_type == "k8s"
-    assert example.image_id == "busybox:latest"
+    # A Job needs a shell to run its run-to-completion command; the pause image
+    # (used by the long-running kinds) has none, so the Job example uses busybox.
+    assert example.image_id == "busybox:1.37"
+    assert example.command == ["sh", "-c", "exit 0"]
 
 
 # ---------------------------------------------------------------------------

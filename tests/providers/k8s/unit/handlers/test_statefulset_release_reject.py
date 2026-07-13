@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from orb.providers.k8s.exceptions.k8s_errors import K8sError
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 from orb.providers.k8s.infrastructure.handlers.statefulset_handler import (
     K8sStatefulSetHandler,
 )

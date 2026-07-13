@@ -255,7 +255,7 @@ class KubernetesMPIJobHandler(K8sHandlerBase):
                                 "containers": [
                                     {
                                         "name": "mpi-launcher",
-                                        "image": template.container_image,
+                                        "image": template.image_id,
                                     }
                                 ],
                             },
@@ -269,7 +269,7 @@ class KubernetesMPIJobHandler(K8sHandlerBase):
                                 "containers": [
                                     {
                                         "name": "mpi-worker",
-                                        "image": template.container_image,
+                                        "image": template.image_id,
                                     }
                                 ],
                             },

@@ -189,6 +189,13 @@ async def test_410_gone_relists_and_resumes_from_new_resource_version() -> None:
     stale rv and its cache start, leaving the pod cache out of sync.  The
     correct recovery is a full LIST (consistent snapshot) followed by a
     watch resumed from the resourceVersion the LIST returned.
+
+    After the 410-recovery LIST, pods that were in the cache from the first
+    watch session survive even if absent from the LIST snapshot.  The second
+    watch session (resumed from the LIST rv) will deliver DELETE events for
+    any pods that were genuinely removed during the gap; 410-recovery does
+    not evict eagerly so it cannot discard pods that are still running.
+    Eviction is reserved for the periodic-resync path (``evict_absent=True``).
     """
     cache = PodStateCache()
     client = _make_kubernetes_client_mock()
@@ -221,6 +228,8 @@ async def test_410_gone_relists_and_resumes_from_new_resource_version() -> None:
         watch_timeout_seconds=1,
     )
     watcher.start()
+    # Wait until all three pods are visible: orb-0001 (first session),
+    # orb-relist (LIST snapshot), orb-0002 (second session).
     for _ in range(200):
         states = cache.get("req-1")
         if states is not None and len(states) >= 3:
@@ -231,9 +240,11 @@ async def test_410_gone_relists_and_resumes_from_new_resource_version() -> None:
     states = cache.get("req-1")
     assert states is not None
     pod_names = {s.pod_name for s in states}
-    # LIST populated the cache with the relist snapshot, and both watch
-    # sessions contributed their own events.
-    assert {"orb-0001", "orb-relist", "orb-0002"} <= pod_names
+    # All three pods must be present: 410-recovery does not evict.
+    assert {"orb-0001", "orb-relist", "orb-0002"} <= pod_names, (
+        "All pods from both watch sessions and the LIST snapshot must survive "
+        "410-recovery (eviction is the periodic-resync path's responsibility)"
+    )
     # The re-list must have been called with label_selector but WITHOUT
     # a stale resource_version.
     assert client.core_v1.list_namespaced_pod.called

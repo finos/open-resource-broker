@@ -53,7 +53,7 @@ def _make_acquire_request(
 ) -> Any:
     from orb.domain.request.aggregate import Request
     from orb.domain.request.value_objects import RequestId, RequestType
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     # Embed the template in request.metadata so K8sHandlerRegistry.build_template_for_request
     # picks it up (the registry's acquire() builds the template from metadata, not from a

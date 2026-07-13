@@ -44,7 +44,7 @@ def _build_template(**k8s_fields) -> Template:
     accepted as a legacy alias for ``image_id`` to keep existing tests
     succinct.
     """
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     image_id = k8s_fields.pop("container_image", None) or k8s_fields.pop(
         "image_id", "busybox:latest"
@@ -278,7 +278,7 @@ def test_apply_pod_spec_override_preserves_restart_policy_never() -> None:
 
 def test_apply_pod_spec_override_rejects_snake_case_restart_policy() -> None:
     """Supplying restart_policy != 'Never' in snake_case must raise K8sError."""
-    from orb.providers.k8s.exceptions.k8s_errors import K8sError
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
     from orb.providers.k8s.utilities.pod_spec import apply_pod_spec_override
 
     request = _build_request()
@@ -292,7 +292,7 @@ def test_apply_pod_spec_override_rejects_snake_case_restart_policy() -> None:
 
 def test_apply_pod_spec_override_rejects_camel_case_restart_policy() -> None:
     """Supplying restartPolicy != 'Never' in camelCase must raise K8sError."""
-    from orb.providers.k8s.exceptions.k8s_errors import K8sError
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
     from orb.providers.k8s.utilities.pod_spec import apply_pod_spec_override
 
     request = _build_request()
@@ -315,3 +315,71 @@ def test_apply_pod_spec_override_allows_explicit_never() -> None:
     )
     patched = apply_pod_spec_override(pod, {"restartPolicy": "Never"})
     assert patched.spec.restart_policy == "Never"
+
+
+# ---------------------------------------------------------------------------
+# Regression: _normalise_sdk_kwargs list recursion (Fix 5)
+# ---------------------------------------------------------------------------
+
+
+def test_normalise_sdk_kwargs_recurses_into_list_items() -> None:
+    """camelCase keys nested inside list items must be converted to snake_case.
+
+    Before the fix, ``_normalise_sdk_kwargs`` only recursed into dicts, not
+    lists.  A ``pod_spec_override`` with a list-valued field like
+    ``containers[].volumeMounts[].mountPath`` would leave ``mountPath`` as-is
+    and the kubernetes SDK constructor would raise a cryptic ``TypeError``
+    because it expects ``mount_path``.
+    """
+    from orb.providers.k8s.utilities.pod_spec import _normalise_sdk_kwargs
+
+    override = {
+        "containers": [
+            {
+                "name": "orb",
+                "volumeMounts": [
+                    {"name": "data", "mountPath": "/data"},
+                    {"name": "logs", "mountPath": "/logs", "readOnly": True},
+                ],
+            }
+        ]
+    }
+    result = _normalise_sdk_kwargs(override)
+
+    assert "containers" in result
+    container = result["containers"][0]
+    assert "volume_mounts" in container, "volumeMounts should be snake_case'd"
+    assert "volumeMounts" not in container
+
+    vm0 = container["volume_mounts"][0]
+    assert "mount_path" in vm0, "mountPath inside the list item should be snake_case'd"
+    assert "mountPath" not in vm0
+    assert vm0["mount_path"] == "/data"
+
+    vm1 = container["volume_mounts"][1]
+    assert "read_only" in vm1, "readOnly should be snake_case'd"
+    assert vm1["read_only"] is True
+
+
+def test_normalise_sdk_kwargs_non_dict_list_items_pass_through() -> None:
+    """Non-dict list items (strings, ints) must pass through unchanged."""
+    from orb.providers.k8s.utilities.pod_spec import _normalise_sdk_kwargs
+
+    override = {"someList": ["a", "b", 1, 2]}
+    result = _normalise_sdk_kwargs(override)
+
+    assert result["some_list"] == ["a", "b", 1, 2]
+
+
+def test_normalise_sdk_kwargs_nested_list_in_dict_in_list() -> None:
+    """Deeply nested list-of-dicts is normalised recursively."""
+    from orb.providers.k8s.utilities.pod_spec import _normalise_sdk_kwargs
+
+    override = {"initContainers": [{"envFrom": [{"configMapRef": {"name": "my-cm"}}]}]}
+    result = _normalise_sdk_kwargs(override)
+
+    assert "init_containers" in result
+    init_c = result["init_containers"][0]
+    assert "env_from" in init_c
+    env_from_entry = init_c["env_from"][0]
+    assert "config_map_ref" in env_from_entry

@@ -97,7 +97,7 @@ def _make_acquire_request(provider_api: str, requested_count: int = 1) -> Any:
 
 
 def _make_template(provider_api: str) -> Any:
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     return K8sTemplate(
         template_id="tpl-err",

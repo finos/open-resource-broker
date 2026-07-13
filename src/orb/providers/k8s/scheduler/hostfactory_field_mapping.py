@@ -38,6 +38,7 @@ class K8sFieldMapping:
         "nodeSelector": "node_selector",
         "tolerations": "tolerations",
         "serviceAccount": "service_account",
+        "serviceName": "service_name",
         # Resource requests / limits
         "resourceRequests": "resource_requests",
         "resourceLimits": "resource_limits",
@@ -63,6 +64,8 @@ class K8sFieldMapping:
         "priorityClassName": "priority_class_name",
         # Pod termination
         "terminationGracePeriodSeconds": "termination_grace_period_seconds",
+        # Pod restart policy
+        "restartPolicy": "restart_policy",
         # Container health probes
         "readinessProbe": "readiness_probe",
         "livenessProbe": "liveness_probe",
@@ -71,6 +74,8 @@ class K8sFieldMapping:
         # Job lifecycle
         "ttlSecondsAfterFinished": "ttl_seconds_after_finished",
         "activeDeadlineSeconds": "active_deadline_seconds",
+        # Native-spec file path escape hatch
+        "nativeSpecPath": "native_spec_path",
     }
 
     def get_mappings(self) -> dict[str, str]:

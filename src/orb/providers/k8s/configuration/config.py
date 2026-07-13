@@ -8,21 +8,20 @@ integrates with the configuration loader and the provider settings registry.
 from __future__ import annotations
 
 import contextlib
-import logging
-import re
 from pathlib import Path
 from typing import Any, Optional
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
+from orb.infrastructure.logging.logger import get_logger
+from orb.providers.k8s.utilities.dns_names import (
+    DNS_1123_LABEL_REGEX as _DNS_1123_LABEL_RE,
+    DNS_1123_SUBDOMAIN_REGEX as _DNS_SUBDOMAIN_RE,
+)
 
 _SA_NAMESPACE_FILE = Path("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-
-# RFC 1123 DNS subdomain: one or more labels separated by dots where each
-# label starts and ends with [a-z0-9] and may contain hyphens in the middle.
-_DNS_SUBDOMAIN_RE = re.compile(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$")
 
 # Symphony-era field names that were renamed when the k8s provider was
 # introduced.  Keys are the legacy names; values are the canonical names.
@@ -36,19 +35,21 @@ _LEGACY_FIELD_MAP: dict[str, str] = {
 }
 
 
-def _get_logger() -> logging.Logger:
-    """Return a stdlib logger for namespace auto-detection messages.
+def _get_logger() -> Any:
+    """Return a logger for namespace auto-detection messages.
 
     The K8sProviderConfig model validator runs during Pydantic construction,
     before any DI container is available, so injecting a LoggingPort here is
-    not feasible without a service-locator.  The stdlib logging module is used
-    directly and the call-site is limited to a single informational message.
+    not feasible without a service-locator.  The project ``get_logger``
+    wrapper (a thin alias over ``logging.getLogger``) is used instead of bare
+    ``logging.getLogger`` so the call follows the project-wide logging
+    convention.
 
     TODO: move namespace auto-detection out of the validator and into the
     provider strategy's initialize() path so the injected LoggingPort can
     be used instead.
     """
-    return logging.getLogger(__name__)
+    return get_logger(__name__)
 
 
 def _read_in_cluster_namespace() -> Optional[str]:
@@ -64,6 +65,153 @@ def _read_in_cluster_namespace() -> Optional[str]:
             if ns:
                 return ns
     return None
+
+
+class K8sNamingConfig(BaseModel):
+    """Configurable resource-naming policy for managed Kubernetes workloads.
+
+    All four controller kinds (Pod, Deployment, StatefulSet, Job) use the
+    pattern ``<prefix>-<uuid_segment>`` for the resource name, where
+    ``uuid_segment`` is the first ``uuid_chars`` hex characters of the
+    request UUID (hyphens stripped).  Pods additionally append a
+    zero-padded sequential suffix ``-<seq:04d>`` so each pod in a batch
+    gets a unique name.
+
+    Budget math (must pass the model validator):
+
+    * **Deployment** (tightest): pod names inherit the deployment name as a
+      prefix and the ReplicaSet controller appends ``-<hash>-<suffix>``
+      (≈16 chars).  So the deployment name must satisfy
+      ``len(prefix) + 1 + uuid_chars ≤ max_deployment_name_len``.
+    * **StatefulSet**: pod names are ``<statefulset-name>-<ordinal>``; the
+      ordinal can be up to 5 digits for very large sets, so the
+      statefulset name must leave room: ``len(prefix) + 1 + uuid_chars ≤
+      max_statefulset_name_len``.
+    * **Job**: the Job controller may append a controller-suffix;
+      ``len(prefix) + 1 + uuid_chars ≤ max_job_name_len``.
+    * **Pod**: ``len(prefix) + 1 + uuid_chars + 1 + 4 ≤ max_pod_name_len``
+      (4 digits for the sequence number, 1 for the hyphen separator).
+    """
+
+    prefix: str = Field(
+        "orb",
+        description=(
+            "Name prefix applied to every managed Kubernetes resource.  "
+            "Must be a valid DNS-1123 label segment (lowercase alphanumeric "
+            "and hyphens, starting and ending with alphanumeric, max 20 chars "
+            "to leave room for the uuid segment)."
+        ),
+    )
+    uuid_chars: int = Field(
+        20,
+        ge=8,
+        le=32,
+        description=(
+            "Number of hex characters taken from the hyphen-stripped request "
+            "UUID to form the name's uuid segment.  Default 20 (≈2^80 "
+            "collision space — negligible at production scale; matches the "
+            "historical pod-name pattern).  Must be at least 8 for a "
+            "reasonable collision budget."
+        ),
+    )
+
+    # Per-kind maximum name length budgets.  Callers use these to truncate
+    # defensively; the model_validator enforces that prefix+uuid_chars fit.
+    max_pod_name_len: int = Field(
+        63,
+        ge=20,
+        le=253,
+        description="Maximum DNS-1123 label length for Pod names (default 63).",
+    )
+    max_deployment_name_len: int = Field(
+        47,
+        ge=10,
+        le=253,
+        description=(
+            "Maximum length for Deployment names.  Default 47 = 63 – 16-char "
+            "ReplicaSet controller suffix budget."
+        ),
+    )
+    max_statefulset_name_len: int = Field(
+        57,
+        ge=10,
+        le=253,
+        description=(
+            "Maximum length for StatefulSet names.  Default 57 = 63 – 6-char "
+            "ordinal suffix budget (up to -99999)."
+        ),
+    )
+    max_job_name_len: int = Field(
+        50,
+        ge=10,
+        le=253,
+        description=(
+            "Maximum length for Job names.  Default 50 = 63 – 13-char controller suffix margin."
+        ),
+    )
+
+    @field_validator("prefix")
+    @classmethod
+    def _validate_prefix(cls, v: str) -> str:
+        """Reject non-DNS-1123 prefixes and enforce a max length of 20 chars."""
+        if not v:
+            raise ValueError("naming.prefix must be a non-empty string")
+        if len(v) > 20:
+            raise ValueError(
+                f"naming.prefix {v!r} is too long ({len(v)} chars); max 20 to leave "
+                "room for the uuid segment within the tightest kind budget."
+            )
+        if not _DNS_1123_LABEL_RE.match(v):
+            raise ValueError(
+                f"naming.prefix {v!r} is not a valid DNS-1123 label.  "
+                "Must consist of lowercase alphanumeric characters and hyphens, "
+                "start and end with an alphanumeric character."
+            )
+        return v
+
+    @model_validator(mode="after")
+    def _validate_budget(self) -> "K8sNamingConfig":
+        """Ensure prefix+uuid_chars fit within every per-kind length budget.
+
+        Deployment is almost always the tightest constraint because its
+        pod names have the longest controller-appended suffix.  The validator
+        checks all four kinds so operators get a single, clear error message
+        naming the offending kind rather than a confusing runtime truncation.
+        """
+        # <prefix>-<uuid_chars> for controller kinds
+        controller_len = len(self.prefix) + 1 + self.uuid_chars
+        # <prefix>-<uuid_chars>-<seq:04d> for pod (seq = 4 digits + 1 hyphen)
+        pod_len = controller_len + 5
+
+        failures: list[str] = []
+        if pod_len > self.max_pod_name_len:
+            failures.append(
+                f"Pod: {pod_len} > max_pod_name_len={self.max_pod_name_len} "
+                f"(prefix={self.prefix!r} + uuid_chars={self.uuid_chars} + seq-suffix=5)"
+            )
+        if controller_len > self.max_deployment_name_len:
+            failures.append(
+                f"Deployment: {controller_len} > max_deployment_name_len="
+                f"{self.max_deployment_name_len} "
+                f"(prefix={self.prefix!r} + uuid_chars={self.uuid_chars})"
+            )
+        if controller_len > self.max_statefulset_name_len:
+            failures.append(
+                f"StatefulSet: {controller_len} > max_statefulset_name_len="
+                f"{self.max_statefulset_name_len} "
+                f"(prefix={self.prefix!r} + uuid_chars={self.uuid_chars})"
+            )
+        if controller_len > self.max_job_name_len:
+            failures.append(
+                f"Job: {controller_len} > max_job_name_len={self.max_job_name_len} "
+                f"(prefix={self.prefix!r} + uuid_chars={self.uuid_chars})"
+            )
+        if failures:
+            raise ValueError(
+                "K8sNamingConfig: prefix + uuid_chars overflow the per-kind name budget.  "
+                "Reduce prefix length or uuid_chars:\n  " + "\n  ".join(failures)
+            )
+        return self
 
 
 class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
@@ -190,6 +338,15 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     default_image_pull_secret: Optional[str] = Field(
         None, description="Default image pull secret name applied to every managed pod."
     )
+    default_restart_policy: Optional[str] = Field(
+        None,
+        description=(
+            "Default ``restartPolicy`` for pods when a template does not set one. "
+            "Per-kind constraints apply: Deployment/StatefulSet always use "
+            "'Always'; Job accepts only 'Never'/'OnFailure'; bare Pod accepts any. "
+            "None means each handler uses its built-in default (Pod/Job='Never')."
+        ),
+    )
 
     # Timing
     pod_timeout_seconds: int = Field(
@@ -299,6 +456,55 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         ),
     )
 
+    # Events API watching (node-disruption visibility)
+    events_watch_enabled: bool = Field(
+        False,
+        description=(
+            "Opt-in flag for the k8s Events API watch background task.  When True, ORB "
+            "starts a K8sEventsWatcher that streams ``CoreV1Api.list_event_for_all_namespaces`` "
+            "filtered to ``involvedObject.kind=Node`` and caches Karpenter node-disruption "
+            "events (e.g. 'Disrupting Node: Underutilized/Delete', 'Disrupting Node: "
+            "Empty/Delete').  The cached disruption reason is available for surfacing in "
+            "status responses.  Default ``False`` because the events watcher requires "
+            "an additional RBAC grant (``events: get/list/watch`` on the core API group) "
+            "that may not exist in every cluster -- see "
+            "``docs/root/providers/k8s/rbac.yaml`` for the required rule."
+        ),
+    )
+
+    # Periodic full-LIST backstop for the pod watcher
+    periodic_resync_interval_seconds: int = Field(
+        0,
+        description=(
+            "Interval in seconds at which the pod watcher performs a full LIST of all "
+            "managed pods and reconciles the in-process cache, independent of 410-Gone "
+            "responses.  Mirrors the legacy RefreshPodsTask (hfcron.py) which ran every "
+            "~180 s as a correctness backstop against slow-drift apiservers.  "
+            "Default 0 (disabled) to avoid extra apiserver load -- opt in by setting a "
+            "positive value (e.g. 180).  When >0, a background asyncio task wakes every "
+            "``periodic_resync_interval_seconds`` and calls the same _relist_snapshot "
+            "path used on 410-Gone recovery, reconciling any cache drift that "
+            "accumulated during a healthy watch session."
+        ),
+    )
+
+    # Inbound HTTP auth
+    inbound_auth_enabled: bool = Field(
+        False,
+        description=(
+            "Opt-in flag for the Kubernetes inbound HTTP auth strategy "
+            "(``KubeAuthStrategy``).  When True, ORB registers a "
+            "``KubeAuthStrategy`` with the ``AuthRegistry`` so that callers "
+            "of ORB's own REST API can be authenticated via a Kubernetes "
+            "ServiceAccount Bearer token validated through the cluster's "
+            "``authentication.k8s.io/v1 TokenReview`` API.  Default False "
+            "because this requires a ``system:auth-delegator`` "
+            "``ClusterRoleBinding`` (or a targeted ``tokenreviews: create`` "
+            "RBAC grant) for the ORB pod's ServiceAccount — a privilege "
+            "operators must opt in to deliberately."
+        ),
+    )
+
     # Controller-status cache
     controller_status_cache_ttl_seconds: float = Field(
         5.0,
@@ -345,6 +551,92 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         ),
     )
 
+    # Base directory for native-spec manifest files.  Mirrors the AWS
+    # provider's ``spec_file_base_path`` field.  When set, relative
+    # ``native_spec_path`` values on templates are resolved against this
+    # directory; absolute paths are always used as-is.  When unset (the
+    # default), relative paths are resolved against the process working
+    # directory.  Path traversal outside this base is rejected at render
+    # time with a clear error.
+    native_spec_base_path: Optional[str] = Field(
+        None,
+        description=(
+            "Base directory for native-spec manifest files (YAML or JSON).  "
+            "Relative ``native_spec_path`` values on templates are resolved "
+            "against this directory.  Absolute paths are always honoured.  "
+            "When unset, relative paths are resolved against the current "
+            "working directory.  Path traversal outside the base is rejected."
+        ),
+    )
+
+    # Circuit-breaker and retry knobs.
+    # These values are threaded through K8sHandlerRegistry.get_handler() into
+    # each K8sHandlerBase constructor so operators can tune resilience behaviour
+    # without recompiling.  Defaults match the K8sHandlerBase hardcoded values
+    # so this change is a no-op for existing deployments.
+    circuit_breaker_failure_threshold: int = Field(
+        5,
+        ge=1,  # 0 would trip the breaker on the very first call
+        description=(
+            "Number of consecutive apiserver failures that trips the per-handler "
+            "circuit breaker.  Once open, calls fast-fail with "
+            "``CircuitBreakerOpenError`` until the reset window expires.  "
+            "Default 5 — matches the K8sHandlerBase hardcoded value."
+        ),
+    )
+    circuit_breaker_reset_timeout: int = Field(
+        60,
+        ge=1,  # 0 seconds would immediately half-open, effectively disabling the breaker
+        description=(
+            "Seconds after the circuit opens before the breaker transitions to "
+            "half-open and allows a probe request through.  Default 60 — matches "
+            "the K8sHandlerBase hardcoded value."
+        ),
+    )
+    max_retries: int = Field(
+        3,
+        ge=0,  # 0 = no retries (fail immediately); negative values are nonsensical
+        description=(
+            "Maximum number of retry attempts for transient apiserver errors "
+            "(429 / 5xx) before giving up.  Non-recoverable status codes "
+            "(400 / 401 / 403 / 404 / 409 / 410 / 422) are never retried regardless "
+            "of this value.  Default 3 — matches the K8sHandlerBase hardcoded value."
+        ),
+    )
+    retry_base_delay: float = Field(
+        1.0,
+        ge=0.01,  # near-zero delay would create a tight busy-loop on transient errors
+        description=(
+            "Base delay in seconds for the exponential-backoff retry strategy.  "
+            "The first retry waits this many seconds; subsequent retries double "
+            "the delay up to ``retry_max_delay``.  Default 1.0 — matches the "
+            "K8sHandlerBase hardcoded value."
+        ),
+    )
+    retry_max_delay: float = Field(
+        30.0,
+        ge=0.01,  # must be positive; near-zero is effectively no cap on busy-loop risk
+        description=(
+            "Maximum delay in seconds between retry attempts.  The exponential "
+            "backoff is capped at this value.  Default 30.0 — matches the "
+            "K8sHandlerBase hardcoded value."
+        ),
+    )
+
+    # Resource naming policy
+    naming: K8sNamingConfig = Field(
+        default_factory=K8sNamingConfig,  # type: ignore[call-arg]
+        description=(
+            "Configurable resource-naming policy.  The generated name is "
+            "``<prefix>-<uuid_segment>`` for controller kinds (Deployment, "
+            "StatefulSet, Job) and ``<prefix>-<uuid_segment>-<seq:04d>`` for "
+            "Pods.  ``uuid_segment`` is the first ``uuid_chars`` hex chars of "
+            "the hyphen-stripped request UUID.  Defaults produce the same names "
+            "as before this config was added, so existing resources are "
+            "unaffected on upgrade."
+        ),
+    )
+
     @model_validator(mode="before")
     @classmethod
     def normalize_legacy_keys(cls, data: Any) -> Any:
@@ -367,6 +659,23 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
                     # Canonical key wins; discard the legacy copy.
                     updated.pop(legacy)
         return updated
+
+    @field_validator("default_restart_policy")
+    @classmethod
+    def _validate_default_restart_policy(cls, v: Optional[str]) -> Optional[str]:
+        """Reject a ``default_restart_policy`` outside the Kubernetes-accepted set.
+
+        Validated at config-construction time so an operator typo (e.g.
+        ``'always'``) fails fast on load rather than as an opaque error at the
+        first pod acquire.  Per-kind validity (Job rejecting ``Always``, etc.)
+        is still enforced at spec-build time.
+        """
+        if v is not None and v not in ("Always", "OnFailure", "Never"):
+            raise ValueError(
+                f"default_restart_policy {v!r} is not a valid Kubernetes restartPolicy. "
+                "Allowed values: 'Always', 'OnFailure', 'Never'."
+            )
+        return v
 
     @field_validator("namespace")
     @classmethod

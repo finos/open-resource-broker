@@ -11,7 +11,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from orb.providers.k8s.infrastructure.services.metrics import (
+from orb.providers.k8s.infrastructure.instrumentation.metrics import (
     _METRIC_SPECS,
     POD_CREATION_STATUSES,
     WATCH_EVENT_TYPES,
@@ -67,6 +67,9 @@ class TestRegisteredNames:
         "orb_k8s_pod_creations_total",
         "orb_k8s_watch_events_total",
         "orb_k8s_watch_reconnects_total",
+        "orb_k8s_api_errors_total",
+        "orb_k8s_api_throttles_total",
+        "orb_k8s_api_retries_total",
         "orb_k8s_active_pods",
         "orb_k8s_active_requests",
         "orb_k8s_apiserver_latency_seconds",
@@ -121,6 +124,40 @@ class TestCounterValueIncrements:
         m._watch_reconnects_total.add(1, {"namespace": "default", "reason": "timeout"})
         text = _scrape(reg)
         assert "orb_k8s_watch_reconnects_total" in text
+
+    def test_api_errors_total_increments(self) -> None:
+        m, reg = _fresh()
+        m.record_api_error(operation="create_namespaced_pod", error_code="403")
+        text = _scrape(reg)
+        assert "orb_k8s_api_errors_total" in text
+        assert 'error_code="403"' in text
+
+    def test_api_throttles_total_increments_on_429(self) -> None:
+        m, reg = _fresh()
+        m.record_api_error(operation="create_namespaced_pod", error_code="429")
+        text = _scrape(reg)
+        assert "orb_k8s_api_throttles_total" in text
+
+    def test_api_throttles_not_incremented_for_non_429(self) -> None:
+        m, reg = _fresh()
+        m.record_api_error(operation="create_namespaced_pod", error_code="500")
+        text = _scrape(reg)
+        assert "orb_k8s_api_errors_total" in text
+        # throttles counter should NOT appear (no 429 emitted)
+        assert "orb_k8s_api_throttles_total" not in text
+
+    def test_api_retries_total_increments(self) -> None:
+        m, reg = _fresh()
+        m.record_api_retry(operation="create_namespaced_pod")
+        text = _scrape(reg)
+        assert "orb_k8s_api_retries_total" in text
+
+    def test_api_error_rogue_error_code_bucketed(self) -> None:
+        m, reg = _fresh()
+        m.record_api_error(operation="create_namespaced_pod", error_code="999")
+        text = _scrape(reg)
+        assert 'error_code="unknown"' in text
+        assert 'error_code="999"' not in text
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +316,7 @@ class TestNoOpDegradation:
     """K8sMetrics must work when called with a no-op meter (SDK absent)."""
 
     def test_no_op_meter_does_not_raise(self) -> None:
-        from orb.providers.k8s.infrastructure.services.metrics import _NoOpMeter
+        from orb.providers.k8s.infrastructure.instrumentation.metrics import _NoOpMeter
 
         m = K8sMetrics(meter=_NoOpMeter())  # type: ignore[arg-type]
         # All helpers must be call-safe; no assertions on values (no-op).
@@ -287,6 +324,73 @@ class TestNoOpDegradation:
         m.record_pod_creation(namespace="ns", status="success")
         m.record_watch_event(namespace="ns", event_type="ADDED")
         m.record_apiserver_latency(operation="list_pods", seconds=0.1)
+        m.record_api_error(operation="create_namespaced_pod", error_code="403")
+        m.record_api_retry(operation="create_namespaced_pod")
         m.set_active_pods(namespace="ns", count=3)
         m.set_active_requests(namespace="ns", count=1)
         m.set_circuit_breaker_state(name="cb", state=1)
+
+
+# ---------------------------------------------------------------------------
+# Regression: namespace label cardinality bounded (Fix 3)
+# ---------------------------------------------------------------------------
+
+
+class TestNamespaceCardinality:
+    """Namespace labels must be bounded by _safe_namespace to prevent TSDB blowup."""
+
+    def test_wildcard_namespace_normalised_to_cluster_sentinel(self) -> None:
+        """namespaces=['*'] should produce '_cluster_' label, not literal '*'."""
+        from orb.providers.k8s.infrastructure.instrumentation.metrics import _safe_namespace
+
+        assert _safe_namespace("*") == "_cluster_"
+
+    def test_empty_namespace_normalised_to_unknown(self) -> None:
+        from orb.providers.k8s.infrastructure.instrumentation.metrics import _safe_namespace
+
+        assert _safe_namespace("") == "unknown"
+
+    def test_normal_namespace_passes_through(self) -> None:
+        from orb.providers.k8s.infrastructure.instrumentation.metrics import _safe_namespace
+
+        assert _safe_namespace("orb-system") == "orb-system"
+
+    def test_oversized_namespace_truncated(self) -> None:
+        """A namespace longer than 63 chars must be truncated."""
+        from orb.providers.k8s.infrastructure.instrumentation.metrics import _safe_namespace
+
+        long_ns = "a" * 100
+        result = _safe_namespace(long_ns)
+        assert len(result) <= 63, f"Expected truncated namespace, got len={len(result)}"
+
+    def test_record_acquire_wildcard_namespace_uses_sentinel_label(self) -> None:
+        """record_acquire with namespace='*' must emit '_cluster_' not '*'."""
+        m, reg = _fresh()
+        m.record_acquire(namespace="*", spec_kind="Pod")
+        text = _scrape(reg)
+        assert 'namespace="_cluster_"' in text, (
+            "Wildcard namespace must be normalised to '_cluster_' in metric label"
+        )
+        assert 'namespace="*"' not in text, (
+            "Raw '*' must not appear as a metric label value (cardinality risk)"
+        )
+
+    def test_record_release_wildcard_namespace_uses_sentinel_label(self) -> None:
+        m, reg = _fresh()
+        m.record_release(namespace="*", spec_kind="Deployment")
+        text = _scrape(reg)
+        assert 'namespace="_cluster_"' in text
+
+    def test_set_active_pods_wildcard_namespace_uses_sentinel_label(self) -> None:
+        m, reg = _fresh()
+        m.set_active_pods(namespace="*", count=10)
+        text = _scrape(reg)
+        assert 'namespace="_cluster_"' in text
+        assert 'namespace="*"' not in text
+
+    def test_set_active_requests_wildcard_namespace_uses_sentinel_label(self) -> None:
+        m, reg = _fresh()
+        m.set_active_requests(namespace="*", count=5)
+        text = _scrape(reg)
+        assert 'namespace="_cluster_"' in text
+        assert 'namespace="*"' not in text

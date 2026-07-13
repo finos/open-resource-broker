@@ -37,3 +37,14 @@ class DeregisterMachineCommand(BaseCommand):
     machine_id: str
     reason: Optional[str] = None
     metadata: dict[str, Any] = {}
+
+
+class UpdateMachineProviderDataCommand(BaseCommand):
+    """Merge a partial dict into a machine's provider_data.
+
+    Existing keys not present in *updates* are preserved.  The caller
+    supplies only the keys it wants to add or overwrite.
+    """
+
+    machine_id: str
+    updates: dict[str, Any]

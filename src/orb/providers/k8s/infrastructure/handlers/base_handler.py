@@ -12,8 +12,10 @@ lifting is per-handler.
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Callable, Generator, Optional, TypeVar
 
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
@@ -44,7 +46,8 @@ from orb.providers.k8s.utilities.pod_state import (
 from orb.providers.k8s.watch.node_state_cache import K8sNodeStateCache
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
-    from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
+    from orb.providers.k8s.infrastructure.instrumentation.metrics import K8sMetrics
     from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
 
 T = TypeVar("T")
@@ -145,6 +148,94 @@ class K8sHandlerBase(ABC):
         if self._metrics is not None:
             self._metrics.record_pod_creation(namespace=namespace, status=status)
 
+    def _record_api_error(self, *, operation: str, error_code: str) -> None:
+        """Increment ``orb_k8s_api_errors_total``; no-op when metrics not wired."""
+        if self._metrics is not None:
+            self._metrics.record_api_error(operation=operation, error_code=error_code)
+
+    def _record_api_retry(self, *, operation: str) -> None:
+        """Increment ``orb_k8s_api_retries_total``; no-op when metrics not wired."""
+        if self._metrics is not None:
+            self._metrics.record_api_retry(operation=operation)
+
+    def _record_apiserver_latency(self, *, operation: str, seconds: float) -> None:
+        """Observe an API server call latency sample; no-op when metrics not wired."""
+        if self._metrics is not None:
+            self._metrics.record_apiserver_latency(operation=operation, seconds=seconds)
+
+    @contextmanager
+    def _timed_api_call(self, operation: str) -> Generator[None, None, None]:
+        """Context manager that times a single Kubernetes API call.
+
+        Records ``orb_k8s_apiserver_latency_seconds`` with the measured wall
+        time after the block completes (whether via normal return or exception).
+        No-op when metrics are not wired.
+
+        Usage::
+
+            with self._timed_api_call("create_namespaced_pod"):
+                core_v1.create_namespaced_pod(...)
+        """
+        t0 = time.monotonic()
+        try:
+            yield
+        finally:
+            elapsed = time.monotonic() - t0
+            self._record_apiserver_latency(operation=operation, seconds=elapsed)
+
+    def _classify_and_record_api_exception(
+        self,
+        exc: BaseException,
+        *,
+        operation: str,
+    ) -> "K8sError":
+        """Classify a raw ``ApiException`` into a typed K8sError and emit metrics.
+
+        Call this at the API-call boundary after the retry budget is exhausted
+        to translate the raw Kubernetes SDK exception into a structured typed
+        exception.  Emits ``orb_k8s_api_errors_total`` with the HTTP status
+        code.
+
+        The retry layer may wrap the original exception in a
+        ``MaxRetriesExceededError``; this helper unwraps one level to reach
+        the underlying ``ApiException``.
+
+        Args:
+            exc: The exception caught at the API-call boundary.  May be a raw
+                ``ApiException`` or a ``MaxRetriesExceededError`` wrapping one.
+            operation: The Kubernetes API operation that failed (used for both
+                the ``error_source`` field and metric labels).
+
+        Returns:
+            A :class:`~orb.providers.k8s.exceptions.k8s_exceptions.K8sError`
+            sub-class instance with structured fields populated from the
+            exception body.  If the exception is not an ``ApiException`` the
+            base :class:`~orb.providers.k8s.exceptions.k8s_exceptions.K8sError`
+            is returned wrapping the original message.
+        """
+        from orb.providers.k8s.exceptions.k8s_exceptions import K8sError, classify_api_exception
+
+        # Unwrap one level of retry wrapping when present.
+        candidate: BaseException = exc
+        last_exception = getattr(exc, "last_exception", None)
+        if isinstance(last_exception, BaseException):
+            candidate = last_exception
+
+        try:
+            from kubernetes.client.exceptions import ApiException as _ApiException
+
+            if isinstance(candidate, _ApiException):
+                status = int(getattr(candidate, "status", 0) or 0)
+                error_code = str(status) if status else "unknown"
+                self._record_api_error(operation=operation, error_code=error_code)
+                return classify_api_exception(candidate, operation=operation)
+        except ImportError:  # pragma: no cover — kubernetes extra absent
+            pass
+
+        # Not an ApiException — wrap in base K8sError.
+        self._record_api_error(operation=operation, error_code="unknown")
+        return K8sError(str(exc), error_source=f"kubernetes.{operation}")
+
     @property
     def client(self) -> K8sClient:
         return self._kubernetes_client
@@ -164,7 +255,7 @@ class K8sHandlerBase(ABC):
           ``False``, the entire audit is skipped silently.
         * ``reject_high_risk_pod_fields`` (default ``False``) — when
           ``True`` *and* findings are non-empty, a
-          :class:`orb.providers.k8s.exceptions.k8s_errors.K8sError` is
+          :class:`orb.providers.k8s.exceptions.k8s_exceptions.K8sError` is
           raised with the joined findings so the acquire call fails fast
           before touching the apiserver.
 
@@ -192,7 +283,7 @@ class K8sHandlerBase(ABC):
         findings = audit_pod_spec(spec_dict, self._logger)
 
         if findings and self._config.reject_high_risk_pod_fields:
-            from orb.providers.k8s.exceptions.k8s_errors import K8sError
+            from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 
             raise K8sError(
                 "Acquire rejected: pod spec contains high-risk fields — " + "; ".join(findings)

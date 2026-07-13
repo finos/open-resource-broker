@@ -4,7 +4,7 @@
     {
       "templateId": "k8s-pod-example",
       "maxNumber": 1,
-      "imageId": "busybox:latest",
+      "imageId": "registry.k8s.io/pause:3.9",
       "priceType": "ondemand",
       "allocationStrategy": "lowestPrice",
       "name": "Kubernetes Pod example",
@@ -15,7 +15,7 @@
     {
       "templateId": "k8s-deployment-example",
       "maxNumber": 3,
-      "imageId": "busybox:latest",
+      "imageId": "registry.k8s.io/pause:3.9",
       "priceType": "ondemand",
       "allocationStrategy": "lowestPrice",
       "name": "Kubernetes Deployment example",
@@ -26,7 +26,7 @@
     {
       "templateId": "k8s-statefulset-example",
       "maxNumber": 3,
-      "imageId": "busybox:latest",
+      "imageId": "registry.k8s.io/pause:3.9",
       "priceType": "ondemand",
       "allocationStrategy": "lowestPrice",
       "name": "Kubernetes StatefulSet example",
@@ -37,13 +37,27 @@
     {
       "templateId": "k8s-job-example",
       "maxNumber": 3,
-      "imageId": "busybox:latest",
+      "imageId": "busybox:1.37",
       "priceType": "ondemand",
       "allocationStrategy": "lowestPrice",
       "name": "Kubernetes Job example",
       "providerApi": "Job",
       "providerType": "k8s",
+      "command": ["sh", "-c", "exit 0"],
       "createdAt": "2026-07-06T22:07:11.808487"
+    },
+    {
+      "templateId": "k8s-nginx-deployment-native-path",
+      "maxNumber": 2,
+      "imageId": "nginx:1.27",
+      "priceType": "ondemand",
+      "allocationStrategy": "lowestPrice",
+      "name": "Kubernetes nginx Deployment via native_spec_path",
+      "providerApi": "Deployment",
+      "providerType": "k8s",
+      "nativeSpecPath": "config/specs/k8s/nginx-deployment.yaml",
+      "createdAt": "2026-07-12T00:00:00.000000",
+      "_comment": "Requires native_spec_enabled=true in the k8s provider config. Set ORB_K8S_NATIVE_SPEC_ENABLED=true to use."
     }
   ]
 }

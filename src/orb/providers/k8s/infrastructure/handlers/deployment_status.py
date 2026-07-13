@@ -298,6 +298,28 @@ class DeploymentStatusResolver:
                 pending_count=pending_count,
                 failed_count=failed_count,
             )
+        # Partial-cache crashloop guard: when the cache returns fewer pods than
+        # requested (e.g. watcher hasn't seen all pods yet), the "all failed"
+        # branch above won't fire.  But if every pod we *can* see is failed,
+        # nothing is pending, and nothing is ready, the Deployment is not making
+        # progress — AWS fleet_fulfilment parity: failed only when pending == 0
+        # AND ready == 0.  This is the corrected version of the branch that was
+        # removed in d2635112: that removal was correct to kill the case where
+        # pending > 0 (still scaling), but wrong to also drop the settled-failure
+        # case.  The pending_count == 0 guard here avoids the false-positive.
+        if failed_count > 0 and pending_count == 0 and effective_ready == 0:
+            return ProviderFulfilment(
+                state="failed",
+                message=(
+                    f"Deployment not progressing: {failed_count} pod(s) failed, "
+                    f"none pending or ready (partial cache view possible)"
+                ),
+                target_units=requested_count,
+                fulfilled_units=0,
+                running_count=0,
+                pending_count=0,
+                failed_count=failed_count,
+            )
         if effective_ready > 0:
             return ProviderFulfilment(
                 state="partial",

@@ -542,7 +542,7 @@ def test_get_example_templates_returns_deployment_example() -> None:
     example = examples[0]
     assert example.provider_api == "Deployment"
     assert example.provider_type == "k8s"
-    assert example.image_id == "busybox:latest"
+    assert example.image_id == "registry.k8s.io/pause:3.9"
 
 
 # ---------------------------------------------------------------------------

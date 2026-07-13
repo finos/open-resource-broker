@@ -22,7 +22,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.exceptions.k8s_errors import K8sDiscoveryError
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sDiscoveryError
 from orb.providers.k8s.services.discovery_models import (
     KubeContextInfo,
     NamespaceInfo,

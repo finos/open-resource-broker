@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -20,7 +20,7 @@ from orb.providers.k8s.auth import (
 )
 from orb.providers.k8s.auth.in_cluster import is_in_cluster, load_in_cluster_config
 from orb.providers.k8s.auth.kubeconfig import load_kubeconfig
-from orb.providers.k8s.exceptions.k8s_errors import K8sAuthError
+from orb.providers.k8s.exceptions.k8s_exceptions import K8sAuthError
 
 
 def test_is_in_cluster_true_when_sentinel_exists(tmp_path: Path) -> None:
@@ -258,3 +258,396 @@ users:
 
     load_kubeconfig(config_file=str(kube_file))
     fake_config.load_kube_config.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Group B: HTTP proxy wiring — kubeconfig loader
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_kubernetes_with_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    kube_file: Path,
+) -> MagicMock:
+    """Register a fake kubernetes module and return a spy on Configuration.
+
+    Returns the ``fake_configuration_instance`` that ``Configuration.get_default_copy``
+    will return so tests can assert ``proxy``/``no_proxy`` fields.
+    """
+    from types import SimpleNamespace
+
+    # Fresh mutable object used as the "current global configuration"
+    fake_cfg_instance = MagicMock()
+    fake_cfg_instance.proxy = None
+    fake_cfg_instance.no_proxy = None
+
+    fake_configuration_cls = MagicMock()
+    fake_configuration_cls.get_default_copy.return_value = fake_cfg_instance
+    fake_configuration_cls.set_default = MagicMock()
+
+    fake_client = SimpleNamespace(Configuration=fake_configuration_cls)
+    fake_config_mod = SimpleNamespace(load_kube_config=MagicMock())
+    fake_kubernetes = SimpleNamespace(config=fake_config_mod, client=fake_client)
+
+    monkeypatch.setitem(sys.modules, "kubernetes", fake_kubernetes)
+    monkeypatch.setitem(sys.modules, "kubernetes.config", fake_config_mod)
+    monkeypatch.setitem(sys.modules, "kubernetes.client", fake_client)
+
+    return fake_cfg_instance
+
+
+def test_load_kubeconfig_sets_proxy_from_https_proxy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """HTTPS_PROXY must be wired into Configuration.proxy after kubeconfig load."""
+    kube_file = tmp_path / "config"
+    kube_file.write_text("apiVersion: v1\nkind: Config\n", encoding="utf-8")
+    monkeypatch.setenv("HTTPS_PROXY", "https://proxy.corp.example:3128")
+    for var in ("https_proxy", "HTTP_PROXY", "http_proxy"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+
+    fake_cfg = _make_fake_kubernetes_with_configuration(monkeypatch, kube_file)
+
+    from orb.providers.k8s.auth.kubeconfig import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(None)
+
+    assert fake_cfg.proxy == "https://proxy.corp.example:3128"
+
+
+def test_load_kubeconfig_sets_proxy_from_http_proxy_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """HTTP_PROXY must be used when no HTTPS_PROXY variant is set."""
+    kube_file = tmp_path / "config"
+    kube_file.write_text("apiVersion: v1\nkind: Config\n", encoding="utf-8")
+    monkeypatch.delenv("HTTPS_PROXY", raising=False)
+    monkeypatch.delenv("https_proxy", raising=False)
+    monkeypatch.setenv("HTTP_PROXY", "http://proxy.corp.example:8080")
+    monkeypatch.delenv("http_proxy", raising=False)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+
+    fake_cfg = _make_fake_kubernetes_with_configuration(monkeypatch, kube_file)
+
+    from orb.providers.k8s.auth.kubeconfig import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(None)
+
+    assert fake_cfg.proxy == "http://proxy.corp.example:8080"
+
+
+def test_load_kubeconfig_prefers_https_proxy_over_http_proxy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """HTTPS_PROXY must take precedence over HTTP_PROXY."""
+    kube_file = tmp_path / "config"
+    kube_file.write_text("apiVersion: v1\nkind: Config\n", encoding="utf-8")
+    monkeypatch.setenv("HTTPS_PROXY", "https://secure-proxy:3128")
+    monkeypatch.setenv("HTTP_PROXY", "http://plain-proxy:8080")
+    monkeypatch.delenv("https_proxy", raising=False)
+    monkeypatch.delenv("http_proxy", raising=False)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+
+    fake_cfg = _make_fake_kubernetes_with_configuration(monkeypatch, kube_file)
+
+    from orb.providers.k8s.auth.kubeconfig import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(None)
+
+    assert fake_cfg.proxy == "https://secure-proxy:3128"
+
+
+def test_load_kubeconfig_no_proxy_is_noop_when_no_env_vars(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When no proxy env vars are set, Configuration must not be touched."""
+    kube_file = tmp_path / "config"
+    kube_file.write_text("apiVersion: v1\nkind: Config\n", encoding="utf-8")
+    for var in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "NO_PROXY", "no_proxy"):
+        monkeypatch.delenv(var, raising=False)
+
+    _make_fake_kubernetes_with_configuration(monkeypatch, kube_file)
+
+    from kubernetes.client import Configuration as _RealConfiguration
+
+    with patch.object(_RealConfiguration, "set_default") as mock_set_default:
+        from orb.providers.k8s.auth.kubeconfig import _apply_proxy_to_default_configuration
+
+        _apply_proxy_to_default_configuration(None)
+        mock_set_default.assert_not_called()
+
+
+def test_load_kubeconfig_wires_no_proxy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NO_PROXY must be wired into Configuration.no_proxy."""
+    kube_file = tmp_path / "config"
+    kube_file.write_text("apiVersion: v1\nkind: Config\n", encoding="utf-8")
+    monkeypatch.setenv("HTTPS_PROXY", "https://proxy.corp:3128")
+    monkeypatch.setenv("NO_PROXY", "localhost,127.0.0.1,.internal")
+    monkeypatch.delenv("https_proxy", raising=False)
+    monkeypatch.delenv("HTTP_PROXY", raising=False)
+    monkeypatch.delenv("http_proxy", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+
+    fake_cfg = _make_fake_kubernetes_with_configuration(monkeypatch, kube_file)
+
+    from orb.providers.k8s.auth.kubeconfig import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(None)
+
+    assert fake_cfg.no_proxy == "localhost,127.0.0.1,.internal"
+
+
+def test_load_kubeconfig_logs_proxy_at_debug(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When a logger is provided and proxy is set, a debug message must be emitted."""
+    kube_file = tmp_path / "config"
+    kube_file.write_text("apiVersion: v1\nkind: Config\n", encoding="utf-8")
+    monkeypatch.setenv("HTTPS_PROXY", "https://proxy.corp:3128")
+    monkeypatch.delenv("https_proxy", raising=False)
+    monkeypatch.delenv("HTTP_PROXY", raising=False)
+    monkeypatch.delenv("http_proxy", raising=False)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+
+    _make_fake_kubernetes_with_configuration(monkeypatch, kube_file)
+    mock_logger = MagicMock()
+
+    from orb.providers.k8s.auth.kubeconfig import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(mock_logger)
+
+    mock_logger.debug.assert_called()
+    debug_calls = [str(c) for c in mock_logger.debug.call_args_list]
+    assert any("proxy" in c.lower() for c in debug_calls)
+
+
+# ---------------------------------------------------------------------------
+# Group C: HTTP proxy wiring — in-cluster loader
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_kubernetes_for_in_cluster(
+    monkeypatch: pytest.MonkeyPatch,
+) -> MagicMock:
+    """Register a fake kubernetes module for in-cluster tests.
+
+    Returns the ``fake_configuration_instance`` that ``Configuration.get_default_copy``
+    will return.
+    """
+    from types import SimpleNamespace
+
+    fake_cfg_instance = MagicMock()
+    fake_cfg_instance.proxy = None
+    fake_cfg_instance.no_proxy = None
+
+    fake_configuration_cls = MagicMock()
+    fake_configuration_cls.get_default_copy.return_value = fake_cfg_instance
+    fake_configuration_cls.set_default = MagicMock()
+
+    fake_client = SimpleNamespace(Configuration=fake_configuration_cls)
+    fake_config_mod = SimpleNamespace(load_incluster_config=MagicMock())
+    fake_kubernetes = SimpleNamespace(config=fake_config_mod, client=fake_client)
+
+    monkeypatch.setitem(sys.modules, "kubernetes", fake_kubernetes)
+    monkeypatch.setitem(sys.modules, "kubernetes.config", fake_config_mod)
+    monkeypatch.setitem(sys.modules, "kubernetes.client", fake_client)
+
+    return fake_cfg_instance
+
+
+def test_load_in_cluster_config_sets_proxy_from_https_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """HTTPS_PROXY must be wired into Configuration.proxy after in-cluster load."""
+    monkeypatch.setenv("HTTPS_PROXY", "https://proxy.corp.example:3128")
+    for var in ("https_proxy", "HTTP_PROXY", "http_proxy"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+
+    fake_cfg = _make_fake_kubernetes_for_in_cluster(monkeypatch)
+
+    from orb.providers.k8s.auth.in_cluster import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(None)
+
+    assert fake_cfg.proxy == "https://proxy.corp.example:3128"
+
+
+def test_load_in_cluster_config_sets_proxy_from_http_proxy_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """HTTP_PROXY must be used when no HTTPS_PROXY variant is set."""
+    monkeypatch.delenv("HTTPS_PROXY", raising=False)
+    monkeypatch.delenv("https_proxy", raising=False)
+    monkeypatch.setenv("HTTP_PROXY", "http://proxy.corp.example:8080")
+    monkeypatch.delenv("http_proxy", raising=False)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+
+    fake_cfg = _make_fake_kubernetes_for_in_cluster(monkeypatch)
+
+    from orb.providers.k8s.auth.in_cluster import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(None)
+
+    assert fake_cfg.proxy == "http://proxy.corp.example:8080"
+
+
+def test_load_in_cluster_config_no_proxy_is_noop_when_no_env_vars(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When no proxy env vars are set, Configuration must not be touched."""
+    for var in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "NO_PROXY", "no_proxy"):
+        monkeypatch.delenv(var, raising=False)
+
+    from kubernetes.client import Configuration as _RealConfiguration
+
+    with patch.object(_RealConfiguration, "set_default") as mock_set_default:
+        from orb.providers.k8s.auth.in_cluster import _apply_proxy_to_default_configuration
+
+        _apply_proxy_to_default_configuration(None)
+        mock_set_default.assert_not_called()
+
+
+def test_load_in_cluster_config_wires_no_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NO_PROXY must be wired into Configuration.no_proxy for in-cluster mode."""
+    monkeypatch.setenv("HTTPS_PROXY", "https://proxy.corp:3128")
+    monkeypatch.setenv("NO_PROXY", "localhost,127.0.0.1,.cluster.local")
+    monkeypatch.delenv("https_proxy", raising=False)
+    monkeypatch.delenv("HTTP_PROXY", raising=False)
+    monkeypatch.delenv("http_proxy", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+
+    fake_cfg = _make_fake_kubernetes_for_in_cluster(monkeypatch)
+
+    from orb.providers.k8s.auth.in_cluster import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(None)
+
+    assert fake_cfg.no_proxy == "localhost,127.0.0.1,.cluster.local"
+
+
+def test_load_in_cluster_config_logs_proxy_at_debug(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When a logger is provided and proxy is set, a debug message must be emitted."""
+    monkeypatch.setenv("HTTPS_PROXY", "https://proxy.corp:3128")
+    monkeypatch.delenv("https_proxy", raising=False)
+    monkeypatch.delenv("HTTP_PROXY", raising=False)
+    monkeypatch.delenv("http_proxy", raising=False)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+
+    _make_fake_kubernetes_for_in_cluster(monkeypatch)
+    mock_logger = MagicMock()
+
+    from orb.providers.k8s.auth.in_cluster import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(mock_logger)
+
+    mock_logger.debug.assert_called()
+    debug_calls = [str(c) for c in mock_logger.debug.call_args_list]
+    assert any("proxy" in c.lower() for c in debug_calls)
+
+
+# ---------------------------------------------------------------------------
+# Regression: proxy URL credential redaction (Fix 1)
+# ---------------------------------------------------------------------------
+
+
+def test_redact_proxy_url_strips_credentials() -> None:
+    """_redact_proxy_url must replace user:pass@ with ***@ in the log string."""
+    from orb.providers.k8s.auth.in_cluster import _redact_proxy_url
+
+    raw = "https://user:secret@proxy.corp.example:3128"
+    redacted = _redact_proxy_url(raw)
+    assert "secret" not in redacted, "password must not appear in redacted URL"
+    assert "user" not in redacted, "username must not appear in redacted URL"
+    assert "proxy.corp.example" in redacted, "host must remain visible for diagnostics"
+    assert "3128" in redacted, "port must remain visible for diagnostics"
+    assert "***" in redacted, "redacted marker must be present"
+
+
+def test_redact_proxy_url_no_credentials_passes_through() -> None:
+    """A proxy URL without credentials must be returned unchanged."""
+    from orb.providers.k8s.auth.in_cluster import _redact_proxy_url
+
+    plain = "https://proxy.corp.example:3128"
+    assert _redact_proxy_url(plain) == plain
+
+
+def test_redact_proxy_url_kubeconfig_strips_credentials() -> None:
+    """kubeconfig._redact_proxy_url also redacts credentials."""
+    from orb.providers.k8s.auth.kubeconfig import _redact_proxy_url as kc_redact
+
+    raw = "http://admin:hunter2@proxy.internal:8080"
+    redacted = kc_redact(raw)
+    assert "hunter2" not in redacted
+    assert "admin" not in redacted
+    assert "proxy.internal" in redacted
+
+
+def test_in_cluster_debug_log_does_not_log_raw_proxy_creds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The DEBUG log emitted for proxy wiring must not contain the raw password."""
+    monkeypatch.setenv("HTTPS_PROXY", "https://user:supersecret@proxy.corp:3128")
+    for var in ("https_proxy", "HTTP_PROXY", "http_proxy", "NO_PROXY", "no_proxy"):
+        monkeypatch.delenv(var, raising=False)
+
+    _make_fake_kubernetes_for_in_cluster(monkeypatch)
+    mock_logger = MagicMock()
+
+    from orb.providers.k8s.auth.in_cluster import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(mock_logger)
+
+    # Collect all debug call args as strings
+    all_debug_text = " ".join(
+        str(arg) for call in mock_logger.debug.call_args_list for arg in call.args
+    )
+    assert "supersecret" not in all_debug_text, "Raw proxy password must not appear in debug log"
+    assert "proxy.corp" in all_debug_text, "Host should still be logged for diagnostics"
+
+
+def test_kubeconfig_debug_log_does_not_log_raw_proxy_creds(
+    tmp_path: "Path",
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The kubeconfig debug log must not emit the raw proxy password."""
+    monkeypatch.setenv("HTTPS_PROXY", "https://alice:topsecret@proxy.corp:3128")
+    for var in ("https_proxy", "HTTP_PROXY", "http_proxy", "NO_PROXY", "no_proxy"):
+        monkeypatch.delenv(var, raising=False)
+
+    kube_file = tmp_path / "config"
+    kube_file.write_text("apiVersion: v1\nkind: Config\n", encoding="utf-8")
+    _make_fake_kubernetes_with_configuration(monkeypatch, kube_file)
+    mock_logger = MagicMock()
+
+    from orb.providers.k8s.auth.kubeconfig import _apply_proxy_to_default_configuration
+
+    _apply_proxy_to_default_configuration(mock_logger)
+
+    all_debug_text = " ".join(
+        str(arg) for call in mock_logger.debug.call_args_list for arg in call.args
+    )
+    assert "topsecret" not in all_debug_text, (
+        "Raw proxy password must not appear in kubeconfig debug log"
+    )
+    assert "proxy.corp" in all_debug_text

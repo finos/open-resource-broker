@@ -300,22 +300,61 @@ def get_k8s_extension_defaults() -> dict[str, Any]:
     return K8sTemplateExtensionConfig().to_template_defaults()  # type: ignore[call-arg]
 
 
-def register_k8s_auth_strategies(logger: Optional[LoggingPort] = None) -> None:
-    """Register Kubernetes auth strategies with the auth registry.
+def register_k8s_auth_strategies(
+    logger: Optional[LoggingPort] = None,
+    inbound_auth_enabled: bool = False,
+) -> None:
+    """Register Kubernetes inbound HTTP auth strategies with the auth registry.
 
-    The kubernetes provider does not currently ship an inbound HTTP auth
-    strategy.  The kube-API auth helpers
+    When ``inbound_auth_enabled=True`` the :class:`KubeAuthStrategy` is
+    registered under the ``"kubernetes"`` key so that ``AuthRegistry``
+    can resolve it without server.py importing provider-specific classes.
+
+    The kubernetes API bootstrap helpers
     (:mod:`orb.providers.k8s.auth.in_cluster` and
-    :mod:`orb.providers.k8s.auth.kubeconfig`) are separate concerns —
-    they bootstrap the kubernetes API client, not the ORB REST surface.
-    This function is wired into ``initialize_k8s_provider`` so the
-    integration point exists; concrete strategies can be added later.
+    :mod:`orb.providers.k8s.auth.kubeconfig`) are a separate concern —
+    they bootstrap the outbound Kubernetes API client, not the inbound
+    ORB REST surface.
+
+    Registration is skipped (debug-logged) when ``inbound_auth_enabled``
+    is ``False`` (the default) because ``TokenReview`` requires a
+    ``system:auth-delegator`` ``ClusterRoleBinding`` that operators must
+    opt in to deliberately.
+
+    Args:
+        logger: Optional logger for registration messages.
+        inbound_auth_enabled: When ``True``, register ``KubeAuthStrategy``
+            in the ``AuthRegistry``.  Mirrors how ``register_aws_auth_strategies``
+            registers Cognito and IAM strategies.
     """
-    if logger:
-        logger.debug(
-            "Kubernetes provider has no inbound HTTP auth strategies; "
-            "kube-API auth is handled via providers.k8s.auth.*"
-        )
+    if not inbound_auth_enabled:
+        if logger:
+            logger.debug(
+                "Kubernetes inbound HTTP auth is disabled (inbound_auth_enabled=False); "
+                "KubeAuthStrategy not registered.  Set inbound_auth_enabled=True in "
+                "K8sProviderConfig to gate ORB's REST API on Kubernetes ServiceAccount JWTs."
+            )
+        return
+
+    try:
+        from orb.infrastructure.auth.registry import get_auth_registry
+
+        registry = get_auth_registry()
+
+        if not registry.is_registered("kubernetes"):
+            from orb.providers.k8s.auth.kube_auth_strategy import KubeAuthStrategy
+
+            registry.register_strategy("kubernetes", KubeAuthStrategy)
+            if logger:
+                logger.debug("Kubernetes inbound auth strategy (KubeAuthStrategy) registered")
+
+    except ImportError as exc:
+        if logger:
+            logger.warning("Kubernetes auth strategy not available: %s", exc)
+    except Exception as exc:
+        if logger:
+            logger.error("Failed to register Kubernetes auth strategies: %s", exc, exc_info=True)
+        raise
 
 
 def register_k8s_template_factory(
@@ -328,7 +367,7 @@ def register_k8s_template_factory(
     importing this module unconditionally.
     """
     try:
-        from orb.providers.k8s.domain.template.k8s_template import (
+        from orb.providers.k8s.domain.template.k8s_template_aggregate import (
             K8sTemplate,
         )
 
@@ -476,6 +515,7 @@ def register_k8s_provider_instance(provider_instance, logger=None) -> bool:
 def initialize_k8s_provider(
     template_factory: Optional[TemplateFactory] = None,
     logger: Optional[LoggingPort] = None,
+    inbound_auth_enabled: bool = False,
 ) -> None:
     """Initialize Kubernetes provider components.
 
@@ -484,11 +524,19 @@ def initialize_k8s_provider(
     template DTO extensions, auth strategies, the optional template factory,
     the CLI spec, the HostFactory field-mapping adapter, and the defaults
     loader.
+
+    Args:
+        template_factory: Optional template factory to register k8s components with.
+        logger: Optional logger for initialization messages.
+        inbound_auth_enabled: When ``True``, register ``KubeAuthStrategy`` in
+            the ``AuthRegistry`` so ORB's REST surface can gate on caller
+            ServiceAccount JWTs.  Mirrors the AWS provider pattern; default
+            ``False`` because it requires a ``system:auth-delegator`` RBAC grant.
     """
     try:
         register_k8s_provider_settings()
         register_k8s_extensions(logger)
-        register_k8s_auth_strategies(logger)
+        register_k8s_auth_strategies(logger, inbound_auth_enabled=inbound_auth_enabled)
 
         if template_factory is not None:
             register_k8s_template_factory(template_factory, logger)

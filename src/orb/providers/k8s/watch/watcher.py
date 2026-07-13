@@ -8,15 +8,21 @@ upserts it into the supplied cache.
 
 Resilience contract:
 
-* **410 Gone**          — drop the in-flight ``resource_version`` and
+* **410 Gone**          -- drop the in-flight ``resource_version`` and
   restart the stream from ``None`` (the apiserver picks the latest).
   The retry budget is reset because a 410 is expected and not a fault.
-* **Other ApiException** — exponential backoff (1s, 2s, 4s … capped
+* **Other ApiException** -- exponential backoff (1s, 2s, 4s ... capped
   at ``max_backoff_seconds``) and retry.
-* **Generic exceptions** — same exponential backoff.
-* **Cancellation**       — :meth:`stop` flips a flag and cancels the
+* **Generic exceptions** -- same exponential backoff.
+* **Cancellation**       -- :meth:`stop` flips a flag and cancels the
   worker task; the inner stream is closed via :meth:`Watch.stop` so
   the blocking ``readline()`` returns promptly.
+* **Periodic resync**    -- when ``periodic_resync_interval_seconds > 0``
+  a second asyncio task fires every N seconds and performs a full LIST
+  to reconcile cache drift independent of 410-Gone.  Mirrors the legacy
+  ``RefreshPodsTask`` (``hfcron.py``) which ran every ~180 s as a
+  correctness backstop against slow-drift apiservers.  Default 0
+  (disabled) -- opt in to avoid extra apiserver load.
 
 The watcher is single-namespace; the multi-namespace fan-out lives in
 :mod:`~orb.providers.k8s.watch.multi_namespace`.
@@ -35,6 +41,8 @@ from orb.infrastructure.di.injectable import injectable
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.utilities.pod_state import (
     extract_status_reason,
+    is_crash_loop_or_repeated_failure,
+    is_fatal_waiting_reason,
     is_pod_ready,
     pod_status_string,
 )
@@ -135,6 +143,7 @@ class K8sWatcher:
         max_backoff_seconds: float = _DEFAULT_MAX_BACKOFF_SECONDS,
         watch_factory: WatchFactory = _default_watch_factory,
         metrics: Any = None,
+        periodic_resync_interval_seconds: int = 0,
     ) -> None:
         self._client = kubernetes_client
         self._cache = cache
@@ -148,8 +157,11 @@ class K8sWatcher:
         self._max_backoff_seconds = max_backoff_seconds
         self._watch_factory = watch_factory
         self._metrics = metrics
+        # Periodic full-LIST backstop (0 = disabled).
+        self._periodic_resync_interval_seconds = periodic_resync_interval_seconds
 
         self._task: Optional[asyncio.Task[None]] = None
+        self._resync_task: Optional[asyncio.Task[None]] = None
         self._stop_event = asyncio.Event()
         # threading.Event mirrors _stop_event and is safe to read from the
         # worker thread spawned by asyncio.to_thread.  asyncio.Event is bound
@@ -159,6 +171,11 @@ class K8sWatcher:
         # the general case).  _stop_thread_event is set whenever _stop_event
         # is set so both surfaces stay in sync.
         self._stop_thread_event = threading.Event()
+        # Guards reads and writes of _active_watch.  Under CPython the GIL
+        # makes plain attribute assignment effectively atomic, but using an
+        # explicit lock documents the intent and is correct under all
+        # implementations.
+        self._active_watch_lock = threading.Lock()
         self._active_watch: Optional[Watch] = None
         # Tracked for diagnostics / liveness checks.  Updated each time
         # a watch session ends (cleanly or with error) so external
@@ -193,8 +210,12 @@ class K8sWatcher:
     def start(self) -> None:
         """Spawn the watch task on the current event loop.
 
-        Idempotent — subsequent calls while the task is running are
+        Idempotent -- subsequent calls while the task is running are
         ignored.  After :meth:`stop` the watcher can be re-started.
+
+        When ``periodic_resync_interval_seconds > 0``, a second asyncio
+        task is also started that performs a full LIST every N seconds
+        as a correctness backstop against slow-drift apiservers.
         """
         if self.is_running():
             return
@@ -209,25 +230,53 @@ class K8sWatcher:
                 else "k8s-watcher[cluster]"
             ),
         )
+        if self._periodic_resync_interval_seconds > 0:
+            self._resync_task = asyncio.create_task(
+                self._run_periodic_resync(),
+                name=(
+                    f"k8s-resync[{self._namespace}]"
+                    if self._namespace is not None
+                    else "k8s-resync[cluster]"
+                ),
+            )
+            self._logger.info(
+                "Kubernetes pod watcher: periodic resync enabled (namespace=%s, interval=%ss)",
+                self._namespace,
+                self._periodic_resync_interval_seconds,
+            )
 
     async def stop(self) -> None:
-        """Stop the watch task and wait for it to settle.
+        """Stop the watch task (and resync task) and wait for them to settle.
 
         Safe to call multiple times.  Closes the inner ``Watch`` so the
-        blocking stream returns promptly, then awaits the task.
+        blocking stream returns promptly, then awaits the tasks.
         """
         self._stop_event.set()
         self._stop_thread_event.set()
-        watch = self._active_watch
+        with self._active_watch_lock:
+            watch = self._active_watch
         if watch is not None:
             try:
-                # ``Watch.stop`` does its own socket shutdown — protect
+                # ``Watch.stop`` does its own socket shutdown -- protect
                 # against the unlikely case where the SDK raises.
                 stop_fn = getattr(watch, "stop", None)
                 if callable(stop_fn):
                     stop_fn()
-            except Exception as exc:  # pragma: no cover — defensive
+            except Exception as exc:  # pragma: no cover -- defensive
                 self._logger.debug("Watch.stop raised (ignored): %s", exc, exc_info=True)
+
+        # Stop the periodic resync task first (it waits on _stop_event too).
+        resync_task = self._resync_task
+        if resync_task is not None and not resync_task.done():
+            try:
+                await asyncio.wait_for(resync_task, timeout=5.0)
+            except asyncio.TimeoutError:
+                resync_task.cancel()
+                try:
+                    await resync_task
+                except (asyncio.CancelledError, Exception):  # pragma: no cover
+                    pass
+        self._resync_task = None
 
         task = self._task
         if task is None:
@@ -316,6 +365,61 @@ class K8sWatcher:
                 continue
         self._logger.debug("Kubernetes watch loop exited (namespace=%s)", self._namespace)
 
+    async def _run_periodic_resync(self) -> None:
+        """Periodically perform a full LIST and reconcile the pod cache.
+
+        Runs as a sibling asyncio task to the main watch loop.  Fires
+        every ``periodic_resync_interval_seconds`` seconds (measured
+        from the previous resync completion, not the start time) and
+        calls :meth:`_relist_snapshot` -- the same full-LIST path used
+        on 410-Gone recovery -- to reconcile any cache drift that
+        accumulated while the watch was healthy.
+
+        This mirrors the legacy ``RefreshPodsTask`` (``hfcron.py``)
+        which ran every ~180 s as a backstop against slow-drift
+        apiservers past ``stale_cache_timeout_seconds``.
+
+        Errors during resync are logged as warnings and do not propagate
+        -- the watch task continues serving from the existing cache.
+        The task exits cleanly when :attr:`_stop_event` is set.
+        """
+        interval = self._periodic_resync_interval_seconds
+        if interval <= 0:
+            return  # Disabled -- should not be spawned, but guard defensively.
+        self._logger.debug(
+            "Kubernetes pod watcher periodic resync task started (namespace=%s, interval=%ss)",
+            self._namespace,
+            interval,
+        )
+        while not self._stop_event.is_set():
+            # Wait the full interval (or until stop is requested).
+            if await self._sleep_or_stop(float(interval)):
+                break  # Stop requested.
+            if self._stop_event.is_set():
+                break
+            try:
+                self._logger.debug(
+                    "Kubernetes pod watcher: starting periodic resync (namespace=%s)",
+                    self._namespace,
+                )
+                await asyncio.to_thread(self._relist_snapshot, evict_absent=True)
+                self._logger.debug(
+                    "Kubernetes pod watcher: periodic resync complete (namespace=%s)",
+                    self._namespace,
+                )
+            except asyncio.CancelledError:  # pragma: no cover
+                raise
+            except Exception as exc:
+                self._logger.warning(
+                    "Kubernetes pod watcher periodic resync failed (namespace=%s): %s",
+                    self._namespace,
+                    exc,
+                )
+        self._logger.debug(
+            "Kubernetes pod watcher periodic resync task exited (namespace=%s)",
+            self._namespace,
+        )
+
     def _record_reconnect(self, reason: str) -> None:
         """Increment ``orb_k8s_watch_reconnects_total`` when metrics are wired."""
         if self._metrics is not None:
@@ -392,7 +496,8 @@ class K8sWatcher:
         Executed via :func:`asyncio.to_thread` from :meth:`_run`.
         """
         watch = self._watch_factory()
-        self._active_watch = watch
+        with self._active_watch_lock:
+            self._active_watch = watch
         try:
             api_func, kwargs = self._build_list_call(resource_version)
             kwargs.setdefault("label_selector", self._label_selector)
@@ -424,7 +529,8 @@ class K8sWatcher:
                 raise _ResourceTooOld() from exc
             raise
         finally:
-            self._active_watch = None
+            with self._active_watch_lock:
+                self._active_watch = None
 
     def _build_list_call(
         self,
@@ -439,26 +545,86 @@ class K8sWatcher:
             return core_v1.list_pod_for_all_namespaces, kwargs
         return core_v1.list_namespaced_pod, {"namespace": self._namespace, **kwargs}
 
-    def _relist_snapshot(self) -> Optional[str]:
-        """Perform a full LIST and rebuild cache from the response.
+    def _relist_snapshot(self, *, evict_absent: bool = False) -> Optional[str]:
+        """Perform a full LIST and reconcile the cache from the response.
 
-        Called after a 410-Gone response to obtain a consistent snapshot
-        of pods matching the label selector.  Returns the
-        ``resourceVersion`` of the LIST so the next watch session resumes
-        from a known-good point.  Cache is upserted with every observed
-        pod and any request rows not present in the snapshot are
-        implicitly stale (subsequent watch DELETE events will evict
-        them; the mark-stale sweeper handles longer gaps).
+        Called after a 410-Gone response (or by the periodic resync task)
+        to obtain a consistent snapshot of pods matching the label
+        selector.  Returns the ``resourceVersion`` of the LIST so the
+        next watch session resumes from a known-good point.
+
+        Reconciliation semantics
+        ------------------------
+        After upserting every pod from the LIST, pods that were in the
+        cache for the scoped namespace/request but are absent from the
+        LIST can optionally be evicted (controlled by ``evict_absent``).
+        The scope of eviction matches the scope of the LIST:
+
+        * namespace-scoped LIST  → only evict entries in that namespace.
+        * cluster-scoped LIST    → evict all entries absent from the LIST.
+
+        This prevents deleted pods from persisting in the cache when the
+        watch stream has drifted (periodic resync path).
+
+        **Why eviction is opt-in (``evict_absent=False`` by default)**:
+
+        On 410-Gone recovery the watch stream was disrupted, but the
+        second watch session (resumed from the LIST's ``resourceVersion``)
+        will deliver DELETE events for any pods that were genuinely
+        removed during the gap.  Evicting eagerly here would discard pods
+        whose ADDED event arrived via the first watch session but whose
+        DELETE event has not been seen yet — pods that are still running
+        in the cluster.  Callers that *are* authoritative about absent
+        pods (the periodic resync task, where the watch stream is healthy
+        and has been running long enough to catch drift) must pass
+        ``evict_absent=True`` explicitly.
+
+        Eviction safety: two guards combine to prevent over-eviction:
+
+        (a) Only pods whose cache key existed **before the LIST started**
+            are candidates.  The pre-LIST key set is snapshotted while
+            holding the cache lock so pods added to the cache by the
+            concurrent watch stream during the LIST call are never
+            considered for eviction.
+
+        (b) Among those candidates, any pod whose ``last_updated``
+            timestamp is strictly greater than ``captured_before`` was
+            refreshed by a watch event that arrived after the snapshot was
+            taken — that newer event is authoritative and the pod is left
+            in place.
+
+        To avoid overwriting a live watch-stream update that arrived
+        *after* the LIST snapshot was taken, upserts use
+        :meth:`PodStateCache.upsert_if_not_newer` with the monotonic
+        timestamp recorded just before the LIST call.  Watch events that
+        landed after that timestamp are left in place.
 
         Runs in a worker thread via :func:`asyncio.to_thread`.
         """
         core_v1 = self._client.core_v1
         kwargs: dict[str, Any] = {"label_selector": self._label_selector}
+        # Record the snapshot capture start time before the LIST so we
+        # can compare against existing cache entry timestamps and avoid
+        # overwriting watch events that arrived after this LIST began.
+        captured_before = time.monotonic()
+
+        # (a) Snapshot the set of keys currently in the cache BEFORE the
+        # LIST call.  Only pods present in this snapshot are candidates for
+        # eviction — pods added to the cache by the concurrent watch stream
+        # during the LIST are never considered.
+        pre_list_keys: set[tuple[str, str]] = set()
+        if evict_absent:
+            pre_list_keys = {(s.request_id, s.pod_name) for s in self._cache.all_states()}
+
         with self._timed_list("list_pods"):
             if self._namespace is None:
                 pod_list = core_v1.list_pod_for_all_namespaces(**kwargs)
             else:
                 pod_list = core_v1.list_namespaced_pod(namespace=self._namespace, **kwargs)
+
+        # Collect the (request_id, pod_name) pairs returned by the LIST.
+        # These are the pods that should remain in the cache after reconcile.
+        seen_keys: set[tuple[str, str]] = set()
         for pod in getattr(pod_list, "items", []) or []:
             metadata = getattr(pod, "metadata", None)
             if metadata is None:
@@ -472,9 +638,53 @@ class K8sWatcher:
                 continue
             namespace = getattr(metadata, "namespace", None) or self._namespace or ""
             state = self._pod_to_state(pod, request_id, namespace, deleted=False)
-            self._cache.upsert(state)
-        metadata = getattr(pod_list, "metadata", None)
-        resource_version = getattr(metadata, "resource_version", None)
+            self._cache.upsert_if_not_newer(state, captured_before)
+            seen_keys.add((request_id, pod_name))
+
+        # Evict cache entries that are within the LIST scope but absent
+        # from the results — these pods were deleted between the last
+        # watch event and this LIST.
+        #
+        # Only runs when evict_absent=True (periodic resync).  See the
+        # docstring for why eviction is suppressed on 410-recovery.
+        if evict_absent:
+            # Scope: for a namespace-scoped LIST, only evict entries in the
+            # same namespace; for a cluster-scoped LIST evict all absent
+            # entries.  We never evict a pod that was written after
+            # ``captured_before`` (i.e. a pod created between the LIST start
+            # and now) because we only compare entries whose last_updated is
+            # at most ``captured_before``.
+            all_current = self._cache.all_states()
+            for cached_state in all_current:
+                if cached_state.deleted:
+                    # Already being torn down by a concurrent watch DELETE.
+                    continue
+                if (cached_state.request_id, cached_state.pod_name) in seen_keys:
+                    continue
+                # Only evict within the scope the LIST covered.
+                if self._namespace is not None and cached_state.namespace != self._namespace:
+                    continue
+                # (a) Only evict pods that were in the cache when the LIST
+                # started — pods added by the watch stream during the LIST
+                # are not authoritative from this snapshot's perspective.
+                if (cached_state.request_id, cached_state.pod_name) not in pre_list_keys:
+                    continue
+                # (b) Guard against evicting a pod that was refreshed by a
+                # watch event after the LIST started.
+                if cached_state.last_updated > captured_before:
+                    continue
+                # Pod was present before the LIST, absent from the LIST, within
+                # scope, and not refreshed mid-flight — evict as deleted.
+                self._logger.debug(
+                    "Resync evicting pod absent from LIST (namespace=%s, pod=%s, request_id=%s)",
+                    cached_state.namespace,
+                    cached_state.pod_name,
+                    cached_state.request_id,
+                )
+                self._cache.delete(cached_state.request_id, cached_state.pod_name)
+
+        list_metadata = getattr(pod_list, "metadata", None)
+        resource_version = getattr(list_metadata, "resource_version", None)
         if not resource_version:
             # Fallback: an empty rv would drop us straight back into a 410
             # loop.  Return ``None`` so the next session starts a fresh
@@ -574,6 +784,16 @@ class K8sWatcher:
             list(getattr(status, "container_statuses", None) or []) if status is not None else []
         )
 
+        # Capture the primary container's image so the cache-fed code path
+        # can populate image_id on the instance dict (mirrors instance_dict_for_pod).
+        containers = list(getattr(spec, "containers", None) or []) if spec is not None else []
+        raw_image = getattr(containers[0], "image", None) if containers else None
+        image_id: Optional[str] = str(raw_image) if raw_image else None
+
+        # The pod's restartPolicy governs whether repeated restarts are a crash
+        # loop (Always/Never) or intended retry semantics (OnFailure).
+        restart_policy = getattr(spec, "restart_policy", None) if spec is not None else None
+
         # Read the provider-API type from the pod label so the Succeeded
         # phase mapping can apply the correct semantics per workload kind.
         pod_provider_api: Optional[str] = labels.get(self._provider_api_label)
@@ -593,6 +813,24 @@ class K8sWatcher:
                 pod_provider_api or "unknown",
                 name,
             )
+
+        # Escalate a fatal waiting reason (ImagePullBackOff, ErrImagePull, ...)
+        # to "failed" so a pod that can never start is not reported as pending
+        # forever.  Mirrors pod_state_translator.instance_dict_for_pod so the
+        # watcher cache and the on-demand list paths agree.
+        if status_str in ("pending", "starting") and is_fatal_waiting_reason(reason):
+            status_str = "failed"
+
+        # Escalate crash-looping containers to "failed" regardless of their
+        # current oscillation phase.  Mirrors the same logic in
+        # pod_state_translator.instance_dict_for_pod so the watcher cache
+        # and the on-demand list paths agree.
+        if status_str in ("running", "starting", "pending") and is_crash_loop_or_repeated_failure(
+            container_statuses, restart_policy=restart_policy
+        ):
+            status_str = "failed"
+            if reason is None:
+                reason = "CrashLoopBackOff"
 
         # DisruptionTarget condition — Karpenter preemption signal.
         disrupted_reason: Optional[str] = None
@@ -628,6 +866,7 @@ class K8sWatcher:
             disrupted_reason=disrupted_reason,
             disrupted_message=disrupted_message,
             restart_count=restart_count,
+            image_id=image_id,
         )
 
 

@@ -4,7 +4,6 @@ import asyncio
 from typing import Any, cast
 
 from orb.application.dto.interface_response import InterfaceResponse
-from orb.infrastructure.di.container import get_container
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 
 
@@ -26,7 +25,7 @@ async def handle_provider_health(args) -> dict[str, Any]:
         GetProviderHealthOrchestrator,
     )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(GetProviderHealthOrchestrator)
     result = await orchestrator.execute(
         GetProviderHealthInput(
@@ -43,7 +42,7 @@ async def handle_list_providers(args) -> dict[str, Any]:
     from orb.application.services.orchestration.dtos import ListProvidersInput
     from orb.application.services.orchestration.list_providers import ListProvidersOrchestrator
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(ListProvidersOrchestrator)
     result = await orchestrator.execute(
         ListProvidersInput(
@@ -68,7 +67,7 @@ async def handle_provider_config(args) -> dict[str, Any]:
         GetProviderConfigOrchestrator,
     )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(GetProviderConfigOrchestrator)
     result = await orchestrator.execute(GetProviderConfigInput())
     return {"config": result.config, "message": result.message}
@@ -110,7 +109,7 @@ async def handle_provider_metrics(args) -> dict[str, Any]:
         GetProviderMetricsOrchestrator,
     )
 
-    container = get_container()
+    container = args._container
     orchestrator = container.get(GetProviderMetricsOrchestrator)
     result = await orchestrator.execute(
         GetProviderMetricsInput(
@@ -127,7 +126,7 @@ async def handle_reload_provider_config(args) -> InterfaceResponse:
     from orb.application.services.provider_registry_service import ProviderRegistryService
     from orb.interface.response_formatting_service import ResponseFormattingService
 
-    container = get_container()
+    container = args._container
     formatter = container.get(ResponseFormattingService)
     try:
         registry = container.get(ProviderRegistryService)
@@ -145,7 +144,7 @@ async def handle_system_status(args) -> InterfaceResponse:
     from orb.infrastructure.di.buses import QueryBus
     from orb.interface.response_formatting_service import ResponseFormattingService
 
-    container = get_container()
+    container = args._container
     query_bus = container.get(QueryBus)
     formatter = container.get(ResponseFormattingService)
 

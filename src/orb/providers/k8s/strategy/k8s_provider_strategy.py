@@ -47,32 +47,26 @@ from orb.providers.k8s.reconciliation.startup_reconciler import (
     ReconciliationReport,
     StartupReconciler,
 )
+from orb.providers.k8s.services.capability_service import K8sCapabilityService
+from orb.providers.k8s.services.health_check_service import K8sHealthCheckService
 from orb.providers.k8s.services.infrastructure_discovery_service import (
     K8sInfrastructureDiscoveryService,
 )
+from orb.providers.k8s.services.instance_operation_service import (
+    CancelResourceResult,
+    K8sInstanceOperationService,
+)
+from orb.providers.k8s.services.start_stop_service import K8sStartStopService
+from orb.providers.k8s.services.template_validation_service import K8sTemplateValidationService
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 from orb.providers.k8s.value_objects import KubernetesProviderApi
+from orb.providers.k8s.watch.events_watcher import K8sEventsWatcher, K8sNodeEventsCache
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
 from orb.providers.k8s.watch.node_state_cache import K8sNodeStateCache
 from orb.providers.k8s.watch.node_watcher import K8sNodeWatcher
 from orb.providers.k8s.watch.pod_state_cache import PodStateCache
 
 _logger = get_logger(__name__)
-
-# Sentinel value used when the user selects the in-cluster ServiceAccount
-# credential source.  Accepted both as ``"in_cluster"`` (canonical) and
-# ``"in-cluster"`` (hyphenated alias) via ``_normalise_sentinel``.
-_IN_CLUSTER_SENTINEL = "in_cluster"
-
-
-def _normalise_sentinel(value: str) -> str:
-    """Normalise ``"in-cluster"`` → ``"in_cluster"`` for sentinel comparison.
-
-    Both spellings are accepted so that YAML configs, CLI flags and the
-    ``get_available_credential_sources`` output are mutually compatible.
-    """
-    return value.replace("-", "_").lower()
-
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.domain.request.aggregate import Request
@@ -166,6 +160,8 @@ class K8sProviderStrategy(ProviderStrategy):
         orphan_gc: Optional[OrphanGarbageCollector] = None,
         node_watcher: Optional[K8sNodeWatcher] = None,
         node_state_cache: Optional[K8sNodeStateCache] = None,
+        events_watcher: Optional[K8sEventsWatcher] = None,
+        node_events_cache: Optional[K8sNodeEventsCache] = None,
         native_spec_service: Optional[Any] = None,
     ) -> None:
         if not isinstance(config, K8sProviderConfig):
@@ -200,6 +196,12 @@ class K8sProviderStrategy(ProviderStrategy):
         # Tests inject both via the constructor kwargs to avoid real threads.
         self._node_state_cache: K8sNodeStateCache = node_state_cache or K8sNodeStateCache()
         self._node_watcher: Optional[K8sNodeWatcher] = node_watcher
+        # Events API watching.  When ``events_watch_enabled=True`` (opt-in via
+        # K8sProviderConfig) the strategy starts a K8sEventsWatcher on a
+        # background thread and populates K8sNodeEventsCache with Karpenter
+        # node-disruption events.  Tests inject both via constructor kwargs.
+        self._node_events_cache: K8sNodeEventsCache = node_events_cache or K8sNodeEventsCache()
+        self._events_watcher: Optional[K8sEventsWatcher] = events_watcher
         # Native-spec escape hatch.  Resolved lazily on first handler
         # construction.  ``None`` after resolution means the service is
         # unavailable (jinja2 missing, injected service not provided, etc.)
@@ -215,6 +217,21 @@ class K8sProviderStrategy(ProviderStrategy):
         # Infrastructure discovery service — constructed lazily by
         # :meth:`_get_discovery_service` on first use.
         self._discovery_service: Optional[K8sInfrastructureDiscoveryService] = None
+        # Focused service objects — mirror the AWS provider's layout.
+        self._capability_service = K8sCapabilityService(logger=self._logger)
+        self._template_service = K8sTemplateValidationService(logger=self._logger)
+        self._health_check_service = K8sHealthCheckService(
+            config=self._k8s_config,
+            logger=self._logger,
+        )
+        self._instance_operation_service = K8sInstanceOperationService(
+            config=self._k8s_config,
+            logger=self._logger,
+        )
+        # Start/stop service (scale Deployment/StatefulSet) — constructed
+        # lazily by :meth:`_get_start_stop_service` on first use so the
+        # kubernetes client is resolved only when a start/stop is requested.
+        self._start_stop_service: Optional[K8sStartStopService] = None
         # Per-instance plugin factory registry — seeded from the class-level
         # defaults so every instance starts with the same empty set but is
         # fully isolated from other instances.  Two strategy objects for
@@ -330,6 +347,7 @@ class K8sProviderStrategy(ProviderStrategy):
         self._maybe_start_watch_manager()
         self._maybe_start_orphan_gc()
         self._maybe_start_node_watcher()
+        self._maybe_start_events_watcher()
         self._daemon_services_started = True
 
     def cleanup(self) -> None:
@@ -365,6 +383,15 @@ class K8sProviderStrategy(ProviderStrategy):
         except Exception as exc:
             self._logger.warning(
                 "Failed to stop Kubernetes node watcher during cleanup: %s", exc, exc_info=True
+            )
+
+        try:
+            if self._events_watcher is not None:
+                self._events_watcher.stop()
+                self._events_watcher = None
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to stop Kubernetes events watcher during cleanup: %s", exc, exc_info=True
             )
 
         # Stage 4: client cleanup.  Only clear ``_initialized`` when the
@@ -707,6 +734,48 @@ class K8sProviderStrategy(ProviderStrategy):
             self._logger.warning("Failed to start Kubernetes node watcher: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
+    # Events watcher lifecycle
+    # ------------------------------------------------------------------
+
+    @property
+    def node_events_cache(self) -> K8sNodeEventsCache:
+        """The shared node-events cache populated by the Events API watcher.
+
+        Always present (never ``None``) -- when ``events_watch_enabled`` is
+        ``False`` it is simply an empty cache that returns ``None`` for
+        every lookup.
+        """
+        return self._node_events_cache
+
+    def _maybe_start_events_watcher(self) -> None:
+        """Start the Events API watcher when enabled by config.
+
+        Like the node watcher, the events watcher runs on a plain
+        background daemon thread (not in the asyncio event loop) so it
+        can start from both synchronous (CLI bootstrap) and async
+        (daemon) contexts.
+
+        Requires the operator to have granted the ``events: get/list/watch``
+        RBAC verb on the core API group -- see
+        ``docs/root/providers/k8s/rbac.yaml``.
+        """
+        if not self._k8s_config.events_watch_enabled:
+            return
+        if self._events_watcher is None:
+            self._events_watcher = K8sEventsWatcher(
+                kubernetes_client=self.kubernetes_client,
+                cache=self._node_events_cache,
+                logger=self._logger,
+            )
+        try:
+            self._events_watcher.start()
+            self._logger.info("Kubernetes events watcher started (events_watch_enabled=True)")
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to start Kubernetes events watcher: %s", exc, exc_info=True
+            )
+
+    # ------------------------------------------------------------------
     # Operation dispatch
     # ------------------------------------------------------------------
 
@@ -768,12 +837,27 @@ class K8sProviderStrategy(ProviderStrategy):
                 )
             elif operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
                 result = await self._handle_create_instances(operation)
+            elif operation.operation_type == ProviderOperationType.TERMINATE_INSTANCES and (
+                operation.context or {}
+            ).get("cancel_mode"):
+                # cancel_mode: in-flight cancel before pods exist — delete
+                # workloads by orb.io/request-id label rather than by pod name.
+                # This branch must precede the plain TERMINATE_INSTANCES branch
+                # so that cancel-path operations are not silently routed to the
+                # normal deprovisioning handler.
+                result = await self._handle_cancel_resource(operation)
             elif operation.operation_type == ProviderOperationType.TERMINATE_INSTANCES:
                 result = await self._handle_terminate_instances(operation)
             elif operation.operation_type == ProviderOperationType.GET_INSTANCE_STATUS:
                 result = await self._handle_get_instance_status(operation)
             elif operation.operation_type == ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES:
                 result = await self._handle_describe_resource_instances(operation)
+            elif operation.operation_type == ProviderOperationType.VALIDATE_TEMPLATE:
+                result = self._template_service.validate_template(operation)
+            elif operation.operation_type == ProviderOperationType.START_INSTANCES:
+                result = await self._get_start_stop_service().start_instances(operation)
+            elif operation.operation_type == ProviderOperationType.STOP_INSTANCES:
+                result = await self._get_start_stop_service().stop_instances(operation)
             else:
                 result = ProviderResult.error_result(
                     f"Operation {operation.operation_type} is not supported by the "
@@ -854,7 +938,26 @@ class K8sProviderStrategy(ProviderStrategy):
             or operation.parameters.get("machine_ids")
             or []
         )
-        outcome = await self.return_machines(machine_ids, request)
+        # A return request carries its own request_id and no controller name, so
+        # the controller-backed handlers (Deployment/StatefulSet/Job) would
+        # otherwise resolve the wrong resource name and no-op.  The deprovisioning
+        # operation supplies the acquire-time controller name (resource_id) and
+        # the origin request_id — thread both into provider_data so release
+        # targets the resource that was actually created.  The name key is set
+        # for every controller kind; each handler reads only its own key, and the
+        # Pod handler ignores all of them (it deletes by machine_ids).
+        overrides: dict[str, Any] = {}
+        resource_id = operation.parameters.get("resource_id")
+        if resource_id:
+            overrides["deployment_name"] = resource_id
+            overrides["statefulset_name"] = resource_id
+            overrides["job_name"] = resource_id
+        origin_request_id = operation.parameters.get("request_id")
+        if origin_request_id:
+            overrides["request_id"] = str(origin_request_id)
+        outcome = await self.return_machines(
+            machine_ids, request, provider_data_overrides=overrides or None
+        )
         return _outcome_to_provider_result(outcome, fallback_operation="terminate_instances")
 
     async def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
@@ -922,131 +1025,89 @@ class K8sProviderStrategy(ProviderStrategy):
                 )
         return result
 
+    async def _handle_cancel_resource(self, operation: ProviderOperation) -> ProviderResult:
+        """Delete in-flight workloads by ``orb.io/request-id`` label.
+
+        Called via ``execute_operation`` when ``operation.context["cancel_mode"]``
+        is truthy.  Delegates to :class:`K8sInstanceOperationService.cancel_resource`
+        which finds every Pod / Deployment / StatefulSet / Job carrying the
+        request-id label and deletes them.
+        """
+        request_id = operation.parameters.get("request_id") or (
+            str(
+                getattr(
+                    operation.parameters.get("request"),
+                    "request_id",
+                    "",
+                )
+            )
+        )
+        if not request_id:
+            return ProviderResult.error_result(
+                "cancel_resource requires request_id in operation.parameters",
+                "MISSING_REQUEST_ID",
+            )
+        result = await self._instance_operation_service.cancel_resource(
+            request_id=request_id,
+            kubernetes_client=self.kubernetes_client,
+        )
+        if result.status == "partial":
+            return ProviderResult.error_result(
+                f"cancel_resource partially failed for request {request_id}: "
+                f"{[f for f in result.failed]}",
+                "PARTIAL_CANCEL_FAILURE",
+            ).model_copy(
+                update={"data": result.to_dict(), "success": True}  # surface partial data
+            )
+        return ProviderResult.success_result(
+            result.to_dict(),
+            {"operation": "cancel_resource", "provider": "k8s"},
+        )
+
+    async def cancel_resource(self, request_id: str) -> CancelResourceResult:
+        """Delete all workloads associated with *request_id*.
+
+        Public entry point for the cancel path.  Delegates to
+        :class:`K8sInstanceOperationService.cancel_resource` so tests and
+        callers that hold a strategy reference can invoke the operation
+        directly without constructing a :class:`ProviderOperation` envelope.
+
+        Args:
+            request_id: The ORB request UUID to cancel.
+
+        Returns:
+            :class:`CancelResourceResult` with per-kind delete outcomes.
+        """
+        return await self._instance_operation_service.cancel_resource(
+            request_id=request_id,
+            kubernetes_client=self.kubernetes_client,
+        )
+
     # ------------------------------------------------------------------
     # Capabilities & health
     # ------------------------------------------------------------------
 
+    @classmethod
+    def is_image_resolution_needed(cls) -> bool:
+        """Kubernetes does not resolve image references provider-side.
+
+        Container images are pulled by the kubelet at pod start from the image
+        string as-is; there is no SSM-style indirection to resolve.  Declaring
+        this explicitly stops the TemplateConfigurationManager from attempting
+        (and warning about) image resolution against the k8s strategy.
+        """
+        return False
+
     def get_capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(
-            provider_type="k8s",
-            supported_operations=[
-                ProviderOperationType.CREATE_INSTANCES,
-                ProviderOperationType.TERMINATE_INSTANCES,
-                ProviderOperationType.GET_INSTANCE_STATUS,
-                ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
-                ProviderOperationType.HEALTH_CHECK,
-            ],
-            supported_apis=list(self._SUPPORTED_APIS),
-            features={
-                # Selective termination support varies by provider_api:
-                #   Pod         — delete individual pods by name (fully selective)
-                #   Deployment  — pod-deletion-cost annotation + replicas patch
-                #   StatefulSet — pod-deletion-cost annotation (highest-ordinal first)
-                #   Job         — deletes the whole Job regardless of machine_ids
-                #                 (NOT selective)
-                # The dict below is the authoritative per-API declaration.
-                # Callers that need a single boolean should treat the
-                # provider as selective only when their target api is in
-                # the True set.
-                "selective_termination": False,
-                "selective_termination_by_api": {
-                    "Pod": True,
-                    "Deployment": True,
-                    "StatefulSet": True,
-                    "Job": False,
-                },
-                "watch_supported": True,
-                "namespaces_supported": True,
-            },
-        )
+        return self._capability_service.get_capabilities()
 
     def check_health(self) -> ProviderHealthStatus:
         """Probe the Kubernetes API server via ``CoreV1Api.get_api_resources``.
 
-        On success the status message and ``error_details`` dict are enriched
-        with the cluster endpoint, server version, and current namespace so
-        operators running against multiple clusters can identify which cluster
-        the probe hit.  Each enrichment field is fetched defensively — a
-        failure to retrieve the server version or endpoint never causes the
-        overall health check to fail.
+        Delegates to :class:`K8sHealthCheckService` which houses all the
+        enrichment and probe logic.
         """
-        start = time.time()
-        try:
-            client = self.kubernetes_client
-            resources = client.core_v1.get_api_resources()
-            response_time_ms = (time.time() - start) * 1000.0
-            resource_count = len(getattr(resources, "resources", []) or [])
-
-            # --- enrichment: cluster endpoint ---
-            # Gathers: api_client.configuration.host (apiserver URL).
-            cluster_endpoint: Optional[str] = None
-            try:
-                cluster_endpoint = getattr(
-                    client.api_client.configuration,  # type: ignore[union-attr]
-                    "host",
-                    None,
-                )
-            except Exception as exc:
-                self._logger.debug("Could not read cluster endpoint from api_client: %s", exc)
-
-            # --- enrichment: server version ---
-            # Gathers: VersionApi.get_code().git_version (Kubernetes server semver).
-            server_version: Optional[str] = None
-            try:
-                from kubernetes.client import VersionApi
-
-                version_info = VersionApi(api_client=client.api_client).get_code()
-                server_version = getattr(version_info, "git_version", None)
-            except Exception as exc:
-                self._logger.debug("Could not read server version from VersionApi: %s", exc)
-
-            # --- enrichment: current namespace ---
-            # Gathers: in-cluster SA namespace from /var/run/secrets/…/namespace.
-            current_namespace: Optional[str] = self._k8s_config.namespace
-            if current_namespace is None and self._k8s_config.in_cluster:
-                try:
-                    from orb.providers.k8s.configuration.config import (
-                        _read_in_cluster_namespace,
-                    )
-
-                    current_namespace = _read_in_cluster_namespace()
-                except Exception as exc:
-                    self._logger.debug("Could not read in-cluster namespace: %s", exc)
-
-            parts: list[str] = [
-                f"Kubernetes API server reachable; {resource_count} core/v1 resources"
-            ]
-            if cluster_endpoint:
-                parts.append(f"endpoint={cluster_endpoint}")
-            if server_version:
-                parts.append(f"version={server_version}")
-            if current_namespace:
-                parts.append(f"namespace={current_namespace}")
-
-            details: dict[str, Any] = {"response_time_ms": response_time_ms}
-            if cluster_endpoint:
-                details["cluster_endpoint"] = cluster_endpoint
-            if server_version:
-                details["server_version"] = server_version
-            if current_namespace:
-                details["namespace"] = current_namespace
-
-            return ProviderHealthStatus(
-                is_healthy=True,
-                status_message="; ".join(parts),
-                response_time_ms=response_time_ms,
-                error_details=details,
-            )
-        except Exception as exc:
-            response_time_ms = (time.time() - start) * 1000.0
-            self._logger.warning("Kubernetes health check failed: %s", exc, exc_info=True)
-            return ProviderHealthStatus.unhealthy(
-                message=f"Kubernetes API server unreachable: {exc}",
-                error_details={
-                    "error": str(exc),
-                    "response_time_ms": response_time_ms,
-                },
-            )
+        return self._health_check_service.check_health(self.kubernetes_client)
 
     # ------------------------------------------------------------------
     # Naming
@@ -1056,46 +1117,10 @@ class K8sProviderStrategy(ProviderStrategy):
     def generate_provider_name(cls, config: dict[str, Any]) -> str:
         """Generate a Kubernetes provider instance name.
 
-        Pattern: ``k8s_{sanitized_context}``.
-
-        The kubeconfig context name is sanitised by replacing any character
-        outside ``[a-zA-Z0-9_-]`` with a hyphen — this handles ARN-style
-        context names (colons, slashes) gracefully.
-
-        Lookup and sentinel resolution:
-
-        1. ``context`` key — treated as a real kubeconfig context name.
-           It is sanitised directly without sentinel interpretation: even
-           if the context is literally named ``"in-cluster"`` it is treated
-           as a kubeconfig context, not the in-cluster ServiceAccount path.
-        2. No context → fall back to ``k8s_in-cluster`` (in-cluster or
-           ambient kubeconfig default — the name signals no explicit
-           cluster was targeted).
-
-        Disambiguation: a kubeconfig context whose sanitised form is
-        ``"in-cluster"`` (i.e. the literal context name ``"in-cluster"``)
-        would collide with the sentinel output ``k8s_in-cluster``.  It is
-        instead prefixed with ``ctx_`` → ``k8s_ctx_in-cluster``.
-
-        Note: the legacy ``profile`` key from pre-k8s-provider ``orb init``
-        writes is no longer consulted.  Callers that previously relied on
-        the ``profile`` fallback should pass ``context`` explicitly.
+        Delegates to :class:`K8sCapabilityService`.  See that class for the
+        full specification of the ``k8s_{sanitized_context}`` pattern.
         """
-        import re
-
-        raw_context: str | None = config.get("context") or None
-
-        if raw_context:
-            # Real kubeconfig context name — sanitise and check for collision.
-            sanitized = re.sub(r"[^a-zA-Z0-9\-_]", "-", raw_context)
-            # Guard: a literal context named "in-cluster" would collide with
-            # the sentinel output; prefix with ctx_ to disambiguate.
-            if sanitized == "in-cluster":
-                sanitized = f"ctx_{sanitized}"
-            return f"k8s_{sanitized}"
-
-        # No context → in-cluster sentinel.
-        return "k8s_in-cluster"
+        return K8sCapabilityService.generate_provider_name(config)
 
     @classmethod
     def get_defaults_config(cls) -> dict:
@@ -1133,16 +1158,13 @@ class K8sProviderStrategy(ProviderStrategy):
 
     def parse_provider_name(self, provider_name: str) -> dict[str, str]:
         """Inverse of :meth:`generate_provider_name`."""
-        if not provider_name.startswith("k8s_"):
-            return {}
-        suffix = provider_name[len("k8s_") :]
-        return {"context_or_namespace": suffix}
+        return K8sCapabilityService.parse_provider_name(provider_name)
 
     def get_provider_name_pattern(self) -> str:
-        return "k8s_{sanitized_context}"
+        return K8sCapabilityService.get_provider_name_pattern()
 
     def get_supported_apis(self) -> list[str]:
-        return list(self._SUPPORTED_APIS)
+        return K8sCapabilityService.get_supported_apis()
 
     def resolve_api_alias(self, raw_api: str) -> str:
         """Normalise alternate-case provider_api spellings to canonical form.
@@ -1154,6 +1176,148 @@ class K8sProviderStrategy(ProviderStrategy):
         """
         return self._API_ALIASES.get(raw_api, raw_api)
 
+    @classmethod
+    def get_ui_column_schema(cls) -> list:  # type: ignore[override]
+        """Return k8s-specific UI column descriptors for machines, requests, and templates."""
+        from orb.application.dto.system import UIColumnDescriptor
+
+        return [
+            # ------------------------------------------------------------------
+            # machines — pod/workload-level columns
+            # ------------------------------------------------------------------
+            UIColumnDescriptor(
+                key="k8s_namespace",
+                path="provider_data.namespace",
+                label="Namespace",
+                kind="badge",
+                resource_type="machines",
+                provider="k8s",
+                sortable=True,
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="k8s_node_name",
+                path="provider_data.node_name",
+                label="Node",
+                kind="text",
+                resource_type="machines",
+                provider="k8s",
+                sortable=True,
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="k8s_phase",
+                path="provider_data.phase",
+                label="Phase",
+                kind="badge",
+                resource_type="machines",
+                provider="k8s",
+                badge_color_map={
+                    "Running": "green",
+                    "Pending": "orange",
+                    "Succeeded": "teal",
+                    "Failed": "red",
+                    "Unknown": "gray",
+                },
+                sortable=True,
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="k8s_restart_count",
+                path="provider_data.restart_count",
+                label="Restarts",
+                kind="count",
+                resource_type="machines",
+                provider="k8s",
+                sortable=True,
+                default_visible=False,
+            ),
+            UIColumnDescriptor(
+                key="k8s_capacity_type",
+                path="provider_data.node_capacity_type",
+                label="Capacity Type",
+                kind="badge",
+                resource_type="machines",
+                provider="k8s",
+                badge_color_map={"spot": "orange", "on-demand": "blue", "on_demand": "blue"},
+                sortable=True,
+                default_visible=False,
+            ),
+            UIColumnDescriptor(
+                key="k8s_workload_kind",
+                path="provider_api",
+                label="Workload Kind",
+                kind="badge",
+                resource_type="machines",
+                provider="k8s",
+                badge_color_map={
+                    "Pod": "blue",
+                    "Deployment": "purple",
+                    "StatefulSet": "teal",
+                    "Job": "orange",
+                },
+                sortable=True,
+                default_visible=False,
+            ),
+            # ------------------------------------------------------------------
+            # requests — provider-level request columns
+            # ------------------------------------------------------------------
+            UIColumnDescriptor(
+                key="k8s_request_namespace",
+                path="provider_data.namespace",
+                label="Namespace",
+                kind="badge",
+                resource_type="requests",
+                provider="k8s",
+                sortable=True,
+                default_visible=True,
+            ),
+            UIColumnDescriptor(
+                key="k8s_request_provider_api",
+                path="provider_data.provider_api",
+                label="Workload Kind",
+                kind="badge",
+                resource_type="requests",
+                provider="k8s",
+                badge_color_map={
+                    "Pod": "blue",
+                    "Deployment": "purple",
+                    "StatefulSet": "teal",
+                    "Job": "orange",
+                },
+                default_visible=True,
+            ),
+            # ------------------------------------------------------------------
+            # templates — k8s template surface
+            # ------------------------------------------------------------------
+            UIColumnDescriptor(
+                key="k8s_template_provider_api",
+                path="provider_api",
+                label="Workload Kind",
+                kind="badge",
+                resource_type="templates",
+                provider="k8s",
+                badge_color_map={
+                    "Pod": "blue",
+                    "Deployment": "purple",
+                    "StatefulSet": "teal",
+                    "Job": "orange",
+                },
+                default_visible=True,
+                sortable=True,
+            ),
+            UIColumnDescriptor(
+                key="k8s_template_namespace",
+                path="namespace",
+                label="Namespace",
+                kind="text",
+                resource_type="templates",
+                provider="k8s",
+                default_visible=True,
+                sortable=True,
+            ),
+        ]
+
     # ------------------------------------------------------------------
     # Region / CLI helpers
     # ------------------------------------------------------------------
@@ -1161,100 +1325,37 @@ class K8sProviderStrategy(ProviderStrategy):
     @classmethod
     def get_available_regions(cls) -> list[tuple[str, str]]:
         """Kubernetes has contexts, not regions — return an empty list."""
-        return []
+        return K8sCapabilityService.get_available_regions()
 
     @classmethod
     def get_default_region(cls) -> str:
         """Kubernetes has no region concept; return an empty string."""
-        return ""
+        return K8sCapabilityService.get_default_region()
 
     @classmethod
     def get_cli_extra_config_keys(cls) -> set[str]:
-        """Return k8s keys that belong in provider config, not template_defaults.
-
-        ``init_command_handler`` calls this after ``discover_infrastructure_interactive``
-        to route each discovered field to the correct section.  Keys returned
-        here land in ``provider_instance.config``; all other keys land in
-        ``provider_instance.template_defaults``.
-
-        Routing table (connection-level → config):
-        - ``context``    → ``K8sProviderConfig.context``   (out-of-cluster only)
-        - ``in_cluster`` → ``K8sProviderConfig.in_cluster``
-        - ``namespace``  → ``K8sProviderConfig.namespace``
-
-        Template-default-level keys NOT in this set (→ template_defaults):
-        - ``service_account``    → ``K8sTemplate.service_account``
-        - ``image_pull_secret``  → ``K8sTemplate.image_pull_secret``
-        """
-        return {"context", "in_cluster", "namespace"}
+        """Return k8s keys that belong in provider config, not template_defaults."""
+        return K8sCapabilityService.get_cli_extra_config_keys()
 
     @classmethod
     def get_cli_infrastructure_defaults(cls, args: Any) -> dict[str, Any]:
-        """Extract k8s infrastructure defaults from parsed CLI args.
-
-        Kubernetes infrastructure is cluster-scoped and not decomposed into
-        subnet/security-group level constructs like AWS.  Returns an empty
-        dict — any relevant cluster-level config comes from
-        :meth:`get_cli_provider_config` instead.
-        """
-        return {}
+        """Extract k8s infrastructure defaults from parsed CLI args."""
+        return K8sCapabilityService.get_cli_infrastructure_defaults(args)
 
     @classmethod
     def get_cli_provider_config(cls, args: Any) -> dict[str, Any]:
-        """Extract Kubernetes provider config keys from parsed CLI args.
-
-        Reads the three kubernetes-scoped flags registered via
-        :class:`~orb.providers.k8s.cli.k8s_cli_spec.K8sCLISpec`:
-
-        * ``--kube-context``  → ``context`` key
-        * ``--kubeconfig``    → ``kubeconfig_path`` key
-        * ``--namespace``     → ``namespace`` key
-
-        Fields that were not supplied by the operator are omitted from the
-        returned dict so that the ``_get_default_config`` overlay can fill
-        the remaining gaps without overwriting explicit values with ``None``.
-
-        Args:
-            args: Parsed ``argparse.Namespace`` from the ``orb init`` or
-                ``orb provider add`` invocation.
-
-        Returns:
-            Dict containing only the keys whose values the operator supplied.
-        """
-        result: dict[str, Any] = {}
-        context = getattr(args, "kubernetes_context", None)
-        if context is not None:
-            result["context"] = context
-        kubeconfig = getattr(args, "kubernetes_kubeconfig", None)
-        if kubeconfig is not None:
-            result["kubeconfig_path"] = kubeconfig
-        namespace = getattr(args, "kubernetes_namespace", None)
-        if namespace is not None:
-            result["namespace"] = namespace
-        return result
+        """Extract Kubernetes provider config keys from parsed CLI args."""
+        return K8sCapabilityService.get_cli_provider_config(args)
 
     @classmethod
     def get_operational_param_choices(cls, param: str) -> list[tuple[str, str]]:
-        """Return picker choices for an operational parameter, if any.
-
-        Mirrors :meth:`AWSProviderStrategy.get_operational_param_choices`.
-        Kubernetes has no region picker; ``namespace`` is a free-text input so
-        an empty list is returned for all parameters, causing the ``orb init``
-        prompt to fall back to free-text input.
-        """
-        return []
+        """Return picker choices for an operational parameter, if any."""
+        return K8sCapabilityService.get_operational_param_choices(param)
 
     @classmethod
     def get_operational_param_default(cls, param: str) -> str:
-        """Return the default value for an operational parameter.
-
-        Mirrors :meth:`AWSProviderStrategy.get_operational_param_default`.
-        Kubernetes uses ``"default"`` as the conventional default namespace;
-        all other parameters have no meaningful pre-filled default.
-        """
-        if param == "namespace":
-            return "default"
-        return ""
+        """Return the default value for an operational parameter."""
+        return K8sCapabilityService.get_operational_param_default(param)
 
     # ------------------------------------------------------------------
     # Credential surface (called by `orb init` and credential probes)
@@ -1262,170 +1363,23 @@ class K8sProviderStrategy(ProviderStrategy):
 
     @classmethod
     def get_available_credential_sources(cls) -> list[dict]:
-        """Return Kubernetes credential sources visible to ORB.
-
-        Returns ``in_cluster`` (when a ServiceAccount token is mounted) and
-        every available kubeconfig context as a separate selectable source.
-
-        Matches the AWS shape consumed by ``init_command_handler``: each
-        entry has ``name`` (technical identifier — kubeconfig context name
-        or ``"in_cluster"``) and ``description`` (human-readable label).
-        ``test_credentials`` receives the ``name`` value as
-        ``credential_source``.
-        """
-        sources: list[dict] = []
-
-        try:
-            from orb.providers.k8s.auth.in_cluster import is_in_cluster
-
-            if is_in_cluster():
-                sources.append(
-                    {
-                        "name": _IN_CLUSTER_SENTINEL,
-                        "description": "in-cluster ServiceAccount",
-                        "config_delta": {"in_cluster": True},
-                    }
-                )
-        except Exception as exc:
-            _logger.debug("in_cluster detection failed: %s", exc)
-
-        try:
-            import kubernetes.config as _k8s_config
-
-            contexts, current = _k8s_config.list_kube_config_contexts()
-            current_name = current.get("name") if current else None
-            for ctx in contexts or []:
-                name = ctx.get("name", "")
-                if not name:
-                    continue
-                marker = " (current)" if name == current_name else ""
-                cluster = ctx.get("context", {}).get("cluster", "?")
-                if name == cluster:
-                    label = f"{name}{marker}"
-                else:
-                    label = f"{name} → {cluster}{marker}"
-                sources.append(
-                    {
-                        "name": name,
-                        "description": label,
-                        "config_delta": {"context": name},
-                    }
-                )
-        except Exception as exc:
-            _logger.debug("kubeconfig context enumeration failed: %s", exc)
-
-        if not sources:
-            sources.append(
-                {
-                    "name": "default",
-                    "description": (
-                        "Default credentials resolved by the kubernetes-client SDK "
-                        "(in-cluster token or KUBECONFIG / ~/.kube/config)"
-                    ),
-                    "config_delta": {"context": "default"},
-                }
-            )
-
-        return sources
+        """Return Kubernetes credential sources visible to ORB."""
+        return K8sCapabilityService(logger=_logger).get_available_credential_sources()  # type: ignore[arg-type]
 
     @classmethod
     def test_credentials(cls, credential_source: Optional[str] = None, **kwargs: Any) -> dict:
-        """Verify the selected credentials can reach the apiserver.
-
-        Calls ``CoreV1Api().get_api_resources()`` with a short timeout.  On
-        success, returns the apiserver endpoint and the resolved current
-        namespace (in-cluster) or kubeconfig context (out-of-cluster).
-        """
-        try:
-            import kubernetes.client as _k8s_client
-            import kubernetes.config as _k8s_config
-            from kubernetes.client.exceptions import ApiException
-        except ImportError:
-            return {
-                "success": False,
-                "error": (
-                    "The kubernetes SDK is not installed.  Install with: pip install 'orb-py[k8s]'"
-                ),
-            }
-
-        try:
-            if (
-                credential_source is not None
-                and _normalise_sentinel(credential_source) == _IN_CLUSTER_SENTINEL
-            ):
-                _k8s_config.load_incluster_config()
-                context_label = "in-cluster"
-            elif credential_source and credential_source not in ("default", ""):
-                # The credential_source is a kubeconfig context name.
-                _k8s_config.load_kube_config(context=credential_source)
-                context_label = credential_source
-            else:
-                _k8s_config.load_config()
-                context_label = "auto-detected"
-
-            # Build the ApiClient ourselves so we keep a typed handle to the
-            # configuration object (the auto-built api_client attribute on
-            # CoreV1Api is not exposed by the type stubs).
-            from kubernetes.client.api_client import ApiClient
-
-            api_client = ApiClient()
-            # kubernetes-stubs-elephant-fork omits the `configuration`
-            # attribute from ApiClient; it exists at runtime.
-            api_client.configuration.timeout = 5  # type: ignore[attr-defined]
-            api = _k8s_client.CoreV1Api(api_client=api_client)
-            resources = api.get_api_resources()
-            endpoint = api_client.configuration.host  # type: ignore[attr-defined]
-
-            return {
-                "success": True,
-                "context": context_label,
-                "endpoint": endpoint,
-                "api_groups": len(resources.resources) if resources else 0,
-            }
-        except ApiException as exc:
-            return {
-                "success": False,
-                "error": (f"Apiserver rejected the probe ({exc.status}): {exc.reason}"),
-            }
-        except Exception as exc:  # ConfigException, network errors, etc.
-            return {"success": False, "error": str(exc)}
+        """Verify the selected credentials can reach the apiserver."""
+        return K8sCapabilityService.test_credentials(credential_source, **kwargs)
 
     @classmethod
     def get_credential_requirements(cls) -> dict:
         """Document the Kubernetes credential parameters operators may set."""
-        return {
-            "kubeconfig_path": {
-                "required": False,
-                "description": "Path to a kubeconfig file (defaults to KUBECONFIG / ~/.kube/config)",
-            },
-            "context": {
-                "required": False,
-                "description": "Kubeconfig context name (defaults to current-context)",
-            },
-            "namespace": {
-                "required": False,
-                "description": "Target namespace (defaults to in-cluster SA namespace or 'default')",
-            },
-        }
+        return K8sCapabilityService.get_credential_requirements()
 
     @classmethod
     def get_operational_requirements(cls) -> dict:
-        """Document operational parameters the init flow may prompt for.
-
-        Mirrors the AWS shape: each entry is ``{required, description}``.
-        Kubernetes has no hard-required parameter at init time — namespace
-        is optional (in-cluster mode auto-detects from the SA token,
-        out-of-cluster defaults to ``"default"``).
-        """
-        return {
-            "namespace": {
-                "required": False,
-                "description": (
-                    "Target namespace for managed pods "
-                    "(defaults to in-cluster SA namespace or 'default')"
-                ),
-            },
-        }
+        """Document operational parameters the init flow may prompt for."""
+        return K8sCapabilityService.get_operational_requirements()
 
     # ------------------------------------------------------------------
     # Health-check integration
@@ -1440,10 +1394,7 @@ class K8sProviderStrategy(ProviderStrategy):
                 "Skipping Kubernetes health-check registration: %s", exc, exc_info=True
             )
             return
-
-        from orb.providers.k8s.health import register_k8s_health_checks
-
-        register_k8s_health_checks(health_check, client)
+        self._health_check_service.register_health_checks(health_check, client)
 
     # ------------------------------------------------------------------
     # Native-spec resolution — kept on the strategy because it owns the
@@ -1523,9 +1474,16 @@ class K8sProviderStrategy(ProviderStrategy):
         """Submit an acquisition request to Kubernetes via the per-API handler."""
         return await self._handler_registry.acquire(request)
 
-    async def return_machines(self, machine_ids: list[str], request: Request) -> OperationOutcome:
-        """Delete the named pods via the per-API handler."""
-        return await self._handler_registry.return_machines(machine_ids, request)
+    async def return_machines(
+        self,
+        machine_ids: list[str],
+        request: Request,
+        provider_data_overrides: Optional[dict[str, Any]] = None,
+    ) -> OperationOutcome:
+        """Delete the named resources via the per-API handler."""
+        return await self._handler_registry.return_machines(
+            machine_ids, request, provider_data_overrides=provider_data_overrides
+        )
 
     async def get_status(self, resource_ids: list[str], request: Request) -> OperationOutcome:
         """Poll the per-API handler's ``check_hosts_status`` for a verdict."""
@@ -1555,6 +1513,21 @@ class K8sProviderStrategy(ProviderStrategy):
                 console=self._console,
             )
         return self._discovery_service
+
+    def _get_start_stop_service(self) -> K8sStartStopService:
+        """Return the start/stop service, constructing it lazily.
+
+        Owns the ``START_INSTANCES`` / ``STOP_INSTANCES`` scale operations
+        for Deployment/StatefulSet workloads.  Constructed on first use so
+        the kubernetes client is resolved only when a start/stop is actually
+        requested — mirrors the lazy discovery-service pattern above.
+        """
+        if self._start_stop_service is None:
+            self._start_stop_service = K8sStartStopService(
+                kubernetes_client=self.kubernetes_client,
+                logger=self._logger,
+            )
+        return self._start_stop_service
 
     def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Discover Kubernetes infrastructure for the configured cluster.

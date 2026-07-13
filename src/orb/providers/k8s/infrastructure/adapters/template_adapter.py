@@ -71,7 +71,7 @@ def _compute_supported_fields() -> list[str]:
                              spec builders entirely).
     """
     from orb.domain.template.template_aggregate import Template
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     _INTERNAL_ONLY = {"provider_config"}
     # Fields intentionally excluded from the operator-facing surface:
@@ -79,7 +79,10 @@ def _compute_supported_fields() -> list[str]:
     #   separately by the scheduler layer).
     # - ``native_spec``: full-replacement escape hatch that bypasses spec
     #   builders; not a "normal" operator field.
-    _EXCLUDED = {"namespaces", "native_spec"}
+    # - ``native_spec_path``: file-path companion to ``native_spec`` — also
+    #   bypasses the typed spec builders and is therefore excluded from the
+    #   operator-facing field list for the same reason.
+    _EXCLUDED = {"namespaces", "native_spec", "native_spec_path"}
 
     parent_fields = set(Template.model_fields.keys())
     k8s_specific = set(K8sTemplate.model_fields.keys()) - parent_fields - _INTERNAL_ONLY - _EXCLUDED
@@ -151,7 +154,7 @@ class K8sTemplateAdapter(TemplateAdapterPort):
         Reads the typed :class:`K8sTemplate` fields directly.  Returns a
         mapping of field name -> error message; empty when valid.
         """
-        from orb.providers.k8s.domain.template.k8s_template import (
+        from orb.providers.k8s.domain.template.k8s_template_aggregate import (
             upcast_to_k8s_template,
         )
 

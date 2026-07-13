@@ -131,6 +131,117 @@ export ORB_K8S_CONTEXT="prod"
 | Auth works locally but fails when ORB runs as a system service     | The service env does not inherit `$HOME`    | Set `ORB_K8S_KUBECONFIG_PATH` to an absolute path.          |
 | Auth works initially then 401s after some hours (EKS)              | Federated token expired                     | Use `aws eks update-kubeconfig` with a long-lived identity, or run ORB in-cluster with IRSA. |
 
+## Inbound TokenReview auth
+
+ORB can optionally validate Bearer tokens on its own REST API by
+submitting them to the Kubernetes
+`authentication.k8s.io/v1 TokenReview` endpoint.  This lets callers
+of ORB's REST API authenticate with a Kubernetes ServiceAccount token
+instead of a separate credential system.
+
+### Enabling
+
+Set `inbound_auth_enabled: true` in the provider config (or
+`ORB_K8S_INBOUND_AUTH_ENABLED=true`) to register the
+`KubeAuthStrategy` with ORB's auth registry.
+
+```json
+{
+  "providers": {
+    "k8s": {
+      "provider_type": "k8s",
+      "namespace": "orb",
+      "inbound_auth_enabled": true
+    }
+  }
+}
+```
+
+### How it works
+
+1. An inbound REST request arrives with an `Authorization: Bearer <token>` header.
+2. ORB extracts the token and submits it to `authentication.k8s.io/v1 TokenReview`
+   on the cluster.
+3. If the API server reports the token is authenticated, the
+   `system:serviceaccount:<namespace>:<name>` principal is extracted.
+4. The principal is mapped to an ORB role using the `sa_role_mapping`
+   in the auth config.  Principals not in the map receive the default
+   `["user"]` role.  Exact matches (`namespace:sa-name`) take priority;
+   wildcard namespace matches (`*:sa-name`) are tried next.
+
+TokenReview is preferred over local JWKS validation because the API
+server is the authoritative signer — there is no possibility of ORB
+accepting a token the cluster itself would reject.
+
+### Required RBAC
+
+The ORB pod's ServiceAccount must be able to create `TokenReview`
+objects.  The recommended approach is to bind the
+`system:auth-delegator` ClusterRole (a standard Kubernetes role that
+grants precisely this permission):
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: orb-auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: orb
+    namespace: orb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+```
+
+Alternatively, grant only `tokenreviews: create` on the
+`authentication.k8s.io` API group via a targeted ClusterRole:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: orb-tokenreview
+rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+```
+
+Both options are included (commented out) in [`rbac.yaml`](rbac.yaml).
+
+### Role mapping
+
+Configure which ServiceAccounts map to which ORB roles in the auth
+config section (not the provider config):
+
+```json
+{
+  "auth": {
+    "provider_auth": {
+      "kubernetes": {
+        "sa_role_mapping": {
+          "orb-system:orb-admin": ["admin"],
+          "orb-system:orb-operator": ["operator"],
+          "*:ci-runner": ["user"]
+        }
+      }
+    }
+  }
+}
+```
+
+Principals not matched by any entry default to `["user"]`.
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `403 Forbidden` when ORB submits a `TokenReview` | ORB's ServiceAccount lacks `tokenreviews: create` | Apply the auth-delegator ClusterRoleBinding from [`rbac.yaml`](rbac.yaml). |
+| Callers get `Token rejected by Kubernetes API server` | Token has expired or is not a valid projected SA token | The caller must obtain a fresh projected token via `kubectl create token`. |
+| Auth succeeds but the caller gets the wrong role | SA principal not in `sa_role_mapping` | Add the `namespace:sa-name` entry to the mapping; or it matched a wildcard entry — check the order. |
+
 ## Why two wrappers?
 
 ORB confines every `kubernetes` SDK import to

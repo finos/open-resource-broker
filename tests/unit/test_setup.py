@@ -9,13 +9,18 @@ import pytest
 
 @pytest.mark.unit
 def test_environment_setup():
-    """Test that test environment is properly set up."""
-    # Check environment variables - TESTING is set by pytest automatically
+    """Test that test environment is properly set up.
+
+    Asserts what the root conftest ``setup_test_environment`` fixture actually
+    sets.  Cloud-provider credentials (AWS_DEFAULT_REGION, AWS_ACCESS_KEY_ID,
+    etc.) are deliberately NOT set by the root conftest so that live suites
+    inherit the operator's real environment untouched.
+    """
+    # PYTEST_CURRENT_TEST is set by pytest for the duration of each test
     assert os.environ.get("PYTEST_CURRENT_TEST") is not None
-    assert os.environ.get("AWS_DEFAULT_REGION") == "us-east-1"
-    assert os.environ.get("AWS_ACCESS_KEY_ID") == "testing"
-    # ENVIRONMENT variable is set by conftest.py during test runs
-    assert os.environ.get("AWS_DEFAULT_REGION") is not None
+    # These vars are explicitly set by setup_test_environment in conftest.py
+    assert os.environ.get("TESTING") == "true"
+    assert os.environ.get("LOG_LEVEL") == "DEBUG"
 
 
 @pytest.mark.unit

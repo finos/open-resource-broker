@@ -24,7 +24,7 @@ import pytest
 from prometheus_client import generate_latest
 
 from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitState
-from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
+from orb.providers.k8s.infrastructure.instrumentation.metrics import K8sMetrics
 from orb.providers.k8s.resilience.circuit_breaker import K8sCircuitBreaker
 from orb.providers.k8s.watch.pod_state_cache import PodStateCache  # noqa: F401
 from orb.providers.k8s.watch.watcher import K8sWatcher

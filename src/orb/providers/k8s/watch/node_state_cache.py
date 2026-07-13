@@ -15,8 +15,12 @@ per-instance ``provider_data`` with node-level metadata:
 * ``zone``               — availability zone; read from
   ``topology.kubernetes.io/zone`` (with
   ``failure-domain.beta.kubernetes.io/zone`` as a fallback).
-* ``capacity_type``      — Karpenter / cluster-autoscaler capacity type;
-  read from the ``karpenter.sh/capacity-type`` label.
+* ``region``             — cloud region; read from
+  ``topology.kubernetes.io/region`` (with
+  ``failure-domain.beta.kubernetes.io/region`` as a fallback).
+* ``capacity_type``      — canonical capacity type resolved cloud-agnostically
+  from provider-specific labels; stored as ``"spot"``, ``"ondemand"``, or
+  ``None``.
 * ``cpu_capacity``       — value of ``node.status.capacity.cpu`` as
   reported by the kubelet (e.g. ``"32"``).
 * ``memory_capacity``    — value of ``node.status.capacity.memory``
@@ -59,9 +63,12 @@ class K8sNodeState:
         zone: Availability zone from the
             ``topology.kubernetes.io/zone`` label (or the legacy
             ``failure-domain.beta.kubernetes.io/zone`` alias).
-        capacity_type: Karpenter / CAS capacity type from the
-            ``karpenter.sh/capacity-type`` label (e.g. ``"spot"``,
-            ``"on-demand"``).  ``None`` when the label is absent.
+        region: Cloud region from the ``topology.kubernetes.io/region``
+            label (or the legacy ``failure-domain.beta.kubernetes.io/region``
+            alias).  ``None`` when the label is absent or on-prem.
+        capacity_type: Canonical capacity type resolved cloud-agnostically;
+            one of ``"spot"``, ``"ondemand"``, or ``None`` when not
+            determinable (e.g. on-prem or unknown labels).
         cpu_capacity: Raw ``node.status.capacity.cpu`` string from
             the kubelet (e.g. ``"32"``).
         memory_capacity: Raw ``node.status.capacity.memory`` string
@@ -83,6 +90,7 @@ class K8sNodeState:
     name: str
     instance_type: Optional[str] = None
     zone: Optional[str] = None
+    region: Optional[str] = None
     capacity_type: Optional[str] = None
     cpu_capacity: Optional[str] = None
     memory_capacity: Optional[str] = None
@@ -130,6 +138,7 @@ class K8sNodeStateCache:
             name=state.name,
             instance_type=state.instance_type,
             zone=state.zone,
+            region=state.region,
             capacity_type=state.capacity_type,
             cpu_capacity=state.cpu_capacity,
             memory_capacity=state.memory_capacity,

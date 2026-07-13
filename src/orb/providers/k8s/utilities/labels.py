@@ -35,6 +35,11 @@ from __future__ import annotations
 
 import re
 
+from orb.providers.k8s.utilities.dns_names import (
+    DNS_1123_LABEL_MAX_LEN as _NAMESPACE_MAX_LEN,
+    DNS_1123_LABEL_REGEX as _NAMESPACE_RE,
+)
+
 # ---------------------------------------------------------------------------
 # Validation patterns
 # ---------------------------------------------------------------------------
@@ -53,14 +58,9 @@ _KEY_MAX_LEN = 63
 _VALUE_RE = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9\-_.]*[a-zA-Z0-9])?$")
 _VALUE_MAX_LEN = 63
 
-# Namespace: RFC 1123 DNS label — lower-case letters, digits, hyphens.
-# Must start and end with a letter or digit; max 63 chars.
-_NAMESPACE_RE = re.compile(r"^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$")
-_NAMESPACE_MAX_LEN = 63
-
 
 # ---------------------------------------------------------------------------
-# Exceptions (avoid circular import — must not import from k8s_errors here
+# Exceptions (avoid circular import — must not import from k8s_exceptions here
 # because utilities is imported by handlers which import exceptions already)
 # ---------------------------------------------------------------------------
 

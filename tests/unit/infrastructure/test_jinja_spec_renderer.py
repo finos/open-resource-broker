@@ -124,3 +124,51 @@ class TestJinjaSpecRenderer:
         result = renderer.render_spec(spec, context)
 
         assert result == {}
+
+    # ------------------------------------------------------------------
+    # YAML support in render_spec_from_file
+    # ------------------------------------------------------------------
+
+    def test_render_spec_from_yaml_file(self, renderer, tmp_path):
+        """render_spec_from_file parses .yaml files via yaml.safe_load."""
+        yaml_file = tmp_path / "manifest.yaml"
+        yaml_file.write_text(
+            "apiVersion: apps/v1\n"
+            "kind: Deployment\n"
+            "metadata:\n"
+            "  name: {{ resource_name }}\n"
+            "  namespace: {{ namespace }}\n"
+        )
+        ctx = {"resource_name": "orb-test", "namespace": "default"}
+        result = renderer.render_spec_from_file(str(yaml_file), ctx)
+        assert result["apiVersion"] == "apps/v1"
+        assert result["kind"] == "Deployment"
+        assert result["metadata"]["name"] == "orb-test"
+        assert result["metadata"]["namespace"] == "default"
+
+    def test_render_spec_from_yml_file(self, renderer, tmp_path):
+        """render_spec_from_file treats .yml extension the same as .yaml."""
+        yml_file = tmp_path / "manifest.yml"
+        yml_file.write_text("kind: Pod\napiVersion: v1\nspec:\n  replicas: {{ replicas }}\n")
+        result = renderer.render_spec_from_file(str(yml_file), {"replicas": 3})
+        assert result["kind"] == "Pod"
+        assert result["spec"]["replicas"] == 3
+
+    def test_render_spec_from_json_file_still_works(self, renderer, tmp_path):
+        """render_spec_from_file keeps the JSON-parse path for .json files."""
+        json_file = tmp_path / "spec.json"
+        json_file.write_text('{"apiVersion": "v1", "kind": "{{ kind }}", "replicas": 2}')
+        result = renderer.render_spec_from_file(str(json_file), {"kind": "Pod"})
+        assert result["apiVersion"] == "v1"
+        assert result["kind"] == "Pod"
+        assert result["replicas"] == 2
+
+    def test_yaml_jinja_variables_substituted(self, renderer, tmp_path):
+        """Jinja variables inside a YAML file are substituted before YAML parse."""
+        yaml_file = tmp_path / "tpl.yaml"
+        yaml_file.write_text("labels:\n  request-id: '{{ request_id }}'\n  count: '{{ count }}'\n")
+        result = renderer.render_spec_from_file(
+            str(yaml_file), {"request_id": "req-abc", "count": 5}
+        )
+        assert result["labels"]["request-id"] == "req-abc"
+        assert result["labels"]["count"] == "5"

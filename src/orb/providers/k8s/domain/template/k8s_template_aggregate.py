@@ -380,11 +380,26 @@ class K8sTemplate(Template):
     # Identity overrides
     service_account: Optional[str] = None
 
+    # StatefulSet headless-Service name (``spec.serviceName``).  The
+    # StatefulSet API requires a non-empty governing service name; by
+    # default this is set to the StatefulSet's own name so the API
+    # accepts the spec without the operator needing to pre-create a
+    # Service.  When the operator deploys a dedicated headless Service
+    # (e.g. for stable pod DNS), they should set this field to the name
+    # of that Service explicitly — it is NOT the same as service_account.
+    service_name: Optional[str] = None
+
     # Pod scheduling priority
     priority_class_name: Optional[str] = None
 
     # Pod termination
     termination_grace_period_seconds: Optional[int] = None
+
+    # Pod restart policy override.  When set the value must be one of the
+    # Kubernetes-accepted values ("Always" / "OnFailure" / "Never").  Per-kind
+    # validity (Deployment/StatefulSet require "Always", Job accepts only
+    # "Never"/"OnFailure") is enforced at spec-build time, not here.
+    restart_policy: Optional[str] = None
 
     # Container health probes
     readiness_probe: Optional[K8sProbe] = None
@@ -417,6 +432,16 @@ class K8sTemplate(Template):
     # ``provider_api_spec`` field — see
     # :class:`orb.providers.k8s.infrastructure.services.k8s_native_spec_service.K8sNativeSpecService`.
     native_spec: Optional[dict[str, Any]] = None
+
+    # Path to a YAML or JSON manifest file whose contents are Jinja-rendered
+    # and used as the native spec body (same pipeline as inline ``native_spec``
+    # but loaded from a file at acquire time).  Mirrors the AWS provider's
+    # ``spec_file_base_path`` / native-spec file loading pattern.
+    # Relative paths are resolved against ``K8sProviderConfig.native_spec_base_path``
+    # when set, otherwise against the current working directory.  Absolute
+    # paths are used as-is.  When both ``native_spec`` and ``native_spec_path``
+    # are set, inline ``native_spec`` takes precedence and a warning is logged.
+    native_spec_path: Optional[str] = None
 
     def __init__(self, **data: Any) -> None:
         """Initialise the K8sTemplate.
@@ -504,6 +529,22 @@ class K8sTemplate(Template):
             raise ValueError("completions / parallelism must be positive integers")
         return value
 
+    @field_validator("restart_policy")
+    @classmethod
+    def _validate_restart_policy(cls, value: Optional[str]) -> Optional[str]:
+        """Reject restart_policy values outside the Kubernetes-accepted set.
+
+        Per-kind validity (Deployment/StatefulSet require "Always"; Job accepts
+        only "Never"/"OnFailure") is enforced at spec-build time — this validator
+        only guards the universally-legal set.
+        """
+        if value is not None and value not in ("Always", "OnFailure", "Never"):
+            raise ValueError(
+                f"restart_policy {value!r} is not a valid Kubernetes restartPolicy. "
+                "Allowed values: 'Always', 'OnFailure', 'Never'."
+            )
+        return value
+
     # ------------------------------------------------------------------
     # Extension-config promotion + service-account fallback
     # ------------------------------------------------------------------
@@ -542,10 +583,13 @@ class K8sTemplate(Template):
             self._promote_field(pc, "parallelism")
             self._promote_field(pc, "priority_class_name")
             self._promote_field(pc, "termination_grace_period_seconds")
+            self._promote_field(pc, "restart_policy")
             self._promote_field(pc, "ttl_seconds_after_finished")
             self._promote_field(pc, "active_deadline_seconds")
             self._promote_field(pc, "pod_spec_override")
             self._promote_field(pc, "native_spec")
+            self._promote_field(pc, "native_spec_path")
+            self._promote_field(pc, "service_name")
 
             # Coerced probe / security-context fields go through per-field validators.
             if self.readiness_probe is None and pc.get("readiness_probe") is not None:

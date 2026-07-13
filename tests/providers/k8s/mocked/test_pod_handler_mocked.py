@@ -544,7 +544,7 @@ async def test_pod_created_in_template_namespace_override(
     """
     from kmock import resource
 
-    from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 
     # Register the pods resource under both namespaces so kmock accepts creates.
     pod_res = resource("", "v1", "pods")

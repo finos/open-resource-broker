@@ -78,7 +78,7 @@ orb templates generate --provider-name kubernetes --provider-api Pod
 ```
 
 This emits a template that targets the Kubernetes provider's Pod handler.
-Tweak `container_image`, `resource_requests`, `resource_limits`, and any
+Tweak `image_id`, `resource_requests`, `resource_limits`, and any
 `node_selector` / `tolerations` to match your cluster, then save it.
 
 ### 4. Request capacity
@@ -102,6 +102,70 @@ Releases trigger a `delete_namespaced_pod` call (or the appropriate
 controller-driven replica reduction for Deployment / StatefulSet / Job
 workloads).
 
+## AWS concepts mapped to Kubernetes
+
+If you are familiar with the AWS provider, this table shows the
+equivalent concept in the Kubernetes world.
+
+| AWS concept                       | Kubernetes equivalent                                                     |
+|-----------------------------------|---------------------------------------------------------------------------|
+| EC2 instance                      | Pod                                                                       |
+| Auto Scaling Group / EC2 Fleet    | Deployment or StatefulSet (controller manages the replica set)            |
+| Amazon Machine Image (AMI)        | Container image (`image_id` field, e.g. `registry/name:tag`)             |
+| Instance type label               | Node label (`node.kubernetes.io/instance-type` or custom node selector)   |
+| Spot / On-Demand capacity type    | Karpenter `karpenter.sh/capacity-type: spot` / `on-demand` node label     |
+| `terminate`                       | Pod `delete`, or scale Deployment / StatefulSet to 0                      |
+| `start` / `stop`                  | Scale Deployment / StatefulSet `spec.replicas` between 0 and N (see [START/STOP operations](#startstop-operations)) |
+| IAM instance profile              | Kubernetes ServiceAccount (`service_account` template field)              |
+| AWS region                        | Kubernetes namespace or cluster context                                   |
+| EC2 security group                | NetworkPolicy                                                             |
+| EBS volume                        | PersistentVolumeClaim (declare via `volumeClaimTemplates` on StatefulSet) |
+| `provider_api_spec` native body   | `native_spec` field on `K8sTemplate` (see [Native spec escape hatch](native-spec.md)) |
+
+Key differences to keep in mind:
+
+* ORB identifies managed resources by the `orb.io/request-id` label,
+  not by name.  Names are cosmetic and generated according to the
+  [naming policy](#configurable-resource-naming); do not rely on them in
+  external scripts.
+* Kubernetes does not have a machine-level "stopped" state for bare
+  Pods or Jobs.  START and STOP operations are only meaningful for
+  Deployment and StatefulSet workloads (scale to 0 / restore).
+
+## START/STOP operations
+
+For Deployment and StatefulSet workloads, ORB maps the
+`START_INSTANCES` and `STOP_INSTANCES` operations to `spec.replicas`
+scaling:
+
+* **STOP** — patches `spec.replicas` to `0` and archives the original
+  count in `provider_data["replicas_before_stop"]`.  All pods are
+  terminated by the controller.
+* **START** — patches `spec.replicas` back to the archived pre-stop
+  count (or falls back to the acquire-time count).
+
+Pod and Job workloads return an `UNSUPPORTED_OPERATION_FOR_KIND` error
+because pods and jobs cannot be meaningfully paused and resumed.
+
+Required RBAC (`deployments/scale` and `statefulsets/scale` get/patch)
+is included in the baseline [`rbac.yaml`](rbac.yaml).
+
+## Configurable resource naming
+
+Every managed resource receives a name generated as
+`<prefix>-<uuid_segment>` for controller kinds (Deployment, StatefulSet,
+Job) and `<prefix>-<uuid_segment>-<seq:04d>` for individual Pods, where
+`uuid_segment` is the first `uuid_chars` hex characters of the
+hyphen-stripped request UUID.
+
+Names are cosmetic — ORB recovers state via the `orb.io/request-id`
+label, not by parsing the name.  The defaults reproduce the historical
+naming pattern so upgrades do not affect existing resources.
+
+The naming policy is controlled by the `naming` field on
+`K8sProviderConfig`.  See [Configuration reference](configuration.md#resource-naming)
+for all available fields.
+
 ## What is in this section
 
 * [Infrastructure discovery](discovery.md) - interactive `orb init` flow, the
@@ -111,12 +175,12 @@ workloads).
 * [Handlers](handlers.md) - Pod, Deployment, StatefulSet, Job; when to pick each.
 * [Native spec escape hatch](native-spec.md) - submit a full kubernetes
   API body and bypass the typed builders for fields ORB does not model.
-* [Authentication](auth.md) - in-cluster vs kubeconfig, troubleshooting.
-* [RBAC example](rbac.yaml) - minimum ServiceAccount + Role + RoleBinding.
+* [Authentication](auth.md) - in-cluster vs kubeconfig, inbound TokenReview auth, troubleshooting.
+* [RBAC example](rbac.yaml) - minimum ServiceAccount + Role + RoleBinding, with all opt-in grants documented.
 * [Migrating from `orb.k8s_legacy`](migrating-from-k8s-legacy.md) - template field
   mapping, label deltas, coexistence guidance.
 * [Security hardening](security-hardening.md) - pod-spec audit, high-risk
-  field warnings, and how to enable reject mode.
+  field reject mode (on by default), and how to disable it for legitimate workloads.
 * [Authoring a provider plugin](plugin-authoring.md) - extending the
   provider via the `orb.providers` entry-point group, with a worked
   MPIJob example.

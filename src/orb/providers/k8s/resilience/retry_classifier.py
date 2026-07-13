@@ -9,7 +9,11 @@ from __future__ import annotations
 
 from orb.domain.base.ports.retry_classifier_port import RetryClassifierPort
 
-_NON_RETRYABLE_STATUSES: frozenset[int] = frozenset({400, 403, 404, 409, 410, 422})
+# 401 is non-retryable: an expired ServiceAccount token needs refresh, not retry.
+# Retrying a 401 wastes the retry budget and falsely increments the circuit-breaker
+# failure counter.  K8sAuthenticationError is the typed exception for 401; the
+# caller should trigger token refresh (handled by K8sClient) and then re-issue.
+_NON_RETRYABLE_STATUSES: frozenset[int] = frozenset({400, 401, 403, 404, 409, 410, 422})
 
 
 class K8sRetryClassifier(RetryClassifierPort):

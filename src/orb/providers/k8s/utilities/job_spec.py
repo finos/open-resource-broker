@@ -34,8 +34,8 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
-from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.domain.template.k8s_template import upcast_to_k8s_template
+from orb.providers.k8s.configuration.config import K8sNamingConfig, K8sProviderConfig
+from orb.providers.k8s.domain.template.k8s_template_aggregate import upcast_to_k8s_template
 from orb.providers.k8s.utilities.pod_spec import (
     _DEFAULT_LABEL_PREFIX,
     apply_pod_spec_override,
@@ -49,6 +49,7 @@ from orb.providers.k8s.utilities.pod_spec import (
     build_pod_volumes,
     resolve_image_pull_secret_name,
     resolve_node_selector,
+    resolve_restart_policy,
 )
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
@@ -57,13 +58,35 @@ if TYPE_CHECKING:  # pragma: no cover — type-checking only
 
 _JOB_NAME_MAX_LEN = 50  # 63 - "-XXXXX" plus a margin for the controller suffix
 
+_DEFAULT_JOB_UUID_CHARS = 8
 
-def make_job_name(request_id: str) -> str:
-    """Build a deterministic Job name for an ORB request."""
-    prefix = (request_id or "unknown")[:8]
-    name = f"orb-{prefix}"
-    if len(name) > _JOB_NAME_MAX_LEN:  # pragma: no cover — defensive
-        name = name[:_JOB_NAME_MAX_LEN]
+
+def make_job_name(
+    request_id: str,
+    naming: Optional[K8sNamingConfig] = None,
+) -> str:
+    """Build a deterministic Job name for an ORB request.
+
+    When *naming* is ``None`` the historical ``orb-{uuid[:8]}`` pattern is
+    reproduced for backward compatibility.
+    """
+    if naming is not None:
+        pfx = naming.prefix
+        n_chars = naming.uuid_chars
+        max_len = naming.max_job_name_len
+    else:
+        pfx = "orb"
+        n_chars = _DEFAULT_JOB_UUID_CHARS
+        max_len = _JOB_NAME_MAX_LEN
+    rid = request_id or "unknown"
+    # Strip a leading req- / req_ prefix so the uuid segment is pure hex.
+    if rid.startswith(("req-", "req_")):
+        rid = rid[4:]
+    safe = rid.replace("-", "")
+    uuid_seg = safe[:n_chars] if safe else "unknown"
+    name = f"{pfx}-{uuid_seg}"
+    if len(name) > max_len:  # pragma: no cover — defensive
+        name = name[:max_len]
     return name
 
 
@@ -150,9 +173,15 @@ def build_job_spec(
     volumes = build_pod_volumes(k8s_template)
     security_context = build_pod_security_context(k8s_template.security_context)
 
+    restart_policy = resolve_restart_policy(
+        k8s_template,
+        config=config,
+        kind_default="Never",
+        allowed_values=frozenset({"Never", "OnFailure"}),
+    )
     pod_spec_kwargs: dict[str, Any] = {
         "containers": [container],
-        "restart_policy": "Never",
+        "restart_policy": restart_policy,
     }
     if node_selector is not None:
         pod_spec_kwargs["node_selector"] = node_selector
@@ -185,7 +214,9 @@ def build_job_spec(
 
     if k8s_template.pod_spec_override:
         transient = V1Pod(spec=pod_template.spec)
-        merged = apply_pod_spec_override(transient, k8s_template.pod_spec_override)
+        merged = apply_pod_spec_override(
+            transient, k8s_template.pod_spec_override, expected_restart_policy=restart_policy
+        )
         pod_template.spec = merged.spec
 
     effective_parallelism = (
@@ -225,4 +256,5 @@ def build_job_spec(
 __all__ = [
     "build_job_spec",
     "make_job_name",
+    "_JOB_NAME_MAX_LEN",
 ]

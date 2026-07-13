@@ -59,28 +59,29 @@ def _make_container_with_otel(otel_config: OtelConfig) -> DIContainer:
 def _reset_otel_globals():
     """Reset telemetry state before and after every test for isolation.
 
-    Also restores the global OTel MeterProvider so that enabled=True tests
-    installing a real provider do not leak into subsequent tests.
+    OTel's set_meter_provider() is intentionally a one-shot operation
+    (guarded by a Once gate): calling it a second time is a no-op.  Trying
+    to "restore" the original proxy provider after each test by calling
+    set_meter_provider(_PROXY_METER_PROVIDER) is therefore wrong — if the
+    Once gate has not yet fired it fires with the proxy as its own argument,
+    causing _ProxyMeterProvider.on_set_meter_provider(_PROXY_METER_PROVIDER)
+    to hold _ProxyMeterProvider._lock and then call back into
+    _ProxyMeterProvider.get_meter(), which tries to acquire the same lock a
+    second time and deadlocks indefinitely (seen as ~277 s hangs under
+    Python 3.14, where the deadlock is reliably deterministic because
+    threading.Lock acquire now always blocks without a timeout by default).
+
+    The correct approach for unit tests that only test idempotency flags and
+    module-level _state is to reset _state via _reset_telemetry_state() and
+    to mock opentelemetry.metrics.set_meter_provider at the call sites that
+    need it (which the enabled-path tests already do).  We must not attempt
+    to mutate OTel's process-wide Once-guarded singleton in teardown.
     """
     telemetry_module._reset_telemetry_state()
-    # Capture the current global meter provider so we can restore it.
-    try:
-        from opentelemetry import metrics as _otel_metrics
-
-        _original_meter_provider = _otel_metrics.get_meter_provider()
-    except (ImportError, Exception):
-        _original_meter_provider = None
 
     yield
 
     telemetry_module._reset_telemetry_state()
-
-    # Restore the global meter provider to what it was before the test.
-    if _original_meter_provider is not None:
-        with suppress(Exception):
-            from opentelemetry import metrics as _otel_metrics
-
-            _otel_metrics.set_meter_provider(_original_meter_provider)
 
 
 # ---------------------------------------------------------------------------

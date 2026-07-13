@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from orb.application.dto.queries import ListMachinesQuery
-from orb.application.machine.commands import UpdateMachineStatusCommand
+from orb.application.dto.queries import GetMachineQuery, ListMachinesQuery
+from orb.application.machine.commands import (
+    UpdateMachineProviderDataCommand,
+    UpdateMachineStatusCommand,
+)
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.ports.query_bus_port import QueryBusPort
 from orb.application.provider.commands import ExecuteProviderOperationCommand
@@ -88,9 +91,34 @@ class StopMachinesOrchestrator(OrchestratorBase[StopMachinesInput, StopMachinesO
                     message=f"Cannot resolve active provider: {exc}",
                 )
 
+        # Fetch per-machine coordinates so provider-specific strategies (e.g.
+        # k8s) can resolve the workload controller rather than treating a pod
+        # name as the target.  Machines whose details cannot be fetched are
+        # attempted with the bare machine_id only.
+        machine_provider_data: dict[str, dict] = {}
+        for mid in machine_ids:
+            try:
+                dto = await self._query_bus.execute(GetMachineQuery(machine_id=mid))
+                if dto is not None:
+                    machine_provider_data[mid] = {
+                        "provider_data": dto.provider_data or {},
+                        "provider_api": dto.provider_api or "",
+                        "resource_id": dto.resource_id or "",
+                        "request_id": dto.request_id or "",
+                    }
+            except Exception as exc:
+                self._logger.warning(
+                    "StopMachinesOrchestrator: could not fetch machine %s details: %s",
+                    mid,
+                    exc,
+                )
+
         operation = ProviderOperation(
             operation_type=ProviderOperationType.STOP_INSTANCES,
-            parameters={"instance_ids": machine_ids},
+            parameters={
+                "instance_ids": machine_ids,
+                "machine_coordinates": machine_provider_data,
+            },
         )
         command = ExecuteProviderOperationCommand(
             operation=operation, strategy_override=strategy_override
@@ -99,8 +127,14 @@ class StopMachinesOrchestrator(OrchestratorBase[StopMachinesInput, StopMachinesO
 
         if command.result and command.result.get("success"):
             stop_results: dict[str, bool] = command.result.get("data", {}).get("results", {})
+            # Per-machine pre-stop replica counts returned by the k8s provider
+            # so start can restore the correct value later.
+            per_machine_replicas: dict[str, int] = (
+                command.result.get("data", {}).get("replicas_before_stop_per_machine") or {}
+            )
         else:
             stop_results = {mid: False for mid in machine_ids}
+            per_machine_replicas = {}
 
         stopped_machines: list[str] = []
         failed_machines: list[str] = []
@@ -109,6 +143,24 @@ class StopMachinesOrchestrator(OrchestratorBase[StopMachinesInput, StopMachinesO
             if success:
                 status_cmd = UpdateMachineStatusCommand(machine_id=machine_id, status="stopping")
                 await self._command_bus.execute(status_cmd)
+                # Persist the pre-stop replica count so start can restore the
+                # correct value even after a manual scale event between stop
+                # and start.
+                replicas_count = per_machine_replicas.get(machine_id)
+                if replicas_count is not None:
+                    try:
+                        pd_cmd = UpdateMachineProviderDataCommand(
+                            machine_id=machine_id,
+                            updates={"replicas_before_stop": replicas_count},
+                        )
+                        await self._command_bus.execute(pd_cmd)
+                    except Exception as exc:
+                        self._logger.warning(
+                            "StopMachinesOrchestrator: could not persist replicas_before_stop "
+                            "for %s: %s",
+                            machine_id,
+                            exc,
+                        )
                 stopped_machines.append(machine_id)
             else:
                 failed_machines.append(machine_id)

@@ -45,7 +45,7 @@ class KubernetesTemplateExampleGeneratorAdapter:
                 matches are returned (e.g. ``"Pod"``, ``"Deployment"``).
 
         Returns:
-            List of :class:`~orb.providers.k8s.domain.template.k8s_template.K8sTemplate`
+            List of :class:`~orb.providers.k8s.domain.template.k8s_template_aggregate.K8sTemplate`
             instances.
         """
         plugin_factories = _resolve_plugin_factories()

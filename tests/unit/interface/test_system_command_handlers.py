@@ -65,10 +65,7 @@ class TestStubHandlers:
             mock_formatter if t is ResponseFormattingService else mock_registry
         )
 
-        with patch(
-            "orb.interface.system_command_handlers.get_container", return_value=mock_container
-        ):
-            result = await handle_reload_provider_config(_ns())
+        result = await handle_reload_provider_config(_ns(_container=mock_container))
 
         assert isinstance(result, InterfaceResponse)
 
@@ -100,8 +97,7 @@ class TestHandleProviderHealth:
         container = MagicMock()
         container.get.return_value = orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_provider_health(_ns())
+        result = await handle_provider_health(_ns(_container=container))
 
         orchestrator.execute.assert_awaited_once()
         assert isinstance(result, dict)
@@ -121,8 +117,7 @@ class TestHandleProviderConfig:
         container = MagicMock()
         container.get.return_value = orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_provider_config(_ns())
+        result = await handle_provider_config(_ns(_container=container))
 
         orchestrator.execute.assert_awaited_once()
         assert isinstance(result, dict)
@@ -142,8 +137,7 @@ class TestHandleProviderMetrics:
         container = MagicMock()
         container.get.return_value = orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_provider_metrics(_ns(provider_name="aws"))
+        result = await handle_provider_metrics(_ns(provider_name="aws", _container=container))
 
         orchestrator.execute.assert_awaited_once()
         call_input = orchestrator.execute.call_args[0][0]
@@ -159,8 +153,7 @@ class TestHandleProviderMetrics:
         container = MagicMock()
         container.get.return_value = orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            await handle_provider_metrics(_ns())
+        await handle_provider_metrics(_ns(_container=container))
 
         call_input = orchestrator.execute.call_args[0][0]
         assert call_input.provider_name is None
@@ -184,8 +177,7 @@ class TestHandleSystemStatus:
             query_bus if t.__name__ == "QueryBus" else mock_formatter
         )
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_system_status(_ns(verbose=True))
+        result = await handle_system_status(_ns(verbose=True, _container=container))
 
         query_bus.execute.assert_awaited_once()
         q = query_bus.execute.call_args[0][0]
@@ -209,8 +201,7 @@ class TestHandleSystemStatus:
             query_bus if t.__name__ == "QueryBus" else mock_formatter
         )
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            await handle_system_status(_ns())
+        await handle_system_status(_ns(_container=container))
 
         q = query_bus.execute.call_args[0][0]
         assert isinstance(q, GetSystemStatusQuery)
@@ -240,8 +231,7 @@ class TestHandleListProviders:
         container = MagicMock()
         container.get.return_value = mock_orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_list_providers(_ns())
+        result = await handle_list_providers(_ns(_container=container))
 
         assert result["count"] == 1
         assert result["providers"][0]["name"] == "aws-default"
@@ -263,8 +253,7 @@ class TestHandleListProviders:
         container = MagicMock()
         container.get.return_value = mock_orchestrator
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            result = await handle_list_providers(_ns())
+        result = await handle_list_providers(_ns(_container=container))
 
         assert result["count"] == 0
         assert result["providers"] == []
@@ -276,9 +265,8 @@ class TestHandleListProviders:
         container = MagicMock()
         container.get.side_effect = RuntimeError("container exploded")
 
-        with patch("orb.interface.system_command_handlers.get_container", return_value=container):
-            with pytest.raises(Exception, match="container exploded"):
-                await handle_list_providers(_ns())
+        with pytest.raises(Exception, match="container exploded"):
+            await handle_list_providers(_ns(_container=container))
 
 
 # ---------------------------------------------------------------------------

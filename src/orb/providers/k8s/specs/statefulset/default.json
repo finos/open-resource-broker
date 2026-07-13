@@ -2,14 +2,14 @@
   "apiVersion": "apps/v1",
   "kind": "StatefulSet",
   "metadata": {
-    "name": "orb-{{ request_id[:8] }}",
+    "name": "{{ resource_name }}",
     "namespace": "{{ namespace }}",
     "labels": {{ labels | tojson }}{% if has_annotations %},
     "annotations": {{ annotations | tojson }}{% endif %}
   },
   "spec": {
     "replicas": {{ replicas }},
-    "serviceName": "orb-{{ request_id[:8] }}",
+    "serviceName": "{{ resource_name }}",
     "selector": {
       "matchLabels": {
         "{{ label_prefix }}/request-id": "{{ request_id }}",
@@ -26,13 +26,17 @@
         {% if has_service_account %}"serviceAccountName": "{{ service_account }}",{% endif %}
         {% if has_runtime_class %}"runtimeClassName": "{{ runtime_class }}",{% endif %}
         {% if has_node_selector %}"nodeSelector": {{ node_selector | tojson }},{% endif %}
+        {% if has_tolerations %}"tolerations": {{ tolerations | tojson }},{% endif %}
         {% if has_image_pull_secret %}"imagePullSecrets": [{"name": "{{ image_pull_secret }}"}],{% endif %}
+        {% if has_volumes %}"volumes": {{ volumes | tojson }},{% endif %}
         "containers": [
           {
             "name": "orb",
             "image": "{{ image }}"{% if has_command %},
             "command": {{ command | tojson }}{% endif %}{% if has_args %},
-            "args": {{ args | tojson }}{% endif %}{% if has_resource_requests or has_resource_limits %},
+            "args": {{ args | tojson }}{% endif %}{% if has_env %},
+            "env": {{ env | tojson }}{% endif %}{% if has_volume_mounts %},
+            "volumeMounts": {{ volume_mounts | tojson }}{% endif %}{% if has_resource_requests or has_resource_limits %},
             "resources": {
               {% if has_resource_requests %}"requests": {{ resource_requests | tojson }}{% if has_resource_limits %},{% endif %}{% endif %}
               {% if has_resource_limits %}"limits": {{ resource_limits | tojson }}{% endif %}

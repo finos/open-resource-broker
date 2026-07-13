@@ -35,6 +35,14 @@ class K8sTemplateDTOConfig(BaseModel):
     service_account: Optional[str] = Field(
         None, description="``serviceAccountName`` applied to pods."
     )
+    service_name: Optional[str] = Field(
+        None,
+        description=(
+            "StatefulSet ``spec.serviceName`` — the governing headless-Service name. "
+            "Defaults to the StatefulSet's own name when unset.  "
+            "Must not be set to the ServiceAccount name; those are different resources."
+        ),
+    )
     node_selector: Optional[dict[str, str]] = Field(
         None, description="``nodeSelector`` applied to pods."
     )
@@ -105,6 +113,17 @@ class K8sTemplateDTOConfig(BaseModel):
         None, description="``terminationGracePeriodSeconds`` applied to pods."
     )
 
+    # Pod restart policy
+    restart_policy: Optional[str] = Field(
+        None,
+        description=(
+            "``restartPolicy`` applied to pods.  One of 'Always' / 'OnFailure' / "
+            "'Never'.  Per-kind constraints apply at build time: "
+            "Deployment/StatefulSet always use 'Always'; Job accepts only "
+            "'Never'/'OnFailure'; bare Pod accepts any."
+        ),
+    )
+
     # Container health probes
     readiness_probe: Optional[dict[str, Any]] = Field(
         None, description="Readiness probe applied to the container."
@@ -148,6 +167,20 @@ class K8sTemplateDTOConfig(BaseModel):
         description=(
             "Full native kubernetes API body passed straight to the SDK when "
             "the provider's native-spec escape hatch is enabled."
+        ),
+    )
+
+    # Path to a YAML or JSON manifest file used as the native spec body.
+    # When set, the file is Jinja-rendered and used the same way as an inline
+    # ``native_spec``.  Relative paths are resolved against
+    # ``K8sProviderConfig.native_spec_base_path``; absolute paths are used
+    # as-is.  ``native_spec`` takes precedence when both are present.
+    native_spec_path: Optional[str] = Field(
+        None,
+        description=(
+            "Path to a YAML or JSON manifest file rendered as the native spec "
+            "body at acquire time.  Relative paths are resolved against the "
+            "configured native_spec_base_path."
         ),
     )
 

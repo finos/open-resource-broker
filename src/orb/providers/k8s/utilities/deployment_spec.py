@@ -22,12 +22,13 @@ confined to the provider tree (enforced by the
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
-from orb.providers.k8s.configuration.config import K8sProviderConfig
-from orb.providers.k8s.domain.template.k8s_template import upcast_to_k8s_template
+from orb.providers.k8s.configuration.config import K8sNamingConfig, K8sProviderConfig
+from orb.providers.k8s.domain.template.k8s_template_aggregate import upcast_to_k8s_template
 from orb.providers.k8s.utilities.pod_spec import (
     _DEFAULT_LABEL_PREFIX,
     apply_pod_spec_override,
@@ -46,6 +47,8 @@ from orb.providers.k8s.utilities.pod_spec import (
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from kubernetes.client import V1Deployment
 
+_logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Deployment name helpers
@@ -56,13 +59,37 @@ if TYPE_CHECKING:  # pragma: no cover — type-checking only
 # plus a pod-suffix (~16 chars), so the deployment name needs headroom.
 _DEPLOYMENT_NAME_MAX_LEN = 47  # 63 - 16-char controller suffix budget
 
+# Default uuid_chars for callers without a naming config (reproduces
+# the original ``orb-{request_id[:8]}`` pattern).
+_DEFAULT_DEPLOYMENT_UUID_CHARS = 8
 
-def make_deployment_name(request_id: str) -> str:
-    """Build a deterministic Deployment name for an ORB request."""
-    prefix = (request_id or "unknown")[:8]
-    name = f"orb-{prefix}"
-    if len(name) > _DEPLOYMENT_NAME_MAX_LEN:  # pragma: no cover — defensive
-        name = name[:_DEPLOYMENT_NAME_MAX_LEN]
+
+def make_deployment_name(
+    request_id: str,
+    naming: Optional[K8sNamingConfig] = None,
+) -> str:
+    """Build a deterministic Deployment name for an ORB request.
+
+    When *naming* is ``None`` the historical ``orb-{uuid[:8]}`` pattern is
+    reproduced for backward compatibility.
+    """
+    if naming is not None:
+        pfx = naming.prefix
+        n_chars = naming.uuid_chars
+        max_len = naming.max_deployment_name_len
+    else:
+        pfx = "orb"
+        n_chars = _DEFAULT_DEPLOYMENT_UUID_CHARS
+        max_len = _DEPLOYMENT_NAME_MAX_LEN
+    rid = request_id or "unknown"
+    # Strip a leading req- / req_ prefix so the uuid segment is pure hex.
+    if rid.startswith(("req-", "req_")):
+        rid = rid[4:]
+    safe = rid.replace("-", "")
+    uuid_seg = safe[:n_chars] if safe else "unknown"
+    name = f"{pfx}-{uuid_seg}"
+    if len(name) > max_len:  # pragma: no cover — defensive
+        name = name[:max_len]
     return name
 
 
@@ -149,6 +176,17 @@ def build_deployment_spec(
     volumes = build_pod_volumes(k8s_template)
     security_context = build_pod_security_context(k8s_template.security_context)
 
+    # Deployment pods MUST use restartPolicy=Always — the Kubernetes API server
+    # rejects any other value in a Deployment pod template.  If an operator set a
+    # different value on the template, warn and ignore it rather than produce a
+    # spec the apiserver will reject.
+    if k8s_template.restart_policy not in (None, "Always"):
+        _logger.warning(
+            "restart_policy=%r on template %r is ignored for Deployment workloads; "
+            "the Kubernetes API requires 'Always' for Deployment pod templates.",
+            k8s_template.restart_policy,
+            k8s_template.template_id,
+        )
     pod_spec_kwargs: dict[str, Any] = {
         "containers": [container],
         "restart_policy": "Always",
@@ -184,7 +222,9 @@ def build_deployment_spec(
 
     if k8s_template.pod_spec_override:
         transient = V1Pod(spec=pod_template.spec)
-        merged = apply_pod_spec_override(transient, k8s_template.pod_spec_override)
+        merged = apply_pod_spec_override(
+            transient, k8s_template.pod_spec_override, expected_restart_policy="Always"
+        )
         pod_template.spec = merged.spec
 
     deployment_spec = V1DeploymentSpec(
@@ -208,4 +248,5 @@ def build_deployment_spec(
 __all__ = [
     "build_deployment_spec",
     "make_deployment_name",
+    "_DEPLOYMENT_NAME_MAX_LEN",
 ]

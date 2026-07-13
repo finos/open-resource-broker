@@ -84,7 +84,7 @@ class TestMetricsEndpoint:
         from opentelemetry.sdk.metrics import MeterProvider
         from prometheus_client import CollectorRegistry, generate_latest
 
-        from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
+        from orb.providers.k8s.infrastructure.instrumentation.metrics import K8sMetrics
 
         reg = CollectorRegistry()
         reader = PrometheusMetricReader(registry=reg)

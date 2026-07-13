@@ -16,7 +16,7 @@ import pytest
 
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestId, RequestType
-from orb.providers.k8s.domain.template.k8s_template import (
+from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     K8sProbe,
     K8sSecurityContext,
     K8sTemplate,

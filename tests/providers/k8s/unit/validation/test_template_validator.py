@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from orb.providers.k8s.domain.template.k8s_template import (
+from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     K8sResourceQuantities,
     K8sTemplate,
     K8sToleration,
@@ -758,8 +758,184 @@ class TestIntegration:
             resource_requests=None,
             resource_limits=None,
             tolerations=None,
+            restart_policy=None,
         )
         result = v.validate(obj)
         assert not result.valid
         # Expect at least four errors.
         assert len(result.errors) >= 4
+
+
+# ---------------------------------------------------------------------------
+# Rule 6 (relaxed) — service_account DNS-1123 subdomain (Fix 4)
+# ---------------------------------------------------------------------------
+
+
+class TestServiceAccountSubdomain:
+    """service_account should accept dotted subdomain names, not just labels."""
+
+    @pytest.mark.parametrize(
+        "sa",
+        [
+            "default",
+            "my-sa",
+            "workload-identity",
+            "sa123",
+            "my.dotted.sa",  # dotted subdomain — valid k8s serviceAccountName
+            "a.b",
+            "long-name.with.dots",
+        ],
+    )
+    def test_valid_subdomain_service_accounts(self, sa: str) -> None:
+        v = _make_validator()
+        obj = _stub(
+            template_id="t",
+            image_id="img",
+            max_instances=1,
+            provider_api=None,
+            namespace=None,
+            service_account=sa,
+            resource_requests=None,
+            resource_limits=None,
+            tolerations=None,
+            restart_policy=None,
+        )
+        result = v.validate(obj)
+        assert result.valid, f"Expected valid for service_account={sa!r}, got {result.errors}"
+
+    @pytest.mark.parametrize(
+        "sa",
+        [
+            "-bad-start",
+            "bad-end-",
+            "ALLCAPS",
+            "has spaces",
+            ".leading-dot",
+            "trailing-dot.",
+        ],
+    )
+    def test_invalid_service_accounts_still_rejected(self, sa: str) -> None:
+        v = _make_validator()
+        obj = _stub(
+            template_id="t",
+            image_id="img",
+            max_instances=1,
+            provider_api=None,
+            namespace=None,
+            service_account=sa,
+            resource_requests=None,
+            resource_limits=None,
+            tolerations=None,
+            restart_policy=None,
+        )
+        result = v.validate(obj)
+        assert not result.valid, f"Expected invalid for service_account={sa!r}"
+        assert any("service_account" in e for e in result.errors)
+
+    def test_dotted_sa_previously_rejected_now_valid(self) -> None:
+        """Regression: 'my.sa' was incorrectly rejected by the old label regex."""
+        v = _make_validator()
+        obj = _stub(
+            template_id="t",
+            image_id="img",
+            max_instances=1,
+            provider_api=None,
+            namespace=None,
+            service_account="my.service-account",
+            resource_requests=None,
+            resource_limits=None,
+            tolerations=None,
+            restart_policy=None,
+        )
+        result = v.validate(obj)
+        assert result.valid, f"Dotted SA name should be valid, got {result.errors}"
+
+
+# ---------------------------------------------------------------------------
+# Rule 9 — restart_policy per-kind (Fix 3)
+# ---------------------------------------------------------------------------
+
+
+class TestRestartPolicyPerKind:
+    """restart_policy must be compatible with the workload kind."""
+
+    def _stub_with_restart(self, provider_api: str | None, restart_policy: str | None) -> Any:
+        return _stub(
+            template_id="t",
+            image_id="img",
+            max_instances=1,
+            provider_api=provider_api,
+            namespace=None,
+            service_account=None,
+            resource_requests=None,
+            resource_limits=None,
+            tolerations=None,
+            restart_policy=restart_policy,
+        )
+
+    # Job constraints
+    def test_job_never_is_valid(self) -> None:
+        v = _make_validator()
+        result = v.validate(self._stub_with_restart("Job", "Never"))
+        assert result.valid, result.errors
+
+    def test_job_on_failure_is_valid(self) -> None:
+        v = _make_validator()
+        result = v.validate(self._stub_with_restart("Job", "OnFailure"))
+        assert result.valid, result.errors
+
+    def test_job_always_is_rejected(self) -> None:
+        v = _make_validator()
+        result = v.validate(self._stub_with_restart("Job", "Always"))
+        assert not result.valid
+        assert any("Job" in e and "Always" in e for e in result.errors)
+
+    # Deployment constraints
+    def test_deployment_always_is_valid(self) -> None:
+        v = _make_validator()
+        result = v.validate(self._stub_with_restart("Deployment", "Always"))
+        assert result.valid, result.errors
+
+    def test_deployment_never_is_rejected(self) -> None:
+        v = _make_validator()
+        result = v.validate(self._stub_with_restart("Deployment", "Never"))
+        assert not result.valid
+        assert any("Deployment" in e for e in result.errors)
+
+    def test_deployment_on_failure_is_rejected(self) -> None:
+        v = _make_validator()
+        result = v.validate(self._stub_with_restart("Deployment", "OnFailure"))
+        assert not result.valid
+        assert any("Deployment" in e for e in result.errors)
+
+    # StatefulSet constraints (same as Deployment)
+    def test_statefulset_always_is_valid(self) -> None:
+        v = _make_validator()
+        result = v.validate(self._stub_with_restart("StatefulSet", "Always"))
+        assert result.valid, result.errors
+
+    def test_statefulset_never_is_rejected(self) -> None:
+        v = _make_validator()
+        result = v.validate(self._stub_with_restart("StatefulSet", "Never"))
+        assert not result.valid
+        assert any("StatefulSet" in e for e in result.errors)
+
+    # Unset restart_policy: no error regardless of kind
+    def test_none_restart_policy_always_valid(self) -> None:
+        v = _make_validator()
+        for kind in ("Pod", "Deployment", "StatefulSet", "Job"):
+            result = v.validate(self._stub_with_restart(kind, None))
+            assert result.valid, f"None restart_policy for {kind} should be valid"
+
+    # Pod: no constraints (any value allowed)
+    def test_pod_accepts_any_restart_policy(self) -> None:
+        v = _make_validator()
+        for policy in ("Always", "Never", "OnFailure"):
+            result = v.validate(self._stub_with_restart("Pod", policy))
+            assert result.valid, f"Pod restart_policy={policy!r} should be valid"
+
+    # No provider_api: rule does not fire
+    def test_no_provider_api_no_restart_policy_check(self) -> None:
+        v = _make_validator()
+        result = v.validate(self._stub_with_restart(None, "Never"))
+        assert result.valid, result.errors

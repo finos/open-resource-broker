@@ -58,6 +58,56 @@ if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from kubernetes.client import V1Node
     from kubernetes.watch import Watch
 
+# ---------------------------------------------------------------------------
+# Cloud-agnostic label resolver tables
+# ---------------------------------------------------------------------------
+
+# Instance type: stable label first, beta alias second.
+_INSTANCE_TYPE_LABELS: tuple[str, ...] = (
+    "node.kubernetes.io/instance-type",
+    "beta.kubernetes.io/instance-type",
+)
+
+# Availability zone: stable label first, beta alias second.
+_ZONE_LABELS: tuple[str, ...] = (
+    "topology.kubernetes.io/zone",
+    "failure-domain.beta.kubernetes.io/zone",
+)
+
+# Region: stable label first, beta alias second.
+_REGION_LABELS: tuple[str, ...] = (
+    "topology.kubernetes.io/region",
+    "failure-domain.beta.kubernetes.io/region",
+)
+
+# Capacity type: list of (label_key, {raw_value: canonical_value, ...}) tuples.
+# Evaluated in order; first match wins.  Canonical values are "spot" or "ondemand".
+_CAPACITY_TYPE_VALUE_MAP: tuple[tuple[str, dict[str, str]], ...] = (
+    (
+        "karpenter.sh/capacity-type",
+        {"spot": "spot", "on-demand": "ondemand", "reserved": "ondemand"},
+    ),
+    (
+        "eks.amazonaws.com/capacityType",
+        {"SPOT": "spot", "ON_DEMAND": "ondemand"},
+    ),
+    (
+        "cloud.google.com/gke-provisioning",
+        {"spot": "spot", "preemptible": "spot", "standard": "ondemand"},
+    ),
+    (
+        "kubernetes.azure.com/scalesetpriority",
+        {"spot": "spot", "regular": "ondemand"},
+    ),
+)
+
+# Boolean-presence labels: if the label value equals "true" the node is spot.
+# Evaluated in order after the value-map labels have all been exhausted.
+_CAPACITY_TYPE_BOOLEAN_SPOT_LABELS: tuple[str, ...] = (
+    "cloud.google.com/gke-spot",
+    "cloud.google.com/gke-preemptible",
+)
+
 # Re-LIST timeout forwarded to the apiserver per session.  Without this
 # the stream can stall behind a dead TCP connection indefinitely.
 _DEFAULT_WATCH_TIMEOUT_SECONDS = 300
@@ -79,6 +129,51 @@ def _default_watch_factory() -> Watch:
     from kubernetes.watch import Watch as _Watch
 
     return _Watch()
+
+
+def _first_label(labels: dict[str, str], candidates: tuple[str, ...]) -> Optional[str]:
+    """Return the value of the first candidate label present in *labels*.
+
+    Returns ``None`` when none of the candidates are present.  The empty
+    string is treated as absent so callers never receive ``""``.
+    """
+    for key in candidates:
+        value = labels.get(key)
+        if value:
+            return value
+    return None
+
+
+def _resolve_capacity_type(labels: dict[str, str]) -> Optional[str]:
+    """Resolve the canonical capacity type from node labels, cloud-agnostically.
+
+    Resolution strategy (first match wins):
+
+    1. Walk ``_CAPACITY_TYPE_VALUE_MAP`` in order; for each entry check
+       whether the label is present and its value maps to a canonical string.
+    2. Walk ``_CAPACITY_TYPE_BOOLEAN_SPOT_LABELS`` in order; if the label
+       value is ``"true"`` return ``"spot"``.
+    3. None of the cloud signals matched — return ``None`` (on-prem or
+       unrecognised setup).
+
+    Adding support for a new cloud requires only a data change in
+    ``_CAPACITY_TYPE_VALUE_MAP`` or ``_CAPACITY_TYPE_BOOLEAN_SPOT_LABELS``.
+    """
+    for label_key, value_map in _CAPACITY_TYPE_VALUE_MAP:
+        raw = labels.get(label_key)
+        if raw is not None:
+            canonical = value_map.get(raw)
+            if canonical is not None:
+                return canonical
+            # Label present but unrecognised value — keep looking in case
+            # another cloud's label also exists (defensive; normally only
+            # one cloud's labels are present on any given node).
+
+    for label_key in _CAPACITY_TYPE_BOOLEAN_SPOT_LABELS:
+        if labels.get(label_key) == "true":
+            return "spot"
+
+    return None
 
 
 @injectable
@@ -334,11 +429,13 @@ class K8sNodeWatcher:
         state = self._node_to_state(node)
         self._cache.upsert(state)
         self._logger.debug(
-            "Node watcher: upserted node %s (ready=%s, instance_type=%s, zone=%s)",
+            "Node watcher: upserted node %s (ready=%s, instance_type=%s, zone=%s, region=%s, capacity_type=%s)",
             node_name,
             state.ready,
             state.instance_type,
             state.zone,
+            state.region,
+            state.capacity_type,
         )
 
     @staticmethod
@@ -373,7 +470,12 @@ class K8sNodeWatcher:
         return False
 
     def _node_to_state(self, node: V1Node) -> K8sNodeState:
-        """Convert a ``V1Node`` event payload into a :class:`K8sNodeState`."""
+        """Convert a ``V1Node`` event payload into a :class:`K8sNodeState`.
+
+        All label resolution is delegated to the module-level data-driven
+        helpers so adding a new cloud requires only a data change, not an
+        ``if/elif`` extension here.
+        """
         metadata = getattr(node, "metadata", None)
         status = getattr(node, "status", None)
 
@@ -382,18 +484,18 @@ class K8sNodeWatcher:
             dict(getattr(metadata, "labels", None) or {}) if metadata is not None else {}
         )
 
-        # Instance type — prefer the stable label, fall back to the beta alias.
-        instance_type: Optional[str] = labels.get("node.kubernetes.io/instance-type") or labels.get(
-            "beta.kubernetes.io/instance-type"
-        )
+        # Instance type — stable label preferred, beta alias as fallback.
+        instance_type: Optional[str] = _first_label(labels, _INSTANCE_TYPE_LABELS)
 
-        # Availability zone — prefer the stable label, fall back to the beta alias.
-        zone: Optional[str] = labels.get("topology.kubernetes.io/zone") or labels.get(
-            "failure-domain.beta.kubernetes.io/zone"
-        )
+        # Availability zone — stable label preferred, beta alias as fallback.
+        zone: Optional[str] = _first_label(labels, _ZONE_LABELS)
 
-        # Karpenter / CAS capacity type.
-        capacity_type: Optional[str] = labels.get("karpenter.sh/capacity-type")
+        # Region — stable label preferred, beta alias as fallback.
+        region: Optional[str] = _first_label(labels, _REGION_LABELS)
+
+        # Capacity type — cloud-agnostic resolver returns canonical
+        # "spot" / "ondemand" / None.  Raw label values are NOT stored.
+        capacity_type: Optional[str] = _resolve_capacity_type(labels)
 
         # Resource quantities from node.status.capacity and .allocatable.
         capacity = getattr(status, "capacity", None) if status is not None else None
@@ -425,9 +527,10 @@ class K8sNodeWatcher:
 
         return K8sNodeState(
             name=name,
-            instance_type=instance_type or None,
-            zone=zone or None,
-            capacity_type=capacity_type or None,
+            instance_type=instance_type,
+            zone=zone,
+            region=region,
+            capacity_type=capacity_type,
             cpu_capacity=str(cpu_capacity) if cpu_capacity is not None else None,
             memory_capacity=str(memory_capacity) if memory_capacity is not None else None,
             cpu_allocatable=str(cpu_allocatable) if cpu_allocatable is not None else None,
@@ -441,4 +544,9 @@ class _ResourceTooOld(Exception):
     """Internal sentinel for ``ApiException(status=410)`` — never escapes the module."""
 
 
-__all__ = ["K8sNodeWatcher", "WatchFactory"]
+__all__ = [
+    "K8sNodeWatcher",
+    "WatchFactory",
+    "_first_label",
+    "_resolve_capacity_type",
+]

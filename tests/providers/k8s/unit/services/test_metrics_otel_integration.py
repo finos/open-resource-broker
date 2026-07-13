@@ -33,7 +33,7 @@ def _isolated_k8s_metrics():
     from opentelemetry.sdk.metrics import MeterProvider
     from prometheus_client import CollectorRegistry
 
-    from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
+    from orb.providers.k8s.infrastructure.instrumentation.metrics import K8sMetrics
 
     reg = CollectorRegistry()
     reader = PrometheusMetricReader(registry=reg)
@@ -156,7 +156,7 @@ class TestNoDuplicatedTimeseriesError:
         from opentelemetry.sdk.metrics import MeterProvider
         from prometheus_client import CollectorRegistry
 
-        from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
+        from orb.providers.k8s.infrastructure.instrumentation.metrics import K8sMetrics
 
         # Build two completely separate stacks.
         reg_a, reg_b = CollectorRegistry(), CollectorRegistry()
@@ -201,7 +201,7 @@ class TestNoDuplicatedTimeseriesError:
         from opentelemetry.sdk.metrics import MeterProvider
         from prometheus_client import REGISTRY, CollectorRegistry
 
-        from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
+        from orb.providers.k8s.infrastructure.instrumentation.metrics import K8sMetrics
 
         # Count collectors on the global REGISTRY before.
         collectors_before = set(REGISTRY._names_to_collectors.keys())
@@ -299,7 +299,7 @@ class TestConfigureTelemetryWiresGlobalMeter:
         from prometheus_client import CollectorRegistry, generate_latest
 
         from orb.bootstrap.telemetry import _reset_telemetry_state
-        from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
+        from orb.providers.k8s.infrastructure.instrumentation.metrics import K8sMetrics
 
         # Use a fresh isolated registry so we don't pollute the global REGISTRY
         # and can make deterministic assertions.

@@ -39,7 +39,7 @@ def resolve_namespace(
 
     Args:
         template: A :class:`~orb.domain.template.template_aggregate.Template`
-            or :class:`~orb.providers.k8s.domain.template.k8s_template.K8sTemplate`
+            or :class:`~orb.providers.k8s.domain.template.k8s_template_aggregate.K8sTemplate`
             instance.
         config: The provider configuration for the target cluster.
 
@@ -50,7 +50,7 @@ def resolve_namespace(
         ValueError: When the resolved namespace is not in the configured
             ``namespaces`` allowlist.
     """
-    from orb.providers.k8s.domain.template.k8s_template import (
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import (
         upcast_to_k8s_template,
     )
 
@@ -71,7 +71,7 @@ def resolve_namespace(
 
         _validate_ns(candidate)
     except Exception as _ns_err:
-        from orb.providers.k8s.exceptions.k8s_errors import K8sError
+        from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 
         raise K8sError(
             f"Resolved namespace {candidate!r} is not a valid Kubernetes namespace: {_ns_err}"

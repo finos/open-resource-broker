@@ -460,8 +460,15 @@ class TestGetScriptsLocation:
 class TestEnvironmentOverrides:
     """Test environment variable overrides."""
 
-    def test_all_env_vars_set(self):
+    def test_all_env_vars_set(self, monkeypatch):
         """Test all ORB_* environment variables set."""
+        # Remove any ambient ORB_* vars that a previous test (e.g. one that
+        # drives CLI main() through its full init path) may have left in the
+        # environment via os.environ.setdefault, then overlay only what this
+        # test needs so the assertions are order-independent.
+        monkeypatch.delenv("ORB_ROOT_DIR", raising=False)
+        monkeypatch.delenv("ORB_SCRIPTS_DIR", raising=False)
+
         env_vars = {
             "ORB_CONFIG_DIR": "/env/config",
             "ORB_WORK_DIR": "/env/work",

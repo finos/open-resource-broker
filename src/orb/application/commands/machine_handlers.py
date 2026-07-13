@@ -6,6 +6,7 @@ from orb.application.machine.commands import (
     CleanupMachineResourcesCommand,
     DeregisterMachineCommand,
     RegisterMachineCommand,
+    UpdateMachineProviderDataCommand,
     UpdateMachineStatusCommand,
 )
 from orb.domain.base.exceptions import DuplicateError
@@ -116,6 +117,34 @@ class RegisterMachineHandler(BaseCommandHandler[RegisterMachineCommand, None]):
             metadata=command.metadata or {},
         )
         self._machine_repository.save(machine)
+
+
+@command_handler(UpdateMachineProviderDataCommand)  # type: ignore[arg-type]
+class UpdateMachineProviderDataHandler(BaseCommandHandler[UpdateMachineProviderDataCommand, None]):
+    """Merge *updates* into a machine's provider_data without clobbering other keys."""
+
+    def __init__(
+        self,
+        machine_repository: MachineRepository,
+        event_publisher: EventPublisherPort,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+    ) -> None:
+        super().__init__(logger, event_publisher, error_handler)
+        self._machine_repository = machine_repository
+
+    async def validate_command(self, command: UpdateMachineProviderDataCommand) -> None:
+        await super().validate_command(command)
+        if not command.machine_id:
+            raise ValueError("machine_id is required")
+
+    async def execute_command(self, command: UpdateMachineProviderDataCommand) -> None:
+        machine = self._machine_repository.find_by_id(command.machine_id)
+        if not machine:
+            raise MachineNotFoundError(command.machine_id)
+        merged = {**machine.provider_data, **command.updates}
+        updated = machine.set_provider_data(merged)
+        self._machine_repository.save(updated)
 
 
 @command_handler(DeregisterMachineCommand)  # type: ignore[arg-type]

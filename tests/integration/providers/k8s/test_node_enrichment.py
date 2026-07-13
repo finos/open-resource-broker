@@ -37,6 +37,8 @@ from .conftest import make_namespaced_config, make_pod_object, make_request, mak
 NODE_NAME = "node-worker-1"
 NODE_INSTANCE_TYPE = "c5.4xlarge"
 NODE_ZONE = "us-east-1b"
+NODE_REGION = "us-east-1"
+# Canonical value (already normalised by the resolver)
 NODE_CAPACITY_TYPE = "spot"
 
 
@@ -45,6 +47,7 @@ def _node_state(name: str = NODE_NAME) -> K8sNodeState:
         name=name,
         instance_type=NODE_INSTANCE_TYPE,
         zone=NODE_ZONE,
+        region=NODE_REGION,
         capacity_type=NODE_CAPACITY_TYPE,
         cpu_capacity="16",
         memory_capacity="32Gi",
@@ -130,10 +133,21 @@ async def test_list_fed_get_status_includes_node_metadata() -> None:
     instances: list[dict[str, Any]] = outcome.metadata.get("instances", [])
 
     assert len(instances) == 1
-    pd = instances[0]["provider_data"]
+    inst = instances[0]
+    pd = inst["provider_data"]
+
+    # Top-level fields promoted from node state
+    assert inst["instance_type"] == NODE_INSTANCE_TYPE
+    assert inst["price_type"] == NODE_CAPACITY_TYPE
+
+    # provider_data diagnostics — kept for UI column schema + tooling
     assert pd.get("node_instance_type") == NODE_INSTANCE_TYPE
-    assert pd.get("node_zone") == NODE_ZONE
     assert pd.get("node_capacity_type") == NODE_CAPACITY_TYPE
+    assert pd.get("node_region") == NODE_REGION
+
+    # AWS-parity keys in provider_data
+    assert pd.get("availability_zone") == NODE_ZONE
+    assert pd.get("region") == NODE_REGION
 
 
 # ---------------------------------------------------------------------------
@@ -204,10 +218,21 @@ async def test_cache_fed_get_status_includes_node_metadata() -> None:
     instances: list[dict[str, Any]] = outcome.metadata.get("instances", [])
 
     assert len(instances) == 1
-    pd = instances[0]["provider_data"]
+    inst = instances[0]
+    pd = inst["provider_data"]
+
+    # Top-level fields promoted from node state
+    assert inst["instance_type"] == NODE_INSTANCE_TYPE
+    assert inst["price_type"] == NODE_CAPACITY_TYPE
+
+    # provider_data diagnostics — kept for UI column schema + tooling
     assert pd.get("node_instance_type") == NODE_INSTANCE_TYPE
-    assert pd.get("node_zone") == NODE_ZONE
     assert pd.get("node_capacity_type") == NODE_CAPACITY_TYPE
+    assert pd.get("node_region") == NODE_REGION
+
+    # AWS-parity keys in provider_data
+    assert pd.get("availability_zone") == NODE_ZONE
+    assert pd.get("region") == NODE_REGION
 
 
 # ---------------------------------------------------------------------------
@@ -244,11 +269,19 @@ async def test_missing_node_in_cache_does_not_add_fields() -> None:
     instances: list[dict[str, Any]] = outcome.metadata.get("instances", [])
 
     assert len(instances) == 1
-    pd = instances[0]["provider_data"]
-    # None of the node enrichment keys should be present
+    inst = instances[0]
+    pd = inst["provider_data"]
+
+    # Top-level: no node info → fallback to k8s/<api>
+    assert inst["instance_type"].startswith("k8s/")
+    assert inst["price_type"] is None
+
+    # None of the node enrichment keys should be present in provider_data
     assert "node_instance_type" not in pd
-    assert "node_zone" not in pd
     assert "node_capacity_type" not in pd
+    assert "node_region" not in pd
+    assert "availability_zone" not in pd
+    assert "region" not in pd
 
 
 # ---------------------------------------------------------------------------

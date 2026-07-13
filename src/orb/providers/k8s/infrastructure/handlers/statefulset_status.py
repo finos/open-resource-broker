@@ -298,6 +298,26 @@ class StatefulSetStatusResolver:
                 pending_count=pending_count,
                 failed_count=failed_count,
             )
+        # Partial-cache crashloop guard: when the cache returns fewer pods than
+        # requested (e.g. watcher hasn't seen all pods yet), the "all failed"
+        # branch above won't fire.  But if every pod we *can* see is failed,
+        # nothing is pending, and nothing is ready, the StatefulSet is not making
+        # progress — AWS fleet_fulfilment parity: failed only when pending == 0
+        # AND ready == 0.  The pending_count == 0 guard prevents false-failing a
+        # still-scaling StatefulSet where the controller is respawning pods.
+        if failed_count > 0 and pending_count == 0 and effective_ready == 0:
+            return ProviderFulfilment(
+                state="failed",
+                message=(
+                    f"StatefulSet not progressing: {failed_count} pod(s) failed, "
+                    f"none pending or ready (partial cache view possible)"
+                ),
+                target_units=requested_count,
+                fulfilled_units=0,
+                running_count=0,
+                pending_count=0,
+                failed_count=failed_count,
+            )
         if effective_ready > 0:
             return ProviderFulfilment(
                 state="partial",

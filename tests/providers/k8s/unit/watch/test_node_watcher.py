@@ -5,7 +5,10 @@ inject a stub ``Watch`` via the ``watch_factory`` constructor parameter
 so no apiserver is required.  Covers:
 
 * event translation (ADDED / MODIFIED / DELETED) into cache mutations
-* label extraction: instance-type, zone, capacity-type (stable and beta labels)
+* label extraction: instance-type, zone, region, capacity-type (stable and
+  beta labels for all clouds)
+* cloud-agnostic capacity-type resolver: EKS, GKE, AKS, Karpenter,
+  boolean-presence labels, on-prem → None
 * condition extraction and ``ready`` derivation
 * capacity / allocatable resource string extraction
 * 410 Gone resets resource_version and continues
@@ -25,7 +28,11 @@ import pytest
 from kubernetes.client.exceptions import ApiException
 
 from orb.providers.k8s.watch.node_state_cache import K8sNodeStateCache
-from orb.providers.k8s.watch.node_watcher import K8sNodeWatcher
+from orb.providers.k8s.watch.node_watcher import (
+    K8sNodeWatcher,
+    _first_label,
+    _resolve_capacity_type,
+)
 
 # ---------------------------------------------------------------------------
 # Stub node builder
@@ -37,6 +44,7 @@ def _node(
     name: str = "node-a",
     instance_type: str | None = "m5.xlarge",
     zone: str | None = "us-east-1a",
+    region: str | None = None,
     capacity_type: str | None = "on-demand",
     cpu_capacity: str | None = "4",
     memory_capacity: str | None = "16Gi",
@@ -44,6 +52,7 @@ def _node(
     memory_allocatable: str | None = "14Gi",
     ready: bool = True,
     use_beta_labels: bool = False,
+    extra_labels: dict[str, str] | None = None,
 ) -> SimpleNamespace:
     """Build a fake ``V1Node`` that mimics the kubernetes SDK object shape."""
     labels: dict[str, str] = {}
@@ -61,8 +70,17 @@ def _node(
             else "topology.kubernetes.io/zone"
         )
         labels[key] = zone
+    if region is not None:
+        key = (
+            "failure-domain.beta.kubernetes.io/region"
+            if use_beta_labels
+            else "topology.kubernetes.io/region"
+        )
+        labels[key] = region
     if capacity_type is not None:
         labels["karpenter.sh/capacity-type"] = capacity_type
+    if extra_labels:
+        labels.update(extra_labels)
 
     conditions: list[SimpleNamespace] = [
         SimpleNamespace(
@@ -191,7 +209,8 @@ def test_added_event_upserts_node_state() -> None:
     assert state is not None
     assert state.instance_type == "m5.xlarge"
     assert state.zone == "us-east-1a"
-    assert state.capacity_type == "on-demand"
+    # "on-demand" Karpenter label normalises to canonical "ondemand"
+    assert state.capacity_type == "ondemand"
     assert state.ready is True
 
 
@@ -446,3 +465,185 @@ def test_backoff_doubles_per_attempt() -> None:
     assert watcher._backoff_for_attempt(4) == 8.0
     assert watcher._backoff_for_attempt(6) == 32.0  # Capped
     assert watcher._backoff_for_attempt(10) == 32.0  # Still capped
+
+
+# ---------------------------------------------------------------------------
+# Region label extraction
+# ---------------------------------------------------------------------------
+
+
+def test_region_label_extracted() -> None:
+    """Stable topology.kubernetes.io/region label is captured in node state."""
+    cache = K8sNodeStateCache()
+    node = _node(name="node-r", region="us-east-1")
+    factory = _single_session_factory([_make_event("ADDED", node)])
+    watcher = _make_watcher(cache, factory)
+
+    _run_sync(watcher)
+
+    state = cache.get("node-r")
+    assert state is not None
+    assert state.region == "us-east-1"
+
+
+def test_beta_region_label_used_as_fallback() -> None:
+    """failure-domain.beta.kubernetes.io/region is used when stable label absent."""
+    cache = K8sNodeStateCache()
+    node = _node(name="node-rb", region="eu-west-1", use_beta_labels=True)
+    factory = _single_session_factory([_make_event("ADDED", node)])
+    watcher = _make_watcher(cache, factory)
+
+    _run_sync(watcher)
+
+    state = cache.get("node-rb")
+    assert state is not None
+    assert state.region == "eu-west-1"
+
+
+def test_no_region_label_yields_none() -> None:
+    """When no region labels are present region is None (on-prem)."""
+    cache = K8sNodeStateCache()
+    node = _node(name="node-nr", region=None)
+    factory = _single_session_factory([_make_event("ADDED", node)])
+    watcher = _make_watcher(cache, factory)
+
+    _run_sync(watcher)
+
+    state = cache.get("node-nr")
+    assert state is not None
+    assert state.region is None
+
+
+# ---------------------------------------------------------------------------
+# _first_label helper
+# ---------------------------------------------------------------------------
+
+
+def test_first_label_returns_first_present() -> None:
+    labels = {"b": "val-b", "c": "val-c"}
+    assert _first_label(labels, ("a", "b", "c")) == "val-b"
+
+
+def test_first_label_returns_none_when_none_match() -> None:
+    labels = {"x": "val"}
+    assert _first_label(labels, ("a", "b")) is None
+
+
+def test_first_label_skips_empty_string() -> None:
+    labels = {"a": "", "b": "good"}
+    assert _first_label(labels, ("a", "b")) == "good"
+
+
+# ---------------------------------------------------------------------------
+# _resolve_capacity_type — all clouds + on-prem
+# ---------------------------------------------------------------------------
+
+
+class TestResolveCapacityType:
+    """Cloud-agnostic capacity type resolver."""
+
+    # Karpenter
+    def test_karpenter_spot(self) -> None:
+        assert _resolve_capacity_type({"karpenter.sh/capacity-type": "spot"}) == "spot"
+
+    def test_karpenter_on_demand(self) -> None:
+        assert _resolve_capacity_type({"karpenter.sh/capacity-type": "on-demand"}) == "ondemand"
+
+    def test_karpenter_reserved_maps_to_ondemand(self) -> None:
+        assert _resolve_capacity_type({"karpenter.sh/capacity-type": "reserved"}) == "ondemand"
+
+    # EKS
+    def test_eks_spot(self) -> None:
+        assert _resolve_capacity_type({"eks.amazonaws.com/capacityType": "SPOT"}) == "spot"
+
+    def test_eks_on_demand(self) -> None:
+        assert _resolve_capacity_type({"eks.amazonaws.com/capacityType": "ON_DEMAND"}) == "ondemand"
+
+    # GKE — value-map labels
+    def test_gke_provisioning_spot(self) -> None:
+        assert _resolve_capacity_type({"cloud.google.com/gke-provisioning": "spot"}) == "spot"
+
+    def test_gke_provisioning_preemptible_maps_to_spot(self) -> None:
+        assert (
+            _resolve_capacity_type({"cloud.google.com/gke-provisioning": "preemptible"}) == "spot"
+        )
+
+    def test_gke_provisioning_standard_maps_to_ondemand(self) -> None:
+        assert (
+            _resolve_capacity_type({"cloud.google.com/gke-provisioning": "standard"}) == "ondemand"
+        )
+
+    # AKS
+    def test_aks_spot(self) -> None:
+        assert _resolve_capacity_type({"kubernetes.azure.com/scalesetpriority": "spot"}) == "spot"
+
+    def test_aks_regular_maps_to_ondemand(self) -> None:
+        assert (
+            _resolve_capacity_type({"kubernetes.azure.com/scalesetpriority": "regular"})
+            == "ondemand"
+        )
+
+    # GKE boolean-presence labels
+    def test_gke_spot_boolean_true(self) -> None:
+        assert _resolve_capacity_type({"cloud.google.com/gke-spot": "true"}) == "spot"
+
+    def test_gke_preemptible_boolean_true(self) -> None:
+        assert _resolve_capacity_type({"cloud.google.com/gke-preemptible": "true"}) == "spot"
+
+    def test_gke_spot_boolean_false_does_not_match(self) -> None:
+        # "false" value → no boolean-presence match → None
+        assert _resolve_capacity_type({"cloud.google.com/gke-spot": "false"}) is None
+
+    # On-prem — no labels → None
+    def test_on_prem_no_labels_returns_none(self) -> None:
+        assert _resolve_capacity_type({}) is None
+
+    def test_unrecognised_values_return_none(self) -> None:
+        # Known label key but unknown value (e.g. custom value)
+        # Karpenter label present but unknown value; no other label → None
+        assert _resolve_capacity_type({"karpenter.sh/capacity-type": "burstable"}) is None
+
+    # Priority: Karpenter wins over EKS when both present
+    def test_karpenter_takes_priority_over_eks(self) -> None:
+        labels = {
+            "karpenter.sh/capacity-type": "spot",
+            "eks.amazonaws.com/capacityType": "ON_DEMAND",
+        }
+        assert _resolve_capacity_type(labels) == "spot"
+
+    # Value-map labels take priority over boolean-presence labels
+    def test_value_map_takes_priority_over_boolean_presence(self) -> None:
+        labels = {
+            "karpenter.sh/capacity-type": "on-demand",
+            "cloud.google.com/gke-spot": "true",
+        }
+        assert _resolve_capacity_type(labels) == "ondemand"
+
+
+# ---------------------------------------------------------------------------
+# Integrated: region + capacity_type surfaced in cached state
+# ---------------------------------------------------------------------------
+
+
+def test_node_state_has_region_and_canonical_capacity() -> None:
+    """node_to_state surfaces region and canonical capacity_type end-to-end."""
+    cache = K8sNodeStateCache()
+    node = _node(
+        name="node-full",
+        instance_type="c5.2xlarge",
+        zone="ap-southeast-1a",
+        region="ap-southeast-1",
+        capacity_type=None,  # no karpenter label
+        extra_labels={"eks.amazonaws.com/capacityType": "SPOT"},
+    )
+    factory = _single_session_factory([_make_event("ADDED", node)])
+    watcher = _make_watcher(cache, factory)
+
+    _run_sync(watcher)
+
+    state = cache.get("node-full")
+    assert state is not None
+    assert state.instance_type == "c5.2xlarge"
+    assert state.zone == "ap-southeast-1a"
+    assert state.region == "ap-southeast-1"
+    assert state.capacity_type == "spot"

@@ -26,10 +26,19 @@ Fixture layout
 
 * ``mock_logger`` (function-scoped) — a plain :class:`unittest.mock.MagicMock`
   satisfying the :class:`LoggingPort` protocol.
+
+* ``orb_config_dir_k8s`` (function-scoped) — a complete ORB config directory
+  pointing at a kmock-backed k8s provider instance; used by delivery-surface
+  tests (CLI / MCP / REST / SDK).  Sets ``ORB_CONFIG_DIR`` and tears down
+  cleanly.
 """
 
 from __future__ import annotations
 
+import json
+import os
+import shutil
+from pathlib import Path
 from typing import AsyncIterator
 from unittest.mock import MagicMock
 
@@ -37,6 +46,12 @@ import pytest
 import pytest_asyncio
 from kmock import KubernetesEmulator
 from kmock._internal.apps import Server
+
+_PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
+_CONFIG_SOURCE = _PROJECT_ROOT / "config"
+
+# Provider instance name used in delivery-surface tests.
+K8S_KMOCK_PROVIDER_NAME = "k8s_kmock_test"
 
 
 @pytest_asyncio.fixture()
@@ -91,3 +106,92 @@ def k8s_config():  # type: ignore[return]
 def mock_logger() -> MagicMock:
     """A MagicMock satisfying the LoggingPort protocol."""
     return MagicMock()
+
+
+# ---------------------------------------------------------------------------
+# orb_config_dir_k8s — delivery-surface tests (CLI / MCP / REST / SDK)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def orb_config_dir_k8s(tmp_path, kmock_k8s):
+    """Generate a complete ORB config directory pointing at the kmock k8s provider.
+
+    Writes a ``config.json`` that declares a single k8s provider instance
+    (``k8s_kmock_test``) with ``in_cluster: false`` and an explicit
+    ``namespace: orb-test``.  Sets ``ORB_CONFIG_DIR`` for the test and clears
+    it on teardown.
+
+    Depends on ``kmock_k8s`` so each test gets a fresh emulator.
+
+    Yields the Path to the config directory.
+    """
+    from orb.infrastructure.di.container import reset_container
+    from tests.utilities.reset_singletons import reset_all_singletons
+
+    reset_container()
+    reset_all_singletons()
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    config_data = {
+        "scheduler": {
+            "type": "hostfactory",
+            "config_root": str(config_dir),
+        },
+        "provider": {
+            "providers": [
+                {
+                    "name": K8S_KMOCK_PROVIDER_NAME,
+                    "type": "k8s",
+                    "enabled": True,
+                    "default": True,
+                    "config": {
+                        # in_cluster=True passes the empty-config guard in
+                        # create_k8s_strategy (False is falsy and would trigger
+                        # the "no cluster-targeting info" error).  The actual
+                        # K8sClient is replaced post-bootstrap by
+                        # _inject_kmock_factory before any network calls are made
+                        # (initialize() is a no-op — it sets _initialized=True only).
+                        "in_cluster": True,
+                        "namespace": "orb-test",
+                        "watch_enabled": False,
+                        "orphan_gc_enabled": False,
+                        "metrics_enabled": False,
+                    },
+                }
+            ]
+        },
+        "storage": {
+            "strategy": "json",
+            "default_storage_path": str(tmp_path / "data"),
+            "json_strategy": {
+                "storage_type": "single_file",
+                "base_path": str(tmp_path / "data"),
+                "filenames": {"single_file": "request_database.json"},
+            },
+        },
+    }
+    with open(config_dir / "config.json", "w") as f:
+        json.dump(config_data, f, indent=2)
+
+    # Copy k8s_templates.json into the config dir so the template loader finds them.
+    k8s_tpl_src = _CONFIG_SOURCE / "k8s_templates.json"
+    if k8s_tpl_src.exists():
+        shutil.copy2(k8s_tpl_src, config_dir / "k8s_templates.json")
+
+    default_src = _CONFIG_SOURCE / "default_config.json"
+    if default_src.exists():
+        shutil.copy2(default_src, config_dir / "default_config.json")
+
+    os.environ["ORB_CONFIG_DIR"] = str(config_dir)
+
+    yield config_dir
+
+    os.environ.pop("ORB_CONFIG_DIR", None)
+    from orb.infrastructure.di.container import reset_container
+    from tests.utilities.reset_singletons import reset_all_singletons
+
+    reset_container()
+    reset_all_singletons()

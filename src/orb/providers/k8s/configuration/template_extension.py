@@ -114,6 +114,15 @@ class K8sTemplateExtensionConfig(BaseModel):
         None, description="Default ``terminationGracePeriodSeconds`` applied to managed pods."
     )
 
+    # Pod restart policy
+    restart_policy: Optional[str] = Field(
+        None,
+        description=(
+            "Default ``restartPolicy`` applied to managed pods.  One of "
+            "'Always' / 'OnFailure' / 'Never'; per-kind constraints apply at build time."
+        ),
+    )
+
     # Container health probes
     readiness_probe: Optional[dict[str, Any]] = Field(
         None, description="Default readiness probe applied to managed containers."

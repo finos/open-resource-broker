@@ -77,3 +77,28 @@ class TestCreateMachineTagsPassthrough:
         machine = svc._create_machine_from_processed_data(data, _make_request())
 
         assert machine.price_type == "spot"
+
+    def test_status_reason_forwarded(self):
+        """status_reason from the provider dict must be set on the created machine.
+
+        Without this, a failed pod's error message is invisible on the first
+        get-request-status poll — it only appears once a subsequent sync cycle
+        triggers the update path.
+        """
+        svc = _make_service()
+        data = _base_processed_data()
+        data["status"] = "failed"
+        data["status_reason"] = "OOMKilled"
+
+        machine = svc._create_machine_from_processed_data(data, _make_request())
+
+        assert machine.status_reason == "OOMKilled"
+
+    def test_status_reason_absent_yields_none(self):
+        """When the provider does not supply status_reason, the field stays None."""
+        svc = _make_service()
+        data = _base_processed_data()
+
+        machine = svc._create_machine_from_processed_data(data, _make_request())
+
+        assert machine.status_reason is None

@@ -51,33 +51,16 @@ Two fields in `K8sProviderConfig` control the audit:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `audit_high_risk_pod_fields` | `bool` | `True` | Enable or disable the entire audit.  Set to `False` to silence all warnings. |
-| `reject_high_risk_pod_fields` | `bool` | `False` | When `True`, ORB raises a `K8sError` instead of logging a warning if any findings are present.  Acquire fails before the spec reaches the apiserver. |
+| `reject_high_risk_pod_fields` | `bool` | `True` | When `True` (default), ORB raises a `K8sError` instead of logging a warning if any findings are present.  Acquire fails before the spec reaches the apiserver.  Set to `False` to revert to warning-only behaviour — operators must opt out explicitly. |
 
-### Enable reject mode
+### Reject mode is on by default
 
-Add to your provider configuration:
+Reject mode is enabled in the default configuration.  Workloads that
+contain high-risk fields will be rejected at acquire time unless you
+explicitly opt out.
 
-```json
-{
-  "providers": {
-    "k8s": {
-      "provider_type": "k8s",
-      "namespace": "orb",
-      "audit_high_risk_pod_fields": true,
-      "reject_high_risk_pod_fields": true
-    }
-  }
-}
-```
-
-Or via environment variable:
-
-```bash
-export ORB_K8S_REJECT_HIGH_RISK_POD_FIELDS=true
-```
-
-When reject mode is active and a spec contains one or more flagged fields,
-the acquire call raises `K8sError` with a message listing every finding:
+When a spec contains one or more flagged fields, the acquire call raises
+`K8sError` with a message listing every finding:
 
 ```
 K8sError: Acquire rejected: pod spec contains high-risk fields —
@@ -87,16 +70,41 @@ K8sError: Acquire rejected: pod spec contains high-risk fields —
 
 The request is left in the `pending` state and no pod is created.
 
-### Disable warnings entirely
+### Allow legitimate high-risk fields (disable reject mode)
 
-If your workloads legitimately require one or more of the flagged fields
-and you do not want the noise:
+If your workloads legitimately require one or more of the flagged fields,
+disable reject mode explicitly:
 
 ```json
 {
   "providers": {
     "k8s": {
-      "audit_high_risk_pod_fields": false
+      "reject_high_risk_pod_fields": false
+    }
+  }
+}
+```
+
+Or via environment variable:
+
+```bash
+export ORB_K8S_REJECT_HIGH_RISK_POD_FIELDS=false
+```
+
+Audit warnings will still fire unless you also set
+`audit_high_risk_pod_fields: false`.
+
+### Disable warnings entirely
+
+If your workloads legitimately require one or more of the flagged fields
+and you do not want any noise:
+
+```json
+{
+  "providers": {
+    "k8s": {
+      "audit_high_risk_pod_fields": false,
+      "reject_high_risk_pod_fields": false
     }
   }
 }

@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from orb.domain.template.template_aggregate import Template
 from orb.providers.k8s.configuration.template_extension import K8sTemplateExtensionConfig
-from orb.providers.k8s.domain.template.k8s_template import K8sTemplate
+from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 from orb.providers.k8s.domain.template.k8s_template_dto_config import K8sTemplateDTOConfig
 from orb.providers.k8s.infrastructure.adapters.template_adapter import _SUPPORTED_FIELDS
 from orb.providers.k8s.scheduler.hostfactory_field_mapping import K8sFieldMapping
@@ -42,15 +42,24 @@ _DOMAIN_K8S_ALL: frozenset[str] = frozenset(K8sTemplate.model_fields.keys()) - _
 # Fields excluded from the "operator-facing" surface with documented reasons.
 # Each exclusion is tested explicitly in the assertions below.
 _INTERNAL_ONLY = frozenset({"provider_config"})  # internal round-trip carrier
-_NO_HF_KEY = frozenset({"native_spec"})  # escape hatch; no HostFactory key
+# Fields that are escape hatches bypassing the typed spec builders.
+# ``native_spec`` has no HostFactory key; ``native_spec_path`` has an HF key
+# (``nativeSpecPath``) but is treated the same way — it bypasses spec builders
+# and is therefore excluded from the operator-facing parity obligations.
+_NO_HF_KEY = frozenset({"native_spec", "native_spec_path"})
 _SCHEDULING_LIST = frozenset({"namespaces"})  # multi-namespace; not in DTO pipeline
 
 # The "normal" operator-facing k8s fields that all shapes should know about.
 _DOMAIN_K8S_OPERATOR = _DOMAIN_K8S_ALL - _INTERNAL_ONLY - _NO_HF_KEY - _SCHEDULING_LIST
 
 # Fields S3 (ExtensionConfig) intentionally omits: low-level overrides that
-# don't make sense as provider-level defaults.
-_S3_INTENTIONAL_OMISSIONS = frozenset({"args", "command", "pod_spec_override"})
+# don't make sense as provider-level defaults.  service_name is a per-template
+# StatefulSet governing-Service name, not a provider-wide default.
+# native_spec_path is the file-path companion to native_spec — neither makes
+# sense as a provider-wide default.
+_S3_INTENTIONAL_OMISSIONS = frozenset(
+    {"args", "command", "native_spec_path", "pod_spec_override", "service_name"}
+)
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +93,12 @@ def test_s2_dto_config_covers_operator_domain_fields() -> None:
     assert "native_spec" in s2_fields, (
         "native_spec should be present in K8sTemplateDTOConfig — it is the "
         "full-replacement escape hatch that must be round-trippable through the DTO."
+    )
+    # native_spec_path IS intentionally present in S2 — file-path companion
+    # to native_spec that must be round-trippable through the DTO.
+    assert "native_spec_path" in s2_fields, (
+        "native_spec_path should be present in K8sTemplateDTOConfig — it is the "
+        "file-path companion to native_spec that must be round-trippable through the DTO."
     )
 
 

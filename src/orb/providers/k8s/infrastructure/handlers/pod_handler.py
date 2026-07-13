@@ -69,7 +69,9 @@ def _classify_pod_create_error(exc: BaseException) -> str:
 class K8sPodHandler(K8sHandlerBase):
     """Handler for the ``Pod`` provider-API key.
 
-    One ORB capacity unit equals one ``v1/Pod`` with ``restartPolicy: Never``.
+    One ORB capacity unit equals one ``v1/Pod``.  The pod's ``restartPolicy``
+    defaults to ``Never`` but can be set to ``OnFailure`` or ``Always`` via the
+    template ``restart_policy`` field or the provider ``default_restart_policy``.
     """
 
     PROVIDER_API: str = "Pod"
@@ -80,7 +82,12 @@ class K8sPodHandler(K8sHandlerBase):
         config: K8sProviderConfig,
         logger: LoggingPort,
         max_concurrent_creates: int = _MAX_CONCURRENT_CREATES,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 30.0,
         *,
+        circuit_breaker_failure_threshold: int = 5,
+        circuit_breaker_reset_timeout: int = 60,
         pod_state_cache: Optional[PodStateCache] = None,
         cache_alive: Optional[Callable[[], bool]] = None,
         stale_cache_timeout_seconds: Optional[float] = None,
@@ -92,6 +99,11 @@ class K8sPodHandler(K8sHandlerBase):
             kubernetes_client=kubernetes_client,
             config=config,
             logger=logger,
+            max_retries=max_retries,
+            base_delay=base_delay,
+            max_delay=max_delay,
+            circuit_breaker_failure_threshold=circuit_breaker_failure_threshold,
+            circuit_breaker_reset_timeout=circuit_breaker_reset_timeout,
             pod_state_cache=pod_state_cache,
             cache_alive=cache_alive,
             stale_cache_timeout_seconds=stale_cache_timeout_seconds,
@@ -147,7 +159,7 @@ class K8sPodHandler(K8sHandlerBase):
         pods_to_create: list[tuple[str, Any]] = []
         _audited = False
         for seq in range(count):
-            pod_name = make_pod_name(str(request.request_id), seq)
+            pod_name = make_pod_name(str(request.request_id), seq, naming=self._config.naming)
             if native_pod_body is not None:
                 pod_body: Any = self._stamp_native_pod_body(
                     native_pod_body,
@@ -259,16 +271,82 @@ class K8sPodHandler(K8sHandlerBase):
         pod_name: str,
         body: Any,
     ) -> str:
-        """Submit a single ``create_namespaced_pod`` call under the semaphore."""
+        """Submit a single ``create_namespaced_pod`` call under the semaphore.
+
+        409 AlreadyExists idempotency: when a retried create returns 409, the
+        pod may already exist from a previous attempt (e.g. the response was
+        lost in flight).  If the existing pod carries the same
+        ``orb.io/request-id`` label as the body being submitted, we treat the
+        create as succeeded — the pod is ours and is already present.  A 409
+        on a pod that belongs to a different request (genuine conflict) is
+        still treated as a failure.
+        """
         async with sem:
-            await asyncio.to_thread(
-                self.with_retry,
-                self.client.core_v1.create_namespaced_pod,
-                namespace=namespace,
-                body=body,
-                operation_name="create_namespaced_pod",
-            )
+            try:
+                with self._timed_api_call("create_namespaced_pod"):
+                    await asyncio.to_thread(
+                        self.with_retry,
+                        self.client.core_v1.create_namespaced_pod,
+                        namespace=namespace,
+                        body=body,
+                        operation_name="create_namespaced_pod",
+                    )
+            except Exception as exc:
+                if getattr(exc, "status", None) == 409:
+                    # 409 AlreadyExists — check whether the existing pod is ours.
+                    if await self._is_our_pod(namespace, pod_name, body):
+                        self._logger.debug(
+                            "Pod %s in %s already exists and belongs to this request "
+                            "(idempotent retry) — treating as created",
+                            pod_name,
+                            namespace,
+                        )
+                        return pod_name
+                    # Genuine conflict — a pod with this name exists but it is not
+                    # ours (different request-id label or no label at all).
+                raise self._classify_and_record_api_exception(
+                    exc, operation="create_namespaced_pod"
+                ) from exc
         return pod_name
+
+    async def _is_our_pod(self, namespace: str, pod_name: str, body: Any) -> bool:
+        """Return True when the existing pod at ``pod_name`` carries our request-id label.
+
+        Used to distinguish idempotent 409s (retried create that already
+        landed) from genuine conflicts (same pod name, different request).
+        Returns False on any read failure so the caller falls through to the
+        normal error path.
+        """
+        label_prefix = self._config.label_prefix
+        # Extract the request-id from the body we were trying to submit so
+        # we can compare it against the existing pod's label.
+        try:
+            if isinstance(body, dict):
+                body_metadata: Any = body.get("metadata", {}) or {}
+            else:
+                body_metadata = getattr(body, "metadata", None) or {}
+            if isinstance(body_metadata, dict):
+                body_labels: dict[str, str] = dict(body_metadata.get("labels", {}) or {})
+            else:
+                body_labels = dict(getattr(body_metadata, "labels", None) or {})
+            our_request_id = body_labels.get(f"{label_prefix}/request-id")
+        except Exception:
+            return False
+
+        if not our_request_id:
+            return False
+
+        try:
+            existing = await asyncio.to_thread(
+                self.client.core_v1.read_namespaced_pod,
+                name=pod_name,
+                namespace=namespace,
+            )
+            existing_metadata = getattr(existing, "metadata", None)
+            existing_labels: dict[str, str] = dict(getattr(existing_metadata, "labels", None) or {})
+            return existing_labels.get(f"{label_prefix}/request-id") == our_request_id
+        except Exception:
+            return False
 
     # ------------------------------------------------------------------
     # check_hosts_status — delegated to PodStatusResolver
@@ -389,11 +467,12 @@ class K8sPodHandler(K8sHandlerBase):
 
         async with sem:
             try:
-                await asyncio.to_thread(
-                    self.with_retry,
-                    _delete_pod_or_skip,
-                    operation_name="delete_namespaced_pod",
-                )
+                with self._timed_api_call("delete_namespaced_pod"):
+                    await asyncio.to_thread(
+                        self.with_retry,
+                        _delete_pod_or_skip,
+                        operation_name="delete_namespaced_pod",
+                    )
             except Exception as exc:
                 if self.is_not_found(exc):
                     # Defensive: with_retry may re-raise after max attempts;
@@ -410,7 +489,10 @@ class K8sPodHandler(K8sHandlerBase):
                     namespace,
                     exc,
                 )
-                raise
+                typed = self._classify_and_record_api_exception(
+                    exc, operation="delete_namespaced_pod"
+                )
+                raise typed from exc
 
     # ------------------------------------------------------------------
     # Examples
@@ -419,7 +501,7 @@ class K8sPodHandler(K8sHandlerBase):
     @classmethod
     def get_example_templates(cls) -> list[Template]:
         """Return one example template that submits as a ``Pod``."""
-        from orb.providers.k8s.domain.template.k8s_template import (
+        from orb.providers.k8s.domain.template.k8s_template_aggregate import (
             K8sResourceQuantities,
             K8sTemplate,
         )
@@ -430,11 +512,10 @@ class K8sPodHandler(K8sHandlerBase):
                 name="Kubernetes Pod example",
                 description="Submit a single pod via the kubernetes provider.",
                 provider_api="Pod",
-                image_id="busybox:latest",
+                image_id="registry.k8s.io/pause:3.9",
                 max_instances=1,
                 resource_requests=K8sResourceQuantities(cpu="100m", memory="128Mi"),
                 resource_limits=K8sResourceQuantities(cpu="500m", memory="256Mi"),
-                command=["sh", "-c", "sleep 3600"],
             ),
         ]
 

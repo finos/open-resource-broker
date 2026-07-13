@@ -180,6 +180,13 @@ terraform.rc
 
 # Application specific
 config/config.json
+# Runtime-generated per-provider-instance template files (e.g.
+# config/aws_<instance>_templates.json, config/k8s_<instance>_templates.json).
+# The canonical example files config/aws_templates.json and
+# config/k8s_templates.json are tracked and explicitly un-ignored below.
+config/*_*_templates.json
+!config/aws_templates.json
+!config/k8s_templates.json
 # Runtime-generated script copies (orb init)
 /scripts/
 data/

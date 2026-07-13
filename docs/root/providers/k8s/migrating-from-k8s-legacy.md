@@ -17,7 +17,7 @@ operators can plan their migration with full visibility.
 | Code location                    | `src/orb/k8s_legacy/`                                              | `src/orb/providers/k8s/`                                     |
 | Architecture                     | Standalone HostFactory plugin with its own watchers + storage      | First-class ORB provider behind the standard `ProviderStrategy` contract |
 | State store                      | Filesystem workdir (`/var/tmp/hostfactory`) + event log            | ORB primary storage (SQLite / DynamoDB / SQL - operator's choice)    |
-| Templates                        | Legacy template format with HF-camelCase fields                    | ORB template aggregate (`provider_api`, `container_image`, etc.)    |
+| Templates                        | Legacy template format with HF-camelCase fields                    | ORB template aggregate (`provider_api`, `image_id`, etc.)           |
 | Identifying labels               | `symphony/open-resource-broker-reqid`                              | `orb.io/managed`, `orb.io/request-id`, `orb.io/machine-id`           |
 | Workloads supported              | Bare pods                                                          | Pod, Deployment, StatefulSet, Job (see [Handlers](handlers.md))     |
 | HostFactory API                  | Native HF JSON (`requestMachines.sh` etc.)                         | Same HF JSON, via ORB's HostFactory adapter                          |
@@ -98,7 +98,7 @@ complete, flip it to `false`.
 | Legacy template field             | Modern equivalent                              | Notes                                                                       |
 |-----------------------------------|------------------------------------------------|-----------------------------------------------------------------------------|
 | `templateId` / `template_id`      | `template_id`                                  | Same field, snake_case at rest.                                              |
-| `imageId`                         | `container_image`                              | Modern field always carries the full OCI ref (`registry/name:tag`).          |
+| `imageId`                         | `image_id`                                     | Canonical field on the base `Template` aggregate; carries the full OCI ref (`registry/name:tag`). |
 | `attributes.namespace`            | `namespace` (on template) or `namespace` (on provider config) | Per-template wins.                                                          |
 | `attributes.serviceAccountName`   | `service_account`                              | Maps to `spec.serviceAccountName`.                                           |
 | `attributes.runtimeClassName`     | `runtime_class`                                | Maps to `spec.runtimeClassName`.                                             |
@@ -107,7 +107,7 @@ complete, flip it to `false`.
 | `attributes.resources.requests`   | `resource_requests`                            | Same `dict[str,str]` shape (e.g. `{"cpu":"1","memory":"2Gi"}`).              |
 | `attributes.resources.limits`     | `resource_limits`                              | Same shape as requests.                                                      |
 | `attributes.environment`          | `env`                                          | `dict[str,str]`.                                                             |
-| `attributes.imagePullSecrets`     | `image_pull_secret`                            | `str` — single image-pull secret name.                                       |
+| `attributes.imagePullSecrets`     | `image_pull_secret`                            | `str` — single image-pull secret name added to `spec.imagePullSecrets`.      |
 | `attributes.labels`               | `labels`                                       | ORB-emitted labels always win when key conflicts arise.                      |
 | `attributes.annotations`          | `annotations`                                  | Free-form passthrough.                                                       |
 | n/a                               | `provider_api`                                 | New required field - `Pod`, `Deployment`, `StatefulSet`, or `Job`. |

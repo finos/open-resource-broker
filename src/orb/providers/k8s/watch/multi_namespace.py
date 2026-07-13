@@ -210,6 +210,7 @@ class MultiNamespaceWatcher:
             "namespace": namespace,
             "label_selector": f"{self._config.label_prefix}/managed=true",
             "request_id_label": f"{self._config.label_prefix}/request-id",
+            "periodic_resync_interval_seconds": self._config.periodic_resync_interval_seconds,
         }
         if self._watch_factory is not None:
             kwargs["watch_factory"] = self._watch_factory

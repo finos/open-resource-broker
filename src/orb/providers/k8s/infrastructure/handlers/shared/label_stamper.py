@@ -37,8 +37,23 @@ def stamp_native_workload_body(
     Used by the Deployment / StatefulSet / Job handlers when the native-spec
     escape hatch is active.  Overwrites the fields ORB owns at acquire time
     (name / namespace / replicas, request-id and managed labels) while
-    preserving operator-controlled fields (pod-template selector match labels,
-    container spec, ...) as-is.
+    preserving operator-controlled fields (container spec, ...) as-is.
+
+    ORB's status and release paths identify pods via a label-selector query
+    on ``<prefix>/request-id=<id>``.  For controller-based workloads this
+    label MUST appear in three places so the selector chain is unbroken:
+
+    1. ``metadata.labels``                     — workload-level identity.
+    2. ``spec.template.metadata.labels``       — pod-template labels;
+       the controller copies these onto every pod it creates.
+    3. ``spec.selector.matchLabels``           — the controller's pod-selector;
+       the API server rejects a Deployment/StatefulSet whose selector does not
+       match the pod-template labels, so this entry is mandatory.
+
+    Job workloads use ``spec.parallelism`` / ``spec.completions`` instead of
+    ``spec.replicas``, and their selector is set automatically by the Job
+    controller — we do not write ``spec.selector`` for Job bodies to avoid
+    conflicting with the controller's own selector management.
 
     Args:
         native_body: The operator-rendered workload body dict.  Mutated in a
@@ -65,18 +80,22 @@ def stamp_native_workload_body(
     metadata["labels"] = labels
 
     spec = body.setdefault("spec", {})
+
+    # Determine whether this is a Job-kind body (uses parallelism/completions
+    # instead of replicas) so we can skip selector stamping for Jobs — the
+    # Job controller manages its own pod selector and rejects an explicit one
+    # that conflicts with what it would generate.
+    is_job_kind = "parallelism" in spec or "completions" in spec
+
     # Stamp the replica count under whichever key the workload kind uses.
-    # Job uses ``parallelism``/``completions``; Deployment/StatefulSet use
-    # ``replicas``.  Only overwrite keys already present in the operator body
-    # so an unrecognised kind gets the ``replicas`` default.
-    if "parallelism" in spec or "completions" in spec:
+    if is_job_kind:
         spec["parallelism"] = replicas
         spec["completions"] = replicas
     else:
         spec["replicas"] = replicas
 
-    # Ensure request-id label is in the pod-template labels too so the
-    # controller's selector can match the pods.
+    # Stamp the pod-template labels so every pod the controller creates
+    # carries the ORB identity labels.
     template_section = spec.setdefault("template", {})
     template_metadata = template_section.setdefault("metadata", {})
     template_labels = dict(template_metadata.get("labels", {}) or {})
@@ -84,6 +103,18 @@ def stamp_native_workload_body(
     template_labels[f"{label_prefix}/managed"] = "true"
     template_labels[f"{label_prefix}/template-id"] = str(request.template_id)
     template_metadata["labels"] = template_labels
+
+    # Stamp spec.selector.matchLabels for Deployment/StatefulSet kinds so the
+    # controller's pod selector includes the request-id label.  ORB's status
+    # and release paths use ``list_namespaced_pod(label_selector=request-id)``
+    # to find pods; without this selector entry the query returns nothing.
+    # Jobs are excluded: the Job controller auto-generates its own selector and
+    # the API server rejects a body that sets it explicitly.
+    if not is_job_kind:
+        selector = spec.setdefault("selector", {})
+        match_labels = dict(selector.get("matchLabels", {}) or {})
+        match_labels[f"{label_prefix}/request-id"] = str(request.request_id)
+        selector["matchLabels"] = match_labels
 
     return body
 
