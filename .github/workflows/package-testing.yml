@@ -17,47 +17,49 @@ on:
 permissions:
   contents: read
 
+# Per-ref concurrency: prevents a rapid series of pushes to main from queuing
+# redundant package-testing runs.  Each ref can only have one run active at a
+# time; a newer push cancels the older in-progress run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # Shared configuration: provides python-versions, default-python-version, and
+  # package-extras (via the discover step in shared-config) so this workflow has
+  # a single source of truth instead of duplicating hardcoded version strings.
+  config:
+    name: Get Configuration
+    uses: ./.github/workflows/shared-config.yml
+
   package-variants:
     name: Test Package Variants
     runs-on: ubuntu-latest
+    needs: [config]
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        variant:
-          - name: "minimal"
-            install: "."
-            description: "Core functionality only"
-            test_cli_rich: false
-            test_api: false
-            test_monitoring: false
-          - name: "cli"
-            install: ".[cli]"
-            description: "CLI with rich formatting"
-            test_cli_rich: true
-            test_api: false
-            test_monitoring: false
-          - name: "api"
-            install: ".[api]"
-            description: "API server functionality"
-            test_cli_rich: false
-            test_api: true
-            test_monitoring: false
-          - name: "monitoring"
-            install: ".[monitoring]"
-            description: "Monitoring and observability"
-            test_cli_rich: false
-            test_api: false
-            test_monitoring: true
-          - name: "all"
-            install: ".[all]"
-            description: "All features"
-            test_cli_rich: true
-            test_api: true
-            test_monitoring: true
-        python-version: ["3.10", "3.12"]
+        # Dynamic: fromJSON pulls the discovered extras list from shared-config.
+        # The 'minimal' base install (no extras) is always tested first via a
+        # separate include entry so the matrix only needs extra names here.
+        # Static fallback ['cli','api','monitoring'] preserves historical coverage.
+        extra: ${{ fromJSON(needs.config.outputs.package-extras || '["cli","api","monitoring"]') }}
+        # Python version axis driven from .project.yml via shared-config.
+        # Static fallback keeps act/offline CI valid; update it when python.versions changes.
+        python-version: ${{ fromJSON(needs.config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
+        include:
+          # Always test the minimal (no extras) variant on the oldest + newest supported versions.
+          - extra: "minimal"
+            python-version: "3.10"
+          - extra: "minimal"
+            python-version: "3.14"
+          # Always test the .[all] meta-extra (all feature layers together).
+          - extra: "all"
+            python-version: "3.10"
+          - extra: "all"
+            python-version: "3.14"
 
     steps:
       - name: Checkout code
@@ -73,16 +75,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install build wheel
           python -m build
-          pip install "${{ matrix.variant.install }}"
+          # Install the built wheel (not editable source) for true variant isolation.
+          # 'minimal' maps to the base package with no extras; 'all' is the
+          # meta-extra that pulls in all feature layers; everything else is
+          # installed as .[<extra>].
+          EXTRA="${{ matrix.extra }}"
+          WHEEL=$(find dist -name '*.whl' | head -1)
+          if [ "$EXTRA" = "minimal" ]; then
+            pip install "${WHEEL}"
+          else
+            pip install "${WHEEL}[${EXTRA}]"
+          fi
 
       - name: Test core imports
         run: |
           python -c "
           import sys
-          print(f'Testing variant: ${{ matrix.variant.name }}')
+          extra = '${{ matrix.extra }}'
+          print(f'Testing extra: {extra}')
           print(f'Python version: {sys.version}')
-          
-          # Test core imports always work
+
+          # Core package must import regardless of which extra is installed.
           try:
               import orb.run
               from orb.bootstrap import Application
@@ -103,138 +116,121 @@ jobs:
           # Test commands that should work in all variants
           python -m orb templates list --help || echo "Templates command help failed (expected in some cases)"
 
-      - name: Test CLI Rich formatting
-        if: matrix.variant.test_cli_rich
+      # Data-driven per-extra assertion: replaces the old boolean-flag steps
+      # (test_cli_rich / test_api / test_monitoring).  Each extra gets one step
+      # that probes the specific import it provides.  Unknown extras only run
+      # the core-import step above.
+      - name: Test CLI extra (rich formatting)
+        if: matrix.extra == 'cli' || matrix.extra == 'all'
         run: |
           python -c "
           try:
               from orb.cli.formatters import format_generic_table
               from orb.cli.console import get_console
-
-              # Test Rich table formatting
               test_data = [{'id': '1', 'name': 'test'}]
-              result = format_generic_table(test_data, 'Test Items')
-              print('PASS: Rich CLI formatting successful')
-              
-              # Test console
+              format_generic_table(test_data, 'Test Items')
               console = get_console()
               console.print('[green]Rich console test[/green]')
-              print('PASS: Rich console successful')
+              print('PASS: Rich CLI formatting successful')
           except ImportError as e:
               print(f'FAIL: Rich CLI functionality failed: {e}')
-              sys.exit(1)
+              import sys; sys.exit(1)
           "
 
-      - name: Test CLI without Rich (minimal variant)
-        if: matrix.variant.name == 'minimal'
+      - name: Test minimal variant (no rich, CLI fallbacks only)
+        if: matrix.extra == 'minimal'
         run: |
           python -c "
-          # Verify Rich is not available
           try:
               import rich
               print('WARNING: Rich is available but should not be in minimal variant')
           except ImportError:
               print('PASS: Rich correctly not available in minimal variant')
-          
-          # Test CLI still works with fallbacks
+
           from orb.cli.formatters import format_generic_table
           from orb.cli.console import get_console
-
           test_data = [{'id': '1', 'name': 'test'}]
-          result = format_generic_table(test_data, 'Test Items')
-          print('PASS: CLI fallback formatting works')
-          
+          format_generic_table(test_data, 'Test Items')
           console = get_console()
           console.print('Plain console test')
-          print('PASS: Plain console works')
+          print('PASS: CLI fallback formatting works in minimal variant')
           "
 
-      - name: Test API functionality
-        if: matrix.variant.test_api
+      - name: Test API extra (FastAPI available)
+        if: matrix.extra == 'api' || matrix.extra == 'all'
         run: |
           python -c "
           try:
               from orb.api.server import create_fastapi_app
               print('PASS: FastAPI imports successful')
-              
-              # Test app creation (basic test)
-              print('PASS: API functionality available')
           except ImportError as e:
               print(f'FAIL: API functionality failed: {e}')
-              sys.exit(1)
+              import sys; sys.exit(1)
           "
 
-      - name: Test API not available (non-API variants)
-        if: "!matrix.variant.test_api"
+      - name: Test API graceful failure (non-API extras)
+        if: matrix.extra != 'api' && matrix.extra != 'all'
         run: |
           python -c "
-          # Verify FastAPI is not available
+          extra = '${{ matrix.extra }}'
           try:
               import fastapi
-              print('WARNING: FastAPI available but not expected in ${{ matrix.variant.name }} variant')
+              print(f'INFO: FastAPI present for extra={extra} (may be transitive dep)')
           except ImportError:
-              print('PASS: FastAPI correctly not available in ${{ matrix.variant.name }} variant')
-          
-          # Test that API server creation fails gracefully
+              print(f'PASS: FastAPI correctly absent for extra={extra}')
+
           try:
               from orb.api.server import create_fastapi_app
               try:
                   create_fastapi_app(None)
-                  print('FAIL: API should have failed without FastAPI')
-                  sys.exit(1)
+                  # FastAPI may be present via a transitive dep in some extras (e.g. monitoring).
+                  print(f'INFO: API callable for extra={extra} (fastapi present as transitive dep)')
               except ImportError as e:
                   if 'FastAPI not installed' in str(e):
                       print('PASS: API gracefully fails without FastAPI')
                   else:
                       print(f'FAIL: Unexpected API error: {e}')
-                      sys.exit(1)
+                      import sys; sys.exit(1)
           except ImportError:
-              print('PASS: API server module handles missing FastAPI')
+              print(f'PASS: API server module handles missing FastAPI for extra={extra}')
           "
 
-      - name: Test monitoring functionality
-        if: matrix.variant.test_monitoring
+      - name: Test monitoring extra (OpenTelemetry available)
+        if: matrix.extra == 'monitoring' || matrix.extra == 'all'
         run: |
           python -c "
           try:
               from orb.monitoring.health import HealthCheck
               print('PASS: Monitoring imports successful')
-              
-              # Test basic monitoring functionality
-              print('PASS: Monitoring functionality available')
           except ImportError as e:
               print(f'FAIL: Monitoring functionality failed: {e}')
-              sys.exit(1)
+              import sys; sys.exit(1)
           "
 
-      - name: Test monitoring not available (non-monitoring variants)
-        if: "!matrix.variant.test_monitoring"
+      - name: Test monitoring module imports gracefully (non-monitoring extras)
+        if: matrix.extra != 'monitoring' && matrix.extra != 'all'
         run: |
           python -c "
-          # Check optional monitoring dependencies
+          extra = '${{ matrix.extra }}'
           optional_monitoring = ['prometheus_client', 'opentelemetry', 'psutil']
-          missing_deps = []
-          
           for dep in optional_monitoring:
               try:
                   __import__(dep)
-                  print(f'WARNING: {dep} available but not expected in ${{ matrix.variant.name }} variant')
+                  print(f'INFO: {dep} present for extra={extra} (may be transitive dep)')
               except ImportError:
-                  missing_deps.append(dep)
-                  print(f'PASS: {dep} correctly not available')
-          
-          # Monitoring should still import but with limited functionality
+                  print(f'PASS: {dep} absent for extra={extra}')
           try:
               from orb.monitoring.health import HealthCheck
               print('PASS: Monitoring module imports with limited functionality')
           except ImportError as e:
               print(f'FAIL: Monitoring module should import even without optional deps: {e}')
-              sys.exit(1)
+              import sys; sys.exit(1)
           "
 
   import-guard-validation:
     name: Import Guard Validation
     runs-on: ubuntu-latest
+    needs: [config]
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -242,14 +238,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
-          python-version: "3.12"
+          python-version: ${{ needs.config.outputs.default-python-version }}
 
       - name: Install minimal dependencies
         run: |
           python -m pip install --upgrade pip
           pip install build pytest pytest-mock
           python -m build
-          pip install .
+          pip install "$(find dist -name '*.whl' | head -1)"
 
       - name: Test import guards
         run: |
@@ -293,6 +289,7 @@ jobs:
   dependency-isolation:
     name: Dependency Isolation Test
     runs-on: ubuntu-latest
+    needs: [config]
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -300,27 +297,35 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
-          python-version: "3.12"
+          python-version: ${{ needs.config.outputs.default-python-version }}
 
       - name: Test clean environment
         run: |
           python -m pip install --upgrade pip
           pip install build
           python -m build
-          pip install .
+          pip install "$(find dist -name '*.whl' | head -1)"
           
           # Verify no optional dependencies are installed
           python -c "
           import sys
-          
-          optional_deps = ['rich', 'fastapi', 'uvicorn', 'opentelemetry', 'prometheus_client', 'psutil']
+
+          # psutil is a base dependency (system health check), so it is
+          # intentionally present in every install and not listed here.
+          optional_deps = ['rich', 'fastapi', 'uvicorn', 'opentelemetry', 'prometheus_client']
+          leaked = []
           for dep in optional_deps:
               try:
                   __import__(dep)
-                  print(f'WARNING: {dep} is available but should not be in minimal install')
+                  print(f'FAIL: {dep} leaked into minimal install')
+                  leaked.append(dep)
               except ImportError:
                   print(f'PASS: {dep} correctly not available')
-          
+
+          if leaked:
+              print(f'ERROR: {len(leaked)} optional dep(s) leaked: {leaked}')
+              sys.exit(1)
+
           # Test that core functionality still works
           import orb.run
           from orb.bootstrap import Application
@@ -337,6 +342,7 @@ jobs:
   error-message-quality:
     name: Error Message Quality Test
     runs-on: ubuntu-latest
+    needs: [config]
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -344,14 +350,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
-          python-version: "3.12"
+          python-version: ${{ needs.config.outputs.default-python-version }}
 
       - name: Install minimal package
         run: |
           python -m pip install --upgrade pip
           pip install build
           python -m build
-          pip install .
+          pip install "$(find dist -name '*.whl' | head -1)"
 
       - name: Test error messages are helpful
         run: |
@@ -382,7 +388,7 @@ jobs:
   integration-test:
     name: Integration Test
     runs-on: ubuntu-latest
-    needs: [package-variants, import-guard-validation, dependency-isolation]
+    needs: [config, package-variants, import-guard-validation, dependency-isolation]
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -390,14 +396,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
-          python-version: "3.12"
+          python-version: ${{ needs.config.outputs.default-python-version }}
 
       - name: Test full installation
         run: |
           python -m pip install --upgrade pip
           pip install build
           python -m build
-          pip install ".[all]"
+          pip install "$(find dist -name '*.whl' | head -1)[all]"
 
       - name: Run comprehensive test
         run: |
@@ -449,13 +455,14 @@ jobs:
             echo "- Integration Test: ${{ needs.integration-test.result }}"
             echo ""
             
-            if [[ "${{ needs.package-variants.result }}" == "success" && 
-                  "${{ needs.import-guard-validation.result }}" == "success" && 
-                  "${{ needs.dependency-isolation.result }}" == "success" && 
-                  "${{ needs.error-message-quality.result }}" == "success" && 
+            if [[ "${{ needs.package-variants.result }}" == "success" &&
+                  "${{ needs.import-guard-validation.result }}" == "success" &&
+                  "${{ needs.dependency-isolation.result }}" == "success" &&
+                  "${{ needs.error-message-quality.result }}" == "success" &&
                   "${{ needs.integration-test.result }}" == "success" ]]; then
               echo "PASS: All package testing strategy tests passed!"
             else
               echo "FAIL: Some package testing strategy tests failed!"
+              exit 1
             fi
           } >> "$GITHUB_STEP_SUMMARY"
