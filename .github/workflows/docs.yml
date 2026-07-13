@@ -10,10 +10,6 @@ on:
       - '*.md'
       - 'pyproject.toml'
       - '.github/workflows/docs.yml'
-  workflow_run:
-    workflows: ["Quality Checks", "Unit Tests"]
-    types: [completed]
-    branches: [main]
   pull_request:
     branches: [main]
     paths:
@@ -22,7 +18,12 @@ on:
       - 'README.md'
       - '*.md'
       - 'pyproject.toml'
+  # workflow_dispatch: allows triggering docs builds manually from the Actions UI
   workflow_dispatch:
+  # NOTE: workflow_run trigger removed.  It fired after "Quality Checks" and
+  # "Unit Tests" completed, causing docs to build twice on every main push
+  # (once from push: and once from workflow_run:).  The push: trigger is
+  # sufficient — it runs immediately and is path-scoped to docs-relevant files.
 
 permissions:
   contents: read
@@ -36,6 +37,7 @@ jobs:
   config:
     name: Get Configuration
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
@@ -57,6 +59,7 @@ jobs:
   build:
     needs: [config, setup-cache]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -91,6 +94,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: build
     permissions:
       pages: write

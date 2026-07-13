@@ -1,10 +1,8 @@
 name: Semantic Release
 
 on:
-  push:
-    branches: [main]
   workflow_run:
-    workflows: ["Quality Checks", "Unit Tests", "Security Scanning", "Workflow Validation", "Changelog Validation", "Container Build", "PyPI Publishing", "Documentation"]
+    workflows: ["TestPyPI Publishing"]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -41,14 +39,18 @@ jobs:
   preview:
     name: Preview next version
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
       packages: write
       id-token: write
+    # Only release from main: guard workflow_dispatch against feature-branch runs.
+    # No release: commit-message filter — python-semantic-release does not emit
+    # such commits, so the gate would be dead; the release-approval environment
+    # on the release job is the human gate.
     if: |
-      (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'release:')) ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_commit.message, 'release:'))
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -65,7 +67,7 @@ jobs:
       - name: Compute next version (dry run)
         id: next_version
         run: |
-          FORCE_FLAG=${{ inputs.force_level != 'auto' && format('--{0}', inputs.force_level) || '' }}
+          FORCE_FLAG=${{ (inputs.force_level != '' && inputs.force_level != 'auto') && format('--{0}', inputs.force_level) || '' }}
           NEXT=$(uv run semantic-release version --print $FORCE_FLAG 2>/dev/null || echo "no-release")
           echo "next_version=$NEXT" >> "$GITHUB_OUTPUT"
           {
@@ -77,6 +79,7 @@ jobs:
   release:
     name: Semantic Release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [preview]
     environment: release-approval
     permissions:
@@ -112,7 +115,7 @@ jobs:
       - name: Setup Bun (for UI static bundle)
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"  # pinned; update intentionally to avoid surprise breakage
 
       - name: Build UI static bundle
         run: make ui-build

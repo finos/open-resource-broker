@@ -15,16 +15,15 @@ env:
   PUBLISH_TRIGGERS: "/package"
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'k8s-legacy/**'
-      - 'pyproject.toml'
-      - 'requirements*.txt'
-      - 'uv.lock'
+  # Trigger only after Unit Tests pass so TestPyPI always receives a package
+  # that has passed the quality gate.  Using a single sentinel workflow avoids
+  # the double-fire that occurs when multiple entries in the workflows list
+  # complete independently on the same push — both would fire and the second
+  # publish attempt would fail with "version already exists".
+  # Unit Tests is the right sentinel: it is the comprehensive per-push gate
+  # and its completion implies the Quality Checks gate ran first (via needs).
   workflow_run:
-    workflows: ["Quality Checks", "Unit Tests"]
+    workflows: ["Unit Tests"]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -43,6 +42,7 @@ jobs:
   config:
     name: Get Configuration
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     outputs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
@@ -59,6 +59,7 @@ jobs:
   publish:
     name: Build and Publish Package
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [config]
     environment:
       name: testpypi
@@ -90,7 +91,7 @@ jobs:
     - name: Setup Bun (for UI static bundle)
       uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f4b11  # v2
       with:
-        bun-version: latest
+        bun-version: "1.2.15"  # pinned; update intentionally to avoid surprise breakage
 
     - name: Build UI static bundle
       run: make ui-build
@@ -128,6 +129,7 @@ jobs:
   generate-sbom:
     name: Generate SBOM
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [config, publish]
 
     permissions:
