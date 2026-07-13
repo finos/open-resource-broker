@@ -69,6 +69,23 @@ case "$MODE" in
             --config-file docs/mkdocs.yml \
             --branch gh-pages \
             dev
+
+        # Set root default to 'dev' only when no 'latest' alias exists yet
+        # (i.e. pre-first-release).  Once a release sets default=latest we
+        # must never stomp it back to dev on subsequent dev pushes.
+        echo "==> Checking whether a 'latest' alias exists..."
+        if uv run mike list \
+                --config-file docs/mkdocs.yml \
+                --branch gh-pages 2>/dev/null \
+                | grep -q '\blatest\b'; then
+            echo "==> 'latest' alias found — leaving default unchanged (root stays on latest)."
+        else
+            echo "==> 'latest' alias not found — setting default to 'dev' so site root is reachable."
+            uv run mike set-default \
+                --config-file docs/mkdocs.yml \
+                --branch gh-pages \
+                dev
+        fi
         ;;
     release)
         uv run mike deploy \
@@ -111,17 +128,11 @@ if [ ! -f "docs/site/versions.json" ]; then
     exit 1
 fi
 
-# Root index.html (redirect to default alias) is only created by 'mike set-default'.
-# On the very first dev deploy, no default has been set yet, so index.html may be
-# absent — that is expected.  The release path always calls set-default, so by the
-# time the full site is live, index.html will exist.
+# Root index.html (redirect to default alias) is created by 'mike set-default'.
+# Both paths now call set-default, so index.html must always be present after deploy.
 if [ ! -f "docs/site/index.html" ]; then
-    if [ "$MODE" = "release" ]; then
-        echo "ERROR: docs/site/index.html not found after release deploy — root redirect is missing." >&2
-        exit 1
-    else
-        echo "==> NOTE: docs/site/index.html not present yet (no default alias set). This is expected on first dev deploy."
-    fi
+    echo "ERROR: docs/site/index.html not found after ${MODE} deploy — root redirect is missing." >&2
+    exit 1
 fi
 
 echo "==> docs/site contents (top-level):"
