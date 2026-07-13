@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'dev-tools/docs/**'
       - 'src/**/cli/**'
       - 'README.md'
       - '*.md'
@@ -14,10 +15,12 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'dev-tools/docs/**'
       - 'src/**/cli/**'
       - 'README.md'
       - '*.md'
       - 'pyproject.toml'
+      - '.github/workflows/docs.yml'
   # workflow_dispatch: allows triggering docs builds manually from the Actions UI
   workflow_dispatch:
   # NOTE: workflow_run trigger removed.  It fired after "Quality Checks" and
