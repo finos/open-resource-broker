@@ -128,6 +128,13 @@ def register_port_adapters(container):
 
     container.register_singleton(SystemInfoPort, lambda _: PsutilSystemInfoAdapter())
 
+    # Register TokenDenylistPort with an in-process InMemoryTokenDenylist as the
+    # default implementation.  Production deployments that require a shared
+    # denylist (e.g. Redis) should override this registration after bootstrap.
+    from orb.infrastructure.auth.token_denylist import InMemoryTokenDenylist, TokenDenylistPort
+
+    container.register_singleton(TokenDenylistPort, lambda _: InMemoryTokenDenylist())
+
     # Register response formatting service
     from orb.application.ports.scheduler_port import SchedulerPort
     from orb.interface.response_formatting_service import ResponseFormattingService

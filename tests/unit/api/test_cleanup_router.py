@@ -624,3 +624,153 @@ class TestMachinePurgeEndpoint:
         assert body["machine_id"] == "m-1"
         assert body["machines_deleted"] == 1
         uow.machines.delete.assert_called_once_with("m-1")
+
+
+# ---------------------------------------------------------------------------
+# Security: information-leak regression tests
+# Verify raw exception text never reaches the HTTP response body for the
+# purge endpoints and the cleanup (INVALID_STATUS) path.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestRequestPurgeNoInfoLeak:
+    """KeyError and NonTerminalStatusError must not expose internal detail in responses."""
+
+    def test_key_error_message_not_in_response_body(self, cleanup_app, caplog):
+        """KeyError text (internal storage key) must not appear in the 404 body."""
+        import logging
+
+        config_port = _make_config_port(allow_destructive=True)
+        uow = _make_uow(request_map={})
+        container = _make_container(config_port, _make_uow_factory(uow))
+
+        # Patch delete_request so KeyError carries a recognisable secret token.
+        secret = "internal-storage-key-secret-abc123"
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.requests.get_di_container",
+            container=container,
+        ):
+            with patch(
+                "orb.api.routers.requests.CleanupDatabaseService.delete_request",
+                side_effect=KeyError(secret),
+            ):
+                with caplog.at_level(logging.WARNING, logger="orb.api.routers.requests"):
+                    client = TestClient(cleanup_app, raise_server_exceptions=False)
+                    r = client.post("/requests/req-secret/purge")
+
+        assert r.status_code == 404
+        assert secret not in r.text, (
+            f"Secret KeyError text leaked into response: {secret!r} found in {r.text!r}"
+        )
+        warning_messages = [rec.message for rec in caplog.records if rec.levelno >= logging.WARNING]
+        assert any(secret in m for m in warning_messages), (
+            f"Expected {secret!r} in server WARNING log, got: {warning_messages}"
+        )
+
+    def test_non_terminal_status_error_message_not_in_response_body(self, cleanup_app, caplog):
+        """NonTerminalStatusError text (machine state detail) must not appear in the 400 body."""
+        import logging
+
+        from orb.application.services.admin.cleanup_database import NonTerminalStatusError
+
+        config_port = _make_config_port(allow_destructive=True)
+        uow = _make_uow(request_map={})
+        container = _make_container(config_port, _make_uow_factory(uow))
+
+        secret = "req-secret-state-in_progress-detail-xyz"
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.requests.get_di_container",
+            container=container,
+        ):
+            with patch(
+                "orb.api.routers.requests.CleanupDatabaseService.delete_request",
+                side_effect=NonTerminalStatusError(secret),
+            ):
+                with caplog.at_level(logging.WARNING, logger="orb.api.routers.requests"):
+                    client = TestClient(cleanup_app, raise_server_exceptions=False)
+                    r = client.post("/requests/req-active/purge")
+
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "NON_TERMINAL_STATUS"
+        assert secret not in r.text, (
+            f"NonTerminalStatusError detail leaked: {secret!r} found in {r.text!r}"
+        )
+        warning_messages = [rec.message for rec in caplog.records if rec.levelno >= logging.WARNING]
+        assert any(secret in m for m in warning_messages), (
+            f"Expected {secret!r} in server WARNING log, got: {warning_messages}"
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestMachinePurgeNoInfoLeak:
+    """KeyError and NonTerminalStatusError must not expose internal detail in responses."""
+
+    def test_key_error_message_not_in_response_body(self, cleanup_app, caplog):
+        """KeyError text (storage key) must not appear in the 404 body."""
+        import logging
+
+        config_port = _make_config_port(allow_destructive=True)
+        uow = _make_uow(machine_map={})
+        container = _make_container(config_port, _make_uow_factory(uow))
+
+        secret = "internal-machine-storage-key-secret-def456"
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.machines.get_di_container",
+            container=container,
+        ):
+            with patch(
+                "orb.api.routers.machines.CleanupDatabaseService.delete_machine",
+                side_effect=KeyError(secret),
+            ):
+                with caplog.at_level(logging.WARNING, logger="orb.api.routers.machines"):
+                    client = TestClient(cleanup_app, raise_server_exceptions=False)
+                    r = client.delete("/machines/m-secret?purge=true")
+
+        assert r.status_code == 404
+        assert secret not in r.text, (
+            f"Secret KeyError text leaked into response: {secret!r} found in {r.text!r}"
+        )
+        warning_messages = [rec.message for rec in caplog.records if rec.levelno >= logging.WARNING]
+        assert any(secret in m for m in warning_messages), (
+            f"Expected {secret!r} in server WARNING log, got: {warning_messages}"
+        )
+
+    def test_non_terminal_status_error_message_not_in_response_body(self, cleanup_app, caplog):
+        """NonTerminalStatusError text (machine state detail) must not appear in the 400 body."""
+        import logging
+
+        from orb.application.services.admin.cleanup_database import NonTerminalStatusError
+
+        config_port = _make_config_port(allow_destructive=True)
+        uow = _make_uow(machine_map={})
+        container = _make_container(config_port, _make_uow_factory(uow))
+
+        secret = "m-secret-running-state-detail-ghi789"
+        with _patch_containers(
+            "orb.api.routers.admin.get_di_container",
+            "orb.api.routers.machines.get_di_container",
+            container=container,
+        ):
+            with patch(
+                "orb.api.routers.machines.CleanupDatabaseService.delete_machine",
+                side_effect=NonTerminalStatusError(secret),
+            ):
+                with caplog.at_level(logging.WARNING, logger="orb.api.routers.machines"):
+                    client = TestClient(cleanup_app, raise_server_exceptions=False)
+                    r = client.delete("/machines/m-active?purge=true")
+
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "NON_TERMINAL_STATUS"
+        assert secret not in r.text, (
+            f"NonTerminalStatusError detail leaked: {secret!r} found in {r.text!r}"
+        )
+        warning_messages = [rec.message for rec in caplog.records if rec.levelno >= logging.WARNING]
+        assert any(secret in m for m in warning_messages), (
+            f"Expected {secret!r} in server WARNING log, got: {warning_messages}"
+        )

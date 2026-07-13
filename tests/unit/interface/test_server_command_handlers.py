@@ -561,3 +561,150 @@ class TestHandleServerLogs:
 
         call_kwargs = mock_daemon.tail_log.call_args.kwargs
         assert call_kwargs["lines"] == 50
+
+
+# ---------------------------------------------------------------------------
+# _resolve_configs — real DI + real ConfigurationManager (regression)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.cli
+class TestResolveConfigsRealDI:
+    """Regression tests that exercise the real ConfigurationManager via a real
+    DIContainer, so a signature mismatch in the get_typed_with_defaults call
+    produces a test failure rather than a silent runtime error.
+
+    Previously the code resolved ConfigurationPort from the container and called
+    get_typed_with_defaults(ServerConfig) against it.  ConfigurationPort's
+    method signature is (self, key: str, expected_type: type, default=None),
+    so passing only ServerConfig (the type) as the sole positional argument
+    silently received ServerConfig as the ``key`` argument, produced a
+    TypeError, and — before the fail-closed change — was swallowed by a broad
+    except clause that returned a bare ServerConfig().
+
+    This test class binds a real ConfigurationManager to both ConfigurationManager
+    and ConfigurationPort in a lightweight DIContainer, then calls _resolve_configs.
+    Any plumbing regression (wrong object resolved, wrong method signature) will
+    raise immediately and fail this test.
+    """
+
+    def _make_args_with_real_container(self, **kwargs) -> argparse.Namespace:
+        """Build args whose _container has a real ConfigurationManager registered."""
+        from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
+        from orb.infrastructure.di.container import DIContainer
+
+        # Build a ConfigurationManager from an empty in-memory dict so no
+        # filesystem access is required.  All config values fall back to
+        # Pydantic defaults, which is exactly what we want for this test.
+        real_cm = ConfigurationManager(config_dict={})
+
+        container = DIContainer()
+        container.register_instance(ConfigurationManager, real_cm)
+        container.register_instance(ConfigurationPort, real_cm)  # type: ignore[arg-type]
+
+        defaults = {
+            "foreground": False,
+            "timeout": None,
+            "host": None,
+            "port": None,
+            "workers": None,
+            "server_log_level": None,
+            "scheduler": None,
+            "api_only": False,
+            "socket_path": None,
+            "reload": False,
+            "lines": None,
+        }
+        defaults.update(kwargs)
+        ns = argparse.Namespace(**defaults)
+        ns._container = container
+        return ns
+
+    def test_resolve_configs_returns_server_config_instance(self):
+        """_resolve_configs must return a ServerConfig (not raise) when wired correctly."""
+        from orb.config.schemas.server_schema import ServerConfig
+        from orb.interface.server_command_handlers import _resolve_configs
+
+        args = self._make_args_with_real_container()
+        server_config, ui_config = _resolve_configs(args)
+
+        assert isinstance(server_config, ServerConfig), (
+            f"Expected ServerConfig instance, got {type(server_config)!r}. "
+            "The container likely resolved ConfigurationPort instead of "
+            "ConfigurationManager, causing get_typed_with_defaults to receive "
+            "ServerConfig as the 'key' argument (wrong signature)."
+        )
+
+    def test_resolve_configs_server_config_has_expected_defaults(self):
+        """ServerConfig loaded via real ConfigurationManager has valid typed fields."""
+        from orb.interface.server_command_handlers import _resolve_configs
+
+        args = self._make_args_with_real_container()
+        server_config, _ = _resolve_configs(args)
+
+        # The result must be a proper ServerConfig with typed attributes, not a
+        # raw dict, string, or MagicMock.  Exact default values depend on the
+        # config loader; the important assertion is that the type system is intact.
+        assert isinstance(server_config.host, str) and server_config.host, (
+            "server_config.host must be a non-empty string"
+        )
+        assert isinstance(server_config.port, int) and server_config.port > 0, (
+            "server_config.port must be a positive integer"
+        )
+        assert isinstance(server_config.workers, int) and server_config.workers >= 1, (
+            "server_config.workers must be >= 1"
+        )
+
+    def test_resolve_configs_cli_overrides_applied(self):
+        """CLI args (host/port/workers) must override values from ServerConfig."""
+        from orb.interface.server_command_handlers import _resolve_configs
+
+        args = self._make_args_with_real_container(host="0.0.0.0", port=9000, workers=4)
+        server_config, _ = _resolve_configs(args)
+
+        assert server_config.host == "0.0.0.0"
+        assert server_config.port == 9000
+        assert server_config.workers == 4
+
+    def test_resolve_configs_port_has_different_signature_than_manager(self):
+        """Confirm ConfigurationPort.get_typed_with_defaults has the legacy (key, expected_type)
+        signature — NOT the (config_type,) signature used by ConfigurationManager.
+
+        This documents WHY the production code must resolve ConfigurationManager
+        rather than ConfigurationPort: calling port.get_typed_with_defaults(ServerConfig)
+        would receive ServerConfig as the 'key' argument, leaving 'expected_type'
+        missing, and raise TypeError at runtime.
+        """
+        import inspect
+
+        from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
+
+        port_sig = inspect.signature(ConfigurationPort.get_typed_with_defaults)
+        manager_sig = inspect.signature(ConfigurationManager.get_typed_with_defaults)
+
+        port_params = list(port_sig.parameters.keys())
+        manager_params = list(manager_sig.parameters.keys())
+
+        # Port: (self, key, expected_type, default) — legacy three-arg variant
+        assert "key" in port_params, (
+            "ConfigurationPort.get_typed_with_defaults no longer has a 'key' parameter — "
+            "update this test and the production code accordingly."
+        )
+        assert "expected_type" in port_params, (
+            "ConfigurationPort.get_typed_with_defaults no longer has an 'expected_type' "
+            "parameter — update this test and the production code accordingly."
+        )
+
+        # Manager: (self, config_type) — single-arg typed-schema variant
+        assert "config_type" in manager_params, (
+            "ConfigurationManager.get_typed_with_defaults no longer has a 'config_type' "
+            "parameter — update this test and the production code accordingly."
+        )
+        assert "key" not in manager_params, (
+            "ConfigurationManager.get_typed_with_defaults now has a 'key' parameter — "
+            "the signatures have converged; revisit whether the production code still "
+            "needs to distinguish between the port and the manager."
+        )

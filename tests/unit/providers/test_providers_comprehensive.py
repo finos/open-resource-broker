@@ -58,8 +58,10 @@ class TestAWSProviderEnvironmentVariables:
                 {"ORB_AWS_ACCESS_KEY_ID": "AKIATEST123", "ORB_AWS_SECRET_ACCESS_KEY": "secret123"},  # nosec B105
             ):
                 config = AWSProviderConfig()  # type: ignore[call-arg]  # type: ignore[call-arg]
-                assert config.access_key_id == "AKIATEST123"
-                assert config.secret_access_key == "secret123"
+                assert config.access_key_id is not None
+                assert config.access_key_id.get_secret_value() == "AKIATEST123"
+                assert config.secret_access_key is not None
+                assert config.secret_access_key.get_secret_value() == "secret123"
 
         except ImportError:
             pytest.skip("AWSProviderConfig not available")

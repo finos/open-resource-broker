@@ -3,6 +3,59 @@
 import threading
 from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
+# Exact-match keys whose values are always sensitive, regardless of surrounding
+# characters.  Also used as suffix patterns ("ends with").
+_SECRET_EXACT_KEYS = frozenset({"access_key_id", "secret_access_key", "session_token"})
+
+# Substring fragments that indicate a sensitive key when found anywhere in the
+# lowercased field name.  Deliberately excludes bare "key" to avoid hiding
+# legitimate debug fields such as key_file, public_key, region_key, etc.
+_SECRET_FRAGMENTS = ("secret", "password", "token", "credential")
+
+
+def _is_sensitive_key(key: str) -> bool:
+    """Return True when *key* (case-insensitive) refers to a sensitive value.
+
+    Rules (applied in order, first match wins):
+    1. Exact match against the known-secret set (access_key_id, etc.).
+    2. The lowercased key ends with one of the exact-match suffixes.
+    3. The lowercased key contains one of the sensitive fragments
+       (secret, password, token, credential) — NOT bare "key".
+    """
+    lower = key.lower()
+    if lower in _SECRET_EXACT_KEYS:
+        return True
+    for exact in _SECRET_EXACT_KEYS:
+        if lower.endswith(exact):
+            return True
+    return any(frag in lower for frag in _SECRET_FRAGMENTS)
+
+
+def _mask_config_dict(config: dict) -> dict:
+    """Return a deep copy of *config* with sensitive values replaced by '***'.
+
+    Recursion rules:
+    - dict values: recurse (so nested secrets such as {"auth": {"secret_access_key": "..."}}
+      are masked regardless of depth).
+    - list values: iterate elements, recursing into any dict elements.
+    - scalar values: replaced with '***' only when the key is deemed sensitive
+      by ``_is_sensitive_key``; otherwise passed through unchanged.
+    """
+    masked: dict = {}
+    for k, v in config.items():
+        if isinstance(v, dict):
+            # Recurse unconditionally: the child dict may contain sensitive keys
+            # even when the parent key itself is not sensitive.
+            masked[k] = _mask_config_dict(v)
+        elif isinstance(v, list):
+            masked[k] = [_mask_config_dict(item) if isinstance(item, dict) else item for item in v]
+        elif _is_sensitive_key(k):
+            masked[k] = "***"
+        else:
+            masked[k] = v
+    return masked
+
+
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -94,11 +147,28 @@ class AWSClient:
         self._logger.debug("AWS client profile determined: %s", self.profile_name)
 
         try:
-            # Initialize session
+            # Initialize session — extract explicit credentials (if any) so
+            # they reach boto3.Session instead of being silently discarded.
             from orb.providers.aws.session_factory import AWSSessionFactory
 
+            _explicit_key_id: Optional[str] = None
+            _explicit_secret: Optional[str] = None
+            _explicit_token: Optional[str] = None
+            _creds_cfg = self.get_selected_aws_provider_config()
+            if _creds_cfg is not None:
+                if _creds_cfg.access_key_id is not None:
+                    _explicit_key_id = _creds_cfg.access_key_id.get_secret_value()
+                if _creds_cfg.secret_access_key is not None:
+                    _explicit_secret = _creds_cfg.secret_access_key.get_secret_value()
+                # session_token is a plain Optional[str] — no SecretStr unwrap needed
+                _explicit_token = _creds_cfg.session_token or None
+
             self.session = AWSSessionFactory.create_session(
-                profile=self.profile_name, region=self.region_name
+                profile=self.profile_name,
+                region=self.region_name,
+                aws_access_key_id=_explicit_key_id,
+                aws_secret_access_key=_explicit_secret,
+                aws_session_token=_explicit_token,
             )
 
             # Initialize service client attributes but don't create clients yet
@@ -248,12 +318,23 @@ class AWSClient:
                             return self._aws_config
 
                         if isinstance(provider.config, dict):
-                            self._logger.debug("Config dict contents: %s", provider.config)
+                            self._logger.debug(
+                                "Config dict contents: %s", _mask_config_dict(provider.config)
+                            )
                             self._aws_config = AWSProviderConfig(**provider.config)
                             return self._aws_config
 
                         config_data = None
                         if hasattr(provider.config, "model_dump"):
+                            # model_dump() (default mode="python") preserves SecretStr
+                            # objects rather than serialising them to plain strings.
+                            # Passing this dict to AWSProviderConfig(**config_data) is
+                            # safe — Pydantic accepts SecretStr for Optional[SecretStr]
+                            # fields.  Do NOT pass this dict to json.dumps or any JSON
+                            # serialiser: SecretStr is not JSON-serialisable and will
+                            # raise TypeError (or emit the masked repr "**********").
+                            # Use model_dump(mode="json") or unwrap via
+                            # .get_secret_value() if a plain-string dict is required.
                             config_data = provider.config.model_dump()
                         elif hasattr(provider.config, "dict"):
                             config_data = provider.config.dict()

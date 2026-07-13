@@ -321,16 +321,24 @@ async def purge_request(
     try:
         cleanup_result = service.delete_request(request_id, cascade_machines=True)
     except KeyError as exc:
+        _logger.warning("Request purge failed — not found: %s", exc)
         return JSONResponse(
             status_code=404,
-            content={"success": False, "error": {"code": "NOT_FOUND", "message": str(exc)}},
+            content={
+                "success": False,
+                "error": {"code": "NOT_FOUND", "message": "Request not found."},
+            },
         )
     except NonTerminalStatusError as exc:
+        _logger.warning("Request purge rejected — non-terminal status: %s", exc)
         return JSONResponse(
             status_code=400,
             content={
                 "success": False,
-                "error": {"code": "NON_TERMINAL_STATUS", "message": str(exc)},
+                "error": {
+                    "code": "NON_TERMINAL_STATUS",
+                    "message": "Request cannot be purged because it is not in a terminal state.",
+                },
             },
         )
 

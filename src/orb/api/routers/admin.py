@@ -413,11 +413,15 @@ async def cleanup_database(
             ),
         )
     except InvalidCleanupStatusError as exc:
+        logger.warning("Cleanup rejected due to invalid status list: %s", exc)
         return JSONResponse(
             status_code=400,
             content={
                 "success": False,
-                "error": {"code": "INVALID_STATUS", "message": str(exc)},
+                "error": {
+                    "code": "INVALID_STATUS",
+                    "message": "One or more supplied statuses are not valid terminal statuses.",
+                },
             },
         )
 
@@ -490,6 +494,9 @@ async def reload_config(request: Request, _user=Depends(require_role("admin"))) 
             status_code=500,
             content={
                 "reloaded": False,
-                "error": {"code": "RELOAD_FAILED", "message": str(exc)},
+                "error": {
+                    "code": "RELOAD_FAILED",
+                    "message": "Configuration reload failed. Check server logs for details.",
+                },
             },
         )

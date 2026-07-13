@@ -660,3 +660,163 @@ class TestAdminExecutorOffload:
 
         assert ping_r.status_code == 200, "concurrent GET stalled while wipe was running"
         assert wipe_r.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Security: information-leak regression tests for cleanup and reload
+# ---------------------------------------------------------------------------
+
+
+def _cleanup_post(client: TestClient, body: dict | None = None):
+    if body is None:
+        body = {"confirm": "CLEANUP", "request_statuses": ["cancelled"]}
+    return client.post("/admin/database/cleanup", json=body)
+
+
+def _reload_post(client: TestClient):
+    return client.post("/admin/reload-config")
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestCleanupInvalidStatusNoInfoLeak:
+    """InvalidCleanupStatusError text must not appear in the 400 response body
+    but must be visible in the server WARNING log."""
+
+    def test_invalid_status_error_message_not_in_response_body(self, admin_app, caplog):
+        """Raw InvalidCleanupStatusError text must not be returned to the client."""
+        import logging
+
+        from orb.application.services.admin.cleanup_database import InvalidCleanupStatusError
+
+        config_port = _make_config_port(allow_destructive=True, environment="development")
+        machine_repo, request_repo, template_repo = _make_repositories()
+        container = _make_container(config_port, machine_repo, request_repo, template_repo)
+
+        # Inject a recognisable secret into the error message.
+        secret = "valid-statuses-are-secret-enum-abc123"
+        with _patch_ctx(container):
+            with patch(
+                "orb.api.routers.admin.CleanupDatabaseService.bulk_cleanup",
+                side_effect=InvalidCleanupStatusError(secret),
+            ):
+                with caplog.at_level(logging.WARNING, logger="orb.api.routers.admin"):
+                    client = TestClient(admin_app, raise_server_exceptions=False)
+                    r = _cleanup_post(client)
+
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "INVALID_STATUS"
+        assert secret not in r.text, (
+            f"InvalidCleanupStatusError detail leaked: {secret!r} found in {r.text!r}"
+        )
+        warning_messages = [rec.message for rec in caplog.records if rec.levelno >= logging.WARNING]
+        assert any(secret in m for m in warning_messages), (
+            f"Expected {secret!r} in server WARNING log, got: {warning_messages}"
+        )
+
+    def test_invalid_status_error_code_unchanged(self, admin_app):
+        """HTTP status code and error code must not change after the fix."""
+        from orb.application.services.admin.cleanup_database import InvalidCleanupStatusError
+
+        config_port = _make_config_port(allow_destructive=True, environment="development")
+        machine_repo, request_repo, template_repo = _make_repositories()
+        container = _make_container(config_port, machine_repo, request_repo, template_repo)
+
+        with _patch_ctx(container):
+            with patch(
+                "orb.api.routers.admin.CleanupDatabaseService.bulk_cleanup",
+                side_effect=InvalidCleanupStatusError("any detail"),
+            ):
+                client = TestClient(admin_app, raise_server_exceptions=False)
+                r = _cleanup_post(client)
+
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "INVALID_STATUS"
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestReloadConfigNoInfoLeak:
+    """Broad Exception during config reload must not expose internal text in the
+    500 response body, but must be visible in the server ERROR log."""
+
+    def _make_failing_container(
+        self, config_port, machine_repo, request_repo, template_repo, secret
+    ):
+        """Return a DI container whose ConfigurationManager.reload() raises with *secret*."""
+        from orb.domain.base import UnitOfWorkFactory
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
+        from orb.domain.machine.repository import MachineRepository
+        from orb.domain.request.repository import RequestRepository
+        from orb.domain.template.repository import TemplateRepository
+
+        uow = MagicMock()
+        uow.machines = machine_repo
+        uow.requests = request_repo
+        uow.templates = template_repo
+        uow.__enter__ = MagicMock(return_value=uow)
+        uow.__exit__ = MagicMock(return_value=False)
+        uow_factory = MagicMock()
+        uow_factory.create_unit_of_work = MagicMock(return_value=uow)
+
+        # A ConfigurationManager mock whose reload() raises with the secret.
+        cm_mock = MagicMock()
+        cm_mock.reload.side_effect = Exception(secret)
+
+        # Import lazily to match what the router does at call time.
+        from orb.config.managers.configuration_manager import ConfigurationManager
+
+        type_map = {
+            ConfigurationPort: config_port,
+            MachineRepository: machine_repo,
+            RequestRepository: request_repo,
+            TemplateRepository: template_repo,
+            UnitOfWorkFactory: uow_factory,
+            ConfigurationManager: cm_mock,
+        }
+        container = MagicMock()
+        container.get.side_effect = lambda t: type_map[t]
+        return container
+
+    def test_reload_exception_message_not_in_response_body(self, admin_app, caplog):
+        """Raw exception text must not be returned to the client on reload failure."""
+        import logging
+
+        config_port = _make_config_port(allow_destructive=True, environment="development")
+        machine_repo, request_repo, template_repo = _make_repositories()
+
+        secret = "config-file-path-secret-/etc/orb/secret.json"
+        container = self._make_failing_container(
+            config_port, machine_repo, request_repo, template_repo, secret
+        )
+
+        with _patch_ctx(container):
+            with caplog.at_level(logging.ERROR, logger="orb.api.routers.admin"):
+                client = TestClient(admin_app, raise_server_exceptions=False)
+                r = _reload_post(client)
+
+        assert r.status_code == 500
+        assert r.json()["error"]["code"] == "RELOAD_FAILED"
+        assert secret not in r.text, (
+            f"Exception detail leaked into reload response: {secret!r} found in {r.text!r}"
+        )
+        error_messages = [rec.message for rec in caplog.records if rec.levelno >= logging.ERROR]
+        assert any(secret in m for m in error_messages), (
+            f"Expected {secret!r} in server ERROR log, got: {error_messages}"
+        )
+
+    def test_reload_error_code_and_status_unchanged(self, admin_app):
+        """HTTP 500 and code=RELOAD_FAILED must be preserved after the fix."""
+        config_port = _make_config_port(allow_destructive=True, environment="development")
+        machine_repo, request_repo, template_repo = _make_repositories()
+
+        container = self._make_failing_container(
+            config_port, machine_repo, request_repo, template_repo, "any internal detail"
+        )
+
+        with _patch_ctx(container):
+            client = TestClient(admin_app, raise_server_exceptions=False)
+            r = _reload_post(client)
+
+        assert r.status_code == 500
+        assert r.json()["error"]["code"] == "RELOAD_FAILED"

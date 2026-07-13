@@ -128,12 +128,15 @@ class ProviderAuthSubConfig(BaseModel):
     )
 
 
+_NO_AUTH_STRATEGIES: frozenset[str | None] = frozenset({"none", "", None})
+
+
 class AuthConfig(BaseModel):
     """Authentication configuration."""
 
     model_config = ConfigDict(extra="forbid")
 
-    enabled: bool = Field(False, description="Enable authentication")
+    enabled: bool = Field(True, description="Enable authentication")
     strategy: str = Field(
         "none",
         description="Authentication strategy (none, bearer_token, bearer_token_enhanced, iam, cognito)",
@@ -152,6 +155,31 @@ class AuthConfig(BaseModel):
         None, description="Provider-specific auth configuration"
     )
 
+    @model_validator(mode="after")
+    def _reject_enabled_with_no_strategy(self) -> "AuthConfig":
+        """Fail hard when auth.enabled=True but no real strategy is configured.
+
+        The "none" strategy (NoAuthStrategy) is a pass-through that grants every
+        anonymous caller permissions=["*"].  Combining it with enabled=True is a
+        silent fail-open: the server advertises "auth is on" while enforcing
+        nothing.  Any construction that would produce this combination is a
+        misconfiguration and is rejected at build time so the error surfaces
+        immediately rather than at request time.
+
+        To run with authentication disabled, use AuthConfig(enabled=False)
+        explicitly.  To enable auth, also set strategy to a real strategy name
+        (e.g. "bearer_token", "iam", "cognito").
+        """
+        if self.enabled and self.strategy in _NO_AUTH_STRATEGIES:
+            raise ValueError(
+                "auth.enabled=True requires a real authentication strategy. "
+                f"Got strategy={self.strategy!r}, which is a pass-through that enforces nothing. "
+                "Either set enabled=False (to disable auth explicitly) "
+                "or set strategy to a real strategy name "
+                "(e.g. 'bearer_token', 'bearer_token_enhanced', 'iam', 'cognito')."
+            )
+        return self
+
 
 class CORSConfig(BaseModel):
     """CORS configuration.
@@ -161,6 +189,15 @@ class CORSConfig(BaseModel):
     Operators who bind the server to ``0.0.0.0`` (network exposure) MUST also
     update ``origins`` and ``trusted_hosts`` to the actual client origins they
     want to permit.
+
+    **Security note — credentials + wildcard origin:**
+    The combination of ``credentials=True`` and ``origins=["*"]`` is rejected at
+    validation time.  Browsers refuse to honour ``Access-Control-Allow-Credentials:
+    true`` when the server responds with ``Access-Control-Allow-Origin: *``
+    (the spec requires an explicit origin in that case).  Accepting this combo
+    silently would produce a configuration that either breaks browsers or, in
+    environments where the restriction is relaxed, grants credential access to
+    any origin.
     """
 
     enabled: bool = Field(True, description="Enable CORS")
@@ -176,6 +213,49 @@ class CORSConfig(BaseModel):
     )
     headers: list[str] = Field(["*"], description="Allowed headers")
     credentials: bool = Field(False, description="Allow credentials")
+
+    @model_validator(mode="after")
+    def _reject_credentials_with_wildcard_origin(self) -> "CORSConfig":
+        """Reject insecure combinations of allow_credentials=True with wildcard origins/headers.
+
+        Browsers reject ``Access-Control-Allow-Credentials: true`` when the
+        server sends ``Access-Control-Allow-Origin: *``.  Beyond the bare ``*``
+        case, this validator also catches:
+
+        - Whitespace-padded wildcards (e.g. ``" * "`` or ``"  *"``)
+        - Subdomain/path wildcards (any origin containing ``*``, e.g.
+          ``"https://*.example.com"``) — browsers reject credentials with any
+          wildcard origin pattern, not just a bare ``*``
+        - ``headers=["*"]`` with ``credentials=True`` — the spec forbids
+          ``Access-Control-Allow-Headers: *`` when credentials are in play
+
+        When ``credentials=False`` (the default) none of these restrictions apply.
+        """
+        if not self.credentials:
+            return self
+
+        # Check each origin: strip whitespace and reject any that contain '*'.
+        for origin in self.origins:
+            if "*" in origin.strip():
+                raise ValueError(
+                    "cors.credentials=true is incompatible with cors.origins containing "
+                    f"a wildcard pattern (got {origin!r}). "
+                    "Browsers refuse to send credentials to wildcard origins, including "
+                    "subdomain wildcards like 'https://*.example.com'. "
+                    "Replace wildcard entries with the explicit origins you want to permit, "
+                    "or set cors.credentials=false if credentials are not needed."
+                )
+
+        # headers=["*"] with credentials is also forbidden by the CORS spec.
+        if "*" in self.headers:
+            raise ValueError(
+                "cors.credentials=true is incompatible with cors.headers containing '*'. "
+                "The CORS spec forbids 'Access-Control-Allow-Headers: *' when credentials "
+                "are in play.  List the specific request headers you want to allow, "
+                "or set cors.credentials=false if credentials are not needed."
+            )
+
+        return self
 
 
 class ServerConfig(BaseModel):
@@ -203,7 +283,17 @@ class ServerConfig(BaseModel):
     openapi_url: str = Field("/openapi.json", description="OpenAPI schema URL")
 
     # Authentication and CORS
-    auth: AuthConfig = Field(default_factory=AuthConfig, description="Authentication configuration")  # type: ignore[arg-type]
+    #
+    # Default: auth disabled.  The "none" strategy is a pass-through that grants
+    # every anonymous caller permissions=["*"]; combining it with enabled=True
+    # is silently fail-open.  Operators who want auth MUST set both enabled=True
+    # AND a real strategy name in their config file.  A bare ServerConfig()
+    # therefore boots with auth off (honest posture) rather than appearing to
+    # have auth on while enforcing nothing.
+    auth: AuthConfig = Field(  # type: ignore[arg-type]
+        default_factory=lambda: AuthConfig(enabled=False),  # type: ignore[call-arg]
+        description="Authentication configuration",
+    )
     cors: CORSConfig = Field(default_factory=CORSConfig, description="CORS configuration")  # type: ignore[arg-type]
 
     # Security

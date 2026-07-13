@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from base64 import urlsafe_b64encode
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -32,7 +32,7 @@ def _make_logger() -> MagicMock:
     return logger
 
 
-def _make_strategy(enabled: bool = True) -> Any:
+def _make_strategy(enabled: bool = True, token_denylist=None) -> Any:
     from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
 
     logger = _make_logger()
@@ -48,9 +48,41 @@ def _make_strategy(enabled: bool = True) -> Any:
             client_id="abc123",
             region="us-east-1",
             enabled=enabled,
+            token_denylist=token_denylist,
         )
 
     return strategy
+
+
+def _make_mock_denylist(is_denylisted: bool = False, add_token_returns: bool = True):
+    """Build an AsyncMock that satisfies the TokenDenylistPort interface."""
+    denylist = MagicMock()
+    denylist.is_denylisted = AsyncMock(return_value=is_denylisted)
+    denylist.add_token = AsyncMock(return_value=add_token_returns)
+    return denylist
+
+
+def _make_fake_jwt_token(token_use: str = "access", exp_offset: int = 3600) -> str:
+    """Build a syntactically valid (three-part) fake JWT with the given payload fields.
+
+    The token is NOT cryptographically signed — it is used only to test code paths
+    that read the unsigned payload (revoke_token, structural check).
+    """
+    import base64
+    import json
+
+    header = base64.urlsafe_b64encode(b'{"alg":"RS256","typ":"JWT"}').rstrip(b"=").decode()
+    now = int(time.time())
+    payload_data = {
+        "sub": "user-123",
+        "token_use": token_use,
+        "exp": now + exp_offset,
+        "iss": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE",
+        "aud": "abc123",
+    }
+    payload = base64.urlsafe_b64encode(json.dumps(payload_data).encode()).rstrip(b"=").decode()
+    sig = "fakesignatureAABBCC"
+    return f"{header}.{payload}.{sig}"
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +132,7 @@ async def test_cognito_validate_token_expired():
     import jwt as pyjwt
 
     strategy = _make_strategy()
+    token = _make_fake_jwt_token()
 
     with patch.object(strategy, "_get_public_key", return_value="fake_key"):
         with patch("orb.providers.aws.auth.cognito_strategy.jwt.decode") as mock_decode:
@@ -109,7 +142,7 @@ async def test_cognito_validate_token_expired():
                 "orb.providers.aws.auth.cognito_strategy.jwt.get_unverified_header",
                 return_value={"kid": "test-kid"},
             ):
-                result = await strategy.validate_token("expired.token.here")
+                result = await strategy.validate_token(token)
 
     assert result.status == AuthStatus.EXPIRED
 
@@ -125,14 +158,110 @@ async def test_cognito_validate_token_missing_kid():
     """validate_token returns INVALID when token header has no kid."""
 
     strategy = _make_strategy()
+    token = _make_fake_jwt_token()
 
     with patch(
         "orb.providers.aws.auth.cognito_strategy.jwt.get_unverified_header",
         return_value={},  # no "kid"
     ):
-        result = await strategy.validate_token("some.token.here")
+        result = await strategy.validate_token(token)
 
     assert result.status == AuthStatus.INVALID
+
+
+# ---------------------------------------------------------------------------
+# validate_token() — structural check rejects garbage tokens
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_validate_token_rejects_garbage():
+    """validate_token returns INVALID for strings that are not JWT-shaped."""
+    strategy = _make_strategy()
+
+    for bad_token in ("", "notaJWT", "two.parts", "x" * 9000):
+        result = await strategy.validate_token(bad_token)
+        assert result.status == AuthStatus.INVALID, f"expected INVALID for {bad_token!r}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_validate_token_structural_check_accepts_real_shape():
+    """validate_token does NOT reject a properly shaped token at the structural gate."""
+    strategy = _make_strategy()
+    token = _make_fake_jwt_token()
+
+    # The structural regex should pass; subsequent failure is expected (bad sig / key),
+    # but the error must NOT be "Invalid token format".
+    with patch(
+        "orb.providers.aws.auth.cognito_strategy.jwt.get_unverified_header",
+        return_value={},  # triggers "Token missing key ID", not structural failure
+    ):
+        result = await strategy.validate_token(token)
+
+    assert result.error_message != "Invalid token format"
+
+
+# ---------------------------------------------------------------------------
+# validate_token() — denylist check rejects revoked tokens
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_validate_token_rejects_denylisted_token():
+    """validate_token returns INVALID when the token is on the denylist."""
+    denylist = _make_mock_denylist(is_denylisted=True)
+    strategy = _make_strategy(token_denylist=denylist)
+    token = _make_fake_jwt_token()
+
+    result = await strategy.validate_token(token)
+
+    assert result.status == AuthStatus.INVALID
+    assert "revoked" in (result.error_message or "").lower()
+    denylist.is_denylisted.assert_called_once_with(token)
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_validate_token_revoked_warning_does_not_leak_token():
+    """The warning log for a revoked token must not contain the full token value."""
+    denylist = _make_mock_denylist(is_denylisted=True)
+    strategy = _make_strategy(token_denylist=denylist)
+    token = _make_fake_jwt_token()
+
+    await strategy.validate_token(token)
+
+    # Collect all warning calls and confirm the raw token is absent.
+    for call_args in strategy._logger.warning.call_args_list:
+        args, kwargs = call_args
+        rendered = " ".join(str(a) for a in args)
+        assert token not in rendered, "Full token leaked in warning log"
+
+
+# ---------------------------------------------------------------------------
+# validate_token() — error_message must not contain the raw token
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_validate_token_error_message_no_raw_token():
+    """validate_token error messages must never echo back the raw token."""
+    import jwt as pyjwt
+
+    strategy = _make_strategy()
+    token = _make_fake_jwt_token()
+
+    # Force InvalidTokenError to exercise the except branch
+    with patch(
+        "orb.providers.aws.auth.cognito_strategy.jwt.get_unverified_header",
+        side_effect=pyjwt.InvalidTokenError("bad"),
+    ):
+        result = await strategy.validate_token(token)
+
+    assert token not in (result.error_message or ""), "Raw token leaked in error_message"
 
 
 # ---------------------------------------------------------------------------
@@ -170,13 +299,249 @@ def test_cognito_from_auth_config_defaults():
 
     with patch("boto3.client") as _mock:
         _mock.return_value = MagicMock()
-        from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
+        # get_container is a local import inside from_auth_config; patch at source.
+        with patch(
+            "orb.infrastructure.di.container.get_container",
+            side_effect=Exception("no container"),
+        ):
+            from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
 
-        strategy = CognitoAuthStrategy.from_auth_config(auth_config)
+            strategy = CognitoAuthStrategy.from_auth_config(auth_config)
 
     assert strategy.region == "us-east-1"
     assert strategy.user_pool_id == ""
     assert strategy.client_id == ""
+
+
+@pytest.mark.unit
+def test_cognito_from_auth_config_produces_non_none_denylist():
+    """from_auth_config must always produce an instance with a non-None denylist.
+
+    This test would FAIL on the pre-fix code where from_auth_config never
+    injected token_denylist (leaving it as None on every live instance).
+    """
+    from orb.config.schemas.server_schema import AuthConfig
+    from orb.infrastructure.auth.token_denylist import TokenDenylistPort
+
+    auth_config = AuthConfig(strategy="cognito")  # type: ignore[call-arg]
+
+    with patch("boto3.client") as _mock:
+        _mock.return_value = MagicMock()
+        # Let the container resolution fail so the InMemoryTokenDenylist fallback fires.
+        with patch(
+            "orb.infrastructure.di.container.get_container",
+            side_effect=Exception("no container"),
+        ):
+            from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
+
+            strategy = CognitoAuthStrategy.from_auth_config(auth_config)
+
+    assert strategy._token_denylist is not None
+    assert isinstance(strategy._token_denylist, TokenDenylistPort)
+
+
+@pytest.mark.unit
+def test_cognito_from_auth_config_uses_container_denylist_when_available():
+    """from_auth_config resolves TokenDenylistPort from the DI container when present."""
+    from orb.config.schemas.server_schema import AuthConfig
+    from orb.infrastructure.auth.token_denylist import TokenDenylistPort
+
+    auth_config = AuthConfig(strategy="cognito")  # type: ignore[call-arg]
+
+    mock_denylist = _make_mock_denylist()
+    mock_container = MagicMock()
+    mock_container.get = MagicMock(
+        side_effect=lambda cls: mock_denylist if cls is TokenDenylistPort else MagicMock()
+    )
+
+    with patch("boto3.client") as _mock:
+        _mock.return_value = MagicMock()
+        # get_container is a local import; patch at source.
+        with patch(
+            "orb.infrastructure.di.container.get_container",
+            return_value=mock_container,
+        ):
+            from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
+
+            strategy = CognitoAuthStrategy.from_auth_config(auth_config)
+
+    assert strategy._token_denylist is mock_denylist
+
+
+# ---------------------------------------------------------------------------
+# revoke_token() — zero-test gap filled (H4)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_revoke_refresh_token_calls_cognito_api():
+    """revoke_token calls cognito_client.revoke_token for a refresh token.
+
+    This test FAILS on the pre-fix code where a refresh token would skip
+    denylist insertion and only call RevokeToken — the mock denylist would
+    show zero calls.
+    """
+    denylist = _make_mock_denylist()
+    strategy = _make_strategy(token_denylist=denylist)
+    strategy.cognito_client = MagicMock()
+    strategy.cognito_client.revoke_token = MagicMock(return_value={})
+
+    token = _make_fake_jwt_token(token_use="refresh")
+
+    with patch(
+        "orb.providers.aws.auth.cognito_strategy.asyncio.to_thread",
+        new=AsyncMock(side_effect=lambda fn, **kw: fn(**kw)),
+    ):
+        result = await strategy.revoke_token(token)
+
+    assert result is True
+    strategy.cognito_client.revoke_token.assert_called_once_with(
+        Token=token,
+        ClientId=strategy.client_id,
+    )
+    # Denylist insertion must also have happened (H6 fix).
+    denylist.add_token.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_revoke_access_token_adds_to_denylist():
+    """revoke_token adds an access token to the denylist and does NOT call Cognito API.
+
+    This test FAILS on the pre-fix code if _token_denylist is None (the live
+    behaviour before this fix), since add_token would never be called.
+    """
+    denylist = _make_mock_denylist()
+    strategy = _make_strategy(token_denylist=denylist)
+    strategy.cognito_client = MagicMock()
+
+    token = _make_fake_jwt_token(token_use="access")
+    result = await strategy.revoke_token(token)
+
+    assert result is True
+    denylist.add_token.assert_called_once()
+    # RevokeToken must NOT be called for access tokens.
+    strategy.cognito_client.revoke_token.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_revoke_token_returns_false_without_denylist():
+    """revoke_token returns False when no denylist is configured.
+
+    Before the fix this returned True even though nothing was revoked.
+    This test FAILS on the pre-fix code.
+    """
+    strategy = _make_strategy(token_denylist=None)
+    token = _make_fake_jwt_token(token_use="access")
+
+    result = await strategy.revoke_token(token)
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_revoke_refresh_token_without_denylist_returns_false():
+    """revoke_token returns False for a refresh token when no denylist is available.
+
+    On the pre-fix code a refresh token would skip denylist and call RevokeToken,
+    returning True — even though the local denylist was never populated and the
+    token could be re-used against any route that doesn't call Cognito.
+    """
+    strategy = _make_strategy(token_denylist=None)
+    token = _make_fake_jwt_token(token_use="refresh")
+
+    result = await strategy.revoke_token(token)
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_revoke_token_forged_token_use_still_denylists():
+    """A token with forged token_use='refresh' is still added to the denylist (H6).
+
+    An attacker could craft a valid access JWT with token_use='refresh' in the
+    UNSIGNED payload to steer the pre-fix code into the Cognito RevokeToken path
+    (which would fail with an error for an access token) and thereby avoid being
+    denylisted.
+
+    After the fix, denylist insertion happens FIRST for ALL tokens regardless of
+    the unsigned token_use claim.  This test verifies that even if token_use
+    claims 'refresh', the denylist is still populated.
+    """
+    denylist = _make_mock_denylist()
+    strategy = _make_strategy(token_denylist=denylist)
+    # Simulate a Cognito client that raises on revoke_token (access token presented
+    # as refresh — Cognito rejects it).
+    mock_client = MagicMock()
+    from botocore.exceptions import ClientError
+
+    mock_client.revoke_token.side_effect = ClientError(
+        {"Error": {"Code": "InvalidParameterException", "Message": "Not a refresh token"}},
+        "RevokeToken",
+    )
+    strategy.cognito_client = mock_client
+
+    # Build a token whose unsigned payload claims token_use="refresh"
+    token = _make_fake_jwt_token(token_use="refresh")
+
+    with patch(
+        "orb.providers.aws.auth.cognito_strategy.asyncio.to_thread",
+        new=AsyncMock(side_effect=lambda fn, **kw: fn(**kw)),
+    ):
+        result = await strategy.revoke_token(token)
+
+    # The Cognito API step failed, so result is False — but denylist MUST have been
+    # populated before the API call was attempted.
+    denylist.add_token.assert_called_once()
+    assert result is False  # API step failed → False, but denylist is populated
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_revoke_token_denylist_failure_returns_false():
+    """revoke_token returns False when the denylist add_token call fails."""
+    denylist = _make_mock_denylist(add_token_returns=False)
+    strategy = _make_strategy(token_denylist=denylist)
+    token = _make_fake_jwt_token(token_use="access")
+
+    result = await strategy.revoke_token(token)
+
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
+# validate_token() — denylisted token is rejected after revoke
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_cognito_validate_token_rejects_after_revoke():
+    """validate_token rejects a token that was previously revoked (end-to-end denylist check).
+
+    This test uses a real InMemoryTokenDenylist to confirm the full round-trip:
+    revoke_token adds to denylist → validate_token reads denylist → INVALID.
+    """
+    from orb.infrastructure.auth.token_denylist import InMemoryTokenDenylist
+
+    denylist = InMemoryTokenDenylist()
+    strategy = _make_strategy(token_denylist=denylist)
+    strategy.cognito_client = MagicMock()
+
+    token = _make_fake_jwt_token(token_use="access")
+
+    # Step 1: revoke
+    revoked = await strategy.revoke_token(token)
+    assert revoked is True
+
+    # Step 2: validate should now reject
+    result = await strategy.validate_token(token)
+    assert result.status == AuthStatus.INVALID
+    assert "revoked" in (result.error_message or "").lower()
 
 
 # ---------------------------------------------------------------------------

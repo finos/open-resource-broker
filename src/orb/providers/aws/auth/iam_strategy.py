@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -60,11 +61,16 @@ class IAMAuthStrategy(AuthPort):
         self._admin_role_patterns = admin_role_patterns or self._DEFAULT_ADMIN_ROLE_PATTERNS
         self.region = region
         self.profile = profile
-        self.required_actions = required_actions or [
-            "ec2:DescribeInstances",
-            "ec2:RunInstances",
-            "ec2:TerminateInstances",
-        ]
+        # None means "operator did not configure required_actions" → apply defaults.
+        # [] means "operator explicitly set required_actions to empty" → honour it (no actions required).
+        if required_actions is None:
+            self.required_actions: list[str] = [
+                "ec2:DescribeInstances",
+                "ec2:RunInstances",
+                "ec2:TerminateInstances",
+            ]
+        else:
+            self.required_actions = list(required_actions)
         self.enabled = enabled
 
         # assume_permissions is a dev-only escape hatch. It is only honoured when
@@ -91,14 +97,6 @@ class IAMAuthStrategy(AuthPort):
                 "IAM assume_permissions=True is ACTIVE (ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY=true). "
                 "All required_actions are granted without AWS evaluation. "
                 "This MUST NOT be used in production."
-            )
-
-        if not self._assume_permissions:
-            self._logger.error(
-                "IAM strategy active with assume_permissions=False. "
-                "IAM permission evaluation (SimulatePrincipalPolicy) is not yet implemented. "
-                "All permission checks will DENY by default. "
-                "Set assume_permissions=True for development/testing only."
             )
 
         # Initialize AWS session
@@ -290,11 +288,14 @@ class IAMAuthStrategy(AuthPort):
         """
         Get AWS caller identity.
 
+        The underlying boto3 call is executed via ``asyncio.to_thread`` so the
+        event loop is not blocked during the synchronous network round-trip.
+
         Returns:
             Caller identity information
         """
         try:
-            response = self.sts_client.get_caller_identity()
+            response: dict[str, Any] = await asyncio.to_thread(self.sts_client.get_caller_identity)
             return response
         except Exception as e:
             self._logger.error("Failed to get caller identity: %s", e)
@@ -302,21 +303,25 @@ class IAMAuthStrategy(AuthPort):
 
     async def _check_permissions(self, identity: dict[str, Any]) -> list[str]:
         """
-        Check IAM permissions for the caller.
+        Check IAM permissions for the caller using SimulatePrincipalPolicy.
 
-        By default this method denies all permissions. Actual IAM policy evaluation
-        (via SimulatePrincipalPolicy) is not yet implemented.
+        The caller's ARN (from ``identity``) is used as the policy-source ARN.
+        All ``required_actions`` are evaluated in a single API call.  Only
+        actions whose ``EvalDecision`` is ``"allowed"`` are returned; explicit-
+        deny, implicit-deny, or any unknown decision are treated as denied.
 
-        Set ``assume_permissions=True`` at construction time to grant all
-        ``required_actions`` unconditionally — intended for development and testing
-        only, never for production use.
+        On any error (API failure, missing permissions to call IAM, network
+        timeout, etc.) the method returns an empty list — fail secure.
+
+        When the ``assume_permissions`` dev-only flag is active the evaluation
+        is bypassed and all ``required_actions`` plus the hostfactory actions
+        are returned unconditionally.
 
         Args:
-            identity: Caller identity
+            identity: Caller identity dict (must contain ``"Arn"``).
 
         Returns:
-            List of permissions/actions the user can perform. Empty list unless
-            ``assume_permissions=True``.
+            List of IAM actions the caller is allowed to perform.
         """
         if self._assume_permissions:
             permissions = list(self.required_actions)
@@ -329,11 +334,66 @@ class IAMAuthStrategy(AuthPort):
             )
             return permissions
 
-        self._logger.warning(
-            "IAM permission evaluation not implemented. All permissions denied by default. "
-            "Set assume_permissions=True to grant all permissions for development."
-        )
-        return []
+        caller_arn = identity.get("Arn", "")
+        if not caller_arn:
+            self._logger.warning("Cannot evaluate IAM permissions: caller ARN is empty.")
+            return []
+
+        actions_to_check = list(self.required_actions)
+
+        # ResourceArns is not passed here, so the simulation evaluates against
+        # the wildcard resource ("*").  This means resource-scoped Condition
+        # keys and resource-level denies in IAM policies are NOT evaluated,
+        # which can produce an over-grant for resource-restricted policies
+        # (e.g. ``ec2:TerminateInstances`` scoped to specific instance IDs).
+        # Passing concrete ResourceArns would require threading request-context
+        # resource identifiers through the auth layer — a broad refactor deferred
+        # to a future enhancement.  The current behaviour is intentional and
+        # documented here so callers understand the limitation.
+
+        granted: list[str] = []
+        try:
+            # Paginate through all EvaluationResults pages (AWS returns ≤100
+            # results per page and paginates via IsTruncated/Marker).  Using
+            # the boto3 paginator ensures every page is consumed before a
+            # permission decision is made, preventing silent over-grant or
+            # wrong-deny when >100 actions are evaluated.
+            paginator = self.iam_client.get_paginator("simulate_principal_policy")
+
+            def _paginate() -> list[dict[str, Any]]:
+                pages: list[dict[str, Any]] = []
+                for page in paginator.paginate(
+                    PolicySourceArn=caller_arn,
+                    ActionNames=actions_to_check,
+                ):
+                    pages.extend(page.get("EvaluationResults", []))
+                return pages
+
+            all_results: list[dict[str, Any]] = await asyncio.to_thread(_paginate)
+
+        except ClientError as exc:
+            error_code = exc.response.get("Error", {}).get("Code", "Unknown")
+            self._logger.error(
+                "SimulatePrincipalPolicy failed (ClientError %s); denying all permissions.",
+                error_code,
+            )
+            return []
+        except Exception as exc:
+            # Log only the exception type to avoid embedding caller ARN or
+            # action lists (present in botocore exception messages) in log output.
+            self._logger.error(
+                "SimulatePrincipalPolicy raised an unexpected error (%s); denying all permissions.",
+                type(exc).__name__,
+            )
+            return []
+
+        for result in all_results:
+            action = result.get("EvalActionName", "")
+            decision = result.get("EvalDecision", "")
+            if decision == "allowed":
+                granted.append(action)
+
+        return granted
 
     async def _determine_roles(self, identity: dict[str, Any], permissions: list[str]) -> list[str]:
         """

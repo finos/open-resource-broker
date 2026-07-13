@@ -3,7 +3,7 @@
 import json
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
@@ -127,8 +127,20 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     # AWS Authentication
     profile: Optional[str] = Field(None, description="AWS profile")
     role_arn: Optional[str] = Field(None, description="AWS role ARN")
-    access_key_id: Optional[str] = Field(None, description="AWS access key ID")
-    secret_access_key: Optional[str] = Field(None, description="AWS secret access key")
+    access_key_id: Optional[SecretStr] = Field(
+        None,
+        description=(
+            "AWS access key ID. Stored as SecretStr so the value is never exposed "
+            "in repr() or log output. Call .get_secret_value() to pass to boto3."
+        ),
+    )
+    secret_access_key: Optional[SecretStr] = Field(
+        None,
+        description=(
+            "AWS secret access key. Stored as SecretStr so the value is never exposed "
+            "in repr() or log output. Call .get_secret_value() to pass to boto3."
+        ),
+    )
     session_token: Optional[str] = Field(None, description="AWS session token")
 
     # AWS Settings

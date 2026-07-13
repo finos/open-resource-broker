@@ -17,6 +17,28 @@ from orb.domain.base.exceptions import (
 
 from .categories import ErrorCategory
 
+# Keys that are safe to forward to callers.  All other keys are stripped so
+# that wrap-chain internals (original_error, errno, filename, …) never reach
+# the wire.
+_SAFE_DETAIL_KEYS: frozenset[str] = frozenset(
+    {
+        "entity_type",
+        "entity_id",
+        "field",
+        "field_name",
+        "rule",
+        "expected_version",
+        "new_version",
+        "current_state",
+        "attempted_state",
+    }
+)
+
+
+def _safe_details(raw: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of *raw* containing only the keys safe to send to callers."""
+    return {k: v for k, v in raw.items() if k in _SAFE_DETAIL_KEYS}
+
 
 class InfrastructureErrorResponse(BaseDTO):
     """
@@ -56,14 +78,18 @@ class InfrastructureErrorResponse(BaseDTO):
 
     @classmethod
     def from_exception(
-        cls, exception: Exception, context: Optional[str] = None
+        cls,
+        exception: Exception,
+        context: Optional[str] = None,
     ) -> "InfrastructureErrorResponse":
-        """Create infrastructure error response from exception."""
+        """Create infrastructure error response from exception.
+
+        The context parameter is accepted for API compatibility but is not
+        forwarded to the caller - internal context strings must not reach the
+        wire.
+        """
         error_code, message, category, details = cls._exception_to_components(exception)
         http_status = cls._determine_http_status(category)
-
-        if context:
-            details["context"] = context
 
         return cls(
             error_code=error_code,
@@ -103,46 +129,51 @@ class InfrastructureErrorResponse(BaseDTO):
     def _exception_to_components(
         exception: Exception,
     ) -> tuple[str, str, str, dict[str, Any]]:
-        """Convert exception to error components."""
+        """Convert exception to error components.
+
+        Messages are intentionally categorical - never str(exception) - so
+        that internal details (host names, SQL queries, file paths) do not
+        reach callers.
+        """
         if isinstance(exception, ValidationError):
             return (
                 "VALIDATION_ERROR",
-                str(exception),
+                "Invalid input",
                 ErrorCategory.VALIDATION,
-                getattr(exception, "details", {}),
+                _safe_details(getattr(exception, "details", {})),
             )
         elif isinstance(exception, EntityNotFoundError):
             return (
                 "ENTITY_NOT_FOUND",
-                str(exception),
+                "Resource not found",
                 ErrorCategory.ENTITY_NOT_FOUND,
-                {"entity_type": getattr(exception, "entity_type", "unknown")},
+                _safe_details({"entity_type": getattr(exception, "entity_type", "unknown")}),
             )
         elif isinstance(exception, BusinessRuleViolationError):
             return (
                 "BUSINESS_RULE_VIOLATION",
-                str(exception),
+                "Request could not be processed",
                 ErrorCategory.BUSINESS_RULE_VIOLATION,
-                getattr(exception, "details", {}),
+                _safe_details(getattr(exception, "details", {})),
             )
         elif isinstance(exception, ConfigurationError):
             return (
                 "CONFIGURATION_ERROR",
-                str(exception),
+                "A configuration error occurred",
                 ErrorCategory.CONFIGURATION,
-                getattr(exception, "details", {}),
+                {},
             )
         elif isinstance(exception, InfrastructureError):
             return (
                 "INFRASTRUCTURE_ERROR",
-                str(exception),
+                "An infrastructure error occurred",
                 ErrorCategory.DATABASE_ERROR,
-                getattr(exception, "details", {}),
+                {},
             )
         else:
             return (
                 "UNEXPECTED_ERROR",
-                str(exception),
+                "An unexpected error occurred",
                 ErrorCategory.UNEXPECTED_ERROR,
                 {"exception_type": type(exception).__name__},
             )

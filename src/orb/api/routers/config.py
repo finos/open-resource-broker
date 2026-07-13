@@ -19,8 +19,11 @@ from orb.api.dependencies import (
     get_config_manager,
     require_role,
 )
+from orb.infrastructure.logging.logger import get_logger
 
 router = APIRouter(prefix="/config", tags=["Configuration"])
+
+logger = get_logger(__name__)
 
 CONFIG_MANAGER = Depends(get_config_manager)
 
@@ -191,9 +194,13 @@ async def save_config(
     try:
         written_to = config_manager.save_config(resolved_save_path)
     except ValueError as exc:
+        logger.warning("Config save rejected — no config path resolved: %s", exc)
         raise HTTPException(
             status_code=400,
-            detail={"code": "NO_CONFIG_PATH", "message": str(exc)},
+            detail={
+                "code": "NO_CONFIG_PATH",
+                "message": "No config file path could be resolved. Supply an explicit path or load a config file first.",
+            },
         ) from exc
     return JSONResponse(
         content=SaveResponse(persisted=True, path=written_to).model_dump(),

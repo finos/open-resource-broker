@@ -353,3 +353,129 @@ class TestConfigExecutorOffload:
 
         assert ping_r.status_code == 200, "concurrent GET stalled during config file read"
         assert read_r.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Security: information-leak regression tests for save_config
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestSaveConfigNoInfoLeak:
+    """ValueError from save_config must not expose filesystem paths or other
+    internal detail in the HTTP response body, but must be visible in server logs."""
+
+    def _make_save_app(self):
+        """Build a minimal FastAPI app with the config router and destructive-admin
+        guard satisfied (allow_destructive=True, environment=development)."""
+        from unittest.mock import MagicMock
+
+        from fastapi import FastAPI
+
+        from orb.api.dependencies import (
+            CurrentUser,
+            get_current_user,
+        )
+        from orb.api.routers.config import router as config_router
+
+        app = FastAPI()
+        app.include_router(config_router)
+        app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+            username="test-admin", role="admin"
+        )
+
+        # Satisfy the destructive-admin guard embedded in save_config.
+        config_port_for_guard = MagicMock()
+        config_port_for_guard.get_configuration_value.side_effect = lambda key, default=None: {
+            "allow_destructive_admin": True,
+            "environment": "development",
+        }.get(key, default)
+        server_config = MagicMock()
+        server_config.auth.enabled = True
+
+        # We need both get_di_container (for the guard) and get_server_config patched
+        # globally for the lifetime of the test — callers apply them via context managers.
+        return app, config_port_for_guard, server_config
+
+    def test_value_error_text_not_in_response_body(self, config_app, caplog):
+        """ValueError text from save_config (may contain FS paths) must not reach the client."""
+        import logging
+        from unittest.mock import MagicMock, patch
+
+        from fastapi.testclient import TestClient
+
+        from orb.api.dependencies import CurrentUser, get_config_manager, get_current_user
+
+        # Build a config manager that raises ValueError with a secret FS path.
+        secret = "/etc/orb/secret-config-path-abc123.json"
+        port = MagicMock()
+        port.get_configuration_value.side_effect = lambda key, default=None: {
+            "allow_destructive_admin": True,
+            "environment": "development",
+        }.get(key, default)
+        port.save_config.side_effect = ValueError(f"No config file loaded: {secret}")
+        port.get_config_dir.return_value = "/etc/orb"
+
+        config_app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+            username="test-admin", role="admin"
+        )
+        config_app.dependency_overrides[get_config_manager] = lambda: port
+
+        server_config = MagicMock()
+        server_config.auth.enabled = True
+
+        with patch(
+            "orb.api.dependencies.get_di_container",
+            return_value=MagicMock(**{"get.return_value": port}),
+        ):
+            with patch("orb.api.dependencies.get_server_config", return_value=server_config):
+                with caplog.at_level(logging.WARNING, logger="orb.api.routers.config"):
+                    client = TestClient(config_app, raise_server_exceptions=False)
+                    r = client.post("/config/save", json={})
+
+        assert r.status_code == 400
+        body = r.json()
+        assert body["detail"]["code"] == "NO_CONFIG_PATH"
+        assert secret not in r.text, (
+            f"ValueError detail (filesystem path) leaked into response: {secret!r} in {r.text!r}"
+        )
+        warning_messages = [rec.message for rec in caplog.records if rec.levelno >= logging.WARNING]
+        assert any(secret in m for m in warning_messages), (
+            f"Expected {secret!r} in server WARNING log, got: {warning_messages}"
+        )
+
+    def test_no_config_path_error_code_unchanged(self, config_app):
+        """HTTP 400 and code=NO_CONFIG_PATH must be preserved after the fix."""
+        from unittest.mock import MagicMock, patch
+
+        from fastapi.testclient import TestClient
+
+        from orb.api.dependencies import CurrentUser, get_config_manager, get_current_user
+
+        port = MagicMock()
+        port.get_configuration_value.side_effect = lambda key, default=None: {
+            "allow_destructive_admin": True,
+            "environment": "development",
+        }.get(key, default)
+        port.save_config.side_effect = ValueError("no path loaded")
+        port.get_config_dir.return_value = "/etc/orb"
+
+        config_app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+            username="test-admin", role="admin"
+        )
+        config_app.dependency_overrides[get_config_manager] = lambda: port
+
+        server_config = MagicMock()
+        server_config.auth.enabled = True
+
+        with patch(
+            "orb.api.dependencies.get_di_container",
+            return_value=MagicMock(**{"get.return_value": port}),
+        ):
+            with patch("orb.api.dependencies.get_server_config", return_value=server_config):
+                client = TestClient(config_app, raise_server_exceptions=False)
+                r = client.post("/config/save", json={})
+
+        assert r.status_code == 400
+        assert r.json()["detail"]["code"] == "NO_CONFIG_PATH"

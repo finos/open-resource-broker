@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
+import re
 import time
 from base64 import urlsafe_b64decode
 from typing import TYPE_CHECKING, Any, Optional
@@ -27,10 +30,15 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthResult,
     AuthStatus,
 )
+from orb.infrastructure.auth.token_denylist import InMemoryTokenDenylist, TokenDenylistPort
 from orb.infrastructure.di.injectable import injectable
 
 if TYPE_CHECKING:
     pass
+
+# Minimal structural check for a JWT: three dot-separated base64url segments with a
+# coarse length bound to reject obvious garbage before a denylist lookup.
+_JWT_STRUCTURAL_RE = re.compile(r"^[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}$")
 
 
 @injectable
@@ -50,6 +58,7 @@ class CognitoAuthStrategy(AuthPort):
         region: str = "us-east-1",
         jwks_url: Optional[str] = None,
         enabled: bool = True,
+        token_denylist: Optional[TokenDenylistPort] = None,
     ) -> None:
         """
         Initialize Cognito authentication strategy.
@@ -60,12 +69,19 @@ class CognitoAuthStrategy(AuthPort):
             region: AWS region
             jwks_url: JWKS URL for token verification (auto-generated if not provided)
             enabled: Whether this strategy is enabled
+            token_denylist: Optional denylist for revoked access tokens. Cognito
+                cannot revoke access tokens server-side, so a denylist is required
+                to reject them before their natural expiry. If not provided,
+                access-token revocation will log a warning and skip denylist
+                enforcement; refresh-token revocation via the Cognito API still
+                proceeds normally.
         """
         self.user_pool_id = user_pool_id
         self.client_id = client_id
         self.region = region
         self.enabled = enabled
         self._logger = logger
+        self._token_denylist: Optional[TokenDenylistPort] = token_denylist
 
         # Generate JWKS URL if not provided
         if jwks_url:
@@ -123,6 +139,25 @@ class CognitoAuthStrategy(AuthPort):
             Authentication result with user information from Cognito
         """
         try:
+            # Structural check: three dot-delimited base64url segments, rough length
+            # bound. Rejects obvious garbage before hitting the denylist or JWKS.
+            if not _JWT_STRUCTURAL_RE.match(token) or len(token) > 8192:
+                return AuthResult(
+                    status=AuthStatus.INVALID,
+                    error_message="Invalid token format",
+                )
+
+            # Check denylist before any cryptographic work (fail fast for revoked tokens).
+            if self._token_denylist is not None and await self._token_denylist.is_denylisted(token):
+                token_hint = token[-8:]
+                self._logger.warning(
+                    "Attempted use of revoked Cognito token (suffix=%s)", token_hint
+                )
+                return AuthResult(
+                    status=AuthStatus.INVALID,
+                    error_message="Token has been revoked",
+                )
+
             # Decode token without verification first to get header
             unverified_header = jwt.get_unverified_header(token)
             kid = unverified_header.get("kid")
@@ -195,7 +230,8 @@ class CognitoAuthStrategy(AuthPort):
             New authentication result with fresh token
         """
         try:
-            response = self.cognito_client.initiate_auth(
+            response = await asyncio.to_thread(
+                self.cognito_client.initiate_auth,
                 ClientId=self.client_id,
                 AuthFlow="REFRESH_TOKEN_AUTH",
                 AuthParameters={"REFRESH_TOKEN": refresh_token},
@@ -222,25 +258,98 @@ class CognitoAuthStrategy(AuthPort):
 
     async def revoke_token(self, token: str) -> bool:
         """
-        Revoke Cognito token.
+        Revoke a Cognito token.
+
+        Cognito supports two token types with different revocation mechanisms:
+
+        - **Refresh tokens**: revoked server-side via the Cognito RevokeToken API,
+          AND also inserted into the local denylist.  The denylist insertion ensures
+          that even a forged ``token_use`` claim in an unsigned payload cannot allow
+          a valid access token to escape denylisting.
+        - **Access tokens**: Cognito cannot revoke these server-side.  They are added
+          to the local denylist so that subsequent calls to ``validate_token`` reject
+          them before their natural expiry.
+
+        Security note: ``token_use`` is read from the UNSIGNED JWT payload.  An
+        attacker could craft a valid access token with a forged ``token_use="refresh"``
+        to steer into the RevokeToken-only path and thereby skip denylist insertion.
+        The fix is to **always** insert the token into the denylist first, then
+        additionally call RevokeToken when the unsigned payload indicates a refresh
+        token.  The two paths are not mutually exclusive.
 
         Args:
-            token: Token to revoke
+            token: Cognito JWT token (access or refresh) to revoke
 
         Returns:
-            True if token was revoked successfully
+            True if all applicable revocation steps succeeded; False if any failed
+            or if no denylist is available (revocation genuinely did not happen).
         """
         try:
-            # Cognito doesn't have a direct revoke endpoint for access tokens
-            # You would typically revoke the refresh token or sign out the user
-            # This is a simplified implementation
-            self._logger.info(
-                "Token revocation requested (Cognito access tokens expire automatically)"
-            )
-            return True
+            # Extract the unverified JWT payload to determine token type and expiry.
+            # The result is untrusted — used only as a hint for the optional Cognito
+            # API call; denylist insertion always happens regardless of this value.
+            token_use: Optional[str] = None
+            expires_at: Optional[int] = None
+            try:
+                payload_part = token.split(".")[1]
+                padding = 4 - len(payload_part) % 4
+                if padding != 4:
+                    payload_part += "=" * padding
+                decoded_payload = json.loads(base64.urlsafe_b64decode(payload_part))
+                token_use = decoded_payload.get("token_use")
+                expires_at = decoded_payload.get("exp")
+            except Exception:
+                # Malformed token: proceed with denylist insertion using no expiry.
+                pass
 
-        except Exception as e:
-            self._logger.error("Token revocation error: %s", e)
+            # Step 1: ALWAYS insert into denylist regardless of token_use.
+            # This prevents a forged token_use claim from bypassing denylist enforcement.
+            if self._token_denylist is None:
+                self._logger.warning(
+                    "Cognito token cannot be fully revoked: no token denylist is configured. "
+                    "The token will remain valid until its natural expiry."
+                )
+                # Return False — revocation genuinely did not happen.
+                return False
+
+            denylist_success = await self._token_denylist.add_token(token, expires_at)
+            if denylist_success:
+                self._logger.info(
+                    "Cognito token added to denylist (token_use=%s, expires_at=%s)",
+                    token_use,
+                    expires_at,
+                )
+            else:
+                self._logger.error("Failed to add Cognito token to denylist")
+                return False
+
+            # Step 2: For refresh tokens, additionally call the Cognito RevokeToken API.
+            # This invalidates all access tokens derived from that refresh token on the
+            # Cognito side.  The unsigned token_use hint is acceptable here: the worst
+            # case of a forged "refresh" claim is a spurious but harmless API call.
+            if token_use == "refresh":
+                try:
+                    await asyncio.to_thread(
+                        self.cognito_client.revoke_token,
+                        Token=token,
+                        ClientId=self.client_id,
+                    )
+                    self._logger.info("Cognito refresh token revoked via RevokeToken API")
+                except ClientError as exc:
+                    error_code = exc.response.get("Error", {}).get("Code", "Unknown")
+                    self._logger.error(
+                        "Cognito RevokeToken API call failed (code=%s); "
+                        "token is still in the local denylist",
+                        error_code,
+                    )
+                    # Denylist insertion succeeded so partial revocation did occur;
+                    # return False to signal that the Cognito API step failed.
+                    return False
+
+            return denylist_success
+
+        except Exception as exc:
+            self._logger.error("Token revocation error: %s", exc)
             return False
 
     @classmethod
@@ -276,18 +385,33 @@ class CognitoAuthStrategy(AuthPort):
 
         # Intentional service-locator: from_auth_config is called by the
         # AuthRegistry as ``strategy_factory.from_auth_config(auth_config)``
-        # with a fixed signature — no logger parameter can be threaded through
-        # without changing the AuthRegistry protocol (a broad, cross-cutting
-        # change).  The DI container is therefore queried here as a best-effort
-        # bootstrap; a plain LoggingAdapter fallback ensures the classmethod
+        # with a fixed signature — no logger or denylist parameters can be
+        # threaded through without changing the AuthRegistry protocol (a broad,
+        # cross-cutting change).  The DI container is therefore queried here as
+        # a best-effort bootstrap; plain fallbacks ensure this classmethod
         # remains self-contained when the container is not yet initialised.
         try:
             from orb.domain.base.ports import LoggingPort
             from orb.infrastructure.di.container import get_container
 
-            logger: LoggingPort = get_container().get(LoggingPort)
+            _container = get_container()
+            logger: LoggingPort = _container.get(LoggingPort)
         except Exception:
             logger = LoggingAdapter()  # type: ignore[assignment]
+            _container = None
+
+        # Resolve a TokenDenylistPort from the container so that access-token
+        # revocation is enforced in production.  Fall back to an in-process
+        # InMemoryTokenDenylist when the container has none registered — this
+        # guarantees _token_denylist is always non-None on live instances.
+        token_denylist: TokenDenylistPort
+        try:
+            if _container is not None:
+                token_denylist = _container.get(TokenDenylistPort)
+            else:
+                token_denylist = InMemoryTokenDenylist()
+        except Exception:
+            token_denylist = InMemoryTokenDenylist()
 
         return cls(
             logger=logger,
@@ -296,6 +420,7 @@ class CognitoAuthStrategy(AuthPort):
             region=region,
             jwks_url=jwks_url,
             enabled=True,
+            token_denylist=token_denylist,
         )
 
     def get_strategy_name(self) -> str:

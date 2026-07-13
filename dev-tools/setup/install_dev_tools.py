@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Development Tools Installation Script
 
@@ -32,11 +31,12 @@ Options:
 
 import argparse
 import logging
+import os
 import platform
 import subprocess
 import sys
+import tempfile
 
-# Setup logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,10 @@ class DevToolsInstaller:
                 "check_cmd": ["bun", "--version"],
                 "install": {
                     "darwin": self._install_bun_generic,
-                    "windows": ["powershell", "-c", "irm bun.sh/install.ps1 | iex"],
+                    # Windows: download-then-execute avoids inline iex eval of network content.
+                    # Residual risk: no checksum on the installer (RCE-by-design of
+                    # download-to-exec installs). Use choco or winget if available instead.
+                    "windows": self._install_bun_windows,
                     "ubuntu": self._install_bun_generic,
                     "debian": self._install_bun_generic,
                     "rhel": self._install_bun_generic,
@@ -263,7 +266,14 @@ class DevToolsInstaller:
         return "generic"
 
     def _ensure_chocolatey(self):
-        """Ensure Chocolatey is installed on Windows."""
+        """Ensure Chocolatey is installed on Windows.
+
+        The official Chocolatey installer is downloaded to a temp file and executed,
+        avoiding inline iex eval of network content.
+        Residual risk: no checksum is verified on the installer script
+        (RCE-by-design of download-to-exec installs without signature verification).
+        See https://chocolatey.org/install for manual verification steps.
+        """
         if self.distro != "windows":
             return True
 
@@ -281,17 +291,27 @@ class DevToolsInstaller:
             logger.info("[DRY RUN] Would install Chocolatey")
             return True
 
-        # Install Chocolatey using PowerShell
-        powershell_cmd = [
+        # Download installer to a temp file, then execute it — avoids inline iex eval.
+        powershell_download_cmd = [
             "powershell",
             "-Command",
             "Set-ExecutionPolicy Bypass -Scope Process -Force; "
-            "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; "
-            "iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))",
+            "[System.Net.ServicePointManager]::SecurityProtocol = "
+            "[System.Net.ServicePointManager]::SecurityProtocol -bor 3072; "
+            "Invoke-WebRequest -Uri 'https://community.chocolatey.org/install.ps1' "
+            "-OutFile $env:TEMP\\choco_install.ps1",
+        ]
+        powershell_exec_cmd = [
+            "powershell",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "%TEMP%\\choco_install.ps1",
         ]
 
         try:
-            subprocess.run(powershell_cmd, check=True, capture_output=True, text=True)
+            subprocess.run(powershell_download_cmd, check=True, capture_output=True, text=True)
+            subprocess.run(powershell_exec_cmd, check=True, capture_output=True, text=True)
             logger.info("Chocolatey installed successfully")
             return True
         except subprocess.CalledProcessError as e:
@@ -299,12 +319,13 @@ class DevToolsInstaller:
             logger.error("Please install Chocolatey manually: https://chocolatey.org/install")
             return False
 
-    def _run_command(self, cmd, description="", shell=False):
-        """Run a command with dry-run support."""
-        if isinstance(cmd, list):
-            cmd_str = " ".join(cmd)
-        else:
-            cmd_str = cmd
+    def _run_command(self, cmd: list, description: str = "") -> bool:
+        """Run a command with dry-run support.
+
+        Args must always be a list so that no shell interpolation occurs.
+        Never pass user-supplied or URL-derived data through shell=True.
+        """
+        cmd_str = " ".join(cmd)
 
         if self.dry_run:
             logger.info(f"[DRY RUN] Would run: {cmd_str}")
@@ -312,7 +333,7 @@ class DevToolsInstaller:
 
         logger.info(f"Running: {cmd_str}")
         try:
-            subprocess.run(cmd, check=True, capture_output=True, text=True, shell=shell)
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
             return True
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to run {cmd_str}: {e}")
@@ -320,7 +341,7 @@ class DevToolsInstaller:
                 logger.error(f"Error output: {e.stderr}")
             return False
         except FileNotFoundError:
-            logger.error(f"Command not found: {cmd[0] if isinstance(cmd, list) else cmd}")
+            logger.error(f"Command not found: {cmd[0]}")
             return False
 
     def _install_yq_generic(self):
@@ -349,45 +370,198 @@ class DevToolsInstaller:
         ) and self._run_command(["sudo", "chmod", "+x", "/usr/local/bin/hadolint"])
 
     def _install_trivy_generic(self):
-        """Install trivy using their install script."""
-        return self._run_command(
-            [
-                "curl",
-                "-sfL",
-                "https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh",
-                "|",
-                "sh",
-                "-s",
-                "--",
-                "-b",
-                "/usr/local/bin",
-            ]
-        )
+        """Install trivy using their install script (curl-to-tempfile, no shell=True).
+
+        Trust model: script is downloaded from aquasecurity/trivy main branch over HTTPS.
+        No checksum or signature verification is performed here — upstream does not publish
+        a standalone SHA for this helper script.  Residual risk: a compromised CDN or
+        GitHub branch could serve a malicious script (RCE-by-design of curl-to-sh installs).
+        Pin to a specific release tag when a more stable URL becomes available.
+        """
+        if self.dry_run:
+            logger.info(
+                "[DRY RUN] Would download trivy install script and run: sh <script> -s -- -b /usr/local/bin"
+            )
+            return True
+        fd, tmp_path = tempfile.mkstemp(suffix=".sh")
+        try:
+            os.close(fd)
+            ok = self._run_command(
+                [
+                    "curl",
+                    "-sfL",
+                    "-o",
+                    tmp_path,
+                    "https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh",
+                ]
+            ) and self._run_command(["sh", tmp_path, "-s", "--", "-b", "/usr/local/bin"])
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError as exc:
+                logger.debug("Failed to remove temporary installer file %s: %s", tmp_path, exc)
+        return ok
 
     def _install_syft_generic(self):
-        """Install syft using their install script."""
-        return self._run_command(
-            "curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin",
-            shell=True,
-        )
+        """Install syft using their install script (curl-to-tempfile, no shell=True).
+
+        Trust model: script is downloaded from anchore/syft main branch over HTTPS.
+        No checksum or signature verification is performed here.
+        Residual risk: compromised CDN or GitHub branch could serve a malicious script
+        (RCE-by-design of curl-to-sh installs).  Pin to a versioned URL once a stable
+        checksum-verified alternative is available.
+        """
+        if self.dry_run:
+            logger.info(
+                "[DRY RUN] Would download syft install script and run: sh <script> -s -- -b /usr/local/bin"
+            )
+            return True
+        fd, tmp_path = tempfile.mkstemp(suffix=".sh")
+        try:
+            os.close(fd)
+            ok = self._run_command(
+                [
+                    "curl",
+                    "-sSfL",
+                    "-o",
+                    tmp_path,
+                    "https://raw.githubusercontent.com/anchore/syft/main/install.sh",
+                ]
+            ) and self._run_command(["sh", tmp_path, "-s", "--", "-b", "/usr/local/bin"])
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError as exc:
+                logger.debug("Failed to remove temporary installer file %s: %s", tmp_path, exc)
+        return ok
 
     def _install_uv_generic(self):
-        """Install uv using their install script."""
-        return self._run_command(["curl", "-LsSf", "https://astral.sh/uv/install.sh", "|", "sh"])
+        """Install uv using their install script (curl-to-tempfile, no shell=True).
+
+        Trust model: script is downloaded from astral.sh over HTTPS.
+        Astral does not publish a standalone checksum for this installer URL.
+        Residual risk: compromised distribution endpoint could serve a malicious script
+        (RCE-by-design of curl-to-sh installs).
+        """
+        if self.dry_run:
+            logger.info("[DRY RUN] Would download uv install script and run: sh <script>")
+            return True
+        fd, tmp_path = tempfile.mkstemp(suffix=".sh")
+        try:
+            os.close(fd)
+            ok = self._run_command(
+                ["curl", "-LsSf", "-o", tmp_path, "https://astral.sh/uv/install.sh"]
+            ) and self._run_command(["sh", tmp_path])
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError as exc:
+                logger.debug("Failed to remove temporary installer file %s: %s", tmp_path, exc)
+        return ok
 
     def _install_bun_generic(self):
-        """Install bun via the official install script (~/.bun/bin/bun)."""
-        return self._run_command("curl -fsSL https://bun.sh/install | bash", shell=True)
+        """Install bun via the official install script (curl-to-tempfile, no shell=True).
+
+        Trust model: script is downloaded from bun.sh over HTTPS.
+        Bun does not publish a standalone checksum for this installer URL.
+        Residual risk: compromised distribution endpoint could serve a malicious script
+        (RCE-by-design of curl-to-sh installs).
+        """
+        if self.dry_run:
+            logger.info("[DRY RUN] Would download bun install script and run: bash <script>")
+            return True
+        fd, tmp_path = tempfile.mkstemp(suffix=".sh")
+        try:
+            os.close(fd)
+            ok = self._run_command(
+                ["curl", "-fsSL", "-o", tmp_path, "https://bun.sh/install"]
+            ) and self._run_command(["bash", tmp_path])
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError as exc:
+                logger.debug("Failed to remove temporary installer file %s: %s", tmp_path, exc)
+        return ok
+
+    def _install_bun_windows(self):
+        """Install bun on Windows via download-then-execute (avoids inline iex eval).
+
+        Trust model: installer is downloaded from bun.sh over HTTPS then executed as a
+        file — this avoids the `irm ... | iex` pattern where network content is evaluated
+        inline without any intermediate opportunity to inspect or verify.
+        Residual risk: no checksum or signature is verified before execution
+        (RCE-by-design of download-to-exec installs).  Use `choco install bun` or
+        `winget install bun` instead if a package manager is available, as those provide
+        additional verification layers.
+        """
+        if self.dry_run:
+            logger.info(
+                "[DRY RUN] Would download bun installer and run: powershell -File <installer>"
+            )
+            return True
+
+        download_cmd = [
+            "powershell",
+            "-Command",
+            "Invoke-WebRequest -Uri 'https://bun.sh/install.ps1' -OutFile $env:TEMP\\bun_install.ps1",
+        ]
+        exec_cmd = [
+            "powershell",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "%TEMP%\\bun_install.ps1",
+        ]
+
+        try:
+            subprocess.run(download_cmd, check=True, capture_output=True, text=True)
+            subprocess.run(exec_cmd, check=True, capture_output=True, text=True)
+            logger.info("bun installed successfully on Windows")
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to install bun on Windows: {e}")
+            logger.error("Please install bun manually: https://bun.sh/docs/installation")
+            return False
 
     def _install_actionlint_generic(self):
-        """Install actionlint using official download script."""
-        return self._run_command(
-            "bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)",
-            shell=True,
-        )
+        """Install actionlint using official download script (curl-to-tempfile, no shell=True).
+
+        Trust model: script is downloaded from rhysd/actionlint main branch over HTTPS.
+        No checksum or signature verification is performed here.
+        Residual risk: compromised CDN or GitHub branch could serve a malicious script
+        (RCE-by-design of curl-to-sh installs).  Pin to a versioned release URL once
+        a checksum-verified alternative is available.
+        """
+        if self.dry_run:
+            logger.info("[DRY RUN] Would download actionlint install script and run: bash <script>")
+            return True
+        fd, tmp_path = tempfile.mkstemp(suffix=".bash")
+        try:
+            os.close(fd)
+            ok = self._run_command(
+                [
+                    "curl",
+                    "-o",
+                    tmp_path,
+                    "https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash",
+                ]
+            ) and self._run_command(["bash", tmp_path])
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError as exc:
+                logger.debug("Failed to remove temporary installer file %s: %s", tmp_path, exc)
+        return ok
 
     def _install_shellcheck_generic(self):
-        """Install shellcheck using binary download."""
+        """Install shellcheck using binary download (curl-to-tempfile, no shell=True).
+
+        Trust model: binary tarball is downloaded from koalaman/shellcheck GitHub releases
+        over HTTPS.  GitHub Releases does not publish a standalone checksum file for the
+        latest redirect; pin to a specific version tag and verify SHA-256 when reproducibility
+        is required.  Residual risk: a compromised release artifact could be executed
+        (RCE-by-design of curl-to-binary installs without verification).
+        """
         arch = platform.machine().lower()
         if arch == "x86_64":
             arch = "x86_64"
@@ -395,24 +569,44 @@ class DevToolsInstaller:
             arch = "aarch64"
 
         url = f"https://github.com/koalaman/shellcheck/releases/latest/download/shellcheck-latest.linux.{arch}.tar.xz"
-        return self._run_command(
-            [
-                "curl",
-                "-L",
-                url,
-                "|",
-                "sudo",
-                "tar",
-                "-xJ",
-                "-C",
-                "/usr/local/bin",
-                "--strip-components=1",
-                "shellcheck-latest/shellcheck",
-            ]
-        )
+        if self.dry_run:
+            logger.info(
+                f"[DRY RUN] Would download shellcheck from {url} and extract to /usr/local/bin"
+            )
+            return True
+        fd, tmp_path = tempfile.mkstemp(suffix=".tar.xz")
+        try:
+            os.close(fd)
+            ok = self._run_command(["curl", "-L", "-o", tmp_path, url]) and self._run_command(
+                [
+                    "sudo",
+                    "tar",
+                    "-xJ",
+                    "-C",
+                    "/usr/local/bin",
+                    "--strip-components=1",
+                    "-f",
+                    tmp_path,
+                    "shellcheck-latest/shellcheck",
+                ]
+            )
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError as exc:
+                logger.debug("Failed to remove temporary installer file %s: %s", tmp_path, exc)
+        return ok
 
     def _install_trufflehog_generic(self):
-        """Install trufflehog using curl."""
+        """Install trufflehog using curl (curl-to-tempfile, no shell=True).
+
+        Trust model: binary tarball is downloaded from trufflesecurity/trufflehog GitHub
+        releases over HTTPS.  Each release includes checksums_SHA256.txt — verifying that
+        file before extraction would eliminate the residual integrity risk; not implemented
+        here because it requires a second curl call and sha256sum.  Pin to a specific
+        version tag and verify SHA-256 when reproducibility is required.
+        Residual risk: a compromised release artifact could be executed.
+        """
         arch = platform.machine().lower()
         if arch == "x86_64":
             arch = "amd64"
@@ -420,33 +614,53 @@ class DevToolsInstaller:
             arch = "arm64"
 
         url = f"https://github.com/trufflesecurity/trufflehog/releases/latest/download/trufflehog_linux_{arch}.tar.gz"
-        return self._run_command(
-            [
-                "curl",
-                "-L",
-                url,
-                "|",
-                "sudo",
-                "tar",
-                "-xz",
-                "-C",
-                "/usr/local/bin",
-                "trufflehog",
-            ]
-        )
+        if self.dry_run:
+            logger.info(
+                f"[DRY RUN] Would download trufflehog from {url} and extract to /usr/local/bin"
+            )
+            return True
+        fd, tmp_path = tempfile.mkstemp(suffix=".tar.gz")
+        try:
+            os.close(fd)
+            ok = self._run_command(["curl", "-L", "-o", tmp_path, url]) and self._run_command(
+                ["sudo", "tar", "-xz", "-C", "/usr/local/bin", "-f", tmp_path, "trufflehog"]
+            )
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError as exc:
+                logger.debug("Failed to remove temporary installer file %s: %s", tmp_path, exc)
+        return ok
 
     def _install_act_generic(self):
-        """Install act using GitHub releases."""
-        return self._run_command(
-            [
-                "curl",
-                "-s",
-                "https://raw.githubusercontent.com/nektos/act/master/install.sh",
-                "|",
-                "sudo",
-                "bash",
-            ]
-        )
+        """Install act using GitHub releases (curl-to-tempfile, no shell=True).
+
+        Trust model: install script is downloaded from nektos/act master branch over HTTPS.
+        No checksum or signature verification is performed here.
+        Residual risk: compromised CDN or GitHub branch could serve a malicious script
+        (RCE-by-design of curl-to-sh installs).
+        """
+        if self.dry_run:
+            logger.info("[DRY RUN] Would download act install script and run: sudo bash <script>")
+            return True
+        fd, tmp_path = tempfile.mkstemp(suffix=".sh")
+        try:
+            os.close(fd)
+            ok = self._run_command(
+                [
+                    "curl",
+                    "-s",
+                    "-o",
+                    tmp_path,
+                    "https://raw.githubusercontent.com/nektos/act/master/install.sh",
+                ]
+            ) and self._run_command(["sudo", "bash", tmp_path])
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError as exc:
+                logger.debug("Failed to remove temporary installer file %s: %s", tmp_path, exc)
+        return ok
 
     def _install_pip_audit_python(self):
         """Install pip-audit using Python package manager."""
@@ -457,23 +671,26 @@ class DevToolsInstaller:
             return self._run_command(["pip", "install", "--user", "pip-audit"])
 
     def _install_docker_ubuntu(self):
-        """Install Docker on Ubuntu/Debian."""
+        """Install Docker on Ubuntu/Debian using the keyring file method.
+
+        Downloads the Docker GPG key directly to /etc/apt/keyrings/docker.asc using
+        curl -o, avoiding the previous shell-pipe pattern (curl ... | sudo gpg ...)
+        which passed a literal "|" as a subprocess list element and would fail at
+        runtime because shell=False does not interpret pipes.
+        """
         commands = [
             ["sudo", "apt", "update"],
             ["sudo", "apt", "install", "-y", "ca-certificates", "curl", "gnupg"],
             ["sudo", "install", "-m", "0755", "-d", "/etc/apt/keyrings"],
             [
+                "sudo",
                 "curl",
                 "-fsSL",
                 "https://download.docker.com/linux/ubuntu/gpg",
-                "|",
-                "sudo",
-                "gpg",
-                "--dearmor",
                 "-o",
-                "/etc/apt/keyrings/docker.gpg",
+                "/etc/apt/keyrings/docker.asc",
             ],
-            ["sudo", "chmod", "a+r", "/etc/apt/keyrings/docker.gpg"],
+            ["sudo", "chmod", "a+r", "/etc/apt/keyrings/docker.asc"],
             ["sudo", "apt", "update"],
             [
                 "sudo",
@@ -587,7 +804,7 @@ class DevToolsInstaller:
             "actionlint",
             "shellcheck",
             "act",
-            "bun",  # required by `make ui-build` — installs to ~/.bun/bin/bun
+            "bun",  # required by `make ui-build` -- installs to ~/.bun/bin/bun
         ]
 
         tools_to_install = required_tools

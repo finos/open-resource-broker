@@ -393,10 +393,21 @@ def check_destructive_admin_allowed(request: Request) -> None:
 
     container = get_di_container()
 
-    # Guard 0: authentication must be enabled — fail closed if auth is off.
+    # Guard 0: authentication must be enabled with a real strategy.
+    #
+    # Two conditions must both hold:
+    #   (a) auth.enabled is True — an anonymous caller must never reach a
+    #       destructive endpoint.
+    #   (b) auth.strategy is not the "none" pass-through — NoAuthStrategy
+    #       grants permissions=["*"] to every anonymous request, so even when
+    #       enabled=True is set in config the server is effectively unprotected.
+    #       Accepting "none" here would let any caller satisfy this guard while
+    #       logging a misleading "auth enabled" message.
+    _NO_REAL_AUTH_STRATEGIES = frozenset({"none", "", None})
     try:
         server_config = get_server_config()
-        if not server_config.auth.enabled:
+        auth_cfg = server_config.auth
+        if not auth_cfg.enabled:
             _logger.warning(
                 "DESTRUCTIVE_ADMIN blocked: authentication is disabled; "
                 "destructive operations require an authenticated identity"
@@ -406,6 +417,23 @@ def check_destructive_admin_allowed(request: Request) -> None:
                 detail={
                     "code": "AUTH_DISABLED",
                     "message": "Destructive admin requires authentication enabled.",
+                },
+            )
+        if getattr(auth_cfg, "strategy", None) in _NO_REAL_AUTH_STRATEGIES:
+            _logger.warning(
+                "DESTRUCTIVE_ADMIN blocked: auth.strategy=%r is a pass-through "
+                "that grants every anonymous caller full permissions; "
+                "a real authentication strategy is required",
+                getattr(auth_cfg, "strategy", None),
+            )
+            raise HTTPException(  # type: ignore[misc]
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "AUTH_STRATEGY_NONE",
+                    "message": (
+                        "Destructive admin requires a real authentication strategy. "
+                        "The configured strategy enforces no access control."
+                    ),
                 },
             )
     except HTTPException:

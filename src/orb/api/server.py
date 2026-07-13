@@ -259,19 +259,22 @@ def create_fastapi_app(server_config: Any) -> Any:
 
     logger = get_logger(__name__)
 
-    # Validate and default configuration
+    # Validate configuration: refuse to boot with a None or structurally invalid
+    # ServerConfig.  Silently falling back to a default would produce an
+    # unauthenticated server with no intentional auth posture, which is
+    # fail-open in production.  Callers must always supply a well-formed config.
     if server_config is None:
-        logger.warning("No server configuration provided, using defaults")
-        from orb.config.schemas.server_schema import ServerConfig
+        raise ConfigurationError(
+            "create_fastapi_app() requires a ServerConfig; received None. "
+            "Ensure server configuration is loaded before calling this function."
+        )
 
-        server_config = ServerConfig()  # type: ignore[call-arg]
-
-    # Validate configuration object has required attributes
     if not hasattr(server_config, "docs_enabled"):
-        logger.error("Invalid server configuration: missing docs_enabled attribute")
-        from orb.config.schemas.server_schema import ServerConfig
-
-        server_config = ServerConfig()  # type: ignore[call-arg]
+        raise ConfigurationError(
+            "create_fastapi_app() received an invalid ServerConfig object "
+            "(missing required attribute 'docs_enabled'). "
+            "Pass a properly constructed ServerConfig instance."
+        )
 
     from orb.api.documentation import configure_openapi
     from orb.api.middleware import (

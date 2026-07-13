@@ -35,8 +35,11 @@ from orb.application.services.orchestration.dtos import (
 )
 from orb.domain.base import UnitOfWorkFactory
 from orb.infrastructure.error.decorators import handle_rest_exceptions
+from orb.infrastructure.logging.logger import get_logger
 
 router = APIRouter(prefix="/machines", tags=["Machines"])
+
+logger = get_logger(__name__)
 
 # Module-level dependency variables to avoid B008 warnings
 ACQUIRE_ORCHESTRATOR = Depends(get_acquire_machines_orchestrator)
@@ -309,16 +312,24 @@ async def purge_machine(
     try:
         cleanup_result = service.delete_machine(machine_id)
     except KeyError as exc:
+        logger.warning("Machine purge failed — not found: %s", exc)
         return JSONResponse(
             status_code=404,
-            content={"success": False, "error": {"code": "NOT_FOUND", "message": str(exc)}},
+            content={
+                "success": False,
+                "error": {"code": "NOT_FOUND", "message": "Machine not found."},
+            },
         )
     except NonTerminalStatusError as exc:
+        logger.warning("Machine purge rejected — non-terminal status: %s", exc)
         return JSONResponse(
             status_code=400,
             content={
                 "success": False,
-                "error": {"code": "NON_TERMINAL_STATUS", "message": str(exc)},
+                "error": {
+                    "code": "NON_TERMINAL_STATUS",
+                    "message": "Machine cannot be purged because it is not in a terminal state.",
+                },
             },
         )
 

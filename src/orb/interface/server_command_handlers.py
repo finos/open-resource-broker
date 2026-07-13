@@ -11,8 +11,9 @@ logs     → tail the daemon's log file
 from __future__ import annotations
 
 import json
-from typing import Any, cast
+from typing import Any
 
+from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.infrastructure.logging.logger import get_logger
 
@@ -34,20 +35,35 @@ def _resolve_lifecycle_paths(server_config: Any) -> tuple[str, str, str]:
 
 def _resolve_configs(args) -> tuple[Any, Any | None]:
     """Resolve ServerConfig + (optional) UIConfig, applying CLI overrides."""
+    from orb.config.managers.configuration_manager import ConfigurationManager
     from orb.config.schemas.server_schema import ServerConfig
     from orb.domain.base.ports.configuration_port import ConfigurationPort
 
     logger = get_logger(__name__)
     container = args._container
-    config_manager = container.get(ConfigurationPort)
+
+    # Resolve the concrete ConfigurationManager for typed config loads — its
+    # get_typed_with_defaults(config_type) takes a single positional argument
+    # (the type to hydrate), which is the correct call signature.
+    # ConfigurationPort.get_typed_with_defaults has a different signature
+    # (key, expected_type, default) and must NOT be used for typed schema loads.
+    cm = container.get(ConfigurationManager)
 
     try:
-        server_config = cast(Any, config_manager).get_typed_with_defaults(ServerConfig)
+        server_config = cm.get_typed_with_defaults(ServerConfig)
     except Exception as e:
-        logger.warning(f"ServerConfig load failed, using defaults: {e}", exc_info=True)
-        server_config = ServerConfig()  # type: ignore[call-arg]
+        # Refuse to fall back to a default ServerConfig.  A silent fallback
+        # would produce a server with no intentional auth posture (fail-open).
+        # Surface the load failure so the operator can fix the configuration.
+        raise ConfigurationError(
+            f"ServerConfig could not be loaded: {e}. "
+            "Fix the server configuration before starting the server."
+        ) from e
     if server_config is None:
-        server_config = ServerConfig()  # type: ignore[call-arg]
+        raise ConfigurationError(
+            "ServerConfig resolved to None from the configuration manager. "
+            "Ensure the server section is present in the configuration file."
+        )
 
     host = getattr(args, "host", None)
     port = getattr(args, "port", None)
@@ -64,14 +80,17 @@ def _resolve_configs(args) -> tuple[Any, Any | None]:
     if log_level:
         server_config.log_level = log_level
     if scheduler:
-        config_manager.override_scheduler_strategy(scheduler)
+        # override_scheduler_strategy lives on both ConfigurationManager and
+        # ConfigurationPort; use the port reference from the container so
+        # the override propagates through the same object the rest of the
+        # application resolves when it asks for ConfigurationPort.
+        port_manager = container.get(ConfigurationPort)
+        port_manager.override_scheduler_strategy(scheduler)
 
     ui_config = None
     try:
-        from orb.config.managers.configuration_manager import ConfigurationManager
         from orb.config.schemas.ui_schema import UIConfig
 
-        cm = container.get(ConfigurationManager)
         ui_config = cm.get_typed_with_defaults(UIConfig)
     except Exception as ui_e:
         logger.debug("UIConfig load failed, defaults used: %s", ui_e)
