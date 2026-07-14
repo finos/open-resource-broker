@@ -608,6 +608,22 @@ For more information, visit: {DOCS_URL}
     )
     add_global_arguments(server_reload_cmd)
 
+    server_ui_export = server_subparsers.add_parser(
+        "ui-export",
+        help="Copy the compiled SPA bundle to a local directory for CDN / static-host serving",
+    )
+    add_global_arguments(server_ui_export)
+    server_ui_export.add_argument(
+        "--dest",
+        required=True,
+        help="Target directory to copy the SPA bundle into",
+    )
+    server_ui_export.add_argument(
+        "--force",
+        action="store_true",
+        help="Allow overwriting into a non-empty or already-existing destination",
+    )
+
     # Infrastructure
     infrastructure_parser = subparsers.add_parser("infrastructure", help="Infrastructure discovery")
     resource_parsers["infrastructure"] = infrastructure_parser

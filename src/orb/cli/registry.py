@@ -180,6 +180,7 @@ def build_registry() -> None:
         handle_server_start,
         handle_server_status,
         handle_server_stop,
+        handle_server_ui_export,
     )
 
     register("server", "start", handle_server_start)
@@ -188,6 +189,7 @@ def build_registry() -> None:
     register("server", "restart", handle_server_restart)
     register("server", "reload", handle_server_reload)
     register("server", "logs", handle_server_logs)
+    register("server", "ui-export", handle_server_ui_export)
 
     # --- templates ---
     from orb.interface.template_command_handlers import (

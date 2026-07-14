@@ -26,6 +26,7 @@
   <br>
   <a href="https://codecov.io/gh/finos/open-resource-broker"><img src="https://codecov.io/gh/finos/open-resource-broker/graph/badge.svg" alt="Coverage"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/finos/open-resource-broker"><img src="https://api.securityscorecards.dev/projects/github.com/finos/open-resource-broker/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://www.bestpractices.dev/projects/13611"><img src="https://www.bestpractices.dev/projects/13611/badge" alt="OpenSSF Best Practices"></a>
 </p>
 
 ---
@@ -75,6 +76,14 @@ orb requests status <request-id>
 
 ```bash
 orb machines return <machine-id-1> <machine-id-2> ...
+```
+
+### 5. Check the return status
+
+`machines return` prints a return-request id; check it the same way as step 3:
+
+```bash
+orb requests status <return-request-id>
 ```
 
 ## Setup

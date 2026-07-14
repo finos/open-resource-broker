@@ -2,8 +2,8 @@ name: 'ORB CICD App Token'
 description: 'Mint an installation token for the ORB CICD GitHub App and resolve its bot identity for git commit attribution.'
 
 inputs:
-  app-id:
-    description: 'GitHub App ID (from secrets.GH_APP_ID)'
+  client-id:
+    description: 'GitHub App Client ID (from secrets.GH_APP_CLIENT_ID)'
     required: true
   private-key:
     description: 'GitHub App private key (from secrets.GH_APP_PRIVATE_KEY)'
@@ -33,7 +33,7 @@ runs:
       id: app-token
       uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
       with:
-        app-id: ${{ inputs.app-id }}
+        client-id: ${{ inputs.client-id }}
         private-key: ${{ inputs.private-key }}
         # Scope token to this repository only (prevents inadvertent org-wide access)
         repositories: ${{ github.event.repository.name }}

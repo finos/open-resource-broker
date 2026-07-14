@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from orb.domain.base.exceptions import ConfigurationError
+from orb.domain.base.exceptions import ConfigurationError, ValidationError
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.infrastructure.logging.logger import get_logger
 
@@ -416,4 +416,73 @@ async def handle_server_logs(args) -> dict[str, Any]:
     return {
         "log_file": log_file,
         "tail": daemon_mod.tail_log(log_file=log_file, lines=int(lines)),
+    }
+
+
+def _ui_resolve_static_dir():
+    """Thin wrapper around ``orb.ui.app._resolve_static_dir``.
+
+    Importing lazily keeps the heavy Reflex/page graph out of the CLI process
+    when the UI extras are not installed.  The wrapper lives in this module so
+    tests can patch ``orb.interface.server_command_handlers._ui_resolve_static_dir``
+    without having to import ``orb.ui.app`` (and its reflex/page side-effects).
+
+    Raises:
+        ValidationError: When the UI extras (reflex and the orb page graph) are
+            not installed, giving the user an actionable install instruction
+            rather than an opaque ``ModuleNotFoundError`` traceback.
+    """
+    try:
+        from orb.ui.app import _resolve_static_dir
+    except ImportError as exc:
+        raise ValidationError(
+            "UI extras are not installed — run: pip install 'orb-py[ui]'"
+        ) from exc
+
+    return _resolve_static_dir()
+
+
+@handle_interface_exceptions(context="server_ui_export", interface_type="cli")
+async def handle_server_ui_export(args) -> dict[str, Any]:
+    """Copy the compiled SPA bundle to a local directory for CDN / static-host serving.
+
+    Locates the bundle via ``orb.ui.app._resolve_static_dir()`` (single source
+    of truth shared with the embedded server route) and copies it with
+    ``shutil.copytree``.
+
+    # ponytail: local dir only; users pipe to s3/gcs with their own tooling
+    """
+    import shutil
+    from pathlib import Path
+
+    dest_arg: str = getattr(args, "dest", None) or ""
+    force: bool = getattr(args, "force", False)
+
+    static_dir: Path | None = _ui_resolve_static_dir()
+    if static_dir is None:
+        raise ValidationError(
+            "UI bundle not found — no compiled SPA is available. "
+            "Install the UI extras and build the bundle: "
+            "pip install 'orb-py[ui]' then run 'make ui-build'."
+        )
+
+    dest = Path(dest_arg).resolve()
+    if dest.exists() and not dest.is_dir():
+        raise ValidationError(
+            f"Destination '{dest}' exists and is not a directory. "
+            "Provide a path to a directory (existing or new)."
+        )
+    if dest.exists() and any(dest.iterdir()) and not force:
+        raise ValidationError(
+            f"Destination '{dest}' already exists and is not empty. Use --force to overwrite."
+        )
+
+    shutil.copytree(str(static_dir), str(dest), dirs_exist_ok=force)
+
+    file_count = sum(1 for _ in dest.rglob("*") if _.is_file())
+    return {
+        "status": "ok",
+        "dest": str(dest),
+        "file_count": file_count,
+        "message": f"SPA bundle exported to '{dest}' ({file_count} files).",
     }

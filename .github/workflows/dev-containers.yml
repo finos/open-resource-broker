@@ -127,6 +127,10 @@ jobs:
         fail-on-cache-miss: false
 
     - name: Build package wheel
+      # This job builds a wheel to scan in a container image and has no bun/uv
+      # to compile the SPA (it never shipped one).  Skip the UI build.
+      env:
+        ORB_SKIP_UI_BUILD: "1"
       run: make build
 
     - name: Build and scan container image
