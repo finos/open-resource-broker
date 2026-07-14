@@ -173,6 +173,10 @@ clean:  ## Clean up build artifacts
 	rm -rf build/
 	rm -rf dist/
 	rm -rf *.egg-info
+	# Wipe the compiled SPA so a fresh `make build` always rebuilds it rather
+	# than letting setup.py's "already present" short-circuit ship a stale
+	# (e.g. wrong-port) bundle left over from a prior local build.
+	rm -rf src/orb/ui/_static/
 	rm -rf .pytest_cache/
 	rm -rf .coverage
 	rm -rf $(COVERAGE_HTML)/

@@ -229,6 +229,10 @@ jobs:
         fail-on-cache-miss: false
 
     - name: Build package
+      # This job builds a wheel artifact for CI validation only and has no
+      # bun/uv to compile the SPA (it never shipped one).  Skip the UI build.
+      env:
+        ORB_SKIP_UI_BUILD: "1"
       run: make build
 
     - name: Upload build artifacts

@@ -93,9 +93,8 @@ jobs:
       with:
         bun-version: "1.2.15"  # pinned; update intentionally to avoid surprise breakage
 
-    - name: Build UI static bundle
-      run: make ui-build
-
+    # The SPA bundle is built automatically by the setuptools build hook during
+    # `make build-with-version` (python -m build). No separate step needed.
     - name: Build package
       run: |
         make build-with-version

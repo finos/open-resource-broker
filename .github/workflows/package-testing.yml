@@ -17,6 +17,12 @@ on:
 permissions:
   contents: read
 
+# This workflow only tests install/import variants of the built wheel — it never
+# needs the Reflex SPA bundle, and its runners have no bun/uv to build one.  Skip
+# the SPA build hook (setup.py) for every `python -m build` in this file.
+env:
+  ORB_SKIP_UI_BUILD: "1"
+
 # Per-ref concurrency: prevents a rapid series of pushes to main from queuing
 # redundant package-testing runs.  Each ref can only have one run active at a
 # time; a newer push cancels the older in-progress run.

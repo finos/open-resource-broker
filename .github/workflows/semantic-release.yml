@@ -106,7 +106,7 @@ jobs:
         id: cicd
         uses: ./.github/actions/orb-cicd-app-token
         with:
-          app-id: ${{ secrets.GH_APP_ID }}
+          client-id: ${{ secrets.GH_APP_CLIENT_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
 
       - name: Setup UV
@@ -117,12 +117,17 @@ jobs:
         with:
           bun-version: "1.2.15"  # pinned; update intentionally to avoid surprise breakage
 
-      - name: Build UI static bundle
+      # Build the SPA bundle HERE, on the host, where Setup Bun put bun on PATH.
+      # This must run on the host — NOT via the setup.py build hook — because the
+      # next step (Python Semantic Release) runs `make semantic-release-build`
+      # (python -m build) INSIDE a Docker container that has no bun/uv/curl.  With
+      # the bundle already at src/orb/ui/_static/, the in-container build hook
+      # sees it present and skips the build, so `python -m build` succeeds.
+      # build_ui.sh uses an ephemeral venv under $TMPDIR (auto-removed), so no
+      # host .venv is left to break the container's mounted-workspace interpreter.
+      - name: Build UI static bundle (host — bun is unavailable in the release container)
         run: make ui-build
 
-      # Do NOT `uv sync` here: the next step is a Docker action that mounts
-      # the workspace, so a host .venv would be visible inside the container
-      # with a dangling interpreter and break `make semantic-release-build`.
       - name: Python Semantic Release
         id: release
         uses: python-semantic-release/python-semantic-release@39dd2052f2ce8282a5d932c31d58a2ca06d2550e  # v10.6.1

@@ -63,23 +63,88 @@ if [ -z "$BUN" ] || [ ! -x "$BUN" ]; then
 fi
 
 log "INFO: Building UI static bundle..."
-log "INFO: Ensuring [ui] extras are installed..."
-uv pip install --quiet '.[ui]'
 
-# Resolve how to invoke ``reflex`` without hard-coding a venv layout.  The rest
-# of the repo (see dev-tools/docs/ci_docs_build.sh, dev-tools/package/build.sh,
-# makefiles/*.mk) prefers ``uv run`` when uv is on PATH and falls back to the
-# repo-local ``.venv/bin/`` entry points otherwise.  That covers all three
-# supported environments: developer editable install, CI's uv-cached .venv,
-# and a fresh clone driven by ``make dev-install``.
+# ---------------------------------------------------------------------------
+# Venv / reflex setup
+#
+# Strategy: prefer an already-active venv or the project's .venv so that
+# incremental dev builds are fast.  If neither exists, create an ephemeral
+# venv, install .[ui] into it, run the build, and delete it afterward.
+#
+# The [ui] extra (reflex→click>=8.2) conflicts with the dev/ci groups
+# (semgrep→click<8.2), so we NEVER sync from the full lockfile — we always
+# install .[ui] directly into whichever venv we end up using.
+# ---------------------------------------------------------------------------
+
+EPHEMERAL_VENV=""
+
+# Ephemeral venvs live under one deterministic parent so orphans left by an
+# uncatchable kill (SIGKILL / OOM / CI timeout, which no trap can intercept)
+# can be reaped on the next run rather than accumulating on a long-lived host.
+_EPHEMERAL_BASE="${TMPDIR:-/tmp}/orb-ui-build-venvs"
+
+# Ensure this run's ephemeral venv is removed even if the build fails mid-way.
+_cleanup_ephemeral() {
+    if [ -n "$EPHEMERAL_VENV" ]; then
+        rm -rf "$(dirname "$EPHEMERAL_VENV")" 2>/dev/null || true
+    fi
+}
+# EXIT covers normal/`set -e`/SIGINT/SIGTERM exits; INT/TERM added explicitly so
+# cleanup runs before the shell re-raises them.  SIGKILL is uncatchable, so a
+# hard kill can still orphan this run's venv — grouping all ephemeral venvs
+# under one predictable base ($_EPHEMERAL_BASE) means such orphans cluster in a
+# single dir for the OS/CI tmp reaper (or a manual `rm -rf`) to clean, instead
+# of scattering across random mktemp paths.  No auto-sweep here: wiping the base
+# at startup would race a concurrent build sharing the same host.
+trap _cleanup_ephemeral EXIT INT TERM
+
+# Detect whether we are already inside a usable venv (VIRTUAL_ENV is set by
+# `source activate`; UV_PROJECT_ENVIRONMENT is set by uv itself).
+_active_venv="${VIRTUAL_ENV:-${UV_PROJECT_ENVIRONMENT:-}}"
+
+if [ -n "$_active_venv" ] && [ -x "$_active_venv/bin/python" ]; then
+    log "INFO: Using active virtual environment: $_active_venv"
+    _VENV_BIN="$_active_venv/bin"
+elif [ -x "$PROJECT_ROOT/.venv/bin/python" ]; then
+    log "INFO: Using project .venv: $PROJECT_ROOT/.venv"
+    _VENV_BIN="$PROJECT_ROOT/.venv/bin"
+else
+    # No usable venv — create an ephemeral one under the deterministic base.
+    log "INFO: No virtual environment found; creating an ephemeral one..."
+    mkdir -p "$_EPHEMERAL_BASE"
+    EPHEMERAL_VENV="$(mktemp -d "$_EPHEMERAL_BASE/XXXXXX")/orb-ui-build-venv"
+    if command -v uv >/dev/null 2>&1; then
+        uv venv --quiet "$EPHEMERAL_VENV"
+    else
+        python3 -m venv "$EPHEMERAL_VENV"
+    fi
+    _VENV_BIN="$EPHEMERAL_VENV/bin"
+    log "INFO: Ephemeral venv created at $EPHEMERAL_VENV"
+fi
+
+# Install .[ui] into the chosen venv.  Use uv pip when available (faster);
+# fall back to the venv's own pip.
+log "INFO: Ensuring [ui] extras are installed..."
+# Installing '.[ui]' builds the orb-py wheel, which runs setup.py's build_py
+# hook — which calls THIS script.  Set ORB_SKIP_UI_BUILD=1 for the nested
+# build so it does not recurse (we are already inside the UI build).
 if command -v uv >/dev/null 2>&1; then
-    REFLEX=(uv run reflex)
-elif [ -x "$PROJECT_ROOT/.venv/bin/reflex" ]; then
-    REFLEX=("$PROJECT_ROOT/.venv/bin/reflex")
+    ORB_SKIP_UI_BUILD=1 VIRTUAL_ENV="$(dirname "$_VENV_BIN")" uv pip install --quiet '.[ui]'
+else
+    ORB_SKIP_UI_BUILD=1 "$_VENV_BIN/pip" install --quiet "$(pwd)[ui]"
+fi
+
+# Invoke reflex from the venv we installed .[ui] into.  Call the venv binary
+# directly rather than ``uv run``: ``uv run`` resolves reflex against uv's
+# *project* environment, which is NOT $_VENV_BIN when we created an ephemeral
+# venv (or when an unrelated venv is active) — so it would miss the reflex we
+# just installed.  The .[ui] install above guarantees $_VENV_BIN/reflex exists.
+if [ -x "$_VENV_BIN/reflex" ]; then
+    REFLEX=("$_VENV_BIN/reflex")
 elif command -v reflex >/dev/null 2>&1; then
     REFLEX=(reflex)
 else
-    echo "ERROR: reflex not found. Run 'make dev-install' or install '.[ui]' extras." >&2
+    echo "ERROR: reflex not found in $_VENV_BIN. Check the '.[ui]' install above." >&2
     exit 1
 fi
 
@@ -137,3 +202,4 @@ log "SUCCESS: Static bundle written to $STATIC_DIR/"
 if [ "$QUIET" = false ]; then
     du -sh "$STATIC_DIR" 2>/dev/null || true
 fi
+# The EXIT trap (_cleanup_ephemeral) removes the ephemeral venv if one was created.
