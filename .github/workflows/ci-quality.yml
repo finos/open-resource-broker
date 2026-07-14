@@ -83,7 +83,7 @@ jobs:
         id: cicd
         uses: ./.github/actions/orb-cicd-app-token
         with:
-          app-id: ${{ secrets.GH_APP_ID }}
+          client-id: ${{ secrets.GH_APP_CLIENT_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
 
       - name: Setup UV with cache
