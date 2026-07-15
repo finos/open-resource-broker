@@ -180,9 +180,14 @@ monitoring-aws = [
     "opentelemetry-instrumentation-botocore>=0.64b0,<1.0",
 ]
 
-# All optional features (providers + features)
+# All optional runtime features (providers + features + UI).  This is the
+# "give me everything a user could run" extra.  It deliberately includes `ui`
+# (reflex) so `pip install orb-py[all]` yields a fully-functional install incl.
+# the embedded web UI.  NOTE: `ui` conflicts with the `ci`/`dev` dependency
+# groups (reflex→click>=8.2 vs semgrep→click<8.2), so never combine
+# `--extra all` with `--group ci`/`--group dev`; use `--no-dev` when syncing it.
 all = [
-    "orb-py[cli,api,sql,monitoring,all-providers]",
+    "orb-py[cli,api,sql,monitoring,monitoring-aws,all-providers,ui]",
 ]
 
 # ── Test extras ────────────────────────────────────────────────────────────

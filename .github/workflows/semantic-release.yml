@@ -62,6 +62,10 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
 
       - name: Install dependencies
+        # ORB_SKIP_UI_BUILD: preview only needs python-semantic-release, not the
+        # SPA bundle; bun is not installed here and the build hook would hang.
+        env:
+          ORB_SKIP_UI_BUILD: "1"
         run: uv sync
 
       - name: Compute next version (dry run)
@@ -85,7 +89,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-      id-token: write
+      id-token: write      # required by python-semantic-release (GitHub App token)
 
     steps:
       - name: Checkout code
@@ -144,9 +148,24 @@ jobs:
           github_token: ${{ steps.cicd.outputs.token }}
           tag: ${{ steps.release.outputs.tag }}
 
+      # Provenance attestation is intentionally NOT done here.  The single
+      # canonical attestation path runs in prod-release.yml (github-assets job),
+      # which attests the exact wheel artifact that prod-pypi publishes and
+      # uploads the .intoto.jsonl to the release.  A second attest call here
+      # would describe a different build invocation over the same files and
+      # upload a conflicting .intoto.jsonl asset — dual clobbered asset (H3).
+
       - name: Install ORB
         if: steps.release.outputs.released == 'true'
-        run: uv sync --all-extras --group ci
+        # This step only boots the server to export the OpenAPI spec, so it needs
+        # the runtime `all` extra (api + providers + ui) but NOT the ci/dev test
+        # tooling.  --no-dev drops the default `dev` group; without it uv would
+        # reject `all` (which now includes `ui`) via the ui↔dev conflict.
+        # ORB_SKIP_UI_BUILD so building the wheel here doesn't invoke the
+        # (bun-less) SPA build hook.
+        env:
+          ORB_SKIP_UI_BUILD: "1"
+        run: uv sync --extra all --no-dev
 
       - name: Export OpenAPI spec for Go SDK
         if: steps.release.outputs.released == 'true'

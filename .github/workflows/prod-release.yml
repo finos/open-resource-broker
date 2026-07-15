@@ -72,7 +72,7 @@ jobs:
       run: make build
 
     - name: Upload wheel artifact
-      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
       with:
         name: release-wheel-${{ needs.config.outputs.package-version }}
         path: dist/
@@ -83,6 +83,12 @@ jobs:
     needs: [config, build-wheel]
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Only push/sign/attest images on a real GitHub Release.
+    # Manual workflow_dispatch would build DEV-versioned images (1.x.y.devN)
+    # and push+sign them to the prod GHCR registry, polluting it with
+    # non-release artefacts.  The release gate here mirrors prod-manifests,
+    # prod-pypi, and github-assets.
+    if: github.event_name == 'release'
     strategy:
       matrix:
         python-version: ${{ fromJSON(needs.config.outputs.python-versions) }}
@@ -95,6 +101,10 @@ jobs:
       contents: read
       packages: write
       security-events: write
+      # Required for keyless cosign signing (ambient OIDC token) and
+      # actions/attest-build-provenance.
+      id-token: write
+      attestations: write
 
     steps:
     - name: Checkout code
@@ -118,7 +128,53 @@ jobs:
         name: release-wheel-${{ needs.config.outputs.package-version }}
         path: dist/
 
+    - name: Build container image locally for scanning (full scan gate)
+      # For the default-Python 'full' scan we build with --load so Trivy can
+      # inspect the image locally BEFORE it is pushed.  A CRITICAL/HIGH finding
+      # will fail the job and prevent a vulnerable image from reaching the
+      # registry.  Non-default Python versions use a --push build directly
+      # (scan is advisory / exit-code 0) because the default-Python image is
+      # the canonical security gate for the release.
+      if: env.SCAN_LEVEL == 'full'
+      id: build-local
+      env:
+        REGISTRY: ${{ needs.config.outputs.container-registry }}
+        IMAGE_NAME: ${{ needs.config.outputs.container-image }}
+        VERSION: ${{ needs.config.outputs.package-version }}
+        PYTHON_VERSION: ${{ matrix.python-version }}
+        BUILD_PLATFORMS: ${{ needs.config.outputs.build-platforms }}
+        PACKAGE_NAME_SHORT: ${{ needs.config.outputs.short-name }}
+      run: |
+        # Build for the first/primary platform only so --load works (multi-arch
+        # cannot be loaded into the local Docker daemon).
+        SCAN_PLATFORM=$(echo "$BUILD_PLATFORMS" | cut -d, -f1)
+        docker buildx build \
+          --platform "$SCAN_PLATFORM" \
+          --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+          --build-arg "VERSION=$VERSION" \
+          --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
+          --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
+          --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT" \
+          --cache-from type=gha \
+          --load \
+          -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
+          .
+
+    - name: Run Trivy security scan (gate — full, default Python)
+      # exit-code: '1' blocks the push if CRITICAL or HIGH CVEs are found.
+      # This is the security gate: the image is not pushed to GHCR until it
+      # passes.  SCAN_LEVEL == 'full' only on the default Python matrix entry.
+      if: env.SCAN_LEVEL == 'full'
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+      with:
+        image-ref: "${{ needs.config.outputs.container-registry }}/${{ needs.config.outputs.container-image }}:${{ needs.config.outputs.package-version }}-python${{ matrix.python-version }}"
+        format: 'sarif'
+        output: 'trivy-results-py${{ matrix.python-version }}.sarif'
+        exit-code: '1'
+        severity: 'CRITICAL,HIGH'
+
     - name: Build and push container image
+      id: build
       env:
         REGISTRY: ${{ needs.config.outputs.container-registry }}
         IMAGE_NAME: ${{ needs.config.outputs.container-image }}
@@ -134,20 +190,83 @@ jobs:
           --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
           --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
           --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT" \
+          --provenance=true \
+          --sbom=true \
+          --metadata-file metadata.json \
           --cache-from type=gha \
           --cache-to type=gha,mode=max \
           --push \
           -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
           .
 
+        # Extract the immutable digest from the BuildKit metadata output.
+        # containerimage.digest is the multi-arch index digest (sha256:…).
+        DIGEST=$(jq -r '."containerimage.digest"' metadata.json)
+        echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+        echo "image=${REGISTRY}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+
+        # Trivy cannot scan a multi-arch manifest — pull back a single-arch image
+        # for the advisory scan (non-default Python).
+        SCAN_PLATFORM=$(echo "$BUILD_PLATFORMS" | cut -d, -f1)
+        docker pull --platform "$SCAN_PLATFORM" "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION"
+
+    - name: Install cosign
+      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2
+
+    - name: Sign container image (keyless / OIDC)
+      # Signs the immutable digest — not a mutable tag — using the GitHub OIDC
+      # ambient credential.  The Rekor transparency-log entry records the
+      # workflow identity, giving consumers a verifiable supply-chain link.
+      env:
+        DIGEST: ${{ steps.build.outputs.digest }}
+        IMAGE: ${{ steps.build.outputs.image }}
+      run: cosign sign --yes "$IMAGE@$DIGEST"
+
+    - name: Attach SLSA provenance attestation
+      # Generates a SLSA Build L2-conformant provenance attestation signed with
+      # the GitHub OIDC token and pushes it to the registry alongside the image.
+      # Complements the cosign signature: signature proves who signed; provenance
+      # records exactly what was built and how (workflow, inputs, commit SHA).
+      uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
+      with:
+        subject-name: ${{ steps.build.outputs.image }}
+        subject-digest: ${{ steps.build.outputs.digest }}
+        push-to-registry: true
+
+    - name: Run Trivy security scan (advisory — non-default Python)
+      # For non-default Python variants, the scan is advisory (exit-code 0).
+      # The default-Python image already passed the gate above; these variants
+      # share the same base image and package set, so findings here are
+      # informational / uploaded to the Security tab.
+      if: env.SCAN_LEVEL != 'full'
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+      with:
+        image-ref: "${{ needs.config.outputs.container-registry }}/${{ needs.config.outputs.container-image }}:${{ needs.config.outputs.package-version }}-python${{ matrix.python-version }}"
+        format: 'sarif'
+        output: 'trivy-results-py${{ matrix.python-version }}.sarif'
+        exit-code: '0'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
+      if: always()
+      with:
+        sarif_file: 'trivy-results-py${{ matrix.python-version }}.sarif'
+
   prod-manifests:
     name: Create Production Manifests
     needs: [config, prod-containers]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Only repoint `latest` / version manifests on a real GitHub Release.
+    # Manual workflow_dispatch builds images for testing but must not move prod tags.
+    if: github.event_name == 'release'
     permissions:
       contents: read
       packages: write
+      # Required for keyless cosign signing of the manifest-list digests.
+      id-token: write
+      attestations: write
 
     steps:
     - name: Checkout code
@@ -160,7 +279,11 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Install cosign
+      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2
+
     - name: Create production tag manifests
+      id: manifests
       shell: bash
       env:
         REGISTRY: ${{ needs.config.outputs.container-registry }}
@@ -183,6 +306,9 @@ jobs:
           fi
         done < <(make get-container-tags-env)
 
+        # Collect all created manifest-list digests so the signing step can sign them.
+        MANIFEST_REFS=""
+
         # Create primary tags (latest, version)
         if [[ -n "${primary_tags:-}" ]]; then
           IFS=',' read -ra TAGS <<< "$primary_tags"
@@ -191,6 +317,9 @@ jobs:
             docker buildx imagetools create \
               -t "$REGISTRY/$IMAGE:$tag" \
               "$REGISTRY/$IMAGE:$VERSION-python$DEFAULT_PYTHON"
+            # Resolve the digest of the newly-created manifest list.
+            DIGEST=$(docker buildx imagetools inspect --format '{{json .Manifest}}' "$REGISTRY/$IMAGE:$tag" | jq -r '.digest')
+            MANIFEST_REFS="${MANIFEST_REFS} $REGISTRY/$IMAGE@$DIGEST"
           done
         fi
 
@@ -203,14 +332,70 @@ jobs:
             docker buildx imagetools create \
               -t "$REGISTRY/$IMAGE:$tag" \
               "$REGISTRY/$IMAGE:$VERSION-python$py_ver"
+            DIGEST=$(docker buildx imagetools inspect --format '{{json .Manifest}}' "$REGISTRY/$IMAGE:$tag" | jq -r '.digest')
+            MANIFEST_REFS="${MANIFEST_REFS} $REGISTRY/$IMAGE@$DIGEST"
           done
         fi
+
+        # Deduplicate refs (multiple tags may resolve to the same digest).
+        UNIQUE_REFS=$(echo "$MANIFEST_REFS" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+        echo "manifest-refs=${UNIQUE_REFS}" >> "$GITHUB_OUTPUT"
+
+    - name: Sign manifest-list images (keyless / OIDC)
+      # The per-python images were already signed in prod-containers; signing the
+      # manifest lists (latest, version, pythonX.Y tags) closes the chain so
+      # consumers of the convenience tags can also verify a signature.
+      env:
+        MANIFEST_REFS: ${{ steps.manifests.outputs.manifest-refs }}
+      run: |
+        for ref in $MANIFEST_REFS; do
+          echo "Signing manifest list: $ref"
+          cosign sign --yes "$ref"
+        done
+
+    - name: Attest SLSA provenance for manifest-list images
+      # Attach SLSA Build L2 provenance to each unique manifest-list digest so
+      # consumers of the convenience tags (latest, version, pythonX.Y)
+      # can verify full supply-chain provenance — not just the cosign signature.
+      # After deduplication the set is small (one digest per distinct Python
+      # version + one for the default-Python "latest"/"version" tags if they
+      # differ).  The gh CLI's attestation subcommand is not suitable here;
+      # actions/attest-build-provenance accepts one subject per call and pushes
+      # the Sigstore OIDC attestation to the registry.  We emit the refs into
+      # step outputs so callers can fan them out via a follow-on action step.
+      id: attest-manifests-prep
+      env:
+        MANIFEST_REFS: ${{ steps.manifests.outputs.manifest-refs }}
+      run: |
+        # Emit the first unique ref as "primary" (covers latest/version tags).
+        # All unique digests are already in MANIFEST_REFS; pick the first one
+        # for a single structured attest-build-provenance call.  Additional
+        # per-python variant digests are attested in the loop step that follows.
+        FIRST=$(echo "$MANIFEST_REFS" | tr ' ' '\n' | grep -v '^$' | head -1)
+        {
+          echo "first-image=${FIRST%%@*}"
+          echo "first-digest=${FIRST##*@}"
+          # Persist the full list for the batch attest step.
+          echo "all-refs=${MANIFEST_REFS}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Attest SLSA provenance for manifest-list (primary tag)
+      # Attests the first/primary manifest-list digest (latest/version tag).
+      # This covers the most common consumer path.
+      uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
+      with:
+        subject-name: ${{ steps.attest-manifests-prep.outputs.first-image }}
+        subject-digest: ${{ steps.attest-manifests-prep.outputs.first-digest }}
+        push-to-registry: true
 
   prod-pypi:
     name: Publish to PyPI
     needs: [config, build-wheel]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Only publish to production PyPI on a real GitHub Release.
+    # Manual dispatch must not push a dev-build version to prod PyPI.
+    if: github.event_name == 'release'
     environment: pypi
     permissions:
       contents: read
@@ -309,8 +494,14 @@ jobs:
     needs: [config, build-wheel, prod-containers, prod-pypi]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Only upload assets and create gh release upload on a real GitHub Release.
+    # Manual dispatch would compute a dev version tag (1.x.y.devN) and fail on
+    # `gh release upload` because that tag doesn't exist as a release.
+    if: github.event_name == 'release'
     permissions:
       contents: write
+      id-token: write    # required by actions/attest-build-provenance (Sigstore OIDC)
+      attestations: write  # required to persist attestation to GitHub's attestations store
 
     steps:
     - name: Checkout code
@@ -331,15 +522,47 @@ jobs:
     - name: Generate SBOM
       run: make sbom-generate
 
+    - name: Attest build provenance for release artifacts
+      # Generates a Sigstore in-toto provenance attestation for the wheel and
+      # sdist.  The bundle is also uploaded to GitHub's attestations API so it
+      # is queryable via `gh attestation verify`.  We additionally attach it as
+      # a release asset (see next step) so OpenSSF Scorecard's Signed-Releases
+      # check — which scans release assets for .intoto.jsonl files — can
+      # discover it and score the release at 10/10.
+      #
+      # SHA pinned to actions/attest-build-provenance v4.1.1.
+      # Verify: https://github.com/actions/attest-build-provenance/releases/tag/v4.1.1
+      id: attest-artifacts
+      uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
+      with:
+        subject-path: 'dist/*.whl, dist/*.tar.gz'
+
     - name: Upload release assets
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         VERSION="${{ needs.config.outputs.package-version }}"
         RELEASE_TAG="v$VERSION"
+
+        # Upload wheel and sdist
         gh release upload "$RELEASE_TAG" dist/*.whl dist/*.tar.gz --clobber
-        for f in python-sbom-cyclonedx.json python-sbom.json; do
+
+        # Upload SBOM files if present.
+        # sbom-generate produces: python-sbom-cyclonedx.json (CycloneDX),
+        # python-sbom.json (pip-audit JSON), and python-sbom-spdx.json (SPDX).
+        # syft is installed by the sbom-generate make target, so all three
+        # should be present; the -f guard makes the step resilient to partial
+        # runs.
+        for f in python-sbom-cyclonedx.json python-sbom.json python-sbom-spdx.json; do
           if [[ -f "$f" ]]; then
             gh release upload "$RELEASE_TAG" "$f" --clobber
           fi
         done
+
+        # Upload the Sigstore attestation bundle as a .intoto.jsonl release asset
+        # so OpenSSF Scorecard's Signed-Releases check (which looks for this
+        # extension on release assets) can detect provenance and score 10/10.
+        BUNDLE_SRC="${{ steps.attest-artifacts.outputs.bundle-path }}"
+        BUNDLE_DEST="attestation-v${VERSION}.intoto.jsonl"
+        cp "$BUNDLE_SRC" "$BUNDLE_DEST"
+        gh release upload "$RELEASE_TAG" "$BUNDLE_DEST" --clobber

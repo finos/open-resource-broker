@@ -80,12 +80,12 @@ jobs:
           echo "VERSION=${{ needs.config.outputs.package-version }}"
           echo "TARGET=testpypi"
         } >> "$GITHUB_ENV"
-        echo "Publishing to: TestPyPI with version: $VERSION"
+        echo "Publishing to: TestPyPI with version: ${{ needs.config.outputs.package-version }}"
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: deps-${{ needs.config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
+        cache-key: deps-${{ needs.config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'uv.lock') }}
         fail-on-cache-miss: false
 
     - name: Setup Bun (for UI static bundle)
@@ -143,7 +143,7 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: deps-${{ needs.config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
+        cache-key: deps-${{ needs.config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'uv.lock') }}
         fail-on-cache-miss: false
 
     - name: Generate SBOM files
@@ -156,6 +156,7 @@ jobs:
         name: reports-sbom-${{ needs.config.outputs.package-version }}
         path: |
           python-sbom-cyclonedx.json
+          python-sbom.json
           python-sbom-spdx.json
         retention-days: 180
 

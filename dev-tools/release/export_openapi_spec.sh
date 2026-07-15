@@ -35,12 +35,21 @@ orb "${CONFIG_FLAG[@]}" server start --foreground --api-only --socket-path "$SOC
 SERVER_PID=$!
 
 for _ in $(seq 1 30); do
-    if curl -sf --unix-socket "$SOCK" http://localhost/health \
-        | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('status') in ('healthy','degraded') else 1)" 2>/dev/null; then
+    # Poll the OpenAPI endpoint directly: it becomes available as soon as uvicorn
+    # is serving, regardless of provider health (AWS creds, etc.).  The old loop
+    # polled /health whose status depends on backend provider checks that always
+    # fail in CI (no credentials), so the loop never broke early.
+    if curl -sf --unix-socket "$SOCK" http://localhost/openapi.json >/dev/null 2>&1; then
         break
     fi
     sleep 1
 done
+
+# Explicit readiness gate: if the server never became ready the loop above
+# exited without breaking, and the curl below would hang or error with a
+# confusing message.  Fail loudly here instead so CI shows the real cause.
+curl -sf --unix-socket "$SOCK" http://localhost/openapi.json >/dev/null 2>&1 \
+    || { echo "ERROR: ORB server never became ready after 30s; aborting spec export" >&2; exit 1; }
 
 curl --fail --unix-socket "$SOCK" http://localhost/openapi.json > sdk/go/openapi.json
 python3 -c "import json; d=json.load(open('sdk/go/openapi.json')); assert d.get('openapi'), 'Invalid OpenAPI spec'"
