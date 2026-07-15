@@ -5,8 +5,8 @@ Provides the live async Azure resource-management helpers used by ORB.
 
 from typing import Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.exceptions.azure_exceptions import AzureInfrastructureError
 from orb.providers.azure.infrastructure.azure_client import AzureClient

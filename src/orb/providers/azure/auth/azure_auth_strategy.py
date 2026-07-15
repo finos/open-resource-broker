@@ -7,7 +7,6 @@ provider-runtime flows construct the same credential shape.
 import asyncio
 from typing import Any, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.adapters.ports.auth import (
     AuthContext,
@@ -15,6 +14,7 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthResult,
     AuthStatus,
 )
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.azure.infrastructure.credential_factory import (
     AsyncAzureAccessTokenProviderProtocol,
     AsyncDefaultAzureAccessTokenProvider,

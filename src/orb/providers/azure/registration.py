@@ -586,6 +586,18 @@ def register_azure_services_with_di(container) -> None:
             "Failed to register Azure services with DI container: %s", exc, exc_info=True
         )
 
+    from orb.infrastructure.registry.template_example_generator_registry import (
+        TemplateExampleGeneratorRegistry,
+    )
+    from orb.providers.azure.infrastructure.adapters.template_example_generator_adapter import (
+        AzureTemplateExampleGeneratorAdapter,
+    )
+
+    TemplateExampleGeneratorRegistry.register("azure", AzureTemplateExampleGeneratorAdapter())
+    logger.debug(
+        "Azure TemplateExampleGeneratorAdapter registered in TemplateExampleGeneratorRegistry"
+    )
+
 
 # ------------------------------------------------------------------
 # Auto-register extensions on import

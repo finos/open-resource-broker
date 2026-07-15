@@ -6,9 +6,9 @@ Creates and caches Azure handlers based on ``provider_api`` values
 from threading import RLock
 from typing import TYPE_CHECKING
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
 from orb.domain.template.template_aggregate import Template
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.azure_client import AzureClient
@@ -110,6 +110,15 @@ class AzureHandlerFactory:
         return self.create_handler(handler_type)
 
     def _register_handler_classes(self) -> None:
+        self._handler_classes = self.get_handler_classes()
+        self._logger.debug(
+            "Registered Azure handler classes: %s",
+            [handler_type.value for handler_type in self._handler_classes],
+        )
+
+    @staticmethod
+    def get_handler_classes() -> dict[AzureProviderApi, type[AzureHandler]]:
+        """Return the handler classes that define Azure's supported APIs."""
         from orb.providers.azure.infrastructure.handlers.cyclecloud_handler import (
             CycleCloudHandler,
         )
@@ -118,16 +127,12 @@ class AzureHandlerFactory:
         )
         from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
 
-        self._handler_classes = {
+        return {
             AzureProviderApi.VMSS: VMSSHandler,
             AzureProviderApi.VMSS_UNIFORM: VMSSHandler,
             AzureProviderApi.SINGLE_VM: SingleVMHandler,
             AzureProviderApi.CYCLECLOUD: CycleCloudHandler,
         }
-        self._logger.debug(
-            "Registered Azure handler classes: %s",
-            [handler_type.value for handler_type in self._handler_classes],
-        )
 
     def registered_handler_types(self) -> tuple[AzureProviderApi, ...]:
         """Return the registered handler enums in factory-owned canonical order."""
@@ -142,14 +147,12 @@ class AzureHandlerFactory:
 
     def generate_example_templates(self) -> list[dict]:
         """Collect example templates from all registered handlers."""
-        examples: list[dict] = []
-        for handler_type, handler_class in self._handler_classes.items():
-            try:
-                examples.extend(handler_class.get_example_templates())
-            except Exception as exc:
-                self._logger.warning(
-                    "Failed to get example templates from %s: %s",
-                    handler_type,
-                    exc,
-                )
-        return examples
+        return generate_azure_example_templates()
+
+
+def generate_azure_example_templates() -> list[dict[str, object]]:
+    """Generate examples from the same handler set used for live dispatch."""
+    examples: list[dict[str, object]] = []
+    for handler_class in AzureHandlerFactory.get_handler_classes().values():
+        examples.extend(handler_class.get_example_templates())
+    return examples

@@ -99,6 +99,7 @@ class Template(BaseModel):
     # Tags and metadata
     tags: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    provider_data: dict[str, Any] = Field(default_factory=dict)
 
     # Provider configuration (multi-provider support)
     provider_type: Optional[str] = None
