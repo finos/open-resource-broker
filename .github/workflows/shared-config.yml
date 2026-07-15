@@ -130,10 +130,13 @@ jobs:
         except ImportError:
             import tomli as tomllib  # backport for Python < 3.11
         import json
-        META = {'all', 'dev', 'ci', 'test-aws', 'test-k8s', 'all-providers', 'k8s-legacy', 'monitoring-aws'}
+        META = {'all', 'dev', 'ci', 'all-providers', 'k8s-legacy', 'monitoring-aws'}
         with open('pyproject.toml', 'rb') as f:
             data = tomllib.load(f)
-        extras = [k for k in data['project']['optional-dependencies'].keys() if k not in META]
+        extras = [
+            k for k in data['project']['optional-dependencies']
+            if k not in META and not k.startswith('test-')
+        ]
         print(json.dumps(extras if extras else ['cli', 'api', 'monitoring']))
         ")
 

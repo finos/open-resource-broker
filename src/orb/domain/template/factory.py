@@ -113,9 +113,9 @@ class TemplateFactory(BaseTemplateFactory):
             except Exception as e:
                 if self._logger:
                     self._logger.error("Failed to create %s template: %s", provider_type, e)
-                # Fall back to core template
+                raise
 
-        # Fall back to core template
+        # Use the core template only when no provider-specific class is registered.
         try:
             template = Template(**template_data)
 

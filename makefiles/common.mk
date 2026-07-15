@@ -71,8 +71,9 @@ DOCS_BUILD_DIR := $(DOCS_DIR)/site
 
 # Centralized tool execution function
 # Usage: $(call run-tool,tool-name,arguments[,working-dir])
+# Set RUN_TOOL_UV_OPTIONS for options that belong to `uv run`, not the tool.
 define run-tool
-	$(if $(3),cd $(3) && ../dev-tools/setup/run_tool.sh $(1) $(2),@dev-tools/setup/run_tool.sh $(1) $(2))
+	$(if $(3),cd $(3) && RUN_TOOL_UV_OPTIONS="$(RUN_TOOL_UV_OPTIONS)" ../dev-tools/setup/run_tool.sh $(1) $(2),@RUN_TOOL_UV_OPTIONS="$(RUN_TOOL_UV_OPTIONS)" dev-tools/setup/run_tool.sh $(1) $(2))
 endef
 
 # Virtual environment setup (common dependency for all makefiles)

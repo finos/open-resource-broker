@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Central provider list – the single line to edit when adding a new provider.
 # ---------------------------------------------------------------------------
-_REGISTERED_PROVIDERS: list[str] = ["aws", "k8s"]
+_REGISTERED_PROVIDERS: list[str] = ["aws", "azure", "k8s"]
 
 # Entry-point group used by third-party plugins to register provider
 # extensions.  See ``discover_provider_plugins`` and

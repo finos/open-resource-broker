@@ -89,12 +89,17 @@ k8s = [
     "kubernetes",
 ]
 
-# Placeholder entries for future providers (add when provider is implemented)
-# azure = [
-#     "azure-mgmt-compute>=30.0.0",
-#     "azure-identity>=1.15.0",
-#     "azure-mgmt-network>=25.0.0",
-# ]
+# Azure provider runtime dependencies. Install with:
+#   pip install orb-py[azure]
+azure = [
+    "azure-core>=1.38.2",
+    "azure-identity>=1.25.2",
+    "azure-mgmt-compute>=37.2.0",
+    "azure-mgmt-network>=30.2.0",
+    "azure-mgmt-resource>=25.0.0",
+    "azure-mgmt-resource-subscriptions>=1.0.0b1",
+    "httpx>=0.27.0",
+]
 # gcp = [
 #     "google-cloud-compute>=1.14.0",
 #     "google-auth>=2.23.0",
@@ -103,6 +108,7 @@ k8s = [
 # Meta-extra: all currently implemented providers
 all-providers = [
     "orb-py[aws]",
+    "orb-py[azure]",
     "orb-py[k8s]",
 ]
 
@@ -192,6 +198,15 @@ test-aws = [
     "moto[ec2,iam,ec2instanceconnect,autoscaling,ssm,dynamodb,sts,sqs,sns]>=5.1.19,<6.0.0",
     "responses>=0.24.0,<1.0.0",
     "requests-mock>=1.11.0,<2.0.0",
+]
+
+# Azure SDK packages imported directly by the Azure tests. These overlap with
+# the runtime extra because the tests assert behavior using real SDK exception
+# and model types, but the test group does not install unrelated runtime SDKs.
+test-azure = [
+    "azure-core>=1.38.2",
+    "azure-identity>=1.25.2",
+    "azure-mgmt-compute>=37.2.0",
 ]
 
 # Kubernetes test dependencies — kmock is an in-process HTTP-level K8s API mock.
