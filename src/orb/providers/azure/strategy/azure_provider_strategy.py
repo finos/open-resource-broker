@@ -14,8 +14,8 @@ from collections.abc import Mapping
 from threading import Condition, RLock
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.azure.capabilities import (
     get_supported_api_capabilities,
     get_supported_apis,

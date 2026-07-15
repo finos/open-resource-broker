@@ -7,9 +7,9 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from orb.application.services.native_spec_service import NativeSpecService
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
+from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.utilities.common.deep_merge import deep_merge
 from orb.infrastructure.utilities.file.json_utils import read_json_file
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate

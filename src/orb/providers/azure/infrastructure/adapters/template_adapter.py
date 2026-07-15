@@ -6,8 +6,8 @@ Converts between configuration-layer template dicts and the domain
 
 from typing import Any
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 
 

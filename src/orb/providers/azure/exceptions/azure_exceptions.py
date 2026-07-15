@@ -5,10 +5,17 @@ Provides a full exception hierarchy for Azure provider operations
 
 from typing import Any, Optional
 
-from orb.domain.base.exceptions import InfrastructureError
+from orb.providers.base.exceptions import (
+    ProviderAuthError,
+    ProviderConfigError,
+    ProviderError,
+    ProviderPermanentError,
+    ProviderQuotaError,
+    ProviderTransientError,
+)
 
 
-class AzureError(InfrastructureError):
+class AzureError(ProviderError):
     """Base class for Azure-related errors."""
 
     def __init__(
@@ -16,13 +23,31 @@ class AzureError(InfrastructureError):
         message: str,
         details: Optional[dict[str, Any]] = None,
         error_code: Optional[str] = None,
+        *,
+        provider_name: Optional[str] = None,
+        underlying_exception: Optional[BaseException] = None,
+        is_retryable: Optional[bool] = None,
     ) -> None:
-        super().__init__(message, error_code or self.__class__.__name__, details)
+        super().__init__(
+            message,
+            provider_type="azure",
+            provider_name=provider_name,
+            underlying_exception=underlying_exception,
+            details=details,
+            is_retryable=is_retryable,
+        )
         self.error_code = error_code or self.__class__.__name__
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the exception to a dict, including error_code if non-default."""
         result: dict[str, Any] = super().to_dict()
+        if self.error_code and self.error_code != self.__class__.__name__:
+            result["error_code"] = self.error_code
+        return result
+
+    def safe_to_dict(self) -> dict[str, Any]:
+        """Serialize the exception without exposing its underlying exception."""
+        result = super().safe_to_dict()
         if self.error_code and self.error_code != self.__class__.__name__:
             result["error_code"] = self.error_code
         return result
@@ -33,7 +58,7 @@ class AzureError(InfrastructureError):
 # ---------------------------------------------------------------------------
 
 
-class AzureValidationError(AzureError):
+class AzureValidationError(AzureError, ProviderPermanentError):
     """Raised when Azure resource validation fails."""
 
 
@@ -66,7 +91,7 @@ class ImageValidationError(AzureValidationError):
 # ---------------------------------------------------------------------------
 
 
-class AzureEntityNotFoundError(AzureError):
+class AzureEntityNotFoundError(AzureError, ProviderPermanentError):
     """Raised when an Azure resource is not found."""
 
 
@@ -91,7 +116,7 @@ class VMSSNotFoundError(AzureEntityNotFoundError):
 # ---------------------------------------------------------------------------
 
 
-class QuotaExceededError(AzureError):
+class QuotaExceededError(AzureError, ProviderQuotaError):
     """Raised when Azure service quotas would be exceeded."""
 
 
@@ -128,11 +153,11 @@ class ServiceQuotaError(QuotaExceededError):
 # ---------------------------------------------------------------------------
 
 
-class ResourceInUseError(AzureError):
+class ResourceInUseError(AzureError, ProviderTransientError):
     """Raised when an Azure resource is already in use."""
 
 
-class ResourceStateError(AzureError):
+class ResourceStateError(AzureError, ProviderTransientError):
     """Raised when a resource is in an invalid state for the operation."""
 
     def __init__(
@@ -162,11 +187,11 @@ class ResourceStateError(AzureError):
 # ---------------------------------------------------------------------------
 
 
-class AuthenticationError(AzureError):
+class AuthenticationError(AzureError, ProviderAuthError):
     """Raised when Azure authentication fails."""
 
 
-class AuthorizationError(AzureError):
+class AuthorizationError(AzureError, ProviderAuthError):
     """Raised when there are insufficient permissions."""
 
 
@@ -193,11 +218,11 @@ class RBACError(AuthorizationError):
 # ---------------------------------------------------------------------------
 
 
-class RateLimitError(AzureError):
+class RateLimitError(AzureError, ProviderQuotaError):
     """Raised when Azure API rate limits are exceeded."""
 
 
-class NetworkError(AzureError):
+class NetworkError(AzureError, ProviderTransientError):
     """Raised when there are network-related issues."""
 
 
@@ -206,11 +231,11 @@ class NetworkError(AzureError):
 # ---------------------------------------------------------------------------
 
 
-class AzureInfrastructureError(AzureError):
+class AzureInfrastructureError(AzureError, ProviderTransientError):
     """Raised for general Azure infrastructure errors."""
 
 
-class AzureConfigurationError(AzureError):
+class AzureConfigurationError(AzureError, ProviderConfigError):
     """Raised when Azure configuration is invalid."""
 
 
@@ -219,7 +244,7 @@ class AzureConfigurationError(AzureError):
 # ---------------------------------------------------------------------------
 
 
-class LaunchError(AzureError):
+class LaunchError(AzureError, ProviderTransientError):
     """Instance / VMSS launch failed."""
 
     def __init__(
@@ -265,7 +290,7 @@ class VMSSCreationError(LaunchError):
         self.vmss_name = vmss_name
 
 
-class TerminationError(AzureError):
+class TerminationError(AzureError, ProviderTransientError):
     """Instance termination failed."""
 
     def __init__(
@@ -281,7 +306,7 @@ class TerminationError(AzureError):
         self.resource_ids = resource_ids
 
 
-class ResourceCleanupError(AzureError):
+class ResourceCleanupError(AzureError, ProviderTransientError):
     """Failed to clean up Azure resources."""
 
     def __init__(
@@ -303,7 +328,7 @@ class ResourceCleanupError(AzureError):
         self.resource_type = resource_type
 
 
-class TaggingError(AzureError):
+class TaggingError(AzureError, ProviderTransientError):
     """Failed to tag Azure resources."""
 
     def __init__(
@@ -330,7 +355,7 @@ class CycleCloudError(AzureError):
     """Base class for CycleCloud-related errors."""
 
 
-class CycleCloudConnectionError(CycleCloudError):
+class CycleCloudConnectionError(CycleCloudError, ProviderTransientError):
     """Failed to connect to the CycleCloud REST API."""
 
     def __init__(
@@ -346,7 +371,7 @@ class CycleCloudConnectionError(CycleCloudError):
         self.url = url
 
 
-class CycleCloudClusterNotFoundError(CycleCloudError):
+class CycleCloudClusterNotFoundError(CycleCloudError, ProviderPermanentError):
     """The specified CycleCloud cluster was not found."""
 
     def __init__(
@@ -362,7 +387,7 @@ class CycleCloudClusterNotFoundError(CycleCloudError):
         self.cluster_name = cluster_name
 
 
-class CycleCloudNodeError(CycleCloudError):
+class CycleCloudNodeError(CycleCloudError, ProviderTransientError):
     """Failed to add or manage CycleCloud nodes."""
 
     def __init__(

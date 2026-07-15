@@ -11,8 +11,8 @@ import uuid
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Optional, cast
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.request.aggregate import Request
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import (

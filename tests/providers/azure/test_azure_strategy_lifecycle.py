@@ -260,6 +260,7 @@ class TestCreateInstances:
                         "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCu"],
                         "node_attributes": {},
                     },
+                    "provider_data": {},
                 },
                 "count": 1,
             },

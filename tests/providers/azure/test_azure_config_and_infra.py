@@ -1,23 +1,23 @@
 """Tests for Azure configuration and registration behavior."""
 
-import json
-from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from pydantic import ValidationError
 
+from orb.application.dto.template import TemplateDTO
 from orb.bootstrap.infrastructure_services import register_infrastructure_services
 from orb.config import PerformanceConfig
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.di.container import DIContainer
-from orb.infrastructure.template.dtos import TemplateDTO
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 from orb.providers.azure.configuration.validator import (
     validate_azure_config,
     validate_azure_template,
 )
+from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.infrastructure.azure_client import AzureClient
 from orb.providers.azure.infrastructure.azure_handler_factory import AzureHandlerFactory
@@ -26,7 +26,7 @@ from orb.providers.azure.registration import (
     create_azure_config,
     create_azure_strategy,
     register_azure_provider,
-    register_azure_template_factory,
+    register_azure_services_with_di,
 )
 from orb.providers.registry import ProviderRegistry
 
@@ -292,6 +292,50 @@ class TestAzureHandlerFactory:
 
         assert template.image.publisher == "Canonical"
 
+    def test_template_factory_accepts_azure_template_dto_shape(self):
+        container = DIContainer()
+        container.register_instance(LoggingPort, MagicMock())
+        register_infrastructure_services(container)
+
+        template_dto = TemplateDTO(
+            template_id="azure-cheapest-vmss",
+            provider_type="azure",
+            provider_api="VMSS",
+            provider_config=AzureTemplateExtensionConfig(
+                vm_size="Standard_B1s",
+                resource_group="orb-test-rg",
+                location="eastus2",
+                image={
+                    "publisher": "Canonical",
+                    "offer": "0001-com-ubuntu-server-jammy",
+                    "sku": "22_04-lts-gen2",
+                    "version": "latest",
+                },
+                ssh_public_keys=["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+            ),
+            provider_data={},
+        )
+
+        template = container.get(TemplateFactory).create_template(template_dto.to_dict())
+
+        assert isinstance(template, AzureTemplate)
+        assert template.vm_size == "Standard_B1s"
+        assert template.provider_data == {}
+
+    def test_template_factory_does_not_downgrade_invalid_azure_template(self):
+        container = DIContainer()
+        container.register_instance(LoggingPort, MagicMock())
+        register_infrastructure_services(container)
+
+        with pytest.raises(ValidationError, match="vm_size"):
+            container.get(TemplateFactory).create_template(
+                {
+                    "template_id": "invalid-azure-template",
+                    "provider_type": "azure",
+                    "provider_api": "VMSS",
+                }
+            )
+
     def test_registry_created_strategy_gets_azure_client_resolver(self):
         registry = ProviderRegistry()
         registry.clear_registrations()
@@ -469,28 +513,6 @@ class TestTemplateExtension:
         assert defaults["placement_regions"] == ["eastus2"]
         assert defaults["placement_zones"] == ["1", "2", "3"]
 
-    def test_template_dto_roundtrip_preserves_spot_placement_score_fields(self):
-        factory = TemplateFactory()
-        register_azure_template_factory(factory)
-        templates_path = Path(__file__).parents[3] / "config" / "templates.json"
-        raw_template = next(
-            template
-            for template in json.loads(templates_path.read_text())["templates"]
-            if template.get("template_id") == "azure-spot-placement-score-vmss"
-        )
-
-        initial_dto = TemplateDTO.from_domain(factory.create_template(raw_template))
-        roundtripped_dto = TemplateDTO.from_domain(
-            factory.create_template(initial_dto.model_dump())
-        )
-        provider_config = roundtripped_dto.to_dict()["provider_config"]
-
-        assert provider_config["spot_placement_score_enabled"] is True
-        assert provider_config["placement_split_strategy"] == "hybrid"
-        assert provider_config["placement_primary_share_percent"] == 80
-        assert provider_config["placement_regions"] == ["eastus2"]
-        assert provider_config["placement_zones"] == ["1", "2", "3"]
-
 
 class TestAzureRegistration:
     def setup_method(self):
@@ -584,3 +606,35 @@ class TestAzureRegistration:
         assert strategy.azure_client.perf_config["max_workers"] == 4
         assert strategy.azure_client.perf_config["enable_caching"] is False
         assert strategy.azure_client.perf_config["cache_ttl"] == 21
+
+    def test_register_services_populates_template_example_generator_registry(self):
+        from orb.infrastructure.registry.template_example_generator_registry import (
+            TemplateExampleGeneratorRegistry,
+        )
+
+        TemplateExampleGeneratorRegistry.clear()
+        logger = Mock()
+        container = Mock()
+        container.get.return_value = logger
+        container.is_registered.return_value = True
+
+        register_azure_services_with_di(container)
+
+        generator = TemplateExampleGeneratorRegistry.get("azure")
+        assert generator is not None
+        assert generator.generate_example_templates("azure-default")
+
+        TemplateExampleGeneratorRegistry.clear()
+
+
+def test_azure_template_example_generator_filters_by_provider_api() -> None:
+    from orb.providers.azure.infrastructure.adapters.template_example_generator_adapter import (
+        AzureTemplateExampleGeneratorAdapter,
+    )
+
+    examples = AzureTemplateExampleGeneratorAdapter().generate_example_templates(
+        "azure-default", provider_api="SingleVM"
+    )
+
+    assert len(examples) == 1
+    assert examples[0]["provider_api"] == "SingleVM"

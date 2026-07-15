@@ -4,7 +4,6 @@ This module provides an integrated wrapper for Azure SDK interactions with:
 - Lazy initialization of Azure service clients
 - Explicit lifecycle cleanup for owned Azure SDK resources
 - Explicit runtime config assembly before client construction
-- Optional metrics instrumentation
 
 Azure SDK clients wrapped:
 - ComputeManagementClient (VMs, VMSS, Disks, Images, Galleries)
@@ -27,9 +26,8 @@ from threading import RLock
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from orb.config import PerformanceConfig
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
-from orb.monitoring.metrics import MetricsCollector
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.exceptions.azure_exceptions import (
     AuthenticationError,
@@ -76,22 +74,18 @@ class AzureClient:
       and passed in as a typed infrastructure object.
     * Azure SDK management clients are created **lazily** on first access
       through ``@property`` accessors, keeping startup cost near zero.
-    * An optional :class:`MetricsCollector` can be injected for API-call
-      instrumentation (hooks are left as extension points for now).
     """
 
     def __init__(
         self,
         runtime_config: AzureClientRuntimeConfig,
         logger: LoggingPort,
-        metrics: Optional[MetricsCollector] = None,
     ) -> None:
         """Initialise the Azure client wrapper.
 
         Args:
             runtime_config: Fully resolved Azure client runtime settings.
             logger: Logger for diagnostic and operational messages.
-            metrics: Optional metrics collector for Azure API instrumentation.
         """
         self._runtime_config = runtime_config
         self._logger = logger
@@ -147,13 +141,6 @@ class AzureClient:
             arm_resource_id_parser=self._arm_resource_id_parser,
             network_lookup_error_types=self._network_lookup_error_types,
         )
-
-        # Metrics instrumentation (extension point)
-        self._metrics = metrics
-        if metrics:
-            logger.info("Azure API metrics collection enabled")
-        else:
-            logger.debug("Azure API metrics collection disabled - no MetricsCollector provided")
 
         self._logger.info(
             "Azure client initialised: region=%s, subscription=%s, resource_group=%s, "
@@ -711,16 +698,3 @@ class AzureClient:
     ) -> AzureNetworkIdentity:
         """Async variant of NIC-ref network identity resolution."""
         return await self._get_network_identity_resolver().resolve_from_nic_refs_async(nic_refs)
-
-    # ------------------------------------------------------------------
-    # Metrics / observability
-    # ------------------------------------------------------------------
-
-    def get_metrics_stats(self) -> dict[str, Any]:
-        """Return metrics collection statistics.
-
-        Returns:
-            Dictionary with metrics status; currently a placeholder for
-            future instrumentation parity with the AWS client.
-        """
-        return {"metrics_enabled": self._metrics is not None}
