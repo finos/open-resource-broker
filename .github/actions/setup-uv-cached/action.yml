@@ -1,9 +1,19 @@
 name: 'Setup UV with Cache'
-description: 'Install UV and restore cached environment'
+description: 'Install UV and restore cached environment, syncing only the requested dependency group'
 inputs:
   cache-key:
-    description: 'Cache key for UV environment'
+    description: 'Cache key for UV environment (caller-supplied; keyed per group)'
     required: true
+  group:
+    description: >-
+      PEP 735 dependency-group to sync (e.g. lint, typecheck, arch, test, docs,
+      security, build, ci, dev).  When supplied the action runs
+      `uv sync --frozen --no-default-groups --group <group>` on a cache miss so
+      each job installs only the packages it needs.  When empty the action falls
+      back to `uv sync --frozen --all-groups` (preserves legacy callers that
+      have not yet been updated to pass a group).
+    required: false
+    default: ''
   fail-on-cache-miss:
     description: 'Whether to fail if cache is not found'
     required: false
@@ -14,6 +24,11 @@ runs:
   steps:
     - name: Install UV
       uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+    - name: Setup Python 3.12
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+      with:
+        python-version: '3.12'
 
     - name: Restore UV environment
       id: restore-cache
@@ -27,7 +42,17 @@ runs:
         key: ${{ inputs.cache-key }}
         fail-on-cache-miss: ${{ inputs.fail-on-cache-miss }}
 
-    - name: Install dependencies if cache miss
+    - name: Install dependencies (scoped, on cache miss)
       if: steps.restore-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: make dev-install
+      env:
+        ORB_SKIP_UI_BUILD: "1"
+        UV_GROUP: ${{ inputs.group }}
+      run: |
+        if [ -n "$UV_GROUP" ]; then
+          # Scoped install: only the packages this job needs (~2-15 pkgs, fast even cold)
+          uv sync --frozen --no-default-groups --group "$UV_GROUP"
+        else
+          # Legacy fallback: full install (used by callers that predate group scoping)
+          uv sync --frozen --all-groups
+        fi

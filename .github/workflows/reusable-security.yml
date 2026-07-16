@@ -45,19 +45,17 @@ jobs:
         if: contains('bandit,safety,codeql', inputs.scan-type)
         uses: ./.github/actions/setup-uv-cached
         with:
-          # Use the caller-supplied cache key when available so this job hits
-          # the warm cache primed by the caller's setup-cache job (which uses
-          # cache-management.yml with the canonical deps-py3.12-<uv.lock hash>
-          # key).  Fallback mirrors that format so at least restore-keys can
-          # provide a partial hit on a first run.
+          # Use the caller-supplied cache key (keyed to the security group).
+          # Fallback mirrors the canonical group-keyed format so restore-keys
+          # can still provide a partial hit on a first run.
           cache-key: >-
             ${{
               inputs.cache-key != ''
               && inputs.cache-key
-              || format('deps-py{0}-{1}',
-                   inputs.python-version || inputs.default-python-version,
+              || format('deps-py3.12-security-{0}',
                    hashFiles('.project.yml', 'pyproject.toml', 'uv.lock'))
             }}
+          group: security
           fail-on-cache-miss: false
 
       # Bandit Security Scan

@@ -74,6 +74,14 @@ on:
         required: false
         type: string
         default: ''
+      group:
+        description: >-
+          PEP 735 dependency-group to sync on a cache miss (default: test).
+          All test legs use the test group; pass a different value only for
+          non-test consumers of this reusable workflow.
+        required: false
+        type: string
+        default: 'test'
       artifact-prefix:
         description: >-
           Caller-supplied prefix prepended to artifact names to prevent
@@ -113,16 +121,17 @@ jobs:
         with:
           # Use the caller-supplied cache key when available so this job hits the
           # warm cache primed by the caller's cache-management job.  Fallback
-          # mirrors the key format used by cache-management (dependencies type)
-          # so at least restore-keys can provide a partial hit.
+          # mirrors the key format used by cache-management (dependencies type,
+          # group-keyed) so at least restore-keys can provide a partial hit.
           cache-key: >-
             ${{
               inputs.cache-key != ''
               && inputs.cache-key
-              || format('test-deps-py{0}-{1}',
-                   inputs.python-version || inputs.default-python-version,
+              || format('deps-py3.12-{0}-{1}',
+                   inputs.group,
                    hashFiles('.project.yml', 'pyproject.toml', 'uv.lock'))
             }}
+          group: ${{ inputs.group }}
           fail-on-cache-miss: false
 
       - name: Run tests

@@ -35,8 +35,9 @@ jobs:
     uses: ./.github/workflows/cache-management.yml
     with:
       cache-type: dependencies
-      cache-key-base: workflow-validation
+      cache-key-base: deps
       python-version: ${{ needs.config.outputs.default-python-version }}
+      group: lint
 
   validate-workflows:
     name: Validate Workflow Files
@@ -53,6 +54,7 @@ jobs:
       uses: ./.github/actions/setup-uv-cached
       with:
         cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+        group: lint
         fail-on-cache-miss: false
 
     - name: Validate workflow syntax and logic

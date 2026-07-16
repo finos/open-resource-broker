@@ -44,6 +44,7 @@ jobs:
       cache-type: dependencies
       cache-key-base: deps
       python-version: ${{ needs.config.outputs.default-python-version }}
+      group: security
 
   security-bandit:
     name: Bandit (Security Scan)

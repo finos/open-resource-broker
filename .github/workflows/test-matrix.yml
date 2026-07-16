@@ -28,8 +28,9 @@ jobs:
     uses: ./.github/workflows/cache-management.yml
     with:
       cache-type: dependencies
-      cache-key-base: test-deps
+      cache-key-base: deps
       python-version: ${{ needs.config.outputs.default-python-version }}
+      group: test
 
   unit-tests:
     name: Unit Tests

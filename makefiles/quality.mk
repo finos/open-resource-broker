@@ -42,7 +42,8 @@ quality-check-fix: dev-install
 quality-check-files: dev-install
 	@./dev-tools/quality/quality_dispatcher.py files $(FILES)
 
-format-fix: dev-install  # CRITICAL: Used by ci.yml
+format-fix:  # CRITICAL: Used by ci.yml — venv pre-populated by setup-uv-cached (group: lint)
+	@# Local fresh-checkout: run `make dev-install` first.
 	@./dev-tools/quality/quality_dispatcher.py fix
 
 lint-optional: dev-install

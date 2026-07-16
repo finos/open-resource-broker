@@ -2,7 +2,9 @@
 
 # @SECTION CI Quality Checks
 # Individual code quality targets (with tool names)
-ci-quality-ruff: dev-install  ## Run Ruff formatting and linting check (basic rules only)
+ci-quality-ruff:  ## Run Ruff formatting and linting check (basic rules only)
+	@# In CI the venv is pre-populated by setup-uv-cached (group: lint).
+	@# Local fresh-checkout: run `make dev-install` first.
 	@echo "Running Ruff formatting and linting check (basic rules only)..."
 	@uv run --no-sync ruff check --select W,F,I --ignore E501 --quiet .
 	@uv run --no-sync ruff format --check --quiet .
@@ -34,7 +36,9 @@ ci-arch-clean:  ## Run Clean Architecture dependency validation
 	@echo "Running Clean Architecture validation..."
 	uv run --no-sync python ./dev-tools/quality/check_architecture.py
 
-ci-arch-imports: dev-install  ## Run import validation
+ci-arch-imports:  ## Run import validation
+	@# In CI the venv is pre-populated by setup-uv-cached (group: arch).
+	@# Local fresh-checkout: run `make dev-install` first.
 	@echo "Running import validation..."
 	uv run --no-sync python ./dev-tools/quality/validate_imports.py
 
@@ -42,7 +46,9 @@ ci-arch-file-sizes:  ## Check file size compliance
 	@echo "Running file size checks..."
 	uv run --no-sync python ./dev-tools/quality/dev_tools_runner.py check-file-sizes --warn-only
 
-ci-arch-lint-imports: dev-install  ## Run import-linter layer-boundary contracts
+ci-arch-lint-imports:  ## Run import-linter layer-boundary contracts
+	@# In CI the venv is pre-populated by setup-uv-cached (group: arch).
+	@# Local fresh-checkout: run `make dev-install` first.
 	@echo "Running import-linter layer-boundary checks..."
 	$(call run-tool,lint-imports,)
 
@@ -188,8 +194,10 @@ ci-tests-ui-smoke:  ## Boot embedded UI + curl each page + shut down (matches ci
 	@./dev-tools/ci/run_ui_smoke.sh
 
 ci-check-python-version-drift:  ## Assert that workflow fallback strings match .project.yml python.versions
+	@# pyyaml is available via the project's core [dependencies]; uv run --no-sync
+	@# uses the venv pre-populated by setup-uv-cached (group: arch) in CI.
 	@echo "Checking Python version drift between .project.yml and workflow fallback strings..."
-	@python3 dev-tools/ci/check_python_version_drift.py
+	@uv run --no-sync python dev-tools/ci/check_python_version_drift.py
 
 ci-check:  ## Run comprehensive CI checks (matches GitHub Actions exactly)
 	@echo "Running comprehensive CI checks that match GitHub Actions pipeline..."
