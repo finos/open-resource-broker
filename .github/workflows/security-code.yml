@@ -26,14 +26,28 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Belt-and-suspenders: prevent any accidental implicit uv sync from firing
+# the SPA build hook (setup.py build_ui.sh) in this workflow.
+env:
+  ORB_SKIP_UI_BUILD: "1"
+
 jobs:
   config:
     name: Configuration
     uses: ./.github/workflows/shared-config.yml
 
+  setup-cache:
+    name: Setup Cache
+    needs: config
+    uses: ./.github/workflows/cache-management.yml
+    with:
+      cache-type: dependencies
+      cache-key-base: deps
+      python-version: ${{ needs.config.outputs.default-python-version }}
+
   security-bandit:
     name: Bandit (Security Scan)
-    needs: config
+    needs: [config, setup-cache]
     permissions:
       contents: read
       actions: read
@@ -43,10 +57,11 @@ jobs:
       scan-type: bandit
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       python-version: ${{ needs.config.outputs.default-python-version }}
+      cache-key: ${{ needs.setup-cache.outputs.cache-key }}
 
   security-safety:
     name: Safety (Dependency Scan)
-    needs: config
+    needs: [config, setup-cache]
     permissions:
       contents: read
       actions: read
@@ -56,6 +71,7 @@ jobs:
       scan-type: safety
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       python-version: ${{ needs.config.outputs.default-python-version }}
+      cache-key: ${{ needs.setup-cache.outputs.cache-key }}
 
   security-semgrep:
     name: Semgrep (Static Analysis)
@@ -146,7 +162,7 @@ jobs:
 
   codeql-analysis:
     name: CodeQL Analysis
-    needs: config
+    needs: [config, setup-cache]
     if: github.event_name == 'pull_request' || github.event_name == 'schedule' || contains(github.event.head_commit.message, '[security]')
     permissions:
       contents: read
@@ -157,3 +173,4 @@ jobs:
       scan-type: codeql
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       python-version: ${{ needs.config.outputs.default-python-version }}
+      cache-key: ${{ needs.setup-cache.outputs.cache-key }}
