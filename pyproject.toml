@@ -463,6 +463,10 @@ dev = [
 [project.scripts]
 orb = "orb.run:cli_main"
 
+[project.entry-points."orb.providers"]
+aws = "orb.providers.aws.provider_plugin:AWSPlugin.register_plugin"
+k8s = "orb.providers.k8s.provider_plugin:K8sPlugin.register_plugin"
+
 [project.urls]
 Homepage = "https://github.com/finos/open-resource-broker"
 Documentation = "https://finos.github.io/open-resource-broker/"

@@ -37,17 +37,13 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("bootstrap/core_services.py", "orb.providers.registry"),
         # DI wiring — intentional: core services registers ProviderMetricsPort
         ("bootstrap/core_services.py", "orb.providers.base.metrics"),
-        ("bootstrap/infrastructure_services.py", "orb.providers.registration"),
-        ("bootstrap/infrastructure_services.py", "orb.providers.k8s"),
-        ("bootstrap/infrastructure_services.py", "orb.providers.k8s.registration"),
-        # DI wiring — intentional: AMI resolver registration must wire AWS provider
-        ("bootstrap/infrastructure_services.py", "orb.providers.aws.domain.services.ami_resolver"),
+        # TemplateFactory loop now uses get_provider_registry() from live registry
+        ("bootstrap/infrastructure_services.py", "orb.providers.registry"),
         (
             "application/services/orchestration/dashboard_summary.py",
             "orb.providers.registry",
         ),
         ("bootstrap/provider_services.py", "orb.providers.registry"),
-        ("bootstrap/provider_services.py", "orb.providers.registration"),
         ("bootstrap/services.py", "orb.providers.registration"),
         # Provider completeness assertion — intentional: must query ProviderRegistry
         # and all satellite registries to verify every registered provider type is complete.
@@ -75,8 +71,6 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
             "infrastructure/registry/cli_spec_registry.py",
             "orb.providers.base.provider_cli_spec_port",
         ),
-        # DI wiring — intentional: storage registration must wire AWS provider
-        ("infrastructure/storage/registration.py", "orb.providers.aws.storage.registration"),
         # The cpu/ram lookup (derive_cpu_ram_from_instance_type) has been moved
         # into providers/aws/scheduler/hostfactory_field_mapping.py.  The shared
         # hostfactory infrastructure no longer imports from orb.providers.aws.*.

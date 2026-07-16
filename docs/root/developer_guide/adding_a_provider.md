@@ -14,12 +14,14 @@ Before reading this guide, review:
 
 ORB's provider system is built around an extension-point model: all provider-specific behaviour is registered through a set of dedicated registries at startup. Shared infrastructure (the CLI, the scheduler, the REST API, the DI container) never imports provider packages directly; instead it queries registries that were populated during bootstrap.
 
+Providers are discovered at startup via Python's standard [entry-points](https://packaging.python.org/en/latest/specifications/entry-points/) mechanism. Each provider declares itself under the `orb.providers` entry-point group, pointing to a `ProviderPlugin.register_plugin` classmethod. No shared ORB file needs to be edited to add a new provider.
+
 The goal of this model is that adding a new provider should touch exactly:
 
 - `src/orb/providers/<name>/` — your provider package (all provider logic lives here)
-- Three glue points in shared code: an enum entry, a registration call, and a bootstrap block
+- One line in `[project.entry-points."orb.providers"]` in `pyproject.toml`
 
-The AWS provider is the canonical reference implementation. Refer to `src/orb/providers/aws/registration.py` when you need to see a working example of every registration call described below.
+The AWS provider (`src/orb/providers/aws/provider_plugin.py`) and the Kubernetes provider (`src/orb/providers/k8s/provider_plugin.py`) are the canonical reference implementations.
 
 ### Provider package layout
 
@@ -28,7 +30,8 @@ Mirror the AWS structure:
 ```
 src/orb/providers/<name>/
     __init__.py
-    registration.py          # All registration functions for this provider
+    provider_plugin.py            # ProviderPlugin subclass — the single registration entry point
+    registration.py               # Factory functions used by the plugin (strategy, config, etc.)
     strategy/
         <name>_provider_strategy.py
     cli/
@@ -55,59 +58,98 @@ Complete these steps in order. Each one has a corresponding section in the exten
 
 Create `src/orb/providers/<name>/` following the layout above. The strategy class must extend `ProviderStrategy` from `orb.providers.base.strategy` (see `src/orb/providers/base/strategy/provider_strategy.py`). Both the AWS and k8s providers use this base — for example, `AWSProviderStrategy(ProviderStrategy)` in `src/orb/providers/aws/strategy/aws_provider_strategy.py`.
 
-### 2. Add an enum entry
+### 2. Implement a `ProviderPlugin` subclass
 
-Add your provider to `ProviderType` in `src/orb/domain/base/provider_interfaces.py`:
+Create `src/orb/providers/<name>/provider_plugin.py` and subclass `ProviderPlugin` from `src/orb/providers/base/provider_plugin.py`. You must set `provider_name` and implement all seven mandatory satellite accessors.
 
-```python
-class ProviderType(str, Enum):
-    AWS = "aws"
-    AZURE = "azure"   # new entry
-```
-
-Use a short, lowercase string that matches the string keys used in all registry calls.
-
-### 3. Add a registration call in `providers/registration.py`
-
-Add your provider to the two functions in `src/orb/providers/registration.py`:
+Here is the minimal skeleton for an `azure` provider:
 
 ```python
-def register_all_provider_cli_specs() -> None:
-    from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
-    from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
+# src/orb/providers/azure/provider_plugin.py
+from __future__ import annotations
 
-    if CLISpecRegistry.get("azure") is None:
-        CLISpecRegistry.register("azure", AzureCLISpec())
+from typing import Any, Optional
+
+from orb.providers.base.provider_plugin import ProviderPlugin
 
 
-def register_all_provider_types() -> None:
-    from orb.providers.registry import get_provider_registry
+class AzurePlugin(ProviderPlugin):
+    provider_name = "azure"
 
-    registry = get_provider_registry()
+    # ------------------------------------------------------------------
+    # Mandatory satellite accessors
+    # ------------------------------------------------------------------
 
-    from orb.providers.aws.registration import register_aws_provider
-    register_aws_provider(registry)
+    def strategy_factory(self) -> Any:
+        from orb.providers.azure.registration import create_azure_strategy
+        return create_azure_strategy
 
-    from orb.providers.azure.registration import register_azure_provider
-    register_azure_provider(registry)
+    def config_factory(self) -> Any:
+        from orb.providers.azure.registration import create_azure_config
+        return create_azure_config
+
+    def template_dto_config(self) -> Any:
+        try:
+            from orb.providers.azure.domain.template.azure_template_dto_config import (
+                AzureTemplateDTOConfig,
+            )
+            return AzureTemplateDTOConfig
+        except ImportError:
+            return None
+
+    def cli_spec(self) -> Any:
+        try:
+            from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
+            return AzureCLISpec()
+        except ImportError:
+            return None
+
+    def field_mapping(self) -> Any:
+        try:
+            from orb.providers.azure.scheduler.hostfactory_field_mapping import (
+                AzureFieldMapping,
+            )
+            return AzureFieldMapping()
+        except ImportError:
+            return None
+
+    def defaults_loader(self) -> Any:
+        try:
+            from orb.providers.azure.defaults_loader import AzureDefaultsLoader
+            return AzureDefaultsLoader()
+        except ImportError:
+            return None
+
+    def template_example_generator(self, container: Any) -> Any:
+        try:
+            from orb.providers.azure.adapters.template_example_generator_adapter import (
+                AzureTemplateExampleGeneratorAdapter,
+            )
+            return AzureTemplateExampleGeneratorAdapter()
+        except ImportError:
+            return None
 ```
 
-### 4. Add a bootstrap block in `bootstrap/provider_services.py`
+All satellite accessor methods use `try/except ImportError` so the plugin module imports cleanly even when the provider's optional SDK dependencies are not installed.
 
-Add a `find_spec`-guarded block to `_register_provider_utility_services` in `src/orb/bootstrap/provider_services.py`. Use the same pattern as the AWS block immediately above it:
+For optional satellite hooks (`resolver_factory`, `validator_factory`, `strategy_class`, `default_api`, `provider_settings_class`, `template_class`, `register_auth_strategies`, `register_additional_services`, `_do_initialize`) the base class provides no-op defaults; override only the ones your provider needs. See `src/orb/providers/aws/provider_plugin.py` for a fully-overridden example and `src/orb/providers/k8s/provider_plugin.py` for another reference.
 
-```python
-if importlib.util.find_spec("orb.providers.azure"):
-    try:
-        from orb.providers.azure.registration import register_azure_services_with_di
-        register_azure_services_with_di(container)
-    except Exception as e:
-        logger.warning("Failed to register Azure utility services: %s", str(e))
+### 3. Declare the entry point in `pyproject.toml`
+
+Add a single line under `[project.entry-points."orb.providers"]`:
+
+```toml
+[project.entry-points."orb.providers"]
+aws = "orb.providers.aws.provider_plugin:AWSPlugin.register_plugin"
+k8s = "orb.providers.k8s.provider_plugin:K8sPlugin.register_plugin"
+azure = "orb.providers.azure.provider_plugin:AzurePlugin.register_plugin"
 ```
 
-The `find_spec` guard means the rest of ORB still runs when the provider package is not installed (useful for minimal deployments and test environments that exclude a specific provider's SDK).
+That is the complete integration point for bootstrap. No shared ORB registration or bootstrap file needs editing.
 
-### 5. Add SDK dependencies
+When ORB starts it calls `discover_provider_plugins()` (in `src/orb/providers/registration.py`), which walks `importlib.metadata.entry_points(group="orb.providers")` and invokes each target callable. `ProviderPlugin.register_plugin` constructs an instance of your subclass, calls `register_provider()` against the live `ProviderRegistry`, and appends `provider_name` to the internal discovery list so the bootstrap loops pick up the provider.
+
+### 4. Add SDK dependencies
 
 Add your cloud provider SDK to `pyproject.toml` and regenerate the lockfile:
 
@@ -117,6 +159,29 @@ azure = ["azure-mgmt-compute>=30.0", "azure-identity>=1.15"]
 ```
 
 Then run `uv lock` to update `uv.lock`.
+
+---
+
+## Startup completeness check
+
+After all providers are registered, the bootstrap calls `assert_provider_registrations_complete()` (in `src/orb/bootstrap/provider_completeness.py`). This assertion verifies that every provider type registered with `ProviderRegistry` also has an entry in every required satellite registry:
+
+- `CLISpecRegistry`
+- `FieldMappingRegistry`
+- `DefaultsLoaderRegistry`
+- `TemplateExtensionRegistry`
+- `TemplateExampleGeneratorRegistry`
+
+If any satellite is missing, startup **fails immediately** with a `ProviderCompletenessError` that names the provider and every registry it is absent from, for example:
+
+```
+ProviderCompletenessError: Provider registration is incomplete — satellite registries not populated:
+  provider='azure': missing in [FieldMappingRegistry, DefaultsLoaderRegistry]
+Fix: ensure initialize_<provider>_provider() is called during bootstrap
+     for each registered provider type.
+```
+
+This fast-fail catches incomplete plugin implementations before any request is served. If you see this error, check that all seven mandatory satellite accessors in your `ProviderPlugin` subclass return non-`None` values (or that `ImportError` is not silently suppressing a real missing-module error).
 
 ---
 
@@ -130,53 +195,36 @@ Each registry is a class-level singleton. Register during startup; never registe
 
 **What it does:** The central strategy factory. When a request arrives for a named provider, `ProviderRegistry` calls your `strategy_factory` to create the strategy instance and `config_factory` to parse configuration data.
 
-**When to register:** In your `register_<name>_provider(registry)` function called from `providers/registration.py`.
+**When to register:** `ProviderPlugin.register_provider()` handles this automatically when `register_plugin()` is invoked at startup. Your `strategy_factory()` and `config_factory()` accessors supply the factory callables.
 
-**How to register:**
+**How to implement the factories:**
 
 ```python
 # src/orb/providers/azure/registration.py
 
-def register_azure_provider(registry=None) -> None:
-    from orb.providers.registry import get_provider_registry
+def create_azure_strategy(provider_config):
     from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
+    return AzureProviderStrategy(config=provider_config)
 
-    if registry is None:
-        registry = get_provider_registry()
 
-    registry.register_provider(
-        provider_type="azure",
-        strategy_factory=create_azure_strategy,
-        config_factory=create_azure_config,
-        resolver_factory=create_azure_resolver,   # return None if not needed
-        validator_factory=create_azure_validator, # return None if not needed
-        strategy_class=AzureProviderStrategy,
-        default_api=_load_azure_default_api(),    # reads from azure_defaults.json
-    )
+def create_azure_config(raw: dict):
+    from orb.providers.azure.configuration.config import AzureProviderConfig
+    return AzureProviderConfig(**raw)
 ```
 
-**AWS reference:** `register_aws_provider` in `src/orb/providers/aws/registration.py`.
+**AWS reference:** `create_aws_strategy` and `create_aws_config` in `src/orb/providers/aws/registration.py`.
 
 ---
 
 ### CLISpecRegistry + ProviderCLISpecPort
 
-**Location:** `src/orb/domain/base/ports/provider_cli_spec_port.py`
+**Location:** `src/orb/infrastructure/registry/cli_spec_registry.py`
 
 **What it does:** Supplies provider-specific CLI argument definitions, input validation logic, field extraction from parsed arguments, and display formatting. The shared `cli/args.py` and `interface/init_command_handler.py` iterate over `CLISpecRegistry.all()` rather than hard-coding provider flags.
 
-**When to register:** In `register_all_provider_cli_specs()` in `providers/registration.py`. This function is called before application context exists, so keep it lightweight — no network calls, no DI container access.
+**When to register:** `ProviderPlugin.initialize_provider()` registers the instance returned by your `cli_spec()` accessor. This happens during the DI bootstrap phase, before any request is handled.
 
-**How to register:**
-
-```python
-from orb.domain.base.ports.provider_cli_spec_port import CLISpecRegistry
-from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
-
-CLISpecRegistry.register("azure", AzureCLISpec())
-```
-
-Implement `ProviderCLISpecPort` on your spec class:
+**How to implement:**
 
 ```python
 class AzureCLISpec:
@@ -203,27 +251,18 @@ class AzureCLISpec:
 
 ### TemplateExtensionRegistry
 
-**Location:** `src/orb/domain/template/extensions.py`
+**Location:** `src/orb/infrastructure/registry/template_extension_registry.py`
 
-**What it does:** Holds a typed Pydantic model class for each provider's template configuration. When `TemplateDTO.from_domain` serialises a template, it calls `TemplateExtensionRegistry.get_extension_class(provider_type)` to obtain and populate the `provider_config` field. This replaces ad-hoc `metadata` dict keys and `getattr(template, "validate_<provider>")` dynamic dispatch.
+**What it does:** Holds a typed Pydantic model class for each provider's template configuration. When `TemplateDTO.from_domain` serialises a template, it calls `TemplateExtensionRegistry.get_extension_class(provider_type)` to obtain and populate the `provider_config` field. This replaces ad-hoc `metadata` dict keys and dynamic dispatch.
 
-**When to register:** In `register_<name>_extensions()`, called from `initialize_<name>_provider()` during startup.
+**When to register:** `ProviderPlugin.initialize_provider()` registers the class returned by your `template_dto_config()` accessor.
 
-**How to register:**
-
-```python
-from orb.domain.template.extensions import TemplateExtensionRegistry
-from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
-
-TemplateExtensionRegistry.register_extension("azure", AzureTemplateExtensionConfig)
-```
-
-`AzureTemplateExtensionConfig` should be a Pydantic `BaseModel` with `get_provider_type()` returning `"azure"` and a `to_template_defaults()` method returning a `dict` of default values:
+**How to implement:**
 
 ```python
 from pydantic import BaseModel, Field
 
-class AzureTemplateExtensionConfig(BaseModel):
+class AzureTemplateDTOConfig(BaseModel):
     vm_size: str = Field("Standard_D2s_v3", description="Azure VM size")
     location: str = Field("eastus", description="Azure region")
     resource_group: str = Field("", description="Azure resource group")
@@ -235,7 +274,7 @@ class AzureTemplateExtensionConfig(BaseModel):
         return self.model_dump()
 ```
 
-**AWS reference:** `src/orb/providers/aws/configuration/template_extension.py` and the `register_aws_extensions` function in `src/orb/providers/aws/registration.py`.
+**AWS reference:** `src/orb/providers/aws/domain/template/aws_template_dto_config.py` and `src/orb/providers/aws/provider_plugin.py` (the `template_dto_config` accessor).
 
 ---
 
@@ -245,25 +284,25 @@ class AzureTemplateExtensionConfig(BaseModel):
 
 **What it does:** Maps auth strategy names (strings like `"iam"`, `"cognito"`) to auth strategy classes. The REST server calls `AuthRegistry.get_strategy(name, **config)` rather than dispatching through `if/elif` chains. Register all auth strategies your provider supports.
 
-**When to register:** In `register_<name>_auth_strategies()`, called from `initialize_<name>_provider()` during startup.
+**When to register:** Override `register_auth_strategies(self, logger)` in your `ProviderPlugin` subclass. `initialize_provider()` calls this hook after standard satellite registrations.
 
-**How to register:**
+**How to implement:**
 
 ```python
-from orb.infrastructure.auth.registry import get_auth_registry
+def register_auth_strategies(self, logger=None) -> None:
+    from orb.infrastructure.auth.registry import get_auth_registry
+    registry = get_auth_registry()
 
-registry = get_auth_registry()
+    if not registry.is_registered("azure_ad"):
+        from orb.providers.azure.auth.azure_ad_strategy import AzureADAuthStrategy
+        registry.register_strategy("azure_ad", AzureADAuthStrategy)
 
-if not registry.is_registered("azure_ad"):
-    from orb.providers.azure.auth.azure_ad_strategy import AzureADAuthStrategy
-    registry.register_strategy("azure_ad", AzureADAuthStrategy)
-
-if not registry.is_registered("managed_identity"):
-    from orb.providers.azure.auth.managed_identity_strategy import ManagedIdentityAuthStrategy
-    registry.register_strategy("managed_identity", ManagedIdentityAuthStrategy)
+    if not registry.is_registered("managed_identity"):
+        from orb.providers.azure.auth.managed_identity_strategy import ManagedIdentityAuthStrategy
+        registry.register_strategy("managed_identity", ManagedIdentityAuthStrategy)
 ```
 
-**AWS reference:** `register_aws_auth_strategies` in `src/orb/providers/aws/registration.py`.
+**AWS reference:** `register_auth_strategies` in `src/orb/providers/aws/provider_plugin.py`.
 
 ---
 
@@ -273,20 +312,20 @@ if not registry.is_registered("managed_identity"):
 
 **What it does:** Holds a per-provider `FieldMappingPort` adapter. The HostFactory scheduler calls `FieldMappingRegistry.get(provider_type)` to translate IBM Spectrum Symphony camelCase field names to the provider's snake_case equivalents, apply provider-specific defaults, and resolve CPU/RAM values from a provider-specific instance type catalogue.
 
-**When to register:** In `initialize_<name>_provider()`, after other registrations.
+**When to register:** `ProviderPlugin.initialize_provider()` registers the instance returned by your `field_mapping()` accessor.
 
-**How to register:**
+**How to implement:**
+
+Implement `FieldMappingPort` on your mapping class. The two critical methods are `map_fields(raw: dict) -> dict` (camelCase-to-snake_case translation + provider defaults) and `resolve_cpu_ram(vm_size: str) -> tuple[int, int]` (returns `(cpu_count, ram_mb)` from your provider's instance catalogue).
 
 ```python
-from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import FieldMappingRegistry
-from orb.providers.azure.scheduler.hostfactory_field_mapping import AzureFieldMapping
-
-FieldMappingRegistry.register("azure", AzureFieldMapping())
+# src/orb/providers/azure/scheduler/hostfactory_field_mapping.py
+class AzureFieldMapping:
+    def map_fields(self, raw: dict) -> dict: ...
+    def resolve_cpu_ram(self, vm_size: str) -> tuple[int, int]: ...
 ```
 
-Implement `FieldMappingPort` in your mapping class. The two critical methods are `map_fields(raw: dict) -> dict` (camelCase-to-snake_case translation + provider defaults) and `resolve_cpu_ram(vm_size: str) -> tuple[int, int]` (returns `(cpu_count, ram_mb)` from your provider's instance catalogue).
-
-**AWS reference:** `src/orb/providers/aws/scheduler/hostfactory_field_mapping.py` and `register_aws_provider` in `src/orb/providers/aws/registration.py` (the `FieldMappingRegistry.register` call near the end of `initialize_aws_provider`).
+**AWS reference:** `src/orb/providers/aws/scheduler/hostfactory_field_mapping.py`.
 
 ---
 
@@ -296,20 +335,23 @@ Implement `FieldMappingPort` in your mapping class. The two critical methods are
 
 **What it does:** Holds a per-provider `ProviderDefaultsLoaderPort` that loads a provider's defaults JSON file. The template defaults service calls this registry to populate provider-specific default values rather than hard-coding file paths for each provider.
 
-**When to register:** In `initialize_<name>_provider()`.
+**When to register:** `ProviderPlugin.initialize_provider()` registers the instance returned by your `defaults_loader()` accessor.
 
-**How to register:**
+**How to implement:**
 
 ```python
-from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
-from orb.providers.azure.defaults_loader import AzureDefaultsLoader
+# src/orb/providers/azure/defaults_loader.py
+from orb.domain.base.ports.provider_defaults_loader_port import ProviderDefaultsLoaderPort
 
-DefaultsLoaderRegistry.register("azure", AzureDefaultsLoader())
+class AzureDefaultsLoader(ProviderDefaultsLoaderPort):
+    def load_defaults(self) -> dict:
+        import json
+        import importlib.resources as pkg
+        with pkg.open_text("orb.providers.azure.config", "azure_defaults.json") as f:
+            return json.load(f)
 ```
 
-`AzureDefaultsLoader` implements `ProviderDefaultsLoaderPort` and typically reads from a JSON file bundled alongside your provider package (e.g. `src/orb/providers/azure/config/azure_defaults.json`).
-
-**AWS reference:** `src/orb/providers/aws/defaults_loader.py` and the `DefaultsLoaderRegistry.register` call in `initialize_aws_provider`.
+**AWS reference:** `src/orb/providers/aws/defaults_loader.py`.
 
 ---
 
@@ -319,51 +361,53 @@ DefaultsLoaderRegistry.register("azure", AzureDefaultsLoader())
 
 **What it does:** Resolves provider-specific template fields that require a live API call (for example, looking up an AMI by name on AWS, or resolving an image reference on Azure). Registered in the DI container as a singleton, not in a class-level registry.
 
-**When to register:** In `register_<name>_services_with_di(container)`, called from the `find_spec`-guarded block in `bootstrap/provider_services.py`.
+**When to register:** Override `register_additional_services(self, container, logger)` in your `ProviderPlugin` subclass. `register_services_with_di()` calls this hook when the DI container is available.
 
-**How to register:**
+**How to implement:**
 
 ```python
-from orb.domain.base.ports.template_adapter_port import TemplateAdapterPort
-
-def create_azure_template_adapter(c):
-    from orb.providers.azure.infrastructure.adapters.template_adapter import AzureTemplateAdapter
-    from orb.domain.base.ports import LoggingPort, ConfigurationPort
-    return AzureTemplateAdapter(
-        logger=c.get(LoggingPort),
-        config=c.get(ConfigurationPort),
+def register_additional_services(self, container, logger=None) -> None:
+    from orb.domain.base.ports.template_adapter_port import TemplateAdapterPort
+    from orb.providers.azure.infrastructure.adapters.template_adapter import (
+        AzureTemplateAdapter,
     )
 
-container.register_singleton(TemplateAdapterPort, create_azure_template_adapter)
+    def create_azure_template_adapter(c):
+        from orb.domain.base.ports import LoggingPort, ConfigurationPort
+        return AzureTemplateAdapter(
+            logger=c.get(LoggingPort),
+            config=c.get(ConfigurationPort),
+        )
+
+    container.register_singleton(TemplateAdapterPort, create_azure_template_adapter)
 ```
 
-**AWS reference:** `register_aws_services_with_di` in `src/orb/providers/aws/registration.py`.
+**AWS reference:** `register_additional_services` in `src/orb/providers/aws/provider_plugin.py`.
 
 ---
 
-### TemplateExampleGeneratorPort
+### TemplateExampleGeneratorRegistry
 
-**Location:** `src/orb/domain/base/ports/template_example_generator_port.py`
+**Location:** `src/orb/infrastructure/registry/template_example_generator_registry.py`
 
-**What it does:** Generates example template JSON for the `orb template generate` command. ORB resolves this port from the DI container and calls it to produce provider-appropriate example output. No live API connection is required; the generator uses handler class metadata only.
+**What it does:** Generates example template JSON for the `orb template generate` command. ORB resolves this from the registry and calls it to produce provider-appropriate example output. No live API connection is required; the generator uses handler class metadata only.
 
-**When to register:** In `register_<name>_services_with_di(container)`, alongside the template adapter.
+**When to register:** `ProviderPlugin.register_services_with_di()` registers the instance returned by your `template_example_generator(container)` accessor.
 
-**How to register:**
+**How to implement:**
 
 ```python
-from orb.domain.base.ports.template_example_generator_port import TemplateExampleGeneratorPort
-
-def create_azure_example_generator(c):
-    from orb.providers.azure.adapters.template_example_generator_adapter import (
-        AzureTemplateExampleGeneratorAdapter,
-    )
-    return AzureTemplateExampleGeneratorAdapter()
-
-container.register_singleton(TemplateExampleGeneratorPort, create_azure_example_generator)
+def template_example_generator(self, container: Any) -> Any:
+    try:
+        from orb.providers.azure.adapters.template_example_generator_adapter import (
+            AzureTemplateExampleGeneratorAdapter,
+        )
+        return AzureTemplateExampleGeneratorAdapter()
+    except ImportError:
+        return None
 ```
 
-**AWS reference:** The `TemplateExampleGeneratorPort` block inside `register_aws_services_with_di`.
+**AWS reference:** `template_example_generator` in `src/orb/providers/aws/provider_plugin.py`.
 
 ---
 
@@ -486,8 +530,8 @@ The domain template aggregate is provider-agnostic. Adding an `azure_resource_gr
 # Wrong — in src/orb/domain/template/template_aggregate.py
 azure_resource_group: str | None = None
 
-# Right — in AzureTemplateExtensionConfig (a Pydantic model inside the Azure package)
-class AzureTemplateExtensionConfig(BaseModel):
+# Right — in AzureTemplateDTOConfig (a Pydantic model inside the Azure package)
+class AzureTemplateDTOConfig(BaseModel):
     resource_group: str = ""
 ```
 
@@ -499,7 +543,7 @@ class AzureTemplateExtensionConfig(BaseModel):
 # Wrong — in src/orb/application/dto/template_dto.py
 azure_vm_size: str | None = None
 
-# Right — TemplateDTO.provider_config carries AzureTemplateExtensionConfig
+# Right — TemplateDTO.provider_config carries AzureTemplateDTOConfig
 # automatically when the extension is registered
 ```
 
@@ -567,6 +611,16 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(skip)
 ```
 
+Add a smoke test to verify entry-point wiring:
+
+```python
+import importlib.metadata as md
+
+def test_entry_point_is_discoverable() -> None:
+    eps = md.entry_points(group="orb.providers")
+    assert any(ep.name == "azure" for ep in eps)
+```
+
 The AWS provider tests are the reference layout:
 
 - Unit tests: `tests/providers/aws/unit/`
@@ -581,4 +635,7 @@ The AWS provider tests are the reference layout:
 - [Clean Architecture](../architecture/clean_architecture.md) — layer boundaries enforced by architecture tests
 - [Strategy Pattern](../patterns/strategy_pattern.md) — how `ProviderStrategy` and `ProviderRegistry` work together
 - [Ports and Adapters](../patterns/ports_and_adapters.md) — the port/registry decoupling pattern used throughout
-- AWS reference implementation: `src/orb/providers/aws/registration.py`
+- AWS reference: `src/orb/providers/aws/provider_plugin.py` and `src/orb/providers/aws/registration.py`
+- K8s reference: `src/orb/providers/k8s/provider_plugin.py` and `src/orb/providers/k8s/registration.py`
+- Base class: `src/orb/providers/base/provider_plugin.py`
+- Startup completeness check: `src/orb/bootstrap/provider_completeness.py`

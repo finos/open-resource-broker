@@ -525,6 +525,10 @@ def initialize_k8s_provider(
     the CLI spec, the HostFactory field-mapping adapter, and the defaults
     loader.
 
+    Performs each satellite registration step directly so that this module
+    does not need to import :mod:`orb.providers.k8s.provider_plugin`, keeping
+    the dependency graph one-directional (provider_plugin → registration).
+
     Args:
         template_factory: Optional template factory to register k8s components with.
         logger: Optional logger for initialization messages.
@@ -533,51 +537,77 @@ def initialize_k8s_provider(
             ServiceAccount JWTs.  Mirrors the AWS provider pattern; default
             ``False`` because it requires a ``system:auth-delegator`` RBAC grant.
     """
+    from orb.providers.base.provider_plugin import _initialized_providers
+
+    if "k8s" in _initialized_providers:
+        return
     try:
+        # 1. Provider settings
         register_k8s_provider_settings()
+
+        # 2. Template DTO extension
         register_k8s_extensions(logger)
+
+        # 3. Auth strategies
         register_k8s_auth_strategies(logger, inbound_auth_enabled=inbound_auth_enabled)
 
+        # 4. Template class
         if template_factory is not None:
             register_k8s_template_factory(template_factory, logger)
 
-        # Retry classifier — routes k8s non-retryable 4xx codes through the
-        # provider-agnostic registry so the resilience layer needs no direct
-        # kubernetes SDK import.
-        from orb.infrastructure.resilience.retry_classifier_registry import (
-            register_retry_classifier,
-        )
-        from orb.providers.k8s.resilience.retry_classifier import K8sRetryClassifier
+        # 5. CLI spec
+        try:
+            from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
+            from orb.providers.k8s.cli.k8s_cli_spec import K8sCLISpec
 
-        register_retry_classifier(K8sRetryClassifier())
+            CLISpecRegistry.register("k8s", K8sCLISpec())
+        except ImportError:
+            # CLI spec module not installed; skip registration silently.
+            pass
 
-        # CLI spec
-        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
-        from orb.providers.k8s.cli.k8s_cli_spec import K8sCLISpec
+        # 6. HostFactory field mapping
+        try:
+            from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+                FieldMappingRegistry,
+            )
+            from orb.providers.k8s.scheduler.hostfactory_field_mapping import K8sFieldMapping
 
-        CLISpecRegistry.register("k8s", K8sCLISpec())
+            FieldMappingRegistry.register("k8s", K8sFieldMapping())
+        except ImportError:
+            # Field-mapping module not installed; skip registration silently.
+            pass
 
-        # HostFactory field mapping
-        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
-            FieldMappingRegistry,
-        )
-        from orb.providers.k8s.scheduler.hostfactory_field_mapping import (
-            K8sFieldMapping,
-        )
+        # 7. Defaults loader
+        try:
+            from orb.providers.k8s.defaults_loader import KubernetesDefaultsLoader
+            from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
 
-        FieldMappingRegistry.register("k8s", K8sFieldMapping())
+            DefaultsLoaderRegistry.register("k8s", KubernetesDefaultsLoader())
+        except ImportError:
+            # Defaults-loader module not installed; skip registration silently.
+            pass
 
-        # Defaults loader
-        from orb.providers.k8s.defaults_loader import KubernetesDefaultsLoader
-        from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
+        # 8. Retry classifier
+        try:
+            from orb.infrastructure.resilience.retry_classifier_registry import (
+                register_retry_classifier,
+            )
+            from orb.providers.k8s.resilience.retry_classifier import K8sRetryClassifier
 
-        DefaultsLoaderRegistry.register("k8s", KubernetesDefaultsLoader())
+            register_retry_classifier(K8sRetryClassifier())
+        except ImportError:
+            # kubernetes extra not installed; skip retry-classifier registration silently.
+            pass
+
+        _initialized_providers.add("k8s")
 
         if logger:
             logger.info("Kubernetes provider initialization completed successfully")
 
     except Exception as exc:
-        error_msg = f"Kubernetes provider initialization failed: {exc}"
+        # Deliberately NOT adding to _initialized_providers so a retry after
+        # fixing the root cause will re-attempt fully.
+        error_msg = f"k8s provider initialization failed: {exc}"
         if logger:
             logger.error(error_msg, exc_info=True)
         raise
@@ -683,3 +713,32 @@ def is_k8s_provider_registered() -> bool:
 # ``initialize_k8s_provider``.  No module-level auto-registration is
 # performed here; both calls live inside that function and are invoked at
 # application startup through the normal provider initialisation path.
+
+
+# ---------------------------------------------------------------------------
+# Entry-point plugin hook — invoked by ``orb.providers`` entry-point group.
+# ---------------------------------------------------------------------------
+
+_REGISTERED_PROVIDERS: list[str] = []
+"""Module-level sentinel used by ``register_k8s_plugin`` to prevent double-registration.
+
+Populated (value ``"k8s"`` appended) on the first successful call so that
+re-importing this module or calling the hook a second time is a safe no-op.
+"""
+
+
+def register_k8s_plugin() -> None:
+    """Entry-point hook for the ``orb.providers`` entry-point group.
+
+    Zero-argument, idempotent.  Backwards-compatible wrapper that calls
+    :func:`register_k8s_provider` directly, keeping the dependency graph
+    one-directional (provider_plugin → registration) with no reverse import.
+
+    Preserved for backwards-compatibility with any external caller that imports
+    this function directly.  New code should prefer
+    ``K8sPlugin.register_plugin()``.
+    """
+    if "k8s" in _REGISTERED_PROVIDERS:
+        return
+    register_k8s_provider()
+    _REGISTERED_PROVIDERS.append("k8s")

@@ -456,38 +456,113 @@ class MockCloudClient:
 
 ### Adding New Cloud Providers
 
-#### Provider Structure Template
+Providers are discovered at startup via Python entry-points. Adding a new provider requires:
+
+1. A `src/orb/providers/<name>/` package with a `ProviderPlugin` subclass.
+2. One line in `[project.entry-points."orb.providers"]` in `pyproject.toml`.
+
+No shared ORB registration or bootstrap file needs editing.
+
+#### Minimal provider structure
+
 ```
 providers/
-└── new_provider/
-    ├── domain/          # Provider domain extensions
-    ├── application/     # Provider application services
-    ├── infrastructure/  # Provider infrastructure
-    ├── managers/        # Provider resource managers
-    ├── configuration/   # Provider configuration
-    ├── utilities/       # Provider utilities
-    └── resilience/      # Provider resilience patterns
+└── azure/
+    ├── __init__.py
+    ├── provider_plugin.py        # ProviderPlugin subclass — the single entry point
+    ├── registration.py           # strategy/config factory functions
+    ├── strategy/
+    │   └── azure_provider_strategy.py
+    ├── cli/
+    │   └── azure_cli_spec.py
+    ├── configuration/
+    │   └── config.py
+    ├── domain/
+    │   └── template/
+    │       └── azure_template_dto_config.py
+    ├── scheduler/
+    │   └── hostfactory_field_mapping.py
+    └── defaults_loader.py
 ```
 
-#### Provider Interface Implementation
+#### ProviderPlugin subclass (minimal skeleton)
+
 ```python
-class NewCloudProvider(ProviderInterface):
-    """New cloud provider implementation."""
+# src/orb/providers/azure/provider_plugin.py
+from orb.providers.base.provider_plugin import ProviderPlugin
 
-    @property
-    def provider_type(self) -> str:
-        return "new_cloud"
+class AzurePlugin(ProviderPlugin):
+    provider_name = "azure"
 
-    async def provision_resources(self, request: ProvisionRequest) -> List[str]:
-        """Provision cloud resources."""
-        # Provider-specific implementation
-        pass
+    def strategy_factory(self):
+        from orb.providers.azure.registration import create_azure_strategy
+        return create_azure_strategy
 
-    async def terminate_resources(self, resource_ids: List[str]) -> Dict[str, Any]:
-        """Terminate cloud resources."""
-        # Provider-specific implementation
-        pass
+    def config_factory(self):
+        from orb.providers.azure.registration import create_azure_config
+        return create_azure_config
+
+    def template_dto_config(self):
+        try:
+            from orb.providers.azure.domain.template.azure_template_dto_config import (
+                AzureTemplateDTOConfig,
+            )
+            return AzureTemplateDTOConfig
+        except ImportError:
+            return None
+
+    def cli_spec(self):
+        try:
+            from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
+            return AzureCLISpec()
+        except ImportError:
+            return None
+
+    def field_mapping(self):
+        try:
+            from orb.providers.azure.scheduler.hostfactory_field_mapping import (
+                AzureFieldMapping,
+            )
+            return AzureFieldMapping()
+        except ImportError:
+            return None
+
+    def defaults_loader(self):
+        try:
+            from orb.providers.azure.defaults_loader import AzureDefaultsLoader
+            return AzureDefaultsLoader()
+        except ImportError:
+            return None
+
+    def template_example_generator(self, container):
+        try:
+            from orb.providers.azure.adapters.template_example_generator_adapter import (
+                AzureTemplateExampleGeneratorAdapter,
+            )
+            return AzureTemplateExampleGeneratorAdapter()
+        except ImportError:
+            return None
 ```
+
+#### Entry-point declaration in `pyproject.toml`
+
+```toml
+[project.entry-points."orb.providers"]
+azure = "orb.providers.azure.provider_plugin:AzurePlugin.register_plugin"
+```
+
+That single line is the complete integration with ORB's bootstrap. At startup, `discover_provider_plugins()` invokes `AzurePlugin.register_plugin()`, which registers the strategy with `ProviderRegistry` and populates all satellite registries via `initialize_provider()`.
+
+#### Startup completeness check
+
+After all providers are registered, `assert_provider_registrations_complete()` (in `src/orb/bootstrap/provider_completeness.py`) verifies that every registered provider type has an entry in all required satellite registries: `CLISpecRegistry`, `FieldMappingRegistry`, `DefaultsLoaderRegistry`, `TemplateExtensionRegistry`, and `TemplateExampleGeneratorRegistry`. A missing satellite causes an immediate startup failure with a named error identifying the provider and the missing registry.
+
+For a full walkthrough including all extension points, the `OperationOutcome` contract, anti-patterns to avoid, and the test layout, see:
+
+- [Adding a Provider](../../docs/root/developer_guide/adding_a_provider.md)
+- Base class: `src/orb/providers/base/provider_plugin.py`
+- AWS reference: `src/orb/providers/aws/provider_plugin.py`
+- K8s reference: `src/orb/providers/k8s/provider_plugin.py`
 
 ## Best Practices
 
@@ -520,7 +595,7 @@ class NewCloudProvider(ProviderInterface):
 
 ## Developer Guide
 
-For a step-by-step walkthrough of adding a new provider — including the mandatory glue points, all extension point registries, the `OperationOutcome` contract, anti-patterns to avoid, and the recommended test layout — see:
+For a step-by-step walkthrough of adding a new provider — including the `ProviderPlugin` subclass, the entry-point declaration, all satellite registries, the `OperationOutcome` contract, anti-patterns to avoid, and the recommended test layout — see:
 
 - [Adding a Provider](../../docs/root/developer_guide/adding_a_provider.md)
 

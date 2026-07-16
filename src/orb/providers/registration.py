@@ -1,17 +1,20 @@
 """Provider registration functions.
 
-To add a new provider:
-  1. Add its name to ``_REGISTERED_PROVIDERS`` below (one line).
-  2. Create ``src/orb/providers/<name>/registration.py`` that exposes:
-     - ``register_<name>_provider(registry)``   – registers strategy + factories
-     - ``initialize_<name>_provider(container)`` – wires DI services (optional)
+To add a new provider, declare an entry-point in your package's
+``pyproject.toml`` (or ``setup.cfg``)::
 
-That is the only edit outside the new provider package.
+    [project.entry-points."orb.providers"]
+    myprovider = "myprovider.registration:register_myprovider_plugin"
+
+No edits to any shared ORB file are needed.  The entry-point callable must
+be zero-argument and idempotent; it is invoked by
+:func:`discover_provider_plugins` at startup.
 
 Third-party plugins are discovered via the ``orb.providers`` entry-point
 group (see ``docs/root/providers/k8s/plugin-authoring.md``) and
-are loaded by :func:`discover_provider_plugins` immediately after the
-built-in providers have registered.
+are loaded by :func:`discover_provider_plugins`.  The built-in aws and k8s
+providers are also wired via entry-points so all provider bootstrapping
+follows the same path.
 """
 
 from __future__ import annotations
@@ -26,9 +29,19 @@ if TYPE_CHECKING:
     from orb.infrastructure.di.container import DIContainer
 
 # ---------------------------------------------------------------------------
-# Central provider list – the single line to edit when adding a new provider.
+# Live provider list — populated by entry-point discovery at startup.
 # ---------------------------------------------------------------------------
-_REGISTERED_PROVIDERS: list[str] = ["aws", "k8s"]
+_REGISTERED_PROVIDERS: list[str] = []
+"""Providers discovered via the ``orb.providers`` entry-point group.
+
+Do NOT edit this list to add new providers.  Declare an entry-point in your
+provider package's ``pyproject.toml`` pointing to a zero-argument
+``register_<name>_plugin()`` callable instead.  The list is populated at
+startup by :func:`discover_provider_plugins` and is then used by the
+bootstrap loops in :func:`register_all_providers`,
+:func:`register_all_provider_cli_specs`, and
+:func:`register_all_defaults_loaders`.
+"""
 
 # Entry-point group used by third-party plugins to register provider
 # extensions.  See ``discover_provider_plugins`` and
@@ -124,13 +137,25 @@ def register_all_providers(container: DIContainer | None = None) -> None:
             wiring is performed in the same call; when omitted only the
             registry-level registration is performed.
     """
+    # Discover and load provider plugins FIRST so that entry-point-declared
+    # providers are appended to ``_REGISTERED_PROVIDERS`` before the loop
+    # below iterates over them.
+    discover_provider_plugins()
+
     from orb.providers.registry import get_provider_registry
 
     registry = get_provider_registry()
 
     for name in _REGISTERED_PROVIDERS:
         module_path = f"orb.providers.{name}.registration"
-        if importlib.util.find_spec(module_path) is None:
+        try:
+            spec = importlib.util.find_spec(module_path)
+        except (ImportError, ValueError):
+            # find_spec can raise ModuleNotFoundError (subclass of ImportError)
+            # when a parent package exists as a namespace but the child does not.
+            # This can happen with test-injected provider names.
+            continue
+        if spec is None:
             continue
         try:
             mod = importlib.import_module(module_path)
@@ -163,13 +188,6 @@ def register_all_providers(container: DIContainer | None = None) -> None:
 
                 init_fn(template_factory=template_factory, logger=logger_port)
 
-    # Third-party provider plugins are discovered after the built-in
-    # providers register so plugins can rely on the built-in registries
-    # (provider registry, template extension registry, etc.) being
-    # populated.  Failures are logged and tolerated — see
-    # :func:`discover_provider_plugins`.
-    discover_provider_plugins()
-
 
 # ---------------------------------------------------------------------------
 # Deprecated aliases – kept for backward compatibility with existing callers.
@@ -196,6 +214,10 @@ def register_all_provider_cli_specs() -> None:
     as part of ``initialize_<name>_provider``.  This alias is retained so that
     ``cli/args.py`` and other early-bootstrap callers continue to work.
     """
+    # Ensure entry-point providers are registered before iterating the list;
+    # this function may be called before full bootstrap (e.g. from cli/args.py).
+    discover_provider_plugins()
+
     from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
     from orb.providers.base.provider_cli_spec_port import ProviderCLISpecPort
 
@@ -243,6 +265,10 @@ def register_all_defaults_loaders() -> None:
     retained so that ``config/loader.py`` and other early-bootstrap callers
     continue to work.
     """
+    # Ensure entry-point providers are registered before iterating the list;
+    # this function may be called before full bootstrap (e.g. from config/loader.py).
+    discover_provider_plugins()
+
     # Provider-agnostic discovery: each provider's ``defaults_loader`` module
     # is expected to export exactly one class whose runtime instance satisfies
     # ``ProviderDefaultsLoaderPort``.  We import the module from the well-known

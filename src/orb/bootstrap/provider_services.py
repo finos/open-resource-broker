@@ -73,11 +73,18 @@ def _register_provider_utility_services(container: DIContainer) -> None:
     import importlib
     import importlib.util
 
-    from orb.providers.registration import _REGISTERED_PROVIDERS
+    from orb.providers.registry import get_provider_registry
 
     logger = get_logger(__name__)
 
-    for name in _REGISTERED_PROVIDERS:
+    registered_types = get_provider_registry().get_registered_types()
+    if not registered_types:
+        logger.warning(
+            "No providers registered when wiring utility services; "
+            "ensure entry-points are installed (run 'uv sync' or 'pip install -e .')."
+        )
+
+    for name in registered_types:
         mod_path = f"orb.providers.{name}.registration"
         try:
             spec = importlib.util.find_spec(mod_path)
