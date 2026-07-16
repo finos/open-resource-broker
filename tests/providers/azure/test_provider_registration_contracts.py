@@ -81,11 +81,14 @@ def test_register_all_provider_types_includes_azure():
     assert registry.is_provider_registered("azure") is True
 
 
-def test_register_all_provider_types_registers_azure_auth_strategy():
-    """Azure auth strategy must be reachable through AuthRegistry lookup."""
-    from orb.config.schemas.server_schema import AuthConfig
+def test_register_all_provider_types_does_not_register_azure_request_auth():
+    """Provider credentials must not become a caller-authentication strategy.
+
+    Azure's DefaultAzureCredential proves ORB's identity to ARM. It provides no
+    evidence about the HTTP caller invoking ORB, so provider bootstrap must not
+    make it selectable by the inbound authentication middleware.
+    """
     from orb.infrastructure.auth.registry import get_auth_registry
-    from orb.providers.azure.auth.azure_auth_strategy import AzureAuthStrategy
     from orb.providers.registration import register_all_provider_types
 
     registry = get_auth_registry()
@@ -94,10 +97,7 @@ def test_register_all_provider_types_registers_azure_auth_strategy():
 
     register_all_provider_types()
 
-    assert registry.is_registered("azure") is True
-    strategy = registry.get_strategy("azure", AuthConfig(enabled=True, strategy="azure"))
-    assert isinstance(strategy, AzureAuthStrategy)
-    assert strategy.is_enabled() is True
+    assert registry.is_registered("azure") is False
 
 
 def test_provider_config_builder_accepts_azure_provider_instance_config():

@@ -240,7 +240,6 @@ def register_azure_provider(
                 validator_factory=create_azure_validator,
             )
 
-        register_azure_auth_strategies(logger)
         if logger:
             logger.info("Azure provider registered successfully")
     except Exception as exc:
@@ -485,26 +484,6 @@ def register_azure_hostfactory_field_mapping() -> None:
         raise RuntimeError(f"Failed to register Azure HostFactory field mapping: {exc!s}")
 
 
-def register_azure_auth_strategies(logger: Optional["LoggingPort"] = None) -> None:
-    """Register Azure authentication strategies with the auth registry."""
-    try:
-        from orb.infrastructure.auth.registry import get_auth_registry
-        from orb.providers.azure.auth.azure_auth_strategy import AzureAuthStrategy
-
-        registry = get_auth_registry()
-        if not registry.is_registered("azure"):
-            registry.register_strategy("azure", AzureAuthStrategy)
-            if logger:
-                logger.debug("Azure auth strategy registered")
-    except ImportError as exc:
-        if logger:
-            logger.warning("Azure auth strategy not available: %s", exc)
-    except Exception as exc:
-        if logger:
-            logger.error("Failed to register Azure auth strategy: %s", exc, exc_info=True)
-        raise
-
-
 def register_azure_template_factory(
     factory: TemplateFactory, logger: Optional["LoggingPort"] = None
 ) -> None:
@@ -540,7 +519,11 @@ def initialize_azure_provider(
         register_azure_provider_settings()
         register_azure_cli_spec()
         register_azure_hostfactory_field_mapping()
-        register_azure_auth_strategies(logger)
+        # Azure SDK credentials authenticate ORB to Azure Resource Manager; they
+        # do not authenticate callers to ORB. AuthRegistry is consumed by the
+        # inbound API middleware, and Azure has no caller-token validation
+        # contract or auth configuration. Keep DefaultAzureCredential acquisition
+        # in Azure infrastructure rather than exposing it as request auth.
         if template_factory:
             register_azure_template_factory(template_factory, logger)
         if logger:
@@ -608,7 +591,6 @@ try:
     register_azure_provider_settings()
     register_azure_cli_spec()
     register_azure_hostfactory_field_mapping()
-    register_azure_auth_strategies()
 except Exception:
     import logging as _logging
 
