@@ -22,3 +22,49 @@ htmlcov/**
 # security scanner). No fixed version available upstream as of 2026-06-17. Not
 # present in runtime install. Re-evaluate when nltk publishes a patched release.
 CVE-2026-54293
+
+# ── Debian 13 (trixie) OS-package CVEs with no upstream fix as of 2026-07-16 ─────
+#
+# All findings below are in the python:3.X-slim base image (Debian 13.6 for 3.14,
+# Debian 13.4 for older variants). The Dockerfile already runs `apt-get upgrade -y`
+# so every available Debian patch is applied at build time. The CVEs below are
+# suppressed because Debian has not yet published a fixed package version (status:
+# "affected" or "fix_deferred", Fixed Version column is empty in Trivy output).
+# Re-evaluate each on every release — remove this entry as soon as a fixed
+# Debian package is available.
+#
+# util-linux / bsdutils / libblkid1 / libuuid1 / libmount1 / libsmartcols1 /
+# liblastlog2-2 / login / mount — CVE-2026-53615 (HIGH)
+# Integer overflow in libblkid/src/partitions/dos.c. No fixed package in Debian 13.
+CVE-2026-53615
+#
+# ncurses (libncursesw6 / libtinfo6 / ncurses-base / ncurses-bin) — CVE-2025-69720 (HIGH)
+# Buffer overflow in ncurses that may lead to arbitrary code execution.
+# No fixed package in Debian 13 as of 2026-07-16.
+CVE-2025-69720
+#
+# gzip — CVE-2026-41992 (HIGH)
+# Global buffer overflow in LZH decompression. No fixed package in Debian 13.
+CVE-2026-41992
+#
+# libacl1 — CVE-2026-54369 (HIGH)
+# Symlink traversal privilege escalation via libacl functions.
+# No fixed package in Debian 13.
+CVE-2026-54369
+#
+# perl-base — CVE-2026-13221, CVE-2026-8376 (CRITICAL), CVE-2026-57432 (HIGH),
+#             CVE-2026-48962 (HIGH)
+# Multiple perl vulnerabilities (incorrect regex, heap buffer overflow on 32-bit,
+# integer overflow, arbitrary code execution via output glob).
+# No fixed package in Debian 13; status: "affected".
+CVE-2026-13221
+CVE-2026-8376
+CVE-2026-57432
+CVE-2026-48962
+#
+# perl-base — CVE-2026-42496, CVE-2026-42497, CVE-2026-9538 (HIGH/CRITICAL)
+# perl-Archive-Tar / perl-IO-Compress path traversal, arbitrary file modification,
+# DoS via crafted tar headers. No fixed package in Debian 13; status: "fix_deferred".
+CVE-2026-42496
+CVE-2026-42497
+CVE-2026-9538

@@ -90,6 +90,10 @@ jobs:
     # prod-pypi, and github-assets.
     if: github.event_name == 'release'
     strategy:
+      # Each python-version variant scans, builds, and signs independently.
+      # fail-fast: false ensures that one variant's CVE gate failure does not
+      # cancel the other variants — each arch is self-contained.
+      fail-fast: false
       matrix:
         python-version: ${{ fromJSON(needs.config.outputs.python-versions) }}
 
@@ -491,7 +495,12 @@ jobs:
 
   github-assets:
     name: Upload GitHub Release Assets
-    needs: [config, build-wheel, prod-containers, prod-pypi]
+    # prod-containers intentionally removed from needs: wheel signing + GH release
+    # asset upload must run on every release independent of container health.
+    # A container base-image CVE (Trivy gate) must not prevent the Python
+    # wheel/sdist from being signed and published.  prod-manifests (which
+    # legitimately needs the pushed images) retains its prod-containers dep.
+    needs: [config, build-wheel, prod-pypi]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Only upload assets and create gh release upload on a real GitHub Release.
