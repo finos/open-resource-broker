@@ -2,450 +2,450 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architectural_assessment/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/configuration-guide/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/import_guidelines/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/native-spec-guide/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/provider_strategy_guide/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/storage_registry_pattern/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/unified_format_system/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/versioning_guide/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/api/multi-provider-api/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/api/native-spec-reference/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/api/readme/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/clean_architecture/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/cqrs_pattern/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/dependency_injection/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/field_mapping_architecture/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/lazy-loading-design/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/machine-discovery-flow/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/metadata-vs-provider-data/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/metrics_report/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/multi-provider-design/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/system_diagrams/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/system_overview/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/template-infrastructure/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/cli/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/cli/cli-reference/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/cli/filtering/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/cli/infrastructure-commands/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/cli/multi-provider-templates/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/cli/provider-override/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/cli/scheduler-commands/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/cli/template-commands/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/configuration/environment-variables/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/configuration/examples/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/configuration/multi-provider/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/configuration/native-spec-config/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/configuration/provider-naming-guide/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/deployment/cloud_platforms/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/deployment/dev_deployment_documentation/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/deployment/docker/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/deployment/embedded-ui/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/deployment/iam-permissions/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/deployment/monitoring/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/deployment/pypi-setup/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/deployment/readme/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/deployment/security/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/deployment/traditional/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/adding_a_provider/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/architecture/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/basesettings-providers/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/changelog_management/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/cqrs/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/data_models/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/dependency_injection/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/deprecation/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/development/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/events/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/performance-optimization/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/providers/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/releases/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/resilience/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/testing/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/development/testing/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/engineering/dependency_inversion/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/engineering/dry_principle/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/engineering/separation_of_concerns/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/engineering/solid_principles/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/getting_started/quick_start/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/hostfactory/deployment_scenarios/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/hostfactory/feature_mapping/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/hostfactory/integration_guide/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/hostfactory/requirements_compliance/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/hostfactory/supported-apis/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/mcp/api-reference/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/mcp/integration-guide/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/mcp/tools-mode/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/operational/backup_recovery/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/operational/from-open-resource-broker/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/operational/migration/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/operational/monitoring/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/operational/performance/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/operational/tools/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/patterns/factory_pattern/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/patterns/ports_and_adapters/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/patterns/repository_pattern/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/patterns/strategy_pattern/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/auth/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/configuration/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/discovery/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/handlers/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/migrating-from-k8s-legacy/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/native-spec/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/plugin-authoring/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/security-hardening/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/sdk/api-reference/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/sdk/quickstart/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/security/security-scanning/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/testing/readme/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/testing/system-tests-onaws/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/abis/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/api_reference/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/configuration/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/deployment/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/infrastructure-commands/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/installation/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/monitoring/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/requests/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/storage_strategies/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/templates/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/user_guide/troubleshooting/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/workflows/end-to-end/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-16</lastmod>
     </url>
 </urlset>
