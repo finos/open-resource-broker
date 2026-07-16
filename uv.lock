@@ -436,15 +436,6 @@ wheels = [
 ]
 
 [[package]]
-name = "boltons"
-version = "21.0.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ad/1f/6c0608d86e0fc77c982a2923ece80eef85f091f2332fc13cbce41d70d502/boltons-21.0.0.tar.gz", hash = "sha256:65e70a79a731a7fe6e98592ecfb5ccf2115873d01dbc576079874629e5c90f13", size = 180201, upload-time = "2021-05-17T01:20:17.802Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/a7/1a31561d10a089fcb46fe286766dd4e053a12f6e23b4fd1c26478aff2475/boltons-21.0.0-py2.py3-none-any.whl", hash = "sha256:b9bb7b58b2b420bbe11a6025fdef6d3e5edc9f76a42fb467afe7ca212ef9948b", size = 193723, upload-time = "2021-05-17T01:20:20.023Z" },
-]
-
-[[package]]
 name = "boolean-py"
 version = "5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -479,15 +470,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/6a/a1/48a0f38b0cac8196764607c0bca7e3ca50d3cffc825087b743d3635413f2/botocore-1.43.41.tar.gz", hash = "sha256:27627d79af0df7dcb7ecf78d8d3d1310da09a5e9460be30bf759f1c2ed095ee8", size = 15647567, upload-time = "2026-07-06T19:39:27.119Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/61/4f/19e0b97ce1801c66a4d1d35117f36240aa20f864338f093fccc23873a231/botocore-1.43.41-py3-none-any.whl", hash = "sha256:0cc6e79b30a2a98374f16a31cd9c7a9106a51b60650bd8c34cc8223f58ae6b8d", size = 15331199, upload-time = "2026-07-06T19:39:23.694Z" },
-]
-
-[[package]]
-name = "bracex"
-version = "3.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d0/f5/4473ad9b48cd0420a2d762a3750fa0e078e23e060b1af72662e5987e5530/bracex-3.0.tar.gz", hash = "sha256:b73f718d6bd98d8419e45df02426c86e9967c179949f779340d6c3a8c83b9111", size = 43162, upload-time = "2026-06-30T00:43:35.279Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f5/2e/68781b78e764e5ccc4af1e3d27e060069c73af90234853fa80000e7ee79d/bracex-3.0-py3-none-any.whl", hash = "sha256:3833e61c2f092d5aa0468fa2e6c6e990a306185abf763b6d122f0158e59c58a5", size = 11738, upload-time = "2026-06-30T00:43:34.196Z" },
 ]
 
 [[package]]
@@ -1124,18 +1106,6 @@ wheels = [
 ]
 
 [[package]]
-name = "face"
-version = "26.0.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "boltons" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/53/fd/f84f0600bd72953d5a322f0dedbd4f900e2cedab718e6b6a093ae2d16aae/face-26.0.1.tar.gz", hash = "sha256:8183d94bc248baaea855a9f8445f97a22a9988908e60abddccc6e251da77c4c6", size = 51754, upload-time = "2026-06-17T23:14:39.938Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/24/0159c48d19c8b05e6969ee809bbbecc5a5c863f7e38c9327e2c63cb06f0f/face-26.0.1-py3-none-any.whl", hash = "sha256:ab0a83c37c9789dce658a67a9a80eafaa113c9ec37c5a9d950ff5480542a062d", size = 57572, upload-time = "2026-06-17T23:14:38.711Z" },
-]
-
-[[package]]
 name = "fastapi"
 version = "0.139.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1332,20 +1302,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/33/f6/354ae6491228b5eb40e10d89c4d13c651fe1cf7556e35ebdded50cff57ce/gitpython-3.1.50.tar.gz", hash = "sha256:80da2d12504d52e1f998772dc5baf6e553f8d2fcfe1fcc226c9d9a2ee3372dcc", size = 219798, upload-time = "2026-05-06T04:01:26.571Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/20/7a/1c6e3562dfd8950adbb11ffbc65d21e7c89d01a6e4f137fa981056de25c5/gitpython-3.1.50-py3-none-any.whl", hash = "sha256:d352abe2908d07355014abdd21ddf798c2a961469239afec4962e9da884858f9", size = 212507, upload-time = "2026-05-06T04:01:23.799Z" },
-]
-
-[[package]]
-name = "glom"
-version = "22.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "attrs" },
-    { name = "boltons" },
-    { name = "face" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3f/d1/69432deefa6f5283ec75b246d0540097ae26f618b915519ee3824c4c5dd6/glom-22.1.0.tar.gz", hash = "sha256:1510c6587a8f9c64a246641b70033cbc5ebde99f02ad245693678038e821aeb5", size = 189738, upload-time = "2022-01-24T09:34:04.874Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/27/e8/68e274b2a30e1fdfd25bdc27194382be3f233929c8f727c0440d58ac074f/glom-22.1.0-py2.py3-none-any.whl", hash = "sha256:5339da206bf3532e01a83a35aca202960ea885156986d190574b779598e9e772", size = 100687, upload-time = "2022-01-24T09:34:02.391Z" },
 ]
 
 [[package]]
@@ -3306,61 +3262,6 @@ aws = [
     { name = "boto3" },
     { name = "botocore" },
 ]
-ci = [
-    { name = "alembic" },
-    { name = "bandit" },
-    { name = "bandit-sarif-formatter" },
-    { name = "build" },
-    { name = "coverage" },
-    { name = "cyclonedx-bom" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "import-linter" },
-    { name = "jinja2" },
-    { name = "joserfc" },
-    { name = "kubernetes" },
-    { name = "kubernetes-stubs-elephant-fork" },
-    { name = "marshmallow" },
-    { name = "mike" },
-    { name = "mkdocs" },
-    { name = "mkdocs-gen-files" },
-    { name = "mkdocs-literate-nav" },
-    { name = "mkdocs-material" },
-    { name = "mkdocs-section-index" },
-    { name = "mkdocstrings" },
-    { name = "mkdocstrings-python" },
-    { name = "moto", extra = ["all"] },
-    { name = "nltk" },
-    { name = "pathspec" },
-    { name = "peewee" },
-    { name = "pg8000" },
-    { name = "pip-audit" },
-    { name = "prometheus-client" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-benchmark" },
-    { name = "pytest-cov" },
-    { name = "pytest-env", version = "1.1.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "pytest-env", version = "1.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "pytest-html" },
-    { name = "pytest-mock" },
-    { name = "pytest-timeout" },
-    { name = "pytest-xdist" },
-    { name = "requests-mock" },
-    { name = "responses" },
-    { name = "ruff" },
-    { name = "safety" },
-    { name = "semgrep" },
-    { name = "tenacity" },
-    { name = "tomli" },
-    { name = "types-python-dateutil" },
-    { name = "types-pyyaml" },
-    { name = "uvicorn" },
-    { name = "watchdog" },
-    { name = "werkzeug" },
-    { name = "wheel" },
-]
 cli = [
     { name = "rich" },
     { name = "rich-argparse" },
@@ -3383,9 +3284,11 @@ dev = [
     { name = "ipython" },
     { name = "jinja2" },
     { name = "joserfc" },
+    { name = "kmock" },
     { name = "kubernetes" },
     { name = "kubernetes-stubs-elephant-fork" },
     { name = "line-profiler" },
+    { name = "lxml" },
     { name = "marshmallow" },
     { name = "memory-profiler" },
     { name = "mike" },
@@ -3398,6 +3301,15 @@ dev = [
     { name = "mkdocstrings-python" },
     { name = "moto", extra = ["all"] },
     { name = "nltk" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-prometheus" },
+    { name = "opentelemetry-instrumentation-botocore" },
+    { name = "opentelemetry-instrumentation-click" },
+    { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-logging" },
+    { name = "opentelemetry-instrumentation-sqlalchemy" },
+    { name = "opentelemetry-instrumentation-system-metrics" },
+    { name = "opentelemetry-sdk" },
     { name = "pathspec" },
     { name = "peewee" },
     { name = "pg8000" },
@@ -3405,6 +3317,7 @@ dev = [
     { name = "pip-tools" },
     { name = "pre-commit" },
     { name = "prometheus-client" },
+    { name = "psutil" },
     { name = "py-cpuinfo" },
     { name = "py-spy" },
     { name = "pyright" },
@@ -3420,11 +3333,14 @@ dev = [
     { name = "pytest-xdist" },
     { name = "python-semantic-release" },
     { name = "radon" },
+    { name = "reflex" },
     { name = "requests-mock" },
     { name = "responses" },
+    { name = "rich" },
+    { name = "rich-argparse" },
     { name = "ruff" },
     { name = "safety" },
-    { name = "semgrep" },
+    { name = "starlette" },
     { name = "tenacity" },
     { name = "tomli" },
     { name = "twine" },
@@ -3729,54 +3645,52 @@ typecheck = [
 
 [package.metadata]
 requires-dist = [
-    { name = "alembic", marker = "extra == 'ci'", specifier = ">=1.13" },
     { name = "alembic", marker = "extra == 'k8s-legacy'" },
     { name = "alembic", marker = "extra == 'sql'", specifier = ">=1.13" },
-    { name = "bandit", marker = "extra == 'ci'", specifier = ">=1.7.5,<2.0.0" },
-    { name = "bandit-sarif-formatter", marker = "extra == 'ci'", specifier = ">=1.1.1,<2.0.0" },
+    { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.7.5,<2.0.0" },
+    { name = "bandit-sarif-formatter", marker = "extra == 'dev'", specifier = ">=1.1.1,<2.0.0" },
     { name = "boto3", specifier = ">=1.42.21" },
     { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.42.21" },
     { name = "boto3", marker = "extra == 'k8s-legacy'", specifier = ">=1.42.21" },
     { name = "botocore", specifier = ">=1.42.21" },
     { name = "botocore", marker = "extra == 'aws'", specifier = ">=1.42.21" },
-    { name = "build", marker = "extra == 'ci'", specifier = ">=1.0.3,<2.0.0" },
+    { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.3,<2.0.0" },
     { name = "bump2version", marker = "extra == 'dev'", specifier = ">=1.0.1,<2.0.0" },
-    { name = "coverage", marker = "extra == 'ci'", specifier = ">=7.3.2,<8.0.0" },
+    { name = "coverage", marker = "extra == 'dev'", specifier = ">=7.3.2,<8.0.0" },
     { name = "cryptography", specifier = ">=46.0.5" },
-    { name = "cyclonedx-bom", marker = "extra == 'ci'", specifier = ">=4.0.0,<8.0.0" },
+    { name = "cyclonedx-bom", marker = "extra == 'dev'", specifier = ">=4.0.0,<8.0.0" },
     { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.128.0" },
-    { name = "fastapi", marker = "extra == 'ci'", specifier = ">=0.128.0" },
     { name = "fastapi", marker = "extra == 'k8s-legacy'", specifier = ">=0.128.0" },
     { name = "filelock", specifier = ">=3.20.1" },
     { name = "git-changelog", marker = "extra == 'dev'", specifier = ">=2.6.0,<3.0.0" },
-    { name = "httpx", marker = "extra == 'ci'", specifier = ">=0.27.0" },
-    { name = "import-linter", marker = "extra == 'ci'", specifier = ">=2.0,<3.0.0" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
+    { name = "import-linter", marker = "extra == 'dev'", specifier = ">=2.0,<3.0.0" },
     { name = "ipdb", marker = "extra == 'dev'", specifier = ">=0.13.13,<1.0.0" },
     { name = "ipython", marker = "extra == 'dev'", specifier = ">=8.16.1,<9.0.0" },
     { name = "jinja2", marker = "extra == 'api'", specifier = ">=3.1.0" },
-    { name = "jinja2", marker = "extra == 'ci'", specifier = ">=3.1.0" },
     { name = "jinja2", marker = "extra == 'k8s-legacy'", specifier = ">=3.1.0" },
-    { name = "joserfc", marker = "extra == 'ci'", specifier = ">=1.6.1" },
+    { name = "joserfc", marker = "extra == 'dev'", specifier = ">=1.6.1" },
     { name = "jsonschema", specifier = ">=4.17.0" },
+    { name = "kmock", marker = "extra == 'dev'", specifier = ">=0.7" },
     { name = "kmock", marker = "extra == 'test-k8s'", specifier = ">=0.7" },
-    { name = "kubernetes", marker = "extra == 'ci'" },
     { name = "kubernetes", marker = "extra == 'k8s'" },
     { name = "kubernetes", marker = "extra == 'k8s-legacy'" },
-    { name = "kubernetes-stubs-elephant-fork", marker = "extra == 'ci'", specifier = ">=36.0.2,<37.0.0" },
+    { name = "kubernetes-stubs-elephant-fork", marker = "extra == 'dev'", specifier = ">=36.0.2,<37.0.0" },
     { name = "line-profiler", marker = "extra == 'dev'", specifier = ">=4.1.1,<6.0.0" },
-    { name = "marshmallow", marker = "extra == 'ci'", specifier = ">=4.1.2" },
+    { name = "lxml", marker = "extra == 'dev'", specifier = ">=6.1.0" },
+    { name = "marshmallow", marker = "extra == 'dev'", specifier = ">=4.1.2" },
     { name = "memory-profiler", marker = "extra == 'dev'", specifier = ">=0.61.0,<1.0.0" },
-    { name = "mike", marker = "extra == 'ci'", specifier = ">=1.1.0,<3.0.0" },
-    { name = "mkdocs", marker = "extra == 'ci'", specifier = ">=1.5.0,<2.0.0" },
-    { name = "mkdocs-gen-files", marker = "extra == 'ci'", specifier = ">=0.5.0,<1.0.0" },
-    { name = "mkdocs-literate-nav", marker = "extra == 'ci'", specifier = ">=0.6.0,<1.0.0" },
-    { name = "mkdocs-material", marker = "extra == 'ci'", specifier = ">=9.1.0,<10.0.0" },
-    { name = "mkdocs-section-index", marker = "extra == 'ci'", specifier = ">=0.3.0,<1.0.0" },
-    { name = "mkdocstrings", marker = "extra == 'ci'", specifier = ">=0.22.0,<2.0.0" },
-    { name = "mkdocstrings-python", marker = "extra == 'ci'", specifier = ">=1.1.0,<3.0.0" },
-    { name = "moto", extras = ["all"], marker = "extra == 'ci'", specifier = ">=5.1.19,<6.0.0" },
+    { name = "mike", marker = "extra == 'dev'", specifier = ">=1.1.0,<3.0.0" },
+    { name = "mkdocs", marker = "extra == 'dev'", specifier = ">=1.5.0,<2.0.0" },
+    { name = "mkdocs-gen-files", marker = "extra == 'dev'", specifier = ">=0.5.0,<1.0.0" },
+    { name = "mkdocs-literate-nav", marker = "extra == 'dev'", specifier = ">=0.6.0,<1.0.0" },
+    { name = "mkdocs-material", marker = "extra == 'dev'", specifier = ">=9.1.0,<10.0.0" },
+    { name = "mkdocs-section-index", marker = "extra == 'dev'", specifier = ">=0.3.0,<1.0.0" },
+    { name = "mkdocstrings", marker = "extra == 'dev'", specifier = ">=0.22.0,<2.0.0" },
+    { name = "mkdocstrings-python", marker = "extra == 'dev'", specifier = ">=1.1.0,<3.0.0" },
+    { name = "moto", extras = ["all"], marker = "extra == 'dev'", specifier = ">=5.1.19,<6.0.0" },
     { name = "moto", extras = ["ec2", "iam", "ec2instanceconnect", "autoscaling", "ssm", "dynamodb", "sts", "sqs", "sns"], marker = "extra == 'test-aws'", specifier = ">=5.1.19,<6.0.0" },
-    { name = "nltk", marker = "extra == 'ci'", specifier = ">=3.9.3" },
+    { name = "nltk", marker = "extra == 'dev'", specifier = ">=3.9.3" },
     { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.20.0" },
     { name = "opentelemetry-exporter-prometheus", marker = "extra == 'monitoring'", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-instrumentation-botocore", marker = "extra == 'monitoring-aws'", specifier = ">=0.64b0,<1.0" },
@@ -3786,22 +3700,21 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'monitoring'", specifier = ">=0.41b0,<1.0" },
     { name = "opentelemetry-instrumentation-system-metrics", marker = "extra == 'monitoring'", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-sdk", marker = "extra == 'monitoring'", specifier = ">=1.20.0" },
+    { name = "orb-py", extras = ["all"], marker = "extra == 'dev'" },
     { name = "orb-py", extras = ["aws"], marker = "extra == 'all-providers'" },
     { name = "orb-py", extras = ["aws"], marker = "extra == 'test-aws'" },
     { name = "orb-py", extras = ["aws", "monitoring"], marker = "extra == 'monitoring-aws'" },
-    { name = "orb-py", extras = ["ci", "all-providers"], marker = "extra == 'dev'" },
     { name = "orb-py", extras = ["cli", "api", "sql", "monitoring", "monitoring-aws", "all-providers", "ui"], marker = "extra == 'all'" },
     { name = "orb-py", extras = ["k8s"], marker = "extra == 'all-providers'" },
     { name = "orb-py", extras = ["k8s"], marker = "extra == 'test-k8s'" },
     { name = "orb-py", extras = ["otel"], marker = "extra == 'monitoring'" },
-    { name = "pathspec", marker = "extra == 'ci'", specifier = ">=0.11.0" },
-    { name = "peewee", marker = "extra == 'ci'", specifier = ">=3.18.3" },
-    { name = "pg8000", marker = "extra == 'ci'" },
+    { name = "pathspec", marker = "extra == 'dev'", specifier = ">=0.11.0" },
+    { name = "peewee", marker = "extra == 'dev'", specifier = ">=3.18.3" },
+    { name = "pg8000", marker = "extra == 'dev'" },
     { name = "pg8000", marker = "extra == 'k8s-legacy'" },
-    { name = "pip-audit", marker = "extra == 'ci'", specifier = ">=2.6.1,<3.0.0" },
+    { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.6.1,<3.0.0" },
     { name = "pip-tools", marker = "extra == 'dev'", specifier = ">=7.3.0,<8.0.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0,<5.0.0" },
-    { name = "prometheus-client", marker = "extra == 'ci'", specifier = ">=0.17.0" },
     { name = "prometheus-client", marker = "extra == 'k8s-legacy'", specifier = ">=0.17.0" },
     { name = "prometheus-client", marker = "extra == 'monitoring'", specifier = ">=0.17.0" },
     { name = "psutil", specifier = ">=5.9.0" },
@@ -3813,52 +3726,50 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pydantic-settings", marker = "extra == 'k8s-legacy'", specifier = ">=2.0.0" },
     { name = "pyjwt", specifier = ">=2.8.0" },
-    { name = "pyright", marker = "extra == 'ci'", specifier = ">=1.1.408,<2.0.0" },
-    { name = "pytest", marker = "extra == 'ci'", specifier = ">=7.4.3,<10.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'ci'", specifier = ">=0.21.1,<2.0.0" },
-    { name = "pytest-benchmark", marker = "extra == 'ci'", specifier = ">=5.1.0,<6.0.0" },
-    { name = "pytest-cov", marker = "extra == 'ci'", specifier = ">=4.1.0,<8.0.0" },
-    { name = "pytest-env", marker = "extra == 'ci'", specifier = ">=1.1.1,<2.0.0" },
-    { name = "pytest-html", marker = "extra == 'ci'", specifier = ">=4.1.1,<5.0.0" },
-    { name = "pytest-mock", marker = "extra == 'ci'", specifier = ">=3.12.0,<4.0.0" },
-    { name = "pytest-timeout", marker = "extra == 'ci'", specifier = ">=2.2.0,<3.0.0" },
-    { name = "pytest-xdist", marker = "extra == 'ci'", specifier = ">=3.3.1,<4.0.0" },
+    { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.408,<2.0.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.3,<10.0.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.1,<2.0.0" },
+    { name = "pytest-benchmark", marker = "extra == 'dev'", specifier = ">=5.1.0,<6.0.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0,<8.0.0" },
+    { name = "pytest-env", marker = "extra == 'dev'", specifier = ">=1.1.1,<2.0.0" },
+    { name = "pytest-html", marker = "extra == 'dev'", specifier = ">=4.1.1,<5.0.0" },
+    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.12.0,<4.0.0" },
+    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.2.0,<3.0.0" },
+    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.3.1,<4.0.0" },
     { name = "python-semantic-release", marker = "extra == 'dev'", specifier = ">=10.0.0,<11.0.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "radon", marker = "extra == 'dev'", specifier = ">=6.0.1,<7.0.0" },
     { name = "reflex", marker = "extra == 'ui'", specifier = ">=0.9,<0.10" },
     { name = "requests", specifier = ">=2.31.0" },
-    { name = "requests-mock", marker = "extra == 'ci'", specifier = ">=1.11.0,<2.0.0" },
+    { name = "requests-mock", marker = "extra == 'dev'", specifier = ">=1.11.0,<2.0.0" },
     { name = "requests-mock", marker = "extra == 'test-aws'", specifier = ">=1.11.0,<2.0.0" },
-    { name = "responses", marker = "extra == 'ci'", specifier = ">=0.24.0,<1.0.0" },
+    { name = "responses", marker = "extra == 'dev'", specifier = ">=0.24.0,<1.0.0" },
     { name = "responses", marker = "extra == 'test-aws'", specifier = ">=0.24.0,<1.0.0" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13.3.0" },
     { name = "rich", marker = "extra == 'k8s-legacy'", specifier = ">=13.3.0" },
     { name = "rich-argparse", marker = "extra == 'cli'", specifier = ">=1.0.0" },
-    { name = "ruff", marker = "extra == 'ci'", specifier = ">=0.1.0" },
-    { name = "safety", marker = "extra == 'ci'", specifier = ">=3.7.0,<4.0.0" },
-    { name = "semgrep", marker = "extra == 'ci'", specifier = ">=1.45.0,<2.0.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
+    { name = "safety", marker = "extra == 'dev'", specifier = ">=3.7.0,<4.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "sqlalchemy", marker = "extra == 'k8s-legacy'", specifier = ">=2.0.0" },
     { name = "starlette", marker = "extra == 'api'", specifier = ">=0.49.1" },
-    { name = "tenacity", marker = "extra == 'ci'" },
+    { name = "tenacity", marker = "extra == 'dev'" },
     { name = "tenacity", marker = "extra == 'k8s-legacy'" },
-    { name = "tomli", marker = "extra == 'ci'", specifier = ">=2.0.0,<3.0.0" },
+    { name = "tomli", marker = "extra == 'dev'", specifier = ">=2.0.0,<3.0.0" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "types-python-dateutil", marker = "extra == 'ci'", specifier = ">=2.8.19.14,<3.0.0" },
-    { name = "types-pyyaml", marker = "extra == 'ci'", specifier = ">=6.0.12.12,<7.0.0" },
+    { name = "types-python-dateutil", marker = "extra == 'dev'", specifier = ">=2.8.19.14,<3.0.0" },
+    { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.12,<7.0.0" },
     { name = "typing-extensions", marker = "extra == 'k8s-legacy'" },
     { name = "urllib3", specifier = ">=2.6.3" },
     { name = "uvicorn", marker = "extra == 'api'", specifier = ">=0.24.0" },
-    { name = "uvicorn", marker = "extra == 'ci'", specifier = ">=0.24.0" },
     { name = "uvicorn", marker = "extra == 'k8s-legacy'", specifier = ">=0.24.0" },
     { name = "virtualenv", marker = "extra == 'dev'", specifier = ">=20.26.6" },
-    { name = "watchdog", marker = "extra == 'ci'" },
+    { name = "watchdog", marker = "extra == 'dev'" },
     { name = "watchdog", marker = "extra == 'k8s-legacy'" },
-    { name = "werkzeug", marker = "extra == 'ci'", specifier = ">=3.1.6" },
-    { name = "wheel", marker = "extra == 'ci'", specifier = ">=0.41.3,<1.0.0" },
+    { name = "werkzeug", marker = "extra == 'dev'", specifier = ">=3.1.6" },
+    { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.41.3,<1.0.0" },
 ]
-provides-extras = ["sql", "aws", "k8s", "all-providers", "k8s-legacy", "ui", "cli", "api", "otel", "monitoring", "monitoring-aws", "all", "test-aws", "test-k8s", "ci", "dev"]
+provides-extras = ["sql", "aws", "k8s", "all-providers", "k8s-legacy", "ui", "cli", "api", "otel", "monitoring", "monitoring-aws", "all", "test-aws", "test-k8s", "dev"]
 
 [package.metadata.requires-dev]
 arch = [{ name = "import-linter", specifier = ">=2.0,<3.0.0" }]
@@ -6092,38 +6003,6 @@ wheels = [
 ]
 
 [[package]]
-name = "semgrep"
-version = "1.79.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "attrs" },
-    { name = "boltons" },
-    { name = "click" },
-    { name = "click-option-group" },
-    { name = "colorama" },
-    { name = "defusedxml" },
-    { name = "exceptiongroup" },
-    { name = "glom" },
-    { name = "jsonschema" },
-    { name = "packaging" },
-    { name = "peewee" },
-    { name = "requests" },
-    { name = "rich" },
-    { name = "ruamel-yaml" },
-    { name = "tomli" },
-    { name = "typing-extensions" },
-    { name = "urllib3" },
-    { name = "wcmatch" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/45/61/9ee9e601ddc9f9073708d4e6886d0c7021b59b3180b6cb53c0bd01b393d9/semgrep-1.79.0.tar.gz", hash = "sha256:fde15d090b4beb865e12c2c727404c8dee2f41b9d793a7f972b278cdefb22bea", size = 27421587, upload-time = "2024-07-10T10:06:05.122Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/4a/469abc30b134354632d8b8e83249121447fca74a615509a09bed90340813/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-any.whl", hash = "sha256:5a28858c1f5249bf4fed3f180f2db2589ce1832c1058eb6d18a0f086c91dadc1", size = 27832465, upload-time = "2024-07-10T10:05:45.254Z" },
-    { url = "https://files.pythonhosted.org/packages/e9/23/eff37582f900cf742b5fc7709dfd0e63cc2bc0faefe6ec200f150666fa7a/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-macosx_10_14_x86_64.whl", hash = "sha256:4b22b5f4db17204648baf8bc58fcd74c09eb5f41bd407422193253b4de9af18e", size = 28050871, upload-time = "2024-07-10T10:05:52.086Z" },
-    { url = "https://files.pythonhosted.org/packages/d6/88/35615a4e1142755cb3d2c86d63160f63ab770c111c82de9318bba27fb888/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-macosx_11_0_arm64.whl", hash = "sha256:fe5cf0ac8afdb786cbd4e6c97c418ca7adc8f4c42584a69dc7c10e15db5f7d9b", size = 33805877, upload-time = "2024-07-10T10:05:56.42Z" },
-    { url = "https://files.pythonhosted.org/packages/fd/84/3b6afc829f54b331f47d55c565096ef74a98d96d794612d2e5330062d373/semgrep-1.79.0-cp38.cp39.cp310.cp311.py37.py38.py39.py310.py311-none-musllinux_1_0_aarch64.manylinux2014_aarch64.whl", hash = "sha256:41797931371d05c41a6e09861b3d631136b4fe644d80802b2fd48af650e5fa5a", size = 32479030, upload-time = "2024-07-10T10:06:00.777Z" },
-]
-
-[[package]]
 name = "semver"
 version = "3.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -6642,18 +6521,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/27/0b/a54103cfd732bb703c7a749222011a0483ef3705948dae3b203158601119/watchfiles-1.2.0-pp311-pypy311_pp73-macosx_11_0_arm64.whl", hash = "sha256:094b9b70103d4e963499bdea001ee3c2697b144cd9ae6218a62c0f89ec9e31db", size = 396629, upload-time = "2026-05-18T04:32:03.268Z" },
     { url = "https://files.pythonhosted.org/packages/5e/2c/73f31a3b893886206c3f54d73e8ad8dee58cdb2f69ad2622e0a8a9e07f4e/watchfiles-1.2.0-pp311-pypy311_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b0ef001f8c25ad0fa9529f914c1600647ecd0f542d11c19b7894768c67b6acb7", size = 457318, upload-time = "2026-05-18T04:31:01.932Z" },
     { url = "https://files.pythonhosted.org/packages/e9/f9/45d021e4a5cc7b9dd567f7cbb06d3b75f751a690063fb6cc7ec60f4e46b7/watchfiles-1.2.0-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a88fc94e647bc4eec523f1caa540258eb71d14278b9daf72fa1e2658a98df0f0", size = 457771, upload-time = "2026-05-18T04:30:56.331Z" },
-]
-
-[[package]]
-name = "wcmatch"
-version = "8.5.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "bracex" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ea/c4/55e0d36da61d7b8b2a49fd273e6b296fd5e8471c72ebbe438635d1af3968/wcmatch-8.5.2.tar.gz", hash = "sha256:a70222b86dea82fb382dd87b73278c10756c138bd6f8f714e2183128887b9eb2", size = 114983, upload-time = "2024-05-15T12:51:08.054Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/09/78/533ef890536e5ba0fd4f7df37482b5800ecaaceae9afc30978a1a7f88ff1/wcmatch-8.5.2-py3-none-any.whl", hash = "sha256:17d3ad3758f9d0b5b4dedc770b65420d4dac62e680229c287bf24c9db856a478", size = 39397, upload-time = "2024-05-15T12:51:06.2Z" },
 ]
 
 [[package]]

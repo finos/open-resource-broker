@@ -273,6 +273,50 @@ class TestHandleRequestReturnMachines:
         assert call_input.all_machines is True
         assert call_input.force is True
 
+    @pytest.mark.asyncio
+    async def test_request_id_passes_through_to_orchestrator(self):
+        """--request-id provided → ReturnMachinesOrchestrator called with request_id set."""
+        container, _scheduler, _, _, _, _, _, return_orch, _ = _mock_container()
+        return_orch.execute.return_value = ReturnMachinesOutput(
+            request_id="ret-2", status="pending"
+        )
+
+        args = _make_namespace(request_id="req-abc", machine_ids=[], all=False)
+
+        args._container = container
+        await handle_request_return_machines(args)
+
+        call_input = return_orch.execute.call_args[0][0]
+        assert call_input.request_id == "req-abc"
+        assert call_input.machine_ids == []
+        assert call_input.all_machines is False
+
+    @pytest.mark.asyncio
+    async def test_request_id_combined_with_machine_ids_returns_error(self):
+        """request_id + machine_ids → mutual-exclusion error dict."""
+        container, *_ = _mock_container()
+
+        args = _make_namespace(request_id="req-abc", machine_ids=["i-1"])
+
+        args._container = container
+        result = await handle_request_return_machines(args)
+
+        assert isinstance(result, dict)
+        assert "--request-id" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_request_id_combined_with_all_returns_error(self):
+        """request_id + --all → mutual-exclusion error dict."""
+        container, *_ = _mock_container()
+
+        args = _make_namespace(request_id="req-abc", machine_ids=[], all=True)
+
+        args._container = container
+        result = await handle_request_return_machines(args)
+
+        assert isinstance(result, dict)
+        assert "--request-id" in result["error"]
+
 
 # ---------------------------------------------------------------------------
 # handle_cancel_request

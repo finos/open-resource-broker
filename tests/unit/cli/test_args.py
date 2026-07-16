@@ -93,6 +93,18 @@ class TestMachinesReturn:
         ns = _parse(["machines", "return", "id1", "--force"])
         assert ns.force is True
 
+    def test_request_id_long_flag(self):
+        ns = _parse(["machines", "return", "--request-id", "req-abc"])
+        assert ns.request_id == "req-abc"
+
+    def test_request_id_short_flag(self):
+        ns = _parse(["machines", "return", "-r", "req-xyz"])
+        assert ns.request_id == "req-xyz"
+
+    def test_request_id_defaults_to_none(self):
+        ns = _parse(["machines", "return", "id1"])
+        assert ns.request_id is None
+
 
 class TestFilterFlag:
     """--filter flag accumulates into a list."""

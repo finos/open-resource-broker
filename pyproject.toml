@@ -208,22 +208,37 @@ test-k8s = [
 ]
 
 # ---------------------------------------------------------------------------
-# pip compatibility shims for [dependency-groups] (PEP 735)
+# pip compatibility shim for [dependency-groups] (PEP 735)
 #
 # pip does not yet support PEP 735 dependency-groups.  The authoritative dev
-# dependency lists live in [dependency-groups] below.  These optional-deps
-# mirror them so `pip install -e ".[dev]"` keeps working.  When pip gains
-# PEP 735 support these shims can be removed.
+# dependency list lives in [dependency-groups] below.  This optional-dep keeps
+# `pip install -e ".[dev]"` working by combining two things:
+#
+#   1. orb-py[all] — the full runtime surface (providers, api, ui, monitoring,
+#      sql, cli).  pip resolves extras, so runtime deps need NOT be re-listed
+#      here; referencing [all] avoids a hand-maintained mirror of them.
+#   2. The CI/dev TOOLCHAIN (ruff, pytest, mkdocs, bandit, …).  These live only
+#      in [dependency-groups] — which pip cannot read — so they must be mirrored
+#      here until pip gains PEP 735 support.
+#
+# tests/unit/test_pyproject_dev_extra.py guards that this shim still covers the
+# whole dev dependency-group, so the toolchain mirror can't silently drift.
 # ---------------------------------------------------------------------------
-ci = [
-    # Code Quality Tools
+dev = [
+    # Full runtime surface — including the UI, which [all-providers] omits.
+    "orb-py[all]",
+    # --- toolchain from dependency-groups.lint ---
     "ruff>=0.1.0",
     "pathspec>=0.11.0",
+    # --- toolchain from dependency-groups.typecheck ---
     "pyright>=1.1.408,<2.0.0",
-    "bandit>=1.7.5,<2.0.0",
-    "bandit-sarif-formatter>=1.1.1,<2.0.0",
+    "types-PyYAML>=6.0.12.12,<7.0.0",
+    "types-python-dateutil>=2.8.19.14,<3.0.0",
+    "kubernetes-stubs-elephant-fork>=36.0.2,<37.0.0",
+    "tomli>=2.0.0,<3.0.0",
+    # --- toolchain from dependency-groups.arch ---
     "import-linter>=2.0,<3.0.0",
-    # Testing Framework
+    # --- toolchain from dependency-groups.test (runtime test deps not in [all]) ---
     "pytest>=7.4.3,<10.0.0",
     "pytest-cov>=4.1.0,<8.0.0",
     "pytest-env>=1.1.1,<2.0.0",
@@ -234,39 +249,18 @@ ci = [
     "pytest-html>=4.1.1,<5.0.0",
     "pytest-benchmark>=5.1.0,<6.0.0",
     "coverage>=7.3.2,<8.0.0",
-    # Test dependencies for API and template tests
-    "fastapi>=0.128.0",
     "httpx>=0.27.0",
-    "jinja2>=3.1.0",
-    # AWS Testing
     "moto[all]>=5.1.19,<6.0.0",
     "responses>=0.24.0,<1.0.0",
     "requests-mock>=1.11.0,<2.0.0",
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
     "nltk>=3.9.3",
-    # k8s-legacy extra deps — required for tests/integration/k8s_legacy/
-    "kubernetes",
     "watchdog",
     "tenacity",
     "pg8000",
-    "uvicorn>=0.24.0",
-    "prometheus-client>=0.17.0",
-    "alembic>=1.13",
-    # Essential Type Stubs
-    "types-PyYAML>=6.0.12.12,<7.0.0",
-    "types-python-dateutil>=2.8.19.14,<3.0.0",
-    "kubernetes-stubs-elephant-fork>=36.0.2,<37.0.0",
-    # Build Tools
-    "tomli>=2.0.0,<3.0.0",
-    # Security Scanning
-    "safety>=3.7.0,<4.0.0",
-    "pip-audit>=2.6.1,<3.0.0",
-    "semgrep>=1.45.0,<2.0.0",
-    "cyclonedx-bom>=4.0.0,<8.0.0",
-    "peewee>=3.18.3",
-    "marshmallow>=4.1.2",
-    # Documentation
+    "kmock>=0.7",
+    # --- toolchain from dependency-groups.docs ---
     "mkdocs>=1.5.0,<2.0.0",
     "mkdocs-material>=9.1.0,<10.0.0",
     "mkdocstrings>=0.22.0,<2.0.0",
@@ -275,12 +269,21 @@ ci = [
     "mkdocs-literate-nav>=0.6.0,<1.0.0",
     "mkdocs-section-index>=0.3.0,<1.0.0",
     "mike>=1.1.0,<3.0.0",
-    # Build and Packaging
+    # --- inlined from dependency-groups.security ---
+    "bandit>=1.7.5,<2.0.0",
+    "bandit-sarif-formatter>=1.1.1,<2.0.0",
+    "safety>=3.7.0,<4.0.0",
+    "pip-audit>=2.6.1,<3.0.0",
+    "cyclonedx-bom>=4.0.0,<8.0.0",
+    "peewee>=3.18.3",
+    "marshmallow>=4.1.2",
+    "lxml>=6.1.0",
+    # semgrep is intentionally excluded from this shim (as in the security group):
+    # workflows pin and install their own version to avoid version drift.
+    # --- inlined from dependency-groups.build ---
     "build>=1.0.3,<2.0.0",
     "wheel>=0.41.3,<1.0.0",
-]
-dev = [
-    "orb-py[ci,all-providers]",
+    # --- dev-only tools (not in any CI group) ---
     "virtualenv>=20.26.6",
     "pre-commit>=3.5.0,<5.0.0",
     "bump2version>=1.0.1,<2.0.0",
@@ -304,7 +307,7 @@ dev = [
 # The [project.optional-dependencies] ci/dev sections above are pip shims
 # that mirror these lists for `pip install -e ".[dev]"` compatibility.
 #
-# Per-job groups (Phase 2 scoping):
+# Per-job groups (each maps to one CI job):
 #   lint      — ruff + pathspec (lint-ruff, auto-format jobs)
 #   typecheck — pyright + type stubs (lint-pyright job)
 #   arch      — import-linter (arch-validation job; pyyaml via project deps)

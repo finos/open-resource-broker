@@ -46,9 +46,10 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
 
     async def execute(self, input: ReturnMachinesInput) -> ReturnMachinesOutput:  # type: ignore[return]
         self._logger.info(
-            "ReturnMachinesOrchestrator: machines=%s all=%s force=%s",
+            "ReturnMachinesOrchestrator: machines=%s all=%s request_id=%s force=%s",
             input.machine_ids,
             input.all_machines,
+            input.request_id,
             input.force,
         )
 
@@ -70,6 +71,26 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
                     request_id=None,
                     status="no_machines",
                     message="No active machines found",
+                )
+        elif input.request_id:
+            result = await self._query_bus.execute(
+                ListMachinesQuery(
+                    request_id=input.request_id,
+                    provider_name=input.provider_name,
+                    provider_type=input.provider_type,
+                )
+            )
+            machine_dtos = result.items if isinstance(result, Paginated) else (result or [])
+            machine_ids = [dto.machine_id for dto in machine_dtos]
+            if not machine_ids:
+                self._logger.warning(
+                    "ReturnMachinesOrchestrator: request_id=%s requested but no active machines found",
+                    input.request_id,
+                )
+                return ReturnMachinesOutput(
+                    request_id=None,
+                    status="no_machines",
+                    message="No active machines found for request",
                 )
         else:
             machine_ids = list(input.machine_ids)

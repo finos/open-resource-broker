@@ -257,6 +257,7 @@ def test_parse_args_uses_build_parser():
     "resource,subcommand,flag,short",
     [
         ("machines", "return", "--machine-id", "-m"),
+        ("machines", "return", "--request-id", "-r"),
         ("machines", "terminate", "--machine-id", "-m"),
         ("machines", "stop", "--machine-id", "-m"),
         ("machines", "start", "--machine-id", "-m"),
