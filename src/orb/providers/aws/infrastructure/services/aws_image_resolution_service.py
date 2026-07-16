@@ -58,6 +58,9 @@ class AWSImageResolutionService(ImageResolutionService):
         # AWS AMI IDs start with 'ami-'
         if image_specification.startswith("ami-"):
             return False
+        # ARNs are already resolved identifiers (e.g. MicroVM image ARNs)
+        if image_specification.startswith("arn:"):
+            return False
         # SSM parameters typically start with '/'
         if image_specification.startswith("/"):
             return True

@@ -33,10 +33,10 @@
 
 Open Resource Broker (ORB) is a unified API for orchestrating and provisioning compute capacity programmatically. Define what you need in a template, request it, track it, return it — through a CLI, REST API, Python SDK, or MCP server.
 
-Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet), with an extensible provider system for adding new cloud backends.
+Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet, Lambda MicroVMs), with an extensible provider system for adding new cloud backends.
 
 **Provider support:**
-- **AWS** — EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups
+- **AWS** — EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups, Lambda MicroVMs
 - **Kubernetes** — Pod, Deployment, StatefulSet, Job (`pip install "orb-py[k8s]"`; see [Kubernetes provider docs](docs/root/providers/k8s/index.md))
 - **Custom** — extensible via [provider registry](docs/root/developer_guide/architecture.md) and the [`orb.providers` entry-point group](docs/root/providers/k8s/plugin-authoring.md)
 
@@ -85,6 +85,28 @@ orb machines return <machine-id-1> <machine-id-2> ...
 ```bash
 orb requests status <return-request-id>
 ```
+
+## MicroVM Quick Start
+
+Provision isolated [Lambda MicroVMs](https://aws.amazon.com/blogs/aws/run-isolated-sandboxes-with-full-lifecycle-control-aws-lambda-introduces-microvms/) for running untrusted or pull-based workloads:
+
+```bash
+# 1. Create a template pointing to your MicroVM image
+orb templates create my-microvm \
+  --provider-api MicroVM \
+  --image-id arn:aws:lambda:us-east-1:123456789012:microvm-image:my-worker
+
+# 2. Provision 10 MicroVMs
+orb machines request my-microvm 10
+
+# 3. Check status (also syncs live state from AWS)
+orb requests status <request-id>
+
+# 4. Return (terminate) when done
+orb machines return <microvm-id-1> <microvm-id-2> ...
+```
+
+See the [MicroVM Provider Guide](docs/root/providers/aws/microvm.md) for full configuration (IAM roles, idle policy, logging, image build).
 
 ## Setup
 
@@ -196,8 +218,9 @@ aws sts get-caller-identity
 | `EC2Fleet` | Fleet provisioning with mixed instance types |
 | `SpotFleet` | Cost-optimized spot instance fleets |
 | `AutoScalingGroup` | Managed scaling groups |
+| `MicroVM` | Isolated Lambda MicroVM sandboxes for untrusted code |
 
-See the [AWS Provider Guide](docs/root/user_guide/configuration.md) for required IAM permissions and SpotFleet service-linked role setup.
+See the [AWS Provider Guide](docs/root/user_guide/configuration.md) for required IAM permissions and SpotFleet service-linked role setup. See the [MicroVM Provider Guide](docs/root/providers/aws/microvm.md) for Lambda MicroVM setup.
 
 </details>
 
