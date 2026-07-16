@@ -284,7 +284,9 @@ class OpenResourceBrokerMCPServer:
 
         # Convert arguments to args-like object and inject the container
         args = type("Args", (), arguments)()
-        setattr(args, "_container", self.app)
+        setattr(
+            args, "_container", self.app
+        )  # dynamic class; setattr avoids spurious pyright AttributeAccessIssue
 
         # Call the tool function
         tool_func = self.tools[tool_name]
@@ -501,7 +503,9 @@ class OpenResourceBrokerMCPServer:
     def _make_args(self, **kwargs) -> Any:
         """Create an args object with _container pre-injected."""
         args = type("Args", (), {})()
-        setattr(args, "_container", self.app)
+        setattr(
+            args, "_container", self.app
+        )  # dynamic class; setattr avoids spurious pyright AttributeAccessIssue
         for k, v in kwargs.items():
             setattr(args, k, v)
         return args
