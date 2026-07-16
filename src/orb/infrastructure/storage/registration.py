@@ -22,40 +22,17 @@ def register_all_storage_types() -> None:
 
     register_sql_storage()
 
-    try:
-        from orb.providers.aws.storage.registration import (
-            register_aurora_storage,
-            register_dynamodb_storage,
-        )
-
-        register_dynamodb_storage()
-        register_aurora_storage()
-    except ImportError:
-        pass  # [aws] extra not installed; DynamoDB and Aurora storage unavailable
-
 
 def get_available_storage_types() -> list:
     """
-    Get list of available storage types.
+    Get list of available storage types by querying the storage registry.
 
     Returns:
-        List of storage type names that are available for registration
+        List of storage type names that are currently registered
     """
-    from importlib.util import find_spec
+    from orb.infrastructure.storage.registry import get_storage_registry
 
-    available_types = []
-
-    # Each backend is available when its registration module can be imported.
-    # find_spec probes importability without binding an unused name.
-    if find_spec("orb.infrastructure.storage.json.registration") is not None:
-        available_types.append("json")
-    if find_spec("orb.infrastructure.storage.sql.registration") is not None:
-        available_types.append("sql")
-    if find_spec("orb.providers.aws.storage.registration") is not None:
-        available_types.append("dynamodb")
-        available_types.append("aurora")
-
-    return available_types
+    return get_storage_registry().get_registered_types()
 
 
 def is_storage_type_available(storage_type: str) -> bool:
@@ -66,6 +43,8 @@ def is_storage_type_available(storage_type: str) -> bool:
         storage_type: Name of the storage type to check
 
     Returns:
-        True if storage type is available, False otherwise
+        True if storage type is registered, False otherwise
     """
-    return storage_type in get_available_storage_types()
+    from orb.infrastructure.storage.registry import get_storage_registry
+
+    return get_storage_registry().is_registered(storage_type)
