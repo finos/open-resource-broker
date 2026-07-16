@@ -80,6 +80,23 @@ def reset_all_singletons() -> None:
 
     reset_provider_registry()
 
+    # Reset the provider-plugin initialization guard so that a fresh bootstrap
+    # (triggered by create_container() or get_container() in subsequent tests)
+    # can re-run initialize_provider() for every provider.
+    #
+    # Without this reset the module-level _initialized_providers set retains
+    # names from the previous test's bootstrap; the next bootstrap call then
+    # hits the idempotency guard and skips satellite-registry population.  If
+    # any test has cleared a satellite registry in its teardown (e.g.
+    # CLISpecRegistry.clear()) the missing entries are never restored and
+    # assert_provider_registrations_complete() raises SDKError / 500s.
+    try:
+        from orb.providers.base.provider_plugin import reset_for_testing as _reset_plugin_guard
+
+        _reset_plugin_guard()
+    except ImportError:
+        pass  # provider_plugin module not present; skip
+
 
 def reset_singleton(singleton_class: type[Any]) -> None:
     """

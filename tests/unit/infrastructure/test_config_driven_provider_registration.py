@@ -31,19 +31,38 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_provider_utility_services_aws_available(self):
         """Test provider utility registration when AWS provider is available."""
+        import importlib
+
         from orb.bootstrap.provider_services import _register_provider_utility_services
         from orb.infrastructure.di.container import DIContainer
 
         container = DIContainer()
 
+        # The new implementation queries the live provider registry for registered
+        # types.  Mock the registry and importlib so no real module is imported.
+        mock_registry = MagicMock()
+        mock_registry.get_registered_types.return_value = ["aws"]
+
+        mock_aws_mod = MagicMock()
+        mock_di_fn = MagicMock()
+        mock_aws_mod.register_aws_services_with_di = mock_di_fn
+        mock_aws_mod.initialize_aws_provider = None  # skip initialize
+
+        def _import_module(path):
+            if path == "orb.providers.aws.registration":
+                return mock_aws_mod
+            return importlib.import_module(path)
+
         with (
-            patch("importlib.util.find_spec", return_value=MagicMock()),
             patch(
-                "orb.providers.aws.registration.register_aws_services_with_di"
-            ) as mock_aws_register,
+                "orb.providers.registry.get_provider_registry",
+                return_value=mock_registry,
+            ),
+            patch("importlib.util.find_spec", return_value=MagicMock()),
+            patch("importlib.import_module", side_effect=_import_module),
         ):
             _register_provider_utility_services(container)
-            mock_aws_register.assert_called_once_with(container)
+            mock_di_fn.assert_called_once_with(container)
 
     def test_register_provider_utility_services_aws_unavailable(self):
         """Test provider utility registration when AWS provider is unavailable."""

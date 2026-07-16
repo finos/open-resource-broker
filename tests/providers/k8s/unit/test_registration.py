@@ -10,24 +10,48 @@ from orb.config.schemas.provider_settings_registry import ProviderSettingsRegist
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.defaults_loader import KubernetesDefaultsLoader
 from orb.providers.k8s.registration import (
+    _REGISTERED_PROVIDERS as _k8s_registered_providers,
     create_k8s_config,
     create_k8s_resolver,
     create_k8s_strategy,
     create_k8s_validator,
+    initialize_k8s_provider,
     is_k8s_provider_registered,
+    register_k8s_plugin,
     register_k8s_provider,
     register_k8s_provider_settings,
+    register_k8s_services_with_di,
 )
 from orb.providers.k8s.strategy.k8s_provider_strategy import (
     K8sProviderStrategy,
 )
-from orb.providers.registration import _REGISTERED_PROVIDERS
 from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
 
 
 def test_kubernetes_is_in_central_registered_providers_list() -> None:
-    """The kubernetes provider name is wired into the central registration list."""
-    assert "k8s" in _REGISTERED_PROVIDERS
+    """After register_k8s_plugin() fires, 'k8s' appears in the central registration list.
+
+    Under the entry-point discovery design, _REGISTERED_PROVIDERS (in
+    orb.providers.k8s.registration) starts empty and is populated at runtime
+    when the zero-argument entry-point callable register_k8s_plugin() is
+    invoked.  This test simulates that path.
+    """
+    # Clear the module-level sentinel so the test is isolated.
+    # _k8s_registered_providers is the same list object as the module attribute,
+    # so in-place mutation (clear/extend) propagates back to the module.
+    original = list(_k8s_registered_providers)
+    _k8s_registered_providers.clear()
+    try:
+        mock_registry = MagicMock()
+        with patch("orb.providers.registry.get_provider_registry", return_value=mock_registry):
+            register_k8s_plugin()
+
+        assert "k8s" in _k8s_registered_providers, (
+            "register_k8s_plugin() must append 'k8s' to the module sentinel list"
+        )
+    finally:
+        _k8s_registered_providers.clear()
+        _k8s_registered_providers.extend(original)
 
 
 def test_register_provider_settings_inserts_class() -> None:
@@ -99,8 +123,6 @@ def test_initialize_registers_defaults_loader() -> None:
     pollution does not break suites that depend on the AWS loader being
     registered (e.g. ``tests/unit/sdk/test_sdk_init_config_handlers.py``).
     """
-    from orb.providers.k8s.registration import initialize_k8s_provider
-
     snapshot = dict(DefaultsLoaderRegistry.all())
     try:
         initialize_k8s_provider()
@@ -174,7 +196,6 @@ def test_register_k8s_services_with_di_registers_example_generator_in_registry()
     from orb.infrastructure.registry.template_example_generator_registry import (
         TemplateExampleGeneratorRegistry,
     )
-    from orb.providers.k8s.registration import register_k8s_services_with_di
 
     # Clear the registry so state from other tests does not interfere.
     TemplateExampleGeneratorRegistry.clear()
