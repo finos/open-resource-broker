@@ -27,8 +27,10 @@ API.
 | Tweak the behaviour of an existing handler                   | Submit a PR to ORB - provider config and template extension are usually the right surface, not a plugin. |
 | Add a new provider config field                              | PR to ORB.                                                   |
 
-Pattern B (a fresh provider) is out of scope for this page; see the
-existing AWS and Kubernetes providers as the canonical references.
+Pattern B (a fresh provider) is out of scope for this page; see
+[Adding a Provider](../../developer_guide/adding_a_provider.md) for the
+`ProviderPlugin`-based walkthrough, using the AWS provider
+(`src/orb/providers/aws/provider_plugin.py`) as the canonical reference.
 This page covers Pattern A.
 
 ## The entry-point contract
@@ -52,6 +54,14 @@ The entry-point **name** (`mpi_job` above) is a free-form identifier the
 plugin author picks; ORB does not interpret it.  The entry-point
 **value** is a Python import path to a zero-argument callable that ORB
 will invoke during provider discovery.
+
+For a **Pattern A plugin** (extending an existing provider with a new
+handler), a plain `register()` function is sufficient because you only need
+to touch one registry — the handler table of the existing strategy.  For a
+**Pattern B plugin** (a wholly new provider), point the entry-point at
+`YourPlugin.register_plugin` instead; see
+[Adding a Provider](../../developer_guide/adding_a_provider.md) for the full
+`ProviderPlugin` walkthrough.
 
 ### What ORB calls
 
@@ -438,5 +448,11 @@ in `CHANGELOG.md` and held to major-version bumps.
   in doubt about the contract.
 * [Authentication](auth.md) - your plugin inherits the parent
   provider's auth path; no plugin-level auth wiring is required.
-* `src/orb/providers/aws/` - the AWS provider is the canonical example
-  of a fresh `ProviderStrategy` (Pattern B).
+* [Adding a Provider](../../developer_guide/adding_a_provider.md) - full
+  `ProviderPlugin`-based walkthrough for a fresh provider (Pattern B),
+  including the `pyproject.toml` entry-point declaration and startup
+  completeness check.
+* `src/orb/providers/base/provider_plugin.py` - the `ProviderPlugin`
+  abstract base class and the `register_plugin` entry-point hook.
+* `src/orb/providers/aws/provider_plugin.py` - the AWS provider as a
+  fully-populated `ProviderPlugin` reference (Pattern B).
