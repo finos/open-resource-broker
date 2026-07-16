@@ -92,6 +92,9 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-key }}
   ENVIRONMENT: ${{ inputs.environment }}
   TESTING: ${{ inputs.testing-flag }}
+  # Belt-and-suspenders: prevent any accidental implicit uv sync from firing
+  # the SPA build hook (setup.py build_ui.sh) in test jobs.
+  ORB_SKIP_UI_BUILD: "1"
 
 jobs:
   test:

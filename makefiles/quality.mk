@@ -9,14 +9,14 @@ format: dev-install  ## Format code (usage: make format [fix])
 	@if echo "$(MAKECMDGOALS)" | grep -q "fix"; then \
 		./dev-tools/quality/quality_dispatcher.py fix; \
 	else \
-		uv run ruff format --check --quiet .; \
+		uv run --no-sync ruff format --check --quiet .; \
 	fi
 
 lint: dev-install  ## Lint code (usage: make lint [optional])
 	@if echo "$(MAKECMDGOALS)" | grep -q "optional"; then \
-		uv run ruff check --select=N,UP,B,PL,C90,RUF --quiet . || true; \
+		uv run --no-sync ruff check --select=N,UP,B,PL,C90,RUF --quiet . || true; \
 	else \
-		uv run ruff check --quiet .; \
+		uv run --no-sync ruff check --quiet .; \
 	fi
 
 validate: lint ci-tests-unit  ## Run all validation checks
@@ -141,7 +141,7 @@ validate-workflow-syntax: dev-install  ## Validate GitHub Actions workflow YAML 
 	@echo "Validating workflow files..."
 	# Use 'uv run' because this script imports PyYAML (third-party package)
 	# Other dev-tools scripts use only standard library so work with shebang
-	uv run ./dev-tools/quality/validate_workflows.py
+	uv run --no-sync ./dev-tools/quality/validate_workflows.py
 
 validate-workflow-logic: dev-install  ## Validate GitHub Actions workflows with actionlint
 	@echo "Validating workflows with actionlint..."

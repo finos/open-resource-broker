@@ -105,12 +105,12 @@ run_tool() {
             adjusted_args=$(adjust_relative_args "$project_root" "$@")
             if [ -n "$adjusted_args" ]; then
                 # shellcheck disable=SC2086
-                (cd "$project_root" && uv run "${TOOL_NAME}" $adjusted_args)
+                (cd "$project_root" && uv run --no-sync "${TOOL_NAME}" $adjusted_args)
             else
-                (cd "$project_root" && uv run "${TOOL_NAME}")
+                (cd "$project_root" && uv run --no-sync "${TOOL_NAME}")
             fi
         else
-            uv run "${TOOL_NAME}" "$@"
+            uv run --no-sync "${TOOL_NAME}" "$@"
         fi
     elif [ -f ".venv/bin/${TOOL_NAME}" ] && venv_usable ".venv"; then
         echo "Executing with venv..."
@@ -125,12 +125,12 @@ run_tool() {
                 adjusted_args=$(adjust_relative_args "$project_root" "$@")
                 if [ -n "$adjusted_args" ]; then
                     # shellcheck disable=SC2086
-                    (cd "$project_root" && uv run python -m "${TOOL_NAME}" $adjusted_args)
+                    (cd "$project_root" && uv run --no-sync python -m "${TOOL_NAME}" $adjusted_args)
                 else
-                    (cd "$project_root" && uv run python -m "${TOOL_NAME}")
+                    (cd "$project_root" && uv run --no-sync python -m "${TOOL_NAME}")
                 fi
             else
-                uv run python -m "${TOOL_NAME}" "$@"
+                uv run --no-sync python -m "${TOOL_NAME}" "$@"
             fi
         else
             python3 -m "${TOOL_NAME}" "$@"

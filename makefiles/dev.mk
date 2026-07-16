@@ -60,7 +60,7 @@ test-report: dev-install  ## Generate comprehensive test report (PRESERVE: used 
 	./dev-tools/testing/run_tests.py --all --coverage --junit-xml=test-results-combined.xml --cov-xml=coverage-combined.xml --html-coverage --maxfail=1 --timeout=60
 
 system-tests: dev-install  ## Run system integration tests (real AWS)
-	@uv run python -m pytest tests/providers/aws/live/test_onaws.py -v -m manual_aws --no-cov --tb=long
+	@uv run --no-sync python -m pytest tests/providers/aws/live/test_onaws.py -v -m manual_aws --no-cov --tb=long
 
 # Backward compatibility aliases (direct calls to avoid loops)
 test-unit: dev-install
@@ -109,14 +109,14 @@ _HALF_CPU := $(shell python3 -c 'import os; print(max(1, (os.cpu_count() or 2) /
 PYTEST_WORKERS ?= $(_HALF_CPU)
 
 test-no-live: dev-install  ## Run all tests except live cloud suites (pre-PR check)
-	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) --ignore=tests/providers/aws/live
+	@uv run --no-sync pytest --no-cov -q -ra -n $(PYTEST_WORKERS) --ignore=tests/providers/aws/live
 
 test-providers: dev-install  ## Run all provider tests except live
-	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers --ignore=tests/providers/aws/live
+	@uv run --no-sync pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/providers --ignore=tests/providers/aws/live
 
 
 test-architecture: dev-install  ## Run architecture compliance tests
-	@uv run pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/unit/architecture tests/unit/test_architectural_compliance.py
+	@uv run --no-sync pytest --no-cov -q -ra -n $(PYTEST_WORKERS) tests/unit/architecture tests/unit/test_architectural_compliance.py
 
 # Dummy targets removed (consolidated in quality.mk)
 

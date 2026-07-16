@@ -38,6 +38,13 @@ concurrency:
 permissions:
   contents: read
 
+# Belt-and-suspenders: prevent any accidental implicit uv sync from firing
+# the SPA build hook (setup.py build_ui.sh) in this workflow.
+# Exception: build-and-package sets ORB_SKIP_UI_BUILD=1 on its own step env
+# because it intentionally skips the UI build for the CI-only wheel artifact.
+env:
+  ORB_SKIP_UI_BUILD: "1"
+
 jobs:
   config:
     name: Configuration

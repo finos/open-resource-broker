@@ -4,12 +4,12 @@
 # Individual code quality targets (with tool names)
 ci-quality-ruff: dev-install  ## Run Ruff formatting and linting check (basic rules only)
 	@echo "Running Ruff formatting and linting check (basic rules only)..."
-	@uv run ruff check --select W,F,I --ignore E501 --quiet .
-	@uv run ruff format --check --quiet .
+	@uv run --no-sync ruff check --select W,F,I --ignore E501 --quiet .
+	@uv run --no-sync ruff format --check --quiet .
 
 ci-quality-ruff-optional:  ## Run Ruff extended linting (warnings only)
 	@echo "Running Ruff extended linting..."
-	uv run ruff check --select=E501,N,UP,B,PL,C90,RUF . || true
+	uv run --no-sync ruff check --select=E501,N,UP,B,PL,C90,RUF . || true
 
 ci-quality-radon:  ## Run radon complexity analysis
 	@echo "Running radon complexity analysis..."
@@ -28,19 +28,19 @@ ci-quality-full: ci-quality-ruff ci-quality-ruff-optional ci-quality-pyright  ##
 # Individual architecture quality targets (with tool names)
 ci-arch-cqrs:  ## Run CQRS pattern validation
 	@echo "Running CQRS pattern validation..."
-	./dev-tools/quality/validate_cqrs.py
+	uv run --no-sync python ./dev-tools/quality/validate_cqrs.py
 
 ci-arch-clean:  ## Run Clean Architecture dependency validation
 	@echo "Running Clean Architecture validation..."
-	./dev-tools/quality/check_architecture.py
+	uv run --no-sync python ./dev-tools/quality/check_architecture.py
 
 ci-arch-imports: dev-install  ## Run import validation
 	@echo "Running import validation..."
-	uv run python ./dev-tools/quality/validate_imports.py
+	uv run --no-sync python ./dev-tools/quality/validate_imports.py
 
 ci-arch-file-sizes:  ## Check file size compliance
 	@echo "Running file size checks..."
-	./dev-tools/quality/dev_tools_runner.py check-file-sizes --warn-only
+	uv run --no-sync python ./dev-tools/quality/dev_tools_runner.py check-file-sizes --warn-only
 
 ci-arch-lint-imports: dev-install  ## Run import-linter layer-boundary contracts
 	@echo "Running import-linter layer-boundary checks..."
