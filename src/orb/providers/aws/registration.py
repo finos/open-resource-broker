@@ -141,6 +141,10 @@ def register_aws_provider_settings() -> None:
         from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
         from orb.providers.aws.configuration.config import AWSProviderConfig
 
+        # Idempotency guard: skip if already registered.
+        if ProviderSettingsRegistry.get_or_none("aws") is not None:
+            return
+
         # Register AWSProviderConfig as the settings class for AWS providers
         ProviderSettingsRegistry.register_provider_settings("aws", AWSProviderConfig)
 
@@ -397,6 +401,10 @@ def register_aws_extensions(logger: Optional["LoggingPort"] = None) -> None:
         logger: Optional logger for registration messages
     """
     try:
+        # Idempotency guard: skip if already registered.
+        if TemplateExtensionRegistry.has_extension("aws"):
+            return
+
         # Register AWS DTO config as the typed provider_config class for TemplateDTO
         # serialisation.  AWSTemplateDTOConfig covers the fields that were previously
         # split between the top-level TemplateDTO and the opaque metadata dict.
@@ -499,49 +507,90 @@ def initialize_aws_provider(
     This is the main initialization function that should be called during
     application startup to set up all AWS provider components.
 
+    Performs each satellite registration step directly so that this module
+    does not need to import :mod:`orb.providers.aws.provider_plugin`, keeping
+    the dependency graph one-directional (provider_plugin → registration).
+
     Args:
         template_factory: Optional template factory to register AWS components with
         logger: Optional logger for initialization messages
     """
+    from orb.providers.base.provider_plugin import _initialized_providers
+
+    if "aws" in _initialized_providers:
+        return
     try:
-        # Register AWS provider settings
+        # 1. Provider settings
         register_aws_provider_settings()
 
-        # Register AWS extensions
+        # 2. Template DTO extension
         register_aws_extensions(logger)
 
-        # Register AWS authentication strategies
+        # 3. Auth strategies
         register_aws_auth_strategies(logger)
 
-        # Register AWS template factory if provided
-        if template_factory:
+        # 4. Template class
+        if template_factory is not None:
             register_aws_template_factory(template_factory, logger)
 
-        # Register AWS CLI spec
-        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
-        from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
+        # 5. CLI spec
+        try:
+            from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
+            from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
 
-        CLISpecRegistry.register("aws", AWSCLISpec())
+            CLISpecRegistry.register("aws", AWSCLISpec())
+        except ImportError:
+            # CLI spec module not installed; skip registration silently.
+            pass
 
-        # Register AWS HostFactory field-mapping adapter
-        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
-            FieldMappingRegistry,
-        )
-        from orb.providers.aws.scheduler.hostfactory_field_mapping import AWSFieldMapping
+        # 6. HostFactory field mapping
+        try:
+            from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+                FieldMappingRegistry,
+            )
+            from orb.providers.aws.scheduler.hostfactory_field_mapping import AWSFieldMapping
 
-        FieldMappingRegistry.register("aws", AWSFieldMapping())
+            FieldMappingRegistry.register("aws", AWSFieldMapping())
+        except ImportError:
+            # Field-mapping module not installed; skip registration silently.
+            pass
 
-        # Register AWS defaults loader
-        from orb.providers.aws.defaults_loader import AWSDefaultsLoader
-        from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
+        # 7. Defaults loader
+        try:
+            from orb.providers.aws.defaults_loader import AWSDefaultsLoader
+            from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
 
-        DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
+            DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
+        except ImportError:
+            # Defaults-loader module not installed; skip registration silently.
+            pass
+
+        # 8. Storage backends (DynamoDB + Aurora)
+        try:
+            from orb.infrastructure.storage.registry import get_storage_registry
+            from orb.providers.aws.storage.registration import (
+                register_aurora_storage,
+                register_dynamodb_storage,
+            )
+
+            _storage_registry = get_storage_registry()
+            if not _storage_registry.is_registered("dynamodb"):
+                register_dynamodb_storage(_storage_registry, logger)
+            if not _storage_registry.is_registered("aurora"):
+                register_aurora_storage(_storage_registry, logger)
+        except ImportError:
+            # Storage backend extras not installed; skip DynamoDB/Aurora registration silently.
+            pass
+
+        _initialized_providers.add("aws")
 
         if logger:
             logger.info("AWS provider initialization completed successfully")
 
-    except Exception as e:
-        error_msg = f"AWS provider initialization failed: {e}"
+    except Exception as exc:
+        # Deliberately NOT adding to _initialized_providers so a retry after
+        # fixing the root cause will re-attempt fully.
+        error_msg = f"aws provider initialization failed: {exc}"
         if logger:
             logger.error(error_msg, exc_info=True)
         raise
@@ -563,6 +612,20 @@ def register_aws_services_with_di(container) -> None:
     logger = container.get(LoggingPort)
 
     try:
+        # Register AMICacheService + ImageResolver (AWS-backed).
+        # Guarded so that a second call (e.g. during tests) is a no-op.
+        from orb.domain.template.image_resolver import ImageResolver
+        from orb.infrastructure.caching.ami_cache_service import AMICacheService
+        from orb.providers.aws.domain.services.ami_resolver import AWSAMIResolver
+
+        if not container.is_registered(AMICacheService):
+            container.register_singleton(AMICacheService, lambda _c: AMICacheService())
+        if not container.is_registered(ImageResolver):
+            container.register_singleton(
+                ImageResolver,
+                lambda c: AWSAMIResolver(cache_service=c.get(AMICacheService)),
+            )
+
         # Register AWS Template Adapter
         from orb.domain.base.ports.template_adapter_port import TemplateAdapterPort
         from orb.providers.aws.infrastructure.adapters.template_adapter import AWSTemplateAdapter
@@ -610,9 +673,30 @@ def register_aws_services_with_di(container) -> None:
         )
 
 
-# Auto-register AWS extensions when module is imported
-# This ensures basic functionality even if explicit initialization is missed
+# ---------------------------------------------------------------------------
+# Entry-point plugin hook — invoked by ``orb.providers`` entry-point group.
+# ---------------------------------------------------------------------------
 
-with suppress(Exception):
-    register_aws_extensions()
-    register_aws_provider_settings()
+_REGISTERED_PROVIDERS: list[str] = []
+"""Module-level sentinel used by ``register_aws_plugin`` to prevent double-registration.
+
+Populated (value ``"aws"`` appended) on the first successful call so that
+re-importing this module or calling the hook a second time is a safe no-op.
+"""
+
+
+def register_aws_plugin() -> None:
+    """Entry-point hook for the ``orb.providers`` entry-point group.
+
+    Zero-argument, idempotent.  Backwards-compatible wrapper that calls
+    :func:`register_aws_provider` directly, keeping the dependency graph
+    one-directional (provider_plugin → registration) with no reverse import.
+
+    Preserved for backwards-compatibility with any external caller that imports
+    this function directly.  New code should prefer
+    ``AWSPlugin.register_plugin()``.
+    """
+    if "aws" in _REGISTERED_PROVIDERS:
+        return
+    register_aws_provider()
+    _REGISTERED_PROVIDERS.append("aws")
