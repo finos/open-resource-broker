@@ -236,3 +236,76 @@ class TestReturnMachinesOrchestrator:
         result = await orchestrator.execute(input)
         assert result.status == "no_op"
         assert result.machine_ids == []
+
+    # ------------------------------------------------------------------
+    # request_id path
+    # ------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_request_id_dispatches_list_machines_query(
+        self, orchestrator, mock_query_bus, mock_command_bus
+    ):
+        """request_id branch queries list-machines filtered by request_id."""
+        mock_query_bus.execute.return_value = [
+            MagicMock(machine_id="m-001"),
+            MagicMock(machine_id="m-002"),
+        ]
+
+        async def _set_request_ids(cmd):
+            cmd.created_request_ids = ["ret-req-002"]
+
+        mock_command_bus.execute.side_effect = _set_request_ids
+        input = ReturnMachinesInput(request_id="req-abc")
+        await orchestrator.execute(input)
+        mock_query_bus.execute.assert_called_once()
+        query_arg = mock_query_bus.execute.call_args[0][0]
+        assert isinstance(query_arg, ListMachinesQuery)
+        assert query_arg.request_id == "req-abc"
+        assert not getattr(query_arg, "all_resources", False)
+
+    @pytest.mark.asyncio
+    async def test_request_id_passes_resolved_ids_to_command(
+        self, orchestrator, mock_query_bus, mock_command_bus
+    ):
+        """Machines resolved via request_id are forwarded to CreateReturnRequestCommand."""
+        mock_query_bus.execute.return_value = [
+            MagicMock(machine_id="m-001"),
+            MagicMock(machine_id="m-002"),
+        ]
+
+        async def _set_request_ids(cmd):
+            cmd.created_request_ids = ["ret-req-002"]
+
+        mock_command_bus.execute.side_effect = _set_request_ids
+        input = ReturnMachinesInput(request_id="req-abc")
+        await orchestrator.execute(input)
+        cmd = mock_command_bus.execute.call_args[0][0]
+        assert cmd.machine_ids == ["m-001", "m-002"]
+
+    @pytest.mark.asyncio
+    async def test_request_id_no_active_machines_returns_no_machines_status(
+        self, orchestrator, mock_query_bus, mock_command_bus
+    ):
+        """Empty result for request_id → no_machines status, command not dispatched."""
+        mock_query_bus.execute.return_value = []
+        input = ReturnMachinesInput(request_id="req-empty")
+        result = await orchestrator.execute(input)
+        assert result.status == "no_machines"
+        assert result.request_id is None
+        mock_command_bus.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_request_id_returns_pending_when_machines_found(
+        self, orchestrator, mock_query_bus, mock_command_bus
+    ):
+        """Happy path for request_id → pending status with resolved request_id."""
+        mock_query_bus.execute.return_value = [MagicMock(machine_id="m-001")]
+
+        async def _set_request_ids(cmd):
+            cmd.created_request_ids = ["ret-req-002"]
+
+        mock_command_bus.execute.side_effect = _set_request_ids
+        input = ReturnMachinesInput(request_id="req-abc")
+        result = await orchestrator.execute(input)
+        assert result.status == "pending"
+        assert result.request_id == "ret-req-002"

@@ -128,6 +128,7 @@ class ListRequestsOutput:
 class ReturnMachinesInput:
     machine_ids: list[str] = dataclasses.field(default_factory=list)
     all_machines: bool = False
+    request_id: Optional[str] = None
     force: bool = False
     wait: bool = False
     timeout_seconds: int = 300

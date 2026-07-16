@@ -154,6 +154,15 @@ def add_machine_actions(subparsers):
         "--machine-id", "-m", action="append", dest="machine_ids_flag", help="Machine ID to return"
     )
     machines_return.add_argument(
+        "--request-id",
+        "-r",
+        dest="request_id",
+        help=(
+            "Return all machines belonging to this acquisition request ID. "
+            "Mutually exclusive with machine IDs and --all."
+        ),
+    )
+    machines_return.add_argument(
         "--wait", action="store_true", help="Wait for return request to complete"
     )
     machines_return.add_argument("--timeout", type=int, default=300, help="Wait timeout in seconds")

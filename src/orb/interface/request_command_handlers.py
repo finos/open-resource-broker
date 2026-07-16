@@ -190,6 +190,7 @@ async def handle_request_return_machines(
     formatter = container.get(ResponseFormattingService)
 
     has_all = getattr(args, "all", False)
+    request_id = getattr(args, "request_id", None)
     machine_ids: list[str] = []
 
     if hasattr(args, "input_data") and args.input_data:
@@ -205,6 +206,18 @@ async def handle_request_return_machines(
 
     has_specific_ids = bool(machine_ids)
 
+    if request_id and has_specific_ids:
+        return {
+            "error": "Cannot use --request-id with specific machine IDs",
+            "message": "Use either --request-id or specific machine IDs, not both",
+        }
+
+    if request_id and has_all:
+        return {
+            "error": "Cannot use --request-id with --all",
+            "message": "Use either --request-id or --all, not both",
+        }
+
     if has_all and has_specific_ids:
         return {
             "error": "Cannot use --all with specific machine IDs",
@@ -219,7 +232,7 @@ async def handle_request_return_machines(
                 "message": "Use --force to confirm returning all machines",
             }
 
-    if not has_all and not machine_ids:
+    if not has_all and not machine_ids and not request_id:
         return {
             "error": "Machine IDs are required",
             "message": "Machine IDs must be provided either as arguments or in JSON file",
@@ -228,6 +241,7 @@ async def handle_request_return_machines(
     result = await orchestrator.execute(
         ReturnMachinesInput(
             machine_ids=machine_ids,
+            request_id=request_id,
             all_machines=has_all,
             force=getattr(args, "force", False),
             wait=getattr(args, "wait", False),

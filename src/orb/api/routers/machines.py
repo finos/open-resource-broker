@@ -5,7 +5,7 @@ from typing import Any, Optional
 try:
     from fastapi import APIRouter, Depends, Query, Request
     from fastapi.responses import JSONResponse
-    from pydantic import AliasChoices, Field
+    from pydantic import AliasChoices, Field, model_validator
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
@@ -68,13 +68,29 @@ class ReturnMachinesRequest(APIRequest):
     """Request for machine return.
 
     Accepts both camelCase (machineIds) and snake_case field names.
+    Exactly one of machine_ids (non-empty), request_id, or all_machines=True must be provided.
     """
 
-    machine_ids: list[str]
+    machine_ids: list[str] = Field(default_factory=list)
+    request_id: Optional[str] = None
     all_machines: bool = False
     force: bool = False
     provider_name: Optional[str] = None
     provider_type: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_target_selection(self) -> "ReturnMachinesRequest":
+        has_machine_ids = bool(self.machine_ids)
+        has_request_id = bool(self.request_id)
+        has_all = self.all_machines
+        # Targeting modes are mutually exclusive, but zero is allowed: an empty
+        # request is handled downstream as a no-op (preserves existing contract).
+        if sum([has_machine_ids, has_request_id, has_all]) > 1:
+            raise ValueError(
+                "machine_ids, request_id, and all_machines are mutually exclusive; "
+                "provide at most one."
+            )
+        return self
 
 
 @router.post(
@@ -138,6 +154,7 @@ async def return_machines(
     result = await orchestrator.execute(
         ReturnMachinesInput(
             machine_ids=request_data.machine_ids,
+            request_id=request_data.request_id,
             all_machines=request_data.all_machines,
             force=request_data.force,
             provider_name=request_data.provider_name,
