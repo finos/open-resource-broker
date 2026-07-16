@@ -16,6 +16,7 @@ import sys
 from orb.cli.args import parse_args
 from orb.cli.console import print_error, print_success, print_warning
 from orb.cli.router import execute_command
+from orb.infrastructure.di.container import get_container
 from orb.infrastructure.logging.logger import get_logger
 
 __all__ = ["main", "parse_args", "execute_command"]
@@ -134,7 +135,6 @@ async def main() -> None:
         if hasattr(args, "scheduler") and args.scheduler:
             try:
                 from orb.domain.base.ports.configuration_port import ConfigurationPort
-                from orb.infrastructure.di.container import get_container
 
                 container = get_container()
                 config = container.get(ConfigurationPort)
@@ -146,7 +146,6 @@ async def main() -> None:
         if hasattr(args, "provider_name") and args.provider_name:
             try:
                 from orb.domain.base.ports.configuration_port import ConfigurationPort
-                from orb.infrastructure.di.container import get_container
 
                 container = get_container()
                 config = container.get(ConfigurationPort)
@@ -157,7 +156,6 @@ async def main() -> None:
         if hasattr(args, "provider_type") and args.provider_type:
             try:
                 from orb.domain.base.ports.configuration_port import ConfigurationPort
-                from orb.infrastructure.di.container import get_container
 
                 container = get_container()
                 config = container.get(ConfigurationPort)
@@ -169,6 +167,11 @@ async def main() -> None:
         if args.resource == "init":
             from orb.interface.init_command_handler import handle_init
 
+            # Attach container so handle_init (and any future early-dispatch
+            # handlers) can resolve DI ports via args._container, matching the
+            # contract set by execute_command / router.py.
+            if not hasattr(args, "_container") or args._container is None:
+                args._container = get_container()
             result = await handle_init(args)
             sys.exit(result)
 
@@ -184,6 +187,9 @@ async def main() -> None:
         if args.resource in ["templates", "template"] and args.action == "generate":
             from orb.interface.templates_generate_handler import handle_templates_generate
 
+            # Attach container for early-dispatch parity with execute_command.
+            if not hasattr(args, "_container") or args._container is None:
+                args._container = get_container()
             try:
                 result = await handle_templates_generate(args)
                 if result.get("status") == "success":
@@ -264,7 +270,6 @@ async def main() -> None:
             if scheduler_override_active:
                 try:
                     from orb.domain.base.ports.configuration_port import ConfigurationPort
-                    from orb.infrastructure.di.container import get_container
 
                     container = get_container()
                     config = container.get(ConfigurationPort)

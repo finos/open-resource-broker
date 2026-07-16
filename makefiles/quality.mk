@@ -97,8 +97,13 @@ sbom-generate: dev-install ## Generate Software Bill of Materials (SBOM)
 	./dev-tools/setup/install_dev_tools.py --tool syft
 	./dev-tools/setup/install_dev_tools.py --tool pip-audit
 	@echo "Generating Python dependency SBOM..."
-	$(call run-tool,pip-audit,--format=cyclonedx-json --output=python-sbom-cyclonedx.json)
-	$(call run-tool,pip-audit,--format=json --output=python-sbom.json)
+	# pip-audit exits 1 when it finds CVEs (routine) or on a network blip.
+	# We still want the output file; || true keeps the recipe non-failing.
+	# Real vulnerability gating lives in the ci-security stage, not here.
+	-$(call run-tool,pip-audit,--format=cyclonedx-json --output=python-sbom-cyclonedx.json) || true
+	-$(call run-tool,pip-audit,--format=json --output=python-sbom.json) || true
+	@echo "Generating SPDX dependency SBOM via syft..."
+	-$(call run-tool,syft,. -o spdx-json=python-sbom-spdx.json) || true
 	@echo "SBOM files generated successfully"
 
 security-report: security sbom-generate  ## Generate comprehensive security report

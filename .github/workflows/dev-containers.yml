@@ -103,6 +103,10 @@ jobs:
       contents: read
       packages: write
       security-events: write
+      # Required for keyless cosign signing (ambient OIDC token) and
+      # actions/attest-build-provenance on pushed images.
+      id-token: write
+      attestations: write
 
     steps:
     - name: Checkout code
@@ -126,14 +130,23 @@ jobs:
         cache-key: ${{ needs.setup-cache.outputs.cache-key }}
         fail-on-cache-miss: false
 
+    - name: Setup Bun (for UI static bundle)
+      # Bun is required to compile the Reflex SPA bundle during `make build`.
+      # Without it the wheel ships no _static/ directory and the container starts
+      # in embedded mode with a missing SPA — a non-bootable signed image (H2).
+      # This mirrors the prod-release.yml build-wheel pattern for prod/dev parity.
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
+      with:
+        bun-version: "1.2.15"  # pinned; update intentionally to avoid surprise breakage
+
     - name: Build package wheel
-      # This job builds a wheel to scan in a container image and has no bun/uv
-      # to compile the SPA (it never shipped one).  Skip the UI build.
-      env:
-        ORB_SKIP_UI_BUILD: "1"
+      # SPA bundle is compiled by the setuptools build hook during `make build`
+      # now that Bun is on PATH.  ORB_SKIP_UI_BUILD is NOT set so the wheel
+      # ships the _static/ directory — identical to the prod-release.yml wheel.
       run: make build
 
     - name: Build and scan container image
+      id: build
       shell: bash
       env:
         REGISTRY: ${{ needs.config.outputs.container-registry }}
@@ -169,11 +182,22 @@ jobs:
             --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
             --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
             --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT" \
+            --provenance=true \
+            --sbom=true \
+            --metadata-file metadata.json \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --push \
             -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
             .
+
+          # Extract the immutable digest for the signing steps below.
+          DIGEST=$(jq -r '."containerimage.digest"' metadata.json)
+          {
+            echo "digest=${DIGEST}"
+            echo "image=${REGISTRY}/${IMAGE_NAME}"
+            echo "pushed=true"
+          } >> "$GITHUB_OUTPUT"
 
           # Pull back a single-arch image for local Trivy scanning.
           # Multi-arch manifests cannot be loaded/scanned; we use the first
@@ -195,7 +219,28 @@ jobs:
             --load \
             -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
             .
+          echo "pushed=false" >> "$GITHUB_OUTPUT"
         fi
+
+    - name: Install cosign
+      # Only needed when an image was pushed; skip on PR / local-only builds.
+      if: steps.build.outputs.pushed == 'true'
+      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2
+
+    - name: Sign container image (keyless / OIDC)
+      if: steps.build.outputs.pushed == 'true'
+      env:
+        DIGEST: ${{ steps.build.outputs.digest }}
+        IMAGE: ${{ steps.build.outputs.image }}
+      run: cosign sign --yes "$IMAGE@$DIGEST"
+
+    - name: Attach SLSA provenance attestation
+      if: steps.build.outputs.pushed == 'true'
+      uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
+      with:
+        subject-name: ${{ steps.build.outputs.image }}
+        subject-digest: ${{ steps.build.outputs.digest }}
+        push-to-registry: true
 
     - name: Run Trivy security scan
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0

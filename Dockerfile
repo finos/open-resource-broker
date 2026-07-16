@@ -52,10 +52,17 @@ RUN pip install --no-cache-dir uv==0.8.12 \
     && uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy pre-built wheel and install dependencies
+# Copy pre-built wheel and install with all runtime extras.
+#
+# [all] = cli + api (fastapi/uvicorn) + sql + monitoring + all-providers
+#         (aws, k8s) + ui (reflex).  The server needs api to serve, and the
+#         default UIConfig (enabled=True, mode="embedded") makes the entrypoint's
+#         `orb server start --foreground` import orb.ui.app, which needs reflex.
+# The ci/dev test tooling groups are not installed — this is a production image.
 COPY dist/*.whl /tmp/
-RUN uv pip install --no-cache /tmp/*.whl \
-    && rm -rf /tmp/*.whl
+RUN WHEEL=$(ls /tmp/*.whl) \
+    && uv pip install --no-cache "${WHEEL}[all]" \
+    && rm -f /tmp/*.whl
 
 # Copy only runtime files needed
 COPY config/ ./config/
@@ -91,9 +98,12 @@ ENV PYTHONPATH=/app \
 ENV HF_AUTH_ENABLED=false \
     HF_AUTH_STRATEGY=none
 
-# Health check
+# Health check.
+# In embedded mode (default, UIConfig.mode="embedded") the Reflex backend mounts
+# ORB's FastAPI at /orb, so the health endpoint is /orb/health — NOT /health.
+# /health (no prefix) is only reachable in api-only / split mode.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:${HF_SERVER_PORT}/health', timeout=5).raise_for_status()" || exit 1
+    CMD python -c "import requests; requests.get('http://localhost:${HF_SERVER_PORT}/orb/health', timeout=5).raise_for_status()" || exit 1
 
 # Expose port
 EXPOSE 8000

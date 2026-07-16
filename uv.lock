@@ -3248,7 +3248,7 @@ wheels = [
 
 [[package]]
 name = "orb-py"
-version = "1.7.0"
+version = "1.8.0"
 source = { editable = "." }
 dependencies = [
     { name = "boto3" },
@@ -3276,6 +3276,7 @@ all = [
     { name = "kubernetes" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-prometheus" },
+    { name = "opentelemetry-instrumentation-botocore" },
     { name = "opentelemetry-instrumentation-click" },
     { name = "opentelemetry-instrumentation-fastapi" },
     { name = "opentelemetry-instrumentation-logging" },
@@ -3284,6 +3285,7 @@ all = [
     { name = "opentelemetry-sdk" },
     { name = "prometheus-client" },
     { name = "psutil" },
+    { name = "reflex" },
     { name = "rich" },
     { name = "rich-argparse" },
     { name = "starlette" },
@@ -3711,7 +3713,7 @@ requires-dist = [
     { name = "orb-py", extras = ["aws"], marker = "extra == 'test-aws'" },
     { name = "orb-py", extras = ["aws", "monitoring"], marker = "extra == 'monitoring-aws'" },
     { name = "orb-py", extras = ["ci", "all-providers"], marker = "extra == 'dev'" },
-    { name = "orb-py", extras = ["cli", "api", "sql", "monitoring", "all-providers"], marker = "extra == 'all'" },
+    { name = "orb-py", extras = ["cli", "api", "sql", "monitoring", "monitoring-aws", "all-providers", "ui"], marker = "extra == 'all'" },
     { name = "orb-py", extras = ["k8s"], marker = "extra == 'all-providers'" },
     { name = "orb-py", extras = ["k8s"], marker = "extra == 'test-k8s'" },
     { name = "orb-py", extras = ["otel"], marker = "extra == 'monitoring'" },
@@ -5011,7 +5013,7 @@ name = "redis"
 version = "7.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "async-timeout", marker = "python_full_version < '3.11.3'" },
+    { name = "async-timeout", marker = "python_full_version < '3.11.3' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/51/93/05e7d4a65285066a74f48697f9b9cde5cfce71398033d69ed83c3d98f5c9/redis-7.4.1.tar.gz", hash = "sha256:1a1df5067062cf7cbe677994e391f8ee0840f499d370f1a71266e0dd3aa9308e", size = 4945742, upload-time = "2026-06-05T09:10:06.703Z" }
 wheels = [
@@ -5039,10 +5041,10 @@ version = "0.9.6.post1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
-    { name = "granian", extra = ["reload"], marker = "extra == 'extra-6-orb-py-ui'" },
+    { name = "granian", extra = ["reload"] },
     { name = "httpx" },
     { name = "packaging" },
-    { name = "psutil", marker = "sys_platform == 'win32'" },
+    { name = "psutil", marker = "sys_platform == 'win32' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "python-multipart" },
     { name = "python-socketio" },
     { name = "redis" },

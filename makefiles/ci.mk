@@ -159,7 +159,11 @@ ci-tests-providers:  ## Run providers tests (PROVIDER=<name> scopes to one provi
 
 ci-tests-providers-serial:  ## Run the serial-marked subset of provider tests (live AWS, etc.)
 	@echo "Running serial provider tests: $(if $(PROVIDER),$(PROVIDER),all)..."
-	$(call run-tool,pytest,$(PROVIDER_SERIAL_PATH) $(PYTEST_SERIAL) $(PYTEST_LIVE) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers$(PROVIDER_SUFFIX)-serial.xml --junitxml=junit-providers$(PROVIDER_SUFFIX)-serial.xml)
+	# Report filenames must match the caller's Codecov upload pattern
+	# junit-<test-type>-<provider>.xml (test-type=providers-serial), i.e.
+	# junit-providers-serial-<provider>.xml — NOT providers-<provider>-serial,
+	# or the serial leg's results never reach Codecov's test count.
+	$(call run-tool,pytest,$(PROVIDER_SERIAL_PATH) $(PYTEST_SERIAL) $(PYTEST_LIVE) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-providers-serial$(PROVIDER_SUFFIX).xml --junitxml=junit-providers-serial$(PROVIDER_SUFFIX).xml)
 
 ci-tests-infrastructure:  ## Run infrastructure tests only (matches ci.yml infrastructure-tests job)
 	@echo "Running infrastructure tests (parallel)..."
