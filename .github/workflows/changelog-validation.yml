@@ -32,8 +32,9 @@ jobs:
     uses: ./.github/workflows/cache-management.yml
     with:
       cache-type: dependencies
-      cache-key-base: changelog-validation
+      cache-key-base: deps
       python-version: ${{ needs.config.outputs.default-python-version }}
+      group: build
 
   validate-changelog:
     name: Validate Changelog Format
@@ -53,6 +54,7 @@ jobs:
       uses: ./.github/actions/setup-uv-cached
       with:
         cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+        group: build
         fail-on-cache-miss: false
     
     - name: Install changelog dependencies

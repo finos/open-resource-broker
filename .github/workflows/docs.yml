@@ -36,6 +36,11 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+# Belt-and-suspenders: prevent any accidental implicit uv sync from firing
+# the SPA build hook (setup.py build_ui.sh) in this workflow.
+env:
+  ORB_SKIP_UI_BUILD: "1"
+
 jobs:
   config:
     name: Get Configuration
@@ -56,8 +61,9 @@ jobs:
     uses: ./.github/workflows/cache-management.yml
     with:
       cache-type: dependencies
-      cache-key-base: docs-deps
+      cache-key-base: deps
       python-version: ${{ needs.config.outputs.default-python-version }}
+      group: docs
 
   build:
     needs: [config, setup-cache]
@@ -73,6 +79,7 @@ jobs:
         uses: ./.github/actions/setup-uv-cached
         with:
           cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+          group: docs
           fail-on-cache-miss: false
 
       - name: Build documentation

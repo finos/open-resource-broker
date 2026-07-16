@@ -4,6 +4,12 @@ set -e
 # Centralized tool execution script with environment setup
 # Usage: run_tool.sh <tool_name> [args...]
 # Handles environment setup and tries different execution methods
+#
+# In CI the venv is pre-populated by setup-uv-cached (per-job scoped group).
+# All `uv run` calls below use --no-sync so they never trigger a redundant sync
+# or the setup.py SPA build hook.  The adjust_relative_args helper and the
+# subdirectory-cd path are retained for local developer use where the tool may
+# be invoked from a subdirectory; they are not exercised in CI.
 
 TOOL_NAME="$1"
 shift  # Remove tool name from arguments
@@ -105,12 +111,12 @@ run_tool() {
             adjusted_args=$(adjust_relative_args "$project_root" "$@")
             if [ -n "$adjusted_args" ]; then
                 # shellcheck disable=SC2086
-                (cd "$project_root" && uv run "${TOOL_NAME}" $adjusted_args)
+                (cd "$project_root" && uv run --no-sync "${TOOL_NAME}" $adjusted_args)
             else
-                (cd "$project_root" && uv run "${TOOL_NAME}")
+                (cd "$project_root" && uv run --no-sync "${TOOL_NAME}")
             fi
         else
-            uv run "${TOOL_NAME}" "$@"
+            uv run --no-sync "${TOOL_NAME}" "$@"
         fi
     elif [ -f ".venv/bin/${TOOL_NAME}" ] && venv_usable ".venv"; then
         echo "Executing with venv..."
@@ -125,12 +131,12 @@ run_tool() {
                 adjusted_args=$(adjust_relative_args "$project_root" "$@")
                 if [ -n "$adjusted_args" ]; then
                     # shellcheck disable=SC2086
-                    (cd "$project_root" && uv run python -m "${TOOL_NAME}" $adjusted_args)
+                    (cd "$project_root" && uv run --no-sync python -m "${TOOL_NAME}" $adjusted_args)
                 else
-                    (cd "$project_root" && uv run python -m "${TOOL_NAME}")
+                    (cd "$project_root" && uv run --no-sync python -m "${TOOL_NAME}")
                 fi
             else
-                uv run python -m "${TOOL_NAME}" "$@"
+                uv run --no-sync python -m "${TOOL_NAME}" "$@"
             fi
         else
             python3 -m "${TOOL_NAME}" "$@"

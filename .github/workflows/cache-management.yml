@@ -19,6 +19,15 @@ on:
         description: 'Python version for cache key'
         required: true
         type: string
+      group:
+        description: >-
+          PEP 735 dependency-group to prime (e.g. lint, typecheck, test).
+          When provided the prime job runs `uv sync --frozen --no-default-groups
+          --group <group>` so only the relevant slice is cached.  When empty the
+          prime installs --all-groups (legacy / umbrella callers).
+        required: false
+        type: string
+        default: ''
     outputs:
       cache-key:
         description: 'Generated cache key for use in setup-uv-cached'
@@ -36,12 +45,27 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
+    - name: Install UV
+      uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+    - name: Setup Python 3.12
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+      with:
+        python-version: '3.12'
+
     - name: Generate cache key
       id: cache-key
       run: |
         case "${{ inputs.cache-type }}" in
           dependencies)
-            KEY="${{ inputs.cache-key-base }}-py${{ inputs.python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'uv.lock') }}"
+            # Key encodes the group so per-group caches are independent;
+            # a uv.lock bump invalidates only that group's slice.
+            GROUP="${{ inputs.group }}"
+            if [ -n "$GROUP" ]; then
+              KEY="${{ inputs.cache-key-base }}-py3.12-${GROUP}-${{ hashFiles('.project.yml', 'pyproject.toml', 'uv.lock') }}"
+            else
+              KEY="${{ inputs.cache-key-base }}-py3.12-${{ hashFiles('.project.yml', 'pyproject.toml', 'uv.lock') }}"
+            fi
             ;;
           *)
             KEY="${{ inputs.cache-key-base }}-${{ github.sha }}"
@@ -50,7 +74,7 @@ jobs:
         echo "key=$KEY" >> "$GITHUB_OUTPUT"
         echo "Generated cache key: $KEY"
 
-    - name: Restore cache
+    - name: Restore cache (check for existing warm cache)
       id: cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
       with:
@@ -61,5 +85,22 @@ jobs:
           .pytest_cache
         key: ${{ steps.cache-key.outputs.key }}
         restore-keys: |
-          ${{ inputs.cache-key-base }}-py${{ inputs.python-version }}-
+          ${{ inputs.cache-key-base }}-py3.12-${{ inputs.group != '' && format('{0}-', inputs.group) || '' }}
           ${{ inputs.cache-key-base }}-
+
+    - name: Prime cache (populate on miss)
+      # Only runs when there is no existing warm cache for this key.
+      # Installs the scoped group so the post-step cache save writes a populated
+      # .venv rather than an empty one.  Each job's setup-uv-cached composite
+      # also syncs-on-miss, so correctness never depends on the prime winning
+      # the race; this is best-effort warming.
+      if: steps.cache.outputs.cache-hit != 'true'
+      env:
+        ORB_SKIP_UI_BUILD: "1"
+        UV_GROUP: ${{ inputs.group }}
+      run: |
+        if [ -n "$UV_GROUP" ]; then
+          uv sync --frozen --no-default-groups --group "$UV_GROUP"
+        else
+          uv sync --frozen --all-groups
+        fi

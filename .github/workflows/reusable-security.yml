@@ -15,6 +15,15 @@ on:
         description: 'Default Python version (fallback)'
         required: true
         type: string
+      cache-key:
+        description: >-
+          Pre-computed cache key from the caller's setup-cache step.  When
+          provided the job hits the warm cache primed by the caller's
+          cache-management job.  When omitted the job falls back to installing
+          from scratch (always cold).
+        required: false
+        type: string
+        default: ''
 
 jobs:
   security-scan:
@@ -36,7 +45,17 @@ jobs:
         if: contains('bandit,safety,codeql', inputs.scan-type)
         uses: ./.github/actions/setup-uv-cached
         with:
-          cache-key: deps-${{ inputs.python-version || inputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
+          # Use the caller-supplied cache key (keyed to the security group).
+          # Fallback mirrors the canonical group-keyed format so restore-keys
+          # can still provide a partial hit on a first run.
+          cache-key: >-
+            ${{
+              inputs.cache-key != ''
+              && inputs.cache-key
+              || format('deps-py3.12-security-{0}',
+                   hashFiles('.project.yml', 'pyproject.toml', 'uv.lock'))
+            }}
+          group: security
           fail-on-cache-miss: false
 
       # Bandit Security Scan

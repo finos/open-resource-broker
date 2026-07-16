@@ -33,34 +33,37 @@ endef
 define _provider_targets
 test-providers-$(1)-unit: dev-install  ## Run $(1) provider unit tests
 	@if [ -d tests/providers/$(1)/unit ]; then \
-	  uv run pytest --no-cov -q -ra $(call _workers_flag,$(1)) tests/providers/$(1)/unit; \
+	  uv run --no-sync pytest --no-cov -q -ra $(call _workers_flag,$(1)) tests/providers/$(1)/unit; \
 	else \
 	  echo "no unit tests for $(1)"; \
 	fi
 
 test-providers-$(1)-mocked: dev-install  ## Run $(1) provider mocked tests (in-process API mock)
 	@if [ -d tests/providers/$(1)/mocked ]; then \
-	  uv run pytest --no-cov -q -ra $(call _workers_flag,$(1)) tests/providers/$(1)/mocked; \
+	  uv run --no-sync pytest --no-cov -q -ra $(call _workers_flag,$(1)) tests/providers/$(1)/mocked; \
 	else \
 	  echo "no mocked tests for $(1)"; \
 	fi
 
 test-providers-$(1)-contract: dev-install  ## Run $(1) provider contract tests
 	@if [ -d tests/providers/$(1)/contract ]; then \
-	  uv run pytest --no-cov -q -ra $(call _workers_flag,$(1)) tests/providers/$(1)/contract; \
+	  uv run --no-sync pytest --no-cov -q -ra $(call _workers_flag,$(1)) tests/providers/$(1)/contract; \
 	else \
 	  echo "no contract tests for $(1)"; \
 	fi
 
+# Live tests must sync the provider extra (--extra installs the cloud SDK).
+# ORB_SKIP_UI_BUILD=1 prevents setup.py's build_ui.sh hook from firing during
+# that extra-sync without stripping the --extra flag.
 test-providers-$(1)-live: dev-install  ## Run $(1) provider live tests (real cloud / cluster)
 	@if [ -d tests/providers/$(1)/live ]; then \
-	  uv run --extra $$(or $$(EXTRAS_$(1)),$(1)) pytest --no-cov -q -ra $(call _workers_flag,$(1)) $$(or $$(LIVE_GATE_$(1)),--run-$(1)) tests/providers/$(1)/live; \
+	  ORB_SKIP_UI_BUILD=1 uv run --extra $$(or $$(EXTRAS_$(1)),$(1)) pytest --no-cov -q -ra $(call _workers_flag,$(1)) $$(or $$(LIVE_GATE_$(1)),--run-$(1)) tests/providers/$(1)/live; \
 	else \
 	  echo "no live tests for $(1)"; \
 	fi
 
 test-providers-$(1): dev-install  ## Run all non-live $(1) provider tests
-	@uv run pytest --no-cov -q -ra $(call _workers_flag,$(1)) tests/providers/$(1) --ignore=tests/providers/$(1)/live
+	@uv run --no-sync pytest --no-cov -q -ra $(call _workers_flag,$(1)) tests/providers/$(1) --ignore=tests/providers/$(1)/live
 
 endef
 

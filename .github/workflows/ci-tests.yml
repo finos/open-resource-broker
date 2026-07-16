@@ -38,6 +38,13 @@ concurrency:
 permissions:
   contents: read
 
+# Belt-and-suspenders: prevent any accidental implicit uv sync from firing
+# the SPA build hook (setup.py build_ui.sh) in this workflow.
+# Exception: build-and-package sets ORB_SKIP_UI_BUILD=1 on its own step env
+# because it intentionally skips the UI build for the CI-only wheel artifact.
+env:
+  ORB_SKIP_UI_BUILD: "1"
+
 jobs:
   config:
     name: Configuration
@@ -49,8 +56,9 @@ jobs:
     uses: ./.github/workflows/cache-management.yml
     with:
       cache-type: dependencies
-      cache-key-base: test-deps
+      cache-key-base: deps
       python-version: ${{ needs.config.outputs.default-python-version }}
+      group: test
 
   # Parallel test-group matrix (T2613): splits the non-provider test corpus
   # into independent legs that each run on their own runner with xdist within
@@ -210,11 +218,21 @@ jobs:
       environment: ${{ needs.config.outputs.environment }}
       testing-flag: ${{ needs.config.outputs.testing-flag }}
 
+  setup-cache-build:
+    name: Setup Build Cache
+    needs: config
+    uses: ./.github/workflows/cache-management.yml
+    with:
+      cache-type: dependencies
+      cache-key-base: deps
+      python-version: ${{ needs.config.outputs.default-python-version }}
+      group: build
+
   build-and-package:
     name: Build & Package
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [config, setup-cache]
+    needs: [config, setup-cache-build]
     permissions:
       contents: read
 
@@ -225,7 +243,8 @@ jobs:
     - name: Setup UV with cache
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+        cache-key: ${{ needs.setup-cache-build.outputs.cache-key }}
+        group: build
         fail-on-cache-miss: false
 
     - name: Build package
@@ -264,6 +283,7 @@ jobs:
       uses: ./.github/actions/setup-uv-cached
       with:
         cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+        group: test
         fail-on-cache-miss: false
 
     - name: Download test results
@@ -304,6 +324,7 @@ jobs:
       uses: ./.github/actions/setup-uv-cached
       with:
         cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+        group: test
         fail-on-cache-miss: false
 
     - name: Download coverage artifacts
@@ -354,6 +375,7 @@ jobs:
     needs:
       - config
       - setup-cache
+      - setup-cache-build
       - test-groups
       - e2e-tests
       - providers-tests

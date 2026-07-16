@@ -3505,6 +3505,13 @@ ui = [
 ]
 
 [package.dev-dependencies]
+arch = [
+    { name = "import-linter" },
+]
+build = [
+    { name = "build" },
+    { name = "wheel" },
+]
 ci = [
     { name = "alembic" },
     { name = "bandit" },
@@ -3540,6 +3547,7 @@ ci = [
     { name = "opentelemetry-instrumentation-sqlalchemy" },
     { name = "opentelemetry-instrumentation-system-metrics" },
     { name = "opentelemetry-sdk" },
+    { name = "orb-py", extra = ["all"], marker = "extra == 'group-6-orb-py-ci' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "pathspec" },
     { name = "peewee" },
     { name = "pg8000" },
@@ -3560,7 +3568,6 @@ ci = [
     { name = "responses" },
     { name = "ruff" },
     { name = "safety" },
-    { name = "semgrep" },
     { name = "tenacity" },
     { name = "tomli" },
     { name = "types-python-dateutil" },
@@ -3611,6 +3618,7 @@ dev = [
     { name = "opentelemetry-instrumentation-sqlalchemy" },
     { name = "opentelemetry-instrumentation-system-metrics" },
     { name = "opentelemetry-sdk" },
+    { name = "orb-py", extra = ["all"], marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
     { name = "pathspec" },
     { name = "peewee" },
     { name = "pg8000" },
@@ -3637,7 +3645,6 @@ dev = [
     { name = "responses" },
     { name = "ruff" },
     { name = "safety" },
-    { name = "semgrep" },
     { name = "tenacity" },
     { name = "tomli" },
     { name = "twine" },
@@ -3648,6 +3655,76 @@ dev = [
     { name = "watchdog" },
     { name = "werkzeug" },
     { name = "wheel" },
+]
+docs = [
+    { name = "mike" },
+    { name = "mkdocs" },
+    { name = "mkdocs-gen-files" },
+    { name = "mkdocs-literate-nav" },
+    { name = "mkdocs-material" },
+    { name = "mkdocs-section-index" },
+    { name = "mkdocstrings" },
+    { name = "mkdocstrings-python" },
+]
+lint = [
+    { name = "pathspec" },
+    { name = "ruff" },
+]
+security = [
+    { name = "bandit" },
+    { name = "bandit-sarif-formatter" },
+    { name = "cyclonedx-bom" },
+    { name = "lxml" },
+    { name = "marshmallow" },
+    { name = "peewee" },
+    { name = "pip-audit" },
+    { name = "safety" },
+]
+test = [
+    { name = "alembic" },
+    { name = "coverage" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "jinja2" },
+    { name = "joserfc" },
+    { name = "kmock" },
+    { name = "kubernetes" },
+    { name = "moto", extra = ["all"] },
+    { name = "nltk" },
+    { name = "opentelemetry-exporter-prometheus" },
+    { name = "opentelemetry-instrumentation-botocore" },
+    { name = "opentelemetry-instrumentation-click" },
+    { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-logging" },
+    { name = "opentelemetry-instrumentation-sqlalchemy" },
+    { name = "opentelemetry-instrumentation-system-metrics" },
+    { name = "opentelemetry-sdk" },
+    { name = "pg8000" },
+    { name = "prometheus-client" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-benchmark" },
+    { name = "pytest-cov" },
+    { name = "pytest-env", version = "1.1.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "pytest-env", version = "1.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "pytest-html" },
+    { name = "pytest-mock" },
+    { name = "pytest-timeout" },
+    { name = "pytest-xdist" },
+    { name = "requests-mock" },
+    { name = "responses" },
+    { name = "tenacity" },
+    { name = "uvicorn" },
+    { name = "watchdog" },
+    { name = "werkzeug" },
+]
+typecheck = [
+    { name = "kubernetes-stubs-elephant-fork" },
+    { name = "orb-py", extra = ["all"] },
+    { name = "pyright" },
+    { name = "tomli" },
+    { name = "types-python-dateutil" },
+    { name = "types-pyyaml" },
 ]
 
 [package.metadata]
@@ -3784,6 +3861,11 @@ requires-dist = [
 provides-extras = ["sql", "aws", "k8s", "all-providers", "k8s-legacy", "ui", "cli", "api", "otel", "monitoring", "monitoring-aws", "all", "test-aws", "test-k8s", "ci", "dev"]
 
 [package.metadata.requires-dev]
+arch = [{ name = "import-linter", specifier = ">=2.0,<3.0.0" }]
+build = [
+    { name = "build", specifier = ">=1.0.3,<2.0.0" },
+    { name = "wheel", specifier = ">=0.41.3,<1.0.0" },
+]
 ci = [
     { name = "alembic", specifier = ">=1.13" },
     { name = "bandit", specifier = ">=1.7.5,<2.0.0" },
@@ -3819,6 +3901,7 @@ ci = [
     { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.41b0,<1.0" },
     { name = "opentelemetry-instrumentation-system-metrics", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.20.0" },
+    { name = "orb-py", extras = ["all"] },
     { name = "pathspec", specifier = ">=0.11.0" },
     { name = "peewee", specifier = ">=3.18.3" },
     { name = "pg8000" },
@@ -3838,7 +3921,6 @@ ci = [
     { name = "responses", specifier = ">=0.24.0,<1.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
     { name = "safety", specifier = ">=3.7.0,<4.0.0" },
-    { name = "semgrep", specifier = ">=1.45.0,<2.0.0" },
     { name = "tenacity" },
     { name = "tomli", specifier = ">=2.0.0,<3.0.0" },
     { name = "types-python-dateutil", specifier = ">=2.8.19.14,<3.0.0" },
@@ -3889,6 +3971,7 @@ dev = [
     { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.41b0,<1.0" },
     { name = "opentelemetry-instrumentation-system-metrics", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.20.0" },
+    { name = "orb-py", extras = ["all"] },
     { name = "pathspec", specifier = ">=0.11.0" },
     { name = "peewee", specifier = ">=3.18.3" },
     { name = "pg8000" },
@@ -3914,7 +3997,6 @@ dev = [
     { name = "responses", specifier = ">=0.24.0,<1.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
     { name = "safety", specifier = ">=3.7.0,<4.0.0" },
-    { name = "semgrep", specifier = ">=1.45.0,<2.0.0" },
     { name = "tenacity" },
     { name = "tomli", specifier = ">=2.0.0,<3.0.0" },
     { name = "twine", specifier = ">=4.0.0" },
@@ -3925,6 +4007,75 @@ dev = [
     { name = "watchdog" },
     { name = "werkzeug", specifier = ">=3.1.6" },
     { name = "wheel", specifier = ">=0.41.3,<1.0.0" },
+]
+docs = [
+    { name = "mike", specifier = ">=1.1.0,<3.0.0" },
+    { name = "mkdocs", specifier = ">=1.5.0,<2.0.0" },
+    { name = "mkdocs-gen-files", specifier = ">=0.5.0,<1.0.0" },
+    { name = "mkdocs-literate-nav", specifier = ">=0.6.0,<1.0.0" },
+    { name = "mkdocs-material", specifier = ">=9.1.0,<10.0.0" },
+    { name = "mkdocs-section-index", specifier = ">=0.3.0,<1.0.0" },
+    { name = "mkdocstrings", specifier = ">=0.22.0,<2.0.0" },
+    { name = "mkdocstrings-python", specifier = ">=1.1.0,<3.0.0" },
+]
+lint = [
+    { name = "pathspec", specifier = ">=0.11.0" },
+    { name = "ruff", specifier = ">=0.1.0" },
+]
+security = [
+    { name = "bandit", specifier = ">=1.7.5,<2.0.0" },
+    { name = "bandit-sarif-formatter", specifier = ">=1.1.1,<2.0.0" },
+    { name = "cyclonedx-bom", specifier = ">=4.0.0,<8.0.0" },
+    { name = "lxml", specifier = ">=6.1.0" },
+    { name = "marshmallow", specifier = ">=4.1.2" },
+    { name = "peewee", specifier = ">=3.18.3" },
+    { name = "pip-audit", specifier = ">=2.6.1,<3.0.0" },
+    { name = "safety", specifier = ">=3.7.0,<4.0.0" },
+]
+test = [
+    { name = "alembic", specifier = ">=1.13" },
+    { name = "coverage", specifier = ">=7.3.2,<8.0.0" },
+    { name = "fastapi", specifier = ">=0.128.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "jinja2", specifier = ">=3.1.0" },
+    { name = "joserfc", specifier = ">=1.6.1" },
+    { name = "kmock", specifier = ">=0.7" },
+    { name = "kubernetes" },
+    { name = "moto", extras = ["all"], specifier = ">=5.1.19,<6.0.0" },
+    { name = "nltk", specifier = ">=3.9.3" },
+    { name = "opentelemetry-exporter-prometheus", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-click", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.41b0,<1.0" },
+    { name = "opentelemetry-instrumentation-logging", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.41b0,<1.0" },
+    { name = "opentelemetry-instrumentation-system-metrics", specifier = ">=0.64b0,<1.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.20.0" },
+    { name = "pg8000" },
+    { name = "prometheus-client", specifier = ">=0.17.0" },
+    { name = "pytest", specifier = ">=7.4.3,<10.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.21.1,<2.0.0" },
+    { name = "pytest-benchmark", specifier = ">=5.1.0,<6.0.0" },
+    { name = "pytest-cov", specifier = ">=4.1.0,<8.0.0" },
+    { name = "pytest-env", specifier = ">=1.1.1,<2.0.0" },
+    { name = "pytest-html", specifier = ">=4.1.1,<5.0.0" },
+    { name = "pytest-mock", specifier = ">=3.12.0,<4.0.0" },
+    { name = "pytest-timeout", specifier = ">=2.2.0,<3.0.0" },
+    { name = "pytest-xdist", specifier = ">=3.3.1,<4.0.0" },
+    { name = "requests-mock", specifier = ">=1.11.0,<2.0.0" },
+    { name = "responses", specifier = ">=0.24.0,<1.0.0" },
+    { name = "tenacity" },
+    { name = "uvicorn", specifier = ">=0.24.0" },
+    { name = "watchdog" },
+    { name = "werkzeug", specifier = ">=3.1.6" },
+]
+typecheck = [
+    { name = "kubernetes-stubs-elephant-fork", specifier = ">=36.0.2,<37.0.0" },
+    { name = "orb-py", extras = ["all"] },
+    { name = "pyright", specifier = ">=1.1.408,<2.0.0" },
+    { name = "tomli", specifier = ">=2.0.0,<3.0.0" },
+    { name = "types-python-dateutil", specifier = ">=2.8.19.14,<3.0.0" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.12,<7.0.0" },
 ]
 
 [[package]]
