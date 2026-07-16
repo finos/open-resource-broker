@@ -6,7 +6,7 @@ easy to add e.g. a new provider extra and silently leave `pip install
 orb-py[all]` incomplete.  This test asserts `all` transitively includes every
 runtime extra except an explicit denylist:
 
-- test/tooling extras (`ci`, `dev`, `test-*`) are not runtime features;
+- test/tooling extras (`dev`, `test-*`) are not runtime features;
 - `k8s-legacy` is the deprecated Symphony HostFactory plugin whose heavy legacy
   deps are intentionally kept out of `all`.
 
@@ -26,7 +26,6 @@ _PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
 _DENYLIST = frozenset(
     {
         "all",  # self
-        "ci",  # test/lint tooling, not runtime
         "dev",  # dev tooling, not runtime
         "test-aws",  # test-only
         "test-k8s",  # test-only
