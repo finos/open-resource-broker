@@ -152,6 +152,10 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
         ProviderCompletenessError,
         assert_provider_registrations_complete,
     )
+    from orb.bootstrap.storage_completeness import (
+        StorageCompletenessError,
+        assert_storage_registration_complete,
+    )
     from orb.infrastructure.logging.logger import get_logger as _get_logger
 
     _bc_logger = _get_logger(__name__)
@@ -160,6 +164,13 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
         _bc_logger.debug("Provider completeness assertion passed")
     except ProviderCompletenessError as _bce:
         _bc_logger.error("Provider completeness check failed: %s", _bce)
+        raise
+
+    try:
+        assert_storage_registration_complete()
+        _bc_logger.debug("Storage completeness assertion passed")
+    except StorageCompletenessError as _sce:
+        _bc_logger.error("Storage completeness check failed: %s", _sce)
         raise
 
     # 9. Register infrastructure services immediately (needed for template system)
@@ -211,6 +222,10 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
         ProviderCompletenessError,
         assert_provider_registrations_complete,
     )
+    from orb.bootstrap.storage_completeness import (
+        StorageCompletenessError,
+        assert_storage_registration_complete,
+    )
     from orb.infrastructure.logging.logger import get_logger as _get_logger_eager
 
     _eager_logger = _get_logger_eager(__name__)
@@ -219,6 +234,13 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
         _eager_logger.debug("Provider completeness assertion passed")
     except ProviderCompletenessError as _bce_eager:
         _eager_logger.error("Provider completeness check failed: %s", _bce_eager)
+        raise
+
+    try:
+        assert_storage_registration_complete()
+        _eager_logger.debug("Storage completeness assertion passed")
+    except StorageCompletenessError as _sce_eager:
+        _eager_logger.error("Storage completeness check failed: %s", _sce_eager)
         raise
 
     register_infrastructure_services(container)
