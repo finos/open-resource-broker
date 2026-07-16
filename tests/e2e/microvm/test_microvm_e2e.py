@@ -421,18 +421,46 @@ def provision_microvms(
     return request_id
 
 
-def provision_microvms_manual(image_arn: str, num_microvms: int, region: str):
+def provision_microvms_manual(image_arn: str, num_microvms: int, region: str, account_id: str):
     """Pause and let the user provision MicroVMs manually via ORB CLI."""
     console.rule("[bold blue]Phase 5: Provision MicroVMs (Manual Mode)")
 
+    # Write a template file for the user
+    template_file = Path(__file__).parent / "microvm-template.json"
+    template_data = {
+        "templateId": "microvm-e2e-test",
+        "name": "MicroVM E2E Test Worker",
+        "description": "E2E test worker that processes SQS tasks",
+        "provider_api": "MicroVM",
+        "image_id": image_arn,
+        "maxNumber": num_microvms * 2,
+        "tags": {"Environment": "test", "TestRun": "microvm-e2e"},
+        "metadata": {
+            "execution_role_arn": f"arn:aws:iam::{account_id}:role/{RUNTIME_ROLE_NAME}",
+            "idle_policy": {
+                "maxIdleDurationSeconds": 3600,
+                "suspendedDurationSeconds": 3600,
+                "autoResumeEnabled": True,
+            },
+            "maximum_duration_in_seconds": 3600,
+            "logging": {
+                "cloudWatch": {
+                    "logGroup": f"/aws/lambda-microvms/{IMAGE_NAME}",
+                }
+            },
+        },
+    }
+    template_file.write_text(json.dumps(template_data, indent=2))
+
     console.print(f"\n  [bold yellow]Manual mode:[/bold yellow] Provision MicroVMs using the ORB CLI.\n")
+    console.print(f"  Template file written to: [cyan]{template_file}[/cyan]\n")
     console.print(f"  Suggested commands:\n")
-    console.print(f"    [dim]# Create template (if not already done)[/dim]")
-    console.print(f"    orb templates create microvm-e2e-test --provider-api MicroVM --image-id {image_arn}\n")
+    console.print(f"    [dim]# Create template[/dim]")
+    console.print(f"    orb templates create --file {template_file}\n")
     console.print(f"    [dim]# Request MicroVMs[/dim]")
     console.print(f"    orb machines request microvm-e2e-test {num_microvms}\n")
     console.print(f"    [dim]# Check status[/dim]")
-    console.print(f"    orb requests list\n")
+    console.print(f"    orb requests status <request-id>\n")
 
     console.print(f"  [bold]Press Enter when MicroVMs are running...[/bold]", end="")
     input()
@@ -707,7 +735,7 @@ def main():
 
     # Phase 5: Provision MicroVMs
     if args.manual:
-        provision_microvms_manual(image_arn, args.microvms, args.region)
+        provision_microvms_manual(image_arn, args.microvms, args.region, account_id)
         orb_request_id = None
     else:
         orb_request_id = provision_microvms(
@@ -732,8 +760,7 @@ def main():
     if args.manual:
         console.rule("[bold blue]Phase 8: Cleanup")
         console.print("  [yellow]Manual mode: terminate MicroVMs via ORB CLI:[/yellow]\n")
-        console.print("    [dim]# Return all machines from the request[/dim]")
-        console.print("    orb machines list --format json | python -c \"import sys,json; ids=[m['machine_id'] for m in json.load(sys.stdin)['machines']]; print(' '.join(ids))\" | xargs orb machines return\n")
+        console.print("    orb machines return --request-id <request-id>\n")
     elif not args.skip_cleanup:
         cleanup_microvms(orb_request_id)
     else:

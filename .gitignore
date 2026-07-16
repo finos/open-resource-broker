@@ -24,6 +24,7 @@ tests/providers/aws/live/run_templates/
 tests/providers/aws/live/run_templates/**
 tests/e2e/microvm/worker/*.zip
 tests/e2e/microvm/*.local.*
+tests/e2e/microvm/microvm-template.json
 
 # Desloppify scan artifacts
 .desloppify/
