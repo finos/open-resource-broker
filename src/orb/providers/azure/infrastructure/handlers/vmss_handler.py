@@ -273,7 +273,7 @@ class VMSSHandler(AzureHandler):
                     "provisioning_state": "creating",
                     "operation_status": "submitted",
                     "error_codes": [],
-                    "fulfillment_final": True,
+                    "requires_async_polling": True,
                 },
             }
         except AzureValidationError:

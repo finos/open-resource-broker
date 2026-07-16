@@ -120,6 +120,8 @@ def test_acquire_hosts_submits_one_batched_deployment_and_returns_submitted_stat
     assert result["success"] is True
     assert len(result["resource_ids"]) == 2
     assert result["provider_data"]["operation_status"] == "submitted"
+    assert result["provider_data"]["requires_async_polling"] is True
+    assert "fulfillment_final" not in result["provider_data"]
     deployment_call = azure_client.resource_client.resources.begin_create_or_update.call_args.kwargs
     deployment_template = deployment_call["parameters"]["properties"]["template"]
     resource_types = [resource["type"] for resource in deployment_template["resources"]]
@@ -191,6 +193,7 @@ async def test_acquire_hosts_async_submits_one_batched_deployment_and_returns_su
     assert result["success"] is True
     assert result["provider_data"]["deployment_name"] == "dep-async"
     assert result["provider_data"]["submitted_count"] == 2
+    assert result["provider_data"]["requires_async_polling"] is True
 
 
 def test_acquire_hosts_falls_back_to_alternate_vm_size_for_the_whole_batch():

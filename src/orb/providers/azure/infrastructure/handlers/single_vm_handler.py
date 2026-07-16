@@ -378,7 +378,7 @@ class SingleVMHandler(AzureHandler):
                 "location": location,
                 "submitted_count": len(created_ids),
                 "operation_status": "submitted",
-                "fulfillment_final": True,
+                "requires_async_polling": True,
                 "deployment_name": submitted_deployment_name,
                 "error_codes": [],
                 "fleet_errors": [],

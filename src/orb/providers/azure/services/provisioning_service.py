@@ -201,7 +201,7 @@ class AzureProvisioningService:
                 "template_config": template_config,
                 "handler_used": provider_api_key(provider_api),
                 "method": "handler",
-                "provider_data": provider_data,
+                **provider_data,
             },
         )
 

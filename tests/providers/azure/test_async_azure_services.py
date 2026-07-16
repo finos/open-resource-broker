@@ -304,7 +304,10 @@ async def test_execute_create_handler_async_normalizes_handler_result():
             "resource_ids": ["vm-1"],
             "instances": [],
             "error_message": None,
-            "provider_data": {"operation_status": "submitted"},
+            "provider_data": {
+                "operation_status": "submitted",
+                "requires_async_polling": True,
+            },
         }
     )
     create_context = CreateOperationContext(
@@ -324,6 +327,9 @@ async def test_execute_create_handler_async_normalizes_handler_result():
     assert result.success is True
     assert result.data["resource_ids"] == ["vm-1"]
     assert result.metadata["handler_used"] == "SingleVM"
+    assert result.metadata["operation_status"] == "submitted"
+    assert result.metadata["requires_async_polling"] is True
+    assert "provider_data" not in result.metadata
 
 
 @pytest.mark.asyncio
