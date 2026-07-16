@@ -84,30 +84,12 @@ def _register_template_services(container: DIContainer):
         import importlib.util
 
         from orb.domain.template.factory import TemplateFactory
-        from orb.providers.registration import _REGISTERED_PROVIDERS
+        from orb.providers.registry import get_provider_registry
 
         factory = TemplateFactory(logger=c.get(LoggingPort))
         logger_port = c.get(LoggingPort)
 
-        # Register Kubernetes template extensions so K8sTemplateDTOConfig is
-        # available for round-trip serialisation before per-provider template
-        # classes are registered below.  Guarded by ImportError so the factory
-        # builds cleanly when the k8s extra is not installed.
-        try:
-            from orb.providers.k8s.registration import (  # noqa: PLC0415
-                register_k8s_extensions,
-                register_k8s_template_factory,
-            )
-
-            register_k8s_extensions(logger_port)
-            register_k8s_template_factory(factory, logger_port)
-        except ImportError:
-            # K8s is an optional extra; when the k8s package or its
-            # dependencies are not installed the caller proceeds without
-            # k8s support.  This is expected in minimal installs.
-            pass
-
-        for _name in _REGISTERED_PROVIDERS:
+        for _name in get_provider_registry().get_registered_types():
             _mod_path = f"orb.providers.{_name}.registration"
             if importlib.util.find_spec(_mod_path) is None:
                 continue
@@ -155,35 +137,6 @@ def _register_template_services(container: DIContainer):
 
     container.register_singleton(
         TemplateConfigurationManager, create_template_configuration_manager
-    )
-
-    # Check if AMI resolution is enabled via AWS extensions
-    _register_ami_resolver_if_enabled(container)
-
-
-def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
-    """Register AMICacheService and AWSAMIResolver against ImageResolver.
-
-    Guard: only registers when the ``aws`` provider is present in
-    ``_REGISTERED_PROVIDERS``.  K8s-only or minimal deployments must not have
-    an AWS-backed ImageResolver wired into the global DI container — doing so
-    would pull in boto3 imports and fail at resolution time when AWS credentials
-    are absent.
-    """
-    from orb.providers.registration import _REGISTERED_PROVIDERS
-
-    if "aws" not in _REGISTERED_PROVIDERS:
-        return
-
-    from orb.domain.template.image_resolver import ImageResolver
-    from orb.infrastructure.caching.ami_cache_service import AMICacheService
-    from orb.providers.aws.domain.services.ami_resolver import AWSAMIResolver
-
-    container.register_singleton(AMICacheService, lambda _c: AMICacheService())
-
-    container.register_singleton(
-        ImageResolver,
-        lambda c: AWSAMIResolver(cache_service=c.get(AMICacheService)),
     )
 
 
