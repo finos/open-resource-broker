@@ -851,13 +851,21 @@ class AWSProviderStrategy(ProviderStrategy):
 
     async def _handle_resolve_image(self, operation: ProviderOperation) -> ProviderResult:
         """Handle image resolution using registry-based service."""
+        from orb.providers.aws.infrastructure.services.aws_image_resolution_service import (
+            AWSImageResolutionService,
+        )
+
         try:
             image_specifications = operation.parameters.get("image_specifications", [])
             if not image_specifications:
                 return ProviderResult.success_result({"resolved_images": {}})
 
             # Partition specs — only create the service (and activate aws_client) if needed
-            needs_resolution = [s for s in image_specifications if not s.startswith("ami-")]
+            needs_resolution = [
+                s
+                for s in image_specifications
+                if AWSImageResolutionService.is_resolution_needed_static(s)
+            ]
 
             resolved_images = {s: s for s in image_specifications}  # default: pass-through
 

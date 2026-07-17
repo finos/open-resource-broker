@@ -1,7 +1,7 @@
 """Unit tests for the MicroVM handler."""
 
 from datetime import datetime, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -111,16 +111,21 @@ class TestMicroVMHandlerAcquire:
 
     def test_acquire_partial_failure(self, handler, microvm_template):
         """If some launches fail, result still contains successful ones."""
+        import threading
+
+        lock = threading.Lock()
         call_count = [0]
 
         def side_effect(**kwargs):
-            call_count[0] += 1
-            if call_count[0] == 2:
+            with lock:
+                call_count[0] += 1
+                current = call_count[0]
+            if current == 2:
                 raise Exception("capacity error")
             return {
-                "microvmId": f"microvm-{call_count[0]}",
+                "microvmId": f"microvm-{current}",
                 "state": "PENDING",
-                "endpoint": f"https://{call_count[0]}.example.com",
+                "endpoint": f"https://{current}.example.com",
                 "imageArn": microvm_template.image_id,
             }
 
@@ -136,17 +141,17 @@ class TestMicroVMHandlerAcquire:
         assert len(result["resource_ids"]) == 2
 
     def test_acquire_total_failure(self, handler, microvm_template):
-        """If all launches fail, result is unsuccessful."""
+        """If all launches fail, the exception propagates to the decorator."""
+        from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+
         handler.aws_client.microvm_client.run_microvm.side_effect = Exception("all fail")
 
         request = MagicMock()
         request.requested_count = 2
         request.request_id = "req-004"
 
-        result = handler.acquire_hosts(request, microvm_template)
-
-        assert result["success"] is False
-        assert result["resource_ids"] == []
+        with pytest.raises(AWSInfrastructureError):
+            handler.acquire_hosts(request, microvm_template)
 
 
 class TestMicroVMHandlerCheckStatus:
@@ -194,6 +199,25 @@ class TestMicroVMHandlerCheckStatus:
         handler.aws_client.microvm_client.get_microvm.return_value = {
             "microvmId": "microvm-1",
             "state": "SUSPENDED",
+            "endpoint": "https://1.example.com",
+            "imageArn": "arn:aws:lambda:us-east-1:123:microvm-image:test",
+            "startedAt": datetime(2026, 7, 13, tzinfo=timezone.utc),
+        }
+
+        request = MagicMock()
+        request.resource_ids = ["microvm-1"]
+        request.requested_count = 1
+
+        result = handler.check_hosts_status(request)
+
+        assert result.fulfilment.state == "fulfilled"
+        assert result.instances[0]["status"] == "running"
+
+    def test_check_status_suspending_maps_to_running(self, handler):
+        """SUSPENDING MicroVMs are reported as running (in-flight suspend)."""
+        handler.aws_client.microvm_client.get_microvm.return_value = {
+            "microvmId": "microvm-1",
+            "state": "SUSPENDING",
             "endpoint": "https://1.example.com",
             "imageArn": "arn:aws:lambda:us-east-1:123:microvm-image:test",
             "startedAt": datetime(2026, 7, 13, tzinfo=timezone.utc),
@@ -374,8 +398,12 @@ class TestMicroVMHandlerCheckStatusEdgeCases:
 
 
 class TestMicroVMHandlerThrottleRetry:
-    def test_throttle_retries_then_succeeds(self, handler):
-        """Throttled calls should retry and eventually succeed."""
+    @patch(
+        "orb.providers.aws.infrastructure.handlers.microvm.handler.random.uniform", return_value=0.5
+    )
+    @patch("orb.providers.aws.infrastructure.handlers.microvm.handler.time.sleep")
+    def test_throttle_retries_then_succeeds(self, mock_sleep, mock_uniform, handler):
+        """Throttled calls should retry with exponential backoff and succeed."""
         from botocore.exceptions import ClientError
 
         throttle_error = ClientError(
@@ -394,10 +422,6 @@ class TestMicroVMHandlerThrottleRetry:
             },
         ]
 
-        request = MagicMock()
-        request.requested_count = 1
-        request.request_id = "req-001"
-
         params = {
             "imageIdentifier": "arn:aws:lambda:us-east-1:123:microvm-image:test",
             "clientToken": "test-token",
@@ -407,8 +431,43 @@ class TestMicroVMHandlerThrottleRetry:
         assert result["microvmId"] == "microvm-1"
         assert handler.aws_client.microvm_client.run_microvm.call_count == 3
 
-    def test_non_throttle_error_raises_immediately(self, handler):
-        """Non-throttle errors should not be retried."""
+        # Verify full-jitter backoff: uniform(0, min(base*2^attempt, 20))
+        assert mock_uniform.call_count == 2
+        mock_uniform.assert_any_call(0, 1.0)  # attempt 0: cap = 1.0*2^0 = 1.0
+        mock_uniform.assert_any_call(0, 2.0)  # attempt 1: cap = 1.0*2^1 = 2.0
+
+        assert mock_sleep.call_count == 2
+        mock_sleep.assert_any_call(0.5)  # mocked uniform returns 0.5
+        mock_sleep.assert_any_call(0.5)
+
+    @patch(
+        "orb.providers.aws.infrastructure.handlers.microvm.handler.random.uniform", return_value=0.5
+    )
+    @patch("orb.providers.aws.infrastructure.handlers.microvm.handler.time.sleep")
+    def test_non_throttle_client_error_raises_immediately(self, mock_sleep, mock_uniform, handler):
+        """Non-throttle ClientErrors should not be retried."""
+        from botocore.exceptions import ClientError
+
+        error = ClientError(
+            {"Error": {"Code": "InvalidParameterValue", "Message": "bad param"}},
+            "RunMicrovm",
+        )
+        handler.aws_client.microvm_client.run_microvm.side_effect = error
+
+        params = {"imageIdentifier": "test", "clientToken": "test-token"}
+
+        with pytest.raises(ClientError):
+            handler._run_single_microvm(params)
+
+        assert handler.aws_client.microvm_client.run_microvm.call_count == 1
+        mock_sleep.assert_not_called()
+
+    @patch(
+        "orb.providers.aws.infrastructure.handlers.microvm.handler.random.uniform", return_value=0.5
+    )
+    @patch("orb.providers.aws.infrastructure.handlers.microvm.handler.time.sleep")
+    def test_non_client_error_raises_immediately(self, mock_sleep, mock_uniform, handler):
+        """Non-ClientError exceptions propagate without retry."""
         handler.aws_client.microvm_client.run_microvm.side_effect = Exception("validation error")
 
         params = {"imageIdentifier": "test", "clientToken": "test-token"}
@@ -417,6 +476,7 @@ class TestMicroVMHandlerThrottleRetry:
             handler._run_single_microvm(params)
 
         assert handler.aws_client.microvm_client.run_microvm.call_count == 1
+        mock_sleep.assert_not_called()
 
 
 class TestMicroVMHandlerMisc:
@@ -432,6 +492,47 @@ class TestMicroVMHandlerMisc:
 
         assert len(templates) >= 1
         assert templates[0].provider_api.value == "MicroVM"
+
+    def test_build_run_params_includes_falsy_values(self, handler):
+        """Falsy but non-None values (0, empty string) must be passed to the API."""
+        template = AWSTemplate(
+            template_id="falsy-test",
+            name="Falsy Test",
+            provider_api="MicroVM",
+            image_id="arn:aws:lambda:us-east-1:123:microvm-image:test",
+            machine_types={"microvm": 1},
+            metadata={
+                "maximum_duration_in_seconds": 0,
+                "run_hook_payload": "",
+                "execution_role_arn": "arn:aws:iam::123:role/Role",
+            },
+        )
+
+        params = handler._build_run_params(template)
+
+        assert params["maximumDurationInSeconds"] == 0
+        assert params["runHookPayload"] == ""
+        assert params["executionRoleArn"] == "arn:aws:iam::123:role/Role"
+
+    def test_build_run_params_excludes_none_values(self, handler):
+        """None values in metadata should not appear in API params."""
+        template = AWSTemplate(
+            template_id="none-test",
+            name="None Test",
+            provider_api="MicroVM",
+            image_id="arn:aws:lambda:us-east-1:123:microvm-image:test",
+            machine_types={"microvm": 1},
+            metadata={
+                "maximum_duration_in_seconds": None,
+                "execution_role_arn": None,
+            },
+        )
+
+        params = handler._build_run_params(template)
+
+        assert "maximumDurationInSeconds" not in params
+        assert "executionRoleArn" not in params
+        assert params == {"imageIdentifier": template.image_id}
 
 
 class TestMicroVMHandlerValidation:
@@ -484,8 +585,11 @@ class TestAWSClientMicroVMProperty:
         """Verify microvm_client property creates the client on first access."""
         from orb.providers.aws.infrastructure.aws_client import AWSClient
 
+        import threading
+
         client = object.__new__(AWSClient)
         client._microvm_client = None
+        client._cache_lock = threading.RLock()
         client.session = MagicMock()
         client.boto_config = MagicMock()
         client._logger = MagicMock()
@@ -541,3 +645,81 @@ class TestImageResolutionARNSkip:
             )
             is True
         )
+
+
+class TestAWSValidationMicroVM:
+    def test_validate_provider_api_accepts_microvm(self):
+        """MicroVM should be a valid provider API in the AWS validation adapter."""
+        from orb.providers.aws.configuration.validator import AWSHandlerConfig
+
+        config = AWSHandlerConfig()
+        assert "MicroVM" in config.capabilities
+        assert "micro_vm" in config.types
+        assert config.types["micro_vm"] == "MicroVM"
+
+
+class TestHostFactoryMicroVMFieldMapping:
+    def test_hf_microvm_fields_land_in_metadata(self):
+        """HF camelCase MicroVM fields should be routed into metadata via dotted paths."""
+        from orb.infrastructure.scheduler.hostfactory.field_mapper import (
+            HostFactoryFieldMapper,
+        )
+
+        mapper = HostFactoryFieldMapper(provider_type="aws")
+
+        hf_template = {
+            "templateId": "microvm-test",
+            "providerApi": "MicroVM",
+            "imageId": "arn:aws:lambda:us-east-1:123456789012:microvm-image:worker",
+            "maxNumber": 10,
+            "executionRoleArn": "arn:aws:iam::123456789012:role/MyRole",
+            "idlePolicy": {
+                "maxIdleDurationSeconds": 3600,
+                "suspendedDurationSeconds": 3600,
+                "autoResumeEnabled": True,
+            },
+            "maximumDurationInSeconds": 3600,
+            "imageVersion": "2",
+            "runHookPayload": '{"key": "value"}',
+        }
+
+        mapped = mapper.map_input_fields(hf_template)
+
+        assert mapped["metadata"]["execution_role_arn"] == "arn:aws:iam::123456789012:role/MyRole"
+        assert mapped["metadata"]["idle_policy"]["maxIdleDurationSeconds"] == 3600
+        assert mapped["metadata"]["maximum_duration_in_seconds"] == 3600
+        assert mapped["metadata"]["image_version"] == "2"
+        assert mapped["metadata"]["run_hook_payload"] == '{"key": "value"}'
+
+    def test_hf_microvm_template_constructs_aws_template(self):
+        """Mapped HF MicroVM fields should survive AWSTemplate construction."""
+        from orb.infrastructure.scheduler.hostfactory.field_mapper import (
+            HostFactoryFieldMapper,
+        )
+
+        mapper = HostFactoryFieldMapper(provider_type="aws")
+
+        hf_template = {
+            "templateId": "microvm-hf-test",
+            "providerApi": "MicroVM",
+            "imageId": "arn:aws:lambda:us-east-1:123456789012:microvm-image:worker",
+            "maxNumber": 5,
+            "executionRoleArn": "arn:aws:iam::123456789012:role/TestRole",
+            "maximumDurationInSeconds": 7200,
+        }
+
+        mapped = mapper.map_input_fields(hf_template)
+
+        template = AWSTemplate(
+            template_id=mapped.get("template_id", "test"),
+            provider_api=mapped.get("provider_api", "MicroVM"),
+            image_id=mapped.get("image_id", ""),
+            max_instances=mapped.get("max_instances", 1),
+            machine_types={},
+            subnet_ids=[],
+            security_group_ids=[],
+            metadata=mapped.get("metadata", {}),
+        )
+
+        assert template.metadata["execution_role_arn"] == "arn:aws:iam::123456789012:role/TestRole"
+        assert template.metadata["maximum_duration_in_seconds"] == 7200

@@ -58,6 +58,7 @@ def main():
                 print(f"Worker ID: {worker_id}", flush=True)
 
             for message in messages:
+                received_at = time.time()
                 body = json.loads(message["Body"])
                 task_id = body["task_id"]
                 wait_seconds = body["wait_seconds"]
@@ -71,6 +72,7 @@ def main():
                         {
                             "task_id": task_id,
                             "worker_id": worker_id,
+                            "received_at": received_at,
                             "completed_at": time.time(),
                         }
                     ),

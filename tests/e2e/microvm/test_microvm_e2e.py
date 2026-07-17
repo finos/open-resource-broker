@@ -34,15 +34,10 @@ import uuid
 from pathlib import Path
 
 import boto3
-
-try:
-    from rich.console import Console
-    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
-    from rich.table import Table
-except ImportError:
-    import pytest
-
-    pytest.skip("MicroVM E2E test requires 'rich': pip install rich", allow_module_level=True)
+import pytest
+from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.table import Table
 
 console = Console()
 
@@ -251,15 +246,15 @@ def ensure_iam_roles(iam_client, region: str, account_id: str):
     console.rule("[bold blue]Phase 2: IAM Roles")
 
     # Runtime role: used as buildRoleArn — becomes the app's AWS identity at runtime.
-    # Needs: S3 read (for image build artifact) + whatever the app uses (SQS, CW Logs).
+    # Needs: S3 read (for image build artifact) + SQS send/receive/delete + basic logging.
     _ensure_role(
         iam_client,
         RUNTIME_ROLE_NAME,
         trust_service="lambda.amazonaws.com",
         policies=[
             "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
-            "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
-            "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess",
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole",
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
         ],
     )
 
@@ -269,7 +264,7 @@ def ensure_iam_roles(iam_client, region: str, account_id: str):
         PLATFORM_ROLE_NAME,
         trust_service="lambda.amazonaws.com",
         policies=[
-            "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess",
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
         ],
     )
 
@@ -799,6 +794,61 @@ def main():
         console.print("\n[yellow]Skipping cleanup (--skip-cleanup)[/yellow]")
 
     console.print("\n[bold]Done.[/bold]\n")
+
+
+@pytest.mark.e2e
+def test_microvm_e2e_scenario():
+    """Pytest-discoverable E2E scenario for the MicroVM handler.
+
+    Requires real AWS credentials and is gated behind the ``e2e`` marker so
+    normal ``pytest`` runs skip it.  Run with::
+
+        pytest -m e2e tests/e2e/microvm/
+    """
+    region = os.environ.get("AWS_REGION", "us-east-1")
+    num_tasks = int(os.environ.get("ORB_E2E_TASKS", "5"))
+    num_microvms = int(os.environ.get("ORB_E2E_MICROVMS", "2"))
+    wait_seconds = float(os.environ.get("ORB_E2E_WAIT_SECONDS", "1.0"))
+
+    ensure_orb_config(region)
+
+    session = boto3.Session(region_name=region)
+    sqs_client = session.client("sqs")
+    iam_client = session.client("iam")
+    s3_client = session.client("s3")
+    sts_client = session.client("sts")
+    microvm_client = session.client("lambda-microvms")
+
+    account_id = sts_client.get_caller_identity()["Account"]
+
+    # Setup
+    request_queue_url, response_queue_url = setup_sqs_queues(sqs_client, region)
+    ensure_iam_roles(iam_client, region, account_id)
+    image_arn = ensure_microvm_image(
+        microvm_client, s3_client, region, account_id, request_queue_url, response_queue_url
+    )
+
+    # Execute
+    submit_tasks(sqs_client, request_queue_url, num_tasks, wait_seconds)
+    orb_request_id = provision_microvms(
+        image_arn=image_arn,
+        num_microvms=num_microvms,
+        region=region,
+        account_id=account_id,
+    )
+
+    responses, _monitor_start, end_time = monitor_progress(
+        sqs_client=sqs_client,
+        response_queue_url=response_queue_url,
+        num_tasks=num_tasks,
+        orb_request_id=orb_request_id,
+    )
+
+    # Verify
+    assert len(responses) == num_tasks, f"Expected {num_tasks} responses, got {len(responses)}"
+
+    # Cleanup
+    cleanup_microvms(orb_request_id)
 
 
 if __name__ == "__main__":

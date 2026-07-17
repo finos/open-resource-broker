@@ -482,8 +482,12 @@ class AWSClient:
     def microvm_client(self):
         """Lazy initialization of Lambda MicroVMs client."""
         if self._microvm_client is None:
-            self._logger.debug("Initializing Lambda MicroVMs client on first use")
-            self._microvm_client = self.session.client("lambda-microvms", config=self.boto_config)
+            with self._cache_lock:
+                if self._microvm_client is None:
+                    self._logger.debug("Initializing Lambda MicroVMs client on first use")
+                    self._microvm_client = self.session.client(
+                        "lambda-microvms", config=self.boto_config
+                    )
         return self._microvm_client
 
     def _get_aws_metrics_config(self) -> dict:

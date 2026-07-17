@@ -49,6 +49,7 @@ class AWSHandlerConfig:
             "spot_fleet": "SpotFleet",
             "asg": "ASG",
             "run_instances": "RunInstances",
+            "micro_vm": "MicroVM",
         }
     )
 
@@ -73,6 +74,12 @@ class AWSHandlerConfig:
                 supports_on_demand=True,
             ),
             "RunInstances": AWSHandlerCapabilities(
+                supported_fleet_types=[],
+                default_fleet_type=None,
+                supports_spot=False,
+                supports_on_demand=True,
+            ),
+            "MicroVM": AWSHandlerCapabilities(
                 supported_fleet_types=[],
                 default_fleet_type=None,
                 supports_spot=False,

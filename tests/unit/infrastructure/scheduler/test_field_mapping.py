@@ -504,3 +504,19 @@ def test_get_mappings_k8s_static_matches_k8s_field_mapping_class():
         "HostFactoryFieldMappings.MAPPINGS['k8s'] is out of sync with "
         "K8sFieldMapping._PROVIDER_MAPPINGS. Update field_mappings.py to match."
     )
+
+
+def test_get_mappings_aws_static_matches_aws_field_mapping_class():
+    """The static MAPPINGS['aws'] table must match AWSFieldMapping._PROVIDER_MAPPINGS exactly.
+
+    This test acts as a sync-check: if AWSFieldMapping gains or changes entries,
+    this will fail and remind the developer to update the static fallback table.
+    """
+    from orb.providers.aws.scheduler.hostfactory_field_mapping import AWSFieldMapping
+
+    canonical = AWSFieldMapping().get_mappings()
+    static = HostFactoryFieldMappings.MAPPINGS["aws"]
+    assert static == canonical, (
+        "HostFactoryFieldMappings.MAPPINGS['aws'] is out of sync with "
+        "AWSFieldMapping._PROVIDER_MAPPINGS. Update field_mappings.py to match."
+    )

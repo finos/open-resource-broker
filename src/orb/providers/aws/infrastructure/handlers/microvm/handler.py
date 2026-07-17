@@ -8,6 +8,8 @@ Unlike fleet-based handlers, MicroVMs are individual resources — requesting
 N machines means N separate run_microvm API calls, executed in parallel.
 """
 
+import random
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Optional
 from uuid import uuid4
@@ -47,6 +49,7 @@ _MICROVM_STATE_MAP = {
     "SUSPENDED": "running",
     "TERMINATING": "shutting-down",
     "TERMINATED": "terminated",
+    "FAILED": "terminated",
 }
 
 _MAX_WORKERS = 25
@@ -96,44 +99,37 @@ class MicroVMHandler(AWSHandler):
     def _acquire_hosts_internal(
         self, request: Request, aws_template: AWSTemplate
     ) -> dict[str, Any]:
-        """Launch N MicroVMs in parallel."""
-        try:
-            params = self._build_run_params(aws_template)
-            count = request.requested_count
+        """Launch N MicroVMs in parallel.
 
-            self._logger.info(
-                "Launching %d MicroVM(s) from image %s",
-                count,
-                aws_template.image_id,
-            )
+        Partial success (some launches fail) is returned as a normal result.
+        Total failure raises so the decorator can translate the exception.
+        """
+        params = self._build_run_params(aws_template)
+        count = request.requested_count
 
-            results = self._run_microvms_parallel(params, count)
+        self._logger.info(
+            "Launching %d MicroVM(s) from image %s",
+            count,
+            aws_template.image_id,
+        )
 
-            microvm_ids = [r["microvmId"] for r in results]
-            instances = [self._build_machine_payload(r) for r in results]
+        results = self._run_microvms_parallel(params, count)
 
-            self._logger.info(
-                "Successfully launched %d MicroVM(s): %s", len(microvm_ids), microvm_ids
-            )
+        microvm_ids = [r["microvmId"] for r in results]
+        instances = [self._build_machine_payload(r) for r in results]
 
-            return {
-                "success": True,
-                "resource_ids": microvm_ids,
-                "instances": instances,
-                "provider_data": {
-                    "resource_type": "microvm",
-                    "microvm_ids": microvm_ids,
-                    "requires_async_polling": True,
-                },
-            }
-        except Exception as e:
-            self._logger.error("MicroVM provisioning failed: %s", e)
-            return {
-                "success": False,
-                "resource_ids": [],
-                "instances": [],
-                "error_message": str(e),
-            }
+        self._logger.info("Successfully launched %d MicroVM(s): %s", len(microvm_ids), microvm_ids)
+
+        return {
+            "success": True,
+            "resource_ids": microvm_ids,
+            "instances": instances,
+            "provider_data": {
+                "resource_type": "microvm",
+                "microvm_ids": microvm_ids,
+                "requires_async_polling": True,
+            },
+        }
 
     # Internal (snake_case) metadata field → AWS API (camelCase) parameter.
     # The scheduler field mapper (FieldMappingPort) handles external-format →
@@ -161,7 +157,7 @@ class MicroVMHandler(AWSHandler):
 
         for internal_key, api_key in self._METADATA_TO_API.items():
             value = metadata.get(internal_key)
-            if value:
+            if value is not None:
                 params[api_key] = value
 
         return params
@@ -187,7 +183,7 @@ class MicroVMHandler(AWSHandler):
                     results.append(result)
                 except Exception as e:
                     self._logger.error("MicroVM launch %d failed: %s", idx, e)
-                    errors.append(f"Launch {idx}: {e}")
+                    errors.append(f"Launch {idx}: {self._redact_aws_message(str(e))}")
 
         if not results:
             raise AWSInfrastructureError(
@@ -199,28 +195,38 @@ class MicroVMHandler(AWSHandler):
 
         return results
 
+    _THROTTLE_CODES = frozenset(
+        {
+            "Throttling",
+            "ThrottlingException",
+            "RequestLimitExceeded",
+            "TooManyRequestsException",
+        }
+    )
+
     def _run_single_microvm(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Execute a single run_microvm call with retry and jitter for throttling."""
-        import random
-        import time as _time
+        """Execute a single run_microvm call with retry and full jitter for throttling."""
+        from botocore.exceptions import ClientError
 
         max_attempts = 6
         base_delay = 1.0
+        max_delay = 20.0
 
         for attempt in range(max_attempts):
             try:
                 return self.aws_client.microvm_client.run_microvm(**params)
-            except Exception as e:
-                is_throttle = "ThrottlingException" in str(type(e).__name__) or "Throttling" in str(
-                    e
-                )
-                if attempt == max_attempts - 1 or not is_throttle:
+            except ClientError as e:
+                error_code = e.response["Error"]["Code"]
+                if attempt == max_attempts - 1 or error_code not in self._THROTTLE_CODES:
                     raise
-                delay = base_delay * (2**attempt) + random.uniform(0, 1)
-                self._logger.debug("Throttled on run_microvm, retrying in %.1fs", delay)
-                _time.sleep(delay)
+                cap = min(base_delay * (2**attempt), max_delay)
+                delay = random.uniform(0, cap)
+                self._logger.debug(
+                    "Throttled on run_microvm (%s), retrying in %.1fs", error_code, delay
+                )
+                time.sleep(delay)
 
-        raise AWSInfrastructureError("run_microvm failed: max retry attempts exceeded")
+        raise AssertionError("unreachable: loop always returns or raises")
 
     # ------------------------------------------------------------------
     # Check Status
@@ -243,19 +249,30 @@ class MicroVMHandler(AWSHandler):
             )
 
         instances: list[dict[str, Any]] = []
-        for microvm_id in microvm_ids:
-            try:
-                resp = self._retry_with_backoff(
-                    self.aws_client.microvm_client.get_microvm,
-                    operation_type="read_only",
-                    microvmIdentifier=microvm_id,
-                )
-                instances.append(self._build_machine_payload(resp))
-            except Exception as e:
-                self._logger.warning("Failed to get status for MicroVM %s: %s", microvm_id, e)
+        with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(self._get_single_microvm_status, mid): mid for mid in microvm_ids
+            }
+            for future in as_completed(futures):
+                mid = futures[future]
+                try:
+                    payload = future.result()
+                    if payload is not None:
+                        instances.append(payload)
+                except Exception as e:
+                    self._logger.warning("Failed to get status for MicroVM %s: %s", mid, e)
 
         fulfilment = self._compute_microvm_fulfilment(instances, request.requested_count)
         return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
+
+    def _get_single_microvm_status(self, microvm_id: str) -> Optional[dict[str, Any]]:
+        """Fetch status for a single MicroVM and return a machine payload."""
+        resp = self._retry_with_backoff(
+            self.aws_client.microvm_client.get_microvm,
+            operation_type="read_only",
+            microvmIdentifier=microvm_id,
+        )
+        return self._build_machine_payload(resp)
 
     def _compute_microvm_fulfilment(
         self, instances: list[dict[str, Any]], requested_count: int
@@ -267,7 +284,7 @@ class MicroVMHandler(AWSHandler):
             1 for i in instances if i.get("status") in ("shutting-down", "terminated")
         )
 
-        if running_count >= requested_count and failed_count == 0:
+        if running_count >= requested_count:
             return ProviderFulfilment(
                 state="fulfilled",
                 message=f"All {running_count} MicroVM(s) running",
@@ -346,7 +363,7 @@ class MicroVMHandler(AWSHandler):
                     future.result()
                 except Exception as e:
                     self._logger.error("Failed to terminate MicroVM %s: %s", mid, e)
-                    errors.append(f"{mid}: {e}")
+                    errors.append(f"{mid}: {self._redact_aws_message(str(e))}")
 
         if errors:
             raise AWSInfrastructureError(
@@ -390,7 +407,7 @@ class MicroVMHandler(AWSHandler):
         return {
             "instance_id": microvm_response.get("microvmId"),
             "resource_id": microvm_response.get("microvmId"),
-            "status": _MICROVM_STATE_MAP.get(state, "pending"),
+            "status": _MICROVM_STATE_MAP.get(state, "terminated"),
             "private_ip": None,
             "public_ip": None,
             "launch_time": started_at,
@@ -407,7 +424,6 @@ class MicroVMHandler(AWSHandler):
             "provider_data": {
                 "endpoint": microvm_response.get("endpoint"),
                 "image_version": microvm_response.get("imageVersion"),
-                "execution_role_arn": microvm_response.get("executionRoleArn"),
                 "state_reason": microvm_response.get("stateReason"),
                 "maximum_duration_in_seconds": microvm_response.get("maximumDurationInSeconds"),
             },

@@ -5,6 +5,7 @@ This module provides an adapter for AWS-specific resource provisioning operation
 It implements the ResourceProvisioningPort interface from the domain layer.
 """
 
+import asyncio
 from typing import Any, Optional
 
 from orb.domain.base.exceptions import InfrastructureError
@@ -93,7 +94,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         # Check if dry-run mode is requested
         is_dry_run = request.metadata.get("dry_run", False)
 
-        return self._provision_via_handlers(request, template, dry_run=is_dry_run)
+        return await asyncio.to_thread(
+            self._provision_via_handlers, request, template, dry_run=is_dry_run
+        )
 
     async def _provision_via_strategy(
         self, request: Request, template: Template, dry_run: bool = False

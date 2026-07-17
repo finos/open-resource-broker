@@ -27,6 +27,7 @@ PROVIDER_APIS: list[dict[str, str]] = [
     {"value": "EC2Fleet", "label": "AWS - EC2Fleet"},
     {"value": "SpotFleet", "label": "AWS - SpotFleet"},
     {"value": "ASG", "label": "AWS - Auto Scaling Group"},
+    {"value": "MicroVM", "label": "AWS - Lambda MicroVM"},
 ]
 
 COMMON_INSTANCE_TYPES: list[str] = [

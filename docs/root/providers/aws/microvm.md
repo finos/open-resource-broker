@@ -33,9 +33,6 @@ The build produces an image ARN like `arn:aws:lambda:us-east-1:123456789012:micr
   "provider_api": "MicroVM",
   "image_id": "arn:aws:lambda:us-east-1:123456789012:microvm-image:my-worker",
   "maxNumber": 20,
-  "tags": {
-    "Environment": "prod"
-  },
   "metadata": {
     "image_version": "1",
     "execution_role_arn": "arn:aws:iam::123456789012:role/MicroVMRole",
@@ -78,7 +75,6 @@ The MicroVM handler uses `provider_api: "MicroVM"` and configures the MicroVM th
 | `provider_api` | Yes | Must be `"MicroVM"` |
 | `image_id` | Yes | The MicroVM image ARN or identifier. This is the image your MicroVMs will boot from. |
 | `max_instances` | No | Maximum number of MicroVMs this template can provision (default: unlimited) |
-| `tags` | No | Key-value tags applied to MicroVMs via `tag_resource` |
 
 ### Metadata fields
 
@@ -244,9 +240,7 @@ The IAM principal running ORB needs these permissions:
       "Action": [
         "lambda-microvms:RunMicrovm",
         "lambda-microvms:GetMicrovm",
-        "lambda-microvms:TerminateMicrovm",
-        "lambda-microvms:TagResource",
-        "lambda-microvms:ListMicrovms"
+        "lambda-microvms:TerminateMicrovm"
       ],
       "Resource": "*"
     }
