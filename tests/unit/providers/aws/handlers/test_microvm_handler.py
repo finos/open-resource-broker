@@ -583,9 +583,9 @@ class TestMicroVMHandlerValidation:
 class TestAWSClientMicroVMProperty:
     def test_microvm_client_lazy_init(self):
         """Verify microvm_client property creates the client on first access."""
-        from orb.providers.aws.infrastructure.aws_client import AWSClient
-
         import threading
+
+        from orb.providers.aws.infrastructure.aws_client import AWSClient
 
         client = object.__new__(AWSClient)
         client._microvm_client = None
