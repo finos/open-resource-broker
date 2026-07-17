@@ -182,8 +182,9 @@ class MicroVMHandler(AWSHandler):
                     result = future.result()
                     results.append(result)
                 except Exception as e:
-                    self._logger.error("MicroVM launch %d failed: %s", idx, e)
-                    errors.append(f"Launch {idx}: {self._redact_aws_message(str(e))}")
+                    redacted = self._redact_aws_message(str(e))
+                    self._logger.error("MicroVM launch %d failed: %s", idx, redacted)
+                    errors.append(f"Launch {idx}: {redacted}")
 
         if not results:
             raise AWSInfrastructureError(
@@ -260,7 +261,11 @@ class MicroVMHandler(AWSHandler):
                     if payload is not None:
                         instances.append(payload)
                 except Exception as e:
-                    self._logger.warning("Failed to get status for MicroVM %s: %s", mid, e)
+                    self._logger.warning(
+                        "Failed to get status for MicroVM %s: %s",
+                        mid,
+                        self._redact_aws_message(str(e)),
+                    )
 
         fulfilment = self._compute_microvm_fulfilment(instances, request.requested_count)
         return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
@@ -362,8 +367,9 @@ class MicroVMHandler(AWSHandler):
                 try:
                     future.result()
                 except Exception as e:
-                    self._logger.error("Failed to terminate MicroVM %s: %s", mid, e)
-                    errors.append(f"{mid}: {self._redact_aws_message(str(e))}")
+                    redacted = self._redact_aws_message(str(e))
+                    self._logger.error("Failed to terminate MicroVM %s: %s", mid, redacted)
+                    errors.append(f"{mid}: {redacted}")
 
         if errors:
             raise AWSInfrastructureError(
@@ -386,10 +392,11 @@ class MicroVMHandler(AWSHandler):
             self._terminate_single_microvm(resource_id)
             return {"status": "success", "message": f"MicroVM {resource_id} terminated"}
         except Exception as e:
-            self._logger.error("Failed to cancel MicroVM %s: %s", resource_id, e)
+            redacted = self._redact_aws_message(str(e))
+            self._logger.error("Failed to cancel MicroVM %s: %s", resource_id, redacted)
             return {
                 "status": "error",
-                "message": f"Failed to cancel MicroVM {resource_id}: {e!s}",
+                "message": f"Failed to cancel MicroVM {resource_id}: {redacted}",
             }
 
     # ------------------------------------------------------------------

@@ -691,6 +691,13 @@ def ensure_orb_config(region: str):
 
 
 def main():
+    if Console is None:
+        sys.stderr.write(
+            "This acceptance script requires the 'rich' package for console output.\n"
+            "Install it with: pip install rich\n"
+        )
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(description="ORB Lambda MicroVM E2E acceptance test")
     parser.add_argument("--tasks", type=int, default=20, help="Number of tasks to submit")
     parser.add_argument("--microvms", type=int, default=3, help="Number of MicroVMs to provision")

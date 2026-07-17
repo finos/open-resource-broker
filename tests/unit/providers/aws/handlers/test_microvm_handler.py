@@ -658,6 +658,67 @@ class TestAWSValidationMicroVM:
         assert config.types["micro_vm"] == "MicroVM"
 
 
+class TestAWSTemplateAdapterMicroVMValidation:
+    """MicroVM templates must not be rejected for missing EC2-only fields."""
+
+    def _adapter(self):
+        from orb.providers.aws.infrastructure.adapters.template_adapter import (
+            AWSTemplateAdapter,
+        )
+
+        return AWSTemplateAdapter(
+            template_config_manager=MagicMock(),
+            aws_client=MagicMock(),
+            logger=MagicMock(),
+        )
+
+    def _microvm_template(self):
+        return AWSTemplate(
+            template_id="microvm-validate",
+            provider_api="MicroVM",
+            image_id="arn:aws:lambda:us-east-1:123456789012:microvm-image:worker",
+            max_instances=1,
+            machine_types={},
+            subnet_ids=[],
+            security_group_ids=[],
+            metadata={},
+        )
+
+    def test_validate_template_accepts_microvm_without_machine_types_or_subnets(self):
+        """A valid MicroVM template (no machine_types/subnets) should have no errors."""
+        adapter = self._adapter()
+        errors = adapter.validate_template(self._microvm_template())
+
+        assert errors == []
+
+    def test_required_fields_skips_machine_types_and_subnets_for_microvm(self):
+        """_validate_required_fields must not emit EC2-only errors for MicroVM."""
+        adapter = self._adapter()
+        errors = adapter._validate_required_fields(self._microvm_template())
+
+        assert not any("Machine types are required" in e for e in errors)
+        assert not any("subnet ID is required" in e for e in errors)
+
+    def test_required_fields_still_enforced_for_ec2(self):
+        """EC2 templates lacking machine_types/subnets should still be rejected."""
+        adapter = self._adapter()
+        ec2_template = AWSTemplate(
+            template_id="ec2-validate",
+            provider_api="EC2Fleet",
+            image_id="ami-0abcdef1234567890",
+            max_instances=1,
+            machine_types={},
+            subnet_ids=[],
+            security_group_ids=[],
+            metadata={},
+        )
+
+        errors = adapter._validate_required_fields(ec2_template)
+
+        assert any("Machine types are required" in e for e in errors)
+        assert any("subnet ID is required" in e for e in errors)
+
+
 class TestHostFactoryMicroVMFieldMapping:
     def test_hf_microvm_fields_land_in_metadata(self):
         """HF camelCase MicroVM fields should be routed into metadata via dotted paths."""
