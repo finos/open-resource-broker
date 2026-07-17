@@ -69,14 +69,14 @@ hadolint-check-container: dev-install  ## Check Dockerfile with hadolint in cont
 	./dev-tools/ci/run_dev_checks.sh all
 
 install-dev-tools: dev-install  ## Install all development tools
-	./dev-tools/setup/install_dev_tools.py
+	$(PYTHON) ./dev-tools/setup/install_dev_tools.py
 
 install-dev-tools-required: dev-install  ## Install only required development tools
-	./dev-tools/setup/install_dev_tools.py --required-only
+	$(PYTHON) ./dev-tools/setup/install_dev_tools.py --required-only
 
 install-dev-tools-dry-run: dev-install  ## Show what development tools would be installed
 	@echo "Checking what development tools would be installed..."
-	./dev-tools/setup/install_dev_tools.py --dry-run
+	$(PYTHON) ./dev-tools/setup/install_dev_tools.py --dry-run
 
 clean-whitespace:  ## Clean whitespace in blank lines from all files
 	@echo "Cleaning whitespace in blank lines..."
@@ -95,8 +95,8 @@ security: dev-install  ## Run security checks (usage: make security [quick] [all
 sbom-generate: dev-install ## Generate Software Bill of Materials (SBOM)
 	@echo "Generating SBOM files..."
 	@echo "Ensuring required tools are installed..."
-	./dev-tools/setup/install_dev_tools.py --tool syft
-	./dev-tools/setup/install_dev_tools.py --tool pip-audit
+	$(PYTHON) ./dev-tools/setup/install_dev_tools.py --tool syft
+	$(PYTHON) ./dev-tools/setup/install_dev_tools.py --tool pip-audit
 	@echo "Generating Python dependency SBOM..."
 	# pip-audit exits 1 when it finds CVEs (routine) or on a network blip.
 	# We still want the output file; || true keeps the recipe non-failing.
@@ -147,13 +147,13 @@ validate-workflow-syntax: dev-install  ## Validate GitHub Actions workflow YAML 
 validate-workflow-logic: dev-install  ## Validate GitHub Actions workflows with actionlint
 	@echo "Validating workflows with actionlint..."
 	@echo "Ensuring actionlint is installed..."
-	./dev-tools/setup/install_dev_tools.py --tool actionlint
+	$(PYTHON) ./dev-tools/setup/install_dev_tools.py --tool actionlint
 	./dev-tools/quality/validate_actionlint.py
 
 validate-shell-scripts: dev-install  ## Validate shell scripts with shellcheck
 	@echo "Validating shell scripts with shellcheck..."
 	@echo "Ensuring shellcheck is installed..."
-	./dev-tools/setup/install_dev_tools.py --tool shellcheck
+	$(PYTHON) ./dev-tools/setup/install_dev_tools.py --tool shellcheck
 	./dev-tools/quality/validate_shell_scripts.py
 
 validate-all-workflows: validate-workflow-syntax validate-workflow-logic  ## Run all workflow validation checks

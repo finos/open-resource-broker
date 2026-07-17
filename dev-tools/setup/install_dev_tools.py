@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Development Tools Installation Script
 
