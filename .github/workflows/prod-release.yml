@@ -168,6 +168,9 @@ jobs:
       # exit-code: '1' blocks the push if CRITICAL or HIGH CVEs are found.
       # This is the security gate: the image is not pushed to GHCR until it
       # passes.  SCAN_LEVEL == 'full' only on the default Python matrix entry.
+      # trivyignores honours the suppression file for known unfixable base-image
+      # CVEs (e.g. Debian CVEs in the Python slim images) so the gate only fires
+      # on actionable findings.
       if: env.SCAN_LEVEL == 'full'
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
       with:
@@ -176,6 +179,7 @@ jobs:
         output: 'trivy-results-py${{ matrix.python-version }}.sarif'
         exit-code: '1'
         severity: 'CRITICAL,HIGH'
+        trivyignores: .trivyignore
 
     - name: Build and push container image
       id: build
@@ -250,6 +254,7 @@ jobs:
         output: 'trivy-results-py${{ matrix.python-version }}.sarif'
         exit-code: '0'
         severity: 'CRITICAL,HIGH'
+        trivyignores: .trivyignore
 
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
