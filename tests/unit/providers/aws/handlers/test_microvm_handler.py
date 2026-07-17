@@ -275,6 +275,165 @@ class TestMicroVMHandlerCancel:
         assert result["status"] == "error"
 
 
+class TestMicroVMHandlerCheckStatusEdgeCases:
+    def test_check_status_no_resource_ids_falls_back_to_provider_data(self, handler):
+        """When resource_ids is empty, falls back to provider_data.microvm_ids."""
+        handler.aws_client.microvm_client.get_microvm.return_value = {
+            "microvmId": "microvm-1",
+            "state": "RUNNING",
+            "endpoint": "https://1.example.com",
+            "imageArn": "arn:aws:lambda:us-east-1:123:microvm-image:test",
+        }
+
+        request = MagicMock()
+        request.resource_ids = []
+        request.provider_data = {"microvm_ids": ["microvm-1"]}
+        request.requested_count = 1
+
+        result = handler.check_hosts_status(request)
+
+        assert result.fulfilment.state == "fulfilled"
+        assert len(result.instances) == 1
+
+    def test_check_status_no_ids_anywhere(self, handler):
+        """When no IDs exist anywhere, return in_progress."""
+        request = MagicMock()
+        request.resource_ids = []
+        request.provider_data = {}
+        request.requested_count = 1
+
+        result = handler.check_hosts_status(request)
+
+        assert result.fulfilment.state == "in_progress"
+        assert result.instances == []
+
+    def test_check_status_get_microvm_failure_skips(self, handler):
+        """When get_microvm fails for one ID, it's skipped gracefully."""
+        from orb.providers.aws.exceptions.aws_exceptions import AWSEntityNotFoundError
+
+        def side_effect(**kwargs):
+            if kwargs.get("microvmIdentifier") == "microvm-1":
+                raise AWSEntityNotFoundError("not found")
+            return {
+                "microvmId": "microvm-2",
+                "state": "RUNNING",
+                "endpoint": "https://2.example.com",
+                "imageArn": "arn:aws:lambda:us-east-1:123:microvm-image:test",
+            }
+
+        handler.aws_client.microvm_client.get_microvm.side_effect = side_effect
+
+        request = MagicMock()
+        request.resource_ids = ["microvm-1", "microvm-2"]
+        request.requested_count = 2
+
+        result = handler.check_hosts_status(request)
+
+        assert len(result.instances) == 1
+        assert result.fulfilment.state == "partial"
+
+    def test_check_status_partial_fulfilment(self, handler):
+        """When some MicroVMs are running and some terminated, report partial."""
+        responses = [
+            {
+                "microvmId": "microvm-1",
+                "state": "RUNNING",
+                "endpoint": "https://1.example.com",
+                "imageArn": "arn:aws:lambda:us-east-1:123:microvm-image:test",
+            },
+            {
+                "microvmId": "microvm-2",
+                "state": "TERMINATED",
+                "imageArn": "arn:aws:lambda:us-east-1:123:microvm-image:test",
+            },
+        ]
+        handler.aws_client.microvm_client.get_microvm.side_effect = [responses[0], responses[1]]
+
+        request = MagicMock()
+        request.resource_ids = ["microvm-1", "microvm-2"]
+        request.requested_count = 2
+
+        result = handler.check_hosts_status(request)
+
+        assert result.fulfilment.state == "partial"
+        assert result.fulfilment.running_count == 1
+        assert result.fulfilment.failed_count == 1
+
+    def test_check_status_all_starting_no_results(self, handler):
+        """When all get_microvm calls fail, return in_progress with empty instances."""
+        handler.aws_client.microvm_client.get_microvm.side_effect = Exception("timeout")
+
+        request = MagicMock()
+        request.resource_ids = ["microvm-1"]
+        request.requested_count = 1
+
+        result = handler.check_hosts_status(request)
+
+        assert result.instances == []
+        assert result.fulfilment.state == "in_progress"
+
+
+class TestMicroVMHandlerThrottleRetry:
+    def test_throttle_retries_then_succeeds(self, handler):
+        """Throttled calls should retry and eventually succeed."""
+        from botocore.exceptions import ClientError
+
+        throttle_error = ClientError(
+            {"Error": {"Code": "ThrottlingException", "Message": "Rate exceeded"}},
+            "RunMicrovm",
+        )
+
+        handler.aws_client.microvm_client.run_microvm.side_effect = [
+            throttle_error,
+            throttle_error,
+            {
+                "microvmId": "microvm-1",
+                "state": "PENDING",
+                "endpoint": "https://1.example.com",
+                "imageArn": "arn:aws:lambda:us-east-1:123:microvm-image:test",
+            },
+        ]
+
+        request = MagicMock()
+        request.requested_count = 1
+        request.request_id = "req-001"
+
+        params = {
+            "imageIdentifier": "arn:aws:lambda:us-east-1:123:microvm-image:test",
+            "clientToken": "test-token",
+        }
+        result = handler._run_single_microvm(params)
+
+        assert result["microvmId"] == "microvm-1"
+        assert handler.aws_client.microvm_client.run_microvm.call_count == 3
+
+    def test_non_throttle_error_raises_immediately(self, handler):
+        """Non-throttle errors should not be retried."""
+        handler.aws_client.microvm_client.run_microvm.side_effect = Exception("validation error")
+
+        params = {"imageIdentifier": "test", "clientToken": "test-token"}
+
+        with pytest.raises(Exception, match="validation error"):
+            handler._run_single_microvm(params)
+
+        assert handler.aws_client.microvm_client.run_microvm.call_count == 1
+
+
+class TestMicroVMHandlerMisc:
+    def test_default_provider_api(self, handler):
+        """Verify handler returns correct provider API string."""
+        assert handler._default_provider_api() == "MicroVM"
+
+    def test_get_example_templates(self):
+        """Verify example templates are returned."""
+        from orb.providers.aws.infrastructure.handlers.microvm.handler import MicroVMHandler
+
+        templates = MicroVMHandler.get_example_templates()
+
+        assert len(templates) >= 1
+        assert templates[0].provider_api.value == "MicroVM"
+
+
 class TestMicroVMHandlerValidation:
     def test_missing_image_id_raises(self, handler):
         """Template without image_id should fail validation."""
