@@ -204,6 +204,7 @@ class MicroVMHandler(AWSHandler):
     def _run_single_microvm(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute a single run_microvm call with retry and jitter for throttling."""
         import random
+        import time as _time
 
         max_attempts = 6
         base_delay = 1.0
@@ -217,8 +218,9 @@ class MicroVMHandler(AWSHandler):
                     raise
                 delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
                 self._logger.debug("Throttled on run_microvm, retrying in %.1fs", delay)
-                import time
-                time.sleep(delay)
+                _time.sleep(delay)
+
+        raise AWSInfrastructureError("run_microvm failed: max retry attempts exceeded")
 
     # ------------------------------------------------------------------
     # Check Status

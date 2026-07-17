@@ -34,10 +34,15 @@ import uuid
 from pathlib import Path
 
 import boto3
-from rich.console import Console
-from rich.live import Live
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
-from rich.table import Table
+
+try:
+    from rich.console import Console
+    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+    from rich.table import Table
+except ImportError:
+    import pytest
+
+    pytest.skip("MicroVM E2E test requires 'rich': pip install rich", allow_module_level=True)
 
 console = Console()
 
@@ -78,7 +83,7 @@ def _ensure_queue(sqs_client, queue_name: str) -> str:
             sqs_client.purge_queue(QueueUrl=queue_url)
         except Exception as e:
             if "PurgeQueueInProgress" in str(e):
-                console.print(f"  [yellow]Purge already in progress, continuing...[/yellow]")
+                console.print("  [yellow]Purge already in progress, continuing...[/yellow]")
             else:
                 raise
         return queue_url
@@ -126,12 +131,14 @@ def ensure_microvm_image(
                         if del_state not in ("DELETING",):
                             break
                     except Exception:
+                        # ResourceNotFoundException means deletion is complete
                         break
                     time.sleep(5)
-            console.print(f"  Deletion complete.")
+            console.print("  Deletion complete.")
         else:
             console.print(f"  Image [cyan]{IMAGE_NAME}[/cyan] in state {state}, rebuilding...")
     except Exception:
+        # Image doesn't exist yet — proceed to build
         pass
 
     if not needs_build:
@@ -452,19 +459,19 @@ def provision_microvms_manual(image_arn: str, num_microvms: int, region: str, ac
     }
     template_file.write_text(json.dumps(template_data, indent=2))
 
-    console.print(f"\n  [bold yellow]Manual mode:[/bold yellow] Provision MicroVMs using the ORB CLI.\n")
+    console.print("\n  [bold yellow]Manual mode:[/bold yellow] Provision MicroVMs using the ORB CLI.\n")
     console.print(f"  Template file written to: [cyan]{template_file}[/cyan]\n")
-    console.print(f"  Suggested commands:\n")
-    console.print(f"    [dim]# Ensure ORB is installed with AWS provider entry-points[/dim]")
-    console.print(f"    pip install -e \".[aws]\"\n")
-    console.print(f"    [dim]# Create template[/dim]")
+    console.print("  Suggested commands:\n")
+    console.print("    [dim]# Ensure ORB is installed with AWS provider entry-points[/dim]")
+    console.print("    pip install -e \".[aws]\"\n")
+    console.print("    [dim]# Create template[/dim]")
     console.print(f"    orb templates create --file {template_file}\n")
-    console.print(f"    [dim]# Request MicroVMs[/dim]")
+    console.print("    [dim]# Request MicroVMs[/dim]")
     console.print(f"    orb machines request microvm-e2e-test {num_microvms}\n")
-    console.print(f"    [dim]# Check status[/dim]")
-    console.print(f"    orb requests status <request-id>\n")
+    console.print("    [dim]# Check status[/dim]")
+    console.print("    orb requests status <request-id>\n")
 
-    console.print(f"  [bold]Press Enter when MicroVMs are running...[/bold]", end="")
+    console.print("  [bold]Press Enter when MicroVMs are running...[/bold]", end="")
     input()
     console.print()
 
@@ -647,7 +654,7 @@ def ensure_orb_config(region: str):
 
     config_dir.mkdir(parents=True, exist_ok=True)
 
-    aws_config: dict[str, Any] = {"region": region}
+    aws_config: dict = {"region": region}
     profile = os.environ.get("AWS_PROFILE")
     if profile:
         aws_config["profile"] = profile
