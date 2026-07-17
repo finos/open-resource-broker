@@ -35,11 +35,16 @@ from pathlib import Path
 
 import boto3
 import pytest
-from rich.console import Console
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
-from rich.table import Table
 
-console = Console()
+try:
+    from rich.console import Console
+    from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+    from rich.table import Table
+except ImportError:  # pragma: no cover - rich is only needed for the live acceptance run
+    Console = None  # type: ignore[assignment,misc]
+    BarColumn = Progress = SpinnerColumn = TextColumn = TimeElapsedColumn = Table = None  # type: ignore[assignment,misc]
+
+console = Console() if Console is not None else None
 
 QUEUE_PREFIX = "orb-microvm-test"
 IMAGE_NAME = "orb-microvm-test-worker"
@@ -797,14 +802,25 @@ def main():
 
 
 @pytest.mark.e2e
-def test_microvm_e2e_scenario():
+def test_microvm_e2e_scenario(request):
     """Pytest-discoverable E2E scenario for the MicroVM handler.
 
-    Requires real AWS credentials and is gated behind the ``e2e`` marker so
-    normal ``pytest`` runs skip it.  Run with::
+    Requires real AWS credentials and a real account, so it is gated behind the
+    ``--live`` flag (alias ``--run-aws``).  Without it the test is skipped —
+    default CI runs use fake credentials and cannot reach the Lambda MicroVMs
+    or STS endpoints.  Run with::
 
-        pytest -m e2e tests/e2e/microvm/
+        pytest --live tests/e2e/microvm/
+
+    ``rich`` is also required for the live run's console output::
+
+        pip install rich boto3
     """
+    if not (request.config.getoption("--live") or request.config.getoption("--run-aws")):
+        pytest.skip("requires real credentials — pass --live (or --run-aws) to run")
+    if Console is None:
+        pytest.skip("rich is not installed — pip install rich to run the live scenario")
+
     region = os.environ.get("AWS_REGION", "us-east-1")
     num_tasks = int(os.environ.get("ORB_E2E_TASKS", "5"))
     num_microvms = int(os.environ.get("ORB_E2E_MICROVMS", "2"))
