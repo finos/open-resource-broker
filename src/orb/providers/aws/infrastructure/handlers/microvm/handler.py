@@ -32,7 +32,6 @@ from orb.providers.aws.infrastructure.handlers.microvm.example_templates import 
     MICROVM_EXAMPLE_TEMPLATES,
 )
 from orb.providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
-from orb.providers.aws.infrastructure.tags import build_system_tags
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 # MicroVM state → ORB status mapping.
@@ -112,9 +111,6 @@ class MicroVMHandler(AWSHandler):
 
             microvm_ids = [r["microvmId"] for r in results]
             instances = [self._build_machine_payload(r) for r in results]
-
-            # Tag each MicroVM with ORB system tags
-            self._tag_microvms(microvm_ids, request, aws_template)
 
             self._logger.info(
                 "Successfully launched %d MicroVM(s): %s", len(microvm_ids), microvm_ids
@@ -223,38 +219,6 @@ class MicroVMHandler(AWSHandler):
                 self._logger.debug("Throttled on run_microvm, retrying in %.1fs", delay)
                 import time
                 time.sleep(delay)
-
-    def _tag_microvms(
-        self,
-        microvm_ids: list[str],
-        request: Request,
-        aws_template: AWSTemplate,
-    ) -> None:
-        """Apply standard ORB tags to MicroVMs in parallel."""
-        tags = build_system_tags(
-            request_id=str(request.request_id),
-            template_id=str(aws_template.template_id),
-            provider_api="MicroVM",
-        )
-
-        tag_dict = {t["Key"]: t["Value"] for t in tags}
-
-        def _tag_one(microvm_id: str) -> None:
-            self._retry_with_backoff(
-                self.aws_client.microvm_client.tag_resource,
-                operation_type="standard",
-                resourceArn=microvm_id,
-                tags=tag_dict,
-            )
-
-        with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
-            futures = {executor.submit(_tag_one, mid): mid for mid in microvm_ids}
-            for future in as_completed(futures):
-                mid = futures[future]
-                try:
-                    future.result()
-                except Exception as e:
-                    self._logger.warning("Failed to tag MicroVM %s: %s", mid, e)
 
     # ------------------------------------------------------------------
     # Check Status

@@ -71,7 +71,6 @@ class TestMicroVMHandlerAcquire:
             "imageVersion": "1",
             "startedAt": datetime(2026, 7, 13, tzinfo=timezone.utc),
         }
-        handler.aws_client.microvm_client.tag_resource.return_value = {}
 
         request = MagicMock()
         request.requested_count = 3
@@ -94,7 +93,6 @@ class TestMicroVMHandlerAcquire:
             "endpoint": "https://xyz.example.com",
             "imageArn": microvm_template.image_id,
         }
-        handler.aws_client.microvm_client.tag_resource.return_value = {}
 
         request = MagicMock()
         request.requested_count = 1
@@ -127,7 +125,6 @@ class TestMicroVMHandlerAcquire:
             }
 
         handler.aws_client.microvm_client.run_microvm.side_effect = side_effect
-        handler.aws_client.microvm_client.tag_resource.return_value = {}
 
         request = MagicMock()
         request.requested_count = 3
@@ -314,7 +311,6 @@ class TestMicroVMHandlerValidation:
             "endpoint": "https://1.example.com",
             "imageArn": template.image_id,
         }
-        handler.aws_client.microvm_client.tag_resource.return_value = {}
 
         request = MagicMock()
         request.requested_count = 1

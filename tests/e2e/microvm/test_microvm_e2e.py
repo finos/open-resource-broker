@@ -455,6 +455,8 @@ def provision_microvms_manual(image_arn: str, num_microvms: int, region: str, ac
     console.print(f"\n  [bold yellow]Manual mode:[/bold yellow] Provision MicroVMs using the ORB CLI.\n")
     console.print(f"  Template file written to: [cyan]{template_file}[/cyan]\n")
     console.print(f"  Suggested commands:\n")
+    console.print(f"    [dim]# Ensure ORB is installed with AWS provider entry-points[/dim]")
+    console.print(f"    pip install -e \".[aws]\"\n")
     console.print(f"    [dim]# Create template[/dim]")
     console.print(f"    orb templates create --file {template_file}\n")
     console.print(f"    [dim]# Request MicroVMs[/dim]")

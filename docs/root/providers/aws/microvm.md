@@ -293,7 +293,6 @@ This triggers a read-through sync: ORB calls `get_microvm` for each machine, upd
 - **Parallelism**: MicroVMs are provisioned in parallel with a concurrency of 25. Throttled requests automatically retry with exponential backoff and jitter.
 - **Idempotency**: Each `run_microvm` call uses a unique `clientToken` for safe retries.
 - **Partial success**: If some launches fail but others succeed, ORB reports partial fulfilment. The request enters `partial` state with the successfully launched MicroVMs available.
-- **Tagging**: Each MicroVM is tagged with standard ORB tags (`orb:managed-by`, `orb:request-id`, `orb:template-id`, `orb:provider-api`).
 
 ## Availability
 
