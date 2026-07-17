@@ -4829,10 +4829,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-add-an-enum-entry" class="md-nav__link">
+  <a href="#2-implement-a-providerplugin-subclass" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Add an enum entry
+        2. Implement a ProviderPlugin subclass
       
     </span>
   </a>
@@ -4840,10 +4840,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-add-a-registration-call-in-providersregistrationpy" class="md-nav__link">
+  <a href="#3-declare-the-entry-point-in-pyprojecttoml" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Add a registration call in providers/registration.py
+        3. Declare the entry point in pyproject.toml
       
     </span>
   </a>
@@ -4851,21 +4851,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-add-a-bootstrap-block-in-bootstrapprovider_servicespy" class="md-nav__link">
+  <a href="#4-add-sdk-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Add a bootstrap block in bootstrap/provider_services.py
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-add-sdk-dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Add SDK dependencies
+        4. Add SDK dependencies
       
     </span>
   </a>
@@ -4874,6 +4863,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-completeness-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup completeness check
+      
+    </span>
+  </a>
   
 </li>
       
@@ -4967,10 +4967,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#templateexamplegeneratorport" class="md-nav__link">
+  <a href="#templateexamplegeneratorregistry" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TemplateExampleGeneratorPort
+        TemplateExampleGeneratorRegistry
       
     </span>
   </a>
@@ -5140,251 +5140,296 @@
 </ul>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>ORB's provider system is built around an extension-point model: all provider-specific behaviour is registered through a set of dedicated registries at startup. Shared infrastructure (the CLI, the scheduler, the REST API, the DI container) never imports provider packages directly; instead it queries registries that were populated during bootstrap.</p>
+<p>Providers are discovered at startup via Python's standard <a href="https://packaging.python.org/en/latest/specifications/entry-points/">entry-points</a> mechanism. Each provider declares itself under the <code>orb.providers</code> entry-point group, pointing to a <code>ProviderPlugin.register_plugin</code> classmethod. No shared ORB file needs to be edited to add a new provider.</p>
 <p>The goal of this model is that adding a new provider should touch exactly:</p>
 <ul>
 <li><code>src/orb/providers/&lt;name&gt;/</code> — your provider package (all provider logic lives here)</li>
-<li>Three glue points in shared code: an enum entry, a registration call, and a bootstrap block</li>
+<li>One line in <code>[project.entry-points."orb.providers"]</code> in <code>pyproject.toml</code></li>
 </ul>
-<p>The AWS provider is the canonical reference implementation. Refer to <code>src/orb/providers/aws/registration.py</code> when you need to see a working example of every registration call described below.</p>
+<p>The AWS provider (<code>src/orb/providers/aws/provider_plugin.py</code>) and the Kubernetes provider (<code>src/orb/providers/k8s/provider_plugin.py</code>) are the canonical reference implementations.</p>
 <h3 id="provider-package-layout">Provider package layout<a class="headerlink" href="#provider-package-layout" title="Permanent link">&para;</a></h3>
 <p>Mirror the AWS structure:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>src/orb/providers/&lt;name&gt;/
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    __init__.py
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    registration.py          # All registration functions for this provider
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    strategy/
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        &lt;name&gt;_provider_strategy.py
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    cli/
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        &lt;name&gt;_cli_spec.py
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    configuration/
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        config.py
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        template_extension.py
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    domain/
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        template/
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>            &lt;name&gt;_template_aggregate.py
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>            &lt;name&gt;_template_dto_config.py
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    scheduler/
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>        hostfactory_field_mapping.py
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    auth/
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        &lt;strategy&gt;_auth_strategy.py
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    defaults_loader.py
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    provider_plugin.py            # ProviderPlugin subclass — the single registration entry point
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    registration.py               # Factory functions used by the plugin (strategy, config, etc.)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    strategy/
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        &lt;name&gt;_provider_strategy.py
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    cli/
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        &lt;name&gt;_cli_spec.py
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    configuration/
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        config.py
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        template_extension.py
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    domain/
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        template/
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>            &lt;name&gt;_template_aggregate.py
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>            &lt;name&gt;_template_dto_config.py
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    scheduler/
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>        hostfactory_field_mapping.py
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    auth/
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        &lt;strategy&gt;_auth_strategy.py
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    defaults_loader.py
 </code></pre></div>
 <h2 id="mandatory-steps">Mandatory steps<a class="headerlink" href="#mandatory-steps" title="Permanent link">&para;</a></h2>
 <p>Complete these steps in order. Each one has a corresponding section in the extension points reference below.</p>
 <h3 id="1-create-the-provider-package">1. Create the provider package<a class="headerlink" href="#1-create-the-provider-package" title="Permanent link">&para;</a></h3>
 <p>Create <code>src/orb/providers/&lt;name&gt;/</code> following the layout above. The strategy class must extend <code>ProviderStrategy</code> from <code>orb.providers.base.strategy</code> (see <code>src/orb/providers/base/strategy/provider_strategy.py</code>). Both the AWS and k8s providers use this base — for example, <code>AWSProviderStrategy(ProviderStrategy)</code> in <code>src/orb/providers/aws/strategy/aws_provider_strategy.py</code>.</p>
-<h3 id="2-add-an-enum-entry">2. Add an enum entry<a class="headerlink" href="#2-add-an-enum-entry" title="Permanent link">&para;</a></h3>
-<p>Add your provider to <code>ProviderType</code> in <code>src/orb/domain/base/provider_interfaces.py</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ProviderType</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">AWS</span> <span class="o">=</span> <span class="s2">&quot;aws&quot;</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">AZURE</span> <span class="o">=</span> <span class="s2">&quot;azure&quot;</span>   <span class="c1"># new entry</span>
+<h3 id="2-implement-a-providerplugin-subclass">2. Implement a <code>ProviderPlugin</code> subclass<a class="headerlink" href="#2-implement-a-providerplugin-subclass" title="Permanent link">&para;</a></h3>
+<p>Create <code>src/orb/providers/&lt;name&gt;/provider_plugin.py</code> and subclass <code>ProviderPlugin</code> from <code>src/orb/providers/base/provider_plugin.py</code>. You must set <code>provider_name</code> and implement all seven mandatory satellite accessors.</p>
+<p>Here is the minimal skeleton for an <code>azure</code> provider:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># src/orb/providers/azure/provider_plugin.py</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.base.provider_plugin</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProviderPlugin</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzurePlugin</span><span class="p">(</span><span class="n">ProviderPlugin</span><span class="p">):</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">provider_name</span> <span class="o">=</span> <span class="s2">&quot;azure&quot;</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="c1"># ------------------------------------------------------------------</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="c1"># Mandatory satellite accessors</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="c1"># ------------------------------------------------------------------</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">strategy_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.registration</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_azure_strategy</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>        <span class="k">return</span> <span class="n">create_azure_strategy</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">config_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.registration</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_azure_config</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>        <span class="k">return</span> <span class="n">create_azure_config</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">template_dto_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.domain.template.azure_template_dto_config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>                <span class="n">AzureTemplateDTOConfig</span><span class="p">,</span>
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>            <span class="p">)</span>
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>            <span class="k">return</span> <span class="n">AzureTemplateDTOConfig</span>
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>            <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>
+<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">cli_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.cli.azure_cli_spec</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureCLISpec</span>
+<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>            <span class="k">return</span> <span class="n">AzureCLISpec</span><span class="p">()</span>
+<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>            <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>
+<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">field_mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.scheduler.hostfactory_field_mapping</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a>                <span class="n">AzureFieldMapping</span><span class="p">,</span>
+<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>            <span class="p">)</span>
+<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>            <span class="k">return</span> <span class="n">AzureFieldMapping</span><span class="p">()</span>
+<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a>        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a>            <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a>
+<a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">defaults_loader</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.defaults_loader</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureDefaultsLoader</span>
+<a id="__codelineno-1-52" name="__codelineno-1-52" href="#__codelineno-1-52"></a>            <span class="k">return</span> <span class="n">AzureDefaultsLoader</span><span class="p">()</span>
+<a id="__codelineno-1-53" name="__codelineno-1-53" href="#__codelineno-1-53"></a>        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+<a id="__codelineno-1-54" name="__codelineno-1-54" href="#__codelineno-1-54"></a>            <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-1-55" name="__codelineno-1-55" href="#__codelineno-1-55"></a>
+<a id="__codelineno-1-56" name="__codelineno-1-56" href="#__codelineno-1-56"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">template_example_generator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">container</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<a id="__codelineno-1-57" name="__codelineno-1-57" href="#__codelineno-1-57"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-1-58" name="__codelineno-1-58" href="#__codelineno-1-58"></a>            <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.adapters.template_example_generator_adapter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-1-59" name="__codelineno-1-59" href="#__codelineno-1-59"></a>                <span class="n">AzureTemplateExampleGeneratorAdapter</span><span class="p">,</span>
+<a id="__codelineno-1-60" name="__codelineno-1-60" href="#__codelineno-1-60"></a>            <span class="p">)</span>
+<a id="__codelineno-1-61" name="__codelineno-1-61" href="#__codelineno-1-61"></a>            <span class="k">return</span> <span class="n">AzureTemplateExampleGeneratorAdapter</span><span class="p">()</span>
+<a id="__codelineno-1-62" name="__codelineno-1-62" href="#__codelineno-1-62"></a>        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+<a id="__codelineno-1-63" name="__codelineno-1-63" href="#__codelineno-1-63"></a>            <span class="k">return</span> <span class="kc">None</span>
 </code></pre></div>
-<p>Use a short, lowercase string that matches the string keys used in all registry calls.</p>
-<h3 id="3-add-a-registration-call-in-providersregistrationpy">3. Add a registration call in <code>providers/registration.py</code><a class="headerlink" href="#3-add-a-registration-call-in-providersregistrationpy" title="Permanent link">&para;</a></h3>
-<p>Add your provider to the two functions in <code>src/orb/providers/registration.py</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">register_all_provider_cli_specs</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.base.ports.provider_cli_spec_port</span><span class="w"> </span><span class="kn">import</span> <span class="n">CLISpecRegistry</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.cli.azure_cli_spec</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureCLISpec</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">if</span> <span class="n">CLISpecRegistry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;azure&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">CLISpecRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="n">AzureCLISpec</span><span class="p">())</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="k">def</span><span class="w"> </span><span class="nf">register_all_provider_types</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_provider_registry</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">registry</span> <span class="o">=</span> <span class="n">get_provider_registry</span><span class="p">()</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.aws.registration</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_aws_provider</span>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="n">register_aws_provider</span><span class="p">(</span><span class="n">registry</span><span class="p">)</span>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.registration</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_azure_provider</span>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="n">register_azure_provider</span><span class="p">(</span><span class="n">registry</span><span class="p">)</span>
+<p>All satellite accessor methods use <code>try/except ImportError</code> so the plugin module imports cleanly even when the provider's optional SDK dependencies are not installed.</p>
+<p>For optional satellite hooks (<code>resolver_factory</code>, <code>validator_factory</code>, <code>strategy_class</code>, <code>default_api</code>, <code>provider_settings_class</code>, <code>template_class</code>, <code>register_auth_strategies</code>, <code>register_additional_services</code>, <code>_do_initialize</code>) the base class provides no-op defaults; override only the ones your provider needs. See <code>src/orb/providers/aws/provider_plugin.py</code> for a fully-overridden example and <code>src/orb/providers/k8s/provider_plugin.py</code> for another reference.</p>
+<h3 id="3-declare-the-entry-point-in-pyprojecttoml">3. Declare the entry point in <code>pyproject.toml</code><a class="headerlink" href="#3-declare-the-entry-point-in-pyprojecttoml" title="Permanent link">&para;</a></h3>
+<p>Add a single line under <code>[project.entry-points."orb.providers"]</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[project.entry-points.</span><span class="s2">&quot;orb.providers&quot;</span><span class="k">]</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;orb.providers.aws.provider_plugin:AWSPlugin.register_plugin&quot;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">k8s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;orb.providers.k8s.provider_plugin:K8sPlugin.register_plugin&quot;</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">azure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;orb.providers.azure.provider_plugin:AzurePlugin.register_plugin&quot;</span>
 </code></pre></div>
-<h3 id="4-add-a-bootstrap-block-in-bootstrapprovider_servicespy">4. Add a bootstrap block in <code>bootstrap/provider_services.py</code><a class="headerlink" href="#4-add-a-bootstrap-block-in-bootstrapprovider_servicespy" title="Permanent link">&para;</a></h3>
-<p>Add a <code>find_spec</code>-guarded block to <code>_register_provider_utility_services</code> in <code>src/orb/bootstrap/provider_services.py</code>. Use the same pattern as the AWS block immediately above it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">&quot;orb.providers.azure&quot;</span><span class="p">):</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.registration</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_azure_services_with_di</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        <span class="n">register_azure_services_with_di</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Failed to register Azure utility services: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
-</code></pre></div>
-<p>The <code>find_spec</code> guard means the rest of ORB still runs when the provider package is not installed (useful for minimal deployments and test environments that exclude a specific provider's SDK).</p>
-<h3 id="5-add-sdk-dependencies">5. Add SDK dependencies<a class="headerlink" href="#5-add-sdk-dependencies" title="Permanent link">&para;</a></h3>
+<p>That is the complete integration point for bootstrap. No shared ORB registration or bootstrap file needs editing.</p>
+<p>When ORB starts it calls <code>discover_provider_plugins()</code> (in <code>src/orb/providers/registration.py</code>), which walks <code>importlib.metadata.entry_points(group="orb.providers")</code> and invokes each target callable. <code>ProviderPlugin.register_plugin</code> constructs an instance of your subclass, calls <code>register_provider()</code> against the live <code>ProviderRegistry</code>, and appends <code>provider_name</code> to the internal discovery list so the bootstrap loops pick up the provider.</p>
+<h3 id="4-add-sdk-dependencies">4. Add SDK dependencies<a class="headerlink" href="#4-add-sdk-dependencies" title="Permanent link">&para;</a></h3>
 <p>Add your cloud provider SDK to <code>pyproject.toml</code> and regenerate the lockfile:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">[project.optional-dependencies]</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">azure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;azure-mgmt-compute&gt;=30.0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;azure-identity&gt;=1.15&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[project.optional-dependencies]</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">azure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;azure-mgmt-compute&gt;=30.0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;azure-identity&gt;=1.15&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p>Then run <code>uv lock</code> to update <code>uv.lock</code>.</p>
+<hr />
+<h2 id="startup-completeness-check">Startup completeness check<a class="headerlink" href="#startup-completeness-check" title="Permanent link">&para;</a></h2>
+<p>After all providers are registered, the bootstrap calls <code>assert_provider_registrations_complete()</code> (in <code>src/orb/bootstrap/provider_completeness.py</code>). This assertion verifies that every provider type registered with <code>ProviderRegistry</code> also has an entry in every required satellite registry:</p>
+<ul>
+<li><code>CLISpecRegistry</code></li>
+<li><code>FieldMappingRegistry</code></li>
+<li><code>DefaultsLoaderRegistry</code></li>
+<li><code>TemplateExtensionRegistry</code></li>
+<li><code>TemplateExampleGeneratorRegistry</code></li>
+</ul>
+<p>If any satellite is missing, startup <strong>fails immediately</strong> with a <code>ProviderCompletenessError</code> that names the provider and every registry it is absent from, for example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ProviderCompletenessError: Provider registration is incomplete — satellite registries not populated:
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  provider=&#39;azure&#39;: missing in [FieldMappingRegistry, DefaultsLoaderRegistry]
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Fix: ensure initialize_&lt;provider&gt;_provider() is called during bootstrap
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>     for each registered provider type.
+</code></pre></div>
+<p>This fast-fail catches incomplete plugin implementations before any request is served. If you see this error, check that all seven mandatory satellite accessors in your <code>ProviderPlugin</code> subclass return non-<code>None</code> values (or that <code>ImportError</code> is not silently suppressing a real missing-module error).</p>
 <hr />
 <h2 id="extension-points-reference">Extension points reference<a class="headerlink" href="#extension-points-reference" title="Permanent link">&para;</a></h2>
 <p>Each registry is a class-level singleton. Register during startup; never register lazily inside a request handler.</p>
 <h3 id="providerregistry">ProviderRegistry<a class="headerlink" href="#providerregistry" title="Permanent link">&para;</a></h3>
 <p><strong>Location:</strong> <code>src/orb/providers/registry/provider_registry.py</code></p>
 <p><strong>What it does:</strong> The central strategy factory. When a request arrives for a named provider, <code>ProviderRegistry</code> calls your <code>strategy_factory</code> to create the strategy instance and <code>config_factory</code> to parse configuration data.</p>
-<p><strong>When to register:</strong> In your <code>register_&lt;name&gt;_provider(registry)</code> function called from <code>providers/registration.py</code>.</p>
-<p><strong>How to register:</strong></p>
+<p><strong>When to register:</strong> <code>ProviderPlugin.register_provider()</code> handles this automatically when <code>register_plugin()</code> is invoked at startup. Your <code>strategy_factory()</code> and <code>config_factory()</code> accessors supply the factory callables.</p>
+<p><strong>How to implement the factories:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># src/orb/providers/azure/registration.py</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">register_azure_provider</span><span class="p">(</span><span class="n">registry</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_provider_registry</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.strategy.azure_provider_strategy</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureProviderStrategy</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_azure_strategy</span><span class="p">(</span><span class="n">provider_config</span><span class="p">):</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.strategy.azure_provider_strategy</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureProviderStrategy</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">return</span> <span class="n">AzureProviderStrategy</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">provider_config</span><span class="p">)</span>
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="k">if</span> <span class="n">registry</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="n">registry</span> <span class="o">=</span> <span class="n">get_provider_registry</span><span class="p">()</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="n">registry</span><span class="o">.</span><span class="n">register_provider</span><span class="p">(</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>        <span class="n">provider_type</span><span class="o">=</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>        <span class="n">strategy_factory</span><span class="o">=</span><span class="n">create_azure_strategy</span><span class="p">,</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        <span class="n">config_factory</span><span class="o">=</span><span class="n">create_azure_config</span><span class="p">,</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>        <span class="n">resolver_factory</span><span class="o">=</span><span class="n">create_azure_resolver</span><span class="p">,</span>   <span class="c1"># return None if not needed</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>        <span class="n">validator_factory</span><span class="o">=</span><span class="n">create_azure_validator</span><span class="p">,</span> <span class="c1"># return None if not needed</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>        <span class="n">strategy_class</span><span class="o">=</span><span class="n">AzureProviderStrategy</span><span class="p">,</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>        <span class="n">default_api</span><span class="o">=</span><span class="n">_load_azure_default_api</span><span class="p">(),</span>    <span class="c1"># reads from azure_defaults.json</span>
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    <span class="p">)</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_azure_config</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.configuration.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureProviderConfig</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="k">return</span> <span class="n">AzureProviderConfig</span><span class="p">(</span><span class="o">**</span><span class="n">raw</span><span class="p">)</span>
 </code></pre></div>
-<p><strong>AWS reference:</strong> <code>register_aws_provider</code> in <code>src/orb/providers/aws/registration.py</code>.</p>
+<p><strong>AWS reference:</strong> <code>create_aws_strategy</code> and <code>create_aws_config</code> in <code>src/orb/providers/aws/registration.py</code>.</p>
 <hr />
 <h3 id="clispecregistry-providerclispecport">CLISpecRegistry + ProviderCLISpecPort<a class="headerlink" href="#clispecregistry-providerclispecport" title="Permanent link">&para;</a></h3>
-<p><strong>Location:</strong> <code>src/orb/domain/base/ports/provider_cli_spec_port.py</code></p>
+<p><strong>Location:</strong> <code>src/orb/infrastructure/registry/cli_spec_registry.py</code></p>
 <p><strong>What it does:</strong> Supplies provider-specific CLI argument definitions, input validation logic, field extraction from parsed arguments, and display formatting. The shared <code>cli/args.py</code> and <code>interface/init_command_handler.py</code> iterate over <code>CLISpecRegistry.all()</code> rather than hard-coding provider flags.</p>
-<p><strong>When to register:</strong> In <code>register_all_provider_cli_specs()</code> in <code>providers/registration.py</code>. This function is called before application context exists, so keep it lightweight — no network calls, no DI container access.</p>
-<p><strong>How to register:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.base.ports.provider_cli_spec_port</span><span class="w"> </span><span class="kn">import</span> <span class="n">CLISpecRegistry</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.cli.azure_cli_spec</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureCLISpec</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">CLISpecRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="n">AzureCLISpec</span><span class="p">())</span>
-</code></pre></div>
-<p>Implement <code>ProviderCLISpecPort</code> on your spec class:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzureCLISpec</span><span class="p">:</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">add_arguments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>        <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--azure-subscription-id&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Azure subscription ID&quot;</span><span class="p">)</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>        <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--azure-resource-group&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Azure resource group&quot;</span><span class="p">)</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>        <span class="n">errors</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">&quot;azure_subscription_id&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;--azure-subscription-id is required for Azure providers&quot;</span><span class="p">)</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>        <span class="k">return</span> <span class="n">errors</span>
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>
-<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">extract_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>        <span class="k">return</span> <span class="p">{</span>
-<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>            <span class="s2">&quot;subscription_id&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">azure_subscription_id</span><span class="p">,</span>
-<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>            <span class="s2">&quot;resource_group&quot;</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">&quot;azure_resource_group&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
-<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>        <span class="p">}</span>
+<p><strong>When to register:</strong> <code>ProviderPlugin.initialize_provider()</code> registers the instance returned by your <code>cli_spec()</code> accessor. This happens during the DI bootstrap phase, before any request is handled.</p>
+<p><strong>How to implement:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzureCLISpec</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">add_arguments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>        <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--azure-subscription-id&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Azure subscription ID&quot;</span><span class="p">)</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--azure-resource-group&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Azure resource group&quot;</span><span class="p">)</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="n">errors</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">&quot;azure_subscription_id&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;--azure-subscription-id is required for Azure providers&quot;</span><span class="p">)</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>        <span class="k">return</span> <span class="n">errors</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">extract_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>        <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>            <span class="s2">&quot;subscription_id&quot;</span><span class="p">:</span> <span class="n">args</span><span class="o">.</span><span class="n">azure_subscription_id</span><span class="p">,</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>            <span class="s2">&quot;resource_group&quot;</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">&quot;azure_resource_group&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>        <span class="p">}</span>
 </code></pre></div>
 <p><strong>AWS reference:</strong> <code>src/orb/providers/aws/cli/aws_cli_spec.py</code>.</p>
 <hr />
 <h3 id="templateextensionregistry">TemplateExtensionRegistry<a class="headerlink" href="#templateextensionregistry" title="Permanent link">&para;</a></h3>
-<p><strong>Location:</strong> <code>src/orb/domain/template/extensions.py</code></p>
-<p><strong>What it does:</strong> Holds a typed Pydantic model class for each provider's template configuration. When <code>TemplateDTO.from_domain</code> serialises a template, it calls <code>TemplateExtensionRegistry.get_extension_class(provider_type)</code> to obtain and populate the <code>provider_config</code> field. This replaces ad-hoc <code>metadata</code> dict keys and <code>getattr(template, "validate_&lt;provider&gt;")</code> dynamic dispatch.</p>
-<p><strong>When to register:</strong> In <code>register_&lt;name&gt;_extensions()</code>, called from <code>initialize_&lt;name&gt;_provider()</code> during startup.</p>
-<p><strong>How to register:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.template.extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">TemplateExtensionRegistry</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.configuration.template_extension</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureTemplateExtensionConfig</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">TemplateExtensionRegistry</span><span class="o">.</span><span class="n">register_extension</span><span class="p">(</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="n">AzureTemplateExtensionConfig</span><span class="p">)</span>
+<p><strong>Location:</strong> <code>src/orb/infrastructure/registry/template_extension_registry.py</code></p>
+<p><strong>What it does:</strong> Holds a typed Pydantic model class for each provider's template configuration. When <code>TemplateDTO.from_domain</code> serialises a template, it calls <code>TemplateExtensionRegistry.get_extension_class(provider_type)</code> to obtain and populate the <code>provider_config</code> field. This replaces ad-hoc <code>metadata</code> dict keys and dynamic dispatch.</p>
+<p><strong>When to register:</strong> <code>ProviderPlugin.initialize_provider()</code> registers the class returned by your <code>template_dto_config()</code> accessor.</p>
+<p><strong>How to implement:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzureTemplateDTOConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">vm_size</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="s2">&quot;Standard_D2s_v3&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Azure VM size&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">location</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="s2">&quot;eastus&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Azure region&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">resource_group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Azure resource group&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_provider_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>        <span class="k">return</span> <span class="s2">&quot;azure&quot;</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">to_template_defaults</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()</span>
 </code></pre></div>
-<p><code>AzureTemplateExtensionConfig</code> should be a Pydantic <code>BaseModel</code> with <code>get_provider_type()</code> returning <code>"azure"</code> and a <code>to_template_defaults()</code> method returning a <code>dict</code> of default values:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzureTemplateExtensionConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">vm_size</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="s2">&quot;Standard_D2s_v3&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Azure VM size&quot;</span><span class="p">)</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">location</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="s2">&quot;eastus&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Azure region&quot;</span><span class="p">)</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">resource_group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Azure resource group&quot;</span><span class="p">)</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_provider_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="k">return</span> <span class="s2">&quot;azure&quot;</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">to_template_defaults</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_dump</span><span class="p">()</span>
-</code></pre></div>
-<p><strong>AWS reference:</strong> <code>src/orb/providers/aws/configuration/template_extension.py</code> and the <code>register_aws_extensions</code> function in <code>src/orb/providers/aws/registration.py</code>.</p>
+<p><strong>AWS reference:</strong> <code>src/orb/providers/aws/domain/template/aws_template_dto_config.py</code> and <code>src/orb/providers/aws/provider_plugin.py</code> (the <code>template_dto_config</code> accessor).</p>
 <hr />
 <h3 id="authregistry">AuthRegistry<a class="headerlink" href="#authregistry" title="Permanent link">&para;</a></h3>
 <p><strong>Location:</strong> <code>src/orb/infrastructure/auth/registry.py</code></p>
 <p><strong>What it does:</strong> Maps auth strategy names (strings like <code>"iam"</code>, <code>"cognito"</code>) to auth strategy classes. The REST server calls <code>AuthRegistry.get_strategy(name, **config)</code> rather than dispatching through <code>if/elif</code> chains. Register all auth strategies your provider supports.</p>
-<p><strong>When to register:</strong> In <code>register_&lt;name&gt;_auth_strategies()</code>, called from <code>initialize_&lt;name&gt;_provider()</code> during startup.</p>
-<p><strong>How to register:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.infrastructure.auth.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_auth_registry</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">get_auth_registry</span><span class="p">()</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">registry</span><span class="o">.</span><span class="n">is_registered</span><span class="p">(</span><span class="s2">&quot;azure_ad&quot;</span><span class="p">):</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.auth.azure_ad_strategy</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureADAuthStrategy</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    <span class="n">registry</span><span class="o">.</span><span class="n">register_strategy</span><span class="p">(</span><span class="s2">&quot;azure_ad&quot;</span><span class="p">,</span> <span class="n">AzureADAuthStrategy</span><span class="p">)</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">registry</span><span class="o">.</span><span class="n">is_registered</span><span class="p">(</span><span class="s2">&quot;managed_identity&quot;</span><span class="p">):</span>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.auth.managed_identity_strategy</span><span class="w"> </span><span class="kn">import</span> <span class="n">ManagedIdentityAuthStrategy</span>
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="n">registry</span><span class="o">.</span><span class="n">register_strategy</span><span class="p">(</span><span class="s2">&quot;managed_identity&quot;</span><span class="p">,</span> <span class="n">ManagedIdentityAuthStrategy</span><span class="p">)</span>
+<p><strong>When to register:</strong> Override <code>register_auth_strategies(self, logger)</code> in your <code>ProviderPlugin</code> subclass. <code>initialize_provider()</code> calls this hook after standard satellite registrations.</p>
+<p><strong>How to implement:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">register_auth_strategies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.infrastructure.auth.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_auth_registry</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">registry</span> <span class="o">=</span> <span class="n">get_auth_registry</span><span class="p">()</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">registry</span><span class="o">.</span><span class="n">is_registered</span><span class="p">(</span><span class="s2">&quot;azure_ad&quot;</span><span class="p">):</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.auth.azure_ad_strategy</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureADAuthStrategy</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>        <span class="n">registry</span><span class="o">.</span><span class="n">register_strategy</span><span class="p">(</span><span class="s2">&quot;azure_ad&quot;</span><span class="p">,</span> <span class="n">AzureADAuthStrategy</span><span class="p">)</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">registry</span><span class="o">.</span><span class="n">is_registered</span><span class="p">(</span><span class="s2">&quot;managed_identity&quot;</span><span class="p">):</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.auth.managed_identity_strategy</span><span class="w"> </span><span class="kn">import</span> <span class="n">ManagedIdentityAuthStrategy</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>        <span class="n">registry</span><span class="o">.</span><span class="n">register_strategy</span><span class="p">(</span><span class="s2">&quot;managed_identity&quot;</span><span class="p">,</span> <span class="n">ManagedIdentityAuthStrategy</span><span class="p">)</span>
 </code></pre></div>
-<p><strong>AWS reference:</strong> <code>register_aws_auth_strategies</code> in <code>src/orb/providers/aws/registration.py</code>.</p>
+<p><strong>AWS reference:</strong> <code>register_auth_strategies</code> in <code>src/orb/providers/aws/provider_plugin.py</code>.</p>
 <hr />
 <h3 id="fieldmappingregistry">FieldMappingRegistry<a class="headerlink" href="#fieldmappingregistry" title="Permanent link">&para;</a></h3>
 <p><strong>Location:</strong> <code>src/orb/infrastructure/scheduler/hostfactory/field_mapping_registry.py</code></p>
 <p><strong>What it does:</strong> Holds a per-provider <code>FieldMappingPort</code> adapter. The HostFactory scheduler calls <code>FieldMappingRegistry.get(provider_type)</code> to translate IBM Spectrum Symphony camelCase field names to the provider's snake_case equivalents, apply provider-specific defaults, and resolve CPU/RAM values from a provider-specific instance type catalogue.</p>
-<p><strong>When to register:</strong> In <code>initialize_&lt;name&gt;_provider()</code>, after other registrations.</p>
-<p><strong>How to register:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.infrastructure.scheduler.hostfactory.field_mapping_registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">FieldMappingRegistry</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.scheduler.hostfactory_field_mapping</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureFieldMapping</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">FieldMappingRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="n">AzureFieldMapping</span><span class="p">())</span>
+<p><strong>When to register:</strong> <code>ProviderPlugin.initialize_provider()</code> registers the instance returned by your <code>field_mapping()</code> accessor.</p>
+<p><strong>How to implement:</strong></p>
+<p>Implement <code>FieldMappingPort</code> on your mapping class. The two critical methods are <code>map_fields(raw: dict) -&gt; dict</code> (camelCase-to-snake_case translation + provider defaults) and <code>resolve_cpu_ram(vm_size: str) -&gt; tuple[int, int]</code> (returns <code>(cpu_count, ram_mb)</code> from your provider's instance catalogue).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># src/orb/providers/azure/scheduler/hostfactory_field_mapping.py</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzureFieldMapping</span><span class="p">:</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">map_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">resolve_cpu_ram</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vm_size</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span> <span class="o">...</span>
 </code></pre></div>
-<p>Implement <code>FieldMappingPort</code> in your mapping class. The two critical methods are <code>map_fields(raw: dict) -&gt; dict</code> (camelCase-to-snake_case translation + provider defaults) and <code>resolve_cpu_ram(vm_size: str) -&gt; tuple[int, int]</code> (returns <code>(cpu_count, ram_mb)</code> from your provider's instance catalogue).</p>
-<p><strong>AWS reference:</strong> <code>src/orb/providers/aws/scheduler/hostfactory_field_mapping.py</code> and <code>register_aws_provider</code> in <code>src/orb/providers/aws/registration.py</code> (the <code>FieldMappingRegistry.register</code> call near the end of <code>initialize_aws_provider</code>).</p>
+<p><strong>AWS reference:</strong> <code>src/orb/providers/aws/scheduler/hostfactory_field_mapping.py</code>.</p>
 <hr />
 <h3 id="defaultsloaderregistry">DefaultsLoaderRegistry<a class="headerlink" href="#defaultsloaderregistry" title="Permanent link">&para;</a></h3>
 <p><strong>Location:</strong> <code>src/orb/providers/registry/defaults_loader_registry.py</code></p>
 <p><strong>What it does:</strong> Holds a per-provider <code>ProviderDefaultsLoaderPort</code> that loads a provider's defaults JSON file. The template defaults service calls this registry to populate provider-specific default values rather than hard-coding file paths for each provider.</p>
-<p><strong>When to register:</strong> In <code>initialize_&lt;name&gt;_provider()</code>.</p>
-<p><strong>How to register:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.registry.defaults_loader_registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">DefaultsLoaderRegistry</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.defaults_loader</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureDefaultsLoader</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">DefaultsLoaderRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="n">AzureDefaultsLoader</span><span class="p">())</span>
+<p><strong>When to register:</strong> <code>ProviderPlugin.initialize_provider()</code> registers the instance returned by your <code>defaults_loader()</code> accessor.</p>
+<p><strong>How to implement:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># src/orb/providers/azure/defaults_loader.py</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.base.ports.provider_defaults_loader_port</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProviderDefaultsLoaderPort</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzureDefaultsLoader</span><span class="p">(</span><span class="n">ProviderDefaultsLoaderPort</span><span class="p">):</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load_defaults</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>        <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>        <span class="kn">import</span><span class="w"> </span><span class="nn">importlib.resources</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pkg</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>        <span class="k">with</span> <span class="n">pkg</span><span class="o">.</span><span class="n">open_text</span><span class="p">(</span><span class="s2">&quot;orb.providers.azure.config&quot;</span><span class="p">,</span> <span class="s2">&quot;azure_defaults.json&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>            <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
 </code></pre></div>
-<p><code>AzureDefaultsLoader</code> implements <code>ProviderDefaultsLoaderPort</code> and typically reads from a JSON file bundled alongside your provider package (e.g. <code>src/orb/providers/azure/config/azure_defaults.json</code>).</p>
-<p><strong>AWS reference:</strong> <code>src/orb/providers/aws/defaults_loader.py</code> and the <code>DefaultsLoaderRegistry.register</code> call in <code>initialize_aws_provider</code>.</p>
+<p><strong>AWS reference:</strong> <code>src/orb/providers/aws/defaults_loader.py</code>.</p>
 <hr />
 <h3 id="templateadapterport">TemplateAdapterPort<a class="headerlink" href="#templateadapterport" title="Permanent link">&para;</a></h3>
 <p><strong>Location:</strong> <code>src/orb/domain/base/ports/template_adapter_port.py</code></p>
 <p><strong>What it does:</strong> Resolves provider-specific template fields that require a live API call (for example, looking up an AMI by name on AWS, or resolving an image reference on Azure). Registered in the DI container as a singleton, not in a class-level registry.</p>
-<p><strong>When to register:</strong> In <code>register_&lt;name&gt;_services_with_di(container)</code>, called from the <code>find_spec</code>-guarded block in <code>bootstrap/provider_services.py</code>.</p>
-<p><strong>How to register:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.base.ports.template_adapter_port</span><span class="w"> </span><span class="kn">import</span> <span class="n">TemplateAdapterPort</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_azure_template_adapter</span><span class="p">(</span><span class="n">c</span><span class="p">):</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.infrastructure.adapters.template_adapter</span><span class="w"> </span><span class="kn">import</span> <span class="n">AzureTemplateAdapter</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.base.ports</span><span class="w"> </span><span class="kn">import</span> <span class="n">LoggingPort</span><span class="p">,</span> <span class="n">ConfigurationPort</span>
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="k">return</span> <span class="n">AzureTemplateAdapter</span><span class="p">(</span>
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>        <span class="n">logger</span><span class="o">=</span><span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">LoggingPort</span><span class="p">),</span>
-<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>        <span class="n">config</span><span class="o">=</span><span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ConfigurationPort</span><span class="p">),</span>
-<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="p">)</span>
-<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>
-<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="n">container</span><span class="o">.</span><span class="n">register_singleton</span><span class="p">(</span><span class="n">TemplateAdapterPort</span><span class="p">,</span> <span class="n">create_azure_template_adapter</span><span class="p">)</span>
+<p><strong>When to register:</strong> Override <code>register_additional_services(self, container, logger)</code> in your <code>ProviderPlugin</code> subclass. <code>register_services_with_di()</code> calls this hook when the DI container is available.</p>
+<p><strong>How to implement:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">register_additional_services</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">container</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.base.ports.template_adapter_port</span><span class="w"> </span><span class="kn">import</span> <span class="n">TemplateAdapterPort</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.infrastructure.adapters.template_adapter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>        <span class="n">AzureTemplateAdapter</span><span class="p">,</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="p">)</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">create_azure_template_adapter</span><span class="p">(</span><span class="n">c</span><span class="p">):</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.base.ports</span><span class="w"> </span><span class="kn">import</span> <span class="n">LoggingPort</span><span class="p">,</span> <span class="n">ConfigurationPort</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>        <span class="k">return</span> <span class="n">AzureTemplateAdapter</span><span class="p">(</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>            <span class="n">logger</span><span class="o">=</span><span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">LoggingPort</span><span class="p">),</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>            <span class="n">config</span><span class="o">=</span><span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ConfigurationPort</span><span class="p">),</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>        <span class="p">)</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>    <span class="n">container</span><span class="o">.</span><span class="n">register_singleton</span><span class="p">(</span><span class="n">TemplateAdapterPort</span><span class="p">,</span> <span class="n">create_azure_template_adapter</span><span class="p">)</span>
 </code></pre></div>
-<p><strong>AWS reference:</strong> <code>register_aws_services_with_di</code> in <code>src/orb/providers/aws/registration.py</code>.</p>
+<p><strong>AWS reference:</strong> <code>register_additional_services</code> in <code>src/orb/providers/aws/provider_plugin.py</code>.</p>
 <hr />
-<h3 id="templateexamplegeneratorport">TemplateExampleGeneratorPort<a class="headerlink" href="#templateexamplegeneratorport" title="Permanent link">&para;</a></h3>
-<p><strong>Location:</strong> <code>src/orb/domain/base/ports/template_example_generator_port.py</code></p>
-<p><strong>What it does:</strong> Generates example template JSON for the <code>orb template generate</code> command. ORB resolves this port from the DI container and calls it to produce provider-appropriate example output. No live API connection is required; the generator uses handler class metadata only.</p>
-<p><strong>When to register:</strong> In <code>register_&lt;name&gt;_services_with_di(container)</code>, alongside the template adapter.</p>
-<p><strong>How to register:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.base.ports.template_example_generator_port</span><span class="w"> </span><span class="kn">import</span> <span class="n">TemplateExampleGeneratorPort</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_azure_example_generator</span><span class="p">(</span><span class="n">c</span><span class="p">):</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.adapters.template_example_generator_adapter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>        <span class="n">AzureTemplateExampleGeneratorAdapter</span><span class="p">,</span>
-<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="p">)</span>
-<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="k">return</span> <span class="n">AzureTemplateExampleGeneratorAdapter</span><span class="p">()</span>
-<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>
-<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="n">container</span><span class="o">.</span><span class="n">register_singleton</span><span class="p">(</span><span class="n">TemplateExampleGeneratorPort</span><span class="p">,</span> <span class="n">create_azure_example_generator</span><span class="p">)</span>
+<h3 id="templateexamplegeneratorregistry">TemplateExampleGeneratorRegistry<a class="headerlink" href="#templateexamplegeneratorregistry" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/orb/infrastructure/registry/template_example_generator_registry.py</code></p>
+<p><strong>What it does:</strong> Generates example template JSON for the <code>orb template generate</code> command. ORB resolves this from the registry and calls it to produce provider-appropriate example output. No live API connection is required; the generator uses handler class metadata only.</p>
+<p><strong>When to register:</strong> <code>ProviderPlugin.register_services_with_di()</code> registers the instance returned by your <code>template_example_generator(container)</code> accessor.</p>
+<p><strong>How to implement:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">template_example_generator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">container</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.azure.adapters.template_example_generator_adapter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>            <span class="n">AzureTemplateExampleGeneratorAdapter</span><span class="p">,</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>        <span class="p">)</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>        <span class="k">return</span> <span class="n">AzureTemplateExampleGeneratorAdapter</span><span class="p">()</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>        <span class="k">return</span> <span class="kc">None</span>
 </code></pre></div>
-<p><strong>AWS reference:</strong> The <code>TemplateExampleGeneratorPort</code> block inside <code>register_aws_services_with_di</code>.</p>
+<p><strong>AWS reference:</strong> <code>template_example_generator</code> in <code>src/orb/providers/aws/provider_plugin.py</code>.</p>
 <hr />
 <h2 id="operationoutcome-contract">OperationOutcome contract<a class="headerlink" href="#operationoutcome-contract" title="Permanent link">&para;</a></h2>
 <p>Every strategy method that performs a cloud operation returns <code>OperationOutcome</code>, a discriminated union defined in <code>src/orb/domain/base/operation_outcome.py</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">OperationOutcome</span> <span class="o">=</span> <span class="n">Accepted</span> <span class="o">|</span> <span class="n">Completed</span> <span class="o">|</span> <span class="n">RequiresFollowUp</span> <span class="o">|</span> <span class="n">Failed</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">OperationOutcome</span> <span class="o">=</span> <span class="n">Accepted</span> <span class="o">|</span> <span class="n">Completed</span> <span class="o">|</span> <span class="n">RequiresFollowUp</span> <span class="o">|</span> <span class="n">Failed</span>
 </code></pre></div>
 <p>Choose the correct variant based on what the cloud API actually tells you:</p>
 <table>
@@ -5414,36 +5459,36 @@
 </tbody>
 </table>
 <p><strong>AWS example — <code>acquire</code> always returns <code>Accepted</code>:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">acquire</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OperationOutcome</span><span class="p">:</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_operation</span><span class="p">(</span><span class="n">operation</span><span class="p">)</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>        <span class="k">return</span> <span class="n">Failed</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">error_message</span> <span class="ow">or</span> <span class="s2">&quot;acquire failed&quot;</span><span class="p">,</span> <span class="n">recoverable</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    <span class="k">return</span> <span class="n">Accepted</span><span class="p">(</span>
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>        <span class="n">request_id</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">request_id</span><span class="p">),</span>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>        <span class="n">pending_resource_ids</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_ids&quot;</span><span class="p">,</span> <span class="p">[]),</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>    <span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">acquire</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OperationOutcome</span><span class="p">:</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_operation</span><span class="p">(</span><span class="n">operation</span><span class="p">)</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>        <span class="k">return</span> <span class="n">Failed</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">error_message</span> <span class="ow">or</span> <span class="s2">&quot;acquire failed&quot;</span><span class="p">,</span> <span class="n">recoverable</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="k">return</span> <span class="n">Accepted</span><span class="p">(</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>        <span class="n">request_id</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">request_id</span><span class="p">),</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>        <span class="n">pending_resource_ids</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resource_ids&quot;</span><span class="p">,</span> <span class="p">[]),</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>    <span class="p">)</span>
 </code></pre></div>
 <p>EC2 Fleet, SpotFleet, and RunInstances all accept the request immediately and let instances transition through <code>pending → running</code> asynchronously. The correct outcome is always <code>Accepted</code>.</p>
 <p><strong>Azure ARM example — <code>return_machines</code> with multi-step async teardown:</strong></p>
 <p>Azure resource deletion may trigger a long-running ARM operation that requires a separate status poll URL:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">return_machines</span><span class="p">(</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>    <span class="bp">self</span><span class="p">,</span> <span class="n">machine_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">request</span><span class="p">:</span> <span class="n">Request</span>
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OperationOutcome</span><span class="p">:</span>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_arm_client</span><span class="o">.</span><span class="n">begin_delete</span><span class="p">(</span><span class="n">resource_ids</span><span class="o">=</span><span class="n">machine_ids</span><span class="p">)</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">needs_follow_up</span><span class="p">:</span>
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>        <span class="k">return</span> <span class="n">RequiresFollowUp</span><span class="p">(</span>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>            <span class="n">context</span><span class="o">=</span><span class="n">AzureArmFollowUpContext</span><span class="p">(</span>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>                <span class="n">operation_url</span><span class="o">=</span><span class="n">response</span><span class="o">.</span><span class="n">poll_url</span><span class="p">,</span>
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>                <span class="n">resource_ids</span><span class="o">=</span><span class="n">machine_ids</span><span class="p">,</span>
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>                <span class="n">follow_up_kind</span><span class="o">=</span><span class="s2">&quot;arm_async_delete&quot;</span><span class="p">,</span>
-<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>            <span class="p">)</span>
-<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>        <span class="p">)</span>
-<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>    <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">done</span><span class="p">:</span>
-<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>        <span class="k">return</span> <span class="n">Completed</span><span class="p">(</span><span class="n">resource_ids</span><span class="o">=</span><span class="n">machine_ids</span><span class="p">)</span>
-<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a>    <span class="k">return</span> <span class="n">Accepted</span><span class="p">(</span>
-<a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a>        <span class="n">request_id</span><span class="o">=</span><span class="n">response</span><span class="o">.</span><span class="n">operation_id</span><span class="p">,</span>
-<a id="__codelineno-17-17" name="__codelineno-17-17" href="#__codelineno-17-17"></a>        <span class="n">pending_resource_ids</span><span class="o">=</span><span class="n">machine_ids</span><span class="p">,</span>
-<a id="__codelineno-17-18" name="__codelineno-17-18" href="#__codelineno-17-18"></a>    <span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">return_machines</span><span class="p">(</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>    <span class="bp">self</span><span class="p">,</span> <span class="n">machine_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">request</span><span class="p">:</span> <span class="n">Request</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OperationOutcome</span><span class="p">:</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>    <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_arm_client</span><span class="o">.</span><span class="n">begin_delete</span><span class="p">(</span><span class="n">resource_ids</span><span class="o">=</span><span class="n">machine_ids</span><span class="p">)</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>    <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">needs_follow_up</span><span class="p">:</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>        <span class="k">return</span> <span class="n">RequiresFollowUp</span><span class="p">(</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>            <span class="n">context</span><span class="o">=</span><span class="n">AzureArmFollowUpContext</span><span class="p">(</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>                <span class="n">operation_url</span><span class="o">=</span><span class="n">response</span><span class="o">.</span><span class="n">poll_url</span><span class="p">,</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>                <span class="n">resource_ids</span><span class="o">=</span><span class="n">machine_ids</span><span class="p">,</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>                <span class="n">follow_up_kind</span><span class="o">=</span><span class="s2">&quot;arm_async_delete&quot;</span><span class="p">,</span>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>            <span class="p">)</span>
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>        <span class="p">)</span>
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>    <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">done</span><span class="p">:</span>
+<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a>        <span class="k">return</span> <span class="n">Completed</span><span class="p">(</span><span class="n">resource_ids</span><span class="o">=</span><span class="n">machine_ids</span><span class="p">)</span>
+<a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a>    <span class="k">return</span> <span class="n">Accepted</span><span class="p">(</span>
+<a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a>        <span class="n">request_id</span><span class="o">=</span><span class="n">response</span><span class="o">.</span><span class="n">operation_id</span><span class="p">,</span>
+<a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a>        <span class="n">pending_resource_ids</span><span class="o">=</span><span class="n">machine_ids</span><span class="p">,</span>
+<a id="__codelineno-15-18" name="__codelineno-15-18" href="#__codelineno-15-18"></a>    <span class="p">)</span>
 </code></pre></div>
 <p>Always dispatch on <code>OperationOutcome</code> exhaustively using <code>match</code> + <code>assert_never</code> in calling code so pyright catches any future variant additions at compile time.</p>
 <hr />
@@ -5451,101 +5496,108 @@
 <p>The following patterns must not appear in new provider code. Each one creates a coupling that prevents new providers from being added without editing shared infrastructure.</p>
 <h3 id="do-not-edit-cliargspy-for-provider-specific-flags">Do not edit <code>cli/args.py</code> for provider-specific flags<a class="headerlink" href="#do-not-edit-cliargspy-for-provider-specific-flags" title="Permanent link">&para;</a></h3>
 <p><code>cli/args.py</code> iterates <code>CLISpecRegistry.all()</code>. Adding flags for a specific provider here leaks provider knowledge into shared code and means all users see flags that may not apply to their provider.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Wrong — in src/orb/cli/args.py</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--azure-subscription-id&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Right — in src/orb/providers/azure/cli/azure_cli_spec.py</span>
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzureCLISpec</span><span class="p">:</span>
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">add_arguments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>        <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--azure-subscription-id&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Wrong — in src/orb/cli/args.py</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--azure-subscription-id&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># Right — in src/orb/providers/azure/cli/azure_cli_spec.py</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzureCLISpec</span><span class="p">:</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">add_arguments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>        <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;--azure-subscription-id&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="do-not-add-if-provider_type-x-branches-in-shared-services">Do not add <code>if provider_type == "x"</code> branches in shared services<a class="headerlink" href="#do-not-add-if-provider_type-x-branches-in-shared-services" title="Permanent link">&para;</a></h3>
 <p>Branching on provider type in shared services (template defaults service, provisioning orchestration service, scheduler) means every new provider requires editing code it should not know about.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Wrong — in any shared service</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="k">if</span> <span class="n">provider_type</span> <span class="o">==</span> <span class="s2">&quot;azure&quot;</span><span class="p">:</span>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    <span class="n">apply_azure_defaults</span><span class="p">(</span><span class="n">template</span><span class="p">)</span>
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="k">elif</span> <span class="n">provider_type</span> <span class="o">==</span> <span class="s2">&quot;aws&quot;</span><span class="p">:</span>
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    <span class="n">apply_aws_defaults</span><span class="p">(</span><span class="n">template</span><span class="p">)</span>
-<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
-<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="c1"># Right — register a DefaultsLoader and let the registry dispatch</span>
-<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DefaultsLoaderRegistry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">provider_type</span><span class="p">)</span>
-<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="k">if</span> <span class="n">loader</span><span class="p">:</span>
-<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>    <span class="n">defaults</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load_defaults</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Wrong — in any shared service</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="k">if</span> <span class="n">provider_type</span> <span class="o">==</span> <span class="s2">&quot;azure&quot;</span><span class="p">:</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    <span class="n">apply_azure_defaults</span><span class="p">(</span><span class="n">template</span><span class="p">)</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="k">elif</span> <span class="n">provider_type</span> <span class="o">==</span> <span class="s2">&quot;aws&quot;</span><span class="p">:</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="n">apply_aws_defaults</span><span class="p">(</span><span class="n">template</span><span class="p">)</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Right — register a DefaultsLoader and let the registry dispatch</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="n">loader</span> <span class="o">=</span> <span class="n">DefaultsLoaderRegistry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">provider_type</span><span class="p">)</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="k">if</span> <span class="n">loader</span><span class="p">:</span>
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>    <span class="n">defaults</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">load_defaults</span><span class="p">()</span>
 </code></pre></div>
 <h3 id="do-not-use-getattrtemplate-fvalidate_provider_type-dynamic-dispatch">Do not use <code>getattr(template, f"validate_{provider_type}")</code> dynamic dispatch<a class="headerlink" href="#do-not-use-getattrtemplate-fvalidate_provider_type-dynamic-dispatch" title="Permanent link">&para;</a></h3>
 <p>String-keyed <code>getattr</code> dispatch is invisible to the type checker. Renames silently break at runtime and there is no way to enumerate valid provider types statically.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># Wrong</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;validate_</span><span class="si">{</span><span class="n">provider_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="nb">getattr</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;validate_</span><span class="si">{</span><span class="n">provider_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)()</span>
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="c1"># Right — use TemplateExtensionRegistry for unconditional dispatch</span>
-<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="n">extension_class</span> <span class="o">=</span> <span class="n">TemplateExtensionRegistry</span><span class="o">.</span><span class="n">get_extension_class</span><span class="p">(</span><span class="n">provider_type</span><span class="p">)</span>
-<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="k">if</span> <span class="n">extension_class</span><span class="p">:</span>
-<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>    <span class="n">extension_class</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span><span class="n">template</span><span class="o">.</span><span class="n">provider_config</span> <span class="ow">or</span> <span class="p">{})</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Wrong</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;validate_</span><span class="si">{</span><span class="n">provider_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="nb">getattr</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;validate_</span><span class="si">{</span><span class="n">provider_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)()</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="c1"># Right — use TemplateExtensionRegistry for unconditional dispatch</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="n">extension_class</span> <span class="o">=</span> <span class="n">TemplateExtensionRegistry</span><span class="o">.</span><span class="n">get_extension_class</span><span class="p">(</span><span class="n">provider_type</span><span class="p">)</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="k">if</span> <span class="n">extension_class</span><span class="p">:</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    <span class="n">extension_class</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span><span class="n">template</span><span class="o">.</span><span class="n">provider_config</span> <span class="ow">or</span> <span class="p">{})</span>
 </code></pre></div>
 <h3 id="do-not-add-provider-specific-fields-to-the-shared-templateaggregate">Do not add provider-specific fields to the shared <code>TemplateAggregate</code><a class="headerlink" href="#do-not-add-provider-specific-fields-to-the-shared-templateaggregate" title="Permanent link">&para;</a></h3>
 <p>The domain template aggregate is provider-agnostic. Adding an <code>azure_resource_group</code> field to <code>domain/template/template_aggregate.py</code> forces all providers to handle a field they do not own and breaks the provider isolation guarantee.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Wrong — in src/orb/domain/template/template_aggregate.py</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">azure_resource_group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="c1"># Right — in AzureTemplateExtensionConfig (a Pydantic model inside the Azure package)</span>
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzureTemplateExtensionConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>    <span class="n">resource_group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Wrong — in src/orb/domain/template/template_aggregate.py</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">azure_resource_group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Right — in AzureTemplateDTOConfig (a Pydantic model inside the Azure package)</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">AzureTemplateDTOConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    <span class="n">resource_group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
 </code></pre></div>
 <h3 id="do-not-add-provider-specific-fields-to-the-shared-templatedto">Do not add provider-specific fields to the shared <code>TemplateDTO</code><a class="headerlink" href="#do-not-add-provider-specific-fields-to-the-shared-templatedto" title="Permanent link">&para;</a></h3>
 <p><code>TemplateDTO</code> is the serialisation boundary between the application and API layers. Provider-specific fields belong in the <code>provider_config: BaseModel | None</code> extension field populated by <code>TemplateExtensionRegistry</code>, not as top-level DTO attributes.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Wrong — in src/orb/application/dto/template_dto.py</span>
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="n">azure_vm_size</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="c1"># Right — TemplateDTO.provider_config carries AzureTemplateExtensionConfig</span>
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="c1"># automatically when the extension is registered</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># Wrong — in src/orb/application/dto/template_dto.py</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="n">azure_vm_size</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="c1"># Right — TemplateDTO.provider_config carries AzureTemplateDTOConfig</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="c1"># automatically when the extension is registered</span>
 </code></pre></div>
 <h3 id="do-not-add-provider-strings-to-domain-value-objects">Do not add provider strings to domain value objects<a class="headerlink" href="#do-not-add-provider-strings-to-domain-value-objects" title="Permanent link">&para;</a></h3>
 <p><code>domain/base/value_objects.py</code> and similar domain files must not contain string literals for specific providers. Use <code>ProviderType</code> where a typed enum is appropriate, and registries for everything else.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Wrong — in src/orb/domain/base/value_objects.py</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="n">KNOWN_PROVIDERS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;aws&quot;</span><span class="p">,</span> <span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="s2">&quot;gcp&quot;</span><span class="p">]</span>
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Right — ProviderRegistry.registered_providers() returns this list dynamically</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Wrong — in src/orb/domain/base/value_objects.py</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">KNOWN_PROVIDERS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;aws&quot;</span><span class="p">,</span> <span class="s2">&quot;azure&quot;</span><span class="p">,</span> <span class="s2">&quot;gcp&quot;</span><span class="p">]</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="c1"># Right — ProviderRegistry.registered_providers() returns this list dynamically</span>
 </code></pre></div>
 <h3 id="do-not-add-provider-specific-imports-to-shared-infrastructure">Do not add provider-specific imports to shared infrastructure<a class="headerlink" href="#do-not-add-provider-specific-imports-to-shared-infrastructure" title="Permanent link">&para;</a></h3>
 <p>Shared infrastructure files (<code>infrastructure/scheduler/</code>, <code>api/server.py</code>, etc.) must not import from <code>providers/&lt;name&gt;/</code>. Doing so creates a hard dependency that prevents the package from being imported in environments where that provider's SDK is not installed.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Wrong — in src/orb/infrastructure/scheduler/hostfactory/hostfactory_strategy.py</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.aws.utilities.ec2.instances</span><span class="w"> </span><span class="kn">import</span> <span class="n">derive_cpu_ram_from_instance_type</span>
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
-<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="c1"># Right — FieldMappingRegistry.get(provider_type).resolve_cpu_ram(vm_size)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Wrong — in src/orb/infrastructure/scheduler/hostfactory/hostfactory_strategy.py</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.providers.aws.utilities.ec2.instances</span><span class="w"> </span><span class="kn">import</span> <span class="n">derive_cpu_ram_from_instance_type</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="c1"># Right — FieldMappingRegistry.get(provider_type).resolve_cpu_ram(vm_size)</span>
 </code></pre></div>
 <hr />
 <h2 id="test-layout">Test layout<a class="headerlink" href="#test-layout" title="Permanent link">&para;</a></h2>
 <p>Mirror the source layout under <code>tests/providers/&lt;name&gt;/</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>tests/providers/&lt;name&gt;/
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>    conftest.py                  # shared fixtures for this provider
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    unit/                        # pure unit tests, no cloud calls, no mocks of cloud SDK
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>        test_&lt;name&gt;_strategy.py
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>        test_&lt;name&gt;_cli_spec.py
-<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>        test_&lt;name&gt;_template_extension.py
-<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>        test_&lt;name&gt;_field_mapping.py
-<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>    moto/                        # mocked integration tests (use a mock SDK equivalent)
-<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>        conftest.py
-<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a>        test_&lt;name&gt;_acquire.py
-<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a>        test_&lt;name&gt;_return.py
-<a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a>    live/                        # real-cloud tests, gated by --live flag
-<a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a>        conftest.py              # skips all tests unless --live is passed
-<a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a>        test_&lt;name&gt;_connectivity.py
-<a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a>        test_&lt;name&gt;_roundtrip.py
-<a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a>    contract/                    # contract tests verifying OperationOutcome variants
-<a id="__codelineno-25-17" name="__codelineno-25-17" href="#__codelineno-25-17"></a>        test_outcome_variants.py
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>tests/providers/&lt;name&gt;/
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>    conftest.py                  # shared fixtures for this provider
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>    unit/                        # pure unit tests, no cloud calls, no mocks of cloud SDK
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>        test_&lt;name&gt;_strategy.py
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>        test_&lt;name&gt;_cli_spec.py
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>        test_&lt;name&gt;_template_extension.py
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>        test_&lt;name&gt;_field_mapping.py
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>    moto/                        # mocked integration tests (use a mock SDK equivalent)
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>        conftest.py
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>        test_&lt;name&gt;_acquire.py
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>        test_&lt;name&gt;_return.py
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>    live/                        # real-cloud tests, gated by --live flag
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>        conftest.py              # skips all tests unless --live is passed
+<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>        test_&lt;name&gt;_connectivity.py
+<a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a>        test_&lt;name&gt;_roundtrip.py
+<a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a>    contract/                    # contract tests verifying OperationOutcome variants
+<a id="__codelineno-23-17" name="__codelineno-23-17" href="#__codelineno-23-17"></a>        test_outcome_variants.py
 </code></pre></div>
 <p>Use the per-provider <code>conftest.py</code> to define fixtures that supply mock clients, provider configs, and sample request/template domain objects. Keep <code>moto/</code> and <code>live/</code> sub-packages separate so CI can include mocked tests and exclude live tests without test selection gymnastics.</p>
 <p>Gate live tests with a custom pytest marker:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># tests/providers/&lt;name&gt;/live/conftest.py</span>
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
-<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>
-<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">pytest_collection_modifyitems</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">items</span><span class="p">):</span>
-<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">config</span><span class="o">.</span><span class="n">getoption</span><span class="p">(</span><span class="s2">&quot;--live&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>        <span class="n">skip</span> <span class="o">=</span> <span class="n">pytest</span><span class="o">.</span><span class="n">mark</span><span class="o">.</span><span class="n">skip</span><span class="p">(</span><span class="n">reason</span><span class="o">=</span><span class="s2">&quot;pass --live to run real-cloud tests&quot;</span><span class="p">)</span>
-<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
-<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>            <span class="k">if</span> <span class="s2">&quot;live&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">fspath</span><span class="p">):</span>
-<a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a>                <span class="n">item</span><span class="o">.</span><span class="n">add_marker</span><span class="p">(</span><span class="n">skip</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># tests/providers/&lt;name&gt;/live/conftest.py</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">pytest_collection_modifyitems</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">items</span><span class="p">):</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">config</span><span class="o">.</span><span class="n">getoption</span><span class="p">(</span><span class="s2">&quot;--live&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>        <span class="n">skip</span> <span class="o">=</span> <span class="n">pytest</span><span class="o">.</span><span class="n">mark</span><span class="o">.</span><span class="n">skip</span><span class="p">(</span><span class="n">reason</span><span class="o">=</span><span class="s2">&quot;pass --live to run real-cloud tests&quot;</span><span class="p">)</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>            <span class="k">if</span> <span class="s2">&quot;live&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">fspath</span><span class="p">):</span>
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>                <span class="n">item</span><span class="o">.</span><span class="n">add_marker</span><span class="p">(</span><span class="n">skip</span><span class="p">)</span>
+</code></pre></div>
+<p>Add a smoke test to verify entry-point wiring:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">importlib.metadata</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">md</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_entry_point_is_discoverable</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>    <span class="n">eps</span> <span class="o">=</span> <span class="n">md</span><span class="o">.</span><span class="n">entry_points</span><span class="p">(</span><span class="n">group</span><span class="o">=</span><span class="s2">&quot;orb.providers&quot;</span><span class="p">)</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>    <span class="k">assert</span> <span class="nb">any</span><span class="p">(</span><span class="n">ep</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;azure&quot;</span> <span class="k">for</span> <span class="n">ep</span> <span class="ow">in</span> <span class="n">eps</span><span class="p">)</span>
 </code></pre></div>
 <p>The AWS provider tests are the reference layout:</p>
 <ul>
@@ -5560,7 +5612,10 @@
 <li><a href="../../architecture/clean_architecture/">Clean Architecture</a> — layer boundaries enforced by architecture tests</li>
 <li><a href="../../patterns/strategy_pattern/">Strategy Pattern</a> — how <code>ProviderStrategy</code> and <code>ProviderRegistry</code> work together</li>
 <li><a href="../../patterns/ports_and_adapters/">Ports and Adapters</a> — the port/registry decoupling pattern used throughout</li>
-<li>AWS reference implementation: <code>src/orb/providers/aws/registration.py</code></li>
+<li>AWS reference: <code>src/orb/providers/aws/provider_plugin.py</code> and <code>src/orb/providers/aws/registration.py</code></li>
+<li>K8s reference: <code>src/orb/providers/k8s/provider_plugin.py</code> and <code>src/orb/providers/k8s/registration.py</code></li>
+<li>Base class: <code>src/orb/providers/base/provider_plugin.py</code></li>
+<li>Startup completeness check: <code>src/orb/bootstrap/provider_completeness.py</code></li>
 </ul>
 
 

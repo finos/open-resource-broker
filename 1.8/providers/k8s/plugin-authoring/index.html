@@ -5221,8 +5221,10 @@ API.</p>
 </tr>
 </tbody>
 </table>
-<p>Pattern B (a fresh provider) is out of scope for this page; see the
-existing AWS and Kubernetes providers as the canonical references.
+<p>Pattern B (a fresh provider) is out of scope for this page; see
+<a href="../../../developer_guide/adding_a_provider/">Adding a Provider</a> for the
+<code>ProviderPlugin</code>-based walkthrough, using the AWS provider
+(<code>src/orb/providers/aws/provider_plugin.py</code>) as the canonical reference.
 This page covers Pattern A.</p>
 <h2 id="the-entry-point-contract">The entry-point contract<a class="headerlink" href="#the-entry-point-contract" title="Permanent link">&para;</a></h2>
 <p>Plugins declare themselves in their distribution metadata.  With
@@ -5241,6 +5243,13 @@ This page covers Pattern A.</p>
 plugin author picks; ORB does not interpret it.  The entry-point
 <strong>value</strong> is a Python import path to a zero-argument callable that ORB
 will invoke during provider discovery.</p>
+<p>For a <strong>Pattern A plugin</strong> (extending an existing provider with a new
+handler), a plain <code>register()</code> function is sufficient because you only need
+to touch one registry — the handler table of the existing strategy.  For a
+<strong>Pattern B plugin</strong> (a wholly new provider), point the entry-point at
+<code>YourPlugin.register_plugin</code> instead; see
+<a href="../../../developer_guide/adding_a_provider/">Adding a Provider</a> for the full
+<code>ProviderPlugin</code> walkthrough.</p>
 <h3 id="what-orb-calls">What ORB calls<a class="headerlink" href="#what-orb-calls" title="Permanent link">&para;</a></h3>
 <p>At boot, ORB walks <code>importlib.metadata.entry_points(group="orb.providers")</code>
 after the built-in providers have registered.  For each entry-point it
@@ -5585,8 +5594,14 @@ in <code>CHANGELOG.md</code> and held to major-version bumps.</p>
   in doubt about the contract.</li>
 <li><a href="../auth/">Authentication</a> - your plugin inherits the parent
   provider's auth path; no plugin-level auth wiring is required.</li>
-<li><code>src/orb/providers/aws/</code> - the AWS provider is the canonical example
-  of a fresh <code>ProviderStrategy</code> (Pattern B).</li>
+<li><a href="../../../developer_guide/adding_a_provider/">Adding a Provider</a> - full
+  <code>ProviderPlugin</code>-based walkthrough for a fresh provider (Pattern B),
+  including the <code>pyproject.toml</code> entry-point declaration and startup
+  completeness check.</li>
+<li><code>src/orb/providers/base/provider_plugin.py</code> - the <code>ProviderPlugin</code>
+  abstract base class and the <code>register_plugin</code> entry-point hook.</li>
+<li><code>src/orb/providers/aws/provider_plugin.py</code> - the AWS provider as a
+  fully-populated <code>ProviderPlugin</code> reference (Pattern B).</li>
 </ul>
 
 
