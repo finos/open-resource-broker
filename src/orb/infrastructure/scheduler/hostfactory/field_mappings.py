@@ -66,6 +66,14 @@ class HostFactoryFieldMappings:
             "instanceProfile": "machine_role",
             "launchTemplateId": "launch_template_id",
             "userDataScript": "user_data",
+            # AWS MicroVM configuration
+            "imageVersion": "image_version",
+            "executionRoleArn": "execution_role_arn",
+            "idlePolicy": "idle_policy",
+            "maximumDurationInSeconds": "maximum_duration_in_seconds",
+            "ingressNetworkConnectors": "ingress_network_connectors",
+            "egressNetworkConnectors": "egress_network_connectors",
+            "runHookPayload": "run_hook_payload",
         },
         # Kubernetes-specific fields — no-bootstrap fallback so static consumers
         # (e.g. unit tests that exercise the mapper without booting the k8s

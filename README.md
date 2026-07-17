@@ -86,28 +86,6 @@ orb machines return <machine-id-1> <machine-id-2> ...
 orb requests status <return-request-id>
 ```
 
-## MicroVM Quick Start
-
-Provision isolated [Lambda MicroVMs](https://aws.amazon.com/blogs/aws/run-isolated-sandboxes-with-full-lifecycle-control-aws-lambda-introduces-microvms/) for running untrusted or pull-based workloads:
-
-```bash
-# 1. Create a template pointing to your MicroVM image
-orb templates create my-microvm \
-  --provider-api MicroVM \
-  --image-id arn:aws:lambda:us-east-1:123456789012:microvm-image:my-worker
-
-# 2. Provision 10 MicroVMs
-orb machines request my-microvm 10
-
-# 3. Check status (also syncs live state from AWS)
-orb requests status <request-id>
-
-# 4. Return (terminate) when done
-orb machines return <microvm-id-1> <microvm-id-2> ...
-```
-
-See the [MicroVM Provider Guide](docs/root/providers/aws/microvm.md) for full configuration (IAM roles, idle policy, logging, image build).
-
 ## Setup
 
 Get ORB installed and configured for your environment.

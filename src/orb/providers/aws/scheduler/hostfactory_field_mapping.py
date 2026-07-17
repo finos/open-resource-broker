@@ -32,6 +32,14 @@ class AWSFieldMapping:
         "instanceProfile": "machine_role",
         "launchTemplateId": "launch_template_id",
         "userDataScript": "user_data",
+        # AWS MicroVM configuration
+        "imageVersion": "image_version",
+        "executionRoleArn": "execution_role_arn",
+        "idlePolicy": "idle_policy",
+        "maximumDurationInSeconds": "maximum_duration_in_seconds",
+        "ingressNetworkConnectors": "ingress_network_connectors",
+        "egressNetworkConnectors": "egress_network_connectors",
+        "runHookPayload": "run_hook_payload",
     }
 
     def get_mappings(self) -> dict[str, str]:

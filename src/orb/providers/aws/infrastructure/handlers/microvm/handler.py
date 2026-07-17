@@ -139,27 +139,34 @@ class MicroVMHandler(AWSHandler):
                 "error_message": str(e),
             }
 
+    # Internal (snake_case) metadata field → AWS API (camelCase) parameter.
+    # The scheduler field mapper (FieldMappingPort) handles external-format →
+    # internal-format translation on template ingestion; this mapping handles
+    # internal-format → AWS API wire format at provisioning time.
+    _METADATA_TO_API: dict[str, str] = {
+        "image_version": "imageVersion",
+        "execution_role_arn": "executionRoleArn",
+        "idle_policy": "idlePolicy",
+        "maximum_duration_in_seconds": "maximumDurationInSeconds",
+        "ingress_network_connectors": "ingressNetworkConnectors",
+        "egress_network_connectors": "egressNetworkConnectors",
+        "run_hook_payload": "runHookPayload",
+        "logging": "logging",
+    }
+
     def _build_run_params(self, aws_template: AWSTemplate) -> dict[str, Any]:
-        """Build run_microvm API kwargs from template fields and metadata."""
+        """Build run_microvm API kwargs from template fields and metadata.
+
+        Reads from ORB's internal snake_case metadata (already normalised by
+        the scheduler field mapper) and translates to AWS API camelCase.
+        """
         metadata = aws_template.metadata or {}
         params: dict[str, Any] = {"imageIdentifier": aws_template.image_id}
 
-        if metadata.get("image_version"):
-            params["imageVersion"] = metadata["image_version"]
-        if metadata.get("execution_role_arn"):
-            params["executionRoleArn"] = metadata["execution_role_arn"]
-        if metadata.get("idle_policy"):
-            params["idlePolicy"] = metadata["idle_policy"]
-        if metadata.get("maximum_duration_in_seconds"):
-            params["maximumDurationInSeconds"] = metadata["maximum_duration_in_seconds"]
-        if metadata.get("ingress_network_connectors"):
-            params["ingressNetworkConnectors"] = metadata["ingress_network_connectors"]
-        if metadata.get("egress_network_connectors"):
-            params["egressNetworkConnectors"] = metadata["egress_network_connectors"]
-        if metadata.get("run_hook_payload"):
-            params["runHookPayload"] = metadata["run_hook_payload"]
-        if metadata.get("logging"):
-            params["logging"] = metadata["logging"]
+        for internal_key, api_key in self._METADATA_TO_API.items():
+            value = metadata.get(internal_key)
+            if value:
+                params[api_key] = value
 
         return params
 

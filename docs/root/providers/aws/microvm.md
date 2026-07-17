@@ -2,8 +2,6 @@
 
 The MicroVM handler provisions isolated [AWS Lambda MicroVMs](https://aws.amazon.com/blogs/aws/run-isolated-sandboxes-with-full-lifecycle-control-aws-lambda-introduces-microvms/) — lightweight Firecracker-based sandboxes with full lifecycle control. Each MicroVM gets its own dedicated HTTPS endpoint, retains state across idle periods, and can auto-suspend/resume on traffic.
 
-Use this handler when you need to run untrusted or user-supplied code in strong isolation (VM-level, not container-level), such as AI coding assistants, interactive code environments, vulnerability scanners, or multi-tenant data analytics.
-
 ## Quick start
 
 ```bash
@@ -99,13 +97,15 @@ All MicroVM-specific configuration lives in the `metadata` dict:
 
 ### Idle policy
 
-The idle policy controls when a MicroVM auto-suspends (preserving full memory + disk state) and whether it auto-resumes on incoming traffic:
+The idle policy controls when the platform auto-suspends a MicroVM and whether it auto-resumes on incoming traffic. However, **ORB's current implementation assumes MicroVMs operate in pull mode** (e.g. polling an HPC scheduler or SQS for tasks). The platform's suspend/resume mechanism is based on inbound HTTP traffic, which pull-based workers never receive. ORB does not implement suspend/resume — it manages the full lifecycle via explicit provisioning and termination.
+
+**Recommendation:** Set `maxIdleDurationSeconds` to match `maximumDurationInSeconds` to effectively disable suspend:
 
 ```json
 {
   "idle_policy": {
-    "maxIdleDurationSeconds": 900,
-    "suspendedDurationSeconds": 300,
+    "maxIdleDurationSeconds": 3600,
+    "suspendedDurationSeconds": 3600,
     "autoResumeEnabled": true
   }
 }
@@ -113,9 +113,9 @@ The idle policy controls when a MicroVM auto-suspends (preserving full memory + 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `maxIdleDurationSeconds` | `integer` | Time (seconds) of no traffic before the MicroVM auto-suspends. |
+| `maxIdleDurationSeconds` | `integer` | Time (seconds) of no inbound traffic before the platform suspends the MicroVM. Set equal to `maximumDurationInSeconds` for pull-based workloads. |
 | `suspendedDurationSeconds` | `integer` | Time (seconds) the MicroVM can remain suspended before auto-termination. |
-| `autoResumeEnabled` | `boolean` | If `true`, the MicroVM automatically resumes when it receives a request while suspended. |
+| `autoResumeEnabled` | `boolean` | If `true`, the MicroVM resumes on inbound traffic while suspended. Not applicable for pull-based workloads. |
 
 All three fields are required if `idle_policy` is provided.
 
