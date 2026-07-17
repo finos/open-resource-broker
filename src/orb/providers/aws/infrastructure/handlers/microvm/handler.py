@@ -387,7 +387,7 @@ class MicroVMHandler(AWSHandler):
         """Convert a MicroVM API response to an ORB machine dict."""
         state = microvm_response.get("state", "PENDING")
         started_at = microvm_response.get("startedAt")
-        if hasattr(started_at, "isoformat"):
+        if started_at is not None and hasattr(started_at, "isoformat"):
             started_at = started_at.isoformat()
 
         return {
