@@ -477,3 +477,67 @@ class TestMicroVMHandlerValidation:
 
         result = handler.acquire_hosts(request, template)
         assert result["success"] is True
+
+
+class TestAWSClientMicroVMProperty:
+    def test_microvm_client_lazy_init(self):
+        """Verify microvm_client property creates the client on first access."""
+        from orb.providers.aws.infrastructure.aws_client import AWSClient
+
+        client = object.__new__(AWSClient)
+        client._microvm_client = None
+        client.session = MagicMock()
+        client.boto_config = MagicMock()
+        client._logger = MagicMock()
+
+        mock_boto_client = MagicMock()
+        client.session.client.return_value = mock_boto_client
+
+        # First access creates the client
+        result = client.microvm_client
+        client.session.client.assert_called_once_with("lambda-microvms", config=client.boto_config)
+        assert result is mock_boto_client
+
+        # Second access returns cached
+        client.session.client.reset_mock()
+        result2 = client.microvm_client
+        client.session.client.assert_not_called()
+        assert result2 is mock_boto_client
+
+
+class TestImageResolutionARNSkip:
+    def test_arn_does_not_need_resolution(self):
+        """ARN-format image IDs should not trigger SSM resolution."""
+        from orb.providers.aws.infrastructure.services.aws_image_resolution_service import (
+            AWSImageResolutionService,
+        )
+
+        assert (
+            AWSImageResolutionService.is_resolution_needed_static(
+                "arn:aws:lambda:us-east-1:123456789012:microvm-image:my-worker"
+            )
+            is False
+        )
+
+    def test_ami_does_not_need_resolution(self):
+        """AMI IDs should not trigger resolution."""
+        from orb.providers.aws.infrastructure.services.aws_image_resolution_service import (
+            AWSImageResolutionService,
+        )
+
+        assert (
+            AWSImageResolutionService.is_resolution_needed_static("ami-0123456789abcdef0") is False
+        )
+
+    def test_ssm_path_needs_resolution(self):
+        """SSM parameter paths should trigger resolution."""
+        from orb.providers.aws.infrastructure.services.aws_image_resolution_service import (
+            AWSImageResolutionService,
+        )
+
+        assert (
+            AWSImageResolutionService.is_resolution_needed_static(
+                "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+            )
+            is True
+        )
