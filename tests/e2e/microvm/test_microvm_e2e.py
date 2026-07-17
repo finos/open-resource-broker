@@ -102,8 +102,12 @@ def _ensure_queue(sqs_client, queue_name: str) -> str:
 
 
 def ensure_microvm_image(
-    microvm_client, s3_client, region: str, account_id: str,
-    request_queue_url: str, response_queue_url: str,
+    microvm_client,
+    s3_client,
+    region: str,
+    account_id: str,
+    request_queue_url: str,
+    response_queue_url: str,
 ) -> str:
     """Create the MicroVM image if it doesn't exist. Return image ARN."""
     console.rule("[bold blue]Phase 3: MicroVM Image")
@@ -330,10 +334,12 @@ def submit_tasks(sqs_client, request_queue_url: str, num_tasks: int, wait_second
                 "wait_seconds": wait_seconds,
                 "submitted_at": time.time(),
             }
-            batch.append({
-                "Id": str(i),
-                "MessageBody": json.dumps(message),
-            })
+            batch.append(
+                {
+                    "Id": str(i),
+                    "MessageBody": json.dumps(message),
+                }
+            )
 
             if len(batch) == 10 or i == num_tasks - 1:
                 sqs_client.send_message_batch(
@@ -397,7 +403,9 @@ def provision_microvms(
                 console.print(f"  Registered template: [cyan]{template_id}[/cyan]")
             except Exception as e:
                 if "already exists" in str(e):
-                    console.print(f"  Template [cyan]{template_id}[/cyan] already exists, continuing.")
+                    console.print(
+                        f"  Template [cyan]{template_id}[/cyan] already exists, continuing."
+                    )
                 else:
                     raise
 
@@ -459,11 +467,13 @@ def provision_microvms_manual(image_arn: str, num_microvms: int, region: str, ac
     }
     template_file.write_text(json.dumps(template_data, indent=2))
 
-    console.print("\n  [bold yellow]Manual mode:[/bold yellow] Provision MicroVMs using the ORB CLI.\n")
+    console.print(
+        "\n  [bold yellow]Manual mode:[/bold yellow] Provision MicroVMs using the ORB CLI.\n"
+    )
     console.print(f"  Template file written to: [cyan]{template_file}[/cyan]\n")
     console.print("  Suggested commands:\n")
     console.print("    [dim]# Ensure ORB is installed with AWS provider entry-points[/dim]")
-    console.print("    pip install -e \".[aws]\"\n")
+    console.print('    pip install -e ".[aws]"\n')
     console.print("    [dim]# Create template[/dim]")
     console.print(f"    orb templates create --file {template_file}\n")
     console.print("    [dim]# Request MicroVMs[/dim]")
@@ -698,7 +708,8 @@ def main():
         "--show-workers", action="store_true", help="List all worker IDs and their task counts"
     )
     parser.add_argument(
-        "--manual", action="store_true",
+        "--manual",
+        action="store_true",
         help="Manual mode: pause at Phase 5 for user to provision MicroVMs via ORB CLI (script makes zero ORB calls)",
     )
     args = parser.parse_args()
@@ -734,8 +745,12 @@ def main():
         console.print(f"  Using provided image: [cyan]{image_arn}[/cyan]")
     else:
         image_arn = ensure_microvm_image(
-            microvm_client, s3_client, args.region, account_id,
-            request_queue_url, response_queue_url,
+            microvm_client,
+            s3_client,
+            args.region,
+            account_id,
+            request_queue_url,
+            response_queue_url,
         )
 
     # Phase 4: Submit tasks
@@ -763,7 +778,15 @@ def main():
     )
 
     # Phase 7: Report
-    report_results(responses, tasks_submitted_at, end_time, args.tasks, args.microvms, args.wait_seconds, args.show_workers)
+    report_results(
+        responses,
+        tasks_submitted_at,
+        end_time,
+        args.tasks,
+        args.microvms,
+        args.wait_seconds,
+        args.show_workers,
+    )
 
     # Phase 8: Cleanup
     if args.manual:

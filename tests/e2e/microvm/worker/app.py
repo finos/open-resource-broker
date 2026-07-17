@@ -67,11 +67,13 @@ def main():
 
                 sqs.send_message(
                     QueueUrl=response_queue_url,
-                    MessageBody=json.dumps({
-                        "task_id": task_id,
-                        "worker_id": worker_id,
-                        "completed_at": time.time(),
-                    }),
+                    MessageBody=json.dumps(
+                        {
+                            "task_id": task_id,
+                            "worker_id": worker_id,
+                            "completed_at": time.time(),
+                        }
+                    ),
                 )
                 sqs.delete_message(
                     QueueUrl=request_queue_url,

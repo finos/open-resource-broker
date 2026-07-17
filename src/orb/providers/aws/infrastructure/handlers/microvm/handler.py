@@ -195,9 +195,7 @@ class MicroVMHandler(AWSHandler):
             )
 
         if errors:
-            self._logger.warning(
-                "%d/%d MicroVM launches failed: %s", len(errors), count, errors
-            )
+            self._logger.warning("%d/%d MicroVM launches failed: %s", len(errors), count, errors)
 
         return results
 
@@ -213,10 +211,12 @@ class MicroVMHandler(AWSHandler):
             try:
                 return self.aws_client.microvm_client.run_microvm(**params)
             except Exception as e:
-                is_throttle = "ThrottlingException" in str(type(e).__name__) or "Throttling" in str(e)
+                is_throttle = "ThrottlingException" in str(type(e).__name__) or "Throttling" in str(
+                    e
+                )
                 if attempt == max_attempts - 1 or not is_throttle:
                     raise
-                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                delay = base_delay * (2**attempt) + random.uniform(0, 1)
                 self._logger.debug("Throttled on run_microvm, retrying in %.1fs", delay)
                 _time.sleep(delay)
 
@@ -252,9 +252,7 @@ class MicroVMHandler(AWSHandler):
                 )
                 instances.append(self._build_machine_payload(resp))
             except Exception as e:
-                self._logger.warning(
-                    "Failed to get status for MicroVM %s: %s", microvm_id, e
-                )
+                self._logger.warning("Failed to get status for MicroVM %s: %s", microvm_id, e)
 
         fulfilment = self._compute_microvm_fulfilment(instances, request.requested_count)
         return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
@@ -340,8 +338,7 @@ class MicroVMHandler(AWSHandler):
 
         with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
             futures = {
-                executor.submit(self._terminate_single_microvm, mid): mid
-                for mid in machine_ids
+                executor.submit(self._terminate_single_microvm, mid): mid for mid in machine_ids
             }
             for future in as_completed(futures):
                 mid = futures[future]
