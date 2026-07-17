@@ -16,7 +16,7 @@ RUN apt-get update && \
         ca-certificates=20250419 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir --upgrade pip setuptools wheel
+    pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" wheel
 ARG BUILD_DATE
 ARG VERSION=dev
 ARG VCS_REF
@@ -62,6 +62,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY dist/*.whl /tmp/
 RUN WHEEL=$(ls /tmp/*.whl) \
     && uv pip install --no-cache "${WHEEL}[all]" \
+    && uv pip install --no-cache --upgrade "setuptools>=78.1.1" \
     && rm -f /tmp/*.whl
 
 # Copy only runtime files needed
