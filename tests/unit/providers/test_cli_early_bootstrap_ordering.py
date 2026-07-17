@@ -17,6 +17,14 @@ from unittest.mock import patch
 
 def test_register_all_provider_cli_specs_calls_discover_first(monkeypatch) -> None:
     """register_all_provider_cli_specs calls discover_provider_plugins before iterating."""
+    # Import the module before patching so sys.modules holds the canonical object.
+    # A prior test may evict `orb.providers.registration` from sys.modules; if
+    # monkeypatch.setattr runs while the module is absent it patches a stale
+    # package-attribute object (the `orb.providers.registration` binding left on the
+    # orb.providers package), while the subsequent `import` statement re-imports a
+    # fresh copy — two different objects, so the patch is invisible at call time.
+    import orb.providers.registration as reg_mod
+
     call_log: list[str] = []
 
     def _fake_discover(*args, **kwargs):
@@ -26,8 +34,6 @@ def test_register_all_provider_cli_specs_calls_discover_first(monkeypatch) -> No
     monkeypatch.setattr("orb.providers.registration.discover_provider_plugins", _fake_discover)
     # Start with an empty provider list to ensure discover is truly first
     monkeypatch.setattr("orb.providers.registration._REGISTERED_PROVIDERS", [])
-
-    import orb.providers.registration as reg_mod
 
     reg_mod.register_all_provider_cli_specs()
 
@@ -39,6 +45,11 @@ def test_register_all_provider_cli_specs_calls_discover_first(monkeypatch) -> No
 
 def test_register_all_defaults_loaders_calls_discover_first(monkeypatch) -> None:
     """register_all_defaults_loaders calls discover_provider_plugins before iterating."""
+    # Import before patching for the same reason as the cli-specs test above:
+    # ensures sys.modules holds the live module so monkeypatch and the
+    # registration call operate on the same object regardless of suite order.
+    import orb.providers.registration as reg_mod
+
     call_log: list[str] = []
 
     def _fake_discover(*args, **kwargs):
@@ -47,8 +58,6 @@ def test_register_all_defaults_loaders_calls_discover_first(monkeypatch) -> None
 
     monkeypatch.setattr("orb.providers.registration.discover_provider_plugins", _fake_discover)
     monkeypatch.setattr("orb.providers.registration._REGISTERED_PROVIDERS", [])
-
-    import orb.providers.registration as reg_mod
 
     reg_mod.register_all_defaults_loaders()
 
