@@ -2,9 +2,26 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from orb.bootstrap import Application
 from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.sdk.client import ORBClient
+
+
+@pytest.fixture(autouse=True)
+def _reset_domain_container():
+    """Restore the module-level domain container after each test.
+
+    ``Application._ensure_container`` calls ``set_domain_container`` with the
+    (possibly mocked) container.  Without this cleanup a mock container leaks
+    into the global and breaks tests that assert the default is ``None``.
+    """
+    yield
+    from orb.domain.base.decorators import set_domain_container
+
+    set_domain_container(None)  # type: ignore[arg-type]
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
