@@ -222,6 +222,7 @@ sdk-csharp-generate: check-java _ensure-jar  ## Regenerate the C# SDK from sdk/s
 	  '    <AssemblyName>OpenResourceBroker.Sdk</AssemblyName>' \
 	  '    <PackageId>OpenResourceBroker.Sdk</PackageId>' \
 	  '    <RootNamespace>OpenResourceBroker.Sdk</RootNamespace>' \
+	  '    <Version>0.1.0</Version>' \
 	  '    <Nullable>enable</Nullable>' \
 	  '    <LangVersion>12</LangVersion>' \
 	  '    <GenerateDocumentationFile>false</GenerateDocumentationFile>' \

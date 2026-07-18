@@ -1,0 +1,75 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>FINOS.OpenResourceBroker</AssemblyName>
+    <PackageId>FINOS.OpenResourceBroker</PackageId>
+    <RootNamespace>FINOS.OpenResourceBroker</RootNamespace>
+    <Version>0.1.0</Version>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12</LangVersion>
+    <Authors>FINOS</Authors>
+    <Description>FINOS Open Resource Broker .NET SDK — covers all 44 API operations</Description>
+    <PackageTags>finos;orb;open-resource-broker;sdk</PackageTags>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/finos/open-resource-broker</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/finos/open-resource-broker</PackageProjectUrl>
+    <Copyright>Copyright 2024 FINOS</Copyright>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Optimize>false</Optimize>
+    <!-- The generated model assembly (OpenResourceBroker.Sdk) is not published to
+         NuGet on its own — it is an implementation detail produced on build from
+         the OpenAPI spec.  Embed its DLL directly into THIS package's lib/ folder
+         (see the IncludeGeneratedModelsInPackage target) so consumers get the
+         model types without a dangling reference to a non-existent package. -->
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeGeneratedModelsInPackage</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- AWS SigV4: canonical request built from HttpRequestMessage; signing delegated to
+         Amazon.Runtime.Internal.Auth.AWS4Signer.ComputeSignature (AWSSDK.Core native) -->
+    <PackageReference Include="AWSSDK.Core" Version="3.7.400.47" />
+    <!-- JSON serialization -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Hybrid model: the typed request/response models are generated from
+         sdk/spec/openapi.json (generate-on-build, gitignored) by
+         `make sdk-csharp-generate`.  The generated project is System.Text.Json-
+         native so OrbClient consumes its models directly.  If it is missing,
+         run `make sdk-csharp-generate` first.
+
+         PrivateAssets="all" prevents NuGet from emitting a <dependency> on the
+         non-published "OpenResourceBroker.Sdk" package into the nuspec.  Its
+         compiled DLL is instead embedded into this package's lib/ folder by the
+         IncludeGeneratedModelsInPackage target below, so the model types ship
+         inside FINOS.OpenResourceBroker with no dangling reference. -->
+    <ProjectReference Include="../../generated/src/OpenResourceBroker.Sdk/OpenResourceBroker.Sdk.csproj"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Expose internals to unit test project for AuthDelegatingHandler tests -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>UnitTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <!-- Embed the generated model assembly into this package's lib/ folder.
+       Because the ProjectReference above is marked PrivateAssets="all", the
+       OpenResourceBroker.Sdk DLL is NOT copied into the package by default and
+       NO package dependency is emitted for it.  This target adds the compiled
+       DLL to the TFM-specific build output so `dotnet pack` places it alongside
+       FINOS.OpenResourceBroker.dll in lib/net8.0/, ensuring the model types
+       actually ship in the .nupkg. -->
+  <Target Name="IncludeGeneratedModelsInPackage" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)"
+                            Condition="'%(ReferenceCopyLocalPaths.Filename)' == 'OpenResourceBroker.Sdk' And '%(ReferenceCopyLocalPaths.Extension)' == '.dll'" />
+    </ItemGroup>
+  </Target>
+
+</Project>
