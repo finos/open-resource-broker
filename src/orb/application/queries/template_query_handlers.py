@@ -246,8 +246,6 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
                 template_dto = await template_manager.get_template_by_id(template_id)
 
                 if not template_dto:
-                    from orb.domain.base.exceptions import EntityNotFoundError
-
                     raise EntityNotFoundError("Template", template_id)
 
                 template_config = template_dto.model_dump(exclude_none=True)

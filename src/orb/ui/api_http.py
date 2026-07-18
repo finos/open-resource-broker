@@ -349,7 +349,10 @@ async def init_orb(body: dict[str, Any]) -> dict[str, Any]:
         httpx.HTTPStatusError: 403 if the feature is disabled or env is
             production; 400 if the confirmation token is wrong.
     """
-    payload = {"confirm": "INIT", **body}
+    # Merge the caller body first, then pin the confirmation token so a
+    # caller-supplied "confirm" key can never override the mandatory INIT
+    # token the server requires.
+    payload = {**body, "confirm": "INIT"}
     return await _post("/admin/init", json=payload)
 
 
