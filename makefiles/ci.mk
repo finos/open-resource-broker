@@ -181,6 +181,18 @@ ci-tests-coverage-check:  ## Combined-coverage gate: merge per-leg data + enforc
 	# Emit the merged XML BEFORE the threshold check so it is always produced
 	# for the single Codecov upload, even when the gate below fails.
 	$(call run-tool,coverage,xml -o coverage-combined.xml)
+	# Diagnostic: print BOTH the branch-inclusive total (what the gate below
+	# enforces) and the line-only total (closer to what Codecov's line-rate
+	# reports), plus the line-rate embedded in the XML Codecov actually reads.
+	# This makes any gate-vs-Codecov discrepancy self-explaining in the run log.
+	# Diagnostic: the gate below enforces coverage.py's branch-inclusive TOTAL;
+	# Codecov reads the XML's line-rate.  Print both from the SAME combined data
+	# (plus statement/branch counts) so any gate-vs-Codecov delta is explained
+	# in-run and never has to be guessed at again.
+	@echo "=== COVERAGE DIAGNOSTIC (single coverage-combined dataset) ==="
+	@python3 -c "import xml.etree.ElementTree as ET; r=ET.parse('coverage-combined.xml').getroot(); lr=float(r.get('line-rate'))*100; br=float(r.get('branch-rate'))*100; lc=int(r.get('lines-covered',0)); lv=int(r.get('lines-valid',0)); bc=int(r.get('branches-covered',0)); bv=int(r.get('branches-valid',0)); print(f'XML line-rate (Codecov reads this): {lr:.2f}%  ({lc}/{lv} lines)'); print(f'XML branch-rate: {br:.2f}%  ({bc}/{bv} branches)')" || echo "(xml parse failed)"
+	@echo "coverage.py branch-inclusive TOTAL (this gate enforces) ->"
+	@echo "=== END DIAGNOSTIC ==="
 	# `coverage report` uses --fail-under (the pytest-cov spelling
 	# --cov-fail-under is not valid for the coverage CLI).
 	$(call run-tool,coverage,report --fail-under=$(COVERAGE_THRESHOLD))

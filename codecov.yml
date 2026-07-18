@@ -7,7 +7,7 @@ coverage:
   status:
     project:
       default:
-        target: 60% # Combined-coverage floor across all test legs (ratchet up as coverage improves)
+        target: 80% # Combined-coverage floor across all test legs (ratchet up as coverage improves)
         threshold: 0%
         informational: false
     patch:
@@ -38,3 +38,6 @@ ignore:
   - "src/orb/__main__.py"    # thin process entrypoints — not unit-tested
   - "src/orb/run.py"
   - "src/orb/interface/server_daemon.py"
+  - "src/orb/ui/pages/**"    # Reflex render trees — exercised by ui-smoke leg + compile, not pytest
+  - "src/orb/ui/app.py"      # Reflex app entrypoint
+  - "src/orb/ui/rxconfig.py" # Reflex build config

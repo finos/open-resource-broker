@@ -605,6 +605,18 @@ omit = [
     "src/orb/__main__.py",
     "src/orb/run.py",
     "src/orb/interface/server_daemon.py",
+    # Reflex UI render trees + entrypoints: these are declarative rx.* component
+    # definitions that only execute through the Reflex compile step and a running
+    # server, so they are exercised by the ui-smoke leg (boot + curl each page)
+    # and the compile build, NOT by pytest.  Unit-testing render trees yields
+    # brittle structural assertions with no bug-catching value.  The Reflex-
+    # agnostic UI logic (state, api client, cell formatters, column defs,
+    # component helpers) IS unit-tested under tests/ui/ and stays in the report.
+    # This mirrors the k8s_legacy exclusion above and the src/orb/ui pyright
+    # exclusion (Reflex Var[T] unions produce ~50 false positives per component).
+    "src/orb/ui/pages/*",
+    "src/orb/ui/app.py",
+    "src/orb/ui/rxconfig.py",
 ]
 
 [tool.coverage.report]

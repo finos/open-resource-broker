@@ -360,6 +360,11 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         files: coverage-combined.xml
+        # Only upload the single omit-applied combined report.  Without this,
+        # the uploader also auto-discovers the per-leg XMLs under
+        # coverage-artifacts/ and merges them (raw, pre-omit, overlapping),
+        # producing a different — lower — number than the coverage gate.
+        disable_search: true
         name: combined
         # Overwrite any prior partial report for this commit with the full merge.
         override_commit: ${{ github.event.pull_request.head.sha || github.sha }}
