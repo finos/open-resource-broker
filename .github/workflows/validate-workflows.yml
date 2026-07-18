@@ -68,6 +68,12 @@ jobs:
         actionlint .github/workflows/*.yml
       shell: bash
 
+    - name: Validate GitHub Actions SHA consistency
+      # Fails if the same action@version comment is pinned to two different
+      # SHAs across workflows (a divergent/invalid pin is release-breaking).
+      run: python3 dev-tools/quality/validate_action_sha_consistency.py
+      shell: bash
+
     - name: Validate shell scripts with shellcheck
       uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38  # 2.0.0
       with:
