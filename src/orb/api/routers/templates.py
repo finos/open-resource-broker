@@ -118,6 +118,7 @@ class TemplateUpdateRequest(APIRequest):
 
 @router.get(
     "/",
+    operation_id="listTemplates",
     summary="List Templates",
     description="Get all available templates",
     response_model=TemplateListResponse,
@@ -172,6 +173,7 @@ async def list_templates(
 
 @router.post(
     "/validate",
+    operation_id="validateTemplate",
     summary="Validate Template",
     description="Validate template configuration",
     response_model=TemplateMutationResponse,
@@ -210,6 +212,7 @@ async def validate_template(
 
 @router.post(
     "/refresh",
+    operation_id="refreshTemplates",
     summary="Refresh Templates",
     description="Refresh template cache",
     response_model=TemplateListResponse,
@@ -232,6 +235,7 @@ async def refresh_templates(
 
 @router.post(
     "/generate",
+    operation_id="generateTemplates",
     summary="Generate example templates",
     description="Generate example templates per provider (idempotent unless force=true)",
 )
@@ -279,6 +283,7 @@ async def generate_templates(
 
 @router.get(
     "/{template_id}",
+    operation_id="getTemplate",
     summary="Get Template",
     description="Get template by ID",
     response_model=TemplateListResponse,
@@ -306,6 +311,7 @@ async def get_template(
 
 @router.post(
     "/",
+    operation_id="createTemplate",
     summary="Create Template",
     description="Create a new template",
     response_model=TemplateMutationResponse,
@@ -357,6 +363,7 @@ async def create_template(
 
 @router.put(
     "/{template_id}",
+    operation_id="updateTemplate",
     summary="Update Template",
     description="Update an existing template",
     response_model=TemplateMutationResponse,
@@ -408,6 +415,7 @@ async def update_template(
 
 @router.delete(
     "/{template_id}",
+    operation_id="deleteTemplate",
     summary="Delete Template",
     description="Delete a template",
     response_model=TemplateMutationResponse,

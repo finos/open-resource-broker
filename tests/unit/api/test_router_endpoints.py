@@ -445,13 +445,15 @@ class TestRequestsRouter:
         assert inp.verbose is False
 
     def test_get_request_details(self, requests_app):
-        # GET /requests/{id} (no /status) was removed; expect 404 or 405
+        # GET /requests/{id} (without /status) is now re-added; expect 200
+        output = GetRequestStatusOutput(requests=[])
+        self._override_status(requests_app, output)
         self._set_scheduler(requests_app)
         client = TestClient(requests_app, raise_server_exceptions=False)
 
         resp = client.get("/requests/req-456")
 
-        assert resp.status_code in (404, 405)
+        assert resp.status_code == 200
 
     def test_cancel_request_happy_path(self, requests_app):
         output = CancelRequestOutput(

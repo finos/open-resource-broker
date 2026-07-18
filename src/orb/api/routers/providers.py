@@ -106,6 +106,7 @@ def _get_schema_for_provider_type(provider_type: str) -> list[dict[str, Any]]:
 
 @router.get(
     "/schemas",
+    operation_id="getAllProviderSchemas",
     summary="All Provider UI Column Schemas",
     description=(
         "Returns a mapping of provider name → list of UIColumnDescriptor objects "
@@ -141,6 +142,7 @@ async def get_all_provider_schemas(
 
 @router.get(
     "/{name}/schema",
+    operation_id="getProviderSchema",
     summary="Provider UI Column Schema",
     description=(
         "Returns the list of UIColumnDescriptor objects contributed by the named "
@@ -176,6 +178,7 @@ async def get_provider_schema(
 
 @router.get(
     "/",
+    operation_id="listProviders",
     summary="List Providers",
     description=(
         "Returns all configured provider instances with name, type, enabled flag, "
@@ -239,6 +242,7 @@ async def list_providers(
 
 @router.get(
     "/health",
+    operation_id="getProvidersHealth",
     summary="Provider Health",
     description=(
         "Returns per-provider configuration + live connectivity status. "

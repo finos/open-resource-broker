@@ -9,7 +9,7 @@ from orb._package import AUTHOR, EMAIL, REPO_NAME, REPO_ORG, __version__
 from orb.config.schemas.server_schema import ServerConfig
 
 from .examples import get_api_examples
-from .security_schemes import get_security_schemes
+from .security_schemes import get_all_security_scheme_definitions, get_security_schemes
 
 
 def configure_openapi(app: FastAPI, server_config: ServerConfig):
@@ -34,8 +34,16 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig):
             routes=app.routes,
         )
 
-        # Add security schemes if authentication is enabled
+        # Always include the full securitySchemes catalogue so SDK generators
+        # can emit typed auth helpers regardless of whether auth is enabled in
+        # the running server.  The global security requirement (which enforces
+        # auth on every operation) is only added when auth is actually enabled.
+        if "components" not in openapi_schema:
+            openapi_schema["components"] = {}
+        openapi_schema["components"]["securitySchemes"] = get_all_security_scheme_definitions()
+
         if server_config.auth.enabled:
+            # Override with the auth-strategy-specific active schemes.
             openapi_schema["components"]["securitySchemes"] = get_security_schemes(
                 server_config.auth
             )
@@ -69,13 +77,21 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig):
             {"url": "https://api.your-domain.com", "description": "Production server"},
         ]
 
-        # Add tags for better organization
+        # Add tags for better organization.
+        # NOTE: tag names here must exactly match the tags= strings on each
+        # router/decorator.  me.py uses tags=["Auth"] (not "Authentication"),
+        # config.py uses tags=["Configuration"], events.py uses tags=["Events"],
+        # observability.py uses tags=["Observability"],
+        # providers.py uses tags=["Providers"], admin.py uses tags=["Admin"].
         openapi_schema["tags"] = [
             {
                 "name": "System",
-                "description": "System health and information endpoints",
+                "description": "System health, metrics, and service information endpoints",
             },
-            {"name": "Templates", "description": "VM template management operations"},
+            {
+                "name": "Templates",
+                "description": "VM template management operations",
+            },
             {
                 "name": "Machines",
                 "description": "Machine provisioning and management operations",
@@ -85,8 +101,28 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig):
                 "description": "Request status and management operations",
             },
             {
-                "name": "Authentication",
-                "description": "Authentication and authorization operations",
+                "name": "Auth",
+                "description": "Authenticated-user introspection (current user identity and role)",
+            },
+            {
+                "name": "Events",
+                "description": "Server-Sent Events stream for real-time push updates",
+            },
+            {
+                "name": "Observability",
+                "description": "Machine metrics, request timelines, and telemetry status",
+            },
+            {
+                "name": "Providers",
+                "description": "Provider configuration, health, and UI column schema",
+            },
+            {
+                "name": "Admin",
+                "description": "Destructive administrative operations (wipe, cleanup, init, reload)",
+            },
+            {
+                "name": "Configuration",
+                "description": "Runtime configuration inspection and in-memory override",
             },
         ]
 

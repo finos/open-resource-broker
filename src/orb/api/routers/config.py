@@ -70,6 +70,7 @@ class ValidateResponse(BaseModel):
 
 @router.get(
     "/",
+    operation_id="getFullConfig",
     summary="Get full effective configuration",
     description=(
         "Returns the full effective configuration tree as a dict. "
@@ -134,6 +135,7 @@ async def get_full_config(
 
 @router.get(
     "/sources",
+    operation_id="getConfigSources",
     summary="Get configuration source files",
     description="Returns the list of configuration source file paths.",
 )
@@ -148,6 +150,7 @@ async def get_config_sources(
 
 @router.post(
     "/save",
+    operation_id="saveConfig",
     summary="Save current in-memory configuration to disk",
     description=(
         "Persists the current raw configuration dict to the loaded config file "
@@ -210,6 +213,7 @@ async def save_config(
 
 @router.post(
     "/validate",
+    operation_id="validateConfig",
     summary="Validate current configuration",
     description="Validates the current in-memory configuration and returns any errors.",
 )
@@ -227,6 +231,7 @@ async def validate_config(
 
 @router.get(
     "/{key:path}",
+    operation_id="getConfigValue",
     summary="Get a single configuration value",
     description=(
         "Returns a single configuration value by dot-notation key "
@@ -253,6 +258,7 @@ async def get_config_value(
 
 @router.put(
     "/{key:path}",
+    operation_id="setConfigValue",
     summary="Set a configuration value (in-memory only)",
     description=(
         "Sets a configuration value in memory. The change is **not** persisted to disk. "

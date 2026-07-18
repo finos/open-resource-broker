@@ -307,6 +307,7 @@ _TYPE_QUERY = Query(None, description="Comma-separated event type filter")
 
 @router.get(
     "/",
+    operation_id="streamEvents",
     summary="Global Server-Sent Events stream",
     description=(
         "Subscribe once per page load. Receives push deltas for machines, requests, "

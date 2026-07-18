@@ -74,6 +74,7 @@ def _forbidden(code: str, message: str):
 
 @router.post(
     "/database/wipe",
+    operation_id="wipeDatabase",
     summary="Wipe all ORB database tables",
     description=(
         "Truncate all ORB data tables (machines, requests, templates). "
@@ -178,6 +179,7 @@ class CleanupDatabaseBody(BaseModel):
 
 @router.post(
     "/init",
+    operation_id="initOrb",
     summary="Initialize ORB",
     description=(
         "Create default config file, data directories, and optionally refresh templates. "
@@ -330,6 +332,7 @@ async def init_orb(
 
 @router.post(
     "/database/cleanup",
+    operation_id="cleanupDatabase",
     summary="Bulk cleanup terminal request and machine rows",
     description=(
         "Hard-delete requests (and optionally their machine rows) that match the "
@@ -455,6 +458,7 @@ async def cleanup_database(
 
 @router.post(
     "/reload-config",
+    operation_id="reloadConfig",
     summary="Reload ORB configuration from disk",
     description=(
         "Invalidate the in-memory configuration cache and re-read "

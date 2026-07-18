@@ -40,6 +40,7 @@ _FAILURE_STATUSES = {
 
 @router.get(
     "/machines/{machine_id}/metrics",
+    operation_id="getMachineMetrics",
     summary="Get Machine Metrics",
     description=(
         "Return time-series metrics for a machine. "
@@ -98,6 +99,7 @@ async def get_machine_metrics(
 
 @router.get(
     "/requests/{request_id}/timeline",
+    operation_id="getRequestTimeline",
     summary="Get Request Timeline",
     description=(
         "Return the lifecycle event log for a request, synthesised from the "
@@ -199,6 +201,7 @@ async def get_request_timeline(
 
 @router.get(
     "/observability/telemetry",
+    operation_id="getTelemetryStatus",
     summary="Get Telemetry Status",
     description=(
         "Return the current OpenTelemetry instrumentation status — whether telemetry "

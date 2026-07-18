@@ -255,7 +255,7 @@ class MachineItem(BaseModel):
     metadata: Optional[dict[str, Any]] = None
 
     # --- Tags and versioning ---
-    tags: Optional[Any] = None
+    tags: Optional[dict[str, Any]] = None
     version: Optional[int] = None
 
     # --- UI-friendly derived field (populated server-side by router) ---

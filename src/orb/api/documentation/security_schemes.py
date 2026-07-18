@@ -68,6 +68,51 @@ def get_security_schemes(auth_config: AuthConfig) -> dict[str, Any]:
     return schemes
 
 
+def get_all_security_scheme_definitions() -> dict[str, Any]:
+    """Return the complete catalogue of security scheme definitions.
+
+    These definitions are always included in the exported spec so SDK
+    generators can emit typed auth helpers regardless of which auth strategy
+    is active in the running server.  The global ``security`` requirement
+    (which enforces auth on every operation) is separate and only added when
+    auth is enabled.
+    """
+    return {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": (
+                "JWT Bearer token authentication. Include the token in the "
+                "Authorization header as 'Bearer <token>'."
+            ),
+        },
+        "AWSAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "description": (
+                "AWS IAM authentication using AWS credentials. "
+                "The system validates your AWS credentials and IAM permissions."
+            ),
+        },
+        "CognitoAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": (
+                "AWS Cognito authentication using Cognito User Pool tokens. "
+                "Include the Cognito access token in the Authorization header."
+            ),
+        },
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key",
+            "description": "API Key authentication. Include your API key in the X-API-Key header.",
+        },
+    }
+
+
 def get_auth_examples() -> dict[str, Any]:
     """
     Get authentication examples for documentation.
