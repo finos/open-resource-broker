@@ -1,5 +1,5 @@
 #!/bin/bash
-# Export the OpenAPI spec from a running ORB server into sdk/go/openapi.json.
+# Export the OpenAPI spec from a running ORB server into sdk/spec/openapi.json.
 # Uses an existing config/config.json if present; otherwise bootstraps a
 # throwaway config via `orb init --non-interactive` to a temp directory.
 set -euo pipefail
@@ -51,5 +51,6 @@ done
 curl -sf --unix-socket "$SOCK" http://localhost/openapi.json >/dev/null 2>&1 \
     || { echo "ERROR: ORB server never became ready after 30s; aborting spec export" >&2; exit 1; }
 
-curl --fail --unix-socket "$SOCK" http://localhost/openapi.json > sdk/go/openapi.json
-python3 -c "import json; d=json.load(open('sdk/go/openapi.json')); assert d.get('openapi'), 'Invalid OpenAPI spec'"
+mkdir -p sdk/spec
+curl --fail --unix-socket "$SOCK" http://localhost/openapi.json > sdk/spec/openapi.json
+python3 -c "import json; d=json.load(open('sdk/spec/openapi.json')); assert d.get('openapi'), 'Invalid OpenAPI spec'"

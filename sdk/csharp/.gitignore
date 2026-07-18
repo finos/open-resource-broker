@@ -1,0 +1,9 @@
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Generated code — produce on build, not committed.
+# Run `make sdk-csharp-generate` (or `make sdk-generate`) to regenerate.
+generated/

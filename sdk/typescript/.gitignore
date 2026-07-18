@@ -1,0 +1,12 @@
+# Node.js
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Test output
+coverage/
+junit.xml
+
+# Generated code — produce on build, not committed.
+# Run `make sdk-typescript-generate` (or `make sdk-generate`) to regenerate.
+generated/

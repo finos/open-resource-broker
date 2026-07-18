@@ -319,21 +319,20 @@ local-test-matrix: ; @$(MAKE) local-workflow test-matrix
 local-clean: ; @$(MAKE) local-workflow clean
 
 # @SECTION Go SDK
-sdk-go-test:  ## Run Go SDK tests
-	go test ./sdk/go/...
-
-sdk-go-build:  ## Build Go SDK
-	go build ./sdk/go/...
-
-sdk-go-generate:  ## Regenerate Go SDK from OpenAPI spec
-	go generate ./sdk/go/...
+# sdk-go-build, sdk-go-test, and sdk-go-generate are defined in makefiles/sdk.mk
+# (the SDK module has its own go.mod; those targets cd into sdk/go so the build
+# resolves against the SDK module, not the repo-root module).
 
 sdk-go-update-version:  ## Update Go SDK version file and commit (usage: make sdk-go-update-version VERSION=1.6.0)
 	sed -i "s/MinCompatibleVersion = \".*\"/MinCompatibleVersion = \"$(VERSION)\"/" sdk/go/orb/version.go
-	git add sdk/go/openapi.json sdk/go/orb/version.go
+	git add sdk/spec/openapi.json sdk/go/orb/version.go
 	git diff --cached --quiet || git commit -m "chore(sdk/go): update for v$(VERSION) [skip ci]"
 	git push
+	# Push a submodule-scoped tag so the Go module proxy can serve
+	# go get github.com/finos/open-resource-broker/sdk/go@vX.Y.Z
+	git tag sdk/go/v$(VERSION)
+	git push origin sdk/go/v$(VERSION)
 
-sdk-go-export-spec:  ## Export OpenAPI spec from running ORB server into sdk/go/openapi.json
+sdk-go-export-spec:  ## Export OpenAPI spec from running ORB server into sdk/spec/openapi.json
 	@./dev-tools/release/export_openapi_spec.sh
 

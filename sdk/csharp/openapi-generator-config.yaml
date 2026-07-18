@@ -1,0 +1,42 @@
+# openapi-generator configuration for the C# (.NET) SDK.
+#
+# Generator: csharp (openapi-generator v7.23.0)
+# Invoked by: make sdk-csharp-generate  (see makefiles/sdk.mk)
+#
+# Design rationale:
+#   - library=generichost: this is the ONLY C# generator library that emits
+#     System.Text.Json-native models (per-type JsonConverter<T> using
+#     Utf8JsonReader/Writer).  That matches the hand-written transport, which
+#     serializes with System.Text.Json, so the generated models can be consumed
+#     directly by OrbClient — making the C# SDK genuinely hybrid (models come
+#     from the spec, not hand-written).  The httpclient/restsharp libraries emit
+#     Newtonsoft-based models, which would not interoperate with the STJ client.
+#   - Only the Model/ types and their Client/ support files (Option<T>,
+#     ClientUtils, the JSON converters) are kept.  The generichost Api/ stubs,
+#     Extensions/, and the Generic-Host bootstrap (ApiFactory, HostConfiguration)
+#     are removed by the Makefile because the hand-written transport (UDS via
+#     SocketsHttpHandler, AWS SigV4 from AWSSDK.Core, SSE reconnect, subprocess
+#     manager) serves that role.  See sdk/ARCHITECTURE.md.
+#   - targetFramework=net8.0: .NET 8 is LTS and the current stable release.
+#     Aligns with the project's "use newest platform features" principle.
+#
+# SSE exclusions:
+#   stream_events and stream_request_status use text/event-stream; these are
+#   handled by the hand-written SSE layer and not generated.
+
+generatorName: csharp
+inputSpec: ../spec/openapi.json
+outputDir: generated
+
+additionalProperties:
+  packageName: OpenResourceBroker.Sdk
+  packageVersion: 0.1.0
+  targetFramework: net8.0
+  library: generichost
+  nullableReferenceTypes: true
+  generateModelTests: false
+  generateApiTests: false
+  generateModelDocumentation: false
+  generateApiDocumentation: false
+  # Use DateTimeOffset for all date-time fields (recommended over DateTime for APIs).
+  useDateTimeOffset: true

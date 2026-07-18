@@ -4,6 +4,6 @@
 *.out
 coverage.txt
 
-# Generated
+# Generated code — produce on build, not committed.
+# Run `make sdk-go-generate` (or `make sdk-generate`) to regenerate.
 internal/generated/
-!internal/generated/.gitkeep

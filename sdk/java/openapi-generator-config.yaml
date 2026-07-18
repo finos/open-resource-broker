@@ -1,0 +1,48 @@
+# openapi-generator configuration for the Java SDK.
+#
+# Generator: java (openapi-generator v7.23.0)
+# Invoked by: make sdk-java-generate  (see makefiles/sdk.mk)
+#
+# Design rationale:
+#   - library=native: uses java.net.http.HttpClient (Java 11+, built-in, no
+#     additional HTTP-client dependency required).  Prefer native over
+#     okhttp/retrofit for new code — consumers on Java 17+ get zero extra deps.
+#   - Java 17 minimum: aligns with the project's "use newest platform features"
+#     principle; Java 17 is LTS and widely deployed.  Set sourceCompatibility
+#     and targetCompatibility accordingly in the generated build file.
+#   - The generated API stubs are starting points only.  The hand-written
+#     transport (UDS via UnixDomainSocketChannel, SigV4, SSE reconnect,
+#     subprocess manager) must be layered on top — see sdk/ARCHITECTURE.md.
+#
+# SSE exclusions:
+#   stream_events_api_v1_events__get and stream_request_status produce
+#   text/event-stream responses.  These are excluded from codegen; the
+#   hand-written SSE layer handles them.
+
+generatorName: java
+inputSpec: ../spec/openapi.json
+outputDir: generated
+
+additionalProperties:
+  groupId: org.finos.openresourcebroker
+  artifactId: open-resource-broker-java
+  artifactVersion: 0.1.0
+  packageName: org.finos.openresourcebroker.sdk
+  apiPackage: org.finos.openresourcebroker.sdk.api
+  modelPackage: org.finos.openresourcebroker.sdk.model
+  invokerPackage: org.finos.openresourcebroker.sdk
+  library: native
+  java8: true
+  # Java 17+ minimum: use sealed interfaces, records, text blocks where generated.
+  dateLibrary: java8
+  generateModelTests: false
+  generateApiTests: false
+  generateModelDocumentation: false
+  generateApiDocumentation: false
+  useJakartaEe: false
+
+# SSE streaming operations are excluded; hand-written layer handles them.
+# Add operationId values below if additional SSE operations are added to spec.
+# (Note: openapi-generator Java does not support skipOperations natively;
+#  remove unwanted operations from the generated stubs manually or via
+#  .openapi-generator-ignore after initial generation.)

@@ -1,0 +1,49 @@
+# openapi-generator configuration for the TypeScript SDK.
+#
+# Generator: typescript-axios (openapi-generator v7.23.0)
+# Invoked by: make sdk-typescript-generate  (see makefiles/sdk.mk)
+#
+# Design rationale:
+#   - Generator: typescript-axios (NOT typescript-fetch).
+#     Rationale: the fetch API does not support UNIX domain sockets.  Axios
+#     allows injecting a custom adapter; the hand-written UDS transport uses an
+#     undici-backed adapter that dials over a UNIX socket when the client is
+#     configured for subprocess/UDS mode.
+#   - npmName/@orb-sdk: published scope for npm distribution.
+#   - supportsES6: true — modern bundlers and Node 18+ handle ES modules natively.
+#   - withSeparateModelsAndApi: true — splits generated output for cleaner
+#     tree-shaking in bundlers.
+#   - The generated models and API stubs are the starting point.  The
+#     hand-written transport (UDS via undici adapter, AWS SigV4 from
+#     @aws-sdk/signature-v4, SSE reconnect, subprocess manager) is layered on
+#     top.  See sdk/ARCHITECTURE.md.
+#
+# SSE exclusions:
+#   stream_events (GET /api/v1/events/) uses text/event-stream.  The
+#   generated stubs only cover JSON-response operations.  The hand-written
+#   SSE layer (built on the EventSource polyfill or Node's http module)
+#   handles streaming endpoints.  stream_request_status returns application/json
+#   framed as SSE and is also handled by the hand-written layer.
+
+generatorName: typescript-axios
+inputSpec: ../spec/openapi.json
+outputDir: generated
+
+additionalProperties:
+  npmName: "@finos/open-resource-broker"
+  npmVersion: 0.1.0
+  supportsES6: true
+  withSeparateModelsAndApi: true
+  modelPackage: models
+  apiPackage: api
+  generateModelTests: false
+  generateApiTests: false
+  generateModelDocumentation: false
+  generateApiDocumentation: false
+  # Use TypeScript 5 features (const enums, satisfies operator, etc.)
+  typescriptThreePlus: true
+  # Prefer undefined over null for optional fields (better TypeScript ergonomics).
+  useSingleRequestParameter: true
+  # Axios custom adapter injection point is preserved in generated code when
+  # axiosExtensionType is set to true.
+  withInterfaces: true
