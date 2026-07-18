@@ -8,8 +8,8 @@ Java client SDK for the
 ORB is a Python service. Install it before using managed-process mode:
 
 ```bash
-uv tool install 'orb-py>=1.6.2,<2.0.0'
-# or: pip install 'orb-py>=1.6.2,<2.0.0'
+uv tool install 'orb-py>=1.8.3,<2.0.0'
+# or: pip install 'orb-py>=1.8.3,<2.0.0'
 ```
 
 Verify: `orb --version`
@@ -200,4 +200,4 @@ Requires `orb` in PATH:
 
 | Java SDK | Requires Python service |
 |----------|------------------------|
-| 0.1.x | >= 1.6.2 |
+| 0.1.x | >= 1.8.3 |

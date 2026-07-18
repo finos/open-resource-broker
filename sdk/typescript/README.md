@@ -9,10 +9,10 @@ ORB is a Python service. Install it before using managed-process mode:
 
 ```bash
 # Recommended
-uv tool install 'orb-py>=1.6.2,<2.0.0'
+uv tool install 'orb-py>=1.8.3,<2.0.0'
 
 # Or with pip
-pip install 'orb-py>=1.6.2,<2.0.0'
+pip install 'orb-py>=1.8.3,<2.0.0'
 ```
 
 Verify: `orb --version`
@@ -187,4 +187,4 @@ npm run test:contract
 
 | TypeScript SDK | Requires Python service |
 |----------------|------------------------|
-| 0.1.x | >= 1.6.2 |
+| 0.1.x | >= 1.8.3 |

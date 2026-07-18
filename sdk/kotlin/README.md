@@ -8,8 +8,8 @@ Kotlin client SDK for the
 ORB is a Python service. Install it before using managed-process mode:
 
 ```bash
-uv tool install 'orb-py>=1.6.2,<2.0.0'
-# or: pip install 'orb-py>=1.6.2,<2.0.0'
+uv tool install 'orb-py>=1.8.3,<2.0.0'
+# or: pip install 'orb-py>=1.8.3,<2.0.0'
 ```
 
 Verify: `orb --version`
@@ -30,13 +30,13 @@ orb init
 Gradle (Kotlin DSL):
 
 ```kotlin
-implementation("org.finos.openresourcebroker:orb-sdk-kotlin:0.1.0")
+implementation("org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0")
 ```
 
 Gradle (Groovy DSL):
 
 ```groovy
-implementation 'org.finos.openresourcebroker:orb-sdk-kotlin:0.1.0'
+implementation 'org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0'
 ```
 
 ## IPC Model
@@ -138,12 +138,12 @@ val client = OrbClient.create(
 val client = OrbClient.create(
     ClientConfig(
         process = ProcessConfig(binary = "orb"),
-        scheduler = "hostfactory",
+        scheduler = Scheduler.HOSTFACTORY,
     )
 )
 ```
 
-When `scheduler = "hostfactory"` is set, the SDK appends
+When `scheduler = Scheduler.HOSTFACTORY` is set, the SDK appends
 `X-ORB-Scheduler: hostfactory` to every request header.
 
 ## Streaming
@@ -188,4 +188,4 @@ Requires `orb` in PATH:
 
 | Kotlin SDK | Requires Python service |
 |------------|------------------------|
-| 0.1.x | >= 1.6.2 |
+| 0.1.x | >= 1.8.3 |

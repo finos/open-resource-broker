@@ -11,10 +11,10 @@ ORB is a Python service. Install it before using managed-process mode:
 
 ```bash
 # Recommended: uv tool install (permanent, single binary in PATH)
-uv tool install 'orb-py>=1.6.2,<2.0.0'
+uv tool install 'orb-py>=1.8.3,<2.0.0'
 
 # Or with pip
-pip install 'orb-py>=1.6.2,<2.0.0'
+pip install 'orb-py>=1.8.3,<2.0.0'
 ```
 
 Verify: `orb --version`
@@ -30,7 +30,7 @@ This creates `~/.config/orb/config.json` with your AWS credentials and infrastru
 ## Installation
 
 ```bash
-go get github.com/finos/open-resource-broker/sdk/go@v1.6.2
+go get github.com/finos/open-resource-broker/sdk/go@v1.8.3
 ```
 
 The Go SDK lives at `sdk/go/go.mod` as an independent Go module with the path
@@ -146,7 +146,7 @@ final, err := c.WaitForCompletion(ctx, mr.RequestID)
 fmt.Printf("status=%s machines=%d\n", final.Status, len(final.Machines))
 
 // Or stream events manually
-stream, err := c.StreamRequest(ctx, mr.RequestID)
+stream, err := c.StreamRequestStatus(ctx, mr.RequestID)
 defer stream.Close()
 for {
     event, ok := stream.Next()
@@ -265,5 +265,5 @@ the `sdk/go/vX.Y.Z` tag is served by the proxy for this module path.
 
 | Go SDK | Requires Python service |
 |---|---|
-| v1.6.2 | >= 1.6.2 |
+| v1.8.3 | >= 1.8.3 |
 | v2.x | >= 2.0.0 |

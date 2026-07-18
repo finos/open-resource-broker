@@ -8,8 +8,8 @@
 ORB is a Python service. Install it before using managed-process mode:
 
 ```bash
-uv tool install 'orb-py>=1.6.2,<2.0.0'
-# or: pip install 'orb-py>=1.6.2,<2.0.0'
+uv tool install 'orb-py>=1.8.3,<2.0.0'
+# or: pip install 'orb-py>=1.8.3,<2.0.0'
 ```
 
 Verify: `orb --version`
@@ -142,11 +142,11 @@ var client = await OrbClient.CreateAsync(new ClientConfig
 var client = await OrbClient.CreateAsync(new ClientConfig
 {
     Process = new ProcessConfig { Binary = "orb" },
-    Scheduler = "hostfactory",
+    Scheduler = Scheduler.HostFactory,
 });
 ```
 
-When `Scheduler = "hostfactory"` is set, the SDK appends
+When `Scheduler = Scheduler.HostFactory` is set, the SDK appends
 `X-ORB-Scheduler: hostfactory` to every request header.
 
 ## Streaming
@@ -204,4 +204,4 @@ dotnet test --filter Category=Integration
 
 | .NET SDK | Requires Python service |
 |----------|------------------------|
-| 0.1.x | >= 1.6.2 |
+| 0.1.x | >= 1.8.3 |

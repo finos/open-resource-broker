@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/finos/open-resource-broker/sdk/parity/scenario.json",
+  "description": "Canonical cross-language parity scenario. Every official ORB SDK is expected to execute these steps in order and produce equivalent outcomes. Static conformance (each step matches a real spec operation) is enforced in CI via dev-tools/quality/validate_sdk_spec_conformance.py; per-language runtime parity is proposed future work — see sdk/parity/README.md 'Enforcement status'.",
+  "version": "1.0.0",
+  "orb_version_minimum": "1.6.2",
+  "steps": [
+    {
+      "step": 1,
+      "name": "health_check",
+      "description": "Verify the ORB server is running and reports a healthy or degraded status.",
+      "operation_id": "health_check_health_get",
+      "http_method": "GET",
+      "http_path": "/health",
+      "sdk_methods": {
+        "python":     "await client.health_check()",
+        "go":         "c.Health(ctx)",
+        "typescript": "await client.health()",
+        "java":       "client.health()",
+        "kotlin":     "client.health()",
+        "csharp":     "await client.HealthAsync()"
+      },
+      "inputs": {},
+      "expected": {
+        "status_shape": {
+          "type": "object",
+          "required_fields": ["status"],
+          "status_must_be_one_of": ["healthy", "degraded"]
+        },
+        "http_status": 200
+      },
+      "on_failure": "abort — if health check fails all subsequent steps are meaningless"
+    },
+    {
+      "step": 2,
+      "name": "list_templates",
+      "description": "List all registered templates. The result may be empty; downstream steps are conditional on at least one template existing.",
+      "operation_id": "list_templates_api_v1_templates__get",
+      "http_method": "GET",
+      "http_path": "/api/v1/templates/",
+      "sdk_methods": {
+        "python":     "await client.list_templates(active_only=True)",
+        "go":         "c.ListTemplates(ctx)",
+        "typescript": "await client.listTemplates()",
+        "java":       "client.listTemplates(null, null, null)",
+        "kotlin":     "client.listTemplates()",
+        "csharp":     "await client.ListTemplatesAsync()"
+      },
+      "inputs": {},
+      "expected": {
+        "status_shape": {
+          "type": "object",
+          "required_fields": ["templates"],
+          "templates_type": "array"
+        },
+        "http_status": 200
+      },
+      "post_condition": {
+        "bind": "first_template_id",
+        "from": "templates[0].templateId (camelCase) OR templates[0].template_id (snake_case)",
+        "if_empty": "skip steps 3–5 and go directly to step 6"
+      }
+    },
+    {
+      "step": 3,
+      "name": "request_machines",
+      "description": "Submit a provisioning request for 1 machine using the first template found in step 2. Skipped if no templates exist.",
+      "precondition": "first_template_id is bound (step 2 post_condition)",
+      "operation_id": "request_machines_api_v1_machines_request_post",
+      "http_method": "POST",
+      "http_path": "/api/v1/machines/request",
+      "sdk_methods": {
+        "python":     "await client.create_request(template_id=first_template_id, count=1)",
+        "go":         "c.RequestMachines(ctx, orb.RequestMachinesRequest{TemplateID: firstTemplateID, Count: 1})",
+        "typescript": "await client.requestMachines({ templateId: firstTemplateId, count: 1 })",
+        "java":       "client.requestMachines(new RequestMachinesRequest().templateId(firstTemplateId).count(1))",
+        "kotlin":     "client.requestMachines(RequestMachinesRequest(templateId = firstTemplateId, count = 1))",
+        "csharp":     "await client.RequestMachinesAsync(new RequestMachinesRequest { TemplateId = firstTemplateId, Count = 1 })"
+      },
+      "inputs": {
+        "template_id": "$first_template_id",
+        "count": 1
+      },
+      "expected": {
+        "http_status": [200, 201, 202],
+        "response_shape": {
+          "type": "object",
+          "required_fields_one_of": [
+            ["requestId"],
+            ["request_id"]
+          ]
+        }
+      },
+      "post_condition": {
+        "bind": "request_id",
+        "from": "response.requestId OR response.request_id"
+      }
+    },
+    {
+      "step": 4,
+      "name": "poll_request_status",
+      "description": "Retrieve the current status of the request created in step 3. Skipped if step 3 was skipped. Accept any valid status string.",
+      "precondition": "request_id is bound (step 3 post_condition)",
+      "operation_id": "get_request_status_api_v1_requests__request_id__status_get",
+      "http_method": "GET",
+      "http_path": "/api/v1/requests/{request_id}/status",
+      "sdk_methods": {
+        "python":     "await client.get_request(request_id=request_id)",
+        "go":         "c.GetRequest(ctx, requestID)",
+        "typescript": "await client.getRequestStatus(requestId)",
+        "java":       "client.getRequestStatus(requestId, null, null, null)",
+        "kotlin":     "client.getRequestStatus(requestId)",
+        "csharp":     "await client.GetRequestStatusAsync(requestId)"
+      },
+      "inputs": {
+        "request_id": "$request_id"
+      },
+      "expected": {
+        "http_status": 200,
+        "response_shape": {
+          "type": "object",
+          "required_fields_one_of": [
+            ["status"],
+            ["requests"]
+          ],
+          "note": "Some SDKs return the status directly; others return a wrapper with a requests array. Both forms are acceptable."
+        }
+      }
+    },
+    {
+      "step": 5,
+      "name": "return_machines",
+      "description": "If any machines were returned in step 4, submit a return request for them. Skipped if step 3 was skipped or no machines were provisioned.",
+      "precondition": "request_id is bound AND at least one machine_id is available from step 4",
+      "operation_id": "return_machines_api_v1_machines_return_post",
+      "http_method": "POST",
+      "http_path": "/api/v1/machines/return",
+      "sdk_methods": {
+        "python":     "await client.create_return_request(machine_ids=[machine_id])",
+        "go":         "c.ReturnMachines(ctx, []string{machineID})",
+        "typescript": "await client.returnMachines({ machineIds: [machineId] })",
+        "java":       "client.returnMachines(new ReturnMachinesRequest().machineIds(java.util.List.of(machineId)))",
+        "kotlin":     "client.returnMachines(ReturnMachinesRequest(machineIds = listOf(machineId)))",
+        "csharp":     "await client.ReturnMachinesAsync(new ReturnMachinesRequest { MachineIds = new List<string> { machineId } })"
+      },
+      "inputs": {
+        "machine_ids": ["$machine_id"]
+      },
+      "expected": {
+        "http_status": [200, 201, 202],
+        "response_shape": {
+          "type": "object",
+          "note": "Return response shape varies by scheduler. Any 2xx with a JSON body is acceptable."
+        }
+      }
+    },
+    {
+      "step": 6,
+      "name": "list_requests",
+      "description": "List all requests. Verifies that the list endpoint is reachable and returns a collection. Always executed regardless of earlier steps.",
+      "operation_id": "list_requests_api_v1_requests__get",
+      "http_method": "GET",
+      "http_path": "/api/v1/requests/",
+      "sdk_methods": {
+        "python":     "await client.list_active_requests()",
+        "go":         "c.ListRequests(ctx)",
+        "typescript": "await client.listRequests()",
+        "java":       "client.listRequests(null, null, null, null)",
+        "kotlin":     "client.listRequests()",
+        "csharp":     "await client.ListRequestsAsync()"
+      },
+      "inputs": {},
+      "expected": {
+        "http_status": 200,
+        "response_shape": {
+          "type": "object",
+          "required_fields_one_of": [
+            ["requests"],
+            ["data"]
+          ]
+        }
+      }
+    }
+  ],
+  "assertions": {
+    "equivalence_criteria": [
+      "All steps that are not skipped must complete without a route-level 404 or 405 error.",
+      "Step 1 must return status 'healthy' or 'degraded'.",
+      "Step 2 must return an array (possibly empty) in the templates field.",
+      "Step 3, when executed, must return a 2xx response and bind a non-empty request_id.",
+      "Step 4, when executed, must return a 2xx response with a status field or a requests array.",
+      "Step 5, when executed, must return a 2xx response.",
+      "Step 6 must return a 2xx response with a requests field or data field.",
+      "No SDK may produce a different HTTP status code than any other SDK for the same step when all SDKs are pointed at the same ORB server with the same config."
+    ],
+    "skip_rules": [
+      "Steps 3–5 are skipped when step 2 returns an empty templates array.",
+      "Step 5 is skipped when step 4 returns no machine IDs.",
+      "An SDK may report a step as 'skipped' rather than 'failed' when its precondition is not met."
+    ]
+  }
+}
