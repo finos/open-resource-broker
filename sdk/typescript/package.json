@@ -1,0 +1,52 @@
+{
+  "name": "@finos/open-resource-broker",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the FINOS Open Resource Broker API",
+  "author": "FINOS ORB Maintainers",
+  "license": "Apache-2.0",
+  "keywords": ["finos", "open-resource-broker", "orb", "sdk", "typescript"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/finos/open-resource-broker.git",
+    "directory": "sdk/typescript"
+  },
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/cjs/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": ["dist", "src", "generated"],
+  "scripts": {
+    "build": "tsup",
+    "test": "jest --testPathPattern=tests/unit --forceExit",
+    "test:contract": "jest --testPathPattern=tests/contract --forceExit --testTimeout=30000",
+    "test:all": "jest --forceExit",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "undici": "^6.19.0",
+    "@smithy/signature-v4": "^5.6.0",
+    "@aws-sdk/credential-providers": "^3.1089.0",
+    "@smithy/protocol-http": "^5.5.0",
+    "@smithy/types": "^4.1.0",
+    "@aws-crypto/sha256-js": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
