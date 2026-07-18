@@ -15,47 +15,59 @@ var (
 	ErrTimeout        = errors.New("orb: request timeout")
 )
 
-// APIError is returned for all HTTP error responses from ORB.
-// Use errors.Is(err, orb.ErrNotFound) etc. for status-based checks.
-// Use errors.As(err, &apiErr) to access StatusCode, Code, Message.
-type APIError struct {
-	StatusCode int
-	Code       string
-	Message    string
-	Details    any
-	sentinel   error
+// OrbError is the base type for every error the SDK returns. It mirrors the
+// OrbError base exposed by the TypeScript, Kotlin and C# SDKs so the whole
+// family shares one vocabulary. Use errors.Is(err, orb.ErrNotFound) etc. for
+// status-based checks; the sentinel is carried on the embedded OrbError.
+type OrbError struct {
+	Message  string
+	sentinel error
 }
 
-func (e *APIError) Error() string {
+func (e *OrbError) Error() string { return e.Message }
+
+func (e *OrbError) Unwrap() error { return e.sentinel }
+
+func (e *OrbError) Is(target error) bool {
+	return e.sentinel != nil && errors.Is(e.sentinel, target)
+}
+
+// OrbApiError is returned for all HTTP error responses from ORB. It carries the
+// canonical cross-SDK field set: HTTP status, machine-readable error code,
+// message, and the server request ID (for support/correlation).
+//
+// Use errors.Is(err, orb.ErrNotFound) etc. for status-based checks and
+// errors.As(err, &apiErr) to access StatusCode, Code, RequestID, Message.
+type OrbApiError struct {
+	OrbError
+	StatusCode int
+	Code       string
+	RequestID  string
+	Details    any
+}
+
+func (e *OrbApiError) Error() string {
 	if e.Code != "" {
 		return fmt.Sprintf("orb: HTTP %d %s: %s", e.StatusCode, e.Code, e.Message)
 	}
 	return fmt.Sprintf("orb: HTTP %d: %s", e.StatusCode, e.Message)
 }
 
-func (e *APIError) Is(target error) bool {
-	return e.sentinel != nil && errors.Is(e.sentinel, target)
-}
-
-func (e *APIError) Unwrap() error {
-	return e.sentinel
-}
-
 // mapError converts network-level errors (context cancellation, dial failures)
-// into typed APIError values. HTTP-level errors (4xx, 5xx) are handled by
+// into typed OrbApiError values. HTTP-level errors (4xx, 5xx) are handled by
 // parseAPIError in client.go which reads the response body directly.
 func mapError(err error) error {
 	if err == nil {
 		return nil
 	}
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-		return &APIError{StatusCode: 0, sentinel: ErrTimeout, Message: err.Error()}
+		return &OrbApiError{OrbError: OrbError{sentinel: ErrTimeout, Message: err.Error()}}
 	}
 	// Network errors (dial failure, connection reset, etc.)
-	// Wrap in APIError with ErrORBUnavailable sentinel
+	// Wrap in OrbApiError with ErrORBUnavailable sentinel
 	var netErr interface{ Timeout() bool }
 	if errors.As(err, &netErr) {
-		return &APIError{StatusCode: 0, sentinel: ErrORBUnavailable, Message: err.Error()}
+		return &OrbApiError{OrbError: OrbError{sentinel: ErrORBUnavailable, Message: err.Error()}}
 	}
 	return err
 }

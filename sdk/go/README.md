@@ -4,6 +4,9 @@ Go client SDK for the [Open Resource Broker](https://github.com/finos/open-resou
 
 ## Prerequisites
 
+**Go 1.24 or later** is required (uses generics and net/http features introduced in 1.21+;
+the module `go.mod` specifies `go 1.24`).
+
 ORB is a Python service. Install it before using managed-process mode:
 
 ```bash
@@ -28,6 +31,18 @@ This creates `~/.config/orb/config.json` with your AWS credentials and infrastru
 
 ```bash
 go get github.com/finos/open-resource-broker/sdk/go@v1.6.2
+```
+
+The Go SDK lives at `sdk/go/go.mod` as an independent Go module with the path
+`github.com/finos/open-resource-broker/sdk/go`. Each release pushes a
+`sdk/go/vX.Y.Z` git tag so the Go module proxy can serve this submodule path
+separately from the root module.
+
+Import paths (for reference in code):
+
+```go
+import "github.com/finos/open-resource-broker/sdk/go/orb"
+import "github.com/finos/open-resource-broker/sdk/go/mock"
 ```
 
 ## IPC Model
@@ -233,9 +248,20 @@ The socket path is not writable by the current user. Either use the default auto
 **Scheduler mismatch: empty machines or wrong field names**
 The `WithScheduler` option must match the `--scheduler` flag the ORB server was started with. If ORB is running with `--scheduler hostfactory`, set `orb.WithScheduler(orb.SchedulerHostFactory)` on the client.
 
-## Version Compatibility
+## Release / Distribution
 
-See [COMPATIBILITY.md](COMPATIBILITY.md).
+The Go SDK is distributed as an independent Go submodule at
+`github.com/finos/open-resource-broker/sdk/go`. Each ORB release:
+
+1. Bumps `sdk/go/orb/version.go` via `make sdk-go-update-version VERSION=X.Y.Z`.
+2. Pushes a `sdk/go/vX.Y.Z` git tag, which the Go module proxy
+   (proxy.golang.org) uses to serve `go get github.com/finos/open-resource-broker/sdk/go@vX.Y.Z`.
+
+There is no separate CI publish job — Go distribution is entirely tag-based.
+The root module tag (`vX.Y.Z`) is NOT sufficient for the submodule path; only
+the `sdk/go/vX.Y.Z` tag is served by the proxy for this module path.
+
+## Version Compatibility
 
 | Go SDK | Requires Python service |
 |---|---|

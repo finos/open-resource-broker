@@ -30,7 +30,7 @@ consume the same single spec without duplicating or diverging it.
 
 | SDK | Generator | Config |
 |-----|-----------|--------|
-| `sdk/go` | [ogen](https://github.com/ogen-go/ogen) | `sdk/go/ogenconfig.yaml` |
+| `sdk/go` | [openapi-generator](https://openapi-generator.tech) (`-g go`, v7.23.0) | `sdk/go/openapi-generator-config.yaml` |
 
 Additional SDK generators should be added as subdirectories of `sdk/` with their
 own tooling config pointing at `../spec/openapi.json`.

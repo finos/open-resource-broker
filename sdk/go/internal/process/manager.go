@@ -1,3 +1,4 @@
+// Layer 1: Subprocess Manager
 package process
 
 import (
@@ -8,6 +9,8 @@ import (
 	"net"
 	"net/http"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -21,9 +24,24 @@ const (
 	unhealthyThreshold  = 3
 )
 
+// isPythonInterpreter reports whether binary names a Python interpreter (e.g.
+// "python", "python3", "/opt/py/bin/python3.12") rather than the orb console
+// script. The other SDK contract-test legs point their orb env var at
+// .../bin/python, so orb must then be launched as `python -m orb`.
+func isPythonInterpreter(binary string) bool {
+	base := filepath.Base(binary)
+	return base == "python" || strings.HasPrefix(base, "python")
+}
+
 // Config configures the managed ORB subprocess.
 type Config struct {
-	Binary       string
+	Binary string
+	// ConfigPath, if set, is passed as the global `--config <path>` option
+	// BEFORE the `server` subcommand. orb resolves its config directory from
+	// the install layout when this is empty; in a fresh checkout that directory
+	// does not exist and `orb server start` exits 1 with "Configuration file not
+	// found", so callers running against a bare environment must supply one.
+	ConfigPath   string
 	Args         []string
 	Env          []string
 	SocketPath   string
@@ -43,6 +61,7 @@ type Manager struct {
 	stopOnce        sync.Once
 	httpClient      *http.Client
 	logger          *slog.Logger
+	waitCh          chan error // receives the single cmd.Wait() result
 }
 
 // newHealthClient returns an HTTP client suitable for health polling.
@@ -86,24 +105,45 @@ func New(cfg Config) *Manager {
 // Start launches the ORB subprocess and waits for it to become healthy.
 func (m *Manager) Start(ctx context.Context) error {
 	binary := m.cfg.Binary
+	// `--config` is a GLOBAL orb option and must precede the `server`
+	// subcommand — passing it after `server start` is rejected as an unknown
+	// argument. Build the global-option prefix once and reuse it for both the
+	// direct-binary and the `python -m orb` invocation.
+	var globalOpts []string
+	if m.cfg.ConfigPath != "" {
+		globalOpts = []string{"--config", m.cfg.ConfigPath}
+	}
 	// `orb server start` is the lifecycle command. --foreground keeps the
 	// process in the current process tree (we manage the lifecycle from Go,
 	// not via the ORB daemon). --api-only skips the embedded UI so the
 	// subprocess is purely the REST + IPC surface this SDK talks to.
-	baseArgs := []string{"server", "start", "--foreground", "--api-only"}
-	args := append(append([]string{}, baseArgs...), m.cfg.Args...)
+	subCmd := append([]string{"server", "start", "--foreground", "--api-only"}, m.cfg.Args...)
 
-	// Resolve binary; fall back to python -m orb if not found in PATH
+	// Two invocation shapes:
+	//   orb    <global-opts> server start ...          (console script)
+	//   python -m orb <global-opts> server start ...   (interpreter)
+	// Choose based on the binary: an interpreter (e.g. an ORB_BINARY pointing at
+	// .../bin/python, as the other SDK legs use) must go through `-m orb`.
+	orbArgs := func() []string { return append(append([]string{}, globalOpts...), subCmd...) }
+	pyArgs := func() []string { return append(append([]string{"-m", "orb"}, globalOpts...), subCmd...) }
+
+	var args []string
+	if isPythonInterpreter(binary) {
+		args = pyArgs()
+	} else {
+		args = orbArgs()
+	}
+
+	// Resolve binary; fall back to python -m orb if not found in PATH.
 	if _, err := exec.LookPath(binary); err != nil {
 		if _, pyErr := exec.LookPath("python"); pyErr == nil {
 			binary = "python"
-			args = append(append([]string{"-m", "orb"}, baseArgs...), m.cfg.Args...)
 		} else if _, pyErr := exec.LookPath("python3"); pyErr == nil {
 			binary = "python3"
-			args = append(append([]string{"-m", "orb"}, baseArgs...), m.cfg.Args...)
 		} else {
 			return fmt.Errorf("process: %q not found in PATH and python/python3 not available", m.cfg.Binary)
 		}
+		args = pyArgs()
 	}
 
 	if m.cfg.SocketPath != "" {
@@ -127,6 +167,14 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	m.logger.Info("orb process started", "pid", m.cmd.Process.Pid, "binary", binary, "port", m.cfg.Port)
 
+	// Reap the process in the background so we can detect a premature exit
+	// during startup (fail fast with the exit code) instead of polling health
+	// for the full StartTimeout on a process that is already dead. cmd.Wait may
+	// only be called once, so the result is fanned out via this buffered channel
+	// and consumed by whoever needs it (startup loop, Stop, or monitor).
+	m.waitCh = make(chan error, 1)
+	go func() { m.waitCh <- m.cmd.Wait() }()
+
 	// Wait for healthy
 	deadline := time.Now().Add(m.cfg.StartTimeout)
 	for time.Now().Before(deadline) {
@@ -134,6 +182,10 @@ func (m *Manager) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			m.kill()
 			return ctx.Err()
+		case waitErr := <-m.waitCh:
+			// Process exited before becoming healthy.
+			m.kill()
+			return fmt.Errorf("process: orb exited during startup before becoming healthy: %w", waitErr)
 		case <-time.After(startupPollInterval):
 		}
 		if m.pollHealth() {
@@ -163,13 +215,15 @@ func (m *Manager) Stop() error {
 		return nil
 	}
 
-	done := make(chan error, 1)
-	go func() { done <- m.cmd.Wait() }()
-
+	// cmd.Wait() is already running in the background goroutine started by
+	// Start(); consume its result here rather than calling Wait() again (which
+	// panics). If the process does not exit within StopTimeout, SIGKILL the
+	// whole group and wait for the reaper to observe the exit.
 	select {
-	case <-done:
+	case <-m.waitCh:
 	case <-time.After(m.cfg.StopTimeout):
 		m.kill()
+		<-m.waitCh
 	}
 	return nil
 }
@@ -185,6 +239,12 @@ func (m *Manager) monitor() {
 	for {
 		select {
 		case <-m.stopCh:
+			return
+		case waitErr := <-m.waitCh:
+			// Process exited out from under us — mark unhealthy immediately
+			// rather than waiting for health polls to fail.
+			m.healthy.Store(false)
+			m.logger.Warn("orb process exited unexpectedly", "error", waitErr)
 			return
 		case <-ticker.C:
 			if m.pollHealth() {

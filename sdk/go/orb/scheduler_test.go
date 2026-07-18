@@ -1,3 +1,5 @@
+//go:build integration
+
 package orb_test
 
 import (
@@ -93,16 +95,17 @@ func TestRequestMachinesDefaultSchedulerDecodesRequestId(t *testing.T) {
 }
 
 // TestListMachinesHFSchedulerDecodesMachineId verifies that a HF client decodes
-// camelCase machine fields: machineId, vmType, privateIp.
+// camelCase machine fields: machineId, vmType, privateIpAddress.
+// The server emits privateIpAddress / publicIpAddress (not privateIp / publicIp).
 func TestListMachinesHFSchedulerDecodesMachineId(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"machines": []map[string]any{
 				{
-					"machineId": "i-123",
-					"vmType":    "t3.medium",
-					"privateIp": "10.0.0.1",
+					"machineId":        "i-123",
+					"vmType":           "t3.medium",
+					"privateIpAddress": "10.0.0.1",
 				},
 			},
 		})
@@ -135,13 +138,17 @@ func TestListMachinesHFSchedulerDecodesMachineId(t *testing.T) {
 }
 
 // TestGetRequestHFSchedulerDecodesRequestId verifies that a HF client decodes
-// camelCase request fields: requestId, providerName.
+// camelCase request fields from the {"requests": [...]} envelope the server returns.
 func TestGetRequestHFSchedulerDecodesRequestId(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
-			"requestId":    "req-123",
-			"providerName": "aws-default",
+			"requests": []map[string]any{
+				{
+					"requestId":    "req-123",
+					"providerName": "aws-default",
+				},
+			},
 		})
 	}))
 	defer srv.Close()

@@ -1,9 +1,11 @@
 package process_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +58,39 @@ func TestManagerDefaultsApplied(t *testing.T) {
 	}
 	if m.Healthy() {
 		t.Fatal("expected unhealthy before start")
+	}
+}
+
+// TestManagerFailsFastOnPrematureExit verifies that when the subprocess exits
+// before becoming healthy, Start returns promptly with the exit cause rather
+// than polling health for the full StartTimeout.
+func TestManagerFailsFastOnPrematureExit(t *testing.T) {
+	// A health server that never reports healthy, so only a process exit can
+	// end the startup loop.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	m := process.New(process.Config{
+		// `false` exits immediately with a non-zero status.
+		Binary:       "false",
+		HealthURL:    srv.URL,
+		StartTimeout: 10 * time.Second, // long, to prove we do NOT wait it out
+	})
+
+	start := time.Now()
+	err := m.Start(context.Background())
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected Start to fail when the process exits prematurely")
+	}
+	if !strings.Contains(err.Error(), "exited during startup") {
+		t.Fatalf("expected premature-exit error, got: %v", err)
+	}
+	if elapsed > 3*time.Second {
+		t.Fatalf("Start should fail fast on premature exit; took %s", elapsed)
 	}
 }
 
