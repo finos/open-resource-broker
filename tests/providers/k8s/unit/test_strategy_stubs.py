@@ -538,7 +538,7 @@ def test_stop_watch_manager_blocks_until_stop_completes_from_foreign_thread() ->
     from unittest import mock
 
     with mock.patch(
-        "orb.providers.k8s.strategy.k8s_provider_strategy.asyncio.get_running_loop",
+        "orb.providers.k8s.strategy.watch_lifecycle.asyncio.get_running_loop",
         return_value=loop,
     ):
         strategy._stop_watch_manager_sync(shutdown_timeout=5.0)  # type: ignore[attr-defined]
@@ -579,6 +579,10 @@ def test_stop_watch_manager_respects_timeout_from_foreign_thread() -> None:
     strategy = _make_strategy_no_init()
     strategy._watch_manager = fake_manager  # type: ignore[attr-defined]
     strategy._logger = mock_logger  # type: ignore[attr-defined]
+    # The watch-manager shutdown logic lives in the extracted lifecycle
+    # service, which holds its own logger reference; point it at the mock
+    # so the timeout warning is captured here.
+    strategy._watch_lifecycle._logger = mock_logger  # type: ignore[attr-defined]
 
     loop_ready = threading.Event()
     loop_ref: list[asyncio.AbstractEventLoop] = []
@@ -597,7 +601,7 @@ def test_stop_watch_manager_respects_timeout_from_foreign_thread() -> None:
     from unittest import mock
 
     with mock.patch(
-        "orb.providers.k8s.strategy.k8s_provider_strategy.asyncio.get_running_loop",
+        "orb.providers.k8s.strategy.watch_lifecycle.asyncio.get_running_loop",
         return_value=loop,
     ):
         # Use a very short timeout so the test finishes quickly.
@@ -632,7 +636,7 @@ def test_stop_watch_manager_no_loop_runs_synchronously() -> None:
     from unittest import mock
 
     with mock.patch(
-        "orb.providers.k8s.strategy.k8s_provider_strategy.asyncio.get_running_loop",
+        "orb.providers.k8s.strategy.watch_lifecycle.asyncio.get_running_loop",
         side_effect=RuntimeError("no running event loop"),
     ):
         strategy._stop_watch_manager_sync()  # type: ignore[attr-defined]

@@ -94,7 +94,14 @@ class K8sClient:
             else {}
         )
         self._in_cluster_adapter: Optional[InClusterAuthAdapter] = (
-            InClusterAuthAdapter(**refresh_kwargs) if api_client is None else None
+            InClusterAuthAdapter(
+                logger=logger,
+                proxy_url=config.proxy_url,
+                no_proxy=config.no_proxy,
+                **refresh_kwargs,
+            )
+            if api_client is None
+            else None
         )
 
     # ------------------------------------------------------------------
@@ -124,7 +131,11 @@ class K8sClient:
                 if self._in_cluster_adapter is not None:
                     self._in_cluster_adapter.load()
                 else:
-                    load_in_cluster_config()
+                    load_in_cluster_config(
+                        logger=self._logger,
+                        proxy_url=self._config.proxy_url,
+                        no_proxy=self._config.no_proxy,
+                    )
             elif self._config.in_cluster is False:
                 self._logger.debug("Loading kubeconfig (in_cluster=False, forced).")
                 # In-cluster adapter not used for kubeconfig auth.
@@ -133,13 +144,19 @@ class K8sClient:
                     config_file=self._config.kubeconfig_path,
                     context=self._config.context,
                     logger=self._logger,
+                    proxy_url=self._config.proxy_url,
+                    no_proxy=self._config.no_proxy,
                 )
             elif is_in_cluster():
                 self._logger.debug("In-cluster sentinel present; loading in-cluster config.")
                 if self._in_cluster_adapter is not None:
                     self._in_cluster_adapter.load()
                 else:
-                    load_in_cluster_config()
+                    load_in_cluster_config(
+                        logger=self._logger,
+                        proxy_url=self._config.proxy_url,
+                        no_proxy=self._config.no_proxy,
+                    )
             else:
                 self._logger.debug(
                     "No in-cluster sentinel; loading kubeconfig (path=%s, context=%s).",
@@ -151,6 +168,8 @@ class K8sClient:
                     config_file=self._config.kubeconfig_path,
                     context=self._config.context,
                     logger=self._logger,
+                    proxy_url=self._config.proxy_url,
+                    no_proxy=self._config.no_proxy,
                 )
         except K8sAuthError:
             raise
@@ -214,7 +233,11 @@ class K8sClient:
                 try:
                     import time
 
-                    load_in_cluster_config()
+                    load_in_cluster_config(
+                        logger=self._logger,
+                        proxy_url=self._config.proxy_url,
+                        no_proxy=self._config.no_proxy,
+                    )
                     # Update the adapter's timestamp so the TTL window resets.
                     adapter._last_loaded_at = time.monotonic()
                 except K8sAuthError as auth_exc:

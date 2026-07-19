@@ -123,6 +123,33 @@ class K8sHandlerRegistry:
             return self._api_aliases.get(raw, raw)
         return KubernetesProviderApi.POD.value
 
+    def _resilience_kwargs(self) -> dict[str, Any]:
+        """Map the provider config's circuit-breaker / retry knobs to handler kwargs.
+
+        ``K8sHandlerBase`` (and every concrete handler) accepts
+        ``max_retries`` / ``base_delay`` / ``max_delay`` positionally and
+        ``circuit_breaker_failure_threshold`` / ``circuit_breaker_reset_timeout``
+        as keyword-only args, then feeds them into :meth:`with_retry`.  The
+        provider config exposes the operator-facing spellings
+        (``retry_base_delay`` / ``retry_max_delay`` / ``max_retries`` /
+        ``circuit_breaker_*``); this helper bridges the two so the configured
+        values actually reach the handler's retry/circuit-breaker layer.
+
+        ``getattr`` with the K8sHandlerBase default is used so a config object
+        that predates these fields (or a hand-rolled test stub) still yields a
+        valid kwargs mapping rather than raising ``AttributeError``.
+        """
+        cfg = self._config
+        return {
+            "max_retries": getattr(cfg, "max_retries", 3),
+            "base_delay": getattr(cfg, "retry_base_delay", 1.0),
+            "max_delay": getattr(cfg, "retry_max_delay", 30.0),
+            "circuit_breaker_failure_threshold": getattr(
+                cfg, "circuit_breaker_failure_threshold", 5
+            ),
+            "circuit_breaker_reset_timeout": getattr(cfg, "circuit_breaker_reset_timeout", 60),
+        }
+
     def get_handler(self, provider_api: str) -> K8sHandlerBase:
         """Return (and lazily construct) the handler for ``provider_api``.
 
@@ -145,6 +172,13 @@ class K8sHandlerRegistry:
             else None
         )
 
+        # Circuit-breaker and retry knobs read from the provider config so the
+        # handler's ``with_retry`` uses operator-tuned resilience values instead
+        # of the K8sHandlerBase hardcoded defaults.  Threaded into both the
+        # built-in and plugin construction paths.  See
+        # ``K8sProviderConfig`` (circuit_breaker_* / max_retries / retry_*).
+        resilience_kwargs = self._resilience_kwargs()
+
         handler_class = self._handler_classes.get(provider_api)
         if handler_class is not None:
             handler = handler_class(
@@ -156,6 +190,7 @@ class K8sHandlerRegistry:
                 native_spec_service=native_spec_service,
                 node_state_cache=node_cache,
                 metrics=self._metrics_provider() if self._metrics_provider is not None else None,
+                **resilience_kwargs,
             )
             self._handlers[provider_api] = handler
             return handler
@@ -164,7 +199,8 @@ class K8sHandlerRegistry:
         # and ``docs/root/providers/k8s/plugin-authoring.md``.
         # Factories receive the full seven-kwarg surface so plugins that
         # consume ``native_spec_service`` or ``node_state_cache`` do not
-        # silently receive ``None``.
+        # silently receive ``None``, plus the resilience knobs so plugin
+        # handlers inherit the same operator-tuned retry/circuit-breaker values.
         factory = self._plugin_factories().get(provider_api)
         if factory is not None:
             handler = factory(
@@ -176,6 +212,7 @@ class K8sHandlerRegistry:
                 native_spec_service=native_spec_service,
                 node_state_cache=node_cache,
                 metrics=self._metrics_provider() if self._metrics_provider is not None else None,
+                **resilience_kwargs,
             )
             self._handlers[provider_api] = handler
             return handler

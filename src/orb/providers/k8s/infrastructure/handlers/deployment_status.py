@@ -79,14 +79,16 @@ class DeploymentStatusResolver:
             # resource_version='0' serves from the apiserver reflector cache
             # (sub-ms, ~500 ms staleness) instead of reading from etcd.
             # Acceptable for status polls — not used on create/update paths.
-            response = handler.with_retry(
-                handler.client.core_v1.list_namespaced_pod,
-                namespace=namespace,
-                label_selector=selector,
-                resource_version="0",
-                operation_name="list_namespaced_pod",
-            )
+            with handler._timed_api_call("list_namespaced_pod"):
+                response = handler.with_retry(
+                    handler.client.core_v1.list_namespaced_pod,
+                    namespace=namespace,
+                    label_selector=selector,
+                    resource_version="0",
+                    operation_name="list_namespaced_pod",
+                )
         except Exception as exc:
+            handler._record_api_exception(exc, operation="list_namespaced_pod")
             handler._logger.error(
                 "list_namespaced_pod failed for deployment request %s: %s",
                 request.request_id,
@@ -194,12 +196,13 @@ class DeploymentStatusResolver:
         """
         handler = self._handler
         try:
-            deployment = handler.with_retry(
-                handler.client.apps_v1.read_namespaced_deployment,
-                name=deployment_name,
-                namespace=namespace,
-                operation_name="read_namespaced_deployment",
-            )
+            with handler._timed_api_call("read_namespaced_deployment"):
+                deployment = handler.with_retry(
+                    handler.client.apps_v1.read_namespaced_deployment,
+                    name=deployment_name,
+                    namespace=namespace,
+                    operation_name="read_namespaced_deployment",
+                )
         except Exception as exc:
             if handler.is_not_found(exc):
                 handler._logger.debug(
@@ -208,6 +211,7 @@ class DeploymentStatusResolver:
                     namespace,
                 )
                 return {}
+            handler._record_api_exception(exc, operation="read_namespaced_deployment")
             handler._logger.warning(
                 "read_namespaced_deployment failed (deployment=%s namespace=%s): %s",
                 deployment_name,

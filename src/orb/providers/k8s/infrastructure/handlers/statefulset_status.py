@@ -79,14 +79,16 @@ class StatefulSetStatusResolver:
             # resource_version='0' serves from the apiserver reflector cache
             # (sub-ms, ~500 ms staleness) instead of reading from etcd.
             # Acceptable for status polls — not used on create/update paths.
-            response = handler.with_retry(
-                handler.client.core_v1.list_namespaced_pod,
-                namespace=namespace,
-                label_selector=selector,
-                resource_version="0",
-                operation_name="list_namespaced_pod",
-            )
+            with handler._timed_api_call("list_namespaced_pod"):
+                response = handler.with_retry(
+                    handler.client.core_v1.list_namespaced_pod,
+                    namespace=namespace,
+                    label_selector=selector,
+                    resource_version="0",
+                    operation_name="list_namespaced_pod",
+                )
         except Exception as exc:
+            handler._record_api_exception(exc, operation="list_namespaced_pod")
             handler._logger.error(
                 "list_namespaced_pod failed for statefulset request %s: %s",
                 request.request_id,
@@ -194,12 +196,13 @@ class StatefulSetStatusResolver:
         """
         handler = self._handler
         try:
-            statefulset = handler.with_retry(
-                handler.client.apps_v1.read_namespaced_stateful_set,
-                name=statefulset_name,
-                namespace=namespace,
-                operation_name="read_namespaced_stateful_set",
-            )
+            with handler._timed_api_call("read_namespaced_stateful_set"):
+                statefulset = handler.with_retry(
+                    handler.client.apps_v1.read_namespaced_stateful_set,
+                    name=statefulset_name,
+                    namespace=namespace,
+                    operation_name="read_namespaced_stateful_set",
+                )
         except Exception as exc:
             if handler.is_not_found(exc):
                 handler._logger.debug(
@@ -208,6 +211,7 @@ class StatefulSetStatusResolver:
                     namespace,
                 )
                 return {}
+            handler._record_api_exception(exc, operation="read_namespaced_stateful_set")
             handler._logger.warning(
                 "read_namespaced_stateful_set failed (statefulset=%s namespace=%s): %s",
                 statefulset_name,

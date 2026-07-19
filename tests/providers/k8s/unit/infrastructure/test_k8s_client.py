@@ -52,6 +52,8 @@ def test_load_config_with_valid_kubeconfig(tmp_path: pytest.TempPathFactory) -> 
         config_file=cfg.kubeconfig_path,
         context=cfg.context,
         logger=client._logger,
+        proxy_url=cfg.proxy_url,
+        no_proxy=cfg.no_proxy,
     )
 
 

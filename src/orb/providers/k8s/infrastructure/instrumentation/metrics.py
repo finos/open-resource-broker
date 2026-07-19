@@ -118,6 +118,7 @@ API_OPERATIONS: frozenset[str] = frozenset(
         # Job
         "create_namespaced_job",
         "delete_namespaced_job",
+        "read_namespaced_job",
         # Watcher / generic
         "list_watch",
         "unknown",
@@ -225,7 +226,7 @@ _METRIC_SPECS: tuple[tuple[str, str, str, list[str]], ...] = (
 )
 
 
-def _get_default_meter() -> "Meter":
+def _get_default_meter() -> Meter:
     """Return the global OTel Meter (no-op when SDK absent or disabled)."""
     try:
         from opentelemetry import metrics
@@ -302,7 +303,7 @@ class K8sMetrics:
 
     _init_lock: ClassVar[threading.Lock] = threading.Lock()
 
-    def __init__(self, meter: "Meter | None" = None) -> None:
+    def __init__(self, meter: Meter | None = None) -> None:
         """Initialise all metric instruments via *meter*.
 
         Args:

@@ -60,6 +60,12 @@ def _redact_proxy_url(url: str) -> str:
 
     ``HTTPS_PROXY`` values often take the form ``http://user:pass@proxy:port``.
     Logging the raw URL at DEBUG level would expose credentials in log files.
+
+    ``urllib.parse`` only populates ``username``/``password`` when it finds a
+    scheme and network-location component.  A scheme-less but credentialed
+    value such as ``user:pass@proxy:3128`` parses entirely into ``path`` with
+    ``username`` unset, so we additionally detect a userinfo ``@`` segment in
+    the authority portion by hand and redact it.
     """
     try:
         parsed = urllib.parse.urlparse(url)
@@ -70,9 +76,34 @@ def _redact_proxy_url(url: str) -> str:
             redacted_netloc = f"***@{redacted_netloc}"
             parsed = parsed._replace(netloc=redacted_netloc)
             return urllib.parse.urlunparse(parsed)
+        return _redact_schemeless_userinfo(url)
     except Exception:  # pragma: no cover — malformed URLs passed through
         pass
     return url
+
+
+def _redact_schemeless_userinfo(url: str) -> str:
+    """Redact a ``user:pass@host`` userinfo segment that ``urlparse`` missed.
+
+    Handles scheme-less values (``user:pass@proxy:3128``) as well as values
+    whose scheme was recognised but whose userinfo urllib still declined to
+    split.  Only the authority portion (up to the first ``/``) is inspected so
+    an ``@`` inside a path is never mistaken for credentials.
+    """
+    scheme_sep = "://"
+    prefix = ""
+    remainder = url
+    sep_idx = url.find(scheme_sep)
+    if sep_idx != -1:
+        prefix = url[: sep_idx + len(scheme_sep)]
+        remainder = url[sep_idx + len(scheme_sep) :]
+
+    authority, sep, rest = remainder.partition("/")
+    at_idx = authority.rfind("@")
+    if at_idx == -1:
+        return url
+    host_part = authority[at_idx + 1 :]
+    return f"{prefix}***@{host_part}{sep}{rest}"
 
 
 # ---------------------------------------------------------------------------
@@ -80,13 +111,21 @@ def _redact_proxy_url(url: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_proxy_url() -> Optional[str]:
+def _resolve_proxy_url(config_proxy_url: Optional[str] = None) -> Optional[str]:
     """Return the proxy URL to use for apiserver connections, or ``None``.
 
-    Preference order: ``HTTPS_PROXY`` → ``https_proxy`` → ``HTTP_PROXY`` →
-    ``http_proxy``.  HTTPS variants are checked first because the Kubernetes
-    apiserver always serves TLS.
+    When *config_proxy_url* is supplied (from :class:`K8sProviderConfig`) it
+    takes precedence over the environment — explicit provider configuration
+    always wins over ambient env vars.
+
+    Otherwise the preference order is ``HTTPS_PROXY`` → ``https_proxy`` →
+    ``HTTP_PROXY`` → ``http_proxy``.  HTTPS variants are checked first because
+    the Kubernetes apiserver always serves TLS.
     """
+    if config_proxy_url is not None:
+        stripped = config_proxy_url.strip()
+        if stripped:
+            return stripped
     for var in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
         value = os.environ.get(var, "").strip()
         if value:
@@ -94,8 +133,16 @@ def _resolve_proxy_url() -> Optional[str]:
     return None
 
 
-def _resolve_no_proxy() -> Optional[str]:
-    """Return the ``NO_PROXY`` exclusion list, or ``None`` when unset."""
+def _resolve_no_proxy(config_no_proxy: Optional[str] = None) -> Optional[str]:
+    """Return the ``NO_PROXY`` exclusion list, or ``None`` when unset.
+
+    A *config_no_proxy* value from :class:`K8sProviderConfig` takes precedence
+    over the ``NO_PROXY`` / ``no_proxy`` environment variables.
+    """
+    if config_no_proxy is not None:
+        stripped = config_no_proxy.strip()
+        if stripped:
+            return stripped
     for var in ("NO_PROXY", "no_proxy"):
         value = os.environ.get(var, "").strip()
         if value:
@@ -103,27 +150,37 @@ def _resolve_no_proxy() -> Optional[str]:
     return None
 
 
-def _apply_proxy_to_default_configuration(logger: Optional[LoggingPort]) -> None:
+def _apply_proxy_to_default_configuration(
+    logger: Optional[LoggingPort],
+    config_proxy_url: Optional[str] = None,
+    config_no_proxy: Optional[str] = None,
+) -> None:
     """Patch the kubernetes global default Configuration with proxy settings.
 
     This is called *after* ``load_kube_config`` so the loaded credentials are
-    already in place.  We read the proxy env vars, apply them to a copy of the
-    active default Configuration, then promote the patched copy back as the new
-    default.
+    already in place.  We resolve the proxy settings (config values take
+    precedence over env vars), apply them to a copy of the active default
+    Configuration, then promote the patched copy back as the new default.
 
-    When no proxy env vars are set this function is a no-op.
+    When neither a config value nor a proxy env var is set this function is a
+    no-op.
 
     Args:
         logger: Optional :class:`LoggingPort` for DEBUG messages.  When
             ``None`` proxy wiring is still applied silently.
+        config_proxy_url: Explicit proxy URL from :class:`K8sProviderConfig`.
+            Takes precedence over the proxy environment variables.
+        config_no_proxy: Explicit ``no_proxy`` exclusion list from
+            :class:`K8sProviderConfig`.  Takes precedence over the
+            ``NO_PROXY`` / ``no_proxy`` environment variables.
     """
     try:
         from kubernetes.client import Configuration  # type: ignore[reportAttributeAccessIssue]
     except ImportError:  # pragma: no cover — kubernetes extra not installed
         return
 
-    proxy_url = _resolve_proxy_url()
-    no_proxy = _resolve_no_proxy()
+    proxy_url = _resolve_proxy_url(config_proxy_url)
+    no_proxy = _resolve_no_proxy(config_no_proxy)
 
     if proxy_url is None and no_proxy is None:
         return
@@ -273,6 +330,8 @@ def load_kubeconfig(
     config_file: Optional[str] = None,
     context: Optional[str] = None,
     logger: Optional[LoggingPort] = None,
+    proxy_url: Optional[str] = None,
+    no_proxy: Optional[str] = None,
 ) -> None:
     """Bootstrap the global ``kubernetes`` client config from a kubeconfig file.
 
@@ -283,10 +342,13 @@ def load_kubeconfig(
        blocked unless ``ORB_K8S_ALLOW_UNKNOWN_EXEC_PLUGIN=1`` is set.
     2. Sanitises error messages from the SDK so that raw exception text
        (which may embed file contents) is not forwarded to callers.
-    3. Wires any HTTP proxy configured in ``HTTPS_PROXY`` / ``https_proxy``
-       (preferred) or ``HTTP_PROXY`` / ``http_proxy`` into
-       ``kubernetes.client.Configuration.proxy``.  ``NO_PROXY`` / ``no_proxy``
-       is honoured via ``Configuration.no_proxy``.
+    3. Wires an HTTP proxy into ``kubernetes.client.Configuration.proxy``.
+       When *proxy_url* is supplied (from :class:`K8sProviderConfig`) it takes
+       precedence; otherwise the loader falls back to ``HTTPS_PROXY`` /
+       ``https_proxy`` (preferred) or ``HTTP_PROXY`` / ``http_proxy``.  The
+       exclusion list is taken from *no_proxy* (config) or the ``NO_PROXY`` /
+       ``no_proxy`` environment variables and wired into
+       ``Configuration.no_proxy``.
 
     Args:
         config_file: Path to the kubeconfig file.  When ``None`` the
@@ -297,6 +359,13 @@ def load_kubeconfig(
         logger: Optional :class:`LoggingPort` for WARNING-level messages
             about allowed-but-unknown exec plugins and DEBUG-level messages
             about proxy wiring.
+        proxy_url: Explicit proxy URL from :class:`K8sProviderConfig`.  Takes
+            precedence over the proxy environment variables.  ``None`` falls
+            back to the environment.
+        no_proxy: Explicit ``no_proxy`` exclusion list from
+            :class:`K8sProviderConfig`.  Takes precedence over the ``NO_PROXY``
+            / ``no_proxy`` environment variables.  ``None`` falls back to the
+            environment.
 
     Raises:
         K8sAuthError: If the kubernetes SDK is not installed, an unknown
@@ -321,5 +390,6 @@ def load_kubeconfig(
     except Exception as exc:
         raise K8sAuthError(_sanitise_load_error(exc, config_file)) from exc
 
-    # Step 3 — wire HTTP proxy from environment into the loaded configuration.
-    _apply_proxy_to_default_configuration(logger)
+    # Step 3 — wire HTTP proxy (config value or environment) into the loaded
+    # configuration.
+    _apply_proxy_to_default_configuration(logger, proxy_url, no_proxy)

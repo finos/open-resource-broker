@@ -684,10 +684,12 @@ class TestRegisterHandler:
 class TestResolveNativeSpecService:
     def test_returns_cached_result_on_second_call(self) -> None:
         strategy = _make_strategy()
-        strategy._native_spec_service_resolved = True
-        strategy._k8s_native_spec_service = MagicMock()
+        resolver = strategy._native_spec_resolver
+        resolver._resolved = True
+        cached = MagicMock()
+        resolver._k8s_native_spec_service = cached
         result = strategy._resolve_native_spec_service()
-        assert result is strategy._k8s_native_spec_service
+        assert result is cached
 
     def test_returns_none_when_not_enabled(self) -> None:
         cfg = _make_config(native_spec_enabled=False)
@@ -859,7 +861,7 @@ class TestLastReconciliationReport:
     def test_stores_report(self) -> None:
         strategy = _make_strategy()
         mock_report = MagicMock()
-        strategy._last_reconciliation_report = mock_report
+        strategy._reconciliation_lifecycle._last_reconciliation_report = mock_report
         assert strategy.last_reconciliation_report is mock_report
 
 

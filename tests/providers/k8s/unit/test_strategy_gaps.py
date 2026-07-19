@@ -249,7 +249,7 @@ def test_run_startup_reconciler_lazy_constructs_when_none() -> None:
 
     with (
         patch(
-            "orb.providers.k8s.strategy.k8s_provider_strategy.StartupReconciler"
+            "orb.providers.k8s.strategy.reconciliation_lifecycle.StartupReconciler"
         ) as MockReconciler,
         patch.object(strategy, "_ensure_watch_manager", return_value=mock_manager),
     ):
@@ -373,7 +373,7 @@ def test_maybe_start_node_watcher_lazy_constructs_when_none() -> None:
     strategy = _make_strategy(config=_make_config(node_watch_enabled=True))
     assert strategy._node_watcher is None
 
-    with patch("orb.providers.k8s.strategy.k8s_provider_strategy.K8sNodeWatcher") as MockWatcher:
+    with patch("orb.providers.k8s.strategy.node_watch_lifecycle.K8sNodeWatcher") as MockWatcher:
         instance = MagicMock()
         instance.start = MagicMock()
         MockWatcher.return_value = instance
@@ -408,7 +408,7 @@ def test_maybe_start_events_watcher_lazy_constructs_when_none() -> None:
     strategy = _make_strategy(config=_make_config(events_watch_enabled=True))
     assert strategy._events_watcher is None
 
-    with patch("orb.providers.k8s.strategy.k8s_provider_strategy.K8sEventsWatcher") as MockWatcher:
+    with patch("orb.providers.k8s.strategy.node_watch_lifecycle.K8sEventsWatcher") as MockWatcher:
         instance = MagicMock()
         instance.start = MagicMock()
         MockWatcher.return_value = instance
@@ -493,12 +493,14 @@ def test_unregister_handler_noop_for_unknown_key() -> None:
 def test_resolve_native_spec_service_cached_after_first_call() -> None:
     """_resolve_native_spec_service() returns the cached value on second call."""
     strategy = _make_strategy()
-    strategy._native_spec_service_resolved = True
-    strategy._k8s_native_spec_service = MagicMock()
+    resolver = strategy._native_spec_resolver
+    resolver._resolved = True
+    cached = MagicMock()
+    resolver._k8s_native_spec_service = cached
 
     result = strategy._resolve_native_spec_service()
 
-    assert result is strategy._k8s_native_spec_service
+    assert result is cached
 
 
 @pytest.mark.unit

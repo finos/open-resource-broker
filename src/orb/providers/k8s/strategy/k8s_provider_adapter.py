@@ -116,7 +116,7 @@ class K8sResourceValidator:
             return False
         return True
 
-    def validate_launch_template(self, template: "Any") -> bool:  # type: ignore[override]
+    def validate_launch_template(self, template: Any) -> bool:  # type: ignore[override]
         """Not applicable for Kubernetes — always returns False."""
         return False
 
