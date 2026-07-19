@@ -80,9 +80,10 @@ tasks.withType<KotlinCompile> {
 // ---------------------------------------------------------------------------
 tasks.test {
     useJUnitPlatform()
-    // Contract tests require a live ORB binary — opt-in via ORB_TEST=true
+    // Contract + parity tests require a live ORB binary — opt-in via ORB_TEST=true
     if (System.getenv("ORB_TEST") != "true") {
         exclude("**/contract/**")
+        exclude("**/parity/**")
     }
 }
 
@@ -106,6 +107,28 @@ tasks.register<Test>("contractTest") {
             )
         }
         println("contractTest: ORB_BINARY=$binary")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// parityTest — dedicated task for the cross-language parity scenario.
+// Loads sdk/parity/scenario.json and drives its six steps against a real ORB.
+// Requires ORB_BINARY env var, like contractTest.
+// ---------------------------------------------------------------------------
+tasks.register<Test>("parityTest") {
+    useJUnitPlatform()
+    include("**/parity/**")
+    systemProperty("junit.jupiter.execution.timeout.default", "120s")
+
+    doFirst {
+        val binary = System.getenv("ORB_BINARY")
+        if (binary.isNullOrBlank()) {
+            throw GradleException(
+                "parityTest requires ORB_BINARY to be set in the environment.\n" +
+                "Example: ORB_BINARY=/path/to/.venv/bin/python ./gradlew parityTest"
+            )
+        }
+        println("parityTest: ORB_BINARY=$binary")
     }
 }
 

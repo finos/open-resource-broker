@@ -8,13 +8,15 @@ languages.
 
 | Guard | Status | Where |
 |-------|--------|-------|
-| **Static conformance** — every scenario step's (method, path, operationId) exists in `sdk/spec/openapi.json` | **Enforced in CI** | `make sdk-spec-conformance` → `dev-tools/quality/validate_sdk_spec_conformance.py`, run by the `SDK Spec Conformance` job in `sdk.yml` and gated before every publish job in `prod-release.yml` |
-| **Per-language runtime parity** — each SDK drives the scenario against a live ORB and asserts equivalent outcomes | **Proposed / not yet enforced** | The per-SDK examples below are implementation guidance; the `sdk-<lang>-parity` make targets do not exist yet |
+| **Static conformance** — every scenario step's (method, path, operationId) exists in `sdk/spec/openapi.json`, and every `sdk_methods.<lang>` snippet resolves to a real client method | **Enforced in CI** | `make sdk-spec-conformance` → `dev-tools/quality/validate_sdk_spec_conformance.py`, run by the `SDK Spec Conformance` job in `sdk.yml` and gated before every publish job in `prod-release.yml` |
+| **Per-language runtime parity** — each SDK drives the scenario against a live ORB and asserts equivalent outcomes | **Enforced in CI** | `make sdk-<lang>-parity` (aggregate `make sdk-parity`), run per matrix leg in `sdk.yml` (the `Run <lang> SDK parity test` steps) |
 
-The static conformance check is the currently-enforced gate: it guarantees the
-scenario never references an operation the spec does not define. The runtime,
-per-language parity tests described below are a roadmap, not a passing gate —
-do not assume a green build means cross-language runtime parity is verified.
+Both guards are now enforced. The static check guarantees the scenario never
+references an operation the spec does not define, nor a client method that does
+not exist. The runtime, per-language parity tests LOAD this fixture and drive
+its six steps against a real ORB over a UDS, reusing each SDK's contract-test
+orb-spawn harness, and assert the per-step expected status/shape plus the skip
+rules.
 
 ## What is parity testing?
 
@@ -210,18 +212,34 @@ make sdk-spec-conformance
 This validates that every scenario step matches a real operation in
 `sdk/spec/openapi.json`. It requires no running server and is part of CI.
 
-### Per-language runtime parity (proposed)
+### Per-language runtime parity (enforced)
 
-The per-language runtime parity tests are not yet implemented. When they are,
-each SDK is expected to expose a `make sdk-<lang>-parity` target (or equivalent)
-that:
+Each SDK exposes a `make sdk-<lang>-parity` target that spawns a real ORB over a
+UDS (reusing that SDK's contract-test harness), runs the parity test file, and
+reports PASS / SKIP / FAIL per step. Set `ORB_BINARY` (or `ORB_PYTHON` for .NET)
+so the harness can spawn orb — the same convention the contract tests use.
 
-1. Starts ORB in the background (managed subprocess or via `ORB_TEST_URL`).
-2. Runs the parity test file for that language.
-3. Reports PASS / SKIP / FAIL per step.
+```bash
+make sdk-go-parity          # Go
+make sdk-typescript-parity  # TypeScript
+make sdk-java-parity        # Java
+make sdk-kotlin-parity      # Kotlin
+make sdk-csharp-parity      # .NET / C#
+make sdk-parity             # all five languages
+```
 
-An aggregate `make sdk-parity` target and an `ORB_TEST_URL` shared-instance mode
-are part of the same proposed work. Neither exists yet — do not rely on them.
+The parity test files:
+
+| Language | File | Target |
+|----------|------|--------|
+| Go | `sdk/go/orb/parity_test.go` (`//go:build integration`) | `sdk-go-parity` |
+| TypeScript | `sdk/typescript/tests/parity/parity.test.ts` | `sdk-typescript-parity` |
+| Java | `sdk/java/src/test/java/.../parity/ParityScenarioTest.java` (`@Tag("parity")`) | `sdk-java-parity` |
+| Kotlin | `sdk/kotlin/src/test/kotlin/.../parity/ParityScenarioTest.kt` | `sdk-kotlin-parity` |
+| .NET | `sdk/csharp/tests/parity/ParityScenarioTests.cs` | `sdk-csharp-parity` |
+
+In CI, each `sdk.yml` matrix leg runs its own parity step after the contract
+tests, against the same wheel-installed orb.
 
 ## Equivalence criteria
 

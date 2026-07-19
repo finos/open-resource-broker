@@ -288,6 +288,44 @@ sdk-spec-conformance:  ## Verify parity scenario matches the OpenAPI spec (stati
 	@$(PYTHON) dev-tools/quality/validate_sdk_spec_conformance.py
 
 # ---------------------------------------------------------------------------
+# Cross-language runtime parity (requires a live orb)
+# ---------------------------------------------------------------------------
+# Each per-language target LOADS sdk/parity/scenario.json and drives its six
+# ordered steps against a REAL orb spawned over a UDS, reusing that SDK's
+# existing contract-test orb-spawn harness.  Steps are dispatched via the
+# fixture's sdk_methods.<lang> mapping and asserted against each step's expected
+# status/shape + skip rules.  Set ORB_BINARY (or ORB_PYTHON for .NET) so the
+# harness can spawn orb; see the contract-test targets for the same convention.
+# ---------------------------------------------------------------------------
+sdk-go-parity: sdk-go-generate  ## Run the Go parity scenario against a real orb
+	@echo "Running Go SDK parity scenario against real ORB..."
+	@cd sdk/go && go test -tags integration -run TestParityScenario -timeout 150s ./orb/
+	@echo "Go SDK parity complete."
+
+sdk-typescript-parity: sdk-typescript-generate  ## Run the TypeScript parity scenario against a real orb
+	@echo "Running TypeScript SDK parity scenario against real ORB..."
+	@cd sdk/typescript && npm ci && npm run build && npm run test:parity
+	@echo "TypeScript SDK parity complete."
+
+sdk-java-parity:  ## Run the Java parity scenario against a real orb
+	@echo "Running Java SDK parity scenario against real ORB..."
+	@cd sdk/java && ./gradlew --no-daemon parityTest --rerun-tasks
+	@echo "Java SDK parity complete."
+
+sdk-kotlin-parity:  ## Run the Kotlin parity scenario against a real orb
+	@echo "Running Kotlin SDK parity scenario against real ORB..."
+	@cd sdk/kotlin && ./gradlew --no-daemon parityTest --rerun-tasks
+	@echo "Kotlin SDK parity complete."
+
+sdk-csharp-parity:  ## Run the C# parity scenario against a real orb
+	@echo "Running C# SDK parity scenario against real ORB..."
+	@dotnet test sdk/csharp/tests/parity/ParityTests.csproj --configuration Release --verbosity normal
+	@echo "C# SDK parity complete."
+
+sdk-parity: sdk-go-parity sdk-typescript-parity sdk-java-parity sdk-kotlin-parity sdk-csharp-parity  ## Run every language's parity scenario against a real orb
+	@echo "All SDK parity scenarios passed."
+
+# ---------------------------------------------------------------------------
 # Spec-consistency checks (generate-on-build model)
 # ---------------------------------------------------------------------------
 # Generated code is no longer committed — the generated dirs are gitignored.
@@ -364,4 +402,6 @@ sdk-java-contract-test:  ## Run Java SDK contract tests (requires ORB binary in 
         sdk-kotlin-check-drift sdk-typescript-check-drift sdk-csharp-check-drift \
         check-java _ensure-jar sdk-spec-conformance \
         sdk-go-build sdk-go-test \
-        sdk-java-build sdk-java-test sdk-java-contract-test
+        sdk-java-build sdk-java-test sdk-java-contract-test \
+        sdk-parity sdk-go-parity sdk-typescript-parity sdk-java-parity \
+        sdk-kotlin-parity sdk-csharp-parity

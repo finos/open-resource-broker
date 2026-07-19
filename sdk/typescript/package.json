@@ -25,6 +25,7 @@
     "build": "tsup",
     "test": "jest --testPathPattern=tests/unit --forceExit",
     "test:contract": "jest --testPathPattern=tests/contract --forceExit --testTimeout=30000",
+    "test:parity": "jest --testPathPattern=tests/parity --forceExit --testTimeout=60000",
     "test:all": "jest --forceExit",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"

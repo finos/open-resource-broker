@@ -353,3 +353,62 @@ jobs:
           AWS_ACCESS_KEY_ID: testing
           AWS_SECRET_ACCESS_KEY: testing
         run: dotnet test sdk/csharp/tests/contract/ContractTests.csproj --no-build --configuration Release --verbosity normal
+
+      # -----------------------------------------------------------------------
+      # Parity tests — LOAD sdk/parity/scenario.json and drive its six ordered
+      # steps against the same real orb (over UDS), dispatching each step via the
+      # fixture's sdk_methods.<lang> mapping and asserting the per-step expected
+      # status/shape + skip rules.  This is the runtime, per-language half of the
+      # parity guard (the static half is the SDK Spec Conformance job).  Each leg
+      # reuses that SDK's contract-test orb-spawn setup, so the env is identical
+      # to the contract step above (ORB_BINARY, or ORB_PYTHON for .NET).
+      # -----------------------------------------------------------------------
+      - name: Run Go SDK parity test
+        if: matrix.lang == 'go'
+        env:
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/orb
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/go && go test -tags integration -run TestParityScenario -timeout 150s ./orb/
+
+      - name: Run TypeScript SDK parity test
+        if: matrix.lang == 'typescript'
+        env:
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/typescript && npm run test:parity
+
+      - name: Run Java SDK parity test
+        if: matrix.lang == 'java'
+        env:
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/java && ./gradlew --no-daemon parityTest --rerun-tasks
+
+      - name: Run Kotlin SDK parity test
+        if: matrix.lang == 'kotlin'
+        env:
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/kotlin && ./gradlew --no-daemon parityTest --rerun-tasks
+
+      - name: Run .NET SDK parity test
+        if: matrix.lang == 'dotnet'
+        env:
+          ORB_PYTHON: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: dotnet test sdk/csharp/tests/parity/ParityTests.csproj --no-build --configuration Release --verbosity normal

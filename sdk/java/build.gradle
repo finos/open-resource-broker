@@ -95,8 +95,9 @@ dependencies {
 test {
     useJUnitPlatform()
 
-    // Run unit tests only by default (exclude contract tests which need a real ORB)
-    excludes = ['**/*ContractTest*', '**/*Contract*']
+    // Run unit tests only by default (exclude contract + parity tests, which
+    // both need a real ORB process).
+    excludes = ['**/*ContractTest*', '**/*Contract*', '**/*ParityScenarioTest*', '**/parity/**']
 
     testLogging {
         events 'passed', 'skipped', 'failed'
@@ -122,6 +123,27 @@ task contractTest(type: Test) {
     }
 
     // Contract tests need real ORB binary — set ORB_BINARY env var or use default
+    environment 'ORB_BINARY', System.getenv('ORB_BINARY') ?: 'orb'
+}
+
+task parityTest(type: Test) {
+    description = 'Run the cross-language parity scenario against a real ORB process'
+    group = 'verification'
+
+    useJUnitPlatform {
+        includeTags 'parity'
+    }
+
+    // Include only the parity runner
+    includes = ['**/*ParityScenarioTest*']
+
+    testLogging {
+        events 'started', 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+        showStandardStreams = true
+    }
+
+    // Parity tests spawn a real ORB — set ORB_BINARY env var or use default
     environment 'ORB_BINARY', System.getenv('ORB_BINARY') ?: 'orb'
 }
 
