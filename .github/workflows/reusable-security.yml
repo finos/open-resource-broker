@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload Semgrep SARIF results
         if: inputs.scan-type == 'semgrep' && always()
-        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a  # v4.37.1
         with:
           sarif_file: semgrep.sarif
 
@@ -116,7 +116,7 @@ jobs:
 
       - name: Upload Trivy filesystem scan results
         if: inputs.scan-type == 'trivy-fs' && always()
-        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a  # v4.37.1
         with:
           sarif_file: 'trivy-fs-results.sarif'
 
@@ -138,7 +138,7 @@ jobs:
 
       - name: Upload Hadolint SARIF results
         if: inputs.scan-type == 'hadolint' && always()
-        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a  # v4.37.1
         with:
           sarif_file: hadolint-results.sarif
 
@@ -164,7 +164,7 @@ jobs:
       #   TODO: ensure branch protection prevents direct pushes to main.
       - name: Initialize CodeQL
         if: inputs.scan-type == 'codeql'
-        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
+        uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a  # v4.37.1
         with:
           languages: python
           queries: security-extended,security-and-quality
@@ -173,13 +173,13 @@ jobs:
 
       - name: Initialize CodeQL (fallback)
         if: inputs.scan-type == 'codeql' && steps.codeql-init-extended.outcome == 'failure'
-        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
+        uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a  # v4.37.1
         with:
           languages: python
           queries: security-and-quality
 
       - name: Perform CodeQL Analysis
         if: inputs.scan-type == 'codeql'
-        uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9  # v4.37.0
+        uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a  # v4.37.1
         with:
           category: "/language:python"
