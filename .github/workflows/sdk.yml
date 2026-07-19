@@ -50,6 +50,50 @@ jobs:
         run: python3 dev-tools/quality/validate_sdk_spec_conformance.py
 
   # ---------------------------------------------------------------------------
+  # Spec-drift guard: boot a fresh orb, re-export /openapi.json, and fail if the
+  # committed sdk/spec/openapi.json no longer matches the live routes.  The
+  # committed spec is the single source every SDK generates from, so a route or
+  # schema change that lands in the app without a spec regen would silently drift
+  # ALL five SDKs from the real API.  This gate catches that at PR time.
+  # ---------------------------------------------------------------------------
+  spec-drift-guard:
+    name: SDK Spec Drift Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [config, build-orb-wheel]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python (for orb)
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: ${{ needs.config.outputs.default-python-version }}
+
+      - name: Download orb wheel
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: orb-wheel-sdk-${{ github.run_id }}
+          path: /tmp/orb-dist
+
+      - name: Install orb from wheel
+        # The [api] extra provides fastapi + uvicorn so the server can serve
+        # /openapi.json; export_openapi_spec.sh boots `orb server start
+        # --api-only` over a UDS and fetches the spec from it.
+        run: |
+          WHEEL=$(ls /tmp/orb-dist/*.whl)
+          pip install "${WHEEL}[api]"
+
+      - name: Re-export spec and fail on drift
+        # sdk-spec-drift-guard runs sdk-go-export-spec (boots a fresh orb, writes
+        # sdk/spec/openapi.json with canonical formatting) then `git diff
+        # --exit-code` against the committed spec.  export_openapi_spec.sh detects
+        # no uv here and runs orb directly from the pip install on PATH.
+        run: make sdk-spec-drift-guard
+
+  # ---------------------------------------------------------------------------
   # Build the orb wheel once.  All non-Go SDK legs download the same artifact
   # and pip-install it so they run against an identical, hermetically-built orb
   # binary without needing a services: sidecar (which cannot share a UDS socket
@@ -105,7 +149,10 @@ jobs:
           - lang: go
             display-name: Go
             sdk-path: sdk/go
-            generate-target: sdk-go-generate
+            # check-drift-target runs generate + build via make (spec→generate→
+            # build consistency), wiring the sdk-<lang>-check-drift make targets
+            # into CI so a spec change that produces uncompilable code fails here.
+            check-drift-target: sdk-go-check-drift
             # Go runs real-orb contract tests too: the pip-installed orb console
             # script is on PATH, which testutil.StartORB spawns over a UDS.
             needs-orb: true
@@ -114,28 +161,28 @@ jobs:
           - lang: typescript
             display-name: TypeScript
             sdk-path: sdk/typescript
-            generate-target: sdk-typescript-generate
+            check-drift-target: sdk-typescript-check-drift
             needs-orb: true
             orb-env-var: ORB_BINARY
 
           - lang: java
             display-name: Java
             sdk-path: sdk/java
-            generate-target: sdk-java-generate
+            check-drift-target: sdk-java-check-drift
             needs-orb: true
             orb-env-var: ORB_BINARY
 
           - lang: kotlin
             display-name: Kotlin
             sdk-path: sdk/kotlin
-            generate-target: sdk-kotlin-generate
+            check-drift-target: sdk-kotlin-check-drift
             needs-orb: true
             orb-env-var: ORB_BINARY
 
           - lang: dotnet
             display-name: .NET
             sdk-path: sdk/csharp
-            generate-target: sdk-csharp-generate
+            check-drift-target: sdk-csharp-check-drift
             needs-orb: true
             orb-env-var: ORB_PYTHON
 
@@ -223,35 +270,16 @@ jobs:
           pip install "${WHEEL}[api]"
 
       # -----------------------------------------------------------------------
-      # Generate (REQUIRED — generated dirs are gitignored)
+      # Generate + build via the make sdk-<lang>-check-drift target.
+      # These targets run `make sdk-<lang>-generate` (REQUIRED — generated dirs
+      # are gitignored) then compile the SDK, so this single step both produces
+      # the models and proves the current spec generates buildable code.  Wiring
+      # the make targets here (rather than inlining go build / gradlew / dotnet)
+      # keeps CI and `make sdk-check-drift` in lock-step: what a maintainer runs
+      # locally is exactly what CI runs.
       # -----------------------------------------------------------------------
-      - name: Generate SDK models
-        run: make ${{ matrix.generate-target }}
-
-      # -----------------------------------------------------------------------
-      # Build
-      # -----------------------------------------------------------------------
-      - name: Build Go SDK
-        if: matrix.lang == 'go'
-        run: cd sdk/go && go build ./...
-
-      - name: Build TypeScript SDK
-        if: matrix.lang == 'typescript'
-        run: cd sdk/typescript && npm ci && npm run build
-
-      - name: Build Java SDK
-        if: matrix.lang == 'java'
-        run: cd sdk/java && ./gradlew --no-daemon compileJava
-
-      - name: Build Kotlin SDK
-        if: matrix.lang == 'kotlin'
-        run: cd sdk/kotlin && ./gradlew --no-daemon compileKotlin
-
-      - name: Restore and build .NET SDK
-        if: matrix.lang == 'dotnet'
-        run: |
-          dotnet restore sdk/csharp/OrbSdk.sln
-          dotnet build sdk/csharp/OrbSdk.sln --no-restore --configuration Release
+      - name: Generate + build SDK (make ${{ matrix.check-drift-target }})
+        run: make ${{ matrix.check-drift-target }}
 
       # -----------------------------------------------------------------------
       # Unit tests

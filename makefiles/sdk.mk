@@ -367,6 +367,23 @@ sdk-check-drift: sdk-go-check-drift sdk-java-check-drift sdk-kotlin-check-drift 
 	@echo "All SDK spec-consistency checks passed."
 
 # ---------------------------------------------------------------------------
+# Spec-drift guard (PR-time): committed spec vs live routes
+# ---------------------------------------------------------------------------
+# Boots a fresh orb, re-exports /openapi.json into sdk/spec/openapi.json, and
+# fails if the committed spec no longer matches the live routes.  This closes
+# the gap where a route/schema change lands in the app but the committed spec
+# (the single source every SDK generates from) is not regenerated — every SDK
+# would then silently drift from the real API.  export_openapi_spec.sh writes a
+# canonical, stable formatting (indent=2), so the diff below shows only real
+# route/schema changes, never formatting churn.
+sdk-spec-drift-guard: sdk-go-export-spec  ## Fail if the committed OpenAPI spec drifted from live orb routes
+	@echo "Checking committed spec against freshly-exported live routes..."
+	@git diff --exit-code -- sdk/spec/openapi.json \
+		|| { echo "ERROR: sdk/spec/openapi.json is stale — live orb routes differ from the committed spec."; \
+		     echo "Run 'make sdk-go-export-spec' and commit the regenerated spec."; exit 1; }
+	@echo "Spec-drift guard: committed spec matches live orb routes."
+
+# ---------------------------------------------------------------------------
 # Go SDK build helpers
 # ---------------------------------------------------------------------------
 sdk-go-build: sdk-go-generate  ## Generate then compile the Go SDK
@@ -400,7 +417,7 @@ sdk-java-contract-test:  ## Run Java SDK contract tests (requires ORB binary in 
 .PHONY: sdk-generate sdk-go-generate sdk-java-generate sdk-kotlin-generate sdk-csharp-generate \
         sdk-typescript-generate sdk-check-drift sdk-go-check-drift sdk-java-check-drift \
         sdk-kotlin-check-drift sdk-typescript-check-drift sdk-csharp-check-drift \
-        check-java _ensure-jar sdk-spec-conformance \
+        check-java _ensure-jar sdk-spec-conformance sdk-spec-drift-guard \
         sdk-go-build sdk-go-test \
         sdk-java-build sdk-java-test sdk-java-contract-test \
         sdk-parity sdk-go-parity sdk-typescript-parity sdk-java-parity \

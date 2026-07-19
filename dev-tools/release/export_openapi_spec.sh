@@ -52,5 +52,23 @@ curl -sf --unix-socket "$SOCK" http://localhost/openapi.json >/dev/null 2>&1 \
     || { echo "ERROR: ORB server never became ready after 30s; aborting spec export" >&2; exit 1; }
 
 mkdir -p sdk/spec
-curl --fail --unix-socket "$SOCK" http://localhost/openapi.json > sdk/spec/openapi.json
-python3 -c "import json; d=json.load(open('sdk/spec/openapi.json')); assert d.get('openapi'), 'Invalid OpenAPI spec'"
+# Fetch to a temp file, then re-serialise with a canonical, stable formatting
+# (indent=2, trailing newline).  FastAPI/uvicorn serve the spec as a single
+# compact line; committing that makes every re-export a giant one-line diff and
+# defeats the spec-drift guard (which relies on `git diff --exit-code`).  A
+# deterministic pretty-print keeps the committed spec reviewable AND lets the
+# drift guard show only real route/schema changes, not formatting churn.
+RAW_SPEC=$(mktemp)
+curl --fail --unix-socket "$SOCK" http://localhost/openapi.json > "$RAW_SPEC"
+python3 - "$RAW_SPEC" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as fh:
+    doc = json.load(fh)
+assert doc.get("openapi"), "Invalid OpenAPI spec"
+with open("sdk/spec/openapi.json", "w", encoding="utf-8") as fh:
+    json.dump(doc, fh, indent=2, ensure_ascii=True)
+    fh.write("\n")
+PY
+rm -f "$RAW_SPEC"
