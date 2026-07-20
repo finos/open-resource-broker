@@ -8,24 +8,24 @@ rather than carrying kubernetes-specific knowledge directly.
 Only kubernetes-specific fields belong here.  Generic fields that have a
 home on the parent :class:`Template` are not duplicated:
 
-* Container image lives in ``Template.image_id``.
+* Container image lives in ``Template.machine_image``.
 * Operator labels live in ``Template.tags`` and are projected onto the
   pod label set at spec-build time.
 * The per-request replica count comes from ``request.requested_count``;
-  ``Template.max_instances`` caps the quota.
+  ``Template.max_machines`` caps the quota.
 """
 
 from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
+
+from orb.providers.base.template_extension import ProviderTemplateExtensionBase
 
 
-class K8sTemplateDTOConfig(BaseModel):
+class K8sTemplateDTOConfig(ProviderTemplateExtensionBase):
     """Typed container for kubernetes-specific fields on :class:`TemplateDTO`."""
-
-    model_config = ConfigDict(extra="ignore")
 
     # Scheduling / placement
     namespace: Optional[str] = Field(
@@ -232,7 +232,3 @@ class K8sTemplateDTOConfig(BaseModel):
         if v is not None and v <= 0:
             raise ValueError("workload count fields must be positive integers")
         return v
-
-    def to_template_defaults(self) -> dict[str, Any]:
-        """Return a flat dict of non-None values suitable for template defaults merging."""
-        return {k: v for k, v in self.model_dump().items() if v is not None}

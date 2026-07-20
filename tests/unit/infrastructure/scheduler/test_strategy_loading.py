@@ -118,7 +118,7 @@ def test_hf_load_maps_camelcase_to_snake(tmp_path):
     results = strategy.load_templates_from_path(str(f))
     t = results[0]
     assert t["template_id"] == "hf-tpl-001"
-    assert t["max_instances"] == 5
+    assert t["max_machines"] == 5
 
 
 def test_hf_load_transforms_instance_tags_string(tmp_path):
@@ -355,7 +355,7 @@ def test_default_parse_template_config_creates_template_object():
     template = strategy.parse_template_config(raw)
     assert isinstance(template, Template)
     assert template.template_id == "default-cfg-001"
-    assert template.max_instances == 3
+    assert template.max_machines == 3
 
 
 # ---------------------------------------------------------------------------
@@ -396,7 +396,7 @@ def test_hf_round_trip_generate_write_load(tmp_path):
     loaded = strategy.load_templates_from_path(str(f))
     assert len(loaded) == 1
     assert loaded[0]["template_id"] == _MINIMAL_SNAKE_TEMPLATE["template_id"]
-    assert loaded[0]["max_instances"] == _MINIMAL_SNAKE_TEMPLATE["max_instances"]
+    assert loaded[0]["max_machines"] == _MINIMAL_SNAKE_TEMPLATE["max_machines"]
 
 
 def test_default_generation_produces_snake_case_keys():
@@ -420,4 +420,4 @@ def test_default_round_trip_generate_write_load(tmp_path):
     loaded = strategy.load_templates_from_path(str(f))
     assert len(loaded) == 1
     assert loaded[0]["template_id"] == _MINIMAL_SNAKE_TEMPLATE["template_id"]
-    assert loaded[0]["max_instances"] == _MINIMAL_SNAKE_TEMPLATE["max_instances"]
+    assert loaded[0]["max_machines"] == _MINIMAL_SNAKE_TEMPLATE["max_machines"]

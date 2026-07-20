@@ -2,11 +2,12 @@
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
+
+from orb.providers.base.template_extension import ProviderTemplateExtensionBase
 
 
-class AWSTemplateDTOConfig(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+class AWSTemplateDTOConfig(ProviderTemplateExtensionBase):
     """Typed container for AWS-specific fields on TemplateDTO.
 
     This class holds only the fields that are AWS-specific and were
@@ -33,7 +34,3 @@ class AWSTemplateDTOConfig(BaseModel):
     abis_instance_requirements: Optional[dict[str, Any]] = Field(
         None, description="InstanceRequirements dict for attribute-based instance selection"
     )
-
-    def to_template_defaults(self) -> dict[str, Any]:
-        """Return a flat dict of non-None values suitable for template defaults merging."""
-        return {k: v for k, v in self.model_dump().items() if v is not None}

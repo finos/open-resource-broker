@@ -23,7 +23,7 @@ def _make_template(
     t.provider_api = provider_api
     t.price_type = price_type
     t.fleet_type = fleet_type
-    t.max_instances = max_instances
+    t.max_machines = max_instances
     t.metadata = metadata or {}
     return t
 

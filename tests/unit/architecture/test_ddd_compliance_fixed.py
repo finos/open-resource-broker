@@ -27,23 +27,23 @@ class TestDDDComplianceFixed:
         template = Template(
             template_id="test-template",
             name="Test Template",
-            image_id="ami-12345678",
+            machine_image="ami-12345678",
             subnet_ids=["subnet-12345"],
         )
 
-        # Template should have core business fields
+        # Template should have core business fields (new canonical names)
         assert hasattr(template, "template_id")
         assert hasattr(template, "name")
-        assert hasattr(template, "image_id")
-        assert hasattr(template, "max_instances")
+        assert hasattr(template, "machine_image")
+        assert hasattr(template, "max_machines")
 
         # Template should be a appropriate domain object
         assert template.template_id == "test-template"
         assert template.name == "Test Template"
-        assert template.image_id == "ami-12345678"
+        assert template.machine_image == "ami-12345678"
 
         # Template should have validation logic
-        assert template.max_instances > 0
+        assert template.max_machines > 0
 
     def test_domain_service_isolation(self):
         """Validate domain services don't leak infrastructure concerns."""
@@ -51,14 +51,14 @@ class TestDDDComplianceFixed:
         template = Template(
             template_id="test-template",
             name="Test Template",
-            image_id="ami-12345678",
+            machine_image="ami-12345678",
             subnet_ids=["subnet-12345"],
         )
 
         # Domain objects should only depend on other domain objects
         assert isinstance(template, Template)
         assert hasattr(template, "template_id")
-        assert hasattr(template, "image_id")
+        assert hasattr(template, "machine_image")
 
     def test_value_object_immutability(self):
         """Ensure all value objects are truly immutable."""
@@ -87,21 +87,21 @@ class TestDDDComplianceFixed:
         template1 = Template(
             template_id="test-template-1",
             name="Test Template 1",
-            image_id="ami-12345678",
+            machine_image="ami-12345678",
             subnet_ids=["subnet-12345"],
         )
 
         template2 = Template(
             template_id="test-template-1",
             name="Test Template 1 Modified",  # Different name, same ID
-            image_id="ami-87654321",
+            machine_image="ami-87654321",
             subnet_ids=["subnet-54321"],
         )
 
         template3 = Template(
             template_id="test-template-2",
             name="Test Template 2",
-            image_id="ami-12345678",
+            machine_image="ami-12345678",
             subnet_ids=["subnet-12345"],
         )
 
@@ -116,7 +116,7 @@ class TestDDDComplianceFixed:
         template = Template(
             template_id="test-template",
             name="Test Template",
-            image_id="ami-12345678",
+            machine_image="ami-12345678",
             subnet_ids=["subnet-12345"],
         )
 
@@ -159,22 +159,22 @@ class TestDDDComplianceFixed:
                 subnet_ids=["subnet-12345"],
             )
 
-        # Test max_instances validation
-        with pytest.raises(ValueError, match="max_instances must be greater than 0"):
+        # Test max_machines validation
+        with pytest.raises(ValueError, match="max_machines must be greater than 0"):
             Template(
                 template_id="test-template",
                 name="Test Template",
-                max_instances=0,  # Invalid value
+                max_machines=0,  # Invalid value
             )
 
-        # Test that max_instances must be positive - validation happens during construction
-        with pytest.raises(ValueError, match="max_instances must be greater than 0"):
+        # Test that max_machines must be positive - validation happens during construction
+        with pytest.raises(ValueError, match="max_machines must be greater than 0"):
             Template(
                 template_id="test-template",
                 name="Test Template",
-                image_id="ami-12345678",
+                machine_image="ami-12345678",
                 subnet_ids=["subnet-12345"],
-                max_instances=0,  # This should fail validation during construction
+                max_machines=0,  # This should fail validation during construction
             )
 
     def test_value_object_behavior(self):
@@ -198,13 +198,13 @@ class TestDDDComplianceFixed:
         template = Template(
             template_id="valid-template",
             name="Valid Template",
-            image_id="ami-12345678",
+            machine_image="ami-12345678",
             subnet_ids=["subnet-12345"],
-            max_instances=5,
+            max_machines=5,
         )
 
         assert template.template_id == "valid-template"
-        assert template.max_instances == 5
+        assert template.max_machines == 5
         assert template.is_active  # Default value
 
         # Test that timestamps are set
@@ -246,9 +246,9 @@ class TestDDDComplianceFixed:
             template_id="comprehensive-template",
             name="Comprehensive Template",
             description="A comprehensive test template",
-            instance_type="t3.micro",
-            image_id="ami-12345678",
-            max_instances=10,
+            machine_type="t3.micro",
+            machine_image="ami-12345678",
+            max_machines=10,
             subnet_ids=["subnet-12345", "subnet-67890"],
             security_group_ids=["sg-12345"],
             price_type="spot",
@@ -260,7 +260,7 @@ class TestDDDComplianceFixed:
 
         # Verify all fields are set correctly
         assert template.template_id == "comprehensive-template"
-        # instance_type is not a field on the base Template; vm_type is stored in machine_types
+        assert template.machine_type == "t3.micro"
         assert template.price_type == "spot"
         assert template.allocation_strategy == "diversified"
         assert template.max_price == 0.05

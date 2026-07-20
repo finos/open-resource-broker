@@ -158,8 +158,13 @@ class TemplateModel(Base):
     provider_data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
 
     # Instance
-    image_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    max_instances: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    # DB columns keep their original names; the ORM attribute uses the renamed
+    # canonical field (mirrors the machine_role -> "instance_profile" precedent
+    # below) so the storage layer is the translation seam.
+    machine_image: Mapped[str | None] = mapped_column(String(255), nullable=True, name="image_id")
+    max_machines: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="1", name="max_instances"
+    )
     instance_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Machine types (JSON-encoded dicts)
@@ -179,16 +184,20 @@ class TemplateModel(Base):
     max_price: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Storage
-    root_device_volume_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    volume_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    machine_disk_size_gb: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, name="root_device_volume_size"
+    )
+    machine_disk_type: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, name="volume_type"
+    )
     iops: Mapped[int | None] = mapped_column(Integer, nullable=True)
     throughput: Mapped[int | None] = mapped_column(Integer, nullable=True)
     storage_encryption: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     encryption_key: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Access
-    key_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    user_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    machine_ssh_key: Mapped[str | None] = mapped_column(String(255), nullable=True, name="key_name")
+    machine_bootstrap: Mapped[str | None] = mapped_column(Text, nullable=True, name="user_data")
     machine_role: Mapped[str | None] = mapped_column(Text, nullable=True, name="instance_profile")
     launch_template_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 

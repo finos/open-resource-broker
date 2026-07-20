@@ -537,57 +537,18 @@ def initialize_k8s_provider(
             ServiceAccount JWTs.  Mirrors the AWS provider pattern; default
             ``False`` because it requires a ``system:auth-delegator`` RBAC grant.
     """
-    from orb.providers.base.provider_plugin import _initialized_providers
+    from orb.providers.base.registration import (
+        ProviderRegistrationSpec,
+        register_provider_complete,
+    )
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
 
-    if "k8s" in _initialized_providers:
-        return
-    try:
-        # 1. Provider settings
-        register_k8s_provider_settings()
+    def _register_auth(log: Optional[LoggingPort]) -> None:
+        register_k8s_auth_strategies(log, inbound_auth_enabled=inbound_auth_enabled)
 
-        # 2. Template DTO extension
-        register_k8s_extensions(logger)
-
-        # 3. Auth strategies
-        register_k8s_auth_strategies(logger, inbound_auth_enabled=inbound_auth_enabled)
-
-        # 4. Template class
-        if template_factory is not None:
-            register_k8s_template_factory(template_factory, logger)
-
-        # 5. CLI spec
-        try:
-            from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
-            from orb.providers.k8s.cli.k8s_cli_spec import K8sCLISpec
-
-            CLISpecRegistry.register("k8s", K8sCLISpec())
-        except ImportError:
-            # CLI spec module not installed; skip registration silently.
-            pass
-
-        # 6. HostFactory field mapping
-        try:
-            from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
-                FieldMappingRegistry,
-            )
-            from orb.providers.k8s.scheduler.hostfactory_field_mapping import K8sFieldMapping
-
-            FieldMappingRegistry.register("k8s", K8sFieldMapping())
-        except ImportError:
-            # Field-mapping module not installed; skip registration silently.
-            pass
-
-        # 7. Defaults loader
-        try:
-            from orb.providers.k8s.defaults_loader import KubernetesDefaultsLoader
-            from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
-
-            DefaultsLoaderRegistry.register("k8s", KubernetesDefaultsLoader())
-        except ImportError:
-            # Defaults-loader module not installed; skip registration silently.
-            pass
-
-        # 8. Retry classifier
+    def _register_retry_classifier(_log: Optional[LoggingPort]) -> None:
+        # Step 8 for the kubernetes provider is the retry classifier (the AWS
+        # provider registers storage backends here instead).
         try:
             from orb.infrastructure.resilience.retry_classifier_registry import (
                 register_retry_classifier,
@@ -599,18 +560,86 @@ def initialize_k8s_provider(
             # kubernetes extra not installed; skip retry-classifier registration silently.
             pass
 
-        _initialized_providers.add("k8s")
+    # Resolve the optional CLI-spec, field-mapping and defaults-loader instances
+    # under their own import guards so a missing extra module leaves the
+    # corresponding spec field ``None`` (register_provider_complete then skips
+    # that step) rather than aborting the whole registration.
+    cli_spec_instance: Optional[Any] = None
+    try:
+        from orb.providers.k8s.cli.k8s_cli_spec import K8sCLISpec
 
-        if logger:
-            logger.info("Kubernetes provider initialization completed successfully")
+        cli_spec_instance = K8sCLISpec()
+    except ImportError:
+        # Optional CLI-spec module is not installed; leaving the instance None
+        # is acceptable — registration skips the CLI-spec step.
+        pass
 
-    except Exception as exc:
-        # Deliberately NOT adding to _initialized_providers so a retry after
-        # fixing the root cause will re-attempt fully.
-        error_msg = f"k8s provider initialization failed: {exc}"
-        if logger:
-            logger.error(error_msg, exc_info=True)
-        raise
+    field_mapping_instance: Optional[Any] = None
+    try:
+        from orb.providers.k8s.scheduler.hostfactory_field_mapping import K8sFieldMapping
+
+        field_mapping_instance = K8sFieldMapping()
+    except ImportError:
+        # Optional field-mapping module is not installed; leaving the instance
+        # None is acceptable — registration skips the field-mapping step.
+        pass
+
+    defaults_loader_instance: Optional[Any] = None
+    try:
+        from orb.providers.k8s.defaults_loader import KubernetesDefaultsLoader
+
+        defaults_loader_instance = KubernetesDefaultsLoader()
+    except ImportError:
+        # Optional defaults-loader module is not installed; leaving the instance
+        # None is acceptable — registration skips the defaults-loader step.
+        pass
+
+    # The concrete template aggregate is resolved under a guard;
+    # register_provider_complete only runs the template-class step when both
+    # the class and the factory are set.
+    template_class: Optional[type] = None
+    try:
+        from orb.providers.k8s.domain.template.k8s_template_aggregate import (
+            K8sTemplate,
+        )
+
+        template_class = K8sTemplate
+    except ImportError:
+        # Optional template-aggregate module is not installed; leaving the class
+        # None is acceptable — registration skips the template-class step.
+        pass
+
+    # The DTO extension config is resolved under a guard; register_k8s_extensions
+    # registers the same class in the original flow.
+    dto_config_class: Optional[type] = None
+    try:
+        from orb.providers.k8s.domain.template.k8s_template_dto_config import (
+            K8sTemplateDTOConfig,
+        )
+
+        dto_config_class = K8sTemplateDTOConfig
+    except ImportError:
+        # Optional DTO-config module is not installed; leaving the class None is
+        # acceptable — registration skips the DTO-extension step.
+        pass
+
+    # The eight guarded registration steps run in canonical order inside
+    # register_provider_complete (settings, DTO ext, auth, template class,
+    # CLI spec, field mapping, defaults loader, retry classifier) with the
+    # shared idempotency guard against ``_initialized_providers``.
+    spec = ProviderRegistrationSpec(
+        provider_name="k8s",
+        settings_class=K8sProviderConfig,
+        dto_config_class=dto_config_class,
+        register_auth=_register_auth,
+        template_class=template_class,
+        template_factory=template_factory,
+        cli_spec_instance=cli_spec_instance,
+        field_mapping_instance=field_mapping_instance,
+        defaults_loader_instance=defaults_loader_instance,
+        extra_init=_register_retry_classifier,
+    )
+    register_provider_complete(spec, logger)
 
 
 def register_k8s_services_with_di(container) -> None:

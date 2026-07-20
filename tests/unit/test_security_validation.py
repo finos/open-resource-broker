@@ -548,12 +548,12 @@ class TestSecurityConfiguration:
             template_id="test-template",
             name="Test Template",
             provider_api="RunInstances",
-            image_id="ami-12345678",
-            instance_type="t2.micro",
+            machine_image="ami-12345678",
+            machine_type="t2.micro",
         )
 
-        # Should have secure defaults - Template uses max_instances, not max_number
-        assert template.max_instances is None or template.max_instances > 0
+        # Should have secure defaults - Template uses max_machines (min 1)
+        assert template.max_machines is None or template.max_machines > 0
 
     def test_security_headers_simulation(self):
         """Test security headers that would be used in HTTP responses."""

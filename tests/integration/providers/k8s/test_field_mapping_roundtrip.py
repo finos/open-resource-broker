@@ -8,7 +8,7 @@ Covers the path a HostFactory template takes through ORB:
   bootstrap) plus the generic mappings the
   :class:`HostFactoryFieldMapper` always applies;
 * internal defaults are applied via the adapter's
-  :meth:`apply_defaults` (``namespace``, ``max_instances``,
+  :meth:`apply_defaults` (``namespace``, ``max_machines``,
   ``annotations``);
 * mapping back to HF preserves the kubernetes-specific keys that the
   scheduler hands the operator on a ``getAvailableTemplates``
@@ -123,7 +123,7 @@ def test_hf_to_internal_field_mapping_translates_camel_case() -> None:
     mapper = HostFactoryFieldMapper(provider_type="k8s")
     generic_only = mapper.map_input_fields({"templateId": "x", "maxNumber": 3})
     assert generic_only["template_id"] == "x"
-    assert generic_only["max_instances"] == 3
+    assert generic_only["max_machines"] == 3
 
     # Full mapping (generic + kubernetes adapter) translates every
     # kubernetes-specific HF key into the snake_case internal key.
@@ -131,13 +131,13 @@ def test_hf_to_internal_field_mapping_translates_camel_case() -> None:
     mapped = _apply_full_mapping(payload)
 
     assert mapped["template_id"] == "my-k8s-template"
-    assert mapped["max_instances"] == 4
+    assert mapped["max_machines"] == 4
     assert mapped["provider_api"] == "Deployment"
     assert mapped["provider_type"] == "k8s"
     assert mapped["provider_name"] == "kubernetes_orb-it"
 
     # Image and tags come from the generic surfaces.
-    assert mapped["image_id"] == "ghcr.io/example/worker:1.2.3"
+    assert mapped["machine_image"] == "ghcr.io/example/worker:1.2.3"
     # ``instanceTags`` is the HF surface for the generic ``tags`` field.
     assert mapped["tags"] == {"team": "ml"}
     assert mapped["namespace"] == "orb-it"
@@ -163,10 +163,10 @@ def test_internal_to_hf_field_mapping_preserves_kubernetes_keys() -> None:
     """The reverse transformation surfaces the kubernetes-specific keys back to HF."""
     internal = {
         "template_id": "k8s-out",
-        "max_instances": 2,
+        "max_machines": 2,
         "provider_api": "Pod",
         "provider_type": "k8s",
-        "image_id": "busybox:latest",
+        "machine_image": "busybox:latest",
         "tags": {"team": "ml"},
         "namespace": "orb-it",
         "resource_requests": {"cpu": "100m"},
@@ -203,7 +203,7 @@ def test_field_mapping_defaults_applied_in_isolation() -> None:
     """``apply_defaults`` populates kubernetes-sensible defaults for absent fields."""
     adapter = K8sFieldMapping()
     out = adapter.apply_defaults({})
-    assert out["max_instances"] == 1
+    assert out["max_machines"] == 1
     assert out["annotations"] == {}
     # ``namespace`` is NOT defaulted here — the precedence chain at
     # ``K8sBaseHandler.resolve_namespace`` resolves
@@ -220,10 +220,10 @@ def test_field_mapping_defaults_applied_in_isolation() -> None:
 
     # Operator-supplied values win over defaults.
     out = adapter.apply_defaults(
-        {"namespace": "ns-a", "max_instances": 7, "annotations": {"k": "v"}}
+        {"namespace": "ns-a", "max_machines": 7, "annotations": {"k": "v"}}
     )
     assert out["namespace"] == "ns-a"
-    assert out["max_instances"] == 7
+    assert out["max_machines"] == 7
     assert out["annotations"] == {"k": "v"}
 
 

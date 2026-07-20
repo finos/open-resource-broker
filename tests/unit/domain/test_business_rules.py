@@ -202,9 +202,9 @@ class TestTemplateBusinessRules:
         """Test that a valid template can be created."""
         template = _make_template(
             template_id="test-template",
-            max_instances=10,
+            max_machines=10,
         )
-        assert template.max_instances == 10
+        assert template.max_machines == 10
 
     def test_template_subnet_ids_stored(self):
         """Test that subnet IDs are stored correctly."""

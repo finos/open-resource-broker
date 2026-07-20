@@ -40,7 +40,7 @@ def test_missing_image_is_invalid() -> None:
     result = _svc().validate_template(_op({"template_id": "t", "provider_api": "Pod"}))
     assert result.success  # operation succeeded; validation verdict is in data
     assert result.data["valid"] is False
-    assert any("image_id" in e for e in result.data["errors"])
+    assert any("machine_image" in e for e in result.data["errors"])
 
 
 def test_unknown_provider_api_is_invalid() -> None:

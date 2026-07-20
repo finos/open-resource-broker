@@ -200,7 +200,7 @@ class KubeAuthStrategy(AuthPort):
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_auth_config(cls, auth_config: Any) -> "KubeAuthStrategy":
+    def from_auth_config(cls, auth_config: Any) -> KubeAuthStrategy:
         """Build a :class:`KubeAuthStrategy` from an ``AuthConfig`` instance.
 
         Reads ``auth_config.provider_auth.kubernetes`` (or falls back to

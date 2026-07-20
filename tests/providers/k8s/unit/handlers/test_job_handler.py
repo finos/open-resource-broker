@@ -503,7 +503,7 @@ def test_get_example_templates_returns_job_example() -> None:
     assert example.provider_type == "k8s"
     # A Job needs a shell to run its run-to-completion command; the pause image
     # (used by the long-running kinds) has none, so the Job example uses busybox.
-    assert example.image_id == "busybox:1.37"
+    assert example.machine_image == "busybox:1.37"
     assert example.command == ["sh", "-c", "exit 0"]
 
 

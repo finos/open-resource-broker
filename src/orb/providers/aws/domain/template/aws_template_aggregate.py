@@ -211,15 +211,20 @@ class AWSTemplate(Template):
     provider_api: Optional[ProviderApi] = None  # type: ignore[assignment]
     fleet_type: Optional[AWSFleetType] = None
     fleet_role: Optional[str] = None
-    user_data: Optional[str] = None
 
     # AWS EC2 instance type string (distinct from Template.machine_type, which is the
     # provider-agnostic compute-sizing token).  Set when a specific single EC2 instance
     # type is configured rather than a weighted machine_types map.
     aws_instance_type: Optional[AWSInstanceType] = None
 
-    # AWS instance configuration
-    volume_type: Optional[str] = "gp3"  # gp2, gp3, io1, io2, standard
+    # AWS instance configuration — override the generic disk-type default with the
+    # AWS-native default (gp3).  Old ``volume_type`` input keeps working via the base
+    # AliasChoices seam.
+    machine_disk_type: Optional[str] = Field(  # type: ignore[assignment]
+        default="gp3",  # gp2, gp3, io1, io2, standard
+        validation_alias=AliasChoices("machine_disk_type", "volume_type"),
+        deprecated="use 'machine_disk_type' instead of 'volume_type'",
+    )
 
     # AWS spot configuration
     spot_fleet_request_expiry: Optional[int] = None
@@ -413,10 +418,10 @@ class AWSTemplate(Template):
             "provider_api": self.provider_api.value if self.provider_api else None,
             "fleet_type": self.fleet_type.value if self.fleet_type else None,
             "fleet_role": self.fleet_role,
-            "key_name": self.key_name,
-            "user_data": self.user_data,
-            "root_device_volume_size": self.root_device_volume_size,
-            "volume_type": self.volume_type,
+            "key_name": self.machine_ssh_key,
+            "user_data": self.machine_bootstrap,
+            "root_device_volume_size": self.machine_disk_size_gb,
+            "volume_type": self.machine_disk_type,
             "iops": self.iops,
             "machine_role": self.machine_role,
             "spot_fleet_request_expiry": self.spot_fleet_request_expiry,

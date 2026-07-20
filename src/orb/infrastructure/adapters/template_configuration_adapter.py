@@ -62,7 +62,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         if not provider_api and provider_type != "k8s":
             errors.append("Provider API is required")
 
-        image_id = config.get("imageId") or config.get("image_id")
+        image_id = config.get("machine_image") or config.get("imageId") or config.get("image_id")
         if not image_id:
             errors.append("Image ID is required")
 

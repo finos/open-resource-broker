@@ -168,7 +168,11 @@ async def handle_create_template(
             exit_code=1,
         )
 
-    image_id = template_config.get("image_id") or template_config.get("imageId")
+    image_id = (
+        template_config.get("machine_image")
+        or template_config.get("image_id")
+        or template_config.get("imageId")
+    )
 
     if getattr(args, "validate_only", False):
         return {
@@ -292,7 +296,7 @@ async def handle_update_template(
                 machine_type=template_config.get("machine_type")
                 or template_config.get("machineType"),
                 instance_type=template_config.get("instance_type"),
-                image_id=template_config.get("image_id"),
+                image_id=template_config.get("machine_image") or template_config.get("image_id"),
                 configuration=template_config,
             )
         )

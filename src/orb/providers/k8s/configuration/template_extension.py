@@ -11,8 +11,8 @@ The :class:`K8sTemplateExtensionConfig` is registered with
 Shadow fields removed — generic concepts read from the parent ``Template``:
 
 * The replica count comes from ``request.requested_count`` at acquire
-  time; ``max_instances`` on the generic ``Template`` caps the quota.
-* Container images come from ``Template.image_id``.
+  time; ``max_machines`` on the generic ``Template`` caps the quota.
+* Container images come from ``Template.machine_image``.
 * Pod labels are projected from ``Template.tags`` at spec-build time.
 """
 
@@ -20,10 +20,12 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
+
+from orb.providers.base.template_extension import ProviderTemplateExtensionBase
 
 
-class K8sTemplateExtensionConfig(BaseModel):
+class K8sTemplateExtensionConfig(ProviderTemplateExtensionBase):
     """Kubernetes-specific template extension configuration.
 
     These fields are applied to kubernetes templates through the
@@ -32,7 +34,8 @@ class K8sTemplateExtensionConfig(BaseModel):
     overrides on the template itself win against this baseline.
     """
 
-    model_config = ConfigDict(extra="ignore")
+    # ``model_config = ConfigDict(extra="ignore")`` is inherited from
+    # ProviderTemplateExtensionBase.
 
     # Workload sizing overrides for the Job handler.  The per-request
     # replica count is taken from ``request.requested_count`` — these

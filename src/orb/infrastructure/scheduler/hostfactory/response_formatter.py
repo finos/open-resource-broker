@@ -118,8 +118,11 @@ class HostFactoryResponseFormatter:
 
             if "templateId" not in formatted_template and "template_id" in formatted_template:
                 formatted_template["templateId"] = formatted_template["template_id"]
-            if "maxNumber" not in formatted_template and "max_instances" in formatted_template:
-                formatted_template["maxNumber"] = formatted_template["max_instances"]
+            if "maxNumber" not in formatted_template:
+                if "max_machines" in formatted_template:
+                    formatted_template["maxNumber"] = formatted_template["max_machines"]
+                elif "max_instances" in formatted_template:
+                    formatted_template["maxNumber"] = formatted_template["max_instances"]
 
             if "instanceTags" in formatted_template:
                 tags = formatted_template["instanceTags"]

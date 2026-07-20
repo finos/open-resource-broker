@@ -20,9 +20,9 @@ class HostFactoryFieldMappings:
         "generic": {
             # Core template fields
             "templateId": "template_id",
-            "maxNumber": "max_instances",
-            "imageId": "image_id",
-            "keyName": "key_name",
+            "maxNumber": "max_machines",
+            "imageId": "machine_image",
+            "keyName": "machine_ssh_key",
             "fleetType": "fleet_type",
             # Instance configuration
             "vmType": "machine_types",
@@ -32,8 +32,8 @@ class HostFactoryFieldMappings:
             "maxSpotPrice": "max_price",
             "allocationStrategy": "allocation_strategy",
             # Storage configuration
-            "rootDeviceVolumeSize": "root_device_volume_size",
-            "volumeType": "volume_type",
+            "rootDeviceVolumeSize": "machine_disk_size_gb",
+            "volumeType": "machine_disk_type",
             "iops": "iops",
             # Tags and metadata
             "instanceTags": "tags",  # Will be parsed from string format
@@ -65,7 +65,7 @@ class HostFactoryFieldMappings:
             # AWS instance configuration
             "instanceProfile": "machine_role",
             "launchTemplateId": "launch_template_id",
-            "userDataScript": "user_data",
+            "userDataScript": "machine_bootstrap",
             # AWS MicroVM configuration (routed into metadata via dotted paths)
             "imageVersion": "metadata.image_version",
             "executionRoleArn": "metadata.execution_role_arn",

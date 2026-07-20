@@ -456,7 +456,7 @@ class K8sTemplate(Template):
     # Field coercion validators
     # ------------------------------------------------------------------
 
-    @field_validator("image_id")
+    @field_validator("machine_image")
     @classmethod
     def _validate_image_id(cls, value: Optional[str]) -> Optional[str]:
         """Reject image names that contain whitespace (causes kubelet InvalidImageName)."""
@@ -653,14 +653,16 @@ class K8sTemplate(Template):
     def resolve_container_image(self) -> str:
         """Return the container image string for this template.
 
-        The generic ``Template.image_id`` field is the single source of
-        truth — ``K8sTemplate`` does not redefine ``image_id`` and does
+        The generic ``Template.machine_image`` field is the single source of
+        truth — ``K8sTemplate`` does not redefine ``machine_image`` and does
         not honour any nested ``provider_data['k8s']['container_image']``
         legacy path.
         """
-        image = self.image_id
+        image = self.machine_image
         if not image:
-            raise ValueError("K8sTemplate is missing a container image — set Template.image_id.")
+            raise ValueError(
+                "K8sTemplate is missing a container image — set Template.machine_image."
+            )
         return str(image)
 
     def resolve_pod_labels(self) -> dict[str, str]:

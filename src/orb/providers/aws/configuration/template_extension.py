@@ -4,6 +4,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from orb.providers.base.template_extension import ProviderTemplateExtensionBase
+
 
 class AMIResolutionConfig(BaseModel):
     """AMI resolution configuration for AWS templates."""
@@ -12,7 +14,7 @@ class AMIResolutionConfig(BaseModel):
     fallback_on_failure: bool = Field(True, description="Return SSM parameter if resolution fails")
 
 
-class AWSTemplateExtensionConfig(BaseModel):
+class AWSTemplateExtensionConfig(ProviderTemplateExtensionBase):
     """AWS-specific template extension configuration.
 
     This contains all AWS-specific template configuration that was previously

@@ -95,7 +95,7 @@ class K8sInstanceOperationService:
     async def cancel_resource(
         self,
         request_id: str,
-        kubernetes_client: "K8sClient",
+        kubernetes_client: K8sClient,
         *,
         namespace: Optional[str] = None,
     ) -> CancelResourceResult:
@@ -235,7 +235,7 @@ class K8sInstanceOperationService:
     # List helpers (synchronous — run via asyncio.to_thread)
     # ------------------------------------------------------------------
 
-    def _list_pod_names(self, client: "K8sClient", ns: str, label_selector: str) -> list[str]:
+    def _list_pod_names(self, client: K8sClient, ns: str, label_selector: str) -> list[str]:
         """List Pod names matching *label_selector* in *ns*."""
         resp = client.core_v1.list_namespaced_pod(
             namespace=ns,
@@ -243,9 +243,7 @@ class K8sInstanceOperationService:
         )
         return [p.metadata.name for p in (resp.items or []) if p.metadata and p.metadata.name]
 
-    def _list_deployment_names(
-        self, client: "K8sClient", ns: str, label_selector: str
-    ) -> list[str]:
+    def _list_deployment_names(self, client: K8sClient, ns: str, label_selector: str) -> list[str]:
         """List Deployment names matching *label_selector* in *ns*."""
         resp = client.apps_v1.list_namespaced_deployment(
             namespace=ns,
@@ -253,9 +251,7 @@ class K8sInstanceOperationService:
         )
         return [d.metadata.name for d in (resp.items or []) if d.metadata and d.metadata.name]
 
-    def _list_statefulset_names(
-        self, client: "K8sClient", ns: str, label_selector: str
-    ) -> list[str]:
+    def _list_statefulset_names(self, client: K8sClient, ns: str, label_selector: str) -> list[str]:
         """List StatefulSet names matching *label_selector* in *ns*."""
         resp = client.apps_v1.list_namespaced_stateful_set(
             namespace=ns,
@@ -263,7 +259,7 @@ class K8sInstanceOperationService:
         )
         return [s.metadata.name for s in (resp.items or []) if s.metadata and s.metadata.name]
 
-    def _list_job_names(self, client: "K8sClient", ns: str, label_selector: str) -> list[str]:
+    def _list_job_names(self, client: K8sClient, ns: str, label_selector: str) -> list[str]:
         """List Job names matching *label_selector* in *ns*."""
         resp = client.batch_v1.list_namespaced_job(
             namespace=ns,
@@ -275,7 +271,7 @@ class K8sInstanceOperationService:
     # Delete dispatcher (synchronous — run via asyncio.to_thread)
     # ------------------------------------------------------------------
 
-    def _delete_workload(self, client: "K8sClient", ns: str, kind: str, name: str) -> None:
+    def _delete_workload(self, client: K8sClient, ns: str, kind: str, name: str) -> None:
         """Dispatch a delete call for *kind*/*name* in *ns*.
 
         Raises on any API error including 404 — callers distinguish 404

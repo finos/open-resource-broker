@@ -23,6 +23,7 @@ from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.resilience import MaxRetriesExceededError
+from orb.providers.base.handler import ProviderHandlerBase
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.handlers.shared.label_stamper import (
     stamp_native_workload_body as _stamp_workload_body,
@@ -55,7 +56,7 @@ T = TypeVar("T")
 
 
 @injectable
-class K8sHandlerBase(ABC):
+class K8sHandlerBase(ProviderHandlerBase, ABC):
     """Abstract base for kubernetes provider handlers.
 
     Subclasses implement the per-resource-API contract:
@@ -744,7 +745,4 @@ class K8sHandlerBase(ABC):
     # ------------------------------------------------------------------
     # Diagnostics
     # ------------------------------------------------------------------
-
-    def get_handler_type(self) -> str:
-        """Lower-case handler key derived from the class name."""
-        return self.__class__.__name__.replace("Handler", "").lower()
+    # get_handler_type is inherited from ProviderHandlerBase.

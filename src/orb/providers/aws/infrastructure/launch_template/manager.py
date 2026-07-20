@@ -28,14 +28,14 @@ from orb.providers.aws.infrastructure.tags import build_system_tags, merge_tags
 
 _OVERRIDE_FIELDS = frozenset(
     {
-        "image_id",
+        "machine_image",
         "machine_types",
         "subnet_ids",
         "security_group_ids",
-        "key_name",
-        "user_data",
+        "machine_ssh_key",
+        "machine_bootstrap",
         "machine_role",
-        "root_device_volume_size",
+        "machine_disk_size_gb",
         "iops",
         "ebs_optimized",
         "monitoring_enabled",
@@ -332,8 +332,8 @@ class AWSLaunchTemplateManager:
         # Build data dict from non-None override fields only
         lt_data: dict[str, Any] = {}
 
-        if aws_template.image_id:
-            lt_data["ImageId"] = aws_template.image_id
+        if aws_template.machine_image:
+            lt_data["ImageId"] = aws_template.machine_image
 
         if aws_template.machine_types and len(aws_template.machine_types) == 1:
             lt_data["InstanceType"] = next(iter(aws_template.machine_types.keys()))
@@ -350,13 +350,13 @@ class AWSLaunchTemplateManager:
         elif aws_template.security_group_ids:
             lt_data["SecurityGroupIds"] = aws_template.security_group_ids
 
-        if aws_template.key_name:
-            lt_data["KeyName"] = aws_template.key_name
+        if aws_template.machine_ssh_key:
+            lt_data["KeyName"] = aws_template.machine_ssh_key
 
-        if aws_template.user_data:
-            lt_data["UserData"] = base64.b64encode(aws_template.user_data.encode("utf-8")).decode(
-                "ascii"
-            )
+        if aws_template.machine_bootstrap:
+            lt_data["UserData"] = base64.b64encode(
+                aws_template.machine_bootstrap.encode("utf-8")
+            ).decode("ascii")
 
         if aws_template.machine_role:
             lt_data["IamInstanceProfile"] = {
@@ -370,9 +370,9 @@ class AWSLaunchTemplateManager:
         if getattr(aws_template, "monitoring_enabled", None) is not None:
             lt_data["Monitoring"] = {"Enabled": aws_template.monitoring_enabled}
 
-        root_size = getattr(aws_template, "root_device_volume_size", None)
+        root_size = getattr(aws_template, "machine_disk_size_gb", None)
         if root_size is not None:
-            volume_type = getattr(aws_template, "volume_type", "gp3")
+            volume_type = getattr(aws_template, "machine_disk_type", "gp3")
             ebs: dict[str, Any] = {
                 "VolumeSize": root_size,
                 "VolumeType": volume_type,
@@ -598,7 +598,7 @@ class AWSLaunchTemplateManager:
 
         return {
             # Basic values
-            "image_id": template.image_id,
+            "image_id": template.machine_image,
             "instance_type": (
                 next(iter(template.machine_types.keys()))
                 if template.machine_types
@@ -617,11 +617,13 @@ class AWSLaunchTemplateManager:
             "associate_public_ip": True,
             # Optional configurations
             "key_name": (
-                template.key_name if hasattr(template, "key_name") and template.key_name else None
+                template.machine_ssh_key
+                if hasattr(template, "machine_ssh_key") and template.machine_ssh_key
+                else None
             ),
             "user_data": (
-                template.user_data
-                if hasattr(template, "user_data") and template.user_data
+                template.machine_bootstrap
+                if hasattr(template, "machine_bootstrap") and template.machine_bootstrap
                 else None
             ),
             "instance_profile": (
@@ -638,14 +640,14 @@ class AWSLaunchTemplateManager:
             ),
             # Block device configuration
             "root_device_volume_size": (
-                template.root_device_volume_size
-                if hasattr(template, "root_device_volume_size")
-                and template.root_device_volume_size is not None
+                template.machine_disk_size_gb
+                if hasattr(template, "machine_disk_size_gb")
+                and template.machine_disk_size_gb is not None
                 else None
             ),
             "volume_type": (
-                template.volume_type
-                if hasattr(template, "volume_type") and template.volume_type
+                template.machine_disk_type
+                if hasattr(template, "machine_disk_type") and template.machine_disk_type
                 else "gp3"
             ),
             "iops": (
@@ -654,14 +656,15 @@ class AWSLaunchTemplateManager:
             # Conditional flags
             "has_subnet": hasattr(template, "subnet_id") and bool(template.subnet_id),
             "has_security_groups": bool(template.security_group_ids),
-            "has_key_name": hasattr(template, "key_name") and bool(template.key_name),
-            "has_user_data": hasattr(template, "user_data") and bool(template.user_data),
+            "has_key_name": hasattr(template, "machine_ssh_key") and bool(template.machine_ssh_key),
+            "has_user_data": hasattr(template, "machine_bootstrap")
+            and bool(template.machine_bootstrap),
             "has_instance_profile": bool(template.machine_role),
             "has_ebs_optimized": getattr(template, "ebs_optimized", None) is not None,
             "has_monitoring": hasattr(template, "monitoring_enabled")
             and template.monitoring_enabled is not None,
-            "has_root_device_volume_size": hasattr(template, "root_device_volume_size")
-            and template.root_device_volume_size is not None,
+            "has_root_device_volume_size": hasattr(template, "machine_disk_size_gb")
+            and template.machine_disk_size_gb is not None,
             "has_iops": hasattr(template, "iops") and template.iops is not None,
             "has_custom_tags": bool(custom_tags),
             # Dynamic values
@@ -716,7 +719,7 @@ class AWSLaunchTemplateManager:
         """
         # AMI ID is resolved by AWSProvisioningAdapter._resolve_template_image() before this point
         # When an existing launch_template_id is set, image_id is optional (the LT already has one).
-        image_id = aws_template.image_id
+        image_id = aws_template.machine_image
         if not image_id and not aws_template.launch_template_id:
             error_msg = f"Template {aws_template.template_id} has no image_id specified"
             self._logger.error(error_msg)
@@ -755,14 +758,14 @@ class AWSLaunchTemplateManager:
         elif aws_template.security_group_ids:
             launch_template_data["SecurityGroupIds"] = aws_template.security_group_ids
 
-        if aws_template.key_name:
-            launch_template_data["KeyName"] = aws_template.key_name
+        if aws_template.machine_ssh_key:
+            launch_template_data["KeyName"] = aws_template.machine_ssh_key
 
-        if aws_template.user_data:
+        if aws_template.machine_bootstrap:
             # AWS requires user data to be Base64 encoded
-            encoded_user_data = base64.b64encode(aws_template.user_data.encode("utf-8")).decode(
-                "ascii"
-            )
+            encoded_user_data = base64.b64encode(
+                aws_template.machine_bootstrap.encode("utf-8")
+            ).decode("ascii")
             launch_template_data["UserData"] = encoded_user_data
 
         if aws_template.machine_role:
@@ -788,19 +791,19 @@ class AWSLaunchTemplateManager:
 
         # Add block device mappings for root volume if specified
         if (
-            hasattr(aws_template, "root_device_volume_size")
-            and aws_template.root_device_volume_size is not None
+            hasattr(aws_template, "machine_disk_size_gb")
+            and aws_template.machine_disk_size_gb is not None
         ):
-            volume_type = getattr(aws_template, "volume_type", "gp3")
+            volume_type = getattr(aws_template, "machine_disk_type", "gp3")
             self._logger.info(
                 "Adding block device mapping: volume_size=%s, volume_type=%s",
-                aws_template.root_device_volume_size,
+                aws_template.machine_disk_size_gb,
                 volume_type,
             )
             block_device_mapping = {
                 "DeviceName": "/dev/xvda",
                 "Ebs": {
-                    "VolumeSize": aws_template.root_device_volume_size,
+                    "VolumeSize": aws_template.machine_disk_size_gb,
                     "VolumeType": volume_type,
                     "DeleteOnTermination": True,
                 },
@@ -923,7 +926,7 @@ class AWSLaunchTemplateManager:
         # Generate a deterministic client token based on the request ID, template ID, and image ID
         # (or launch_template_id when image_id is absent).
         # This ensures idempotency - identical requests will return the same result
-        image_or_lt = aws_template.image_id or aws_template.launch_template_id or ""
+        image_or_lt = aws_template.machine_image or aws_template.launch_template_id or ""
         token_input = f"{request.request_id}:{aws_template.template_id}:{image_or_lt}"
         # Truncate to 32 chars
         return hashlib.sha256(token_input.encode()).hexdigest()[:32]

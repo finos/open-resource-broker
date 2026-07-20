@@ -54,8 +54,12 @@ class K8sTemplateValidationService:
         warnings: list[str] = []
 
         # A container image is mandatory — the kubelet needs something to pull.
-        if not template_config.get("image_id") and not template_config.get("container_image"):
-            errors.append("Missing required field: image_id")
+        if (
+            not template_config.get("machine_image")
+            and not template_config.get("image_id")
+            and not template_config.get("container_image")
+        ):
+            errors.append("Missing required field: machine_image")
 
         # provider_api, when set, must be a supported workload kind.
         provider_api = template_config.get("provider_api")
@@ -87,14 +91,14 @@ class K8sTemplateValidationService:
                 "restart_policy='Always' is not valid for a Job (use Never or OnFailure)."
             )
 
-        # max_instances, when set, must be a positive integer.
-        max_instances = template_config.get("max_instances")
+        # max_machines, when set, must be a positive integer.
+        max_instances = template_config.get("max_machines", template_config.get("max_instances"))
         if max_instances is not None:
             try:
                 if int(max_instances) <= 0:
-                    errors.append("max_instances must be a positive integer when set.")
+                    errors.append("max_machines must be a positive integer when set.")
             except (TypeError, ValueError):
-                errors.append(f"max_instances must be an integer; got {max_instances!r}.")
+                errors.append(f"max_machines must be an integer; got {max_instances!r}.")
 
         return {
             "valid": len(errors) == 0,

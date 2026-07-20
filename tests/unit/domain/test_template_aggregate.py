@@ -54,7 +54,7 @@ def _make_template(template_id="template-001", **kwargs):
     defaults = dict(
         template_id=template_id,
         name="test-template",
-        image_id="ami-12345678",
+        machine_image="ami-12345678",
         machine_types={"t2.micro": 1},
     )
     defaults.update(kwargs)
@@ -71,22 +71,24 @@ class TestTemplateAggregate:
             template_id="template-001",
             name="test-template",
             provider_api="ec2_fleet",
-            image_id="ami-12345678",
+            machine_image="ami-12345678",
             machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
-            user_data="#!/bin/bash\necho 'Hello World'",
+            machine_bootstrap="#!/bin/bash\necho 'Hello World'",
             tags={"Environment": "test", "Project": "hostfactory"},
         )
 
         assert template.template_id == "template-001"
         assert template.name == "test-template"
         assert template.provider_api == "ec2_fleet"
-        assert template.image_id == "ami-12345678"
+        assert template.machine_image == "ami-12345678"
         assert template.machine_types == {"t2.micro": 1}
         assert template.subnet_ids == ["subnet-12345678"]
         assert template.security_group_ids == ["sg-12345678"]
-        assert template.user_data is not None and "Hello World" in template.user_data
+        assert (
+            template.machine_bootstrap is not None and "Hello World" in template.machine_bootstrap
+        )
         assert template.tags["Environment"] == "test"
         assert template.tags["Project"] == "hostfactory"
 
@@ -99,8 +101,8 @@ class TestTemplateAggregate:
 
         assert template.template_id == "template-002"
         assert template.name == "minimal-template"
-        assert template.key_name is None
-        assert template.user_data is None
+        assert template.machine_ssh_key is None
+        assert template.machine_bootstrap is None
         assert template.tags == {}
 
     def test_template_with_various_provider_apis(self):
@@ -171,13 +173,13 @@ class TestTemplateAggregate:
         for user_data in user_data_scripts:
             template = _make_template(
                 template_id=f"template-userdata-{len(user_data)}",
-                user_data=user_data,
+                machine_bootstrap=user_data,
             )
-            assert template.user_data == user_data
+            assert template.machine_bootstrap == user_data
 
-        # None user_data
+        # None machine_bootstrap
         template = _make_template(template_id="template-no-userdata")
-        assert template.user_data is None
+        assert template.machine_bootstrap is None
 
     def test_template_tags_operations(self):
         """Test template tags operations."""
@@ -235,11 +237,11 @@ class TestTemplateAggregate:
             template_id="template-001",
             name="test-template",
             provider_api="ec2_fleet",
-            image_id="ami-12345678",
+            machine_image="ami-12345678",
             machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
-            user_data="#!/bin/bash\necho 'test'",
+            machine_bootstrap="#!/bin/bash\necho 'test'",
             tags={"Environment": "test"},
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
@@ -250,11 +252,12 @@ class TestTemplateAggregate:
         assert template_dict["template_id"] == "template-001"
         assert template_dict["name"] == "test-template"
         assert template_dict["provider_api"] == "ec2_fleet"
-        assert template_dict["image_id"] == "ami-12345678"
+        # model_dump serialises the canonical (new) field names
+        assert template_dict["machine_image"] == "ami-12345678"
         assert template_dict["machine_types"] == {"t2.micro": 1}
         assert template_dict["subnet_ids"] == ["subnet-12345678"]
         assert template_dict["security_group_ids"] == ["sg-12345678"]
-        assert template_dict["user_data"] == "#!/bin/bash\necho 'test'"
+        assert template_dict["machine_bootstrap"] == "#!/bin/bash\necho 'test'"
         assert template_dict["tags"] == {"Environment": "test"}
         assert "created_at" in template_dict
         assert "updated_at" in template_dict
@@ -275,16 +278,18 @@ class TestTemplateAggregate:
             "updated_at": "2023-01-01T00:00:00",
         }
 
+        # Deserialization from a dict using the OLD (deprecated) keys must still
+        # work via AliasChoices, mapping onto the new canonical attributes.
         template = Template(**template_dict)
 
         assert template.template_id == "template-001"
         assert template.name == "test-template"
         assert template.provider_api == "ec2_fleet"
-        assert template.image_id == "ami-12345678"
+        assert template.machine_image == "ami-12345678"
         assert template.machine_types == {"t2.micro": 1}
         assert template.subnet_ids == ["subnet-12345678"]
         assert template.security_group_ids == ["sg-12345678"]
-        assert template.user_data == "#!/bin/bash\necho 'test'"
+        assert template.machine_bootstrap == "#!/bin/bash\necho 'test'"
         assert template.tags == {"Environment": "test"}
 
     def test_template_with_multiple_subnets_and_security_groups(self):
@@ -315,11 +320,11 @@ class TestTemplateAggregate:
 
     def test_template_update_image_id(self):
         """Test updating image ID via method."""
-        template = _make_template(template_id="template-img", image_id="ami-old")
+        template = _make_template(template_id="template-img", machine_image="ami-old")
         updated = template.update_image_id("ami-new")
-        assert updated.image_id == "ami-new"
+        assert updated.machine_image == "ami-new"
         # Original unchanged
-        assert template.image_id == "ami-old"
+        assert template.machine_image == "ami-old"
 
     def test_template_add_subnet_method(self):
         """Test add_subnet method returns new template."""
@@ -475,16 +480,32 @@ class TestTemplateDeprecatedAliases:
         assert t.machine_role == "arn:aws:iam::123456789012:instance-profile/worker"
 
     def test_new_name_only_construction_no_warning(self):
-        """Using machine_type / machine_role directly emits no DeprecationWarning."""
+        """Using machine_type / machine_role directly emits no input-key deprecation.
+
+        Note: the canonical fields themselves carry Pydantic ``deprecated=``
+        markers that fire a ``DeprecationWarning`` on every attribute *read*
+        (e.g. when ``validate_template`` reads ``max_machines``).  That is a
+        deliberate schema signal and is unrelated to whether the *caller* used a
+        deprecated input key.  This test asserts only that no input-key
+        deprecation ("Template field 'X' is deprecated; use 'Y' instead.") is
+        emitted when constructing with the new names.
+        """
         import warnings
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", DeprecationWarning)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", DeprecationWarning)
             t = Template(
                 template_id="depr-5",
                 machine_type="t3.medium",
                 machine_role="arn:aws:iam::123456789012:instance-profile/new-role",
             )
+        input_key_warnings = [
+            str(w.message) for w in caught if str(w.message).startswith("Template field ")
+        ]
+        assert not input_key_warnings, (
+            f"New-name construction must not emit input-key deprecation warnings; "
+            f"got: {input_key_warnings}"
+        )
         assert t.machine_type == "t3.medium"
         assert t.machine_role == "arn:aws:iam::123456789012:instance-profile/new-role"
 
@@ -507,26 +528,46 @@ class TestTemplateDeprecatedAliases:
         assert t.machine_role == "arn:aws:iam::123456789012:instance-profile/legacy"
 
     def test_model_validate_with_new_name_machine_type(self):
-        """model_validate with new key 'machine_type' is accepted without warning."""
+        """model_validate with new key 'machine_type' emits no input-key deprecation.
+
+        The canonical fields carry Pydantic ``deprecated=`` markers that fire on
+        attribute *reads*; that is unrelated to the input key used.  This test
+        asserts no input-key deprecation ("Template field 'X' is deprecated")
+        is emitted when the new key is supplied.
+        """
         import warnings
 
         data = {"template_id": "depr-8", "machine_type": "t4g.medium"}
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", DeprecationWarning)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", DeprecationWarning)
             t = Template.model_validate(data)
+        input_key_warnings = [
+            str(w.message) for w in caught if str(w.message).startswith("Template field ")
+        ]
+        assert not input_key_warnings, (
+            f"New-name model_validate must not emit input-key deprecation warnings; "
+            f"got: {input_key_warnings}"
+        )
         assert t.machine_type == "t4g.medium"
 
     def test_model_validate_with_new_name_machine_role(self):
-        """model_validate with new key 'machine_role' is accepted without warning."""
+        """model_validate with new key 'machine_role' emits no input-key deprecation."""
         import warnings
 
         data = {
             "template_id": "depr-9",
             "machine_role": "arn:aws:iam::123456789012:instance-profile/current",
         }
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", DeprecationWarning)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", DeprecationWarning)
             t = Template.model_validate(data)
+        input_key_warnings = [
+            str(w.message) for w in caught if str(w.message).startswith("Template field ")
+        ]
+        assert not input_key_warnings, (
+            f"New-name model_validate must not emit input-key deprecation warnings; "
+            f"got: {input_key_warnings}"
+        )
         assert t.machine_role == "arn:aws:iam::123456789012:instance-profile/current"
 
     def test_old_name_not_readable_as_attribute(self):

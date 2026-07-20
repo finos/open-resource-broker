@@ -9,6 +9,24 @@ from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryF
 class HostFactoryFieldMapper(SchedulerFieldMapper):
     """HostFactory-specific field mapping and transformations."""
 
+    # Internal-name canonicalisation for the output direction.  The internal
+    # (snake_case) vocabulary was renamed on the domain ``Template``, but the
+    # application ``TemplateDTO`` deliberately keeps the original field names as
+    # a translation seam.  Output can therefore arrive keyed by either
+    # vocabulary depending on whether it originated from ``Template.model_dump``
+    # (new names) or ``TemplateDTO.to_dict`` (original names).  This table folds
+    # any original names onto the canonical internal name before the reverse
+    # field mapping runs, so both sources produce identical HostFactory output.
+    _OUTPUT_CANONICAL_NAMES: Dict[str, str] = {
+        "image_id": "machine_image",
+        "max_instances": "max_machines",
+        "key_name": "machine_ssh_key",
+        "user_data": "machine_bootstrap",
+        "root_device_volume_size": "machine_disk_size_gb",
+        "volume_type": "machine_disk_type",
+        "instance_profile": "machine_role",
+    }
+
     def __init__(self, provider_type: str | None = None):
         self.provider_type = provider_type
 
@@ -44,6 +62,11 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
         self, internal_template: Dict[str, Any], copy_unmapped: bool = False
     ) -> Dict[str, Any]:
         """Map internal format → HostFactory format with transformations."""
+        # Fold any original (pre-rename) internal names onto the canonical name
+        # so DTO-sourced dicts (original names) and domain-sourced dicts (renamed
+        # names) both map through the reverse field-mapping identically.
+        internal_template = self._canonicalize_internal_names(internal_template)
+
         # Apply internal → external mappings with nested field support
         reverse_mappings = {v: k for k, v in self.field_mappings.items()}
         mapped = self._map_with_nested_support(
@@ -52,6 +75,20 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
 
         # Apply HostFactory-specific transformations
         return self._apply_output_transformations(mapped)
+
+    def _canonicalize_internal_names(self, source: Dict[str, Any]) -> Dict[str, Any]:
+        """Fold original internal field names onto their renamed canonical form.
+
+        Only rewrites a key when the canonical name is not already present, so a
+        dict that already uses the new names is returned unchanged.
+        """
+        if not any(old in source for old in self._OUTPUT_CANONICAL_NAMES):
+            return source
+        out = dict(source)
+        for old_name, new_name in self._OUTPUT_CANONICAL_NAMES.items():
+            if old_name in out and new_name not in out:
+                out[new_name] = out.pop(old_name)
+        return out
 
     def _map_with_nested_support(
         self,

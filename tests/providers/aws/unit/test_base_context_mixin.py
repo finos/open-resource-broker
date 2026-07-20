@@ -192,8 +192,8 @@ class TestBaseContextMixin:
         """Test standard flag preparation."""
         # Add optional attributes
         self.template.machine_types = {"t3.medium": 1, "t3.large": 2}
-        self.template.key_name = "my-key"
-        self.template.user_data = "#!/bin/bash"
+        self.template.machine_ssh_key = "my-key"
+        self.template.machine_bootstrap = "#!/bin/bash"
         self.template.machine_role = "my-profile"
         self.template.ebs_optimized = True
         self.template.monitoring_enabled = False
@@ -215,6 +215,8 @@ class TestBaseContextMixin:
         self.template.security_group_ids = None
         self.template.instance_types = None
         self.template.machine_role = None
+        self.template.machine_ssh_key = None
+        self.template.machine_bootstrap = None
 
         result = self.mixin._prepare_standard_flags(self.template)
 

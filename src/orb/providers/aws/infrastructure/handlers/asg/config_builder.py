@@ -258,7 +258,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
             "request_id": str(request.request_id),
             "requested_count": request.requested_count,
             "desired_capacity": request.requested_count,
-            "image_id": template.image_id,
+            "image_id": template.machine_image,
             "instance_type": next(iter(template.machine_types or {}), None),
             "subnet_ids": template.subnet_ids or [],
             "has_subnets": bool(template.subnet_ids),

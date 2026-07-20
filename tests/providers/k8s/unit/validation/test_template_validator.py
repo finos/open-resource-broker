@@ -85,8 +85,8 @@ class TestTemplateIdRule:
         v = _make_validator()
         # Use a stub without template_id attribute to simulate missing field.
         obj = _stub(
-            image_id="busybox:latest",
-            max_instances=1,
+            machine_image="busybox:latest",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -102,8 +102,8 @@ class TestTemplateIdRule:
         v = _make_validator()
         obj = _stub(
             template_id="",
-            image_id="busybox:latest",
-            max_instances=1,
+            machine_image="busybox:latest",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -119,8 +119,8 @@ class TestTemplateIdRule:
         v = _make_validator()
         obj = _stub(
             template_id="   ",
-            image_id="busybox:latest",
-            max_instances=1,
+            machine_image="busybox:latest",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -141,20 +141,20 @@ class TestTemplateIdRule:
 class TestMaxInstancesRule:
     def test_valid_max_instances(self) -> None:
         v = _make_validator()
-        result = v.validate(_minimal_template(max_instances=5))
+        result = v.validate(_minimal_template(max_machines=5))
         assert result.valid, result.errors
 
     def test_max_instances_of_one(self) -> None:
         v = _make_validator()
-        result = v.validate(_minimal_template(max_instances=1))
+        result = v.validate(_minimal_template(max_machines=1))
         assert result.valid, result.errors
 
     def test_max_instances_zero(self) -> None:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=0,
+            machine_image="img",
+            max_machines=0,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -164,14 +164,14 @@ class TestMaxInstancesRule:
         )
         result = v.validate(obj)
         assert not result.valid
-        assert any("max_instances" in e for e in result.errors)
+        assert any("max_machines" in e for e in result.errors)
 
     def test_max_instances_negative(self) -> None:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=-10,
+            machine_image="img",
+            max_machines=-10,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -181,14 +181,14 @@ class TestMaxInstancesRule:
         )
         result = v.validate(obj)
         assert not result.valid
-        assert any("max_instances" in e for e in result.errors)
+        assert any("max_machines" in e for e in result.errors)
 
     def test_max_instances_none_is_allowed(self) -> None:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=None,
+            machine_image="img",
+            max_machines=None,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -203,8 +203,8 @@ class TestMaxInstancesRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances="banana",
+            machine_image="img",
+            max_machines="banana",
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -214,7 +214,7 @@ class TestMaxInstancesRule:
         )
         result = v.validate(obj)
         assert not result.valid
-        assert any("max_instances" in e for e in result.errors)
+        assert any("max_machines" in e for e in result.errors)
 
 
 # ---------------------------------------------------------------------------
@@ -228,8 +228,8 @@ class TestProviderApiRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=api,
             namespace=None,
             service_account=None,
@@ -244,8 +244,8 @@ class TestProviderApiRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api="CronJob",
             namespace=None,
             service_account=None,
@@ -261,8 +261,8 @@ class TestProviderApiRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -277,8 +277,8 @@ class TestProviderApiRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api="pod",
             namespace=None,
             service_account=None,
@@ -305,8 +305,8 @@ class TestImageIdRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id=None,
-            max_instances=1,
+            machine_image=None,
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -316,14 +316,14 @@ class TestImageIdRule:
         )
         result = v.validate(obj)
         assert not result.valid
-        assert any("image_id" in e for e in result.errors)
+        assert any("machine_image" in e for e in result.errors)
 
     def test_empty_image_id(self) -> None:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="",
-            max_instances=1,
+            machine_image="",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -333,14 +333,14 @@ class TestImageIdRule:
         )
         result = v.validate(obj)
         assert not result.valid
-        assert any("image_id" in e for e in result.errors)
+        assert any("machine_image" in e for e in result.errors)
 
     def test_whitespace_image_id(self) -> None:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="  ",
-            max_instances=1,
+            machine_image="  ",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -374,8 +374,8 @@ class TestNamespaceRule:
         # Use a stub with namespace set.
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=ns,
             service_account=None,
@@ -402,8 +402,8 @@ class TestNamespaceRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=ns,
             service_account=None,
@@ -435,8 +435,8 @@ class TestServiceAccountRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=sa,
@@ -461,8 +461,8 @@ class TestServiceAccountRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=sa,
@@ -495,8 +495,8 @@ class TestResourceQuantitiesRule:
         rq = K8sResourceQuantities(cpu=qty)
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -516,8 +516,8 @@ class TestResourceQuantitiesRule:
         rq = K8sResourceQuantities(cpu=qty)
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -534,8 +534,8 @@ class TestResourceQuantitiesRule:
         rl = K8sResourceQuantities(memory="BAD_QUANTITY")
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -556,8 +556,8 @@ class TestResourceQuantitiesRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -572,8 +572,8 @@ class TestResourceQuantitiesRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -596,8 +596,8 @@ class TestTolerationsRule:
         tol = K8sToleration(key="gpu", operator="Exists", effect="NoSchedule")
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -613,8 +613,8 @@ class TestTolerationsRule:
         tol_dict = {"key": "spot", "operator": "Equal", "value": "true", "effect": "NoSchedule"}
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -629,8 +629,8 @@ class TestTolerationsRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -650,8 +650,8 @@ class TestTolerationsRule:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -671,8 +671,8 @@ class TestTolerationsRule:
         ]
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=None,
@@ -692,7 +692,7 @@ class TestTolerationsRule:
 class TestIntegration:
     def test_minimal_valid_k8s_template(self) -> None:
         v = _make_validator()
-        t = K8sTemplate(template_id="my-pod-template", image_id="nginx:1.25", max_instances=10)
+        t = K8sTemplate(template_id="my-pod-template", machine_image="nginx:1.25", max_machines=10)
         result = v.validate(t)
         assert result.valid, result.errors
 
@@ -700,8 +700,8 @@ class TestIntegration:
         v = _make_validator()
         t = K8sTemplate(
             template_id="full-template",
-            image_id="ghcr.io/example/worker:v2",
-            max_instances=5,
+            machine_image="ghcr.io/example/worker:v2",
+            max_machines=5,
             provider_api="Deployment",
             namespace="my-namespace",
             service_account="workload-sa",
@@ -717,13 +717,13 @@ class TestIntegration:
         t = K8sTemplate(template_id="no-image")
         result = v.validate(t)
         assert not result.valid
-        assert any("image_id" in e for e in result.errors)
+        assert any("machine_image" in e for e in result.errors)
 
     def test_k8s_template_invalid_namespace(self) -> None:
         v = _make_validator()
         t = K8sTemplate(
             template_id="t",
-            image_id="busybox:latest",
+            machine_image="busybox:latest",
             namespace="UPPERCASE-BAD",  # type: ignore[arg-type]
         )
         result = v.validate(t)
@@ -750,8 +750,8 @@ class TestIntegration:
         v = _make_validator()
         obj = _stub(
             template_id="",  # fails rule 1
-            image_id=None,  # fails rule 4
-            max_instances=0,  # fails rule 2
+            machine_image=None,  # fails rule 4
+            max_machines=0,  # fails rule 2
             provider_api="DaemonSet",  # fails rule 3
             namespace=None,
             service_account=None,
@@ -790,8 +790,8 @@ class TestServiceAccountSubdomain:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=sa,
@@ -818,8 +818,8 @@ class TestServiceAccountSubdomain:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account=sa,
@@ -837,8 +837,8 @@ class TestServiceAccountSubdomain:
         v = _make_validator()
         obj = _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=None,
             namespace=None,
             service_account="my.service-account",
@@ -862,8 +862,8 @@ class TestRestartPolicyPerKind:
     def _stub_with_restart(self, provider_api: str | None, restart_policy: str | None) -> Any:
         return _stub(
             template_id="t",
-            image_id="img",
-            max_instances=1,
+            machine_image="img",
+            max_machines=1,
             provider_api=provider_api,
             namespace=None,
             service_account=None,

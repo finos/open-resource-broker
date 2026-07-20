@@ -305,7 +305,7 @@ def test_initialize_k8s_provider_exception_with_logger_logs_error() -> None:
     mock_logger = MagicMock()
     try:
         with patch(
-            "orb.providers.k8s.registration.register_k8s_provider_settings",
+            "orb.providers.k8s.registration.register_k8s_auth_strategies",
             side_effect=RuntimeError("settings-fail"),
         ):
             with pytest.raises(RuntimeError, match="settings-fail"):
