@@ -58,6 +58,12 @@ def _redact_proxy_url(url: str) -> str:
     Logging the raw URL at DEBUG level would expose credentials in log files.
     This helper strips the userinfo from the netloc so the host/port are still
     visible for diagnostics without leaking secrets.
+
+    ``urllib.parse`` only populates ``username``/``password`` when it finds a
+    scheme and network-location component.  A scheme-less but credentialed
+    value such as ``user:pass@proxy:3128`` parses entirely into ``path`` with
+    ``username`` unset, so we additionally detect a userinfo ``@`` segment in
+    the authority portion by hand and redact it.
     """
     try:
         parsed = urllib.parse.urlparse(url)
@@ -69,9 +75,34 @@ def _redact_proxy_url(url: str) -> str:
             redacted_netloc = f"***@{redacted_netloc}"
             parsed = parsed._replace(netloc=redacted_netloc)
             return urllib.parse.urlunparse(parsed)
+        return _redact_schemeless_userinfo(url)
     except Exception:  # pragma: no cover — malformed URLs passed through
         pass
     return url
+
+
+def _redact_schemeless_userinfo(url: str) -> str:
+    """Redact a ``user:pass@host`` userinfo segment that ``urlparse`` missed.
+
+    Handles scheme-less values (``user:pass@proxy:3128``) as well as values
+    whose scheme was recognised but whose userinfo urllib still declined to
+    split.  Only the authority portion (up to the first ``/``) is inspected so
+    an ``@`` inside a path is never mistaken for credentials.
+    """
+    scheme_sep = "://"
+    prefix = ""
+    remainder = url
+    sep_idx = url.find(scheme_sep)
+    if sep_idx != -1:
+        prefix = url[: sep_idx + len(scheme_sep)]
+        remainder = url[sep_idx + len(scheme_sep) :]
+
+    authority, sep, rest = remainder.partition("/")
+    at_idx = authority.rfind("@")
+    if at_idx == -1:
+        return url
+    host_part = authority[at_idx + 1 :]
+    return f"{prefix}***@{host_part}{sep}{rest}"
 
 
 # ---------------------------------------------------------------------------
@@ -79,13 +110,21 @@ def _redact_proxy_url(url: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_proxy_url() -> Optional[str]:
+def _resolve_proxy_url(config_proxy_url: Optional[str] = None) -> Optional[str]:
     """Return the proxy URL to use for apiserver connections, or ``None``.
 
-    Preference order: ``HTTPS_PROXY`` → ``https_proxy`` → ``HTTP_PROXY`` →
-    ``http_proxy``.  HTTPS variants are checked first because the Kubernetes
-    apiserver always serves TLS.
+    When *config_proxy_url* is supplied (from :class:`K8sProviderConfig`) it
+    takes precedence over the environment — explicit provider configuration
+    always wins over ambient env vars.
+
+    Otherwise the preference order is ``HTTPS_PROXY`` → ``https_proxy`` →
+    ``HTTP_PROXY`` → ``http_proxy``.  HTTPS variants are checked first because
+    the Kubernetes apiserver always serves TLS.
     """
+    if config_proxy_url is not None:
+        stripped = config_proxy_url.strip()
+        if stripped:
+            return stripped
     for var in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
         value = os.environ.get(var, "").strip()
         if value:
@@ -93,8 +132,16 @@ def _resolve_proxy_url() -> Optional[str]:
     return None
 
 
-def _resolve_no_proxy() -> Optional[str]:
-    """Return the ``NO_PROXY`` exclusion list, or ``None`` when unset."""
+def _resolve_no_proxy(config_no_proxy: Optional[str] = None) -> Optional[str]:
+    """Return the ``NO_PROXY`` exclusion list, or ``None`` when unset.
+
+    A *config_no_proxy* value from :class:`K8sProviderConfig` takes precedence
+    over the ``NO_PROXY`` / ``no_proxy`` environment variables.
+    """
+    if config_no_proxy is not None:
+        stripped = config_no_proxy.strip()
+        if stripped:
+            return stripped
     for var in ("NO_PROXY", "no_proxy"):
         value = os.environ.get(var, "").strip()
         if value:
@@ -102,27 +149,37 @@ def _resolve_no_proxy() -> Optional[str]:
     return None
 
 
-def _apply_proxy_to_default_configuration(logger: Optional[LoggingPort]) -> None:
+def _apply_proxy_to_default_configuration(
+    logger: Optional[LoggingPort],
+    config_proxy_url: Optional[str] = None,
+    config_no_proxy: Optional[str] = None,
+) -> None:
     """Patch the kubernetes global default Configuration with proxy settings.
 
     This is called *after* ``load_incluster_config`` so the loaded credentials
-    are already in place.  We read the proxy env vars, apply them to a copy of
-    the active default Configuration, then promote the patched copy back as the
-    new default.
+    are already in place.  We resolve the proxy settings (config values take
+    precedence over env vars), apply them to a copy of the active default
+    Configuration, then promote the patched copy back as the new default.
 
-    When no proxy env vars are set this function is a no-op.
+    When neither a config value nor a proxy env var is set this function is a
+    no-op.
 
     Args:
         logger: Optional :class:`LoggingPort` for DEBUG messages.  When
             ``None`` proxy wiring is still applied silently.
+        config_proxy_url: Explicit proxy URL from :class:`K8sProviderConfig`.
+            Takes precedence over the proxy environment variables.
+        config_no_proxy: Explicit ``no_proxy`` exclusion list from
+            :class:`K8sProviderConfig`.  Takes precedence over the
+            ``NO_PROXY`` / ``no_proxy`` environment variables.
     """
     try:
         from kubernetes.client import Configuration  # type: ignore[reportAttributeAccessIssue]
     except ImportError:  # pragma: no cover — kubernetes extra not installed
         return
 
-    proxy_url = _resolve_proxy_url()
-    no_proxy = _resolve_no_proxy()
+    proxy_url = _resolve_proxy_url(config_proxy_url)
+    no_proxy = _resolve_no_proxy(config_no_proxy)
 
     if proxy_url is None and no_proxy is None:
         return
@@ -163,19 +220,33 @@ def is_in_cluster(sentinel: Path | None = None) -> bool:
         return False
 
 
-def load_in_cluster_config(logger: Optional[LoggingPort] = None) -> None:
+def load_in_cluster_config(
+    logger: Optional[LoggingPort] = None,
+    proxy_url: Optional[str] = None,
+    no_proxy: Optional[str] = None,
+) -> None:
     """Bootstrap the global ``kubernetes`` client config from in-cluster secrets.
 
-    After loading the service-account credentials, the function wires any HTTP
-    proxy configured in ``HTTPS_PROXY`` / ``https_proxy`` (preferred) or
-    ``HTTP_PROXY`` / ``http_proxy`` into ``kubernetes.client.Configuration.proxy``.
-    ``NO_PROXY`` / ``no_proxy`` is honoured via ``Configuration.no_proxy``.
-    When no proxy env vars are set this step is a no-op.
+    After loading the service-account credentials, the function wires an HTTP
+    proxy into ``kubernetes.client.Configuration.proxy``.  When *proxy_url* is
+    supplied (from :class:`K8sProviderConfig`) it takes precedence; otherwise
+    the loader falls back to ``HTTPS_PROXY`` / ``https_proxy`` (preferred) or
+    ``HTTP_PROXY`` / ``http_proxy``.  The exclusion list is taken from
+    *no_proxy* (config) or the ``NO_PROXY`` / ``no_proxy`` environment
+    variables and wired into ``Configuration.no_proxy``.  When neither a config
+    value nor a proxy env var is set this step is a no-op.
 
     Args:
         logger: Optional :class:`LoggingPort` for DEBUG messages about proxy
             wiring.  Proxy is applied regardless of whether a logger is
             provided.
+        proxy_url: Explicit proxy URL from :class:`K8sProviderConfig`.  Takes
+            precedence over the proxy environment variables.  ``None`` falls
+            back to the environment.
+        no_proxy: Explicit ``no_proxy`` exclusion list from
+            :class:`K8sProviderConfig`.  Takes precedence over the ``NO_PROXY``
+            / ``no_proxy`` environment variables.  ``None`` falls back to the
+            environment.
 
     Raises:
         K8sAuthError: If the kubernetes SDK is not installed, or the
@@ -194,8 +265,8 @@ def load_in_cluster_config(logger: Optional[LoggingPort] = None) -> None:
     except Exception as exc:
         raise K8sAuthError(f"Failed to load in-cluster config: {exc}") from exc
 
-    # Wire HTTP proxy from environment into the loaded configuration.
-    _apply_proxy_to_default_configuration(logger)
+    # Wire HTTP proxy (config value or environment) into the loaded configuration.
+    _apply_proxy_to_default_configuration(logger, proxy_url, no_proxy)
 
 
 class InClusterAuthAdapter:
@@ -211,10 +282,25 @@ class InClusterAuthAdapter:
             trigger a refresh.  Defaults to 55 minutes (3300 s), which
             provides a comfortable margin before the token is rotated at
             80 % of its default 3600-second lifetime.
+        logger: Optional :class:`LoggingPort` forwarded to
+            ``load_in_cluster_config`` for proxy-wiring DEBUG messages.
+        proxy_url: Explicit proxy URL from :class:`K8sProviderConfig`.  Carried
+            across every (re)load so token refreshes re-apply the same proxy.
+        no_proxy: Explicit ``no_proxy`` exclusion list from
+            :class:`K8sProviderConfig`, carried across every (re)load.
     """
 
-    def __init__(self, token_refresh_seconds: int = _DEFAULT_TOKEN_REFRESH_SECONDS) -> None:
+    def __init__(
+        self,
+        token_refresh_seconds: int = _DEFAULT_TOKEN_REFRESH_SECONDS,
+        logger: Optional[LoggingPort] = None,
+        proxy_url: Optional[str] = None,
+        no_proxy: Optional[str] = None,
+    ) -> None:
         self._token_refresh_seconds = token_refresh_seconds
+        self._logger = logger
+        self._proxy_url = proxy_url
+        self._no_proxy = no_proxy
         self._last_loaded_at: Optional[float] = None
 
     # ------------------------------------------------------------------
@@ -223,7 +309,11 @@ class InClusterAuthAdapter:
 
     def load(self) -> None:
         """Bootstrap the global kubernetes client config and record the timestamp."""
-        load_in_cluster_config()
+        load_in_cluster_config(
+            logger=self._logger,
+            proxy_url=self._proxy_url,
+            no_proxy=self._no_proxy,
+        )
         self._last_loaded_at = time.monotonic()
 
     # ------------------------------------------------------------------
@@ -249,7 +339,11 @@ class InClusterAuthAdapter:
         if age < self._token_refresh_seconds:
             return False
 
-        load_in_cluster_config()
+        load_in_cluster_config(
+            logger=self._logger,
+            proxy_url=self._proxy_url,
+            no_proxy=self._no_proxy,
+        )
         self._last_loaded_at = time.monotonic()
         return True
 

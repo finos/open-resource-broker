@@ -77,14 +77,16 @@ class JobStatusResolver:
             # resource_version='0' serves from the apiserver reflector cache
             # (sub-ms, ~500 ms staleness) instead of reading from etcd.
             # Acceptable for status polls — not used on create/update paths.
-            response = handler.with_retry(
-                handler.client.core_v1.list_namespaced_pod,
-                namespace=namespace,
-                label_selector=selector,
-                resource_version="0",
-                operation_name="list_namespaced_pod",
-            )
+            with handler._timed_api_call("list_namespaced_pod"):
+                response = handler.with_retry(
+                    handler.client.core_v1.list_namespaced_pod,
+                    namespace=namespace,
+                    label_selector=selector,
+                    resource_version="0",
+                    operation_name="list_namespaced_pod",
+                )
         except Exception as exc:
+            handler._record_api_exception(exc, operation="list_namespaced_pod")
             handler._logger.error(
                 "list_namespaced_pod failed for job request %s: %s",
                 request.request_id,
@@ -202,12 +204,13 @@ class JobStatusResolver:
         """
         handler = self._handler
         try:
-            job = handler.with_retry(
-                handler.client.batch_v1.read_namespaced_job,
-                name=job_name,
-                namespace=namespace,
-                operation_name="read_namespaced_job",
-            )
+            with handler._timed_api_call("read_namespaced_job"):
+                job = handler.with_retry(
+                    handler.client.batch_v1.read_namespaced_job,
+                    name=job_name,
+                    namespace=namespace,
+                    operation_name="read_namespaced_job",
+                )
         except Exception as exc:
             if handler.is_not_found(exc):
                 # Job not found is normal after release or before creation.
@@ -219,6 +222,7 @@ class JobStatusResolver:
                     namespace,
                 )
                 return {}
+            handler._record_api_exception(exc, operation="read_namespaced_job")
             handler._logger.warning(
                 "read_namespaced_job failed (job=%s namespace=%s): %s",
                 job_name,

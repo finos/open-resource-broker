@@ -79,11 +79,13 @@ class PodStatusResolver:
             list_kwargs["resource_version"] = "0"
 
         try:
-            response = handler.with_retry(
-                handler.client.core_v1.list_namespaced_pod,
-                **list_kwargs,
-            )
+            with handler._timed_api_call("list_namespaced_pod"):
+                response = handler.with_retry(
+                    handler.client.core_v1.list_namespaced_pod,
+                    **list_kwargs,
+                )
         except Exception as exc:
+            handler._record_api_exception(exc, operation="list_namespaced_pod")
             handler._logger.error(
                 "list_namespaced_pod failed for request %s: %s",
                 request.request_id,

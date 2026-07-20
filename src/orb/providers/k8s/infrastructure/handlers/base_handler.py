@@ -22,7 +22,7 @@ from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, Provider
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.di.injectable import injectable
-from orb.infrastructure.resilience import retry
+from orb.infrastructure.resilience import MaxRetriesExceededError
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.handlers.shared.label_stamper import (
     stamp_native_workload_body as _stamp_workload_body,
@@ -36,6 +36,7 @@ from orb.providers.k8s.infrastructure.handlers.shared.pod_state_translator impor
     instance_dict_for_state as _instance_dict_for_state,
 )
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+from orb.providers.k8s.resilience.circuit_breaker import K8sCircuitBreaker
 from orb.providers.k8s.utilities.pod_spec import request_id_label_selector
 from orb.providers.k8s.utilities.pod_spec_audit import audit_pod_spec
 from orb.providers.k8s.utilities.pod_state import (
@@ -171,16 +172,24 @@ class K8sHandlerBase(ABC):
         time after the block completes (whether via normal return or exception).
         No-op when metrics are not wired.
 
+        Uses :func:`time.perf_counter` (the highest-resolution clock for
+        measuring elapsed durations) rather than :func:`time.monotonic` so the
+        latency measurement is decoupled from the ``monotonic``-based TTL-cache
+        bookkeeping in the status resolvers — a resolver may wrap its
+        controller GET in this context manager and separately consult
+        ``time.monotonic()`` for cache freshness without the two clocks
+        interfering.
+
         Usage::
 
             with self._timed_api_call("create_namespaced_pod"):
                 core_v1.create_namespaced_pod(...)
         """
-        t0 = time.monotonic()
+        t0 = time.perf_counter()
         try:
             yield
         finally:
-            elapsed = time.monotonic() - t0
+            elapsed = time.perf_counter() - t0
             self._record_apiserver_latency(operation=operation, seconds=elapsed)
 
     def _classify_and_record_api_exception(
@@ -188,7 +197,7 @@ class K8sHandlerBase(ABC):
         exc: BaseException,
         *,
         operation: str,
-    ) -> "K8sError":
+    ) -> K8sError:
         """Classify a raw ``ApiException`` into a typed K8sError and emit metrics.
 
         Call this at the API-call boundary after the retry budget is exhausted
@@ -225,16 +234,47 @@ class K8sHandlerBase(ABC):
             from kubernetes.client.exceptions import ApiException as _ApiException
 
             if isinstance(candidate, _ApiException):
-                status = int(getattr(candidate, "status", 0) or 0)
-                error_code = str(status) if status else "unknown"
-                self._record_api_error(operation=operation, error_code=error_code)
+                self._record_api_exception(exc, operation=operation)
                 return classify_api_exception(candidate, operation=operation)
         except ImportError:  # pragma: no cover — kubernetes extra absent
             pass
 
         # Not an ApiException — wrap in base K8sError.
-        self._record_api_error(operation=operation, error_code="unknown")
+        self._record_api_exception(exc, operation=operation)
         return K8sError(str(exc), error_source=f"kubernetes.{operation}")
+
+    def _record_api_exception(self, exc: BaseException, *, operation: str) -> None:
+        """Record ``orb_k8s_api_errors_total`` for a caught API-boundary exception.
+
+        Extracts the HTTP status code from a raw ``ApiException`` (unwrapping one
+        level of retry wrapping when present) and increments the error counter.
+        A ``429`` status additionally increments ``orb_k8s_api_throttles_total``
+        via :meth:`K8sMetrics.record_api_error`.  Non-``ApiException`` inputs are
+        bucketed under the ``"unknown"`` error code so read paths that swallow
+        the exception (status resolvers) still surface as failures on the
+        dashboards.
+
+        Unlike :meth:`_classify_and_record_api_exception` this does not construct
+        a typed :class:`K8sError`; it is intended for call sites that catch and
+        recover from the exception rather than re-raising a structured error.
+        """
+        error_code = "unknown"
+        # Unwrap one level of retry wrapping when present.
+        candidate: BaseException = exc
+        last_exception = getattr(exc, "last_exception", None)
+        if isinstance(last_exception, BaseException):
+            candidate = last_exception
+
+        try:
+            from kubernetes.client.exceptions import ApiException as _ApiException
+
+            if isinstance(candidate, _ApiException):
+                status = int(getattr(candidate, "status", 0) or 0)
+                error_code = str(status) if status else "unknown"
+        except ImportError:  # pragma: no cover — kubernetes extra absent
+            pass
+
+        self._record_api_error(operation=operation, error_code=error_code)
 
     @property
     def client(self) -> K8sClient:
@@ -471,29 +511,67 @@ class K8sHandlerBase(ABC):
         apiserver failure count reaches ``circuit_breaker_failure_threshold``
         the circuit opens and subsequent calls fast-fail with
         ``CircuitBreakerOpenError`` until the reset window expires.  This
-        prevents cascading retry storms during apiserver degradation.
+        prevents cascading retry storms during apiserver degradation.  The
+        breaker is a :class:`K8sCircuitBreaker` wired with the handler's
+        metrics recorder so ``orb_k8s_circuit_breaker_state`` reflects the
+        state of the breakers that actually protect the apiserver calls.
+
+        Metrics: every attempt beyond the first is a genuine retry from the
+        resilience layer, so ``orb_k8s_api_retries_total`` is incremented once
+        per re-invocation of ``operation`` (i.e. ``attempts - 1`` times).  The
+        counter therefore reflects the real retry/backoff path rather than a
+        caller-side estimate.  ``operation_name`` is used as the ``operation``
+        label; values outside :data:`API_OPERATIONS` bucket to ``"unknown"``.
         """
         service_key = f"kubernetes.{self.PROVIDER_API.lower()}"
 
-        @retry(
-            strategy="circuit_breaker",
-            service=service_key,
+        # Metrics-aware circuit breaker so the gauge that tracks these
+        # apiserver-protecting breakers is emitted from the production retry
+        # path.  Semantics are identical to the base CircuitBreakerStrategy;
+        # the subclass only layers the ``orb_k8s_circuit_breaker_state``
+        # emission on top of the shared, class-level circuit state.
+        breaker = K8sCircuitBreaker(
+            service_name=service_key,
             max_attempts=self._max_retries,
             base_delay=self._base_delay,
             max_delay=self._max_delay,
             failure_threshold=self._cb_failure_threshold,
             reset_timeout=self._cb_reset_timeout,
+            metrics=self._metrics,
         )
-        def wrapped() -> T:
+
+        attempt = 0
+        while True:
+            # Every invocation after the first is a retry issued by the
+            # backoff loop — record it against the operation so
+            # ``orb_k8s_api_retries_total`` tracks the actual retry path.
+            if attempt > 0:
+                self._record_api_retry(operation=operation_name)
             self._logger.debug(
                 "Calling Kubernetes operation %s (args=%s kwargs=%s)",
                 operation_name,
                 args,
                 {k: v for k, v in kwargs.items() if k != "body"},
             )
-            return operation(*args, **kwargs)
+            try:
+                result = operation(*args, **kwargs)
+            except Exception as exc:
+                # ``should_retry`` updates the circuit state (and may raise
+                # ``CircuitBreakerOpenError`` when the circuit is open),
+                # emitting the state gauge on any transition.
+                if not breaker.should_retry(attempt, exc):
+                    if attempt >= self._max_retries:
+                        raise MaxRetriesExceededError(attempt + 1, exc) from exc
+                    raise
+                delay = breaker.get_delay(attempt)
+                breaker.on_retry(attempt, exc)
+                if delay > 0:
+                    time.sleep(delay)
+                attempt += 1
+                continue
 
-        return wrapped()
+            breaker.record_success()
+            return result
 
     # ------------------------------------------------------------------
     # Pod-state translation — shared between handlers and watcher

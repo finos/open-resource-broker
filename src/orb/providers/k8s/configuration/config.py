@@ -8,6 +8,7 @@ integrates with the configuration loader and the provider settings registry.
 from __future__ import annotations
 
 import contextlib
+import urllib.parse
 from pathlib import Path
 from typing import Any, Optional
 
@@ -170,7 +171,7 @@ class K8sNamingConfig(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _validate_budget(self) -> "K8sNamingConfig":
+    def _validate_budget(self) -> K8sNamingConfig:
         """Ensure prefix+uuid_chars fit within every per-kind length budget.
 
         Deployment is almost always the tightest constraint because its
@@ -288,6 +289,31 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
             "When ``None`` (default) the provider auto-detects in-cluster mode via "
             "the /var/run/secrets/kubernetes.io sentinel.  Explicit True/False "
             "short-circuits detection."
+        ),
+    )
+
+    # HTTP proxy for apiserver connections
+    proxy_url: Optional[str] = Field(
+        None,
+        description=(
+            "HTTP/HTTPS proxy URL used for connections to the Kubernetes API "
+            "server.  When set, this value is wired into "
+            "``kubernetes.client.Configuration.proxy`` after the credentials are "
+            "loaded and takes precedence over the ``HTTPS_PROXY`` / ``HTTP_PROXY`` "
+            "environment variables.  When ``None`` (the default) the loaders fall "
+            "back to the standard proxy environment variables.  Accepts an "
+            "optional ``user:password@`` userinfo component; credentials are "
+            "redacted from any DEBUG log output."
+        ),
+    )
+    no_proxy: Optional[str] = Field(
+        None,
+        description=(
+            "Comma-separated exclusion list wired into "
+            "``kubernetes.client.Configuration.no_proxy``.  Hosts matching an "
+            "entry bypass ``proxy_url``.  When set this takes precedence over the "
+            "``NO_PROXY`` / ``no_proxy`` environment variables; when ``None`` the "
+            "loaders fall back to those environment variables."
         ),
     )
 
@@ -706,6 +732,35 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
                 "pass None to omit it (the provider will use the current kubeconfig context)."
             )
         return v
+
+    @field_validator("proxy_url")
+    @classmethod
+    def _validate_proxy_url(cls, v: Optional[str]) -> Optional[str]:
+        """Reject an empty/whitespace ``proxy_url`` and require an http(s) scheme.
+
+        ``None`` passes through (proxy disabled / fall back to env vars).  A
+        supplied value must be a non-empty ``http://`` or ``https://`` URL with
+        a host component so an operator typo (e.g. a bare host without scheme)
+        fails fast at config-construction time rather than being silently
+        ignored by the SDK.
+        """
+        if v is None:
+            return v
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError(
+                "proxy_url must be a non-empty URL when supplied; "
+                "pass None to disable the explicit proxy and fall back to the "
+                "HTTPS_PROXY / HTTP_PROXY environment variables."
+            )
+        parsed = urllib.parse.urlparse(stripped)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            raise ValueError(
+                f"proxy_url {v!r} is not a valid proxy URL.  Expected an "
+                "'http://' or 'https://' URL with a host, e.g. "
+                "'http://proxy.corp.example:3128'."
+            )
+        return stripped
 
     @field_validator("kubeconfig_path")
     @classmethod

@@ -21,8 +21,6 @@ factory can be a near drop-in.
 
 from __future__ import annotations
 
-import asyncio
-import threading
 import time
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
@@ -59,6 +57,15 @@ from orb.providers.k8s.services.instance_operation_service import (
 from orb.providers.k8s.services.start_stop_service import K8sStartStopService
 from orb.providers.k8s.services.template_validation_service import K8sTemplateValidationService
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
+from orb.providers.k8s.strategy.native_spec_resolver import K8sNativeSpecResolver
+from orb.providers.k8s.strategy.node_watch_lifecycle import K8sNodeWatchLifecycle
+from orb.providers.k8s.strategy.outcome_bridge import (
+    _all_instances_terminal,
+    _build_provider_result_data,
+    _outcome_to_provider_result,
+)
+from orb.providers.k8s.strategy.reconciliation_lifecycle import K8sReconciliationLifecycle
+from orb.providers.k8s.strategy.watch_lifecycle import K8sWatchManagerLifecycle
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.events_watcher import K8sEventsWatcher, K8sNodeEventsCache
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
@@ -67,6 +74,16 @@ from orb.providers.k8s.watch.node_watcher import K8sNodeWatcher
 from orb.providers.k8s.watch.pod_state_cache import PodStateCache
 
 _logger = get_logger(__name__)
+
+# Re-exported for backward compatibility: tests and callers import these
+# bridge helpers from this module.  The implementations now live in
+# ``outcome_bridge`` to keep the strategy shell focused on lifecycle.
+__all__ = [
+    "K8sProviderStrategy",
+    "_all_instances_terminal",
+    "_build_provider_result_data",
+    "_outcome_to_provider_result",
+]
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.domain.request.aggregate import Request
@@ -175,45 +192,54 @@ class K8sProviderStrategy(ProviderStrategy):
         self._provider_name = provider_name
         self._config_port = config_port
         self._kubernetes_client: Optional[K8sClient] = kubernetes_client
-        # Watch fan-out.  Constructed lazily by :meth:`initialize` when
-        # ``config.watch_enabled`` is True and no override has been
-        # provided.  Tests inject a stub via ``watch_manager``.
-        self._watch_manager: Optional[MultiNamespaceWatcher] = watch_manager
-        # Reconciliation wiring: startup reconciler + orphan GC.
         # ``known_request_ids`` is the storage closure the strategy hands
-        # to both — when the
-        # caller does not supply it the reconciler treats every managed
-        # pod as an orphan (safest signal) and the GC is wired to an
-        # empty set.  Tests can override both subsystems wholesale.
+        # to the reconciler + orphan GC — when the caller does not supply
+        # it the reconciler treats every managed pod as an orphan (safest
+        # signal) and the GC is wired to an empty set.
         self._known_request_ids_fn: Callable[[], Iterable[str]] = known_request_ids or (lambda: ())
-        self._startup_reconciler: Optional[StartupReconciler] = startup_reconciler
-        self._orphan_gc: Optional[OrphanGarbageCollector] = orphan_gc
-        self._last_reconciliation_report: Optional[ReconciliationReport] = None
-        # Node watching.  When ``node_watch_enabled=True`` (opt-in via
-        # K8sProviderConfig) the strategy starts a K8sNodeWatcher on the
-        # background thread and exposes the populated K8sNodeStateCache to
-        # handlers so per-instance status dicts carry node metadata.
-        # Tests inject both via the constructor kwargs to avoid real threads.
-        self._node_state_cache: K8sNodeStateCache = node_state_cache or K8sNodeStateCache()
-        self._node_watcher: Optional[K8sNodeWatcher] = node_watcher
-        # Events API watching.  When ``events_watch_enabled=True`` (opt-in via
-        # K8sProviderConfig) the strategy starts a K8sEventsWatcher on a
-        # background thread and populates K8sNodeEventsCache with Karpenter
-        # node-disruption events.  Tests inject both via constructor kwargs.
-        self._node_events_cache: K8sNodeEventsCache = node_events_cache or K8sNodeEventsCache()
-        self._events_watcher: Optional[K8sEventsWatcher] = events_watcher
+        # ------------------------------------------------------------------
+        # Lifecycle sub-services — mirror the AWS provider's delegation
+        # layout.  Each owns one cohesive background subsystem so the
+        # strategy shell stays a thin orchestrator.
+        # ------------------------------------------------------------------
+        # Watch fan-out (+ shared PodStateCache + metrics recorder).
+        self._watch_lifecycle = K8sWatchManagerLifecycle(
+            config=self._k8s_config,
+            logger=self._logger,
+            client_provider=lambda: self.kubernetes_client,
+            watch_manager=watch_manager,
+        )
+        # Startup reconciler + orphan GC.  Tests can override both
+        # subsystems wholesale via the constructor kwargs.
+        self._reconciliation_lifecycle = K8sReconciliationLifecycle(
+            config=self._k8s_config,
+            logger=self._logger,
+            client_provider=lambda: self.kubernetes_client,
+            watch_lifecycle=self._watch_lifecycle,
+            known_request_ids=self._known_request_ids_fn,
+            startup_reconciler=startup_reconciler,
+            orphan_gc=orphan_gc,
+        )
+        # Node watcher + events watcher (+ their shared caches).  Tests
+        # inject watchers/caches via constructor kwargs to avoid real
+        # threads.
+        self._node_watch_lifecycle = K8sNodeWatchLifecycle(
+            config=self._k8s_config,
+            logger=self._logger,
+            client_provider=lambda: self.kubernetes_client,
+            node_state_cache=node_state_cache,
+            node_watcher=node_watcher,
+            node_events_cache=node_events_cache,
+            events_watcher=events_watcher,
+        )
         # Native-spec escape hatch.  Resolved lazily on first handler
-        # construction.  ``None`` after resolution means the service is
-        # unavailable (jinja2 missing, injected service not provided, etc.)
-        # — handlers fall back to the typed builder path.  The injected
-        # ``native_spec_service`` is the raw ``NativeSpecService`` from the
-        # application layer; :meth:`_resolve_native_spec_service` wraps it
-        # in ``K8sNativeSpecService`` on first call.  There is no DI
-        # container fallback — callers that need native-spec support must
-        # supply the service via this constructor parameter.
-        self._injected_native_spec_service: Optional[Any] = native_spec_service
-        self._native_spec_service_resolved: bool = False
-        self._k8s_native_spec_service: Optional[Any] = None
+        # construction; owns the DI-container / config-port plumbing.
+        self._native_spec_resolver = K8sNativeSpecResolver(
+            config=self._k8s_config,
+            logger=self._logger,
+            config_port=self._config_port,
+            injected_native_spec_service=native_spec_service,
+        )
         # Infrastructure discovery service — constructed lazily by
         # :meth:`_get_discovery_service` on first use.
         self._discovery_service: Optional[K8sInfrastructureDiscoveryService] = None
@@ -244,11 +270,6 @@ class K8sProviderStrategy(ProviderStrategy):
         # a second invocation (e.g. uvicorn worker recycle) short-circuits
         # immediately to prevent double-reconciliation.
         self._daemon_services_started: bool = False
-        # Prometheus metrics — constructed lazily on first use so tests
-        # that never touch the metrics path do not pollute the global
-        # ``prometheus_client.REGISTRY``.  Disabled entirely when
-        # ``config.metrics_enabled=False``.
-        self._metrics: Optional[Any] = None
         # Handler registry — does the per-API handler factory wiring and
         # the typed acquire/return/status dispatch.  Wired with closures
         # over the strategy's lazy client, watcher, native-spec accessors
@@ -258,11 +279,11 @@ class K8sProviderStrategy(ProviderStrategy):
             config=self._k8s_config,
             logger=self._logger,
             client_provider=lambda: self.kubernetes_client,
-            watch_manager_provider=lambda: self._watch_manager,
+            watch_manager_provider=lambda: self._watch_lifecycle.watch_manager,
             plugin_factories=lambda: self._handler_factories,
             native_spec_service_provider=self._resolve_native_spec_service,
             handler_overrides=handler_overrides,
-            node_state_cache_provider=lambda: self._node_state_cache,
+            node_state_cache_provider=lambda: self._node_watch_lifecycle.node_state_cache,
             api_aliases=type(self)._API_ALIASES,
             metrics_provider=self._get_metrics,
         )
@@ -298,6 +319,64 @@ class K8sProviderStrategy(ProviderStrategy):
     def _handlers(self) -> dict[str, K8sHandlerBase]:
         """Handler cache view — preserved for test fixtures that pre-seed it."""
         return self._handler_registry.handlers
+
+    # ------------------------------------------------------------------
+    # Sub-service state delegation
+    #
+    # The background subsystems now live in dedicated lifecycle services,
+    # but the strategy's private attributes remain part of the contract
+    # relied on by fixtures and integration tests (which pre-seed / patch
+    # them directly).  These properties keep that surface intact while the
+    # implementation lives in the extracted services.
+    # ------------------------------------------------------------------
+
+    @property
+    def _watch_manager(self) -> Optional[MultiNamespaceWatcher]:
+        return self._watch_lifecycle.watch_manager
+
+    @_watch_manager.setter
+    def _watch_manager(self, value: Optional[MultiNamespaceWatcher]) -> None:
+        self._watch_lifecycle.watch_manager = value
+
+    @property
+    def _orphan_gc(self) -> Optional[OrphanGarbageCollector]:
+        return self._reconciliation_lifecycle.orphan_gc
+
+    @_orphan_gc.setter
+    def _orphan_gc(self, value: Optional[OrphanGarbageCollector]) -> None:
+        self._reconciliation_lifecycle.orphan_gc = value
+
+    @property
+    def _startup_reconciler(self) -> Optional[StartupReconciler]:
+        return self._reconciliation_lifecycle.startup_reconciler
+
+    @_startup_reconciler.setter
+    def _startup_reconciler(self, value: Optional[StartupReconciler]) -> None:
+        self._reconciliation_lifecycle.startup_reconciler = value
+
+    @property
+    def _node_watcher(self) -> Optional[K8sNodeWatcher]:
+        return self._node_watch_lifecycle.node_watcher
+
+    @_node_watcher.setter
+    def _node_watcher(self, value: Optional[K8sNodeWatcher]) -> None:
+        self._node_watch_lifecycle.node_watcher = value
+
+    @property
+    def _events_watcher(self) -> Optional[K8sEventsWatcher]:
+        return self._node_watch_lifecycle.events_watcher
+
+    @_events_watcher.setter
+    def _events_watcher(self, value: Optional[K8sEventsWatcher]) -> None:
+        self._node_watch_lifecycle.events_watcher = value
+
+    @property
+    def _node_state_cache(self) -> K8sNodeStateCache:
+        return self._node_watch_lifecycle.node_state_cache
+
+    @property
+    def _node_events_cache(self) -> K8sNodeEventsCache:
+        return self._node_watch_lifecycle.node_events_cache
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -377,18 +456,14 @@ class K8sProviderStrategy(ProviderStrategy):
             )
 
         try:
-            if self._node_watcher is not None:
-                self._node_watcher.stop()
-                self._node_watcher = None
+            self._node_watch_lifecycle.stop_node_watcher()
         except Exception as exc:
             self._logger.warning(
                 "Failed to stop Kubernetes node watcher during cleanup: %s", exc, exc_info=True
             )
 
         try:
-            if self._events_watcher is not None:
-                self._events_watcher.stop()
-                self._events_watcher = None
+            self._node_watch_lifecycle.stop_events_watcher()
         except Exception as exc:
             self._logger.warning(
                 "Failed to stop Kubernetes events watcher during cleanup: %s", exc, exc_info=True
@@ -417,126 +492,22 @@ class K8sProviderStrategy(ProviderStrategy):
     def _ensure_watch_manager(self) -> MultiNamespaceWatcher:
         """Lazily construct (but do NOT start) the watch fan-out.
 
-        Exposed so the startup reconciler can share the watcher's
-        :class:`PodStateCache`: the reconciler warms the cache before
-        the watcher spawns, then the watcher takes over.  The watcher
-        is only started later by :meth:`_maybe_start_watch_manager`
-        when an event loop is available.
+        Delegates to :class:`K8sWatchManagerLifecycle`.  Exposed so the
+        startup reconciler can share the watcher's :class:`PodStateCache`.
         """
-        if self._watch_manager is None:
-            self._watch_manager = MultiNamespaceWatcher(
-                kubernetes_client=self.kubernetes_client,
-                config=self._k8s_config,
-                logger=self._logger,
-                metrics=self._get_metrics(),
-            )
-        return self._watch_manager
+        return self._watch_lifecycle.ensure()
 
     def _maybe_start_watch_manager(self) -> None:
-        """Start the watch fleet when enabled by config and a loop is available.
-
-        The fleet runs as an asyncio task and therefore needs a running
-        event loop.  When ``initialize`` is called from a synchronous
-        context (e.g. CLI bootstrap) we skip startup and let the
-        cache-less fallback path serve reads.  Daemon / REST callers
-        typically run inside an event loop and pick up the watcher.
-        """
-        if not self._k8s_config.watch_enabled:
-            return
-        manager = self._ensure_watch_manager()
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            self._logger.debug(
-                "Skipping Kubernetes watcher startup: no running event loop "
-                "(cache-less fallback will serve reads)."
-            )
-            return
-        try:
-            # MultiNamespaceWatcher.start() is idempotent: it guards on
-            # ``self._started`` at entry and returns immediately on a
-            # second call.  A SIGTERM that interrupts between the
-            # subsystem calls in start_daemon_services() therefore does
-            # not leave duplicate watchers running — a retry simply
-            # no-ops on the already-started watcher.
-            manager.start()
-        except Exception as exc:
-            self._logger.warning("Failed to start Kubernetes watcher fleet: %s", exc, exc_info=True)
+        """Start the watch fleet when enabled by config and a loop is available."""
+        self._watch_lifecycle.maybe_start()
 
     def _stop_watch_manager_sync(self, *, shutdown_timeout: float = 10.0) -> None:
         """Stop the watch manager, blocking until all watchers exit or the timeout elapses.
 
-        Three paths depending on the calling context:
-
-        * **No running loop** — drives ``manager.stop()`` synchronously
-          via :func:`asyncio.run`.
-        * **Running loop, different thread** (e.g. signal handler) —
-          schedules the coroutine via
-          :func:`asyncio.run_coroutine_threadsafe` and calls
-          ``.result(timeout)`` to block until the watchers exit.  If the
-          timeout elapses a warning is logged but the caller is not raised.
-        * **Running loop, same thread** (event-loop-thread cleanup path) —
-          blocking via ``.result()`` would deadlock, so this path falls
-          back to fire-and-forget scheduling while logging a warning.
-          Callers that need guaranteed completion should use
-          ``await manager.stop()`` directly instead.
-
-        Args:
-            shutdown_timeout: Maximum seconds to wait for the watcher loop
-                to exit when called from a different thread.  Defaults to
-                ``10.0 s``.
+        Delegates to :class:`K8sWatchManagerLifecycle`; see it for the
+        three context-dependent shutdown paths.
         """
-        manager = self._watch_manager
-        if manager is None or not manager.is_started():
-            return
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-
-        if loop is None:
-            # No running event loop — drive the coroutine synchronously.
-            try:
-                asyncio.run(manager.stop())
-            except Exception as exc:
-                self._logger.debug(
-                    "Watch manager stop raised during cleanup: %s", exc, exc_info=True
-                )
-            return
-
-        # There is a running event loop.  Determine whether this call is
-        # arriving from the event-loop thread itself or from a foreign
-        # thread (e.g. a signal handler or a cleanup thread).
-        loop_thread_id: int | None = getattr(loop, "_thread_id", None)
-        on_loop_thread = (
-            loop_thread_id is not None and threading.current_thread().ident == loop_thread_id
-        )
-
-        if on_loop_thread:
-            # Blocking here would deadlock — the event loop cannot make
-            # progress while the current frame is suspended.  Schedule
-            # fire-and-forget and warn so operators know the watcher may
-            # not finish before the process exits.
-            self._logger.warning(
-                "Kubernetes watcher stop scheduled without awaiting completion "
-                "(cleanup called from the event-loop thread; "
-                "watchers may outlive this cleanup call)."
-            )
-            loop.create_task(manager.stop())
-            return
-
-        # Foreign thread with a running loop — block with timeout.
-        future = asyncio.run_coroutine_threadsafe(manager.stop(), loop)
-        try:
-            future.result(timeout=shutdown_timeout)
-        except TimeoutError:
-            self._logger.warning(
-                "Kubernetes watcher fleet did not stop within %.1fs; "
-                "proceeding with shutdown anyway.",
-                shutdown_timeout,
-            )
-        except Exception as exc:
-            self._logger.debug("Watch manager stop raised during cleanup: %s", exc, exc_info=True)
+        self._watch_lifecycle.stop_sync(shutdown_timeout=shutdown_timeout)
 
     # ------------------------------------------------------------------
     # Reconciliation / orphan-GC lifecycle
@@ -545,157 +516,40 @@ class K8sProviderStrategy(ProviderStrategy):
     @property
     def last_reconciliation_report(self) -> Optional[ReconciliationReport]:
         """Surface the most recent :class:`ReconciliationReport` for diagnostics."""
-        return self._last_reconciliation_report
+        return self._reconciliation_lifecycle.last_reconciliation_report
 
     def _get_metrics(self) -> Optional[Any]:
         """Return the shared :class:`K8sMetrics` instance, constructing on demand.
 
-        Returns ``None`` when ``config.metrics_enabled=False`` so
-        handlers and the watcher stay silent.  Constructed once per
-        strategy instance; a second invocation returns the same
-        object so all recorders share the same OTel meter.
+        Delegates to :class:`K8sWatchManagerLifecycle` which owns the
+        recorder so watcher and handlers share the same OTel meter.
         """
-        if not self._k8s_config.metrics_enabled:
-            return None
-        if self._metrics is None:
-            from orb.providers.k8s.infrastructure.services.metrics import K8sMetrics
-
-            self._metrics = K8sMetrics()
-        return self._metrics
+        return self._watch_lifecycle.get_metrics()
 
     def _shared_cache(self) -> PodStateCache:
-        """Return the cache used by both reconciler and watcher.
-
-        Constructed via :meth:`_ensure_watch_manager` so reconciler and
-        watcher always share the same instance — populating one
-        warms the other.
-        """
-        return self._ensure_watch_manager().cache
+        """Return the cache used by both reconciler and watcher."""
+        return self._watch_lifecycle.shared_cache()
 
     async def _run_startup_reconciler(self) -> None:
         """Run the startup reconciler before the watch task spawns.
 
-        The reconciler is constructed lazily here so tests that pass
-        ``startup_reconciler=`` directly into the strategy can skip the
-        default construction path entirely.  Only called from
+        Delegates to :class:`K8sReconciliationLifecycle`.  Only called from
         :meth:`start_daemon_services` — the CLI path never reaches this
         method.
         """
-        reconciler = self._startup_reconciler
-        if reconciler is None:
-            reconciler = StartupReconciler(
-                kubernetes_client=self.kubernetes_client,
-                config=self._k8s_config,
-                cache=self._shared_cache(),
-                logger=self._logger,
-                known_request_ids=self._known_request_ids_fn,
-            )
-            self._startup_reconciler = reconciler
-        try:
-            report = await reconciler.run_async()
-            self._last_reconciliation_report = report
-            # Only signal first-sync-complete when the reconciler
-            # actually succeeded.  ``run_async`` captures its own
-            # exceptions internally and sets ``report.completed = False``
-            # + ``report.error`` when the LIST failed — gating on the
-            # flag prevents ``is_healthy()`` from returning True with a
-            # cold, empty cache after a silent reconciler failure.
-            if report.completed and self._watch_manager is not None:
-                self._watch_manager.mark_first_sync_complete()
-            elif not report.completed:
-                self._logger.warning(
-                    "Kubernetes startup reconciler did not complete: %s "
-                    "(provider continues; is_healthy will report False until "
-                    "the next successful sync)",
-                    report.error,
-                )
-        except Exception as exc:
-            self._logger.warning(
-                "Kubernetes startup reconciler raised: %s (provider continues)",
-                exc,
-                exc_info=True,
-            )
+        await self._reconciliation_lifecycle.run_startup_reconciler()
 
     def _maybe_start_orphan_gc(self) -> None:
         """Spawn the orphan GC task when enabled and an event loop is available."""
-        if not self._k8s_config.orphan_gc_enabled:
-            return
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            self._logger.debug(
-                "Skipping orphan GC startup: no running event loop "
-                "(GC will not run in this process)."
-            )
-            return
-        if self._orphan_gc is None:
-            self._orphan_gc = OrphanGarbageCollector(
-                kubernetes_client=self.kubernetes_client,
-                config=self._k8s_config,
-                logger=self._logger,
-                known_request_ids=self._known_request_ids_fn,
-            )
-        try:
-            self._orphan_gc.start()
-            self._logger.info(
-                "Kubernetes orphan GC started (interval=%ss, auto_cleanup=%s)",
-                self._k8s_config.orphan_gc_interval_seconds,
-                self._k8s_config.auto_cleanup_orphans,
-            )
-        except Exception as exc:
-            self._logger.warning("Failed to start Kubernetes orphan GC: %s", exc, exc_info=True)
+        self._reconciliation_lifecycle.maybe_start_orphan_gc()
 
     def _stop_orphan_gc_sync(self, *, stop_timeout: float = 5.0) -> None:
         """Stop the orphan GC from a sync-or-async cleanup context.
 
-        Three paths depending on the calling context:
-
-        * **No running loop** — drives ``gc.stop()`` synchronously via
-          :func:`asyncio.run`.
-        * **Running loop, different thread** — schedules the coroutine via
-          :func:`asyncio.run_coroutine_threadsafe` and blocks with a timeout
-          so the coroutine completes before the client is closed.  If the
-          timeout elapses a warning is logged.
-        * **Running loop, same thread** — blocking here would deadlock, so
-          this path also uses :func:`asyncio.run_coroutine_threadsafe` but
-          from a dedicated daemon thread, ensuring the coroutine finishes
-          before this method returns.
-
-        Args:
-            stop_timeout: Maximum seconds to wait for the GC coroutine to
-                finish.  Defaults to ``5.0 s``.
+        Delegates to :class:`K8sReconciliationLifecycle`; see it for the
+        three context-dependent shutdown paths.
         """
-        gc = self._orphan_gc
-        if gc is None or not gc.is_running():
-            return
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-        if loop is None:
-            # No running event loop — drive the coroutine synchronously.
-            try:
-                asyncio.run(gc.stop())
-            except Exception as exc:
-                self._logger.debug("Orphan GC stop raised during cleanup: %s", exc, exc_info=True)
-            return
-
-        # There is a running event loop.  Use run_coroutine_threadsafe from
-        # the current thread (or a helper thread) to schedule and block on
-        # gc.stop().  This is safe regardless of whether we are on the loop
-        # thread itself or a foreign thread because the future is resolved
-        # asynchronously by the loop.
-        future = asyncio.run_coroutine_threadsafe(gc.stop(), loop)
-        try:
-            future.result(timeout=stop_timeout)
-        except TimeoutError:
-            self._logger.warning(
-                "Kubernetes orphan GC did not stop within %.1fs during cleanup; "
-                "proceeding anyway — the GC coroutine may still be running.",
-                stop_timeout,
-            )
-        except Exception as exc:
-            self._logger.debug("Orphan GC stop raised during cleanup: %s", exc, exc_info=True)
+        self._reconciliation_lifecycle.stop_orphan_gc_sync(stop_timeout=stop_timeout)
 
     # ------------------------------------------------------------------
     # Node watcher lifecycle
@@ -709,29 +563,11 @@ class K8sProviderStrategy(ProviderStrategy):
         ``False`` it is simply an empty cache that returns ``None`` for
         every lookup.
         """
-        return self._node_state_cache
+        return self._node_watch_lifecycle.node_state_cache
 
     def _maybe_start_node_watcher(self) -> None:
-        """Start the node watcher when enabled by config.
-
-        Unlike the asyncio pod watcher, the node watcher runs on a
-        plain background daemon thread so it does not require a running
-        event loop.  This means it can start from both synchronous
-        (CLI bootstrap) and async (daemon) contexts.
-        """
-        if not self._k8s_config.node_watch_enabled:
-            return
-        if self._node_watcher is None:
-            self._node_watcher = K8sNodeWatcher(
-                kubernetes_client=self.kubernetes_client,
-                cache=self._node_state_cache,
-                logger=self._logger,
-            )
-        try:
-            self._node_watcher.start()
-            self._logger.info("Kubernetes node watcher started (node_watch_enabled=True)")
-        except Exception as exc:
-            self._logger.warning("Failed to start Kubernetes node watcher: %s", exc, exc_info=True)
+        """Start the node watcher when enabled by config (delegated)."""
+        self._node_watch_lifecycle.maybe_start_node_watcher()
 
     # ------------------------------------------------------------------
     # Events watcher lifecycle
@@ -745,35 +581,11 @@ class K8sProviderStrategy(ProviderStrategy):
         ``False`` it is simply an empty cache that returns ``None`` for
         every lookup.
         """
-        return self._node_events_cache
+        return self._node_watch_lifecycle.node_events_cache
 
     def _maybe_start_events_watcher(self) -> None:
-        """Start the Events API watcher when enabled by config.
-
-        Like the node watcher, the events watcher runs on a plain
-        background daemon thread (not in the asyncio event loop) so it
-        can start from both synchronous (CLI bootstrap) and async
-        (daemon) contexts.
-
-        Requires the operator to have granted the ``events: get/list/watch``
-        RBAC verb on the core API group -- see
-        ``docs/root/providers/k8s/rbac.yaml``.
-        """
-        if not self._k8s_config.events_watch_enabled:
-            return
-        if self._events_watcher is None:
-            self._events_watcher = K8sEventsWatcher(
-                kubernetes_client=self.kubernetes_client,
-                cache=self._node_events_cache,
-                logger=self._logger,
-            )
-        try:
-            self._events_watcher.start()
-            self._logger.info("Kubernetes events watcher started (events_watch_enabled=True)")
-        except Exception as exc:
-            self._logger.warning(
-                "Failed to start Kubernetes events watcher: %s", exc, exc_info=True
-            )
+        """Start the Events API watcher when enabled by config (delegated)."""
+        self._node_watch_lifecycle.maybe_start_events_watcher()
 
     # ------------------------------------------------------------------
     # Operation dispatch
@@ -1178,145 +990,12 @@ class K8sProviderStrategy(ProviderStrategy):
 
     @classmethod
     def get_ui_column_schema(cls) -> list:  # type: ignore[override]
-        """Return k8s-specific UI column descriptors for machines, requests, and templates."""
-        from orb.application.dto.system import UIColumnDescriptor
+        """Return k8s-specific UI column descriptors for machines, requests, and templates.
 
-        return [
-            # ------------------------------------------------------------------
-            # machines — pod/workload-level columns
-            # ------------------------------------------------------------------
-            UIColumnDescriptor(
-                key="k8s_namespace",
-                path="provider_data.namespace",
-                label="Namespace",
-                kind="badge",
-                resource_type="machines",
-                provider="k8s",
-                sortable=True,
-                default_visible=True,
-            ),
-            UIColumnDescriptor(
-                key="k8s_node_name",
-                path="provider_data.node_name",
-                label="Node",
-                kind="text",
-                resource_type="machines",
-                provider="k8s",
-                sortable=True,
-                default_visible=True,
-            ),
-            UIColumnDescriptor(
-                key="k8s_phase",
-                path="provider_data.phase",
-                label="Phase",
-                kind="badge",
-                resource_type="machines",
-                provider="k8s",
-                badge_color_map={
-                    "Running": "green",
-                    "Pending": "orange",
-                    "Succeeded": "teal",
-                    "Failed": "red",
-                    "Unknown": "gray",
-                },
-                sortable=True,
-                default_visible=True,
-            ),
-            UIColumnDescriptor(
-                key="k8s_restart_count",
-                path="provider_data.restart_count",
-                label="Restarts",
-                kind="count",
-                resource_type="machines",
-                provider="k8s",
-                sortable=True,
-                default_visible=False,
-            ),
-            UIColumnDescriptor(
-                key="k8s_capacity_type",
-                path="provider_data.node_capacity_type",
-                label="Capacity Type",
-                kind="badge",
-                resource_type="machines",
-                provider="k8s",
-                badge_color_map={"spot": "orange", "on-demand": "blue", "on_demand": "blue"},
-                sortable=True,
-                default_visible=False,
-            ),
-            UIColumnDescriptor(
-                key="k8s_workload_kind",
-                path="provider_api",
-                label="Workload Kind",
-                kind="badge",
-                resource_type="machines",
-                provider="k8s",
-                badge_color_map={
-                    "Pod": "blue",
-                    "Deployment": "purple",
-                    "StatefulSet": "teal",
-                    "Job": "orange",
-                },
-                sortable=True,
-                default_visible=False,
-            ),
-            # ------------------------------------------------------------------
-            # requests — provider-level request columns
-            # ------------------------------------------------------------------
-            UIColumnDescriptor(
-                key="k8s_request_namespace",
-                path="provider_data.namespace",
-                label="Namespace",
-                kind="badge",
-                resource_type="requests",
-                provider="k8s",
-                sortable=True,
-                default_visible=True,
-            ),
-            UIColumnDescriptor(
-                key="k8s_request_provider_api",
-                path="provider_data.provider_api",
-                label="Workload Kind",
-                kind="badge",
-                resource_type="requests",
-                provider="k8s",
-                badge_color_map={
-                    "Pod": "blue",
-                    "Deployment": "purple",
-                    "StatefulSet": "teal",
-                    "Job": "orange",
-                },
-                default_visible=True,
-            ),
-            # ------------------------------------------------------------------
-            # templates — k8s template surface
-            # ------------------------------------------------------------------
-            UIColumnDescriptor(
-                key="k8s_template_provider_api",
-                path="provider_api",
-                label="Workload Kind",
-                kind="badge",
-                resource_type="templates",
-                provider="k8s",
-                badge_color_map={
-                    "Pod": "blue",
-                    "Deployment": "purple",
-                    "StatefulSet": "teal",
-                    "Job": "orange",
-                },
-                default_visible=True,
-                sortable=True,
-            ),
-            UIColumnDescriptor(
-                key="k8s_template_namespace",
-                path="namespace",
-                label="Namespace",
-                kind="text",
-                resource_type="templates",
-                provider="k8s",
-                default_visible=True,
-                sortable=True,
-            ),
-        ]
+        Delegates to :class:`K8sCapabilityService` which owns the descriptor
+        catalogue alongside the other capability/naming declarations.
+        """
+        return K8sCapabilityService.get_ui_column_schema()
 
     # ------------------------------------------------------------------
     # Region / CLI helpers
@@ -1404,55 +1083,12 @@ class K8sProviderStrategy(ProviderStrategy):
     def _resolve_native_spec_service(self) -> Optional[Any]:
         """Resolve :class:`K8sNativeSpecService` once on first handler build.
 
-        Returns ``None`` when the provider config opts out
-        (``native_spec_enabled=False``), when no ``ConfigurationPort`` is
-        wired, or when no ``native_spec_service`` was passed at construction
-        time.  All construction paths that need native-spec support must
-        supply the service via the constructor parameter — the
-        :func:`orb.providers.k8s.registration.create_k8s_strategy` factory
-        resolves it from the DI container at strategy-creation time and
-        passes it explicitly.  There is no ``get_container()`` fallback.
+        Delegates to :class:`K8sNativeSpecResolver` which owns the
+        config-port / injected-service gating.  Returns ``None`` when the
+        provider config opts out, when no ``ConfigurationPort`` is wired,
+        or when no ``native_spec_service`` was passed at construction time.
         """
-        if self._native_spec_service_resolved:
-            return self._k8s_native_spec_service
-        self._native_spec_service_resolved = True
-
-        if not self._k8s_config.native_spec_enabled:
-            return None
-
-        if self._config_port is None:
-            self._logger.debug(
-                "Kubernetes native-spec service unavailable: no ConfigurationPort "
-                "wired into the strategy (typed builder path will be used)."
-            )
-            return None
-
-        if self._injected_native_spec_service is None:
-            self._logger.debug(
-                "Kubernetes native-spec service unavailable: no NativeSpecService "
-                "injected at construction time (typed builder path will be used).  "
-                "Ensure create_k8s_strategy is used so the service is resolved from "
-                "the DI container before strategy construction."
-            )
-            return None
-
-        try:
-            from orb.providers.k8s.infrastructure.services.k8s_native_spec_service import (
-                K8sNativeSpecService,
-            )
-
-            self._k8s_native_spec_service = K8sNativeSpecService(
-                native_spec_service=self._injected_native_spec_service,
-                config_port=self._config_port,
-                k8s_config=self._k8s_config,
-            )
-            return self._k8s_native_spec_service
-        except Exception as exc:
-            self._logger.warning(
-                "K8sNativeSpecService unavailable, native spec enrichment disabled: %s",
-                exc,
-            )
-            return None
+        return self._native_spec_resolver.resolve()
 
     # ------------------------------------------------------------------
     # Handler dispatch — delegated to K8sHandlerRegistry
@@ -1561,168 +1197,3 @@ class K8sProviderStrategy(ProviderStrategy):
             f"namespace={self._k8s_config.namespace}, "
             f"initialized={self._initialized})"
         )
-
-
-def _build_provider_result_data(
-    *,
-    resource_ids: list[str],
-    metadata: Optional[dict[str, Any]] = None,
-    tracking_request_id: Optional[str] = None,
-) -> dict[str, Any]:
-    """Build the ``ProviderResult.data`` dict for k8s outcomes.
-
-    Resource-vs-machine model (Kubernetes):
-
-    * **Pod handler** — every Pod IS its own resource.  Acquire emits
-      ``resource_ids == machine_ids == [pod_name, ...]`` (1:1).  The
-      handler also surfaces a per-machine ``instances`` list with the
-      pod's ``status``, ``image_id`` and so on, populated lazily by the
-      status resolver.
-    * **Deployment / StatefulSet / Job handler** — the workload controller
-      is the *resource* (1 entry: ``[deployment_name]``); the Pods it
-      spawns are the *machines* (N entries, populated by the status
-      resolver).  Acquire emits ``machine_ids=[]`` because the
-      controller has not yet scheduled any pods.
-
-    The bridge therefore propagates whatever the handler put under
-    ``metadata['instances']`` verbatim (it carries the authoritative
-    ``resource_id`` ↔ ``machine_id`` mapping per pod) and otherwise
-    leaves ``instances`` empty so that downstream machine creation is
-    driven by a subsequent status read rather than by manufactured rows.
-    """
-    meta_dict = dict(metadata or {})
-    # ``machine_ids`` are the per-pod identifiers (1 per machine row);
-    # ``resource_ids`` are the per-controller (or per-pod for the Pod
-    # handler) identifiers.  Both are propagated through ``provider_data``
-    # so the application layer can reason about them independently.
-    machine_ids = list(meta_dict.get("machine_ids") or [])
-    instances = list(meta_dict.get("instances") or [])
-
-    data: dict[str, Any] = {
-        "resource_ids": resource_ids,
-        "instances": instances,
-        # ``instance_ids`` consumed by deprovisioning / sync paths that
-        # want the per-pod identifiers.  Falls back to ``resource_ids``
-        # for the Pod handler (where resource = machine) when the
-        # handler did not put machine_ids in metadata.
-        "instance_ids": machine_ids or resource_ids,
-        "provider_data": meta_dict,
-    }
-    if tracking_request_id is not None:
-        data["tracking_request_id"] = tracking_request_id
-    return data
-
-
-def _all_instances_terminal(instances: list[dict[str, Any]]) -> bool:
-    """Return True when every instance dict has reached a non-pending state.
-
-    Used by the bridge to detect synchronous completions: when an Accepted
-    outcome carries ``pending_resource_ids`` but ``metadata['instances']``
-    already shows every pod as running, succeeded, or terminated, the request
-    has effectively completed and ``fulfillment_final`` should be set so the
-    provisioning service does not keep it in IN_PROGRESS indefinitely.
-
-    An empty instances list is not considered terminal — the status resolver
-    has not yet populated instance data, so we cannot make a determination.
-    """
-    if not instances:
-        return False
-    terminal_states = {"running", "succeeded", "terminated"}
-    return all(inst.get("status") in terminal_states for inst in instances)
-
-
-def _outcome_to_provider_result(
-    outcome: OperationOutcome, *, fallback_operation: str
-) -> ProviderResult:
-    """Translate an :class:`OperationOutcome` into a :class:`ProviderResult`.
-
-    Used by ``execute_operation`` to bridge the kubernetes provider's typed
-    provisioning interface back to the shared ``ProviderOperation`` envelope
-    that the provisioning orchestration service consumes.
-
-    ``fulfillment_final=True`` is set in two cases:
-    * ``Completed`` outcome — always terminal.
-    * ``Accepted`` outcome where ``pending_resource_ids`` is non-empty AND
-      every instance in ``metadata['instances']`` already has a
-      running/terminal status.  This covers Pod handlers that schedule pods
-      synchronously so the provisioning service does not keep the request
-      in IN_PROGRESS waiting for a state transition that already happened.
-    """
-    from orb.domain.base.operation_outcome import (
-        Accepted,
-        Completed,
-        Failed,
-        RequiresFollowUp,
-    )
-
-    if isinstance(outcome, Failed):
-        return ProviderResult.error_result(outcome.error, "OPERATION_FAILED").model_copy(
-            update={
-                "metadata": {
-                    **(outcome.metadata or {}),
-                    "operation": fallback_operation,
-                    "provider": "k8s",
-                    "recoverable": outcome.recoverable,
-                }
-            }
-        )
-
-    if isinstance(outcome, Accepted):
-        meta = dict(outcome.metadata or {})
-        pending = list(outcome.pending_resource_ids)
-        if pending and _all_instances_terminal(list(meta.get("instances") or [])):
-            # All pods are already in a terminal/running state at accept time —
-            # promote to fulfillment_final so the provisioning service closes
-            # the request without a redundant status poll.
-            meta["fulfillment_final"] = True
-        return ProviderResult.success_result(
-            _build_provider_result_data(
-                resource_ids=pending,
-                metadata=meta,
-                tracking_request_id=outcome.request_id,
-            ),
-            {"operation": fallback_operation, "provider": "k8s"},
-        )
-
-    if isinstance(outcome, Completed):
-        # ``fulfillment_final=True`` signals to the provisioning service
-        # that the request has reached a terminal state — without it the
-        # request would stay IN_PROGRESS forever.
-        meta = {**dict(outcome.metadata or {}), "fulfillment_final": True}
-        return ProviderResult.success_result(
-            _build_provider_result_data(
-                resource_ids=list(outcome.resource_ids),
-                metadata=meta,
-            ),
-            {"operation": fallback_operation, "provider": "k8s"},
-        )
-
-    if isinstance(outcome, RequiresFollowUp):
-        ctx = outcome.context
-        # Both follow-up variants carry an ID list; surface it as
-        # ``resource_ids`` so the application layer keeps a handle on
-        # what's still pending.  ``follow_up_kind`` and the typed context
-        # ride along in ``provider_data`` for the background poller.
-        pending_ids: list[str] = list(
-            getattr(ctx, "pending_resource_ids", None)
-            or getattr(ctx, "pending_instance_ids", None)
-            or []
-        )
-        meta = {
-            **dict(outcome.metadata or {}),
-            "follow_up_kind": ctx.follow_up_kind,
-            "provider_handle": getattr(ctx, "provider_handle", None),
-            "expected_terminal_state": getattr(ctx, "expected_terminal_state", None),
-        }
-        return ProviderResult.success_result(
-            _build_provider_result_data(
-                resource_ids=pending_ids,
-                metadata=meta,
-            ),
-            {"operation": fallback_operation, "provider": "k8s"},
-        )
-
-    return ProviderResult.error_result(
-        f"Unknown OperationOutcome variant: {type(outcome).__name__}",
-        "UNSUPPORTED_OUTCOME",
-    )
