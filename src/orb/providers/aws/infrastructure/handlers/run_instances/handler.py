@@ -72,6 +72,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         error_handler: ErrorHandlingPort = None,  # type: ignore[assignment]
         aws_native_spec_service=None,
         config_port: Optional[ConfigurationPort] = None,
+        provider_name: Optional[str] = None,
     ) -> None:
         """
         Initialize RunInstances handler with integrated dependencies.
@@ -95,6 +96,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             error_handler,
             aws_native_spec_service=aws_native_spec_service,
             config_port=config_port,
+            provider_name=provider_name,
         )
 
     @handle_infrastructure_exceptions(context="run_instances_creation")

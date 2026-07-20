@@ -180,11 +180,14 @@ class ConfigurationAdapter(ConfigurationPort):
     def save_config(self, path: str | None = None) -> str:
         """Persist the in-memory raw config to disk.
 
-        If ``path`` is None, writes to the currently-loaded config file.
-        Returns the resolved path that was written. Raises if no path can
-        be resolved (e.g. config came from env only, no file backing).
+        If ``path`` is None, writes back to the file this manager actually
+        loaded from — never to a candidate synthesised from ``ORB_CONFIG_FILE``
+        or the ``~/.orb`` fallback that was never the real source. Returns the
+        resolved path that was written. Raises when no backing file exists
+        (e.g. config came from env or an in-memory dict) so an explicit path
+        must be supplied.
         """
-        target = path or self._config_manager.get_loaded_config_file()
+        target = path if path is not None else self._config_manager.get_source_config_file()
         if not target:
             raise ValueError(
                 "No config file path resolved — config was not loaded from a file. "
@@ -373,22 +376,6 @@ class ConfigurationAdapter(ConfigurationPort):
     def override_scheduler_strategy(self, strategy: str) -> None:  # type: ignore[override]
         """Override scheduler strategy - delegate to ConfigurationManager."""
         self._config_manager.override_scheduler_strategy(strategy)
-
-    def override_provider_name(self, provider_name: str) -> None:
-        """Override provider instance by exact name - delegate to ConfigurationManager."""
-        self._config_manager.override_provider_name(provider_name)
-
-    def override_provider_type(self, provider_type: str) -> None:
-        """Restrict selection to a provider type - delegate to ConfigurationManager."""
-        self._config_manager.override_provider_type(provider_type)
-
-    def get_active_provider_name_override(self) -> str | None:
-        """Get current provider name override from CLI."""
-        return self._config_manager.get_active_provider_name_override()
-
-    def get_active_provider_type_override(self) -> str | None:
-        """Get current provider type override from CLI."""
-        return self._config_manager.get_active_provider_type_override()
 
     def get_resource_prefix(self, resource_type: str) -> str:
         """Get resource naming prefix for the given resource type."""

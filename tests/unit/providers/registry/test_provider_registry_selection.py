@@ -45,8 +45,6 @@ def _make_config_port(providers, selection_policy="FIRST_AVAILABLE"):
 
     config_port = MagicMock(spec=ConfigurationPort)
     config_port.get_provider_config.return_value = provider_config
-    config_port.get_active_provider_name_override.return_value = None
-    config_port.get_active_provider_type_override.return_value = None
     return config_port
 
 

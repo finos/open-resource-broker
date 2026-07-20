@@ -83,6 +83,7 @@ class AWSHandler(ABC):
         error_handler: Optional[ErrorHandlingPort] = None,
         aws_native_spec_service: Optional[Any] = None,
         config_port: Optional[ConfigurationPort] = None,
+        provider_name: Optional[str] = None,
     ) -> None:
         """
         Initialize AWS handler with standardized dependencies.
@@ -95,6 +96,8 @@ class AWSHandler(ABC):
             request_adapter: Request adapter for terminating instances (optional)
             machine_adapter: Machine adapter for provider-specific instance mapping (optional)
             error_handler: Error handling port for exception management (optional)
+            provider_name: Exact instance name of the provider this handler serves,
+                used to scope provider-specific configuration lookups (optional)
         """
         self.aws_client = aws_client
         self._logger = logger
@@ -103,6 +106,7 @@ class AWSHandler(ABC):
         self.error_handler = error_handler
         self.aws_native_spec_service = aws_native_spec_service
         self.config_port = config_port
+        self._provider_name = provider_name
         self.max_retries = 3
         self.base_delay = 1  # seconds
         self.max_delay = 10  # seconds

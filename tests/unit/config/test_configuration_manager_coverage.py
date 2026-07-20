@@ -352,16 +352,6 @@ class TestSchedulerProviderOverrides:
         mgr._provider_manager.get_scheduler_strategy.return_value = "default"
         assert mgr.get_scheduler_strategy() == "default"
 
-    def test_override_provider_name(self):
-        mgr = self._make_mgr()
-        mgr.override_provider_name("aws-east")
-        assert mgr.get_active_provider_name_override() == "aws-east"
-
-    def test_override_provider_type(self):
-        mgr = self._make_mgr()
-        mgr.override_provider_type("k8s")
-        assert mgr.get_active_provider_type_override() == "k8s"
-
 
 # ---------------------------------------------------------------------------
 # get_loaded_config_file
@@ -393,6 +383,44 @@ class TestGetLoadedConfigFile:
             result = mgr.get_loaded_config_file()
 
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# get_source_config_file
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestGetSourceConfigFile:
+    def test_returns_construction_path_when_it_exists(self, tmp_path):
+        from orb.config.managers.configuration_manager import ConfigurationManager
+
+        p = tmp_path / "config.json"
+        p.write_text("{}")
+        mgr = ConfigurationManager(config_file=str(p), config_dict={})
+        mgr._raw_config = {}
+        assert mgr.get_source_config_file() == str(p)
+
+    def test_returns_none_when_construction_path_absent(self, tmp_path):
+        from orb.config.managers.configuration_manager import ConfigurationManager
+
+        mgr = ConfigurationManager(config_file=str(tmp_path / "missing.json"), config_dict={})
+        mgr._raw_config = {}
+        assert mgr.get_source_config_file() is None
+
+    def test_does_not_synthesise_from_env(self, tmp_path, monkeypatch):
+        # An in-memory config with no backing file must not resolve a save
+        # target from ORB_CONFIG_FILE even when that file exists on disk.
+        from orb.config.managers.configuration_manager import ConfigurationManager
+
+        env_file = tmp_path / "env_config.json"
+        env_file.write_text("{}")
+        monkeypatch.setenv("ORB_CONFIG_FILE", str(env_file))
+
+        mgr = ConfigurationManager(config_dict={})
+        mgr._config_file = None
+        mgr._raw_config = {}
+        assert mgr.get_source_config_file() is None
 
 
 # ---------------------------------------------------------------------------

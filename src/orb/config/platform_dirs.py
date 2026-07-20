@@ -154,3 +154,67 @@ def get_cache_location() -> Path:
     if env_dir := os.environ.get("ORB_CACHE_DIR"):
         return Path(env_dir)
     return get_work_location() / ".cache"
+
+
+def resolve_config_file(
+    filename: str = "config.json",
+    explicit_path: str | None = None,
+) -> Path | None:
+    """Shared existence-based discovery for the config-file *consumers*.
+
+    Provides one ordered lookup for the callers that need to know which config
+    file already exists on disk: ``StartupValidator._find_config_file`` (which
+    fails fast when nothing is found) and ``ConfigurationManager`` reporting
+    (``get_loaded_config_file``). Both route through here so their discovery
+    order stays identical.
+
+    This is deliberately *not* the loader's path resolver.
+    ``PathResolutionService`` remains a separate concern: it serves the
+    ``ConfigurationLoader`` for every file type (config, template, legacy, log,
+    work, events, snapshots), applies scheduler-directory priority, and returns
+    a candidate path that may not yet exist (so callers can create it). This
+    function, by contrast, only answers "does a config/template file already
+    exist, and where?" and returns ``None`` when none is found.
+
+    Resolution order (first existing match wins):
+      1. ``explicit_path`` — a caller-supplied path (e.g. ``orb --config ...``).
+         Returned as-is when it exists.
+      2. ``$ORB_CONFIG_FILE`` — full-path override for the primary config file.
+      3. ``$ORB_CONFIG_DIR/<filename>`` — directory override + filename.
+      4. ``get_config_location()/<filename>`` — the platform-scoped location
+         (respects venv / pyproject / uv-tool detection via get_root_location).
+      5. ``~/.orb/config/<filename>`` — user-home fallback so operators running
+         from inside a source checkout (which pins platform_dirs to the repo)
+         still pick up their initialised config.
+
+    Args:
+        filename: The file to locate (e.g. ``"config.json"``,
+            ``"awsprov_templates.json"``).  Ignored for the ``ORB_CONFIG_FILE``
+            candidate, which is a full path in its own right.
+        explicit_path: An explicit path supplied by the caller.  When it exists
+            it wins outright.
+
+    Returns:
+        The first :class:`~pathlib.Path` that exists, or ``None`` when no
+        candidate is found.  Callers decide how to surface a missing file
+        (fail-fast vs. fall back to defaults).
+    """
+    if explicit_path and Path(explicit_path).exists():
+        return Path(explicit_path)
+
+    candidates: list[Path] = []
+
+    if env_file := os.environ.get("ORB_CONFIG_FILE"):
+        candidates.append(Path(env_file))
+
+    if env_dir := os.environ.get("ORB_CONFIG_DIR"):
+        candidates.append(Path(env_dir) / filename)
+
+    candidates.append(get_config_location() / filename)
+    candidates.append(Path.home() / ".orb" / "config" / filename)
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    return None

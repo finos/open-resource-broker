@@ -11,6 +11,7 @@ from orb.config.platform_dirs import (
     get_root_location,
     get_scripts_location,
     get_work_location,
+    resolve_config_file,
 )
 
 # ---------------------------------------------------------------------------
@@ -155,3 +156,63 @@ def test_root_config_dir_infers_root(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ORB_ROOT_DIR", raising=False)
     monkeypatch.setenv("ORB_CONFIG_DIR", "/some/config")
     assert get_root_location() == Path("/some")
+
+
+# ---------------------------------------------------------------------------
+# resolve_config_file — single source of truth for config-file discovery
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_config_file_explicit_path_wins(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    monkeypatch.delenv("ORB_CONFIG_FILE", raising=False)
+    monkeypatch.delenv("ORB_CONFIG_DIR", raising=False)
+    explicit = tmp_path / "explicit.json"
+    explicit.write_text("{}")
+    assert resolve_config_file("config.json", explicit_path=str(explicit)) == explicit
+
+
+def test_resolve_config_file_env_file_wins_over_config_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    env_file = tmp_path / "envfile.json"
+    env_file.write_text("{}")
+    cfg_dir = tmp_path / "cfgdir"
+    cfg_dir.mkdir()
+    (cfg_dir / "config.json").write_text("{}")
+    monkeypatch.setenv("ORB_CONFIG_FILE", str(env_file))
+    monkeypatch.setenv("ORB_CONFIG_DIR", str(cfg_dir))
+    assert resolve_config_file("config.json") == env_file
+
+
+def test_resolve_config_file_config_dir_used_when_no_env_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.delenv("ORB_CONFIG_FILE", raising=False)
+    cfg_dir = tmp_path / "cfgdir"
+    cfg_dir.mkdir()
+    target = cfg_dir / "config.json"
+    target.write_text("{}")
+    monkeypatch.setenv("ORB_CONFIG_DIR", str(cfg_dir))
+    assert resolve_config_file("config.json") == target
+
+
+def test_resolve_config_file_returns_none_when_absent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.delenv("ORB_CONFIG_FILE", raising=False)
+    monkeypatch.setenv("ORB_CONFIG_DIR", str(tmp_path / "empty"))
+    monkeypatch.setattr("orb.config.platform_dirs.get_config_location", lambda: tmp_path / "nope")
+    # Home fallback almost certainly absent under tmp; explicit path missing too.
+    assert resolve_config_file("config.json", explicit_path=str(tmp_path / "x.json")) is None
+
+
+def test_resolve_config_file_honours_custom_filename(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.delenv("ORB_CONFIG_FILE", raising=False)
+    cfg_dir = tmp_path / "cfgdir"
+    cfg_dir.mkdir()
+    target = cfg_dir / "awsprov_templates.json"
+    target.write_text("{}")
+    monkeypatch.setenv("ORB_CONFIG_DIR", str(cfg_dir))
+    assert resolve_config_file("awsprov_templates.json") == target

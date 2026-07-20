@@ -339,14 +339,19 @@ class TestSpotFleetHandlerNameTag:
             assert "hf-" not in name_tag["Value"]
 
 
-def _make_handler_with_config_port(config_port):
+def _make_handler_with_config_port(config_port, provider_name=None):
     aws_client = MagicMock()
     aws_client.sts_client.get_caller_identity.return_value = {"Account": "123456789012"}
     logger = MagicMock()
     aws_ops = MagicMock()
     launch_template_manager = MagicMock()
     return SpotFleetHandler(
-        aws_client, logger, aws_ops, launch_template_manager, config_port=config_port
+        aws_client,
+        logger,
+        aws_ops,
+        launch_template_manager,
+        config_port=config_port,
+        provider_name=provider_name,
     )
 
 
@@ -415,7 +420,6 @@ class TestResolveFleetRole:
     def test_fleet_role_resolved_from_provider_config(self):
         """When fleet_role is absent from template but present in provider config, it is injected."""
         config_port = MagicMock()
-        config_port.get_active_provider_name_override.return_value = None
         config_port.get_provider_config.return_value = _make_provider_config(
             fleet_role_in_config=FULL_SPOT_FLEET_ARN
         )
@@ -429,36 +433,7 @@ class TestResolveFleetRole:
     def test_fleet_role_not_found_returns_template_unchanged(self):
         """When fleet_role is absent from both template and provider config, template is unchanged."""
         config_port = MagicMock()
-        config_port.get_active_provider_name_override.return_value = None
         config_port.get_provider_config.return_value = _make_provider_config()
-        handler = _make_handler_with_config_port(config_port)
-        template = self._make_template(fleet_role=None)
-
-        result = handler._resolve_fleet_role(template)
-
-        assert result.fleet_role is None
-
-    def test_provider_override_matches_uses_fleet_role(self):
-        """When active_provider_override names the same provider, fleet_role is injected."""
-        config_port = MagicMock()
-        config_port.get_active_provider_name_override.return_value = "aws_test_eu-west-2"
-        config_port.get_provider_config.return_value = _make_provider_config(
-            fleet_role_in_config=FULL_SPOT_FLEET_ARN
-        )
-        handler = _make_handler_with_config_port(config_port)
-        template = self._make_template(fleet_role=None)
-
-        result = handler._resolve_fleet_role(template)
-
-        assert result.fleet_role == FULL_SPOT_FLEET_ARN
-
-    def test_provider_override_no_match_returns_template_unchanged(self):
-        """When active_provider_override names a different provider, fleet_role stays None."""
-        config_port = MagicMock()
-        config_port.get_active_provider_name_override.return_value = "aws_other_provider"
-        config_port.get_provider_config.return_value = _make_provider_config(
-            fleet_role_in_config=FULL_SPOT_FLEET_ARN
-        )
         handler = _make_handler_with_config_port(config_port)
         template = self._make_template(fleet_role=None)
 
@@ -475,10 +450,9 @@ class TestResolveFleetRole:
 
         assert result.fleet_role is None
 
-    def test_first_provider_with_fleet_role_is_used(self):
-        """The first provider entry that has a fleet_role is used when no template role is set."""
+    def test_single_provider_fleet_role_is_used(self):
+        """With one provider entry and no name, its fleet_role is used when no template role is set."""
         config_port = MagicMock()
-        config_port.get_active_provider_name_override.return_value = None
         config_port.get_provider_config.return_value = _make_provider_config(
             fleet_role_in_config=FULL_SPOT_FLEET_ARN
         )
@@ -489,6 +463,66 @@ class TestResolveFleetRole:
 
         assert result.fleet_role == FULL_SPOT_FLEET_ARN
 
+    def test_multi_provider_resolves_from_selected_provider(self):
+        """In a multi-provider config, the handler's own provider's fleet_role is used."""
+        other_arn = (
+            "arn:aws:iam::111111111111:role/aws-service-role/"
+            "spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet"
+        )
+        first = _FakeProvider("aws_first", config={"fleet_role": other_arn})
+        selected = _FakeProvider("aws_selected", config={"fleet_role": FULL_SPOT_FLEET_ARN})
+        by_name = {"aws_first": first, "aws_selected": selected}
+
+        config_port = MagicMock()
+        config_port.get_provider_config.return_value = _FakeProviderConfig(
+            providers=[first, selected]
+        )
+        config_port.get_provider_instance_config.side_effect = lambda name: by_name.get(name)
+
+        handler = _make_handler_with_config_port(config_port, provider_name="aws_selected")
+        template = self._make_template(fleet_role=None)
+
+        result = handler._resolve_fleet_role(template)
+
+        assert result.fleet_role == FULL_SPOT_FLEET_ARN
+        config_port.get_provider_instance_config.assert_called_once_with("aws_selected")
+
+    def test_multi_provider_does_not_borrow_other_providers_role(self):
+        """The selected provider without a fleet_role must not fall back to another provider's."""
+        other = _FakeProvider("aws_other", config={"fleet_role": FULL_SPOT_FLEET_ARN})
+        selected = _FakeProvider("aws_selected", config={})
+        by_name = {"aws_other": other, "aws_selected": selected}
+
+        config_port = MagicMock()
+        config_port.get_provider_config.return_value = _FakeProviderConfig(
+            providers=[other, selected]
+        )
+        config_port.get_provider_instance_config.side_effect = lambda name: by_name.get(name)
+
+        handler = _make_handler_with_config_port(config_port, provider_name="aws_selected")
+        template = self._make_template(fleet_role=None)
+
+        result = handler._resolve_fleet_role(template)
+
+        assert result.fleet_role is None
+
+    def test_multi_provider_without_name_does_not_guess(self):
+        """With multiple providers and no selected name, no role is borrowed from any of them."""
+        first = _FakeProvider("aws_first", config={"fleet_role": FULL_SPOT_FLEET_ARN})
+        second = _FakeProvider("aws_second", config={"fleet_role": FULL_SPOT_FLEET_ARN})
+
+        config_port = MagicMock()
+        config_port.get_provider_config.return_value = _FakeProviderConfig(
+            providers=[first, second]
+        )
+
+        handler = _make_handler_with_config_port(config_port, provider_name=None)
+        template = self._make_template(fleet_role=None)
+
+        result = handler._resolve_fleet_role(template)
+
+        assert result.fleet_role is None
+
     def test_ec2fleet_role_arn_converted_to_spotfleet_arn(self):
         """An EC2Fleet service-linked role ARN is converted to the SpotFleet equivalent."""
         ec2fleet_arn = (
@@ -496,7 +530,6 @@ class TestResolveFleetRole:
             "ec2fleet.amazonaws.com/AWSServiceRoleForEC2Fleet"
         )
         config_port = MagicMock()
-        config_port.get_active_provider_name_override.return_value = None
         config_port.get_provider_config.return_value = _make_provider_config(
             fleet_role_in_config=ec2fleet_arn
         )
@@ -512,7 +545,6 @@ class TestResolveFleetRole:
     def test_short_role_name_expanded_to_full_arn(self):
         """The short name 'AWSServiceRoleForEC2SpotFleet' is expanded to a full ARN."""
         config_port = MagicMock()
-        config_port.get_active_provider_name_override.return_value = None
         config_port.get_provider_config.return_value = _make_provider_config(
             fleet_role_in_config="AWSServiceRoleForEC2SpotFleet"
         )
