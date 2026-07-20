@@ -521,13 +521,22 @@ public class RawHttpClient {
         java.net.UnixDomainSocketAddress addr =
                 java.net.UnixDomainSocketAddress.of(socketPath);
         SocketChannel ch = SocketChannel.open(addr);
-        ch.configureBlocking(true);
-        OutputStream out = Channels.newOutputStream(ch);
-        writeSseRequest(out, "localhost", path);
-        InputStream rawIn = Channels.newInputStream(ch);
-        BufferedInputStream buffered = new BufferedInputStream(rawIn, 65536);
-        checkSseResponseStatus(buffered);
-        return buffered;
+        try {
+            ch.configureBlocking(true);
+            OutputStream out = Channels.newOutputStream(ch);
+            writeSseRequest(out, "localhost", path);
+            InputStream rawIn = Channels.newInputStream(ch);
+            BufferedInputStream buffered = new BufferedInputStream(rawIn, 65536);
+            checkSseResponseStatus(buffered);
+            return buffered;
+        } catch (IOException | RuntimeException e) {
+            // checkSseResponseStatus throws OrbApiException (a RuntimeException) on
+            // any 4xx/5xx status, and writeSseRequest/socket I/O can throw IOException.
+            // Close the channel on any throwing path so we don't leak the file
+            // descriptor; the successful path hands the open channel to the caller.
+            try { ch.close(); } catch (IOException ignored) {}
+            throw e;
+        }
     }
 
     private InputStream openSseStreamTcp(String path) throws IOException {

@@ -219,3 +219,130 @@ describe("retry transport", () => {
     expect(count()).toBe(1);
   }, 10_000);
 });
+
+/**
+ * These tests mirror the REAL client configuration: the OrbClient axios
+ * instance is created with `validateStatus: () => true`, so axios RESOLVES
+ * every response — including 429/503/5xx — instead of rejecting. The adapters
+ * here therefore RETURN error responses (they do not throw), exactly like a
+ * real HTTP round-trip against a server returning 503.
+ *
+ * The original suite above used bare instances + throwing adapters, so it never
+ * exercised this path and the status-based retry was silently dead code.
+ */
+describe("retry transport — permissive validateStatus (real-client path)", () => {
+  /** Adapter that RESOLVES an error response N times then RESOLVES a 200. */
+  function makeResolvingAdapter(failCount: number, failStatus: number) {
+    let callCount = 0;
+    return {
+      count: () => callCount,
+      adapter: async (config: any) => {
+        callCount++;
+        if (callCount <= failCount) {
+          return {
+            status: failStatus,
+            statusText: String(failStatus),
+            data: {},
+            headers: {},
+            config,
+            request: {},
+          };
+        }
+        return { status: 200, statusText: "OK", data: { ok: true }, headers: {}, config, request: {} };
+      },
+    };
+  }
+
+  it("retries a 503 on an idempotent GET the expected number of times, then succeeds", async () => {
+    const instance = axios.create({
+      baseURL: "http://test.invalid",
+      validateStatus: () => true, // exactly what OrbClient.create() sets
+    });
+    attachRetry(instance, { maxRetries: 3, baseDelayMs: 1 });
+
+    const { adapter, count } = makeResolvingAdapter(2, 503);
+    instance.defaults.adapter = adapter as any;
+
+    const resp = await instance.get("/test");
+    expect(resp.status).toBe(200); // eventually recovers
+    expect(count()).toBe(3); // initial 503 + 503 + success
+  }, 10_000);
+
+  it("exhausts retries on a persistent 503 GET and RESOLVES the final 503 (caller throws)", async () => {
+    const instance = axios.create({
+      baseURL: "http://test.invalid",
+      validateStatus: () => true,
+    });
+    attachRetry(instance, { maxRetries: 2, baseDelayMs: 1 });
+
+    const { adapter, count } = makeResolvingAdapter(99, 503);
+    instance.defaults.adapter = adapter as any;
+
+    // With permissive validateStatus the exhausted response resolves (it does
+    // not throw); the client's own `resp.status >= 400` check turns it into an
+    // error. Here we assert the retry budget was spent and the status is 503.
+    const resp = await instance.get("/test");
+    expect(resp.status).toBe(503);
+    expect(count()).toBe(3); // initial + 2 retries
+  }, 10_000);
+
+  it("does NOT retry a 503 on a non-idempotent POST (may double-provision)", async () => {
+    const instance = axios.create({
+      baseURL: "http://test.invalid",
+      validateStatus: () => true,
+    });
+    attachRetry(instance, { maxRetries: 3, baseDelayMs: 1 });
+
+    const { adapter, count } = makeResolvingAdapter(99, 503);
+    instance.defaults.adapter = adapter as any;
+
+    const resp = await instance.post("/test", {});
+    expect(resp.status).toBe(503);
+    expect(count()).toBe(1); // no retry for POST
+  }, 10_000);
+
+  it("does NOT retry a 404 GET (terminal client error)", async () => {
+    const instance = axios.create({
+      baseURL: "http://test.invalid",
+      validateStatus: () => true,
+    });
+    attachRetry(instance, { maxRetries: 3, baseDelayMs: 1 });
+
+    const { adapter, count } = makeResolvingAdapter(99, 404);
+    instance.defaults.adapter = adapter as any;
+
+    const resp = await instance.get("/test");
+    expect(resp.status).toBe(404);
+    expect(count()).toBe(1);
+  }, 10_000);
+
+  it("does NOT retry a 503 GET marked with disableRetry() (health() path)", async () => {
+    const instance = axios.create({
+      baseURL: "http://test.invalid",
+      validateStatus: () => true,
+    });
+    attachRetry(instance, { maxRetries: 3, baseDelayMs: 1 });
+
+    const { adapter, count } = makeResolvingAdapter(99, 503);
+    instance.defaults.adapter = adapter as any;
+
+    const resp = await instance.get("/test", disableRetry({}));
+    expect(resp.status).toBe(503);
+    expect(count()).toBe(1);
+  }, 10_000);
+
+  it("does not retry a 200 (fulfillment interceptor passes it through untouched)", async () => {
+    const instance = axios.create({
+      baseURL: "http://test.invalid",
+      validateStatus: () => true,
+    });
+    attachRetry(instance, { maxRetries: 2, baseDelayMs: 1 });
+
+    const { adapter, count } = makeResolvingAdapter(0, 503);
+    instance.defaults.adapter = adapter as any;
+
+    const resp = await instance.get("/test");
+    expect(resp.status).toBe(200);
+    expect(count()).toBe(1);
+  }, 10_000);
+});

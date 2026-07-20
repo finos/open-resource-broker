@@ -104,9 +104,10 @@
       "operation_id": "getRequestStatus",
       "http_method": "GET",
       "http_path": "/api/v1/requests/{request_id}/status",
+      "_sdk_methods_note": "sdk_methods is DOCUMENTATION ONLY: no parity runner dispatches off it — each runner hardcodes its step order and only reads these strings for log lines. They must still name the method that actually hits this step's declared route (getRequestStatus — GET /api/v1/requests/{request_id}/status). The Go/Python entries previously named the /{id} route method (GetRequest / get_request), which was wrong yet unchecked; corrected below to the /status method the Go runner (c.GetRequestStatus) truly calls.",
       "sdk_methods": {
-        "python":     "await client.get_request(request_id=request_id)",
-        "go":         "c.GetRequest(ctx, requestID)",
+        "python":     "await client.get_request_status(request_id=request_id)",
+        "go":         "c.GetRequestStatus(ctx, requestID, false)",
         "typescript": "await client.getRequestStatus(requestId)",
         "java":       "client.getRequestStatus(requestId, null, null, null)",
         "kotlin":     "client.getRequestStatus(requestId)",

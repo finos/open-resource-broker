@@ -611,6 +611,11 @@ export class OrbClient {
       });
 
       if (resp.status >= 400) {
+        // The response stream is already open even on an error status; destroy
+        // it before throwing so the underlying socket/PassThrough is released
+        // rather than leaked (the success path hands the stream to the caller,
+        // which destroys it on completion/abort).
+        (resp.data as Readable | undefined)?.destroy?.();
         const err = new OrbApiError({
           statusCode: resp.status,
           message: `SSE stream returned HTTP ${resp.status}`,
@@ -693,6 +698,9 @@ export class OrbClient {
         signal,
       });
       if (resp.status >= 400) {
+        // Destroy the already-opened response stream before throwing so the
+        // underlying socket/PassThrough is released rather than leaked.
+        (resp.data as Readable | undefined)?.destroy?.();
         throw new OrbApiError({
           statusCode: resp.status,
           message: `Event stream returned HTTP ${resp.status}`,

@@ -42,6 +42,21 @@ public sealed class RetryConfig
 /// </summary>
 public sealed class RetryDelegatingHandler : DelegatingHandler
 {
+    /// <summary>
+    /// Per-request option that, when set to <c>true</c>, tells this handler to
+    /// skip status-code-based retries (429/503/5xx) for that single request while
+    /// STILL retrying transient network errors (e.g. connection refused).
+    /// <para>
+    /// Used by <c>HealthAsync</c>: ORB returns HTTP 503 as a normal steady-state
+    /// "degraded" health status that the caller treats as valid data, so retrying
+    /// it would only burn the full back-off budget before returning the same 503.
+    /// A genuine connection failure should still be retried, so exception-based
+    /// retry is intentionally left intact.
+    /// </para>
+    /// </summary>
+    internal static readonly HttpRequestOptionsKey<bool> SkipStatusRetryOption =
+        new("FINOS.Orb.SkipStatusRetry");
+
     private static readonly ISet<HttpMethod> IdempotentMethods = new HashSet<HttpMethod>
     {
         HttpMethod.Get, HttpMethod.Head, HttpMethod.Put, HttpMethod.Delete, HttpMethod.Options
@@ -60,6 +75,11 @@ public sealed class RetryDelegatingHandler : DelegatingHandler
         var delay = _cfg.BaseDelayMs;
         var idempotent = IdempotentMethods.Contains(request.Method);
 
+        // Per-request opt-out of status-based retry (network-error retry is kept).
+        // Read once from the original request; clones don't need to carry it since
+        // the decision is made here in the loop, not by the cloned request.
+        var skipStatusRetry = request.Options.TryGetValue(SkipStatusRetryOption, out var skip) && skip;
+
         while (true)
         {
             HttpResponseMessage? response = null;
@@ -69,7 +89,9 @@ public sealed class RetryDelegatingHandler : DelegatingHandler
                 var req = attempt == 0 ? request : await CloneRequestAsync(request, cancellationToken);
                 response = await base.SendAsync(req, cancellationToken).ConfigureAwait(false);
 
-                if (!ShouldRetryStatus(idempotent, (int)response.StatusCode) || attempt >= _cfg.MaxRetries)
+                if (skipStatusRetry
+                    || !ShouldRetryStatus(idempotent, (int)response.StatusCode)
+                    || attempt >= _cfg.MaxRetries)
                     return response;
 
                 response.Dispose();

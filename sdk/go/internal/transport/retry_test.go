@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net"
@@ -191,6 +192,70 @@ func TestRetryNetwork_GetRetriedButNotOnEOF(t *testing.T) {
 	}
 	if got := netCalls.Load(); got != 3 {
 		t.Fatalf("GET should retry net.Error; expected 3 attempts, got %d", got)
+	}
+}
+
+// TestRetry_RewindsBodyOnRetry verifies that a bodied idempotent request (PUT)
+// is re-sent with its full body on retry. The first attempt drains the body
+// (mimicking the base transport / SigV4's io.ReadAll of the shared reader); a
+// correct RetryTransport rewinds via req.GetBody so the second attempt still
+// receives every byte. Regression test for empty-body-on-retry.
+func TestRetry_RewindsBodyOnRetry(t *testing.T) {
+	const payload = `{"value":"important-config"}`
+
+	var attempts atomic.Int32
+	var seen [][]byte
+
+	rt := &RetryTransport{
+		Next: rtFunc(func(req *http.Request) (*http.Response, error) {
+			n := attempts.Add(1)
+			// Drain the body exactly as a real downstream transport would.
+			var b []byte
+			if req.Body != nil {
+				var err error
+				b, err = io.ReadAll(req.Body)
+				if err != nil {
+					t.Fatalf("attempt %d: reading body: %v", n, err)
+				}
+				req.Body.Close()
+			}
+			seen = append(seen, b)
+			if n == 1 {
+				return newResp(503), nil // retryable -> triggers a retry
+			}
+			return newResp(200), nil
+		}),
+		MaxRetries: 3,
+		BaseDelay:  time.Millisecond,
+	}
+
+	req, err := http.NewRequest(http.MethodPut, "http://localhost/api/v1/config/key", bytes.NewReader([]byte(payload)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Sanity: net/http must set GetBody for an in-memory *bytes.Reader body,
+	// otherwise the rewind cannot work.
+	if req.GetBody == nil {
+		t.Fatal("expected GetBody to be set for a bytes.Reader body")
+	}
+
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected final 200, got %d", resp.StatusCode)
+	}
+	if got := attempts.Load(); got != 2 {
+		t.Fatalf("expected 2 attempts (503 then 200), got %d", got)
+	}
+	if len(seen) != 2 {
+		t.Fatalf("expected 2 recorded bodies, got %d", len(seen))
+	}
+	for i, b := range seen {
+		if string(b) != payload {
+			t.Fatalf("attempt %d received body %q, want %q", i+1, string(b), payload)
+		}
 	}
 }
 

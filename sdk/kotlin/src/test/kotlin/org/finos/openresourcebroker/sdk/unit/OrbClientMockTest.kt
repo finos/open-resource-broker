@@ -1,5 +1,6 @@
 package org.finos.openresourcebroker.sdk.unit
 
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -333,6 +334,64 @@ class OrbClientMockTest {
             client.health()
             assertEquals("Bearer token-1", server.takeRequest().getHeader("Authorization"))
             assertEquals("Bearer token-2", server.takeRequest().getHeader("Authorization"))
+            client.close()
+        } finally { server.shutdown() }
+    }
+
+    @Test
+    fun `streamRequestStatus emits the terminal event as its last emission`() = runTest {
+        val server = MockWebServer()
+        server.start()
+        try {
+            // SSE stream: two running events, then a terminal completed event.
+            // No {} sentinel — the terminal status alone must stop the flow AND
+            // the terminal event must be delivered (regression guard for the
+            // takeWhile-drops-terminal bug).
+            val sse = buildString {
+                append("data: {\"requests\":[{\"request_id\":\"r1\",\"status\":\"running\"}]}\n\n")
+                append("data: {\"requests\":[{\"request_id\":\"r1\",\"status\":\"provisioning\"}]}\n\n")
+                append("data: {\"requests\":[{\"request_id\":\"r1\",\"status\":\"completed\"}]}\n\n")
+            }
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("Content-Type", "text/event-stream")
+                    .setBody(sse)
+            )
+            val client = makeClient(server)
+            val events = client.streamRequestStatus("r1").toList()
+
+            assertEquals(3, events.size, "all events up to and including terminal must be delivered")
+            assertEquals("running", events[0].status)
+            assertEquals("provisioning", events[1].status)
+            assertEquals("completed", events.last().status)
+            assertEquals("r1", events.last().requestId)
+            client.close()
+        } finally { server.shutdown() }
+    }
+
+    @Test
+    fun `waitForCompletion returns the terminal event`() = runTest {
+        val server = MockWebServer()
+        server.start()
+        try {
+            val sse = buildString {
+                append("data: {\"requests\":[{\"request_id\":\"r1\",\"status\":\"running\"}]}\n\n")
+                append("data: {\"requests\":[{\"request_id\":\"r1\",\"status\":\"failed\",\"message\":\"boom\"}]}\n\n")
+            }
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("Content-Type", "text/event-stream")
+                    .setBody(sse)
+            )
+            val client = makeClient(server)
+            val terminal = client.waitForCompletion("r1")
+
+            assertNotNull(terminal, "terminal event must not be null")
+            assertEquals("failed", terminal!!.status)
+            assertEquals("r1", terminal.requestId)
+            assertEquals("boom", terminal.message)
             client.close()
         } finally { server.shutdown() }
     }

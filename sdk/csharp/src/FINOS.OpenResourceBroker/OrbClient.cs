@@ -336,6 +336,12 @@ public sealed class OrbClient : IAsyncDisposable
         using var req = new HttpRequestMessage(HttpMethod.Get, "/health");
         req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         AddSchedulerHeader(req);
+        // ORB returns 503 as a normal steady-state "degraded" health status that we
+        // accept as valid data below.  Tell the retry handler to skip status-based
+        // retry for this request so a degraded server returns immediately instead of
+        // burning the full back-off budget on 503s it already treats as acceptable.
+        // Network-error retry (e.g. connection refused) is intentionally left intact.
+        req.Options.Set(RetryDelegatingHandler.SkipStatusRetryOption, true);
         // Accept 200 (healthy) and 503 (degraded — ORB returns 503 for degraded health)
         var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseContentRead, ct).ConfigureAwait(false);
         if (resp.StatusCode != System.Net.HttpStatusCode.OK &&

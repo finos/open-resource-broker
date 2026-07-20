@@ -160,11 +160,11 @@ val final = client.waitForCompletion(requestId)
 ## Error Handling
 
 ```kotlin
-import org.finos.openresourcebroker.sdk.client.OrbClientError
+import org.finos.openresourcebroker.sdk.client.OrbApiError
 
 try {
     client.getTemplate("unknown")
-} catch (e: OrbClientError) {
+} catch (e: OrbApiError) {
     println("HTTP ${e.statusCode}: ${e.message}")
 }
 ```

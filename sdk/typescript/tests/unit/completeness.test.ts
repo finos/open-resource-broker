@@ -48,7 +48,20 @@ describe("SDK operation completeness vs OpenAPI spec", () => {
   });
 
   it("covers every spec operationId in the hand-written client", () => {
-    const missing = operationIds.filter((id) => !clientSource.includes(id));
+    // Match each operationId as a WHOLE WORD, not a plain substring.  A plain
+    // includes() is vacuous when one operationId is a prefix of another —
+    // "getRequest" is a substring of "getRequestStatus"/"getRequestTimeline"
+    // (and "getMachine" of "getMachineMetrics"), so the check would still pass
+    // even if the getRequest method were deleted entirely.  operationIds are
+    // [A-Za-z]+ tokens and the doc-comment convention is "<id> — VERB /path",
+    // so a \b word boundary requires the id to appear as its own token (a
+    // non-identifier char must follow) and is NOT satisfied by a longer id that
+    // merely starts with it.
+    const escapeRegExp = (s: string): string =>
+      s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const missing = operationIds.filter(
+      (id) => !new RegExp(`\\b${escapeRegExp(id)}\\b`).test(clientSource),
+    );
     expect(missing).toEqual([]);
   });
 });

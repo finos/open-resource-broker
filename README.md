@@ -305,10 +305,10 @@ from orb import ORBClient as orb
 async with orb(provider="aws") as sdk:
     templates = await sdk.list_templates(active_only=True)
     request = await sdk.request_machines(
-        template_id=templates[0]["template_id"],
+        template_id=templates["templates"][0]["template_id"],
         count=3,
     )
-    status = await sdk.get_request_status(request_id=request["created_request_id"])
+    status = await sdk.get_request_status(request_id=request["request_id"])
 ```
 
 See the [SDK documentation](docs/root/sdk/index.md) for per-language install and usage guides, the [Python SDK Quickstart](docs/root/sdk/quickstart.md), and [Generate Your Own SDK](docs/root/sdk/generating-sdks.md).

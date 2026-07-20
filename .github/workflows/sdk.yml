@@ -6,11 +6,32 @@ on:
     paths:
       - 'sdk/**'
       - '.github/workflows/sdk.yml'
+      # API source that shapes the exported OpenAPI spec.  The spec-drift-guard
+      # job re-exports /openapi.json from a live orb and diffs it against the
+      # committed sdk/spec/openapi.json; a route/schema change here that forgets
+      # to regenerate the spec is exactly the drift this workflow exists to
+      # catch, so these paths must trigger it (they were previously invisible
+      # because the filter only watched sdk/**).
+      - 'src/orb/api/routers/**'          # route declarations (method/path/operationId)
+      - 'src/orb/api/models/**'           # request/response models = spec schemas
+      - 'src/orb/api/documentation/**'    # configure_openapi() shapes the schema
+      - 'src/orb/api/server.py'           # inline /health,/metrics,/info operations + router registration
+      - 'src/orb/api/dependencies.py'     # response-model deps wired into routes
+      - 'dev-tools/release/export_openapi_spec.sh'  # the exporter itself
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'sdk/**'
       - '.github/workflows/sdk.yml'
+      # See the push filter above — the same API-source paths must trigger the
+      # spec-drift-guard on PRs so a route change without a spec regen fails at
+      # PR time rather than silently drifting all five SDKs from the real API.
+      - 'src/orb/api/routers/**'
+      - 'src/orb/api/models/**'
+      - 'src/orb/api/documentation/**'
+      - 'src/orb/api/server.py'
+      - 'src/orb/api/dependencies.py'
+      - 'dev-tools/release/export_openapi_spec.sh'
   schedule:
     - cron: '0 2 * * *'
 

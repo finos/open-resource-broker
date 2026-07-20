@@ -56,7 +56,7 @@ repository, use this path directly:
 INPUT_SPEC="$(pwd)/sdk/spec/openapi.json"
 ```
 
-The spec covers **44 operations** across templates, machines, requests,
+The spec covers **45 operations** across templates, machines, requests,
 providers, config, admin, and observability endpoints.
 
 ## Generating typed models with openapi-generator
@@ -263,7 +263,7 @@ for path, methods in spec['paths'].items():
 " | sort
 ```
 
-The current spec (v1.8.x) exposes **44 operations**. The full list is in
+The current spec (v1.8.x) exposes **45 operations**. The full list is in
 [`sdk/spec/openapi.json`](https://github.com/finos/open-resource-broker/blob/main/sdk/spec/openapi.json).
 
 ## Checking for spec drift

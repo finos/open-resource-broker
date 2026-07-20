@@ -64,6 +64,23 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 				return nil, req.Context().Err()
 			case <-time.After(delay):
 			}
+
+			// Rewind the request body before re-sending. The first attempt
+			// drains req.Body to EOF (the base transport, and SigV4Transport's
+			// io.ReadAll, consume the shared reader), so retrying with the same
+			// *http.Request would send a zero-length body. GetBody, which
+			// net/http sets for in-memory bodies (e.g. bytes.NewReader in
+			// client.put), yields a fresh reader positioned at the start.
+			// Because RetryTransport is the outermost transport in the chain,
+			// resetting here guarantees every downstream attempt — including the
+			// SigV4Transport clone — sees the full body.
+			if req.GetBody != nil {
+				body, gbErr := req.GetBody()
+				if gbErr != nil {
+					return nil, gbErr
+				}
+				req.Body = body
+			}
 		}
 
 		resp, err = t.Next.RoundTrip(req)

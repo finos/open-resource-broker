@@ -24,6 +24,7 @@
 
 import axios, {
   type AxiosInstance,
+  type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from "axios";
 
@@ -88,12 +89,63 @@ export function disableRetry<T extends object>(config: T): T {
 
 /**
  * Attach retry interceptors to an existing Axios instance.
+ *
+ * Two interceptors are registered so retry works regardless of how the instance
+ * treats HTTP error statuses:
+ *
+ *   - A FULFILLMENT interceptor handles the real-client path, where the instance
+ *     is created with `validateStatus: () => true` so axios RESOLVES every
+ *     response (including 429/503/5xx) instead of rejecting. Without this the
+ *     status-based retry would be dead code — axios would never reject on those
+ *     statuses and the rejection handler below would never see them.
+ *   - A REJECTION interceptor handles network errors (no HTTP response) and any
+ *     instance that uses a rejecting validateStatus, keeping parity with the
+ *     Go SDK.
+ *
+ * Both paths share the same shouldRetry helpers, backoff, and idempotent-verb
+ * gating so the retry policy cannot diverge between them.
  */
 export function attachRetry(instance: AxiosInstance, cfg: RetryConfig = {}): void {
   const maxRetries = cfg.maxRetries ?? 3;
   const baseDelayMs = cfg.baseDelayMs ?? 500;
   const maxDelayMs = cfg.maxDelayMs ?? 30_000;
 
+  // Shared backoff + re-issue. Returns the next attempt's response/promise.
+  async function reissue(
+    config: InternalAxiosRequestConfig & Record<string, unknown>,
+    attempt: number
+  ): Promise<AxiosResponse> {
+    const rawDelay = baseDelayMs * Math.pow(2, attempt);
+    const delay = Math.min(jitter(rawDelay), maxDelayMs);
+    await sleep(delay);
+    config[RETRY_COUNT_KEY] = attempt + 1;
+    return instance.request(config);
+  }
+
+  // FULFILLMENT: with a permissive validateStatus, an HTTP error status arrives
+  // here as a resolved response. Decide whether to retry it based on the same
+  // policy as the rejection path; otherwise return the response untouched so the
+  // caller's own status handling (e.g. `resp.status >= 400` throws) still runs.
+  instance.interceptors.response.use(async (response: AxiosResponse) => {
+    const config = response.config as
+      | (InternalAxiosRequestConfig & Record<string, unknown>)
+      | undefined;
+    if (!config) return response;
+
+    // Explicitly opted out (e.g. health() must observe a 503 directly).
+    if (config[DISABLE_RETRY_KEY]) return response;
+
+    const method = (config.method ?? "GET").toUpperCase();
+    if (!shouldRetryStatus(method, response.status)) return response;
+
+    const attempt = (config[RETRY_COUNT_KEY] as number | undefined) ?? 0;
+    if (attempt >= maxRetries) return response;
+
+    return reissue(config, attempt);
+  });
+
+  // REJECTION: network errors (no HTTP response) always land here, as do HTTP
+  // error statuses on any instance whose validateStatus rejects.
   instance.interceptors.response.use(
     undefined,
     async (error: unknown) => {
@@ -122,12 +174,7 @@ export function attachRetry(instance: AxiosInstance, cfg: RetryConfig = {}): voi
       const attempt = (config[RETRY_COUNT_KEY] as number | undefined) ?? 0;
       if (attempt >= maxRetries) throw error;
 
-      const rawDelay = baseDelayMs * Math.pow(2, attempt);
-      const delay = Math.min(jitter(rawDelay), maxDelayMs);
-      await sleep(delay);
-
-      config[RETRY_COUNT_KEY] = attempt + 1;
-      return instance.request(config);
+      return reissue(config, attempt);
     }
   );
 }

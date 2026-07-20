@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.flow.transformWhile
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -603,7 +604,16 @@ class OrbClient private constructor(
             .map { frame -> parseStreamEvent(frame) }
             .filter { it != null }
             .map { it!! }
-            .takeWhile { event -> event.status !in TERMINAL_STATUSES }
+            // Emit the terminal event, THEN stop. transformWhile emits every event
+            // and continues only while the status is non-terminal — so the terminal
+            // StreamEvent (completed/failed/etc.) is delivered as the last emission
+            // before the flow completes. Matches the Go/TS/Java SDK contract, which
+            // all deliver the terminal event and then stop. A plain
+            // `takeWhile { !terminal }` would drop the terminal event entirely.
+            .transformWhile { event ->
+                emit(event)
+                event.status !in TERMINAL_STATUSES
+            }
     }
 
     /**
@@ -616,7 +626,9 @@ class OrbClient private constructor(
         timeoutSeconds: Int = 300,
     ): StreamEvent? {
         var last: StreamEvent? = null
-        // first() on a filtered flow stops collecting after the first terminal event
+        // streamRequestStatus completes right after emitting the first terminal event
+        // (see its transformWhile), so the last collected element IS that terminal
+        // event. Returns null only if the stream ends without ever emitting one.
         streamRequestStatus(requestId, intervalSeconds, timeoutSeconds)
             .collect { event ->
                 last = event

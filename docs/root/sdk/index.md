@@ -6,7 +6,7 @@ models from the OpenAPI spec, plus five hand-written layers for subprocess
 management, UNIX domain socket transport, retry, AWS SigV4 auth, and SSE
 streaming.
 
-Each SDK covers all 44 operations in the current API spec
+Each SDK covers all 45 operations in the current API spec
 (`sdk/spec/openapi.json`).
 
 ## Quick-reference table
@@ -44,15 +44,15 @@ from orb import ORBClient
 async def main():
     async with ORBClient(provider="aws") as client:
         templates = await client.list_templates(active_only=True)
-        if not templates:
+        if not templates["templates"]:
             print("No templates registered")
             return
-        req = await client.create_request(
-            template_id=templates[0]["template_id"],
+        req = await client.request_machines(
+            template_id=templates["templates"][0]["template_id"],
             count=2,
         )
-        print(f"Request submitted: {req['created_request_id']}")
-        status = await client.get_request(request_id=req["created_request_id"])
+        print(f"Request submitted: {req['request_id']}")
+        status = await client.get_request_status(request_id=req["request_id"])
         print(f"Status: {status}")
 
 asyncio.run(main())
@@ -163,7 +163,7 @@ try (OrbClient client = OrbClient.builder()
         new RequestMachinesRequest()
             .templateId(templates.getTemplates().get(0).getTemplateId())
             .count(2));
-    StreamEvent final_ = client.waitForCompletion(op.getRequestId());
+    StreamEvent final_ = client.waitForCompletion(op.getRequestId(), 2.0, 300.0);
     System.out.println(final_.getStatus());
 }
 ```

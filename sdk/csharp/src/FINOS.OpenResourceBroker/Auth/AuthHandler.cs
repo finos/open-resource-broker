@@ -202,7 +202,21 @@ internal sealed class AuthDelegatingHandler : DelegatingHandler
         var canonicalHeadersStr = string.Join("\n", headersToSign.Select(kv => $"{kv.Key}:{kv.Value}")) + "\n";
         var signedHeadersStr = string.Join(";", headersToSign.Keys);
 
-        // Canonical query string (percent-encode and sort)
+        // Canonical query string (RFC 3986, encoded exactly once, sorted).
+        //
+        // uri.Query is ALREADY percent-encoded (that is what goes on the wire), so
+        // we must NOT run Uri.EscapeDataString over it again — doing so would
+        // double-encode the canonical query (e.g. a wire "%20" becomes "%2520"),
+        // making the signed canonical request diverge from what the server
+        // recomputes → signature mismatch → 403.
+        //
+        // Instead we DECODE each key/value back to its raw form, then re-encode
+        // each exactly once with RFC 3986 rules (Uri.EscapeDataString, which
+        // percent-encodes everything except the unreserved set A-Z a-z 0-9 - _ . ~).
+        // This matches the Go interceptor's encode()/isUnreserved() in
+        // sdk/go/internal/transport/sigv4.go so every SDK produces the identical
+        // canonical query string.  Pairs are sorted by encoded key=value (ordinal),
+        // which for AWS canonicalisation equals "sort by key, then by value".
         var query = uri.Query.TrimStart('?');
         var sortedQuery = string.Join("&",
             (query.Length > 0 ? query.Split('&') : Array.Empty<string>())
@@ -210,8 +224,10 @@ internal sealed class AuthDelegatingHandler : DelegatingHandler
             {
                 var eq = part.IndexOf('=');
                 return eq < 0
-                    ? Uri.EscapeDataString(part) + "="
-                    : Uri.EscapeDataString(part[..eq]) + "=" + Uri.EscapeDataString(part[(eq + 1)..]);
+                    ? Uri.EscapeDataString(Uri.UnescapeDataString(part)) + "="
+                    : Uri.EscapeDataString(Uri.UnescapeDataString(part[..eq]))
+                      + "="
+                      + Uri.EscapeDataString(Uri.UnescapeDataString(part[(eq + 1)..]));
             })
             .OrderBy(x => x, StringComparer.Ordinal));
 

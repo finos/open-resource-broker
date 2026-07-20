@@ -62,7 +62,18 @@ class OperationCompletenessTest {
     fun clientCoversEverySpecOperation() {
         assertTrue(Files.exists(clientPath), "client not found: ${clientPath.toAbsolutePath()}")
         val clientSource = Files.readString(clientPath)
-        val missing = specOperationIds().filterNot { clientSource.contains(it) }
+        // Match each operationId as a WHOLE WORD, not a plain substring.  A plain
+        // contains() is vacuous when one operationId is a prefix of another —
+        // "getRequest" is a substring of "getRequestStatus"/"getRequestTimeline"
+        // (and "getMachine" of "getMachineMetrics"), so the check would still pass
+        // even if the getRequest method were deleted entirely.  operationIds are
+        // [A-Za-z]+ tokens and the KDoc convention is "<id> — VERB /path", so a \b
+        // word boundary requires the id to appear as its own token (a
+        // non-identifier char must follow) and is NOT satisfied by a longer id
+        // that merely starts with it.
+        val missing = specOperationIds().filterNot { id ->
+            Regex("\\b" + Regex.escape(id) + "\\b").containsMatchIn(clientSource)
+        }
         assertTrue(
             missing.isEmpty(),
             "OrbClient.kt does not cover ${missing.size} spec operation(s): $missing"

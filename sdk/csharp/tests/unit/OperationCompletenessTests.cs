@@ -12,6 +12,7 @@
 // CI in every language's completeness test, not only Go's.
 
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace UnitTests;
@@ -79,7 +80,18 @@ public class OperationCompletenessTests
         Assert.True(File.Exists(clientPath), "client not found: " + clientPath);
         var clientSource = File.ReadAllText(clientPath);
 
-        var missing = SpecOperationIds().Where(id => !clientSource.Contains(id)).ToList();
+        // Match each operationId as a WHOLE WORD, not a plain substring.  A plain
+        // Contains() is vacuous when one operationId is a prefix of another —
+        // "getRequest" is a substring of "getRequestStatus"/"getRequestTimeline"
+        // (and "getMachine" of "getMachineMetrics"), so the check would still pass
+        // even if the getRequest method were deleted entirely.  operationIds are
+        // [A-Za-z]+ tokens and the doc-comment convention is "<id> — VERB /path",
+        // so a \b word boundary requires the id to appear as its own token (a
+        // non-identifier char — space, em-dash, quote, EOL — must follow) and is
+        // NOT satisfied by a longer id that merely starts with it.
+        var missing = SpecOperationIds()
+            .Where(id => !Regex.IsMatch(clientSource, $@"\b{Regex.Escape(id)}\b"))
+            .ToList();
         Assert.True(missing.Count == 0,
             $"OrbClient.cs does not cover {missing.Count} spec operation(s): {string.Join(", ", missing)}");
     }

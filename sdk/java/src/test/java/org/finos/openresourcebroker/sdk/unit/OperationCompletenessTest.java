@@ -13,6 +13,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -83,7 +84,18 @@ class OperationCompletenessTest {
         String clientSource = Files.readString(CLIENT_PATH);
         List<String> missing = new ArrayList<>();
         for (String opId : specOperationIds()) {
-            if (!clientSource.contains(opId)) {
+            // Match each operationId as a WHOLE WORD, not a plain substring.  A
+            // plain contains() is vacuous when one operationId is a prefix of
+            // another — "getRequest" is a substring of "getRequestStatus"/
+            // "getRequestTimeline" (and "getMachine" of "getMachineMetrics"), so
+            // the check would still pass even if the getRequest method were
+            // deleted entirely.  operationIds are [A-Za-z]+ tokens and the Javadoc
+            // convention is "<id> — VERB /path", so a \b word boundary requires
+            // the id to appear as its own token (a non-identifier char must
+            // follow) and is NOT satisfied by a longer id that merely starts
+            // with it.
+            Pattern token = Pattern.compile("\\b" + Pattern.quote(opId) + "\\b");
+            if (!token.matcher(clientSource).find()) {
                 missing.add(opId);
             }
         }

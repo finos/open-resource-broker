@@ -612,9 +612,11 @@ jobs:
   # ---------------------------------------------------------------------------
 
   # Gate every SDK publish job on a passing static spec-conformance check for
-  # THIS release commit.  The SDK build+contract workflow (sdk.yml) only runs on
-  # sdk/** path changes, so without this gate a tagged release could publish
-  # SDKs whose spec conformance was never verified for the released commit.
+  # THIS release commit.  The SDK build+contract workflow (sdk.yml) is
+  # path-filtered (sdk/** plus the API source that shapes the exported spec), so
+  # a release commit that touched none of those paths would never have run it —
+  # without this gate a tagged release could publish SDKs whose spec conformance
+  # was never verified for the released commit.
   sdk-spec-conformance:
     name: SDK Spec Conformance Gate
     needs: config
