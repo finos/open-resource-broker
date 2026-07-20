@@ -586,12 +586,13 @@ func requestFromJSON(r requestJSON) Request {
 
 // GetRequest returns a single request by ID.
 //
-// There is no GET /api/v1/requests/{request_id} route in the ORB API — the
-// single-read endpoint is GET /api/v1/requests/{request_id}/status, which
-// returns the same {"requests": [...]} envelope as ListRequests. We decode
-// into the envelope and extract the first element.
+// It targets GET /api/v1/requests/{request_id} (the getRequest operation),
+// which returns the same {"requests": [...]} envelope as ListRequests and
+// GetRequestStatus. We decode into the envelope and extract the first element.
+// This is distinct from GetRequestStatus, which targets the /status subroute
+// (the getRequestStatus operation).
 func (c *Client) GetRequest(ctx context.Context, id string) (*Request, error) {
-	path := "/api/v1/requests/" + url.PathEscape(id) + "/status"
+	path := "/api/v1/requests/" + url.PathEscape(id)
 	if c.scheduler == SchedulerHostFactory {
 		var envelope struct {
 			Requests []requestJSONHF `json:"requests"`

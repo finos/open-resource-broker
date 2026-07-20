@@ -61,11 +61,11 @@ public class OperationCompletenessTests
     }
 
     [Fact]
-    public void SpecDeclaresExactly44Operations()
+    public void SpecDeclaresExactly45Operations()
     {
-        // Mirrors Go's `if len(ops) != 44` sentinel: a spec that grows or shrinks
+        // Mirrors Go's `if len(ops) != 45` sentinel: a spec that grows or shrinks
         // forces a deliberate update rather than silently under-covering.
-        Assert.Equal(44, SpecOperationIds().Count);
+        Assert.Equal(45, SpecOperationIds().Count);
     }
 
     [Fact]

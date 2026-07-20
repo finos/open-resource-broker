@@ -52,10 +52,10 @@ class OperationCompletenessTest {
     }
 
     @Test
-    fun specDeclaresExactly44Operations() {
-        // Mirrors Go's `if len(ops) != 44` sentinel: a spec that grows or shrinks
+    fun specDeclaresExactly45Operations() {
+        // Mirrors Go's `if len(ops) != 45` sentinel: a spec that grows or shrinks
         // forces a deliberate update rather than silently under-covering.
-        assertEquals(44, specOperationIds().size, "spec operation count changed — update coverage")
+        assertEquals(45, specOperationIds().size, "spec operation count changed — update coverage")
     }
 
     @Test

@@ -15,7 +15,7 @@
 #     subprocess manager) must be layered on top — see sdk/ARCHITECTURE.md.
 #
 # SSE exclusions:
-#   stream_events_api_v1_events__get and stream_request_status produce
+#   streamEvents and stream_request_status produce
 #   text/event-stream responses.  These are excluded from codegen; the
 #   hand-written SSE layer handles them.
 

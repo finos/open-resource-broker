@@ -190,9 +190,10 @@ func TestStreamEventsDeliversFrames(t *testing.T) {
 	}
 }
 
-// TestGetRequestUsesStatusRoute verifies GetRequest targets the /status route
-// (there is no GET /api/v1/requests/{id} route) and decodes the envelope.
-func TestGetRequestUsesStatusRoute(t *testing.T) {
+// TestGetRequestUsesRequestRoute verifies GetRequest targets the
+// GET /api/v1/requests/{id} route (the getRequest operation) and decodes the
+// {"requests": [...]} envelope.
+func TestGetRequestUsesRequestRoute(t *testing.T) {
 	var gotPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
@@ -211,8 +212,8 @@ func TestGetRequestUsesStatusRoute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRequest: %v", err)
 	}
-	if gotPath != "/api/v1/requests/req-7/status" {
-		t.Fatalf("expected /status route, got %q", gotPath)
+	if gotPath != "/api/v1/requests/req-7" {
+		t.Fatalf("expected /api/v1/requests/req-7 route, got %q", gotPath)
 	}
 	if req.RequestID != "req-7" || req.Status != "completed" {
 		t.Fatalf("unexpected request: %+v", req)

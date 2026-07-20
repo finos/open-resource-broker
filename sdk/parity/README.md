@@ -39,12 +39,12 @@ The fixture defines six steps:
 
 | Step | Operation | operationId |
 |------|-----------|-------------|
-| 1 | Health check | `health_check_health_get` |
-| 2 | List templates | `list_templates_api_v1_templates__get` |
-| 3 | Request machines (conditional) | `request_machines_api_v1_machines_request_post` |
-| 4 | Poll request status (conditional) | `get_request_status_api_v1_requests__request_id__status_get` |
-| 5 | Return machines (conditional) | `return_machines_api_v1_machines_return_post` |
-| 6 | List requests | `list_requests_api_v1_requests__get` |
+| 1 | Health check | `healthCheck` |
+| 2 | List templates | `listTemplates` |
+| 3 | Request machines (conditional) | `requestMachines` |
+| 4 | Poll request status (conditional) | `getRequestStatus` |
+| 5 | Return machines (conditional) | `returnMachines` |
+| 6 | List requests | `listRequests` |
 
 Steps 3–5 are conditional: they run only when step 2 returns at least one
 template. Step 5 also requires step 4 to have returned at least one machine

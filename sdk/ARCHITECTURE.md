@@ -310,7 +310,7 @@ The following operations are excluded from codegen because they use
 
 | Operation | Path | Notes |
 |-----------|------|-------|
-| `stream_events_api_v1_events__get` | `GET /api/v1/events/` | Global SSE event bus |
+| `streamEvents` | `GET /api/v1/events/` | Global SSE event bus |
 
 `GET /api/v1/requests/{request_id}/stream` returns `application/json`-framed
 SSE data; it is included in the generated stubs but the method body is

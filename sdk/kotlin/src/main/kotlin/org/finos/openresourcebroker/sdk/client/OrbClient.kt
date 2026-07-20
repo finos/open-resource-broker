@@ -351,7 +351,7 @@ class OrbClient private constructor(
     // System / Observability — 4 operations
     // ---------------------------------------------------------------------------
 
-    /** health_check_health_get — GET /health
+    /** healthCheck — GET /health
      *
      * Returns the health status regardless of HTTP status code.
      * ORB returns 200 for healthy/degraded and 503 for unhealthy, but in all cases
@@ -374,13 +374,13 @@ class OrbClient private constructor(
         return parseJson(body)
     }
 
-    /** info_info_get — GET /info */
+    /** getServiceInfo — GET /info */
     suspend fun info(): Map<String, Any?> {
         val resp = get("/info")
         return executeRaw(resp)
     }
 
-    /** metrics_metrics_get — GET /metrics */
+    /** getMetrics — GET /metrics */
     suspend fun metrics(): String {
         checkHealth()
         val req = Request.Builder()
@@ -399,7 +399,7 @@ class OrbClient private constructor(
         return resp.body?.string() ?: ""
     }
 
-    /** get_dashboard_summary_api_v1_system_dashboard_get — GET /api/v1/system/dashboard */
+    /** getDashboardSummary — GET /api/v1/system/dashboard */
     suspend fun getDashboardSummary(): Map<String, Any?> {
         val resp = get("/api/v1/system/dashboard")
         return executeRaw(resp)
@@ -409,33 +409,33 @@ class OrbClient private constructor(
     // Templates — 8 operations
     // ---------------------------------------------------------------------------
 
-    /** list_templates_api_v1_templates__get — GET /api/v1/templates/ */
+    /** listTemplates — GET /api/v1/templates/ */
     suspend fun listTemplates(): TemplateListResponse = execute(get("/api/v1/templates/"))
 
-    /** get_template_api_v1_templates__template_id__get — GET /api/v1/templates/{template_id} */
+    /** getTemplate — GET /api/v1/templates/{template_id} */
     suspend fun getTemplate(templateId: String): TemplateItem =
         execute(get("/api/v1/templates/${encode(templateId)}"))
 
-    /** create_template_api_v1_templates__post — POST /api/v1/templates/ */
+    /** createTemplate — POST /api/v1/templates/ */
     suspend fun createTemplate(body: TemplateCreateRequest): TemplateMutationResponse =
         execute(post("/api/v1/templates/", body))
 
-    /** update_template_api_v1_templates__template_id__put — PUT /api/v1/templates/{template_id} */
+    /** updateTemplate — PUT /api/v1/templates/{template_id} */
     suspend fun updateTemplate(templateId: String, body: TemplateUpdateRequest): TemplateMutationResponse =
         execute(put("/api/v1/templates/${encode(templateId)}", body))
 
-    /** delete_template_api_v1_templates__template_id__delete — DELETE /api/v1/templates/{template_id} */
+    /** deleteTemplate — DELETE /api/v1/templates/{template_id} */
     suspend fun deleteTemplate(templateId: String): Map<String, Any?> =
         executeRaw(delete("/api/v1/templates/${encode(templateId)}"))
 
-    /** validate_template_api_v1_templates_validate_post — POST /api/v1/templates/validate */
+    /** validateTemplate — POST /api/v1/templates/validate */
     suspend fun validateTemplate(body: Any): Map<String, Any?> =
         executeRaw(post("/api/v1/templates/validate", body))
 
-    /** refresh_templates_api_v1_templates_refresh_post — POST /api/v1/templates/refresh */
+    /** refreshTemplates — POST /api/v1/templates/refresh */
     suspend fun refreshTemplates(): TemplateListResponse = execute(post("/api/v1/templates/refresh"))
 
-    /** generate_templates_api_v1_templates_generate_post — POST /api/v1/templates/generate */
+    /** generateTemplates — POST /api/v1/templates/generate */
     suspend fun generateTemplates(body: GenerateTemplatesBody): TemplateListResponse =
         execute(post("/api/v1/templates/generate", body))
 
@@ -443,7 +443,7 @@ class OrbClient private constructor(
     // Machines — 8 operations
     // ---------------------------------------------------------------------------
 
-    /** list_machines_api_v1_machines__get — GET /api/v1/machines/ */
+    /** listMachines — GET /api/v1/machines/ */
     suspend fun listMachines(
         status: String? = null,
         requestId: String? = null,
@@ -459,29 +459,29 @@ class OrbClient private constructor(
         return execute(get("/api/v1/machines/", params))
     }
 
-    /** get_machine_api_v1_machines__machine_id__get — GET /api/v1/machines/{machine_id} */
+    /** getMachine — GET /api/v1/machines/{machine_id} */
     suspend fun getMachine(machineId: String): MachineItem =
         execute(get("/api/v1/machines/${encode(machineId)}"))
 
-    /** request_machines_api_v1_machines_request_post — POST /api/v1/machines/request */
+    /** requestMachines — POST /api/v1/machines/request */
     suspend fun requestMachines(body: RequestMachinesRequest): RequestOperationResponse =
         execute(post("/api/v1/machines/request", body))
 
-    /** return_machines_api_v1_machines_return_post — POST /api/v1/machines/return */
+    /** returnMachines — POST /api/v1/machines/return */
     suspend fun returnMachines(body: ReturnMachinesRequest): RequestOperationResponse =
         execute(post("/api/v1/machines/return", body))
 
-    /** sync_machine_status_api_v1_machines__machine_id__status_get — GET /api/v1/machines/{machine_id}/status */
+    /** syncMachineStatus — GET /api/v1/machines/{machine_id}/status */
     suspend fun syncMachineStatus(machineId: String): MachineListResponse =
         execute(get("/api/v1/machines/${encode(machineId)}/status"))
 
-    /** get_machine_metrics_api_v1_machines__machine_id__metrics_get — GET /api/v1/machines/{machine_id}/metrics */
+    /** getMachineMetrics — GET /api/v1/machines/{machine_id}/metrics */
     suspend fun getMachineMetrics(machineId: String, range: String? = null): Map<String, Any?> {
         val params = buildMap<String, String> { range?.let { put("range", it) } }
         return executeRaw(get("/api/v1/machines/${encode(machineId)}/metrics", params))
     }
 
-    /** purge_machine_api_v1_machines__machine_id__delete — DELETE /api/v1/machines/{machine_id} */
+    /** purgeMachine — DELETE /api/v1/machines/{machine_id} */
     suspend fun purgeMachine(machineId: String): Map<String, Any?> =
         executeRaw(delete("/api/v1/machines/${encode(machineId)}"))
 
@@ -490,7 +490,7 @@ class OrbClient private constructor(
     // ---------------------------------------------------------------------------
 
     /**
-     * list_requests_api_v1_requests__get — GET /api/v1/requests/
+     * listRequests — GET /api/v1/requests/
      *
      * Returns the typed [RequestStatusResponse] (matching the Java/.NET SDKs)
      * rather than an untyped Map. Exposes the canonical filter set shared with the
@@ -516,7 +516,7 @@ class OrbClient private constructor(
     }
 
     /**
-     * list_return_requests_api_v1_requests_return_get — GET /api/v1/requests/return
+     * listReturnRequests — GET /api/v1/requests/return
      *
      * Returns the typed [RequestStatusResponse]. Exposes the canonical filter set
      * shared with the Go/TypeScript/Java SDKs via [ListReturnRequestsParams].
@@ -538,18 +538,24 @@ class OrbClient private constructor(
         return execute(get("/api/v1/requests/return", query))
     }
 
-    /** get_request_status_api_v1_requests__request_id__status_get — GET /api/v1/requests/{request_id}/status */
+    /** getRequestStatus — GET /api/v1/requests/{request_id}/status */
     suspend fun getRequestStatus(requestId: String, verbose: Boolean = false): RequestStatusResponse {
         val params = if (verbose) mapOf("verbose" to "true") else emptyMap()
         return execute(get("/api/v1/requests/${encode(requestId)}/status", params))
     }
 
-    /** get_request_timeline_api_v1_requests__request_id__timeline_get — GET /api/v1/requests/{request_id}/timeline */
+    /** getRequest — GET /api/v1/requests/{request_id} */
+    suspend fun getRequest(requestId: String, verbose: Boolean = false): RequestStatusResponse {
+        val params = if (verbose) mapOf("verbose" to "true") else emptyMap()
+        return execute(get("/api/v1/requests/${encode(requestId)}", params))
+    }
+
+    /** getRequestTimeline — GET /api/v1/requests/{request_id}/timeline */
     suspend fun getRequestTimeline(requestId: String): Map<String, Any?> =
         executeRaw(get("/api/v1/requests/${encode(requestId)}/timeline"))
 
     /**
-     * batch_get_request_status_api_v1_requests_status_post — POST /api/v1/requests/status
+     * batchGetRequestStatus — POST /api/v1/requests/status
      *
      * Returns the typed [RequestStatusResponse] (matching the Java/.NET SDKs).
      */
@@ -557,7 +563,7 @@ class OrbClient private constructor(
         execute(post("/api/v1/requests/status", body))
 
     /**
-     * cancel_request_api_v1_requests__request_id__delete — DELETE /api/v1/requests/{request_id}
+     * cancelRequest — DELETE /api/v1/requests/{request_id}
      *
      * @param reason optional cancellation reason (the spec's DELETE query param)
      */
@@ -567,12 +573,12 @@ class OrbClient private constructor(
         return executeRaw(delete(path))
     }
 
-    /** purge_request_api_v1_requests__request_id__purge_post — POST /api/v1/requests/{request_id}/purge */
+    /** purgeRequest — POST /api/v1/requests/{request_id}/purge */
     suspend fun purgeRequest(requestId: String): Map<String, Any?> =
         executeRaw(post("/api/v1/requests/${encode(requestId)}/purge"))
 
     /**
-     * stream_request_status_api_v1_requests__request_id__stream_get
+     * streamRequest
      * GET /api/v1/requests/{request_id}/stream
      *
      * Returns a Flow of [StreamEvent] objects.
@@ -619,7 +625,7 @@ class OrbClient private constructor(
     }
 
     /**
-     * stream_events_api_v1_events__get — GET /api/v1/events/
+     * streamEvents — GET /api/v1/events/
      *
      * Global SSE event bus. Returns a Flow of raw [SseFrame] objects.
      */
@@ -634,18 +640,18 @@ class OrbClient private constructor(
     // Providers — 4 operations
     // ---------------------------------------------------------------------------
 
-    /** list_providers_api_v1_providers__get — GET /api/v1/providers/ */
+    /** listProviders — GET /api/v1/providers/ */
     suspend fun listProviders(): Map<String, Any?> = executeRaw(get("/api/v1/providers/"))
 
-    /** get_all_provider_schemas_api_v1_providers_schemas_get — GET /api/v1/providers/schemas */
+    /** getAllProviderSchemas — GET /api/v1/providers/schemas */
     suspend fun getAllProviderSchemas(): Map<String, Any?> =
         executeRaw(get("/api/v1/providers/schemas"))
 
-    /** get_provider_schema_api_v1_providers__name__schema_get — GET /api/v1/providers/{name}/schema */
+    /** getProviderSchema — GET /api/v1/providers/{name}/schema */
     suspend fun getProviderSchema(name: String): Map<String, Any?> =
         executeRaw(get("/api/v1/providers/${encode(name)}/schema"))
 
-    /** get_providers_health_api_v1_providers_health_get — GET /api/v1/providers/health */
+    /** getProvidersHealth — GET /api/v1/providers/health */
     suspend fun getProvidersHealth(): Map<String, Any?> =
         executeRaw(get("/api/v1/providers/health"))
 
@@ -653,54 +659,54 @@ class OrbClient private constructor(
     // Config — 7 operations
     // ---------------------------------------------------------------------------
 
-    /** get_full_config_api_v1_config__get — GET /api/v1/config/ */
+    /** getFullConfig — GET /api/v1/config/ */
     suspend fun getFullConfig(source: String? = null): Map<String, Any?> {
         val params = buildMap<String, String> { source?.let { put("source", it) } }
         return executeRaw(get("/api/v1/config/", params))
     }
 
-    /** get_config_sources_api_v1_config_sources_get — GET /api/v1/config/sources */
+    /** getConfigSources — GET /api/v1/config/sources */
     suspend fun getConfigSources(): Map<String, Any?> =
         executeRaw(get("/api/v1/config/sources"))
 
-    /** get_config_value_api_v1_config__key__get — GET /api/v1/config/{key} */
+    /** getConfigValue — GET /api/v1/config/{key} */
     suspend fun getConfigValue(key: String): Any? {
         val json = handleResponse(get("/api/v1/config/${encode(key)}"))
         return gson.fromJson(json, Any::class.java)
     }
 
-    /** set_config_value_api_v1_config__key__put — PUT /api/v1/config/{key} */
+    /** setConfigValue — PUT /api/v1/config/{key} */
     suspend fun setConfigValue(key: String, body: SetValueRequest): Any? {
         val json = handleResponse(put("/api/v1/config/${encode(key)}", body))
         return gson.fromJson(json, Any::class.java)
     }
 
-    /** save_config_api_v1_config_save_post — POST /api/v1/config/save */
+    /** saveConfig — POST /api/v1/config/save */
     suspend fun saveConfig(body: SaveRequest = SaveRequest()): Any? {
         val json = handleResponse(post("/api/v1/config/save", body))
         return gson.fromJson(json, Any::class.java)
     }
 
-    /** validate_config_api_v1_config_validate_post — POST /api/v1/config/validate */
+    /** validateConfig — POST /api/v1/config/validate */
     suspend fun validateConfig(): Map<String, Any?> = executeRaw(post("/api/v1/config/validate"))
 
     // ---------------------------------------------------------------------------
     // Admin — 4 operations
     // ---------------------------------------------------------------------------
 
-    /** wipe_database_api_v1_admin_database_wipe_post — POST /api/v1/admin/database/wipe */
+    /** wipeDatabase — POST /api/v1/admin/database/wipe */
     suspend fun wipeDatabase(confirm: Boolean): Map<String, Any?> =
         executeRaw(post("/api/v1/admin/database/wipe", mapOf("confirm" to confirm)))
 
-    /** init_orb_api_v1_admin_init_post — POST /api/v1/admin/init */
+    /** initOrb — POST /api/v1/admin/init */
     suspend fun initOrb(body: InitBody): Map<String, Any?> =
         executeRaw(post("/api/v1/admin/init", body))
 
-    /** cleanup_database_api_v1_admin_database_cleanup_post — POST /api/v1/admin/database/cleanup */
+    /** cleanupDatabase — POST /api/v1/admin/database/cleanup */
     suspend fun cleanupDatabase(body: CleanupDatabaseBody): Map<String, Any?> =
         executeRaw(post("/api/v1/admin/database/cleanup", body))
 
-    /** reload_config_api_v1_admin_reload_config_post — POST /api/v1/admin/reload-config */
+    /** reloadConfig — POST /api/v1/admin/reload-config */
     suspend fun reloadConfig(): Map<String, Any?> =
         executeRaw(post("/api/v1/admin/reload-config"))
 
@@ -708,10 +714,10 @@ class OrbClient private constructor(
     // Me / Observability — 2 operations
     // ---------------------------------------------------------------------------
 
-    /** get_me_api_v1_me__get — GET /api/v1/me/ */
+    /** getCurrentUser — GET /api/v1/me/ */
     suspend fun getMe(): Map<String, Any?> = executeRaw(get("/api/v1/me/"))
 
-    /** get_telemetry_status_api_v1_observability_telemetry_get — GET /api/v1/observability/telemetry */
+    /** getTelemetryStatus — GET /api/v1/observability/telemetry */
     suspend fun getTelemetryStatus(): Map<String, Any?> =
         executeRaw(get("/api/v1/observability/telemetry"))
 

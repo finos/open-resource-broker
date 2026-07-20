@@ -329,7 +329,7 @@ public sealed class OrbClient : IAsyncDisposable
     // System / Observability — 4 operations
     // ---------------------------------------------------------------------------
 
-    /// <summary>health_check_health_get — GET /health</summary>
+    /// <summary>healthCheck — GET /health</summary>
     public async Task<Dictionary<string, object?>> HealthAsync(CancellationToken ct = default)
     {
         CheckHealth();
@@ -350,11 +350,11 @@ public sealed class OrbClient : IAsyncDisposable
         return JsonSerializer.Deserialize<Dictionary<string, object?>>(json, JsonOpts) ?? [];
     }
 
-    /// <summary>info_info_get — GET /info</summary>
+    /// <summary>getServiceInfo — GET /info</summary>
     public async Task<Dictionary<string, object?>> InfoAsync(CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>("/info", ct: ct).ConfigureAwait(false);
 
-    /// <summary>metrics_metrics_get — GET /metrics</summary>
+    /// <summary>getMetrics — GET /metrics</summary>
     public async Task<string> MetricsAsync(CancellationToken ct = default)
     {
         CheckHealth();
@@ -368,7 +368,7 @@ public sealed class OrbClient : IAsyncDisposable
         return await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
     }
 
-    /// <summary>get_dashboard_summary_api_v1_system_dashboard_get — GET /api/v1/system/dashboard</summary>
+    /// <summary>getDashboardSummary — GET /api/v1/system/dashboard</summary>
     public async Task<Dictionary<string, object?>> GetDashboardSummaryAsync(CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>("/api/v1/system/dashboard", ct: ct).ConfigureAwait(false);
 
@@ -376,38 +376,38 @@ public sealed class OrbClient : IAsyncDisposable
     // Templates — 8 operations
     // ---------------------------------------------------------------------------
 
-    /// <summary>list_templates_api_v1_templates__get — GET /api/v1/templates/</summary>
+    /// <summary>listTemplates — GET /api/v1/templates/</summary>
     public async Task<TemplateListResponse> ListTemplatesAsync(CancellationToken ct = default)
         => await GetAsync<TemplateListResponse>("/api/v1/templates/", ct: ct).ConfigureAwait(false);
 
-    /// <summary>get_template_api_v1_templates__template_id__get — GET /api/v1/templates/{template_id}</summary>
+    /// <summary>getTemplate — GET /api/v1/templates/{template_id}</summary>
     public async Task<TemplateItem> GetTemplateAsync(string templateId, CancellationToken ct = default)
         => await GetAsync<TemplateItem>($"/api/v1/templates/{Uri.EscapeDataString(templateId)}", ct: ct)
                  .ConfigureAwait(false);
 
-    /// <summary>create_template_api_v1_templates__post — POST /api/v1/templates/</summary>
+    /// <summary>createTemplate — POST /api/v1/templates/</summary>
     public async Task<TemplateMutationResponse> CreateTemplateAsync(TemplateCreateRequest body, CancellationToken ct = default)
         => await PostAsync<TemplateMutationResponse>("/api/v1/templates/", body, ct).ConfigureAwait(false);
 
-    /// <summary>update_template_api_v1_templates__template_id__put — PUT /api/v1/templates/{template_id}</summary>
+    /// <summary>updateTemplate — PUT /api/v1/templates/{template_id}</summary>
     public async Task<TemplateMutationResponse> UpdateTemplateAsync(string templateId, TemplateUpdateRequest body, CancellationToken ct = default)
         => await PutAsync<TemplateMutationResponse>($"/api/v1/templates/{Uri.EscapeDataString(templateId)}", body, ct)
                  .ConfigureAwait(false);
 
-    /// <summary>delete_template_api_v1_templates__template_id__delete — DELETE /api/v1/templates/{template_id}</summary>
+    /// <summary>deleteTemplate — DELETE /api/v1/templates/{template_id}</summary>
     public async Task<Dictionary<string, object?>> DeleteTemplateAsync(string templateId, CancellationToken ct = default)
         => await DeleteAsync<Dictionary<string, object?>>($"/api/v1/templates/{Uri.EscapeDataString(templateId)}", ct: ct)
                  .ConfigureAwait(false);
 
-    /// <summary>validate_template_api_v1_templates_validate_post — POST /api/v1/templates/validate</summary>
+    /// <summary>validateTemplate — POST /api/v1/templates/validate</summary>
     public async Task<Dictionary<string, object?>> ValidateTemplateAsync(object? body = null, CancellationToken ct = default)
         => await PostAsync<Dictionary<string, object?>>("/api/v1/templates/validate", body, ct).ConfigureAwait(false);
 
-    /// <summary>refresh_templates_api_v1_templates_refresh_post — POST /api/v1/templates/refresh</summary>
+    /// <summary>refreshTemplates — POST /api/v1/templates/refresh</summary>
     public async Task<TemplateListResponse> RefreshTemplatesAsync(CancellationToken ct = default)
         => await PostAsync<TemplateListResponse>("/api/v1/templates/refresh", ct: ct).ConfigureAwait(false);
 
-    /// <summary>generate_templates_api_v1_templates_generate_post — POST /api/v1/templates/generate</summary>
+    /// <summary>generateTemplates — POST /api/v1/templates/generate</summary>
     public async Task<TemplateListResponse> GenerateTemplatesAsync(GenerateTemplatesBody body, CancellationToken ct = default)
         => await PostAsync<TemplateListResponse>("/api/v1/templates/generate", body, ct).ConfigureAwait(false);
 
@@ -415,7 +415,7 @@ public sealed class OrbClient : IAsyncDisposable
     // Machines — 8 operations
     // ---------------------------------------------------------------------------
 
-    /// <summary>list_machines_api_v1_machines__get — GET /api/v1/machines/</summary>
+    /// <summary>listMachines — GET /api/v1/machines/</summary>
     public async Task<MachineListResponse> ListMachinesAsync(
         string? status = null, string? requestId = null,
         int? limit = null, int? offset = null,
@@ -429,25 +429,25 @@ public sealed class OrbClient : IAsyncDisposable
         return await GetAsync<MachineListResponse>("/api/v1/machines/", q, ct).ConfigureAwait(false);
     }
 
-    /// <summary>get_machine_api_v1_machines__machine_id__get — GET /api/v1/machines/{machine_id}</summary>
+    /// <summary>getMachine — GET /api/v1/machines/{machine_id}</summary>
     public async Task<MachineItem> GetMachineAsync(string machineId, CancellationToken ct = default)
         => await GetAsync<MachineItem>($"/api/v1/machines/{Uri.EscapeDataString(machineId)}", ct: ct)
                  .ConfigureAwait(false);
 
-    /// <summary>request_machines_api_v1_machines_request_post — POST /api/v1/machines/request</summary>
+    /// <summary>requestMachines — POST /api/v1/machines/request</summary>
     public async Task<RequestOperationResponse> RequestMachinesAsync(RequestMachinesRequest body, CancellationToken ct = default)
         => await PostAsync<RequestOperationResponse>("/api/v1/machines/request", body, ct).ConfigureAwait(false);
 
-    /// <summary>return_machines_api_v1_machines_return_post — POST /api/v1/machines/return</summary>
+    /// <summary>returnMachines — POST /api/v1/machines/return</summary>
     public async Task<RequestOperationResponse> ReturnMachinesAsync(ReturnMachinesRequest body, CancellationToken ct = default)
         => await PostAsync<RequestOperationResponse>("/api/v1/machines/return", body, ct).ConfigureAwait(false);
 
-    /// <summary>sync_machine_status_api_v1_machines__machine_id__status_get — GET /api/v1/machines/{machine_id}/status</summary>
+    /// <summary>syncMachineStatus — GET /api/v1/machines/{machine_id}/status</summary>
     public async Task<MachineListResponse> SyncMachineStatusAsync(string machineId, CancellationToken ct = default)
         => await GetAsync<MachineListResponse>($"/api/v1/machines/{Uri.EscapeDataString(machineId)}/status", ct: ct)
                  .ConfigureAwait(false);
 
-    /// <summary>get_machine_metrics_api_v1_machines__machine_id__metrics_get — GET /api/v1/machines/{machine_id}/metrics</summary>
+    /// <summary>getMachineMetrics — GET /api/v1/machines/{machine_id}/metrics</summary>
     public async Task<Dictionary<string, object?>> GetMachineMetricsAsync(string machineId, string? range = null, CancellationToken ct = default)
     {
         var q = range != null ? new Dictionary<string, string> { ["range"] = range } : null;
@@ -455,7 +455,7 @@ public sealed class OrbClient : IAsyncDisposable
                      .ConfigureAwait(false);
     }
 
-    /// <summary>purge_machine_api_v1_machines__machine_id__delete — DELETE /api/v1/machines/{machine_id}</summary>
+    /// <summary>purgeMachine — DELETE /api/v1/machines/{machine_id}</summary>
     public async Task<Dictionary<string, object?>> PurgeMachineAsync(string machineId, CancellationToken ct = default)
         => await DeleteAsync<Dictionary<string, object?>>($"/api/v1/machines/{Uri.EscapeDataString(machineId)}", ct: ct)
                  .ConfigureAwait(false);
@@ -465,7 +465,7 @@ public sealed class OrbClient : IAsyncDisposable
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// list_requests_api_v1_requests__get — GET /api/v1/requests/
+    /// listRequests — GET /api/v1/requests/
     /// <para>
     /// Exposes the canonical list-filter set shared across all SDKs: status,
     /// limit, offset, sync, cursor, q, sort, providerName, providerType,
@@ -496,7 +496,7 @@ public sealed class OrbClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// list_return_requests_api_v1_requests_return_get — GET /api/v1/requests/return
+    /// listReturnRequests — GET /api/v1/requests/return
     /// <para>
     /// Exposes the canonical return-list filter set shared across SDKs: limit,
     /// offset, cursor, q, sort, providerName, providerType, filterExpressions.
@@ -520,7 +520,7 @@ public sealed class OrbClient : IAsyncDisposable
         return await GetAsync<RequestStatusResponse>("/api/v1/requests/return", qp, ct).ConfigureAwait(false);
     }
 
-    /// <summary>get_request_status_api_v1_requests__request_id__status_get — GET /api/v1/requests/{request_id}/status</summary>
+    /// <summary>getRequestStatus — GET /api/v1/requests/{request_id}/status</summary>
     public async Task<RequestStatusResponse> GetRequestStatusAsync(string requestId, bool? verbose = null, CancellationToken ct = default)
     {
         var q = verbose.HasValue ? new Dictionary<string, string> { ["verbose"] = verbose.Value.ToString().ToLower() } : null;
@@ -528,17 +528,25 @@ public sealed class OrbClient : IAsyncDisposable
                      .ConfigureAwait(false);
     }
 
-    /// <summary>get_request_timeline_api_v1_requests__request_id__timeline_get — GET /api/v1/requests/{request_id}/timeline</summary>
+    /// <summary>getRequest — GET /api/v1/requests/{request_id}</summary>
+    public async Task<RequestStatusResponse> GetRequestAsync(string requestId, bool? verbose = null, CancellationToken ct = default)
+    {
+        var q = verbose.HasValue ? new Dictionary<string, string> { ["verbose"] = verbose.Value.ToString().ToLower() } : null;
+        return await GetAsync<RequestStatusResponse>($"/api/v1/requests/{Uri.EscapeDataString(requestId)}", q, ct)
+                     .ConfigureAwait(false);
+    }
+
+    /// <summary>getRequestTimeline — GET /api/v1/requests/{request_id}/timeline</summary>
     public async Task<Dictionary<string, object?>> GetRequestTimelineAsync(string requestId, CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>($"/api/v1/requests/{Uri.EscapeDataString(requestId)}/timeline", ct: ct)
                  .ConfigureAwait(false);
 
-    /// <summary>batch_get_request_status_api_v1_requests_status_post — POST /api/v1/requests/status</summary>
+    /// <summary>batchGetRequestStatus — POST /api/v1/requests/status</summary>
     public async Task<RequestStatusResponse> BatchGetRequestStatusAsync(BatchRequestStatusBody body, CancellationToken ct = default)
         => await PostAsync<RequestStatusResponse>("/api/v1/requests/status", body, ct).ConfigureAwait(false);
 
     /// <summary>
-    /// cancel_request_api_v1_requests__request_id__delete — DELETE /api/v1/requests/{request_id}
+    /// cancelRequest — DELETE /api/v1/requests/{request_id}
     /// <para>Optional <paramref name="reason"/> is sent as the <c>reason</c> query parameter.</para>
     /// </summary>
     public async Task<Dictionary<string, object?>> CancelRequestAsync(string requestId, string? reason = null, CancellationToken ct = default)
@@ -548,13 +556,13 @@ public sealed class OrbClient : IAsyncDisposable
             $"/api/v1/requests/{Uri.EscapeDataString(requestId)}", q, ct).ConfigureAwait(false);
     }
 
-    /// <summary>purge_request_api_v1_requests__request_id__purge_post — POST /api/v1/requests/{request_id}/purge</summary>
+    /// <summary>purgeRequest — POST /api/v1/requests/{request_id}/purge</summary>
     public async Task<Dictionary<string, object?>> PurgeRequestAsync(string requestId, CancellationToken ct = default)
         => await PostAsync<Dictionary<string, object?>>($"/api/v1/requests/{Uri.EscapeDataString(requestId)}/purge", ct: ct)
                  .ConfigureAwait(false);
 
     /// <summary>
-    /// stream_request_status_api_v1_requests__request_id__stream_get
+    /// streamRequest
     /// GET /api/v1/requests/{request_id}/stream
     ///
     /// Returns an IAsyncEnumerable that yields StreamEvent objects.
@@ -638,7 +646,7 @@ public sealed class OrbClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// stream_events_api_v1_events__get — GET /api/v1/events/
+    /// streamEvents — GET /api/v1/events/
     ///
     /// Global SSE event bus. Returns IAsyncEnumerable of raw SseFrames.
     /// Auth headers are applied on each (re)connection.
@@ -677,20 +685,20 @@ public sealed class OrbClient : IAsyncDisposable
     // Providers — 4 operations
     // ---------------------------------------------------------------------------
 
-    /// <summary>list_providers_api_v1_providers__get — GET /api/v1/providers/</summary>
+    /// <summary>listProviders — GET /api/v1/providers/</summary>
     public async Task<Dictionary<string, object?>> ListProvidersAsync(CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>("/api/v1/providers/", ct: ct).ConfigureAwait(false);
 
-    /// <summary>get_all_provider_schemas_api_v1_providers_schemas_get — GET /api/v1/providers/schemas</summary>
+    /// <summary>getAllProviderSchemas — GET /api/v1/providers/schemas</summary>
     public async Task<Dictionary<string, object?>> GetAllProviderSchemasAsync(CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>("/api/v1/providers/schemas", ct: ct).ConfigureAwait(false);
 
-    /// <summary>get_provider_schema_api_v1_providers__name__schema_get — GET /api/v1/providers/{name}/schema</summary>
+    /// <summary>getProviderSchema — GET /api/v1/providers/{name}/schema</summary>
     public async Task<Dictionary<string, object?>> GetProviderSchemaAsync(string name, CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>($"/api/v1/providers/{Uri.EscapeDataString(name)}/schema", ct: ct)
                  .ConfigureAwait(false);
 
-    /// <summary>get_providers_health_api_v1_providers_health_get — GET /api/v1/providers/health</summary>
+    /// <summary>getProvidersHealth — GET /api/v1/providers/health</summary>
     public async Task<Dictionary<string, object?>> GetProvidersHealthAsync(CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>("/api/v1/providers/health", ct: ct).ConfigureAwait(false);
 
@@ -698,32 +706,32 @@ public sealed class OrbClient : IAsyncDisposable
     // Config — 7 operations
     // ---------------------------------------------------------------------------
 
-    /// <summary>get_full_config_api_v1_config__get — GET /api/v1/config/</summary>
+    /// <summary>getFullConfig — GET /api/v1/config/</summary>
     public async Task<Dictionary<string, object?>> GetFullConfigAsync(string? source = null, CancellationToken ct = default)
     {
         var q = source != null ? new Dictionary<string, string> { ["source"] = source } : null;
         return await GetAsync<Dictionary<string, object?>>("/api/v1/config/", q, ct).ConfigureAwait(false);
     }
 
-    /// <summary>get_config_sources_api_v1_config_sources_get — GET /api/v1/config/sources</summary>
+    /// <summary>getConfigSources — GET /api/v1/config/sources</summary>
     public async Task<Dictionary<string, object?>> GetConfigSourcesAsync(CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>("/api/v1/config/sources", ct: ct).ConfigureAwait(false);
 
-    /// <summary>get_config_value_api_v1_config__key__get — GET /api/v1/config/{key}</summary>
+    /// <summary>getConfigValue — GET /api/v1/config/{key}</summary>
     public async Task<Dictionary<string, object?>> GetConfigValueAsync(string key, CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>($"/api/v1/config/{Uri.EscapeDataString(key)}", ct: ct)
                  .ConfigureAwait(false);
 
-    /// <summary>set_config_value_api_v1_config__key__put — PUT /api/v1/config/{key}</summary>
+    /// <summary>setConfigValue — PUT /api/v1/config/{key}</summary>
     public async Task<Dictionary<string, object?>> SetConfigValueAsync(string key, SetValueRequest body, CancellationToken ct = default)
         => await PutAsync<Dictionary<string, object?>>($"/api/v1/config/{Uri.EscapeDataString(key)}", body, ct)
                  .ConfigureAwait(false);
 
-    /// <summary>save_config_api_v1_config_save_post — POST /api/v1/config/save</summary>
+    /// <summary>saveConfig — POST /api/v1/config/save</summary>
     public async Task<Dictionary<string, object?>> SaveConfigAsync(SaveRequest? body = null, CancellationToken ct = default)
         => await PostAsync<Dictionary<string, object?>>("/api/v1/config/save", body, ct).ConfigureAwait(false);
 
-    /// <summary>validate_config_api_v1_config_validate_post — POST /api/v1/config/validate</summary>
+    /// <summary>validateConfig — POST /api/v1/config/validate</summary>
     public async Task<Dictionary<string, object?>> ValidateConfigAsync(CancellationToken ct = default)
         => await PostAsync<Dictionary<string, object?>>("/api/v1/config/validate", ct: ct).ConfigureAwait(false);
 
@@ -731,20 +739,20 @@ public sealed class OrbClient : IAsyncDisposable
     // Admin — 4 operations
     // ---------------------------------------------------------------------------
 
-    /// <summary>wipe_database_api_v1_admin_database_wipe_post — POST /api/v1/admin/database/wipe</summary>
+    /// <summary>wipeDatabase — POST /api/v1/admin/database/wipe</summary>
     public async Task<Dictionary<string, object?>> WipeDatabaseAsync(bool confirm, CancellationToken ct = default)
         => await PostAsync<Dictionary<string, object?>>("/api/v1/admin/database/wipe", new { confirm }, ct)
                  .ConfigureAwait(false);
 
-    /// <summary>init_orb_api_v1_admin_init_post — POST /api/v1/admin/init</summary>
+    /// <summary>initOrb — POST /api/v1/admin/init</summary>
     public async Task<Dictionary<string, object?>> InitOrbAsync(InitBody body, CancellationToken ct = default)
         => await PostAsync<Dictionary<string, object?>>("/api/v1/admin/init", body, ct).ConfigureAwait(false);
 
-    /// <summary>cleanup_database_api_v1_admin_database_cleanup_post — POST /api/v1/admin/database/cleanup</summary>
+    /// <summary>cleanupDatabase — POST /api/v1/admin/database/cleanup</summary>
     public async Task<Dictionary<string, object?>> CleanupDatabaseAsync(CleanupDatabaseBody body, CancellationToken ct = default)
         => await PostAsync<Dictionary<string, object?>>("/api/v1/admin/database/cleanup", body, ct).ConfigureAwait(false);
 
-    /// <summary>reload_config_api_v1_admin_reload_config_post — POST /api/v1/admin/reload-config</summary>
+    /// <summary>reloadConfig — POST /api/v1/admin/reload-config</summary>
     public async Task<Dictionary<string, object?>> ReloadConfigAsync(CancellationToken ct = default)
         => await PostAsync<Dictionary<string, object?>>("/api/v1/admin/reload-config", ct: ct).ConfigureAwait(false);
 
@@ -752,11 +760,11 @@ public sealed class OrbClient : IAsyncDisposable
     // Me / Observability — 2 operations
     // ---------------------------------------------------------------------------
 
-    /// <summary>get_me_api_v1_me__get — GET /api/v1/me/</summary>
+    /// <summary>getCurrentUser — GET /api/v1/me/</summary>
     public async Task<Dictionary<string, object?>> GetMeAsync(CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>("/api/v1/me/", ct: ct).ConfigureAwait(false);
 
-    /// <summary>get_telemetry_status_api_v1_observability_telemetry_get — GET /api/v1/observability/telemetry</summary>
+    /// <summary>getTelemetryStatus — GET /api/v1/observability/telemetry</summary>
     public async Task<Dictionary<string, object?>> GetTelemetryStatusAsync(CancellationToken ct = default)
         => await GetAsync<Dictionary<string, object?>>("/api/v1/observability/telemetry", ct: ct).ConfigureAwait(false);
 

@@ -44,7 +44,7 @@ describe("SDK operation completeness vs OpenAPI spec", () => {
   it("declares exactly the operations the spec defines (guards against drift)", () => {
     // Mirrors Go's `if len(ops) != 44` sentinel: if the spec grows or shrinks,
     // this forces a deliberate update rather than silently under-covering.
-    expect(operationIds.length).toBe(44);
+    expect(operationIds.length).toBe(45);
   });
 
   it("covers every spec operationId in the hand-written client", () => {

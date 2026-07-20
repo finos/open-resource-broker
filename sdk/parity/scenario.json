@@ -9,7 +9,7 @@
       "step": 1,
       "name": "health_check",
       "description": "Verify the ORB server is running and reports a healthy or degraded status.",
-      "operation_id": "health_check_health_get",
+      "operation_id": "healthCheck",
       "http_method": "GET",
       "http_path": "/health",
       "sdk_methods": {
@@ -35,7 +35,7 @@
       "step": 2,
       "name": "list_templates",
       "description": "List all registered templates. The result may be empty; downstream steps are conditional on at least one template existing.",
-      "operation_id": "list_templates_api_v1_templates__get",
+      "operation_id": "listTemplates",
       "http_method": "GET",
       "http_path": "/api/v1/templates/",
       "sdk_methods": {
@@ -66,7 +66,7 @@
       "name": "request_machines",
       "description": "Submit a provisioning request for 1 machine using the first template found in step 2. Skipped if no templates exist.",
       "precondition": "first_template_id is bound (step 2 post_condition)",
-      "operation_id": "request_machines_api_v1_machines_request_post",
+      "operation_id": "requestMachines",
       "http_method": "POST",
       "http_path": "/api/v1/machines/request",
       "sdk_methods": {
@@ -101,7 +101,7 @@
       "name": "poll_request_status",
       "description": "Retrieve the current status of the request created in step 3. Skipped if step 3 was skipped. Accept any valid status string.",
       "precondition": "request_id is bound (step 3 post_condition)",
-      "operation_id": "get_request_status_api_v1_requests__request_id__status_get",
+      "operation_id": "getRequestStatus",
       "http_method": "GET",
       "http_path": "/api/v1/requests/{request_id}/status",
       "sdk_methods": {
@@ -132,7 +132,7 @@
       "name": "return_machines",
       "description": "If any machines were returned in step 4, submit a return request for them. Skipped if step 3 was skipped or no machines were provisioned.",
       "precondition": "request_id is bound AND at least one machine_id is available from step 4",
-      "operation_id": "return_machines_api_v1_machines_return_post",
+      "operation_id": "returnMachines",
       "http_method": "POST",
       "http_path": "/api/v1/machines/return",
       "sdk_methods": {
@@ -158,7 +158,7 @@
       "step": 6,
       "name": "list_requests",
       "description": "List all requests. Verifies that the list endpoint is reachable and returns a collection. Always executed regardless of earlier steps.",
-      "operation_id": "list_requests_api_v1_requests__get",
+      "operation_id": "listRequests",
       "http_method": "GET",
       "http_path": "/api/v1/requests/",
       "sdk_methods": {

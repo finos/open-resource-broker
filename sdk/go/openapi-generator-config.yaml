@@ -15,7 +15,7 @@
 #     sdk/go/orb/ provides those layers.
 #
 # SSE exclusions:
-#   The stream_events_api_v1_events__get operation (GET /api/v1/events/) returns
+#   The streamEvents operation (GET /api/v1/events/) returns
 #   text/event-stream.  openapi-generator cannot model SSE properly, so it is
 #   excluded from generation.  The hand-written SSE layer in
 #   sdk/go/internal/sse/ handles both /api/v1/requests/{id}/stream and

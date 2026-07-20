@@ -279,7 +279,7 @@ export class OrbClient {
   // ---------------------------------------------------------------------------
 
   /**
-   * health_check_health_get — GET /health
+   * healthCheck — GET /health
    *
    * A 503 response is a valid, expected result meaning the server is degraded
    * or unhealthy — it carries a parsed health body, not an error. health()
@@ -302,12 +302,12 @@ export class OrbClient {
     return resp.data;
   }
 
-  /** info_info_get — GET /info */
+  /** getServiceInfo — GET /info */
   async info(): Promise<Record<string, unknown>> {
     return this.get<Record<string, unknown>>("/info");
   }
 
-  /** metrics_metrics_get — GET /metrics */
+  /** getMetrics — GET /metrics */
   async metrics(): Promise<string> {
     this.checkHealth();
     const resp = await this.http.get<string>("/metrics", {
@@ -318,7 +318,7 @@ export class OrbClient {
     return resp.data;
   }
 
-  /** get_dashboard_summary_api_v1_system_dashboard_get — GET /api/v1/system/dashboard */
+  /** getDashboardSummary — GET /api/v1/system/dashboard */
   async getDashboardSummary(): Promise<Record<string, unknown>> {
     return this.get<Record<string, unknown>>("/api/v1/system/dashboard");
   }
@@ -327,14 +327,14 @@ export class OrbClient {
   // Templates — 8 operations
   // ---------------------------------------------------------------------------
 
-  /** list_templates_api_v1_templates__get — GET /api/v1/templates/ */
+  /** listTemplates — GET /api/v1/templates/ */
   async listTemplates(): Promise<import("../generated/models/index.js").TemplateListResponse> {
     return this.get<import("../generated/models/index.js").TemplateListResponse>(
       "/api/v1/templates/"
     );
   }
 
-  /** get_template_api_v1_templates__template_id__get — GET /api/v1/templates/{template_id} */
+  /** getTemplate — GET /api/v1/templates/{template_id} */
   async getTemplate(
     templateId: string
   ): Promise<import("../generated/models/index.js").TemplateItem> {
@@ -343,7 +343,7 @@ export class OrbClient {
     );
   }
 
-  /** create_template_api_v1_templates__post — POST /api/v1/templates/ */
+  /** createTemplate — POST /api/v1/templates/ */
   async createTemplate(
     body: import("../generated/models/index.js").TemplateCreateRequest
   ): Promise<import("../generated/models/index.js").TemplateMutationResponse> {
@@ -353,7 +353,7 @@ export class OrbClient {
     );
   }
 
-  /** update_template_api_v1_templates__template_id__put — PUT /api/v1/templates/{template_id} */
+  /** updateTemplate — PUT /api/v1/templates/{template_id} */
   async updateTemplate(
     templateId: string,
     body: import("../generated/models/index.js").TemplateUpdateRequest
@@ -364,26 +364,26 @@ export class OrbClient {
     );
   }
 
-  /** delete_template_api_v1_templates__template_id__delete — DELETE /api/v1/templates/{template_id} */
+  /** deleteTemplate — DELETE /api/v1/templates/{template_id} */
   async deleteTemplate(templateId: string): Promise<unknown> {
     return this.delete<unknown>(
       `/api/v1/templates/${encodeURIComponent(templateId)}`
     );
   }
 
-  /** validate_template_api_v1_templates_validate_post — POST /api/v1/templates/validate */
+  /** validateTemplate — POST /api/v1/templates/validate */
   async validateTemplate(body: unknown): Promise<unknown> {
     return this.post<unknown>("/api/v1/templates/validate", body);
   }
 
-  /** refresh_templates_api_v1_templates_refresh_post — POST /api/v1/templates/refresh */
+  /** refreshTemplates — POST /api/v1/templates/refresh */
   async refreshTemplates(): Promise<import("../generated/models/index.js").TemplateListResponse> {
     return this.post<import("../generated/models/index.js").TemplateListResponse>(
       "/api/v1/templates/refresh"
     );
   }
 
-  /** generate_templates_api_v1_templates_generate_post — POST /api/v1/templates/generate */
+  /** generateTemplates — POST /api/v1/templates/generate */
   async generateTemplates(
     body: import("../generated/models/index.js").GenerateTemplatesBody
   ): Promise<import("../generated/models/index.js").TemplateListResponse> {
@@ -397,7 +397,7 @@ export class OrbClient {
   // Machines — 8 operations
   // ---------------------------------------------------------------------------
 
-  /** list_machines_api_v1_machines__get — GET /api/v1/machines/ */
+  /** listMachines — GET /api/v1/machines/ */
   async listMachines(params?: {
     status?: string;
     request_id?: string;
@@ -410,7 +410,7 @@ export class OrbClient {
     );
   }
 
-  /** get_machine_api_v1_machines__machine_id__get — GET /api/v1/machines/{machine_id} */
+  /** getMachine — GET /api/v1/machines/{machine_id} */
   async getMachine(
     machineId: string
   ): Promise<import("../generated/models/index.js").MachineItem> {
@@ -419,7 +419,7 @@ export class OrbClient {
     );
   }
 
-  /** request_machines_api_v1_machines_request_post — POST /api/v1/machines/request */
+  /** requestMachines — POST /api/v1/machines/request */
   async requestMachines(
     body: import("../generated/models/index.js").RequestMachinesRequest
   ): Promise<import("../generated/models/index.js").RequestOperationResponse> {
@@ -429,7 +429,7 @@ export class OrbClient {
     );
   }
 
-  /** return_machines_api_v1_machines_return_post — POST /api/v1/machines/return */
+  /** returnMachines — POST /api/v1/machines/return */
   async returnMachines(
     body: import("../generated/models/index.js").ReturnMachinesRequest
   ): Promise<import("../generated/models/index.js").RequestOperationResponse> {
@@ -439,7 +439,7 @@ export class OrbClient {
     );
   }
 
-  /** sync_machine_status_api_v1_machines__machine_id__status_get — GET /api/v1/machines/{machine_id}/status */
+  /** syncMachineStatus — GET /api/v1/machines/{machine_id}/status */
   async syncMachineStatus(
     machineId: string
   ): Promise<import("../generated/models/index.js").MachineListResponse> {
@@ -448,7 +448,7 @@ export class OrbClient {
     );
   }
 
-  /** get_machine_metrics_api_v1_machines__machine_id__metrics_get — GET /api/v1/machines/{machine_id}/metrics */
+  /** getMachineMetrics — GET /api/v1/machines/{machine_id}/metrics */
   async getMachineMetrics(
     machineId: string,
     params?: { range?: string }
@@ -459,7 +459,7 @@ export class OrbClient {
     );
   }
 
-  /** purge_machine_api_v1_machines__machine_id__delete — DELETE /api/v1/machines/{machine_id} */
+  /** purgeMachine — DELETE /api/v1/machines/{machine_id} */
   async purgeMachine(machineId: string): Promise<unknown> {
     return this.delete<unknown>(
       `/api/v1/machines/${encodeURIComponent(machineId)}`
@@ -467,10 +467,10 @@ export class OrbClient {
   }
 
   // ---------------------------------------------------------------------------
-  // Requests — 10 operations
+  // Requests — 11 operations
   // ---------------------------------------------------------------------------
 
-  /** list_requests_api_v1_requests__get — GET /api/v1/requests/ */
+  /** listRequests — GET /api/v1/requests/ */
   async listRequests(params?: {
     status?: string;
     limit?: number;
@@ -491,7 +491,7 @@ export class OrbClient {
     );
   }
 
-  /** list_return_requests_api_v1_requests_return_get — GET /api/v1/requests/return */
+  /** listReturnRequests — GET /api/v1/requests/return */
   async listReturnRequests(params?: {
     limit?: number;
     offset?: number;
@@ -508,7 +508,7 @@ export class OrbClient {
     );
   }
 
-  /** get_request_status_api_v1_requests__request_id__status_get — GET /api/v1/requests/{request_id}/status */
+  /** getRequestStatus — GET /api/v1/requests/{request_id}/status */
   async getRequestStatus(
     requestId: string,
     verbose?: boolean
@@ -519,14 +519,25 @@ export class OrbClient {
     );
   }
 
-  /** get_request_timeline_api_v1_requests__request_id__timeline_get — GET /api/v1/requests/{request_id}/timeline */
+  /** getRequest — GET /api/v1/requests/{request_id} */
+  async getRequest(
+    requestId: string,
+    verbose?: boolean
+  ): Promise<import("../generated/models/index.js").RequestStatusResponse> {
+    return this.get<import("../generated/models/index.js").RequestStatusResponse>(
+      `/api/v1/requests/${encodeURIComponent(requestId)}`,
+      verbose ? { verbose: "true" } : undefined
+    );
+  }
+
+  /** getRequestTimeline — GET /api/v1/requests/{request_id}/timeline */
   async getRequestTimeline(requestId: string): Promise<Record<string, unknown>> {
     return this.get<Record<string, unknown>>(
       `/api/v1/requests/${encodeURIComponent(requestId)}/timeline`
     );
   }
 
-  /** batch_get_request_status_api_v1_requests_status_post — POST /api/v1/requests/status */
+  /** batchGetRequestStatus — POST /api/v1/requests/status */
   async batchGetRequestStatus(
     body: import("../generated/models/index.js").BatchRequestStatusBody
   ): Promise<{ requests: import("../generated/models/index.js").RequestItem[] }> {
@@ -536,7 +547,7 @@ export class OrbClient {
     );
   }
 
-  /** cancel_request_api_v1_requests__request_id__delete — DELETE /api/v1/requests/{request_id} */
+  /** cancelRequest — DELETE /api/v1/requests/{request_id} */
   async cancelRequest(requestId: string, reason?: string): Promise<unknown> {
     return this.delete<unknown>(
       `/api/v1/requests/${encodeURIComponent(requestId)}`,
@@ -544,7 +555,7 @@ export class OrbClient {
     );
   }
 
-  /** purge_request_api_v1_requests__request_id__purge_post — POST /api/v1/requests/{request_id}/purge */
+  /** purgeRequest — POST /api/v1/requests/{request_id}/purge */
   async purgeRequest(requestId: string): Promise<unknown> {
     return this.post<unknown>(
       `/api/v1/requests/${encodeURIComponent(requestId)}/purge`
@@ -552,7 +563,7 @@ export class OrbClient {
   }
 
   /**
-   * stream_request_status_api_v1_requests__request_id__stream_get
+   * streamRequest
    * GET /api/v1/requests/{request_id}/stream
    *
    * Returns an AsyncGenerator that yields StreamEvent objects.
@@ -653,7 +664,7 @@ export class OrbClient {
   }
 
   /**
-   * stream_events_api_v1_events__get — GET /api/v1/events/
+   * streamEvents — GET /api/v1/events/
    *
    * Global SSE event bus. Returns an AsyncGenerator of raw SSE frames.
    * Auth headers are applied on each (re)connection.
@@ -703,24 +714,24 @@ export class OrbClient {
   // Providers — 4 operations
   // ---------------------------------------------------------------------------
 
-  /** list_providers_api_v1_providers__get — GET /api/v1/providers/ */
+  /** listProviders — GET /api/v1/providers/ */
   async listProviders(): Promise<{ providers: unknown[] }> {
     return this.get<{ providers: unknown[] }>("/api/v1/providers/");
   }
 
-  /** get_all_provider_schemas_api_v1_providers_schemas_get — GET /api/v1/providers/schemas */
+  /** getAllProviderSchemas — GET /api/v1/providers/schemas */
   async getAllProviderSchemas(): Promise<Record<string, unknown>> {
     return this.get<Record<string, unknown>>("/api/v1/providers/schemas");
   }
 
-  /** get_provider_schema_api_v1_providers__name__schema_get — GET /api/v1/providers/{name}/schema */
+  /** getProviderSchema — GET /api/v1/providers/{name}/schema */
   async getProviderSchema(name: string): Promise<Record<string, unknown>> {
     return this.get<Record<string, unknown>>(
       `/api/v1/providers/${encodeURIComponent(name)}/schema`
     );
   }
 
-  /** get_providers_health_api_v1_providers_health_get — GET /api/v1/providers/health */
+  /** getProvidersHealth — GET /api/v1/providers/health */
   async getProvidersHealth(): Promise<Record<string, unknown>> {
     return this.get<Record<string, unknown>>("/api/v1/providers/health");
   }
@@ -729,7 +740,7 @@ export class OrbClient {
   // Config — 7 operations
   // ---------------------------------------------------------------------------
 
-  /** get_full_config_api_v1_config__get — GET /api/v1/config/ */
+  /** getFullConfig — GET /api/v1/config/ */
   async getFullConfig(params?: { source?: string }): Promise<Record<string, unknown>> {
     return this.get<Record<string, unknown>>(
       "/api/v1/config/",
@@ -737,17 +748,17 @@ export class OrbClient {
     );
   }
 
-  /** get_config_sources_api_v1_config_sources_get — GET /api/v1/config/sources */
+  /** getConfigSources — GET /api/v1/config/sources */
   async getConfigSources(): Promise<Record<string, unknown>> {
     return this.get<Record<string, unknown>>("/api/v1/config/sources");
   }
 
-  /** get_config_value_api_v1_config__key__get — GET /api/v1/config/{key} */
+  /** getConfigValue — GET /api/v1/config/{key} */
   async getConfigValue(key: string): Promise<unknown> {
     return this.get<unknown>(`/api/v1/config/${encodeURIComponent(key)}`);
   }
 
-  /** set_config_value_api_v1_config__key__put — PUT /api/v1/config/{key} */
+  /** setConfigValue — PUT /api/v1/config/{key} */
   async setConfigValue(
     key: string,
     body: import("../generated/models/index.js").SetValueRequest
@@ -755,14 +766,14 @@ export class OrbClient {
     return this.put<unknown>(`/api/v1/config/${encodeURIComponent(key)}`, body);
   }
 
-  /** save_config_api_v1_config_save_post — POST /api/v1/config/save */
+  /** saveConfig — POST /api/v1/config/save */
   async saveConfig(
     body: import("../generated/models/index.js").SaveRequest
   ): Promise<unknown> {
     return this.post<unknown>("/api/v1/config/save", body);
   }
 
-  /** validate_config_api_v1_config_validate_post — POST /api/v1/config/validate */
+  /** validateConfig — POST /api/v1/config/validate */
   async validateConfig(): Promise<unknown> {
     return this.post<unknown>("/api/v1/config/validate");
   }
@@ -771,26 +782,26 @@ export class OrbClient {
   // Admin — 4 operations
   // ---------------------------------------------------------------------------
 
-  /** wipe_database_api_v1_admin_database_wipe_post — POST /api/v1/admin/database/wipe */
+  /** wipeDatabase — POST /api/v1/admin/database/wipe */
   async wipeDatabase(body: { confirm: boolean }): Promise<Record<string, unknown>> {
     return this.post<Record<string, unknown>>("/api/v1/admin/database/wipe", body);
   }
 
-  /** init_orb_api_v1_admin_init_post — POST /api/v1/admin/init */
+  /** initOrb — POST /api/v1/admin/init */
   async initOrb(
     body: import("../generated/models/index.js").InitBody
   ): Promise<Record<string, unknown>> {
     return this.post<Record<string, unknown>>("/api/v1/admin/init", body);
   }
 
-  /** cleanup_database_api_v1_admin_database_cleanup_post — POST /api/v1/admin/database/cleanup */
+  /** cleanupDatabase — POST /api/v1/admin/database/cleanup */
   async cleanupDatabase(
     body: import("../generated/models/index.js").CleanupDatabaseBody
   ): Promise<Record<string, unknown>> {
     return this.post<Record<string, unknown>>("/api/v1/admin/database/cleanup", body);
   }
 
-  /** reload_config_api_v1_admin_reload_config_post — POST /api/v1/admin/reload-config */
+  /** reloadConfig — POST /api/v1/admin/reload-config */
   async reloadConfig(): Promise<Record<string, unknown>> {
     return this.post<Record<string, unknown>>("/api/v1/admin/reload-config");
   }
@@ -799,12 +810,12 @@ export class OrbClient {
   // Me / Observability — 2 operations
   // ---------------------------------------------------------------------------
 
-  /** get_me_api_v1_me__get — GET /api/v1/me/ */
+  /** getCurrentUser — GET /api/v1/me/ */
   async getMe(): Promise<Record<string, unknown>> {
     return this.get<Record<string, unknown>>("/api/v1/me/");
   }
 
-  /** get_telemetry_status_api_v1_observability_telemetry_get — GET /api/v1/observability/telemetry */
+  /** getTelemetryStatus — GET /api/v1/observability/telemetry */
   async getTelemetryStatus(): Promise<Record<string, unknown>> {
     return this.get<Record<string, unknown>>("/api/v1/observability/telemetry");
   }

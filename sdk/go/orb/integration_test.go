@@ -91,8 +91,8 @@ func TestIntegrationReadOnlyRoutesReachable(t *testing.T) {
 	_, err = c.ListReturnRequests(ctx)
 	assertRouteReachable(t, "ListReturnRequests", err)
 
-	// Single-read on a non-existent ID — proves the /status route is wired
-	// (GetRequest must NOT hit a non-existent GET /requests/{id} route).
+	// Single-read on a non-existent ID — proves the GET /requests/{id} route
+	// (the getRequest operation) is wired.
 	_, err = c.GetRequest(ctx, "does-not-exist")
 	assertRouteReachable(t, "GetRequest", err)
 

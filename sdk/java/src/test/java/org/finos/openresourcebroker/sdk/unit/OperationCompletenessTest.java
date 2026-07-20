@@ -69,10 +69,10 @@ class OperationCompletenessTest {
     }
 
     @Test
-    void specDeclaresExactly44Operations() throws Exception {
-        // Mirrors Go's `if len(ops) != 44` sentinel: a spec that grows or shrinks
+    void specDeclaresExactly45Operations() throws Exception {
+        // Mirrors Go's `if len(ops) != 45` sentinel: a spec that grows or shrinks
         // forces a deliberate update rather than silently under-covering.
-        assertEquals(44, specOperationIds().size(),
+        assertEquals(45, specOperationIds().size(),
                 "spec operation count changed — update coverage");
     }
 
