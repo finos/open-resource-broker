@@ -385,7 +385,15 @@
          <lastmod>2026-07-20</lastmod>
     </url>
     <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/sdk/</loc>
+         <lastmod>2026-07-20</lastmod>
+    </url>
+    <url>
          <loc>https://finos.github.io/open-resource-broker/dev/sdk/api-reference/</loc>
+         <lastmod>2026-07-20</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/sdk/generating-sdks/</loc>
          <lastmod>2026-07-20</lastmod>
     </url>
     <url>

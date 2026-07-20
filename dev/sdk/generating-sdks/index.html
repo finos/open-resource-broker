@@ -10,25 +10,31 @@
       
       
       
+        <link rel="canonical" href="https://finos.github.io/open-resource-broker/dev/sdk/generating-sdks/">
       
+      
+        <link rel="prev" href="../api-reference/">
+      
+      
+        <link rel="next" href="../../security/security-scanning/">
       
       
         
       
       
-      <link rel="icon" href="/open-resource-broker/dev/assets/orb-icon.png">
+      <link rel="icon" href="../../assets/orb-icon.png">
       <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.7.6">
     
     
       
-        <title>Open Resource Broker</title>
+        <title>Generate Your Own SDK - Open Resource Broker</title>
       
     
     
-      <link rel="stylesheet" href="/open-resource-broker/dev/assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="/open-resource-broker/dev/assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -47,11 +53,11 @@
       
     
     
-      <link rel="stylesheet" href="/open-resource-broker/dev/assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="/open-resource-broker/dev/assets/extra.css">
+      <link rel="stylesheet" href="../../assets/extra.css">
     
-    <script>__md_scope=new URL("/open-resource-broker/dev",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -75,6 +81,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#generate-your-own-sdk" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -89,9 +100,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/open-resource-broker/dev/." title="Open Resource Broker" class="md-header__button md-logo" aria-label="Open Resource Broker" data-md-component="logo">
+    <a href="../.." title="Open Resource Broker" class="md-header__button md-logo" aria-label="Open Resource Broker" data-md-component="logo">
       
-  <img src="/open-resource-broker/dev/assets/orb-icon.svg" alt="logo">
+  <img src="../../assets/orb-icon.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -108,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              Generate Your Own SDK
             
           </span>
         </div>
@@ -224,7 +235,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/open-resource-broker/dev/." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -245,7 +256,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/open-resource-broker/dev/getting_started/quick_start/" class="md-tabs__link">
+        <a href="../../getting_started/quick_start/" class="md-tabs__link">
           
   
   
@@ -265,7 +276,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/open-resource-broker/dev/user_guide/templates/" class="md-tabs__link">
+        <a href="../../user_guide/templates/" class="md-tabs__link">
           
   
   
@@ -292,7 +303,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/open-resource-broker/dev/architecture/system_overview/" class="md-tabs__link">
+        <a href="../../architecture/system_overview/" class="md-tabs__link">
           
   
   
@@ -322,7 +333,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/open-resource-broker/dev/deployment/readme/" class="md-tabs__link">
+        <a href="../../deployment/readme/" class="md-tabs__link">
           
   
   
@@ -352,7 +363,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/open-resource-broker/dev/providers/k8s/" class="md-tabs__link">
+        <a href="../../providers/k8s/" class="md-tabs__link">
           
   
   
@@ -375,7 +386,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/open-resource-broker/dev/cli/" class="md-tabs__link">
+        <a href="../../cli/" class="md-tabs__link">
           
   
   
@@ -395,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/open-resource-broker/dev/mcp/integration-guide/" class="md-tabs__link">
+        <a href="../../mcp/integration-guide/" class="md-tabs__link">
           
   
   
@@ -411,6 +422,8 @@
   
   
   
+    
+  
   
     
     
@@ -418,11 +431,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="/open-resource-broker/dev/sdk/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -452,7 +467,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/open-resource-broker/dev/api/readme/" class="md-tabs__link">
+        <a href="../../api/readme/" class="md-tabs__link">
           
   
   
@@ -489,9 +504,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/open-resource-broker/dev/." title="Open Resource Broker" class="md-nav__button md-logo" aria-label="Open Resource Broker" data-md-component="logo">
+    <a href="../.." title="Open Resource Broker" class="md-nav__button md-logo" aria-label="Open Resource Broker" data-md-component="logo">
       
-  <img src="/open-resource-broker/dev/assets/orb-icon.svg" alt="logo">
+  <img src="../../assets/orb-icon.svg" alt="logo">
 
     </a>
     Open Resource Broker
@@ -518,7 +533,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -599,7 +614,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/getting_started/quick_start/" class="md-nav__link">
+      <a href="../../getting_started/quick_start/" class="md-nav__link">
         
   
   
@@ -627,7 +642,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/installation/" class="md-nav__link">
+      <a href="../../user_guide/installation/" class="md-nav__link">
         
   
   
@@ -655,7 +670,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/configuration/" class="md-nav__link">
+      <a href="../../user_guide/configuration/" class="md-nav__link">
         
   
   
@@ -744,7 +759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/templates/" class="md-nav__link">
+      <a href="../../user_guide/templates/" class="md-nav__link">
         
   
   
@@ -772,7 +787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/requests/" class="md-nav__link">
+      <a href="../../user_guide/requests/" class="md-nav__link">
         
   
   
@@ -800,7 +815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/storage_strategies/" class="md-nav__link">
+      <a href="../../user_guide/storage_strategies/" class="md-nav__link">
         
   
   
@@ -828,7 +843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/monitoring/" class="md-nav__link">
+      <a href="../../user_guide/monitoring/" class="md-nav__link">
         
   
   
@@ -856,7 +871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/troubleshooting/" class="md-nav__link">
+      <a href="../../user_guide/troubleshooting/" class="md-nav__link">
         
   
   
@@ -884,7 +899,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/deployment/" class="md-nav__link">
+      <a href="../../user_guide/deployment/" class="md-nav__link">
         
   
   
@@ -912,7 +927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/api_reference/" class="md-nav__link">
+      <a href="../../user_guide/api_reference/" class="md-nav__link">
         
   
   
@@ -940,7 +955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/infrastructure-commands/" class="md-nav__link">
+      <a href="../../user_guide/infrastructure-commands/" class="md-nav__link">
         
   
   
@@ -968,7 +983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/user_guide/abis/" class="md-nav__link">
+      <a href="../../user_guide/abis/" class="md-nav__link">
         
   
   
@@ -1111,7 +1126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/system_overview/" class="md-nav__link">
+      <a href="../../architecture/system_overview/" class="md-nav__link">
         
   
   
@@ -1139,7 +1154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/clean_architecture/" class="md-nav__link">
+      <a href="../../architecture/clean_architecture/" class="md-nav__link">
         
   
   
@@ -1167,7 +1182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/template-infrastructure/" class="md-nav__link">
+      <a href="../../architecture/template-infrastructure/" class="md-nav__link">
         
   
   
@@ -1195,7 +1210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/system_diagrams/" class="md-nav__link">
+      <a href="../../architecture/system_diagrams/" class="md-nav__link">
         
   
   
@@ -1223,7 +1238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/cqrs_pattern/" class="md-nav__link">
+      <a href="../../architecture/cqrs_pattern/" class="md-nav__link">
         
   
   
@@ -1251,7 +1266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/dependency_injection/" class="md-nav__link">
+      <a href="../../architecture/dependency_injection/" class="md-nav__link">
         
   
   
@@ -1279,7 +1294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/lazy-loading-design/" class="md-nav__link">
+      <a href="../../architecture/lazy-loading-design/" class="md-nav__link">
         
   
   
@@ -1307,7 +1322,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/machine-discovery-flow/" class="md-nav__link">
+      <a href="../../architecture/machine-discovery-flow/" class="md-nav__link">
         
   
   
@@ -1335,7 +1350,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/multi-provider-design/" class="md-nav__link">
+      <a href="../../architecture/multi-provider-design/" class="md-nav__link">
         
   
   
@@ -1363,7 +1378,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/field_mapping_architecture/" class="md-nav__link">
+      <a href="../../architecture/field_mapping_architecture/" class="md-nav__link">
         
   
   
@@ -1391,7 +1406,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architecture/metrics_report/" class="md-nav__link">
+      <a href="../../architecture/metrics_report/" class="md-nav__link">
         
   
   
@@ -1481,7 +1496,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/patterns/strategy_pattern/" class="md-nav__link">
+      <a href="../../patterns/strategy_pattern/" class="md-nav__link">
         
   
   
@@ -1509,7 +1524,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/patterns/factory_pattern/" class="md-nav__link">
+      <a href="../../patterns/factory_pattern/" class="md-nav__link">
         
   
   
@@ -1537,7 +1552,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/patterns/repository_pattern/" class="md-nav__link">
+      <a href="../../patterns/repository_pattern/" class="md-nav__link">
         
   
   
@@ -1565,7 +1580,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/patterns/ports_and_adapters/" class="md-nav__link">
+      <a href="../../patterns/ports_and_adapters/" class="md-nav__link">
         
   
   
@@ -1655,7 +1670,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/engineering/solid_principles/" class="md-nav__link">
+      <a href="../../engineering/solid_principles/" class="md-nav__link">
         
   
   
@@ -1683,7 +1698,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/engineering/dry_principle/" class="md-nav__link">
+      <a href="../../engineering/dry_principle/" class="md-nav__link">
         
   
   
@@ -1711,7 +1726,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/engineering/separation_of_concerns/" class="md-nav__link">
+      <a href="../../engineering/separation_of_concerns/" class="md-nav__link">
         
   
   
@@ -1739,7 +1754,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/engineering/dependency_inversion/" class="md-nav__link">
+      <a href="../../engineering/dependency_inversion/" class="md-nav__link">
         
   
   
@@ -1829,7 +1844,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/architecture/" class="md-nav__link">
+      <a href="../../developer_guide/architecture/" class="md-nav__link">
         
   
   
@@ -1857,7 +1872,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/cqrs/" class="md-nav__link">
+      <a href="../../developer_guide/cqrs/" class="md-nav__link">
         
   
   
@@ -1885,7 +1900,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/dependency_injection/" class="md-nav__link">
+      <a href="../../developer_guide/dependency_injection/" class="md-nav__link">
         
   
   
@@ -1913,7 +1928,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/data_models/" class="md-nav__link">
+      <a href="../../developer_guide/data_models/" class="md-nav__link">
         
   
   
@@ -1941,7 +1956,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/events/" class="md-nav__link">
+      <a href="../../developer_guide/events/" class="md-nav__link">
         
   
   
@@ -1969,7 +1984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/providers/" class="md-nav__link">
+      <a href="../../developer_guide/providers/" class="md-nav__link">
         
   
   
@@ -1997,7 +2012,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/resilience/" class="md-nav__link">
+      <a href="../../developer_guide/resilience/" class="md-nav__link">
         
   
   
@@ -2025,7 +2040,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/performance-optimization/" class="md-nav__link">
+      <a href="../../developer_guide/performance-optimization/" class="md-nav__link">
         
   
   
@@ -2053,7 +2068,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/development/" class="md-nav__link">
+      <a href="../../developer_guide/development/" class="md-nav__link">
         
   
   
@@ -2081,7 +2096,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/basesettings-providers/" class="md-nav__link">
+      <a href="../../developer_guide/basesettings-providers/" class="md-nav__link">
         
   
   
@@ -2109,7 +2124,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/deprecation/" class="md-nav__link">
+      <a href="../../developer_guide/deprecation/" class="md-nav__link">
         
   
   
@@ -2137,7 +2152,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/changelog_management/" class="md-nav__link">
+      <a href="../../developer_guide/changelog_management/" class="md-nav__link">
         
   
   
@@ -2165,7 +2180,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/releases/" class="md-nav__link">
+      <a href="../../developer_guide/releases/" class="md-nav__link">
         
   
   
@@ -2193,7 +2208,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/developer_guide/testing/" class="md-nav__link">
+      <a href="../../developer_guide/testing/" class="md-nav__link">
         
   
   
@@ -2221,7 +2236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/development/testing/" class="md-nav__link">
+      <a href="../../development/testing/" class="md-nav__link">
         
   
   
@@ -2372,7 +2387,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/deployment/readme/" class="md-nav__link">
+      <a href="../../deployment/readme/" class="md-nav__link">
         
   
   
@@ -2400,7 +2415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/deployment/docker/" class="md-nav__link">
+      <a href="../../deployment/docker/" class="md-nav__link">
         
   
   
@@ -2428,7 +2443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/deployment/cloud_platforms/" class="md-nav__link">
+      <a href="../../deployment/cloud_platforms/" class="md-nav__link">
         
   
   
@@ -2456,7 +2471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/deployment/traditional/" class="md-nav__link">
+      <a href="../../deployment/traditional/" class="md-nav__link">
         
   
   
@@ -2484,7 +2499,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/deployment/pypi-setup/" class="md-nav__link">
+      <a href="../../deployment/pypi-setup/" class="md-nav__link">
         
   
   
@@ -2512,7 +2527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/deployment/security/" class="md-nav__link">
+      <a href="../../deployment/security/" class="md-nav__link">
         
   
   
@@ -2540,7 +2555,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/deployment/iam-permissions/" class="md-nav__link">
+      <a href="../../deployment/iam-permissions/" class="md-nav__link">
         
   
   
@@ -2568,7 +2583,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/deployment/monitoring/" class="md-nav__link">
+      <a href="../../deployment/monitoring/" class="md-nav__link">
         
   
   
@@ -2596,7 +2611,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/deployment/dev_deployment_documentation/" class="md-nav__link">
+      <a href="../../deployment/dev_deployment_documentation/" class="md-nav__link">
         
   
   
@@ -2686,7 +2701,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/operational/backup_recovery/" class="md-nav__link">
+      <a href="../../operational/backup_recovery/" class="md-nav__link">
         
   
   
@@ -2714,7 +2729,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/operational/migration/" class="md-nav__link">
+      <a href="../../operational/migration/" class="md-nav__link">
         
   
   
@@ -2742,7 +2757,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/operational/from-open-resource-broker/" class="md-nav__link">
+      <a href="../../operational/from-open-resource-broker/" class="md-nav__link">
         
   
   
@@ -2770,7 +2785,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/operational/performance/" class="md-nav__link">
+      <a href="../../operational/performance/" class="md-nav__link">
         
   
   
@@ -2798,7 +2813,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/operational/monitoring/" class="md-nav__link">
+      <a href="../../operational/monitoring/" class="md-nav__link">
         
   
   
@@ -2826,7 +2841,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/operational/tools/" class="md-nav__link">
+      <a href="../../operational/tools/" class="md-nav__link">
         
   
   
@@ -2916,7 +2931,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/hostfactory/integration_guide/" class="md-nav__link">
+      <a href="../../hostfactory/integration_guide/" class="md-nav__link">
         
   
   
@@ -2944,7 +2959,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/hostfactory/requirements_compliance/" class="md-nav__link">
+      <a href="../../hostfactory/requirements_compliance/" class="md-nav__link">
         
   
   
@@ -2972,7 +2987,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/hostfactory/feature_mapping/" class="md-nav__link">
+      <a href="../../hostfactory/feature_mapping/" class="md-nav__link">
         
   
   
@@ -3000,7 +3015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/hostfactory/deployment_scenarios/" class="md-nav__link">
+      <a href="../../hostfactory/deployment_scenarios/" class="md-nav__link">
         
   
   
@@ -3028,7 +3043,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/hostfactory/supported-apis/" class="md-nav__link">
+      <a href="../../hostfactory/supported-apis/" class="md-nav__link">
         
   
   
@@ -3179,7 +3194,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/providers/k8s/" class="md-nav__link">
+      <a href="../../providers/k8s/" class="md-nav__link">
         
   
   
@@ -3207,7 +3222,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/providers/k8s/discovery/" class="md-nav__link">
+      <a href="../../providers/k8s/discovery/" class="md-nav__link">
         
   
   
@@ -3235,7 +3250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/providers/k8s/configuration/" class="md-nav__link">
+      <a href="../../providers/k8s/configuration/" class="md-nav__link">
         
   
   
@@ -3263,7 +3278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/providers/k8s/handlers/" class="md-nav__link">
+      <a href="../../providers/k8s/handlers/" class="md-nav__link">
         
   
   
@@ -3291,7 +3306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/providers/k8s/auth/" class="md-nav__link">
+      <a href="../../providers/k8s/auth/" class="md-nav__link">
         
   
   
@@ -3319,7 +3334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/providers/k8s/migrating-from-k8s-legacy/" class="md-nav__link">
+      <a href="../../providers/k8s/migrating-from-k8s-legacy/" class="md-nav__link">
         
   
   
@@ -3347,7 +3362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/providers/k8s/plugin-authoring/" class="md-nav__link">
+      <a href="../../providers/k8s/plugin-authoring/" class="md-nav__link">
         
   
   
@@ -3444,7 +3459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/cli/" class="md-nav__link">
+      <a href="../../cli/" class="md-nav__link">
         
   
   
@@ -3472,7 +3487,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/cli/cli-reference/" class="md-nav__link">
+      <a href="../../cli/cli-reference/" class="md-nav__link">
         
   
   
@@ -3500,7 +3515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/cli/template-commands/" class="md-nav__link">
+      <a href="../../cli/template-commands/" class="md-nav__link">
         
   
   
@@ -3528,7 +3543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/cli/scheduler-commands/" class="md-nav__link">
+      <a href="../../cli/scheduler-commands/" class="md-nav__link">
         
   
   
@@ -3556,7 +3571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/cli/infrastructure-commands/" class="md-nav__link">
+      <a href="../../cli/infrastructure-commands/" class="md-nav__link">
         
   
   
@@ -3584,7 +3599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/cli/multi-provider-templates/" class="md-nav__link">
+      <a href="../../cli/multi-provider-templates/" class="md-nav__link">
         
   
   
@@ -3612,7 +3627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/cli/provider-override/" class="md-nav__link">
+      <a href="../../cli/provider-override/" class="md-nav__link">
         
   
   
@@ -3640,7 +3655,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/cli/filtering/" class="md-nav__link">
+      <a href="../../cli/filtering/" class="md-nav__link">
         
   
   
@@ -3729,7 +3744,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/mcp/integration-guide/" class="md-nav__link">
+      <a href="../../mcp/integration-guide/" class="md-nav__link">
         
   
   
@@ -3757,7 +3772,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/mcp/tools-mode/" class="md-nav__link">
+      <a href="../../mcp/tools-mode/" class="md-nav__link">
         
   
   
@@ -3785,7 +3800,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/mcp/api-reference/" class="md-nav__link">
+      <a href="../../mcp/api-reference/" class="md-nav__link">
         
   
   
@@ -3817,28 +3832,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
-        
-          
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -3856,7 +3874,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -3871,28 +3889,31 @@
                 
   
   
+    
   
   
+  
     
     
     
     
       
       
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
         
           
+          
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9_1" >
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_1" checked>
         
           
-          <label class="md-nav__link" for="__nav_9_1" id="__nav_9_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9_1" id="__nav_9_1_label" tabindex="">
             
   
   
@@ -3910,7 +3931,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9_1">
             <span class="md-nav__icon md-icon"></span>
             
@@ -3928,7 +3949,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/sdk/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -3956,7 +3977,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/sdk/quickstart/" class="md-nav__link">
+      <a href="../quickstart/" class="md-nav__link">
         
   
   
@@ -3984,7 +4005,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/sdk/api-reference/" class="md-nav__link">
+      <a href="../api-reference/" class="md-nav__link">
         
   
   
@@ -4009,10 +4030,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/sdk/generating-sdks/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate Your Own SDK
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -4028,6 +4076,303 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#officially-supported-vs-self-serve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Officially supported vs. self-serve
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-get-the-openapi-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to get the OpenAPI spec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where to get the OpenAPI spec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-a-github-release-recommended-for-production-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a GitHub Release (recommended for production use)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-the-repository-for-development-against-head" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From the repository (for development against HEAD)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generating-typed-models-with-openapi-generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating typed models with openapi-generator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generating typed models with openapi-generator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pinned-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinned version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-docker-no-local-jvm-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Docker (no local JVM required)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-npx-node-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using npx (Node 18+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-scala-scala-akka" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — Scala (scala-akka)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-rust" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — Rust
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-ruby" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — Ruby
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-php" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — PHP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notable-supported-generators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notable supported generators
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-get-and-what-you-still-need-to-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you get — and what you still need to write
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What you get — and what you still need to write">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-generator-produces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the generator produces
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-generator-does-not-produce-the-five-hand-written-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the generator does NOT produce — the five hand-written layers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication headers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Authentication headers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bearer-token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bearer token
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aws-sigv4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS SigV4
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-x-orb-scheduler-header-hostfactory-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The X-ORB-Scheduler header (HostFactory mode)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regenerating-after-a-spec-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating after a spec update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-for-spec-drift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking for spec drift
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -4048,7 +4393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/security/security-scanning/" class="md-nav__link">
+      <a href="../../security/security-scanning/" class="md-nav__link">
         
   
   
@@ -4191,7 +4536,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/api/readme/" class="md-nav__link">
+      <a href="../../api/readme/" class="md-nav__link">
         
   
   
@@ -4219,7 +4564,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/api/native-spec-reference/" class="md-nav__link">
+      <a href="../../api/native-spec-reference/" class="md-nav__link">
         
   
   
@@ -4247,7 +4592,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/api/multi-provider-api/" class="md-nav__link">
+      <a href="../../api/multi-provider-api/" class="md-nav__link">
         
   
   
@@ -4337,7 +4682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/configuration-guide/" class="md-nav__link">
+      <a href="../../configuration-guide/" class="md-nav__link">
         
   
   
@@ -4365,7 +4710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/configuration/examples/" class="md-nav__link">
+      <a href="../../configuration/examples/" class="md-nav__link">
         
   
   
@@ -4393,7 +4738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/configuration/native-spec-config/" class="md-nav__link">
+      <a href="../../configuration/native-spec-config/" class="md-nav__link">
         
   
   
@@ -4421,7 +4766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/configuration/environment-variables/" class="md-nav__link">
+      <a href="../../configuration/environment-variables/" class="md-nav__link">
         
   
   
@@ -4449,7 +4794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/configuration/multi-provider/" class="md-nav__link">
+      <a href="../../configuration/multi-provider/" class="md-nav__link">
         
   
   
@@ -4477,7 +4822,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/configuration/provider-naming-guide/" class="md-nav__link">
+      <a href="../../configuration/provider-naming-guide/" class="md-nav__link">
         
   
   
@@ -4567,7 +4912,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/testing/readme/" class="md-nav__link">
+      <a href="../../testing/readme/" class="md-nav__link">
         
   
   
@@ -4595,7 +4940,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/testing/system-tests-onaws/" class="md-nav__link">
+      <a href="../../testing/system-tests-onaws/" class="md-nav__link">
         
   
   
@@ -4685,7 +5030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/native-spec-guide/" class="md-nav__link">
+      <a href="../../native-spec-guide/" class="md-nav__link">
         
   
   
@@ -4713,7 +5058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/provider_strategy_guide/" class="md-nav__link">
+      <a href="../../provider_strategy_guide/" class="md-nav__link">
         
   
   
@@ -4741,7 +5086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/storage_registry_pattern/" class="md-nav__link">
+      <a href="../../storage_registry_pattern/" class="md-nav__link">
         
   
   
@@ -4769,7 +5114,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/unified_format_system/" class="md-nav__link">
+      <a href="../../unified_format_system/" class="md-nav__link">
         
   
   
@@ -4797,7 +5142,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/import_guidelines/" class="md-nav__link">
+      <a href="../../import_guidelines/" class="md-nav__link">
         
   
   
@@ -4825,7 +5170,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/versioning_guide/" class="md-nav__link">
+      <a href="../../versioning_guide/" class="md-nav__link">
         
   
   
@@ -4853,7 +5198,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/open-resource-broker/dev/architectural_assessment/" class="md-nav__link">
+      <a href="../../architectural_assessment/" class="md-nav__link">
         
   
   
@@ -4906,6 +5251,293 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#officially-supported-vs-self-serve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Officially supported vs. self-serve
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-get-the-openapi-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to get the OpenAPI spec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where to get the OpenAPI spec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-a-github-release-recommended-for-production-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a GitHub Release (recommended for production use)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-the-repository-for-development-against-head" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From the repository (for development against HEAD)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generating-typed-models-with-openapi-generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating typed models with openapi-generator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generating typed models with openapi-generator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pinned-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinned version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-docker-no-local-jvm-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Docker (no local JVM required)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-npx-node-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using npx (Node 18+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-scala-scala-akka" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — Scala (scala-akka)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-rust" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — Rust
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-ruby" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — Ruby
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-php" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — PHP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notable-supported-generators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notable supported generators
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-get-and-what-you-still-need-to-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you get — and what you still need to write
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What you get — and what you still need to write">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-generator-produces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the generator produces
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-generator-does-not-produce-the-five-hand-written-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the generator does NOT produce — the five hand-written layers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication headers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Authentication headers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bearer-token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bearer token
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aws-sigv4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS SigV4
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-x-orb-scheduler-header-hostfactory-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The X-ORB-Scheduler header (HostFactory mode)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regenerating-after-a-spec-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating after a spec update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-for-spec-drift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking for spec drift
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -4918,8 +5550,362 @@
               
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+  
+
+
+<h1 id="generate-your-own-sdk">Generate Your Own SDK<a class="headerlink" href="#generate-your-own-sdk" title="Permanent link">&para;</a></h1>
+<p>This guide explains how to produce a typed client for any language that
+<a href="https://github.com/OpenAPITools/openapi-generator">openapi-generator</a> supports
+but that ORB does not officially ship.</p>
+<h2 id="officially-supported-vs-self-serve">Officially supported vs. self-serve<a class="headerlink" href="#officially-supported-vs-self-serve" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Status</th>
+<th>Package</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python</td>
+<td>Official</td>
+<td><code>pip install orb-py</code></td>
+</tr>
+<tr>
+<td>Go</td>
+<td>Official</td>
+<td><code>go get github.com/finos/open-resource-broker/sdk/go</code></td>
+</tr>
+<tr>
+<td>TypeScript / Node</td>
+<td>Official</td>
+<td><code>npm install @finos/open-resource-broker</code></td>
+</tr>
+<tr>
+<td>Java (17+)</td>
+<td>Official</td>
+<td>Maven / Gradle: <code>org.finos.openresourcebroker:open-resource-broker-java</code></td>
+</tr>
+<tr>
+<td>Kotlin</td>
+<td>Official</td>
+<td>Maven / Gradle: <code>org.finos.openresourcebroker:open-resource-broker-kotlin</code></td>
+</tr>
+<tr>
+<td>.NET / C#</td>
+<td>Official</td>
+<td>NuGet: <code>FINOS.OpenResourceBroker</code></td>
+</tr>
+<tr>
+<td>Scala, Rust, Ruby, PHP, C++, Swift, Dart, …</td>
+<td>Self-serve</td>
+<td>See this guide</td>
+</tr>
+</tbody>
+</table>
+<p>For the six official SDKs, <code>openapi-generator</code> output is produced on demand at
+build time (generate-on-build; the generated directories are gitignored, not
+committed) and the five hand-written layers (subprocess manager, UDS transport,
+retry, auth, SSE) are already implemented. For every other language you must
+generate the models yourself and then hand-write those five layers.</p>
+<h2 id="where-to-get-the-openapi-spec">Where to get the OpenAPI spec<a class="headerlink" href="#where-to-get-the-openapi-spec" title="Permanent link">&para;</a></h2>
+<h3 id="from-a-github-release-recommended-for-production-use">From a GitHub Release (recommended for production use)<a class="headerlink" href="#from-a-github-release-recommended-for-production-use" title="Permanent link">&para;</a></h3>
+<p>Every ORB release publishes the spec as a release artifact at a stable URL:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>https://github.com/finos/open-resource-broker/releases/download/v&lt;version&gt;/openapi-v&lt;version&gt;.json
+</code></pre></div>
+<p>Example — download the spec for v1.8.3:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>https://github.com/finos/open-resource-broker/releases/download/v1.8.3/openapi-v1.8.3.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-o<span class="w"> </span>openapi.json
+</code></pre></div>
+<h3 id="from-the-repository-for-development-against-head">From the repository (for development against HEAD)<a class="headerlink" href="#from-the-repository-for-development-against-head" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sdk/spec/openapi.json
+</code></pre></div>
+<p>This file is generated at release time by running a live ORB server and calling
+<code>GET /openapi.json</code>. It is committed to source control and is the single source
+of truth for all six official SDKs. If you are working from a clone of the
+repository, use this path directly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># From inside the repository root</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">INPUT_SPEC</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">/sdk/spec/openapi.json&quot;</span>
+</code></pre></div>
+<p>The spec covers <strong>45 operations</strong> across templates, machines, requests,
+providers, config, admin, and observability endpoints.</p>
+<h2 id="generating-typed-models-with-openapi-generator">Generating typed models with openapi-generator<a class="headerlink" href="#generating-typed-models-with-openapi-generator" title="Permanent link">&para;</a></h2>
+<h3 id="pinned-version">Pinned version<a class="headerlink" href="#pinned-version" title="Permanent link">&para;</a></h3>
+<p>All official SDKs pin openapi-generator to <strong>v7.23.0</strong>. Pin to the same
+version to ensure generated model shapes match what the server expects.</p>
+<h3 id="using-docker-no-local-jvm-required">Using Docker (no local JVM required)<a class="headerlink" href="#using-docker-no-local-jvm-required" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>-g<span class="w"> </span>&lt;GENERATOR_NAME&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated/&lt;lang&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span>--additional-properties<span class="o">=</span>&lt;<span class="nv">key</span><span class="o">=</span>value,...&gt;
+</code></pre></div>
+<h3 id="using-npx-node-18">Using npx (Node 18+)<a class="headerlink" href="#using-npx-node-18" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>npx<span class="w"> </span>@openapitools/openapi-generator-cli@2.15.3<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-i<span class="w"> </span>openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-g<span class="w"> </span>&lt;GENERATOR_NAME&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>-o<span class="w"> </span>generated/&lt;lang&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--additional-properties<span class="o">=</span>&lt;<span class="nv">key</span><span class="o">=</span>value,...&gt;
+</code></pre></div>
+<p>The npm package <code>@openapitools/openapi-generator-cli@2.15.3</code> wraps
+openapi-generator-cli v7.23.0. Verify with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>npx<span class="w"> </span>@openapitools/openapi-generator-cli@2.15.3<span class="w"> </span>version
+</code></pre></div>
+<h3 id="example-scala-scala-akka">Example — Scala (scala-akka)<a class="headerlink" href="#example-scala-scala-akka" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>-g<span class="w"> </span>scala-akka<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated/scala<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span>--additional-properties<span class="o">=</span><span class="nv">groupId</span><span class="o">=</span>org.finos,artifactId<span class="o">=</span>orb-sdk-scala,artifactVersion<span class="o">=</span><span class="m">0</span>.1.0,generateModelTests<span class="o">=</span>false,generateApiTests<span class="o">=</span><span class="nb">false</span>
+</code></pre></div>
+<h3 id="example-rust">Example — Rust<a class="headerlink" href="#example-rust" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span>-g<span class="w"> </span>rust<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated/rust<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span>--additional-properties<span class="o">=</span><span class="nv">packageName</span><span class="o">=</span>orb-sdk,generateModelTests<span class="o">=</span>false,generateApiTests<span class="o">=</span><span class="nb">false</span>
+</code></pre></div>
+<h3 id="example-ruby">Example — Ruby<a class="headerlink" href="#example-ruby" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span>-g<span class="w"> </span>ruby<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated/ruby<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>--additional-properties<span class="o">=</span><span class="nv">gemName</span><span class="o">=</span>orb_sdk,gemVersion<span class="o">=</span><span class="m">0</span>.1.0,generateModelTests<span class="o">=</span>false,generateApiTests<span class="o">=</span><span class="nb">false</span>
+</code></pre></div>
+<h3 id="example-php">Example — PHP<a class="headerlink" href="#example-php" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span>-g<span class="w"> </span>php<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated/php<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span>--additional-properties<span class="o">=</span><span class="nv">invokerPackage</span><span class="o">=</span>FINOS<span class="se">\\</span>OpenResourceBroker,packageName<span class="o">=</span>finos/orb-sdk,generateModelTests<span class="o">=</span>false,generateApiTests<span class="o">=</span><span class="nb">false</span>
+</code></pre></div>
+<h3 id="notable-supported-generators">Notable supported generators<a class="headerlink" href="#notable-supported-generators" title="Permanent link">&para;</a></h3>
+<p>Run <code>docker run --rm openapitools/openapi-generator-cli:v7.23.0 list</code> for the
+complete list. A representative subset:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Generators</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JVM</td>
+<td><code>java</code>, <code>kotlin</code>, <code>scala-akka</code>, <code>scala-http4s</code>, <code>groovy</code></td>
+</tr>
+<tr>
+<td>.NET</td>
+<td><code>csharp</code>, <code>fsharp</code></td>
+</tr>
+<tr>
+<td>JavaScript / TypeScript</td>
+<td><code>typescript-axios</code>, <code>typescript-fetch</code>, <code>typescript-node</code>, <code>javascript</code></td>
+</tr>
+<tr>
+<td>Python</td>
+<td><code>python</code></td>
+</tr>
+<tr>
+<td>Ruby</td>
+<td><code>ruby</code></td>
+</tr>
+<tr>
+<td>PHP</td>
+<td><code>php</code>, <code>php-symfony</code></td>
+</tr>
+<tr>
+<td>Go</td>
+<td><code>go</code></td>
+</tr>
+<tr>
+<td>Rust</td>
+<td><code>rust</code></td>
+</tr>
+<tr>
+<td>Swift</td>
+<td><code>swift5</code>, <code>swift6</code></td>
+</tr>
+<tr>
+<td>Dart / Flutter</td>
+<td><code>dart</code>, <code>dart-dio</code></td>
+</tr>
+<tr>
+<td>C++</td>
+<td><code>cpp-restbed</code>, <code>cpp-ue4</code></td>
+</tr>
+<tr>
+<td>Other</td>
+<td><code>r</code>, <code>perl</code>, <code>bash</code>, <code>powershell</code>, <code>elm</code>, <code>erlang-proper</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-you-get-and-what-you-still-need-to-write">What you get — and what you still need to write<a class="headerlink" href="#what-you-get-and-what-you-still-need-to-write" title="Permanent link">&para;</a></h2>
+<h3 id="what-the-generator-produces">What the generator produces<a class="headerlink" href="#what-the-generator-produces" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Typed model classes</strong> — one class/struct per OpenAPI schema component (e.g.
+  <code>TemplateItem</code>, <code>RequestMachinesRequest</code>, <code>RequestOperationResponse</code>).</li>
+<li><strong>API stub methods</strong> — one method per operation with typed parameters and
+  return types. These stubs call a generated HTTP client that issues plain
+  TCP/HTTPS requests.</li>
+<li><strong>Serialization helpers</strong> — JSON marshal/unmarshal wired to the model classes.</li>
+</ul>
+<p>This is sufficient if you only need to connect to a <strong>remote ORB server over
+HTTP/HTTPS</strong> and do not use the managed-subprocess or UNIX socket modes.</p>
+<h3 id="what-the-generator-does-not-produce-the-five-hand-written-layers">What the generator does NOT produce — the five hand-written layers<a class="headerlink" href="#what-the-generator-does-not-produce-the-five-hand-written-layers" title="Permanent link">&para;</a></h3>
+<p>The generator cannot produce ORB's core value. For a complete, production-grade
+SDK you must hand-write the five layers documented in
+<a href="https://github.com/finos/open-resource-broker/blob/main/sdk/ARCHITECTURE.md"><code>sdk/ARCHITECTURE.md</code></a>:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What it does</th>
+<th>Reference implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Subprocess Manager</td>
+<td>Spawns and supervises a local ORB process; polls <code>/health</code> until healthy; SIGTERM/SIGKILL on shutdown</td>
+<td><code>sdk/go/internal/process/manager.go</code></td>
+</tr>
+<tr>
+<td>2. UDS Transport</td>
+<td>Dials a UNIX domain socket and wraps it as a standard HTTP transport</td>
+<td><code>sdk/go/internal/transport/uds.go</code></td>
+</tr>
+<tr>
+<td>3. Retry Transport</td>
+<td>Transparent retry on network errors and HTTP 5xx with exponential back-off and jitter</td>
+<td><code>sdk/go/internal/transport/retry.go</code></td>
+</tr>
+<tr>
+<td>4. AWS SigV4 Auth</td>
+<td>Signs outgoing requests using the standard AWS credential chain; supports static credentials and dynamic providers</td>
+<td><code>sdk/go/internal/transport/sigv4.go</code></td>
+</tr>
+<tr>
+<td>5. SSE Reader + Reconnect</td>
+<td>Parses <code>data:</code> frames, honours <code>retry:</code> directives, reconnects with back-off, detects the terminal sentinel event</td>
+<td><code>sdk/go/internal/sse/reader.go</code></td>
+</tr>
+</tbody>
+</table>
+<p>The TypeScript SDK (<code>sdk/typescript/</code>) is the most fully commented reference
+implementation and is a good starting point for languages in that family. The
+Go SDK (<code>sdk/go/</code>) is the canonical reference for all five layers.</p>
+<p><strong>The generated HTTP client talks to a remote ORB server over TCP.</strong> It will
+not start ORB as a subprocess, will not dial a UNIX socket, will not reconnect
+an SSE stream, and will not sign requests with AWS SigV4. If your use-case
+requires those capabilities, you must port the five layers from the reference
+implementations.</p>
+<h2 id="authentication-headers">Authentication headers<a class="headerlink" href="#authentication-headers" title="Permanent link">&para;</a></h2>
+<p>All requests to a remote ORB server must include an <code>Authorization</code> header.</p>
+<h3 id="bearer-token">Bearer token<a class="headerlink" href="#bearer-token" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Authorization: Bearer &lt;token&gt;
+</code></pre></div>
+<h3 id="aws-sigv4">AWS SigV4<a class="headerlink" href="#aws-sigv4" title="Permanent link">&para;</a></h3>
+<p>Use the standard AWS Signature Version 4 signing procedure with:</p>
+<ul>
+<li>Service name: <code>execute-api</code> (AWS API Gateway-fronted deployments) or as
+  configured by the operator.</li>
+<li>Region: the AWS region of the ORB deployment.</li>
+<li>Credentials: read from the standard AWS credential chain (environment
+  variables, <code>~/.aws/credentials</code>, or instance/task metadata).</li>
+</ul>
+<p>Prefer the language-native AWS SDK for signing rather than a hand-rolled
+implementation. See <code>sdk/ARCHITECTURE.md</code> Layer 4 for per-language guidance.</p>
+<h2 id="the-x-orb-scheduler-header-hostfactory-mode">The X-ORB-Scheduler header (HostFactory mode)<a class="headerlink" href="#the-x-orb-scheduler-header-hostfactory-mode" title="Permanent link">&para;</a></h2>
+<p>When connecting to a remote ORB server that is running with
+<code>--scheduler hostfactory</code>, every request must carry:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>X-ORB-Scheduler: hostfactory
+</code></pre></div>
+<p>The server reads this header to select the HostFactory scheduler backend.
+Without it the default scheduler is used. The header is ignored if the server
+was not started with <code>--scheduler hostfactory</code>.</p>
+<p>When using the default scheduler, omit the header entirely.</p>
+<h2 id="regenerating-after-a-spec-update">Regenerating after a spec update<a class="headerlink" href="#regenerating-after-a-spec-update" title="Permanent link">&para;</a></h2>
+<p>The spec can change between ORB releases. To regenerate models after an
+upgrade:</p>
+<ol>
+<li>Download the new spec from the release artifact URL shown above.</li>
+<li>Re-run the same <code>docker run</code> / <code>npx</code> command with the updated spec.</li>
+<li>Commit the diff to generated files alongside your application code.</li>
+<li>Review the diff for any new or renamed operations that require updates to
+   your hand-written transport wiring.</li>
+</ol>
+<p>To check which operations exist in a given spec version:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># List all operationIds in the spec (requires Python 3)</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="s2">import json, sys</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="s2">spec = json.load(open(&#39;openapi.json&#39;))</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="s2">for path, methods in spec[&#39;paths&#39;].items():</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="s2">    for method, op in methods.items():</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="s2">        print(op.get(&#39;operationId&#39;, f&#39;{method.upper()} {path}&#39;))</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort
+</code></pre></div>
+<p>The current spec (v1.8.x) exposes <strong>45 operations</strong>. The full list is in
+<a href="https://github.com/finos/open-resource-broker/blob/main/sdk/spec/openapi.json"><code>sdk/spec/openapi.json</code></a>.</p>
+<h2 id="checking-for-spec-drift">Checking for spec drift<a class="headerlink" href="#checking-for-spec-drift" title="Permanent link">&para;</a></h2>
+<p>The official SDKs do not commit generated models; instead each build regenerates
+them from the spec, so "drift" surfaces as a build failure rather than a diff.
+For a self-serve SDK where you <em>do</em> commit the generated models, you can detect
+drift against a newer spec by running the generator again and checking the diff:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Regenerate into a temp directory and diff</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span>-g<span class="w"> </span>&lt;GENERATOR_NAME&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated-new/&lt;lang&gt;
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>diff<span class="w"> </span>-rq<span class="w"> </span>generated/&lt;lang&gt;<span class="w"> </span>generated-new/&lt;lang&gt;
+</code></pre></div>
+<p>To run this check as a make target, add a target analogous to the existing
+<code>sdk-&lt;lang&gt;-check-drift</code> targets (defined in <code>makefiles/sdk.mk</code>), which
+regenerate from the spec and then build to prove the spec still produces
+compilable code.</p>
+<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p>After generating models and implementing the five hand-written layers:</p>
+<ol>
+<li>Implement unit tests (mock HTTP server, no real ORB process).</li>
+<li>Implement contract tests against a real ORB instance, following the pattern
+   in <code>sdk/typescript/tests/contract/contract.test.ts</code>.</li>
+<li>Run the cross-language parity scenario in <code>sdk/parity/scenario.json</code> to
+   verify behavioral equivalence with the official SDKs.</li>
+<li>Open a pull request on the FINOS repository. The contribution guide is in
+   <code>CONTRIBUTING.md</code>.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -4964,10 +5950,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "/open-resource-broker/dev", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.annotate", "content.code.copy", "content.tabs.link"], "search": "/open-resource-broker/dev/assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.annotate", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="/open-resource-broker/dev/assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
