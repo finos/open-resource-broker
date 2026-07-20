@@ -171,10 +171,11 @@ class TestAddProviderTypeArg:
 class TestBuildParserNoConflict:
     """Guard against the argparse conflict error that caused 104 test failures.
 
-    build_parser() calls add_global_arguments() on every leaf subparser and
-    also attaches --provider-type on init.  If the same parser ever receives
-    two registrations of the same flag, argparse raises ValueError immediately.
-    This test ensures that never happens.
+    build_parser() composes intent-grouped parent parsers (common/list/write/
+    provider-scope/hf-compat) onto every leaf subparser via parents=[...] and
+    also attaches --provider-type on init.  If a parser ever composes two
+    parents that both declare the same option string, argparse raises
+    ArgumentError at build time.  This test ensures that never happens.
     """
 
     def test_build_parser_raises_no_argparse_conflict(self):

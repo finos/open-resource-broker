@@ -104,33 +104,19 @@ class StartupValidator:
             self._console.info("  Check your provider configuration and credentials")
 
     def _find_config_file(self) -> bool:
-        """Find config file using discovery hierarchy."""
-        if self.config_path and Path(self.config_path).exists():
+        """Find config file via the single platform_dirs.resolve_config_file source.
+
+        Delegates the entire discovery hierarchy (explicit path, ORB_CONFIG_FILE,
+        ORB_CONFIG_DIR, platform-dirs location, ~/.orb fallback) to
+        :func:`orb.config.platform_dirs.resolve_config_file` so there is exactly
+        one place that knows how a config file is located.
+        """
+        from orb.config.platform_dirs import resolve_config_file
+
+        resolved = resolve_config_file("config.json", explicit_path=self.config_path)
+        if resolved is not None:
+            self.config_path = str(resolved)
             return True
-
-        from pathlib import Path as _Path
-
-        from orb.config.platform_dirs import get_config_location
-
-        # Discovery hierarchy — must match ConfigurationManager's resolution order.
-        # ORB_CONFIG_FILE and ORB_CONFIG_DIR/config.json are kept explicitly so the
-        # validator can surface a meaningful error when they are set but wrong.
-        # Then the platform-dirs path (respects venv / pyproject / uv-tool detection).
-        # Finally the user-home path so operators running from inside a checkout
-        # (which pins platform_dirs to the repo) still pick up ~/.orb/config/config.json
-        # when the repo has no local config.
-        candidates = [
-            os.environ.get("ORB_CONFIG_FILE"),
-            os.path.join(os.environ.get("ORB_CONFIG_DIR", ""), "config.json"),
-            str(get_config_location() / "config.json"),
-            str(_Path.home() / ".orb" / "config" / "config.json"),
-        ]
-
-        for candidate in candidates:
-            if candidate and Path(candidate).exists():
-                self.config_path = candidate
-                return True
-
         return False
 
     def _check_templates_file(self) -> bool:

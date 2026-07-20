@@ -69,6 +69,7 @@ class MicroVMHandler(AWSHandler):
         machine_adapter: Optional[AWSMachineAdapter] = None,
         aws_native_spec_service=None,
         config_port: Optional[ConfigurationPort] = None,
+        provider_name: Optional[str] = None,
     ) -> None:
         super().__init__(
             aws_client,
@@ -79,6 +80,7 @@ class MicroVMHandler(AWSHandler):
             machine_adapter,
             aws_native_spec_service=aws_native_spec_service,
             config_port=config_port,
+            provider_name=provider_name,
         )
 
     def _validate_prerequisites(self, template: AWSTemplate) -> None:

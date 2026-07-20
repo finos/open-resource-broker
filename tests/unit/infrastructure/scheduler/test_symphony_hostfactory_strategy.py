@@ -21,6 +21,8 @@ class TestSymphonyHostFactorySchedulerStrategy:
             "scheduler": {"type": "hostfactory", "config_root": "/test/config"},
             "provider": {"active_provider": "aws-default"},
         }
+        # get_config_file_path resolves the root via SchedulerConfig.get_config_root()
+        mock_app_config.scheduler.get_config_root.return_value = "/test/config"
         self.mock_config_manager.app_config = mock_app_config
 
         self.mock_logger = Mock()
@@ -41,6 +43,7 @@ class TestSymphonyHostFactorySchedulerStrategy:
             "scheduler": {"config_root": "/test/config"},
             "provider": {"active_provider": "provider1-production"},
         }
+        mock_app_config.scheduler.get_config_root.return_value = "/test/config"
         self.mock_config_manager.app_config = mock_app_config
 
         config_path = self.strategy.get_config_file_path()

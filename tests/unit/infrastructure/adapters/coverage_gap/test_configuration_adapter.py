@@ -253,9 +253,9 @@ class TestGetMetricsConfig:
 
 
 class TestSaveConfig:
-    def test_save_config_uses_loaded_file_path_when_no_path_given(self):
+    def test_save_config_uses_source_file_path_when_no_path_given(self):
         adapter, cm = _make_adapter()
-        cm.get_loaded_config_file.return_value = "/etc/orb/config.yaml"
+        cm.get_source_config_file.return_value = "/etc/orb/config.yaml"
 
         result = adapter.save_config()
 
@@ -270,12 +270,24 @@ class TestSaveConfig:
         cm.save.assert_called_once_with("/tmp/my_config.yaml")
         assert result == "/tmp/my_config.yaml"
 
-    def test_save_config_raises_when_no_path_resolvable(self):
+    def test_save_config_raises_when_no_source_file(self):
         adapter, cm = _make_adapter()
-        cm.get_loaded_config_file.return_value = None
+        cm.get_source_config_file.return_value = None
 
         with pytest.raises(ValueError, match="No config file path resolved"):
             adapter.save_config()
+
+    def test_save_config_ignores_discovered_file_that_was_not_loaded(self):
+        # get_loaded_config_file may resolve a candidate that exists on disk but
+        # was never the loaded source; save_config(None) must not write there.
+        adapter, cm = _make_adapter()
+        cm.get_source_config_file.return_value = None
+        cm.get_loaded_config_file.return_value = "/etc/orb/discovered.yaml"
+
+        with pytest.raises(ValueError, match="No config file path resolved"):
+            adapter.save_config()
+
+        cm.save.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -530,26 +542,6 @@ class TestDelegationMethods:
         adapter, cm = _make_adapter()
         adapter.override_scheduler_strategy("hostfactory")
         cm.override_scheduler_strategy.assert_called_once_with("hostfactory")
-
-    def test_override_provider_name_delegates(self):
-        adapter, cm = _make_adapter()
-        adapter.override_provider_name("my-provider")
-        cm.override_provider_name.assert_called_once_with("my-provider")
-
-    def test_override_provider_type_delegates(self):
-        adapter, cm = _make_adapter()
-        adapter.override_provider_type("k8s")
-        cm.override_provider_type.assert_called_once_with("k8s")
-
-    def test_get_active_provider_name_override_delegates(self):
-        adapter, cm = _make_adapter()
-        cm.get_active_provider_name_override.return_value = "my-prov"
-        assert adapter.get_active_provider_name_override() == "my-prov"
-
-    def test_get_active_provider_type_override_delegates(self):
-        adapter, cm = _make_adapter()
-        cm.get_active_provider_type_override.return_value = "aws"
-        assert adapter.get_active_provider_type_override() == "aws"
 
     def test_get_configuration_value_delegates(self):
         adapter, cm = _make_adapter()

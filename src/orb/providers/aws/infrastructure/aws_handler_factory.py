@@ -35,6 +35,7 @@ class AWSHandlerFactory:
         logger: LoggingPort,
         config: Optional[ConfigurationPort] = None,
         native_spec_service: Optional["NativeSpecServiceProtocol"] = None,
+        provider_name: Optional[str] = None,
     ) -> None:
         """
         Initialize the factory.
@@ -45,10 +46,14 @@ class AWSHandlerFactory:
             config: Configuration port for accessing configuration (optional)
             native_spec_service: Pre-resolved NativeSpecService instance (optional).
                 When provided, used directly instead of resolving from the DI container.
+            provider_name: Exact instance name of the provider this factory serves.
+                Handlers use it to scope configuration lookups (e.g. fleet_role)
+                to the selected provider rather than the first match.
         """
         self._aws_client = aws_client
         self._logger = logger
         self._config = config
+        self._provider_name = provider_name
         self._handlers: dict[str, AWSHandler] = {}
         self._handler_classes: dict[str, type[AWSHandler]] = {}
 
@@ -171,6 +176,7 @@ class AWSHandlerFactory:
             launch_template_manager=launch_template_manager,
             machine_adapter=machine_adapter,
             config_port=config_port,
+            provider_name=self._provider_name,
         )
 
         # Cache the handler for future use

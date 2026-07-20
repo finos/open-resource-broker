@@ -77,6 +77,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         machine_adapter: Optional[AWSMachineAdapter] = None,
         aws_native_spec_service=None,
         config_port: Optional[ConfigurationPort] = None,
+        provider_name: Optional[str] = None,
         spot_fleet_validator: Optional[SpotFleetValidator] = None,
         config_builder: Optional[SpotFleetConfigBuilder] = None,
         release_manager: Optional[SpotFleetReleaseManager] = None,
@@ -106,6 +107,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             machine_adapter,
             aws_native_spec_service=aws_native_spec_service,
             config_port=config_port,
+            provider_name=provider_name,
         )
         self._spot_fleet_validator = spot_fleet_validator or SpotFleetValidator(
             aws_client, logger, aws_ops
@@ -210,16 +212,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         """
         fleet_role = aws_template.fleet_role
         if not fleet_role and self.config_port is not None:
-            provider_config = self.config_port.get_provider_config()
-            if provider_config is not None:
-                active_override = self.config_port.get_active_provider_name_override()
-                providers = getattr(provider_config, "providers", [])
-                for p in providers:
-                    if active_override and getattr(p, "name", None) != active_override:
-                        continue
-                    fleet_role = (p.config or {}).get("fleet_role")
-                    if fleet_role:
-                        break
+            fleet_role = self._fleet_role_from_provider_config()
         if not fleet_role:
             return aws_template
 
@@ -246,6 +239,34 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         if resolved != aws_template.fleet_role:
             aws_template = aws_template.model_copy(update={"fleet_role": resolved})
         return aws_template
+
+    def _fleet_role_from_provider_config(self) -> Optional[str]:
+        """Read fleet_role from the provider instance this handler serves.
+
+        Scoped to ``self._provider_name`` so that in a multi-provider config the
+        role is taken from the selected provider rather than the first provider
+        that happens to define one. Falls back to the single provider entry when
+        no provider name was threaded through (single-provider deployments).
+        """
+        if self.config_port is None:
+            return None
+
+        # Preferred path: look up the exact provider instance by name.
+        if self._provider_name:
+            instance = self.config_port.get_provider_instance_config(self._provider_name)
+            if instance is not None:
+                return (getattr(instance, "config", None) or {}).get("fleet_role")
+            return None
+
+        # No provider name available (single-provider deployment): only trust a
+        # lone provider entry so we never silently pick another provider's role.
+        provider_config = self.config_port.get_provider_config()
+        if provider_config is None:
+            return None
+        providers = getattr(provider_config, "providers", [])
+        if len(providers) == 1:
+            return (providers[0].config or {}).get("fleet_role")
+        return None
 
     def check_hosts_status(self, request: Request) -> CheckHostsStatusResult:
         """Check the status of instances across all spot fleets in the request.

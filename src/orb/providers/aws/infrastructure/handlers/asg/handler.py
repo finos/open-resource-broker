@@ -70,6 +70,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         machine_adapter: Optional[AWSMachineAdapter] = None,
         aws_native_spec_service=None,
         config_port: Optional[ConfigurationPort] = None,
+        provider_name: Optional[str] = None,
     ) -> None:
         """
         Initialize the ASG handler with integrated dependencies.
@@ -91,6 +92,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             machine_adapter,
             aws_native_spec_service=aws_native_spec_service,
             config_port=config_port,
+            provider_name=provider_name,
         )
         self._config_builder = ASGConfigBuilder(aws_native_spec_service, config_port, logger)
         self._capacity_manager = ASGCapacityManager(

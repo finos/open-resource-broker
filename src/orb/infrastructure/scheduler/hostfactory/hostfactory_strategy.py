@@ -406,13 +406,20 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         return mapping.get(hf_field, hf_field)
 
     def get_config_file_path(self) -> str:
-        """Get config file path using configuration."""
-        # Get raw config and build path manually
+        """Get config file path using configuration.
+
+        The provider-config root is resolved via ``SchedulerConfig.get_config_root()``
+        so an explicit ``scheduler.config_root`` override is honoured and,
+        when unset, it defers to ``platform_dirs.get_config_location()`` — the
+        single platform-scoped source of truth — instead of a bare relative
+        ``"config"`` directory that depended on the process working directory.
+        """
         config = self.config_manager.app_config.model_dump()
 
-        # Get scheduler config root
-        scheduler_config = config.get("scheduler", {})
-        config_root = scheduler_config.get("config_root", "config")
+        # Resolve the config root via SchedulerConfig so an explicit
+        # scheduler.config_root override wins and the default falls back to the
+        # platform-scoped config location rather than a relative "config" dir.
+        config_root = self.config_manager.app_config.scheduler.get_config_root()
 
         # Get provider type from active provider
         provider_config = config.get("provider", {})

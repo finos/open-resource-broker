@@ -74,10 +74,6 @@ class ConfigurationManager:
         # Scheduler override support
         self._scheduler_override: Optional[str] = None
 
-        # Provider selection overrides (from CLI --provider-name / --provider-type)
-        self._provider_name_override: Optional[str] = None
-        self._provider_type_override: Optional[str] = None
-
     @property
     def config_file(self) -> str | None:
         """Return the config file path this manager was initialised with.
@@ -295,38 +291,41 @@ class ConfigurationManager:
         """Restore original scheduler strategy."""
         self._scheduler_override = None
 
-    def override_provider_name(self, provider_name: str) -> None:
-        """Temporarily override provider instance by exact name."""
-        self._provider_name_override = provider_name
-
-    def override_provider_type(self, provider_type: str) -> None:
-        """Temporarily restrict selection to a provider type."""
-        self._provider_type_override = provider_type
-
-    def get_active_provider_name_override(self) -> str | None:
-        """Get current provider name override."""
-        return self._provider_name_override
-
-    def get_active_provider_type_override(self) -> str | None:
-        """Get current provider type override."""
-        return self._provider_type_override
-
     def get_loaded_config_file(self) -> str | None:
-        """Get the actual config file that was loaded."""
-        # If a config file path is already stored (set in __init__ or reload), use it
-        if self._config_file is not None:
-            from pathlib import Path
+        """Get the actual config file that was loaded.
 
-            if Path(self._config_file).exists():
-                return self._config_file
+        Routes through the single ``platform_dirs.resolve_config_file`` source of
+        truth so discovery order (explicit path, ORB_CONFIG_FILE, ORB_CONFIG_DIR,
+        platform-dirs location, ~/.orb fallback) stays consistent with the
+        startup validator and every other consumer.
 
-        # Fall back to platform-resolved location
-        from orb.config.platform_dirs import get_config_location
+        This is a *best-effort discovery* used for reporting the effective
+        config file. It may point at a candidate that exists on disk but was
+        not the source this manager loaded (e.g. an ``ORB_CONFIG_FILE`` set
+        after construction). Callers that need the exact source this manager
+        read — for example to choose a safe default save target — must use
+        :meth:`get_source_config_file` instead.
+        """
+        from orb.config.platform_dirs import resolve_config_file
 
-        candidate = get_config_location() / "config.json"
-        if candidate.exists():
-            return str(candidate)
-        return None
+        resolved = resolve_config_file("config.json", explicit_path=self._config_file)
+        return str(resolved) if resolved is not None else None
+
+    def get_source_config_file(self) -> str | None:
+        """Get the file this manager actually loaded configuration from.
+
+        Unlike :meth:`get_loaded_config_file`, this never synthesises a target
+        from ``ORB_CONFIG_FILE`` or the ``~/.orb`` fallback. It returns the
+        construction path only when that file exists on disk (which is what the
+        loader read), and ``None`` when configuration came from an in-memory
+        dict, environment only, or a path with no backing file. This makes it
+        safe to use as an implicit save destination.
+        """
+        if self._config_file is None:
+            return None
+        from pathlib import Path
+
+        return self._config_file if Path(self._config_file).exists() else None
 
     def get_provider_type(self) -> str:
         """Get provider type."""

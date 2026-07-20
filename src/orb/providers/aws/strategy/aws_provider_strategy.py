@@ -491,7 +491,10 @@ class AWSProviderStrategy(ProviderStrategy):
             from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
 
             return AWSHandlerFactory(
-                aws_client=self.aws_client, logger=self._logger, config=self._config_port
+                aws_client=self.aws_client,
+                logger=self._logger,
+                config=self._config_port,
+                provider_name=self._provider_name,
             )
         return None
 

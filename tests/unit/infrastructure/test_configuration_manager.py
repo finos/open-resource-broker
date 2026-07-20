@@ -217,24 +217,6 @@ class TestConfigurationManager:
             f"Found AWS-specific methods that should be renamed: {aws_methods}"
         )
 
-    def test_override_provider_name(self, tmp_path):
-        """Test overriding provider by exact instance name."""
-        config_file = tmp_path / "config.json"
-        config_file.write_text(json.dumps({}))
-
-        manager = ConfigurationManager(config_file=str(config_file))
-        manager.override_provider_name("aws-us-east-1")
-        assert manager.get_active_provider_name_override() == "aws-us-east-1"
-
-    def test_override_provider_type(self, tmp_path):
-        """Test overriding provider type filter."""
-        config_file = tmp_path / "config.json"
-        config_file.write_text(json.dumps({}))
-
-        manager = ConfigurationManager(config_file=str(config_file))
-        manager.override_provider_type("k8s")
-        assert manager.get_active_provider_type_override() == "k8s"
-
     def test_override_scheduler_strategy(self, tmp_path):
         """Test overriding scheduler strategy."""
         config_file = tmp_path / "config.json"

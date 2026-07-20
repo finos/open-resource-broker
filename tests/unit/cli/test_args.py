@@ -233,6 +233,72 @@ class TestGlobalFlags:
         assert ns.yes is True
 
 
+class TestAllScope:
+    """--all is scoped to the sub-commands that consume it, not global.
+
+    After the CLI schema refactor, --all no longer lives on add_global_arguments
+    (it had three different meanings). It is declared explicitly on the
+    per-command sub-parsers where it is meaningful.
+    """
+
+    def test_all_present_on_machines_return(self):
+        ns = _parse(["machines", "return", "--all", "--force"])
+        assert ns.all is True
+
+    def test_all_present_on_machines_stop(self):
+        ns = _parse(["machines", "stop", "--all", "--force"])
+        assert ns.all is True
+
+    def test_all_present_on_machines_start(self):
+        ns = _parse(["machines", "start", "--all"])
+        assert ns.all is True
+
+    def test_all_present_on_machines_status(self):
+        ns = _parse(["machines", "status", "--all"])
+        assert ns.all is True
+
+    def test_all_present_on_requests_status(self):
+        ns = _parse(["requests", "status", "--all"])
+        assert ns.all is True
+
+    def test_all_present_on_templates_validate(self):
+        ns = _parse(["templates", "validate", "--all"])
+        assert ns.all is True
+
+    def test_all_absent_on_machines_list(self):
+        """machines list never used --all — it must no longer be accepted."""
+        with patch.object(sys, "argv", ["orb", "machines", "list", "--all"]):
+            with pytest.raises(SystemExit) as exc_info:
+                parse_args()
+        assert exc_info.value.code == 2
+
+    def test_all_absent_on_config_show(self):
+        """config show never used --all — it must no longer be accepted."""
+        with patch.object(sys, "argv", ["orb", "config", "show", "--all"]):
+            with pytest.raises(SystemExit) as exc_info:
+                parse_args()
+        assert exc_info.value.code == 2
+
+
+class TestHostFactoryCompatFlags:
+    """-f/-d resolve to hf_file/hf_data only on HostFactory-invoked commands."""
+
+    def test_hf_file_on_machines_request(self):
+        ns = _parse(["machines", "request", "-f", "/tmp/in.json"])
+        assert ns.hf_file == "/tmp/in.json"
+
+    def test_hf_data_on_requests_status(self):
+        ns = _parse(["requests", "status", "-d", '{"x":1}'])
+        assert ns.hf_data == '{"x":1}'
+
+    def test_hf_flags_absent_on_config_show(self):
+        """config show is not HF-invoked — -f must not be accepted there."""
+        with patch.object(sys, "argv", ["orb", "config", "show", "-f", "/tmp/x"]):
+            with pytest.raises(SystemExit) as exc_info:
+                parse_args()
+        assert exc_info.value.code == 2
+
+
 class TestRequestsWatch:
     """requests watch positional and flag arguments."""
 
