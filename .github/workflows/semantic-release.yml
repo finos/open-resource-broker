@@ -155,27 +155,23 @@ jobs:
       # would describe a different build invocation over the same files and
       # upload a conflicting .intoto.jsonl asset — dual clobbered asset (H3).
 
-      - name: Install ORB
-        if: steps.release.outputs.released == 'true'
-        # This step only boots the server to export the OpenAPI spec, so it needs
-        # the runtime `all` extra (api + providers + ui) but NOT the ci/dev test
-        # tooling.  --no-dev drops the default `dev` group; without it uv would
-        # reject `all` (which now includes `ui`) via the ui↔dev conflict.
-        # ORB_SKIP_UI_BUILD so building the wheel here doesn't invoke the
-        # (bun-less) SPA build hook.
-        env:
-          ORB_SKIP_UI_BUILD: "1"
-        run: uv sync --extra all --no-dev
-
-      - name: Export OpenAPI spec for Go SDK
-        if: steps.release.outputs.released == 'true'
-        run: uv run make sdk-go-export-spec
-
-      - name: Update Go SDK version
-        if: steps.release.outputs.released == 'true'
-        env:
-          GIT_AUTHOR_NAME: ${{ steps.cicd.outputs.committer-name }}
-          GIT_AUTHOR_EMAIL: ${{ steps.cicd.outputs.committer-email }}
-          GIT_COMMITTER_NAME: ${{ steps.cicd.outputs.committer-name }}
-          GIT_COMMITTER_EMAIL: ${{ steps.cicd.outputs.committer-email }}
-        run: uv run make sdk-go-update-version VERSION=${{ steps.release.outputs.version }}
+      # The Go SDK version bump (version.go) and the version-stamped OpenAPI spec
+      # are folded into the release commit by the semantic-release BUILD hook:
+      # `make semantic-release-build` runs `make sdk-go-stamp-version
+      # VERSION=$NEW_VERSION` (NEW_VERSION is injected by python-semantic-release),
+      # and both files are listed in [tool.semantic_release] assets, so PSR stages
+      # and commits them as part of the tagged vX.Y.Z commit.  There is therefore
+      # NO post-tag `orb server` boot / spec export and NO separate
+      # chore(sdk/go) commit here — the tag is already self-contained.
+      #
+      # The committed spec's ROUTES stay in sync with the live API via the
+      # sdk-spec-drift-guard job (sdk.yml), which re-exports /openapi.json on every
+      # PR touching the API source and fails on drift.  So at release time only
+      # info.version needs updating, which the stamp does deterministically without
+      # booting a server (the slim PSR build container has no uv/orb anyway).
+      #
+      # The module-scoped Go tag (sdk/go/vX.Y.Z) is NO LONGER created here.  It is
+      # created + pushed by the sdk-publish-go job in reusable-sdk-publish.yml
+      # (release channel, invoked from prod-release.yml) so all five SDKs publish
+      # from one unified path.  The tag still points at this PSR release commit —
+      # prod-release runs on the published GitHub Release whose tag PSR created.
