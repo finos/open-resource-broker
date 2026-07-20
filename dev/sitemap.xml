@@ -345,6 +345,10 @@
          <lastmod>2026-07-20</lastmod>
     </url>
     <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/providers/aws/microvm/</loc>
+         <lastmod>2026-07-20</lastmod>
+    </url>
+    <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/</loc>
          <lastmod>2026-07-20</lastmod>
     </url>
