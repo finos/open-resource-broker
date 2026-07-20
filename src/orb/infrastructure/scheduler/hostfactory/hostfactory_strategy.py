@@ -158,7 +158,40 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         mapped["updated_at"] = template.get("updated_at")
         mapped["version"] = template.get("version")
 
+        # Back-compat: the internal domain vocabulary was renamed to the
+        # ``machine_*`` scheme, but the loaded-template dict is a translation
+        # seam consumed by the application ``TemplateDTO`` (which still uses the
+        # original field names) and by callers that read the original names
+        # directly.  Mirror each canonical name onto its deprecated alias so the
+        # seam stays backward compatible.  The domain factory downstream accepts
+        # both spellings via ``AliasChoices`` (canonical wins), so surfacing both
+        # is safe.
+        self._mirror_deprecated_field_names(mapped)
+
         return mapped
+
+    # Canonical internal name -> deprecated alias kept on the loaded-template
+    # seam dict for backward compatibility.
+    _CANONICAL_TO_DEPRECATED_FIELDS: dict[str, str] = {
+        "machine_image": "image_id",
+        "max_machines": "max_instances",
+        "machine_ssh_key": "key_name",
+        "machine_bootstrap": "user_data",
+        "machine_disk_size_gb": "root_device_volume_size",
+        "machine_disk_type": "volume_type",
+        "machine_role": "instance_profile",
+        "machine_type": "instance_type",
+    }
+
+    def _mirror_deprecated_field_names(self, mapped: dict[str, Any]) -> None:
+        """Copy canonical ``machine_*`` keys onto their deprecated aliases in place.
+
+        Only fills a deprecated key when it is absent so an explicit value is
+        never clobbered.
+        """
+        for canonical, deprecated in self._CANONICAL_TO_DEPRECATED_FIELDS.items():
+            if canonical in mapped and deprecated not in mapped:
+                mapped[deprecated] = mapped[canonical]
 
     def convert_cli_args_to_hostfactory_input(self, operation: str, args: Any) -> dict[str, Any]:
         """Convert CLI arguments to HostFactory JSON input format.
@@ -394,11 +427,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         """Map HostFactory field names to internal field names."""
         mapping = {
             "templateId": "template_id",
-            "maxNumber": "max_instances",
-            "imageId": "image_id",
+            "maxNumber": "max_machines",
+            "imageId": "machine_image",
             "subnetId": "subnet_ids",  # Note: HF uses single, we use array
             "vmType": "instance_type",
-            "keyName": "key_name",
+            "keyName": "machine_ssh_key",
             "securityGroupIds": "security_group_ids",
             "priceType": "price_type",
             "abisInstanceRequirements": "abis_instance_requirements",
@@ -549,8 +582,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             # Ensure required HF fields are present
             if "templateId" not in formatted_template and "template_id" in formatted_template:
                 formatted_template["templateId"] = formatted_template["template_id"]
-            if "maxNumber" not in formatted_template and "max_instances" in formatted_template:
-                formatted_template["maxNumber"] = formatted_template["max_instances"]
+            if "maxNumber" not in formatted_template:
+                if "max_machines" in formatted_template:
+                    formatted_template["maxNumber"] = formatted_template["max_machines"]
+                elif "max_instances" in formatted_template:
+                    formatted_template["maxNumber"] = formatted_template["max_instances"]
 
             # Per HF schema, instanceTags must be a string not a dict
             if "instanceTags" in formatted_template:

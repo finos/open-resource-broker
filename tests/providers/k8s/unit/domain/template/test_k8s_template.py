@@ -2,7 +2,7 @@
 
 Covers:
 
-* the generic ``Template.image_id`` is the single source of truth for
+* the generic ``Template.machine_image`` is the single source of truth for
   the container image; shadow fields are gone.
 * :attr:`K8sTemplate.service_account` falls back to
   :attr:`Template.machine_role` via the ``after`` model-validator.
@@ -80,13 +80,13 @@ def test_k8s_template_accepts_valid_image_names() -> None:
         "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-image:tag",
     ]:
         t = K8sTemplate(template_id="tpl", image_id=image)
-        assert t.image_id == image
+        assert t.machine_image == image
 
 
 def test_k8s_template_accepts_none_image_id() -> None:
     """None image_id is allowed."""
     t = K8sTemplate(template_id="tpl", image_id=None)
-    assert t.image_id is None
+    assert t.machine_image is None
 
 
 def test_extension_config_does_not_define_container_image() -> None:
@@ -184,8 +184,8 @@ def test_upcast_from_generic_template_round_trips_cleanly() -> None:
     k8s = upcast_to_k8s_template(base)
     assert isinstance(k8s, K8sTemplate)
     assert k8s.template_id == "tpl"
-    assert k8s.image_id == "busybox:latest"
-    assert k8s.max_instances == 4
+    assert k8s.machine_image == "busybox:latest"
+    assert k8s.max_machines == 4
     assert k8s.tags == {"team": "ml"}
     # Service-account fallback runs on the upcast model.
     assert k8s.service_account == "svc-acct"
@@ -214,7 +214,7 @@ def test_model_validate_round_trip_via_model_dump() -> None:
     )
     revived = K8sTemplate.model_validate(original.model_dump())
     assert revived.namespace == "orb"
-    assert revived.image_id == "busybox:latest"
+    assert revived.machine_image == "busybox:latest"
     assert revived.tolerations is not None
     assert revived.tolerations[0].key == "dedicated"
     assert revived.resource_requests is not None

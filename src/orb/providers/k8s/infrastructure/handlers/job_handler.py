@@ -485,8 +485,8 @@ class K8sJobHandler(K8sHandlerBase):
                 # image that has a shell and a command that exits 0 immediately.
                 # The pause image (used by the long-running kinds) has no shell,
                 # so it cannot run a command and is unsuitable for a Job.
-                image_id="busybox:1.37",
-                max_instances=3,
+                machine_image="busybox:1.37",
+                max_machines=3,
                 resource_requests=K8sResourceQuantities(cpu="100m", memory="128Mi"),
                 resource_limits=K8sResourceQuantities(cpu="500m", memory="256Mi"),
                 command=["sh", "-c", "exit 0"],

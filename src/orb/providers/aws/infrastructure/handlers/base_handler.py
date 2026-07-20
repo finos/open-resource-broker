@@ -43,6 +43,7 @@ from orb.providers.aws.infrastructure.handlers.launch_template_cleanup import (
     LaunchTemplateCleanupService,
 )
 from orb.providers.aws.infrastructure.tags import build_resource_tags
+from orb.providers.base.handler import ProviderHandlerBase
 
 T = TypeVar("T")
 TRequest = TypeVar("TRequest")
@@ -50,7 +51,7 @@ TResponse = TypeVar("TResponse")
 
 
 @injectable
-class AWSHandler(ABC):
+class AWSHandler(ProviderHandlerBase, ABC):
     """
     Integrated AWS handler base class following Clean Architecture and CQRS patterns.
 
@@ -405,7 +406,7 @@ class AWSHandler(ABC):
 
     def _get_service_name(self) -> str:
         """Get service name from handler class name."""
-        return self.__class__.__name__.replace("Handler", "").lower()
+        return self.get_handler_type()
 
     def _get_circuit_breaker_config(self) -> dict[str, int]:
         """
@@ -775,7 +776,7 @@ class AWSHandler(ABC):
         errors = {}
 
         # Validate image ID
-        if not template.image_id and not template.launch_template_id:
+        if not template.machine_image and not template.launch_template_id:
             errors["imageId"] = "Image ID is required when no launchTemplateId is specified"
         # Skip AMI ID format validation as it might have been updated by AWSTemplateAdapter
         # The actual AWS API call will validate the AMI ID format
@@ -814,9 +815,7 @@ class AWSHandler(ABC):
         }
 
     # Utility methods for AWS operations (keeping existing functionality)
-    def get_handler_type(self) -> str:
-        """Get handler type from class name."""
-        return self.__class__.__name__.replace("Handler", "").lower()
+    # get_handler_type is inherited from ProviderHandlerBase.
 
     def _get_default_capacity_type(self, price_type: str) -> str:
         """Get default target capacity type based on price type."""

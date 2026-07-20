@@ -208,10 +208,10 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             raise InfrastructureError(str(e))
 
     def _resolve_template_image(self, template: Template) -> Template:
-        """Resolve SSM parameter paths in template.image_id to real AMI IDs."""
+        """Resolve SSM parameter paths in template.machine_image to real AMI IDs."""
         if getattr(template, "launch_template_id", None):
             return template
-        image_id = template.image_id
+        image_id = template.machine_image
         if not image_id:
             return template
 

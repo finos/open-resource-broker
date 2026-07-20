@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +31,16 @@ class Template(BaseModel):
         validation_alias=AliasChoices("machine_type", "instance_type"),
         deprecated="use 'machine_type' instead of 'instance_type'",
     )
-    image_id: Optional[str] = None
-    max_instances: int = 1
+    machine_image: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("machine_image", "image_id"),
+        deprecated="use 'machine_image' instead of 'image_id'",
+    )
+    max_machines: int = Field(
+        default=1,
+        validation_alias=AliasChoices("max_machines", "max_instances"),
+        deprecated="use 'max_machines' instead of 'max_instances'",
+    )
 
     # Network configuration
     subnet_ids: list[str] = Field(default_factory=list)
@@ -52,16 +61,32 @@ class Template(BaseModel):
     public_ip_assignment: Optional[bool] = None  # generic concept
 
     # Storage configuration (generic concepts)
-    root_device_volume_size: Optional[int] = None  # root disk size
-    volume_type: Optional[str] = None  # disk type
+    machine_disk_size_gb: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices("machine_disk_size_gb", "root_device_volume_size"),
+        deprecated="use 'machine_disk_size_gb' instead of 'root_device_volume_size'",
+    )  # root disk size
+    machine_disk_type: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("machine_disk_type", "volume_type"),
+        deprecated="use 'machine_disk_type' instead of 'volume_type'",
+    )  # disk type
     iops: Optional[int] = None  # performance
     throughput: Optional[int] = None  # throughput
     storage_encryption: Optional[bool] = None  # encryption
     encryption_key: Optional[str] = None  # key reference
 
     # Access and security (generic concepts)
-    key_name: Optional[str] = None  # SSH key, etc.
-    user_data: Optional[str] = None  # cloud-init, etc.
+    machine_ssh_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("machine_ssh_key", "key_name"),
+        deprecated="use 'machine_ssh_key' instead of 'key_name'",
+    )  # SSH key, etc.
+    machine_bootstrap: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("machine_bootstrap", "user_data"),
+        deprecated="use 'machine_bootstrap' instead of 'user_data'",
+    )  # cloud-init, etc.
     machine_role: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("machine_role", "instance_profile"),
@@ -121,6 +146,29 @@ class Template(BaseModel):
             logger.warning(
                 "Template field 'instance_profile' is deprecated; use 'machine_role' instead."
             )
+        if "image_id" in data and "machine_image" not in data:
+            logger.warning("Template field 'image_id' is deprecated; use 'machine_image' instead.")
+        if "max_instances" in data and "max_machines" not in data:
+            logger.warning(
+                "Template field 'max_instances' is deprecated; use 'max_machines' instead."
+            )
+        if "root_device_volume_size" in data and "machine_disk_size_gb" not in data:
+            logger.warning(
+                "Template field 'root_device_volume_size' is deprecated; "
+                "use 'machine_disk_size_gb' instead."
+            )
+        if "volume_type" in data and "machine_disk_type" not in data:
+            logger.warning(
+                "Template field 'volume_type' is deprecated; use 'machine_disk_type' instead."
+            )
+        if "key_name" in data and "machine_ssh_key" not in data:
+            logger.warning(
+                "Template field 'key_name' is deprecated; use 'machine_ssh_key' instead."
+            )
+        if "user_data" in data and "machine_bootstrap" not in data:
+            logger.warning(
+                "Template field 'user_data' is deprecated; use 'machine_bootstrap' instead."
+            )
         return data
 
     def __init__(self, **data: Any) -> None:
@@ -162,6 +210,49 @@ class Template(BaseModel):
                 stacklevel=2,
             )
 
+        if "image_id" in data and "machine_image" not in data:
+            warnings.warn(
+                "Template field 'image_id' is deprecated; use 'machine_image' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        if "max_instances" in data and "max_machines" not in data:
+            warnings.warn(
+                "Template field 'max_instances' is deprecated; use 'max_machines' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        if "root_device_volume_size" in data and "machine_disk_size_gb" not in data:
+            warnings.warn(
+                "Template field 'root_device_volume_size' is deprecated; "
+                "use 'machine_disk_size_gb' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        if "volume_type" in data and "machine_disk_type" not in data:
+            warnings.warn(
+                "Template field 'volume_type' is deprecated; use 'machine_disk_type' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        if "key_name" in data and "machine_ssh_key" not in data:
+            warnings.warn(
+                "Template field 'key_name' is deprecated; use 'machine_ssh_key' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        if "user_data" in data and "machine_bootstrap" not in data:
+            warnings.warn(
+                "Template field 'user_data' is deprecated; use 'machine_bootstrap' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # Set default name if not provided
         if "name" not in data and "template_id" in data:
             data["name"] = data["template_id"]
@@ -181,8 +272,8 @@ class Template(BaseModel):
         if not self.template_id:
             raise ValueError("template_id is required")
 
-        if self.max_instances <= 0:
-            raise ValueError("max_instances must be greater than 0")
+        if self.max_machines <= 0:
+            raise ValueError("max_machines must be greater than 0")
 
         # Set allocation strategy default based on price type
         if self.allocation_strategy is None:
@@ -238,6 +329,87 @@ class Template(BaseModel):
         """Convenience property for single subnet access."""
         return self.subnet_ids[0] if self.subnet_ids else None
 
+    # ------------------------------------------------------------------
+    # Deprecated read-only compatibility accessors
+    # ------------------------------------------------------------------
+    # The fields above were renamed to the ``machine_*`` naming scheme, with
+    # the old names kept as input-only ``AliasChoices`` so existing payloads
+    # still deserialize.  These read-only properties preserve *attribute read*
+    # access to the old names for the duration of the deprecation window so
+    # callers doing ``template.image_id`` (etc.) keep working.  They map onto
+    # the canonical field and are intentionally read-only — write via the new
+    # ``machine_*`` field names.
+    #
+    # NOTE: ``instance_type`` -> ``machine_type`` and ``instance_profile`` ->
+    # ``machine_role`` are intentionally NOT exposed as read properties.  Those
+    # two fields are write-only deprecated aliases (see the deprecated-aliases
+    # tests); only the six fields renamed alongside them below keep read access.
+
+    @property
+    def image_id(self) -> Optional[str]:
+        """Deprecated alias for :attr:`machine_image`."""
+        return self.machine_image
+
+    @property
+    def max_instances(self) -> int:
+        """Deprecated alias for :attr:`max_machines`."""
+        return self.max_machines
+
+    @property
+    def root_device_volume_size(self) -> Optional[int]:
+        """Deprecated alias for :attr:`machine_disk_size_gb`."""
+        return self.machine_disk_size_gb
+
+    @property
+    def volume_type(self) -> Optional[str]:
+        """Deprecated alias for :attr:`machine_disk_type`."""
+        return self.machine_disk_type
+
+    @property
+    def key_name(self) -> Optional[str]:
+        """Deprecated alias for :attr:`machine_ssh_key`."""
+        return self.machine_ssh_key
+
+    @property
+    def user_data(self) -> Optional[str]:
+        """Deprecated alias for :attr:`machine_bootstrap`."""
+        return self.machine_bootstrap
+
+    # Maps each deprecated field name to its canonical ``machine_*`` name.  Used
+    # by :meth:`model_copy` so callers passing old names in ``update=`` write the
+    # canonical field rather than a silently-ignored extra attribute.
+    _DEPRECATED_FIELD_NAMES: dict[str, str] = {
+        "instance_type": "machine_type",
+        "image_id": "machine_image",
+        "max_instances": "max_machines",
+        "root_device_volume_size": "machine_disk_size_gb",
+        "volume_type": "machine_disk_type",
+        "key_name": "machine_ssh_key",
+        "user_data": "machine_bootstrap",
+        "instance_profile": "machine_role",
+    }
+
+    def model_copy(self, *, update: Optional[dict[str, Any]] = None, deep: bool = False) -> Self:
+        """Copy the model, translating deprecated field names in ``update``.
+
+        The renamed fields keep read-only compatibility properties, but Pydantic
+        ``model_copy`` writes ``update`` keys straight onto the instance dict.  A
+        deprecated key (e.g. ``image_id``) would therefore land as an ignored
+        extra attribute instead of updating the canonical field.  Fold any
+        deprecated keys onto their canonical name first so old-name updates keep
+        working during the deprecation window.
+        """
+        if update:
+            translated: dict[str, Any] = {}
+            for key, value in update.items():
+                canonical = self._DEPRECATED_FIELD_NAMES.get(key, key)
+                # An explicit canonical key in the same update dict wins.
+                if canonical in update and canonical != key:
+                    continue
+                translated[canonical] = value
+            update = translated
+        return super().model_copy(update=update, deep=deep)
+
     def update_name(self, new_name: str) -> "Template":
         """Update the name and return a new template instance."""
         return self.model_copy(update={"name": new_name})
@@ -257,7 +429,7 @@ class Template(BaseModel):
     def update_image_id(self, new_image_id: str) -> "Template":
         """Update the image ID and return a new template instance."""
         fields = self.model_dump(mode="json")
-        fields["image_id"] = new_image_id
+        fields["machine_image"] = new_image_id
         fields["updated_at"] = datetime.now()
         return self.__class__.model_validate(fields)
 
@@ -303,13 +475,13 @@ class Template(BaseModel):
 
     def __str__(self) -> str:
         """Return string representation of template."""
-        return f"Template(id={self.template_id}, provider={self.provider_api}, instances={self.max_instances})"
+        return f"Template(id={self.template_id}, provider={self.provider_api}, instances={self.max_machines})"
 
     def __repr__(self) -> str:
         """Detailed string representation of template."""
         return (
             f"Template(template_id='{self.template_id}', name='{self.name}', "
-            f"provider_api='{self.provider_api}', max_instances={self.max_instances})"
+            f"provider_api='{self.provider_api}', max_machines={self.max_machines})"
         )
 
 

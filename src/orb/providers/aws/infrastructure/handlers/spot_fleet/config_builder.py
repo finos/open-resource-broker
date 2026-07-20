@@ -174,7 +174,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
             "on_demand_count": capacity["on_demand_count"],
             "spot_count": capacity["spot_count"],
             "base_launch_spec": {
-                "image_id": template.image_id,
+                "image_id": template.machine_image,
                 "security_groups": template.security_group_ids or [],
             },
             "instance_overrides": instance_overrides,

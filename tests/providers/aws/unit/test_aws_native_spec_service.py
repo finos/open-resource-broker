@@ -32,7 +32,7 @@ class TestAWSNativeSpecService:
         """Create mock AWS template with native specs."""
         template = Mock()
         template.template_id = "test-template"
-        template.image_id = "ami-12345678"
+        template.machine_image = "ami-12345678"
         template.machine_types = {"t2.micro": 1}
         template.launch_template_spec = {
             "LaunchTemplateName": "custom-template",

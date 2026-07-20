@@ -12,7 +12,7 @@ exposed via :class:`K8sTemplate`: ``namespace``, resource requests /
 limits, ``runtime_class``, ``node_selector``, ``tolerations``,
 ``service_account``, ``completions`` / ``parallelism``, annotations,
 env vars, volume mounts, and volumes.  Generic concepts such as the
-container image (``Template.image_id``) and operator labels
+container image (``Template.machine_image``) and operator labels
 (``Template.tags``) come from the parent ``Template`` and are not
 duplicated here.
 """
@@ -159,10 +159,10 @@ class K8sTemplateAdapter(TemplateAdapterPort):
         errors: dict[str, str] = {}
         k8s_template = upcast_to_k8s_template(template)
 
-        # Container image required via the generic ``Template.image_id`` field.
-        if not getattr(template, "image_id", None):
-            errors["image_id"] = (
-                "Container image is required — set Template.image_id on the kubernetes template."
+        # Container image required via the generic ``Template.machine_image`` field.
+        if not getattr(template, "machine_image", None):
+            errors["machine_image"] = (
+                "Container image is required — set Template.machine_image on the kubernetes template."
             )
 
         # namespace: optional but must conform to DNS-1123 when set
@@ -194,7 +194,7 @@ class K8sTemplateAdapter(TemplateAdapterPort):
                     break
 
         # Workload sizing — only completions / parallelism are operator
-        # surfaces.  ``Template.max_instances`` cap is enforced by the
+        # surfaces.  ``Template.max_machines`` cap is enforced by the
         # handler at acquire time; replica count comes from
         # ``request.requested_count``.
         for field_name, value in (

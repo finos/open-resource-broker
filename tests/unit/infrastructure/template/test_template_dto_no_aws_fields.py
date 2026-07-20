@@ -3,6 +3,8 @@
 import ast
 import os
 
+import pytest
+
 from orb.infrastructure.template.factories import TemplateDTOFactory
 
 _factory = TemplateDTOFactory()
@@ -13,6 +15,23 @@ from orb.providers.aws.domain.template.aws_template_aggregate import (
     AWSTemplate,
 )
 from orb.providers.aws.domain.template.aws_template_dto_config import AWSTemplateDTOConfig
+
+
+@pytest.fixture(autouse=True)
+def _register_aws_extensions():
+    """Ensure the AWS template extension is registered before each test.
+
+    ``TemplateExtensionRegistry`` is a process-global class-level registry.  The
+    ``from_domain`` factory returns ``provider_config=None`` for the ``"aws"``
+    provider type unless the extension class has been registered.  Registering
+    it here (rather than relying on another test having populated the global
+    registry as a side effect) makes these tests deterministic under xdist.
+    """
+    from orb.providers.aws.registration import register_aws_extensions
+
+    register_aws_extensions()
+    yield
+
 
 # ---------------------------------------------------------------------------
 # AST scan — no top-level AWS fields on TemplateDTO

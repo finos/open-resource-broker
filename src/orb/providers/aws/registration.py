@@ -515,57 +515,16 @@ def initialize_aws_provider(
         template_factory: Optional template factory to register AWS components with
         logger: Optional logger for initialization messages
     """
-    from orb.providers.base.provider_plugin import _initialized_providers
+    from orb.providers.aws.configuration.config import AWSProviderConfig
+    from orb.providers.base.registration import (
+        ProviderRegistrationSpec,
+        register_provider_complete,
+    )
 
-    if "aws" in _initialized_providers:
-        return
-    try:
-        # 1. Provider settings
-        register_aws_provider_settings()
+    def _register_auth(log: Optional["LoggingPort"]) -> None:
+        register_aws_auth_strategies(log)
 
-        # 2. Template DTO extension
-        register_aws_extensions(logger)
-
-        # 3. Auth strategies
-        register_aws_auth_strategies(logger)
-
-        # 4. Template class
-        if template_factory is not None:
-            register_aws_template_factory(template_factory, logger)
-
-        # 5. CLI spec
-        try:
-            from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
-            from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
-
-            CLISpecRegistry.register("aws", AWSCLISpec())
-        except ImportError:
-            # CLI spec module not installed; skip registration silently.
-            pass
-
-        # 6. HostFactory field mapping
-        try:
-            from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
-                FieldMappingRegistry,
-            )
-            from orb.providers.aws.scheduler.hostfactory_field_mapping import AWSFieldMapping
-
-            FieldMappingRegistry.register("aws", AWSFieldMapping())
-        except ImportError:
-            # Field-mapping module not installed; skip registration silently.
-            pass
-
-        # 7. Defaults loader
-        try:
-            from orb.providers.aws.defaults_loader import AWSDefaultsLoader
-            from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
-
-            DefaultsLoaderRegistry.register("aws", AWSDefaultsLoader())
-        except ImportError:
-            # Defaults-loader module not installed; skip registration silently.
-            pass
-
-        # 8. Storage backends (DynamoDB + Aurora)
+    def _register_storage(log: Optional["LoggingPort"]) -> None:
         try:
             from orb.infrastructure.storage.registry import get_storage_registry
             from orb.providers.aws.storage.registration import (
@@ -575,25 +534,76 @@ def initialize_aws_provider(
 
             _storage_registry = get_storage_registry()
             if not _storage_registry.is_registered("dynamodb"):
-                register_dynamodb_storage(_storage_registry, logger)
+                register_dynamodb_storage(_storage_registry, log)
             if not _storage_registry.is_registered("aurora"):
-                register_aurora_storage(_storage_registry, logger)
+                register_aurora_storage(_storage_registry, log)
         except ImportError:
             # Storage backend extras not installed; skip DynamoDB/Aurora registration silently.
             pass
 
-        _initialized_providers.add("aws")
+    # Resolve the optional CLI-spec, field-mapping and defaults-loader instances
+    # under their own import guards so a missing extra module leaves the
+    # corresponding spec field ``None`` (register_provider_complete then skips
+    # that step) rather than aborting the whole registration.
+    cli_spec_instance: Optional[Any] = None
+    try:
+        from orb.providers.aws.cli.aws_cli_spec import AWSCLISpec
 
-        if logger:
-            logger.info("AWS provider initialization completed successfully")
+        cli_spec_instance = AWSCLISpec()
+    except ImportError:
+        # Optional CLI-spec module is not installed; leaving the instance None
+        # is acceptable — registration skips the CLI-spec step.
+        pass
 
-    except Exception as exc:
-        # Deliberately NOT adding to _initialized_providers so a retry after
-        # fixing the root cause will re-attempt fully.
-        error_msg = f"aws provider initialization failed: {exc}"
-        if logger:
-            logger.error(error_msg, exc_info=True)
-        raise
+    field_mapping_instance: Optional[Any] = None
+    try:
+        from orb.providers.aws.scheduler.hostfactory_field_mapping import AWSFieldMapping
+
+        field_mapping_instance = AWSFieldMapping()
+    except ImportError:
+        # Optional field-mapping module is not installed; leaving the instance
+        # None is acceptable — registration skips the field-mapping step.
+        pass
+
+    defaults_loader_instance: Optional[Any] = None
+    try:
+        from orb.providers.aws.defaults_loader import AWSDefaultsLoader
+
+        defaults_loader_instance = AWSDefaultsLoader()
+    except ImportError:
+        # Optional defaults-loader module is not installed; leaving the instance
+        # None is acceptable — registration skips the defaults-loader step.
+        pass
+
+    # AWSTemplate is resolved under a guard; register_provider_complete only
+    # runs the template-class step when both the class and the factory are set.
+    template_class: Optional[type] = None
+    try:
+        from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+
+        template_class = AWSTemplate
+    except ImportError:
+        # Optional template-aggregate module is not installed; leaving the class
+        # None is acceptable — registration skips the template-class step.
+        pass
+
+    # The eight guarded registration steps run in canonical order inside
+    # register_provider_complete (settings, DTO ext, auth, template class,
+    # CLI spec, field mapping, defaults loader, storage) with the shared
+    # idempotency guard against ``_initialized_providers``.
+    spec = ProviderRegistrationSpec(
+        provider_name="aws",
+        settings_class=AWSProviderConfig,
+        dto_config_class=AWSTemplateDTOConfig,
+        register_auth=_register_auth,
+        template_class=template_class,
+        template_factory=template_factory,
+        cli_spec_instance=cli_spec_instance,
+        field_mapping_instance=field_mapping_instance,
+        defaults_loader_instance=defaults_loader_instance,
+        extra_init=_register_storage,
+    )
+    register_provider_complete(spec, logger)
 
 
 def is_aws_provider_registered() -> bool:

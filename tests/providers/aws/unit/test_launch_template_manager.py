@@ -140,8 +140,8 @@ class TestAWSLaunchTemplateManager:
         assert data["InstanceType"] == "t3.medium"
 
     def test_create_launch_template_data_key_name(self):
-        """Test that key_name is included when set via key_name field."""
-        self.aws_template.key_name = "my-key"
+        """Test that key_name is included when set via machine_ssh_key field."""
+        self.aws_template.machine_ssh_key = "my-key"
 
         data = self.manager._create_launch_template_data_legacy(self.aws_template, self.request)
 
@@ -160,8 +160,8 @@ class TestAWSLaunchTemplateManager:
 
     def test_create_launch_template_data_storage_configuration(self):
         """Test launch template data creation with storage configuration."""
-        self.aws_template.root_device_volume_size = 20
-        self.aws_template.volume_type = "gp3"
+        self.aws_template.machine_disk_size_gb = 20
+        self.aws_template.machine_disk_type = "gp3"
         self.aws_template.iops = 3000
 
         data = self.manager._create_launch_template_data_legacy(self.aws_template, self.request)
@@ -183,7 +183,7 @@ class TestAWSLaunchTemplateManager:
         import base64
 
         user_data_script = "#!/bin/bash\necho 'Hello World'"
-        self.aws_template.user_data = user_data_script
+        self.aws_template.machine_bootstrap = user_data_script
 
         data = self.manager._create_launch_template_data_legacy(self.aws_template, self.request)
 

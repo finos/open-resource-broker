@@ -394,7 +394,7 @@ class K8sNativeSpecService:
         """
         package_info = self.config_port.get_package_info()
 
-        image = k8s_template.image_id or ""
+        image = k8s_template.machine_image or ""
         replicas = max(int(request.requested_count), 1)
 
         resource_requests = k8s_template.resolve_resource_requests_map() or {}

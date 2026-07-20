@@ -31,7 +31,7 @@ class AWSFieldMapping:
         # AWS instance configuration
         "instanceProfile": "machine_role",
         "launchTemplateId": "launch_template_id",
-        "userDataScript": "user_data",
+        "userDataScript": "machine_bootstrap",
         # AWS MicroVM configuration (routed into metadata via dotted paths)
         "imageVersion": "metadata.image_version",
         "executionRoleArn": "metadata.execution_role_arn",
@@ -53,7 +53,7 @@ class AWSFieldMapping:
         network configuration, so ``subnet_ids`` and ``security_group_ids``
         should not be defaulted to empty lists.
         """
-        mapped.setdefault("max_instances", 1)
+        mapped.setdefault("max_machines", 1)
         mapped.setdefault("price_type", "ondemand")
         mapped.setdefault("allocation_strategy", "lowestPrice")
         if not mapped.get("launch_template_id"):

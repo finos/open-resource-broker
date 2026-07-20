@@ -87,7 +87,7 @@ class K8sFieldMapping:
 
         Mutates *mapped* in place and returns it for convenience.  Defaults:
 
-        * ``max_instances`` -> ``1`` (generic quota cap).
+        * ``max_machines`` -> ``1`` (generic quota cap).
         * ``annotations`` -> empty dict.
 
         ``namespace`` is intentionally NOT defaulted here.  Doing so would
@@ -103,7 +103,7 @@ class K8sFieldMapping:
         defaulted here.  Operator labels live on the generic ``tags``
         field on :class:`Template`.
         """
-        mapped.setdefault("max_instances", 1)
+        mapped.setdefault("max_machines", 1)
         mapped.setdefault("annotations", {})
         return mapped
 

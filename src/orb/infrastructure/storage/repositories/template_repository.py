@@ -71,14 +71,24 @@ class TemplateSerializer(BaseEntitySerializer):
 
     @handle_infrastructure_exceptions(context="template_serialization")
     def to_dict(self, template: Template) -> dict[str, Any]:
-        """Convert Template aggregate to dictionary with complete field support."""
+        """Convert Template aggregate to dictionary with complete field support.
+
+        The persistence column names are the storage layer's translation seam:
+        the domain aggregate exposes ``machine_*`` fields while the SQL columns
+        retain their original physical names (``image_id``, ``max_instances``,
+        ``root_device_volume_size``, ``volume_type``, ``key_name``,
+        ``user_data``, ``instance_profile``).  Serialising to the physical
+        column names keeps values inside the SQL column allowlist so they are
+        actually persisted; ``from_dict`` reconstructs the ``machine_*`` fields
+        from these names on read.
+        """
         try:
             return {
                 "template_id": template.template_id,
                 "name": template.name,
                 "description": template.description,
-                "image_id": template.image_id,
-                "max_instances": template.max_instances,
+                "image_id": template.machine_image,
+                "max_instances": template.max_machines,
                 "machine_types": template.machine_types,
                 "machine_types_ondemand": template.machine_types_ondemand,
                 "machine_types_priority": template.machine_types_priority,
@@ -86,15 +96,15 @@ class TemplateSerializer(BaseEntitySerializer):
                 "security_group_ids": template.security_group_ids,
                 "network_zones": template.network_zones,
                 "public_ip_assignment": template.public_ip_assignment,
-                "root_device_volume_size": template.root_device_volume_size,
-                "volume_type": template.volume_type,
+                "root_device_volume_size": template.machine_disk_size_gb,
+                "volume_type": template.machine_disk_type,
                 "iops": template.iops,
                 "throughput": template.throughput,
                 "storage_encryption": template.storage_encryption,
                 "encryption_key": template.encryption_key,
-                "key_name": template.key_name,
-                "user_data": template.user_data,
-                "machine_role": template.machine_role,
+                "key_name": template.machine_ssh_key,
+                "user_data": template.machine_bootstrap,
+                "instance_profile": template.machine_role,
                 "monitoring_enabled": template.monitoring_enabled,
                 "price_type": template.price_type,
                 "allocation_strategy": template.allocation_strategy,
@@ -145,9 +155,13 @@ class TemplateSerializer(BaseEntitySerializer):
                 "template_id": template_id,
                 "name": processed_data.get("name", template_id),
                 "description": processed_data.get("description"),
-                "image_id": processed_data.get("imageId", processed_data.get("image_id")),
-                "max_instances": processed_data.get(
-                    "maxNumber", processed_data.get("max_instances", 1)
+                "machine_image": processed_data.get(
+                    "machine_image",
+                    processed_data.get("imageId", processed_data.get("image_id")),
+                ),
+                "max_machines": processed_data.get(
+                    "max_machines",
+                    processed_data.get("maxNumber", processed_data.get("max_instances", 1)),
                 ),
                 "machine_types": self._normalize_machine_types(data),
                 "machine_types_ondemand": data.get("vmTypesOnDemand", {}),
@@ -162,16 +176,22 @@ class TemplateSerializer(BaseEntitySerializer):
                 ),
                 "network_zones": processed_data.get("network_zones", []),
                 "public_ip_assignment": processed_data.get("public_ip_assignment"),
-                "root_device_volume_size": data.get(
-                    "root_device_volume_size", data.get("root_volume_size")
+                "machine_disk_size_gb": data.get(
+                    "machine_disk_size_gb",
+                    data.get("root_device_volume_size", data.get("root_volume_size")),
                 ),
-                "volume_type": data.get("volume_type", data.get("root_volume_type")),
+                "machine_disk_type": data.get(
+                    "machine_disk_type", data.get("volume_type", data.get("root_volume_type"))
+                ),
                 "iops": data.get("iops", data.get("root_volume_iops")),
                 "throughput": data.get("throughput", data.get("root_volume_throughput")),
                 "storage_encryption": data.get("storage_encryption"),
                 "encryption_key": data.get("encryption_key"),
-                "key_name": data.get("keyName", data.get("key_name", data.get("key_pair_name"))),
-                "user_data": data.get("user_data"),
+                "machine_ssh_key": data.get(
+                    "machine_ssh_key",
+                    data.get("keyName", data.get("key_name", data.get("key_pair_name"))),
+                ),
+                "machine_bootstrap": data.get("machine_bootstrap", data.get("user_data")),
                 "machine_role": data.get("machine_role") or data.get("instance_profile"),
                 "monitoring_enabled": data.get("monitoring_enabled"),
                 "price_type": data.get("price_type", "ondemand"),

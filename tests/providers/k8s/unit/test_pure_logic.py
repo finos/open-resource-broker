@@ -1574,7 +1574,7 @@ class TestK8sTemplateValidationService:
         result = svc.validate_template(op)
         data = result.data
         assert not data["valid"]
-        assert any("image_id" in e for e in data["errors"])
+        assert any("machine_image" in e for e in data["errors"])
 
     def test_exception_returns_error_result(self) -> None:
         svc = self._make_service()
@@ -1598,8 +1598,8 @@ class TestConfigDictToK8sFields:
         config = {"templateId": "t1", "imageId": "nginx", "maxInstances": 5}
         result = _config_dict_to_k8s_fields(config)
         assert result.get("template_id") == "t1"
-        assert result.get("image_id") == "nginx"
-        assert result.get("max_instances") == 5
+        assert result.get("machine_image") == "nginx"
+        assert result.get("max_machines") == 5
 
     def test_nonpositive_max_instances_dropped(self) -> None:
         from orb.providers.k8s.validation.template_validator import _config_dict_to_k8s_fields
@@ -1628,7 +1628,7 @@ class TestConfigDictToK8sFields:
 
         config = {"image_id": "nginx", "maxNumber": 10}
         result = _config_dict_to_k8s_fields(config)
-        assert result.get("max_instances") == 10
+        assert result.get("max_machines") == 10
 
 
 @pytest.mark.unit
@@ -1649,7 +1649,7 @@ class TestK8sTemplateValidatorDictInput:
         v = self._validator()
         result = v.validate({"template_id": "t1", "image_id": "nginx", "maxNumber": 0})
         assert not result.valid
-        assert any("max_instances" in e for e in result.errors)
+        assert any("max_machines" in e for e in result.errors)
 
     def test_dict_with_camelcase_provider_api_error(self) -> None:
         v = self._validator()

@@ -128,7 +128,7 @@ def test_max_instances_zero_caught_via_adapter_delegation() -> None:
         }
     )
     assert errors, "Expected at least one error for max_instances=0"
-    assert any("max_instances" in e for e in errors)
+    assert any("max_machines" in e for e in errors)
 
 
 def test_k8s_namespace_forwarded_to_validator() -> None:

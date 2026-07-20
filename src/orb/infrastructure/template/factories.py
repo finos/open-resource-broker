@@ -54,8 +54,8 @@ class TemplateDTOFactory(TemplateDTOFactoryPort):
             name=getattr(template, "name", None),
             description=getattr(template, "description", None),
             # Instance configuration
-            image_id=getattr(template, "image_id", None),
-            max_instances=getattr(template, "max_instances", 1),
+            image_id=getattr(template, "machine_image", None),
+            max_instances=getattr(template, "max_machines", 1),
             # Machine types configuration (unified)
             machine_types=getattr(template, "machine_types", {}),
             machine_types_ondemand=getattr(template, "machine_types_ondemand", {}),
@@ -71,16 +71,16 @@ class TemplateDTOFactory(TemplateDTOFactoryPort):
             network_zones=getattr(template, "network_zones", []),
             public_ip_assignment=getattr(template, "public_ip_assignment", None),
             # Storage configuration
-            root_device_volume_size=getattr(template, "root_device_volume_size", None),
-            volume_type=getattr(template, "volume_type", None),
+            root_device_volume_size=getattr(template, "machine_disk_size_gb", None),
+            volume_type=getattr(template, "machine_disk_type", None),
             iops=getattr(template, "iops", None),
             throughput=getattr(template, "throughput", None),
             storage_encryption=getattr(template, "storage_encryption", None),
             encryption_key=getattr(template, "encryption_key", None),
             # Access and security
-            key_name=getattr(template, "key_name", None),
-            user_data=getattr(template, "user_data", None),
-            instance_profile=getattr(template, "instance_profile", None),
+            key_name=getattr(template, "machine_ssh_key", None),
+            user_data=getattr(template, "machine_bootstrap", None),
+            instance_profile=getattr(template, "machine_role", None),
             # Advanced configuration
             monitoring_enabled=getattr(template, "monitoring_enabled", None),
             # Tags and metadata (cross-provider opaque data only)

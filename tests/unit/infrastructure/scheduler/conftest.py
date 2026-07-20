@@ -41,7 +41,7 @@ _MINIMAL_HF_TEMPLATE_ON_DISK: dict[str, Any] = {
 
 _MINIMAL_SNAKE_TEMPLATE: dict[str, Any] = {
     "template_id": "default-tpl-001",
-    "max_instances": 5,
+    "max_machines": 5,
     "machine_types": {"t3.medium": 1},
     "subnet_ids": ["subnet-aaa"],
     "security_group_ids": ["sg-111"],

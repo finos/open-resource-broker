@@ -58,7 +58,7 @@ def test_hf_map_input_template_id():
 def test_hf_map_input_max_number():
     mapper = HostFactoryFieldMapper("aws")
     result = mapper.map_input_fields({"maxNumber": 10})
-    assert result["max_instances"] == 10
+    assert result["max_machines"] == 10
 
 
 def test_hf_map_input_subnet_id_string_becomes_list():

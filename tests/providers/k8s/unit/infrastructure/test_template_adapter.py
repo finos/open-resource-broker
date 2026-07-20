@@ -147,11 +147,11 @@ def test_validate_field_values_requires_image_id() -> None:
         template_id="tpl-no-image",
         provider_api="Pod",
         max_instances=1,
-        # image_id deliberately absent
+        # machine_image deliberately absent
     )
     adapter = _make_adapter()
     errors = adapter.validate_field_values(tpl)
-    assert "image_id" in errors
+    assert "machine_image" in errors
 
 
 def test_validate_field_values_rejects_invalid_namespace() -> None:

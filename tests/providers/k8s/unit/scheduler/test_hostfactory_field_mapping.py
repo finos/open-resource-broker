@@ -70,7 +70,7 @@ def test_get_mappings_returns_copy(mapping: K8sFieldMapping) -> None:
 def test_apply_defaults_fills_unset_keys(mapping: K8sFieldMapping) -> None:
     """Unset fields are filled with kubernetes-sensible defaults."""
     out = mapping.apply_defaults({})
-    assert out["max_instances"] == 1
+    assert out["max_machines"] == 1
     assert out["annotations"] == {}
     # ``namespace`` is intentionally NOT defaulted here — see the
     # ``test_apply_defaults_does_not_force_namespace`` test below for

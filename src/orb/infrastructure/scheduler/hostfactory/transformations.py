@@ -143,34 +143,39 @@ class HostFactoryTransformations:
                 mapped_data["tags"],
             )
 
-        # Transform user_data (read file content if it's a file path)
-        if "user_data" in mapped_data:
-            original_value = mapped_data["user_data"]
-            mapped_data["user_data"] = HostFactoryTransformations.transform_user_data(
+        # Transform machine_bootstrap (read file content if it's a file path).
+        # The field mapper has already translated the HF ``userDataScript`` key
+        # to the internal ``machine_bootstrap`` name by this point.
+        if "machine_bootstrap" in mapped_data:
+            original_value = mapped_data["machine_bootstrap"]
+            mapped_data["machine_bootstrap"] = HostFactoryTransformations.transform_user_data(
                 original_value
             )
-            if mapped_data["user_data"] != original_value:
+            if mapped_data["machine_bootstrap"] != original_value:
                 logger.debug(
-                    "HostFactory: Transformed user_data from file path: %s -> %d bytes of content",
+                    "HostFactory: Transformed machine_bootstrap from file path: "
+                    "%s -> %d bytes of content",
                     original_value,
-                    len(mapped_data["user_data"]) if mapped_data["user_data"] else 0,
+                    len(mapped_data["machine_bootstrap"])
+                    if mapped_data["machine_bootstrap"]
+                    else 0,
                 )
 
-        # Transform volume-related camelCase fields to snake_case
+        # Transform volume-related camelCase fields to the internal names.
         if "rootDeviceVolumeSize" in mapped_data:
-            mapped_data["root_device_volume_size"] = mapped_data["rootDeviceVolumeSize"]
+            mapped_data["machine_disk_size_gb"] = mapped_data["rootDeviceVolumeSize"]
             logger.debug(
-                "HostFactory: Transformed rootDeviceVolumeSize: %s -> root_device_volume_size: %s",
+                "HostFactory: Transformed rootDeviceVolumeSize: %s -> machine_disk_size_gb: %s",
                 mapped_data["rootDeviceVolumeSize"],
-                mapped_data["root_device_volume_size"],
+                mapped_data["machine_disk_size_gb"],
             )
 
         if "volumeType" in mapped_data:
-            mapped_data["volume_type"] = mapped_data["volumeType"]
+            mapped_data["machine_disk_type"] = mapped_data["volumeType"]
             logger.debug(
-                "HostFactory: Transformed volumeType: %s -> volume_type: %s",
+                "HostFactory: Transformed volumeType: %s -> machine_disk_type: %s",
                 mapped_data["volumeType"],
-                mapped_data["volume_type"],
+                mapped_data["machine_disk_type"],
             )
 
         # Ensure instance type consistency

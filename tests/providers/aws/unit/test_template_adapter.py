@@ -48,7 +48,7 @@ def _make_template(
     abis=None,
 ):
     tmpl = MagicMock()
-    tmpl.image_id = image_id
+    tmpl.machine_image = image_id
     # Use a sentinel so callers can pass machine_types={} explicitly
     tmpl.machine_types = {"t3.medium": 1} if machine_types is _SENTINEL else machine_types
     tmpl.subnet_ids = subnet_ids if subnet_ids is not None else ["subnet-0abc12345def67890"]
@@ -522,14 +522,14 @@ class TestResolveTemplateReferences:
         }
         tmpl = _make_template(image_id="/my/ami/path")
         result = adapter.resolve_template_references(tmpl)
-        assert result.image_id == resolved_ami
+        assert result.machine_image == resolved_ami
 
     def test_leaves_valid_ami_unchanged(self):
         adapter = _make_adapter()
         ami = "ami-0abc12345def67890"
         tmpl = _make_template(image_id=ami)
         result = adapter.resolve_template_references(tmpl)
-        assert result.image_id == ami
+        assert result.machine_image == ami
 
     def test_no_image_id_skips_resolution(self):
         adapter = _make_adapter()

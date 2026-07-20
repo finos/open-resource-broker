@@ -155,7 +155,7 @@ class AWSNativeSpecService:
             "request_id": str(request.request_id),
             "requested_count": request.requested_count,
             "template_id": template.template_id,
-            "image_id": template.image_id,
+            "image_id": template.machine_image,
             "instance_type": next(iter(template.machine_types.keys()))
             if template.machine_types
             else None,

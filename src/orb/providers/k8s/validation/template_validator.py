@@ -13,10 +13,10 @@ templates are rejected before the first acquire attempt.
 Validation rules
 ----------------
 1. ``template_id`` — must be set and non-empty.
-2. ``max_instances`` — must be a positive integer (>= 1).
+2. ``max_machines`` — must be a positive integer (>= 1).
 3. ``provider_api`` — when set, must be one of ``{Pod, Deployment,
    StatefulSet, Job}``; absent means the runtime default (``Pod``) is used.
-4. ``image_id`` — must be set and non-empty (the container image reference).
+4. ``machine_image`` — must be set and non-empty (the container image reference).
 5. ``namespace`` — when set, must conform to the DNS-1123 label pattern
    (lowercase alphanumeric, hyphens permitted but not at start/end, max 63
    characters).
@@ -75,14 +75,16 @@ _QUANTITY = re.compile(
 #: Template-config-dict keys (accepting both camelCase and snake_case) mapped
 #: to the K8sTemplate field names, so a plain config dict handed to the
 #: validator can be coerced to a typed K8sTemplate without the caller importing
-#: any provider type.  Generic parent-template fields (template_id, image_id,
-#: provider_api, max_instances) are forwarded verbatim.
+#: any provider type.  Generic parent-template fields (template_id, machine_image,
+#: provider_api, max_machines) are forwarded verbatim.
 _CONFIG_KEY_ALIASES: dict[str, str] = {
     "templateId": "template_id",
-    "imageId": "image_id",
+    "imageId": "machine_image",
+    "image_id": "machine_image",
     "providerApi": "provider_api",
-    "maxInstances": "max_instances",
-    "maxNumber": "max_instances",
+    "maxInstances": "max_machines",
+    "maxNumber": "max_machines",
+    "max_instances": "max_machines",
     "serviceAccount": "service_account",
     "serviceName": "service_name",
     "resourceRequests": "resource_requests",
@@ -94,9 +96,9 @@ _CONFIG_KEY_ALIASES: dict[str, str] = {
 _K8S_TEMPLATE_FIELDS: frozenset[str] = frozenset(
     {
         "template_id",
-        "image_id",
+        "machine_image",
         "provider_api",
-        "max_instances",
+        "max_machines",
         "namespace",
         "service_account",
         "service_name",
@@ -123,17 +125,20 @@ def _config_dict_to_k8s_fields(config: dict[str, Any]) -> dict[str, Any]:
         if key in _K8S_TEMPLATE_FIELDS and value is not None:
             out.setdefault(key, value)
     out.setdefault("template_id", config.get("template_id") or config.get("templateId") or "temp")
-    out.setdefault("image_id", config.get("image_id") or config.get("imageId") or "")
-    # Drop a non-positive max_instances so K8sTemplate construction does not
+    out.setdefault(
+        "machine_image",
+        config.get("machine_image") or config.get("image_id") or config.get("imageId") or "",
+    )
+    # Drop a non-positive max_machines so K8sTemplate construction does not
     # raise (the invalid value is already reported by _check_dict_only_rules);
     # dropping it lets the remaining typed rules still run.
-    mi = out.get("max_instances")
+    mi = out.get("max_machines")
     if mi is not None:
         try:
             if int(mi) <= 0:
-                out.pop("max_instances", None)
+                out.pop("max_machines", None)
         except (TypeError, ValueError):
-            out.pop("max_instances", None)
+            out.pop("max_machines", None)
     return out
 
 
@@ -227,7 +232,9 @@ class K8sTemplateValidator:
         error surfaces regardless of whether the typed model would accept it.
         """
         errors: list[str] = []
-        raw_max = config.get("maxInstances")
+        raw_max = config.get("max_machines")
+        if raw_max is None:
+            raw_max = config.get("maxInstances")
         if raw_max is None:
             raw_max = config.get("maxNumber")
         if raw_max is None:
@@ -235,9 +242,9 @@ class K8sTemplateValidator:
         if raw_max is not None:
             try:
                 if int(raw_max) <= 0:
-                    errors.append(f"max_instances must be a positive integer; got {raw_max!r}")
+                    errors.append(f"max_machines must be a positive integer; got {raw_max!r}")
             except (TypeError, ValueError):
-                errors.append(f"max_instances must be an integer; got {raw_max!r}")
+                errors.append(f"max_machines must be an integer; got {raw_max!r}")
         return errors
 
     @staticmethod
@@ -286,15 +293,15 @@ class K8sTemplateValidator:
         return []
 
     def _check_max_instances(self, template: Any) -> list[str]:
-        """Rule 2: max_instances must be >= 1 when set."""
-        max_inst = getattr(template, "max_instances", None)
+        """Rule 2: max_machines must be >= 1 when set."""
+        max_inst = getattr(template, "max_machines", None)
         if max_inst is None:
             return []
         try:
             if int(max_inst) < 1:
-                return [f"max_instances must be >= 1, got {max_inst!r}"]
+                return [f"max_machines must be >= 1, got {max_inst!r}"]
         except (TypeError, ValueError):
-            return [f"max_instances must be an integer >= 1, got {max_inst!r}"]
+            return [f"max_machines must be an integer >= 1, got {max_inst!r}"]
         return []
 
     def _check_provider_api(self, template: Any) -> list[str]:
@@ -308,10 +315,10 @@ class K8sTemplateValidator:
         return []
 
     def _check_image_id(self, template: Any) -> list[str]:
-        """Rule 4: image_id must be set and non-empty."""
-        image_id = getattr(template, "image_id", None)
+        """Rule 4: machine_image must be set and non-empty."""
+        image_id = getattr(template, "machine_image", None)
         if not image_id or not str(image_id).strip():
-            return ["image_id (container image) is required and must be non-empty"]
+            return ["machine_image (container image) is required and must be non-empty"]
         return []
 
     def _check_namespace(self, template: Any) -> list[str]:

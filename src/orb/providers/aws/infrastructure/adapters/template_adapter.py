@@ -146,11 +146,11 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             Template with resolved references
         """
         # Resolve AMI ID if it's an alias or SSM parameter
-        if template.image_id:
-            resolved_ami = self.resolve_ami_id(template.image_id)
-            if resolved_ami != template.image_id:
-                template.image_id = resolved_ami
-                self._logger.info("Resolved AMI ID: %s", template.image_id)
+        if template.machine_image:
+            resolved_ami = self.resolve_ami_id(template.machine_image)
+            if resolved_ami != template.machine_image:
+                template.machine_image = resolved_ami
+                self._logger.info("Resolved AMI ID: %s", template.machine_image)
 
         return template
 
@@ -177,13 +177,13 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         is_microvm = getattr(template, "provider_api", None) == "MicroVM"
 
         # Validate image ID
-        if not template.image_id:
+        if not template.machine_image:
             errors["image_id"] = "Image ID is required"
         elif is_microvm:
-            if not template.image_id.startswith("arn:"):
-                errors["image_id"] = f"MicroVM image_id must be an ARN: {template.image_id}"
-        elif not self._is_valid_ami_format(template.image_id):
-            errors["image_id"] = f"Invalid AMI ID format: {template.image_id}"
+            if not template.machine_image.startswith("arn:"):
+                errors["image_id"] = f"MicroVM image_id must be an ARN: {template.machine_image}"
+        elif not self._is_valid_ami_format(template.machine_image):
+            errors["image_id"] = f"Invalid AMI ID format: {template.machine_image}"
 
         if not is_microvm:
             # Validate instance type(s) — not applicable to MicroVM
@@ -388,7 +388,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         """Validate required AWS fields."""
         errors = []
 
-        if not template.image_id:
+        if not template.machine_image:
             errors.append("Image ID is required for AWS templates")
 
         # MicroVM templates are individual Firecracker sandboxes launched from an

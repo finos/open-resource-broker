@@ -411,7 +411,7 @@ def test_build_template_for_request_fallback_returns_k8s_template() -> None:
     assert template.template_id == "tpl-fallback"
     assert template.provider_type == "k8s"
     assert template.provider_api == "Pod"
-    assert template.max_instances == 3
+    assert template.max_machines == 3
 
     # Empty-metadata dict + no ``template`` key -> still fallback path.
     fake_request.metadata = {}

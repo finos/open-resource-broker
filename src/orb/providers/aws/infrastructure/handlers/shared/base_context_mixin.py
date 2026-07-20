@@ -103,8 +103,9 @@ class BaseContextMixin:
             "has_instance_types": bool(getattr(template, "machine_types", None)),
             "has_allocation_strategy": bool(getattr(template, "allocation_strategy", None)),
             # Optional configuration flags
-            "has_key_name": hasattr(template, "key_name") and bool(template.key_name),
-            "has_user_data": hasattr(template, "user_data") and bool(template.user_data),
+            "has_key_name": hasattr(template, "machine_ssh_key") and bool(template.machine_ssh_key),
+            "has_user_data": hasattr(template, "machine_bootstrap")
+            and bool(template.machine_bootstrap),
             "has_instance_profile": hasattr(template, "machine_role")
             and bool(template.machine_role),
             "has_ebs_optimized": hasattr(template, "ebs_optimized")

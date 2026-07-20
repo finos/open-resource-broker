@@ -26,9 +26,9 @@ class TestTemplateMultiProviderFields:
         assert template.provider_type == "aws"
         assert template.provider_name == "aws-us-east-1"
         assert template.provider_api == "EC2Fleet"
-        assert template.image_id == "ami-12345"
+        assert template.machine_image == "ami-12345"
         assert template.subnet_ids == ["subnet-123"]
-        assert template.max_instances == 5
+        assert template.max_machines == 5
 
     def test_template_with_partial_provider_fields(self):
         """Test template creation with partial provider fields."""
@@ -146,22 +146,22 @@ class TestTemplateMultiProviderFields:
 
     def test_template_existing_validation_still_works(self):
         """Test that existing template validation still works."""
-        # Test max_instances validation
-        with pytest.raises(ValueError, match="max_instances must be greater than 0"):
+        # Test max_machines validation
+        with pytest.raises(ValueError, match="max_machines must be greater than 0"):
             Template(
                 template_id="validation-test",
-                image_id="ami-12345",
+                machine_image="ami-12345",
                 subnet_ids=["subnet-123"],
-                max_instances=0,
+                max_machines=0,
             )
 
-        # image_id is now optional in Template base class — no validation error expected
+        # machine_image is now optional in Template base class — no validation error expected
         template_no_image = Template(
             template_id="validation-test",
             subnet_ids=["subnet-123"],
-            max_instances=1,
+            max_machines=1,
         )
-        assert template_no_image.image_id is None
+        assert template_no_image.machine_image is None
 
         # Test subnet_ids — empty list is allowed in base Template (AWSTemplate enforces it)
         template_no_subnets = Template(
@@ -264,9 +264,9 @@ class TestTemplateAdditionalMultiProviderFields:
         assert template.provider_type == "aws"
         assert template.provider_name == "aws-us-east-1"
         assert template.provider_api == "EC2Fleet"
-        assert template.image_id == "ami-12345"
+        assert template.machine_image == "ami-12345"
         assert template.subnet_ids == ["subnet-123"]
-        assert template.max_instances == 4
+        assert template.max_machines == 4
 
     def test_template_without_additional_provider_fields(self):
         """Test Template creation without additional provider fields."""
@@ -316,8 +316,9 @@ class TestMultiProviderBackwardCompatibility:
         )
 
         assert template.template_id == "backward-compat-test"
-        assert template.image_id == "ami-12345"
-        assert template.max_instances == 2
+        # Old input keys are mapped onto the new canonical attributes via AliasChoices
+        assert template.machine_image == "ami-12345"
+        assert template.max_machines == 2
         # New fields should be None
         assert template.provider_type is None
         assert template.provider_name is None

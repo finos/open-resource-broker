@@ -535,7 +535,7 @@ def test_get_example_templates_returns_statefulset_example() -> None:
     example = examples[0]
     assert example.provider_api == "StatefulSet"
     assert example.provider_type == "k8s"
-    assert example.image_id == "registry.k8s.io/pause:3.9"
+    assert example.machine_image == "registry.k8s.io/pause:3.9"
 
 
 # ---------------------------------------------------------------------------

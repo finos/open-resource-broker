@@ -88,7 +88,7 @@ def create_k8s_template_example_generator(
         from orb.domain.base.ports import LoggingPort as _LoggingPort
 
         logger = container.get(_LoggingPort)
-    except Exception:  # noqa: BLE001 — DI lookup is best-effort; fall back to no-logger
+    except Exception:
         # LoggingPort is not required for example-template generation.  The
         # caller falls back to a stdlib logger when adapter.logger is None,
         # so a container miss (test harness, minimal DI setup) is safe to

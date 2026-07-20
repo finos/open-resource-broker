@@ -85,7 +85,7 @@ class MicroVMHandler(AWSHandler):
 
     def _validate_prerequisites(self, template: AWSTemplate) -> None:
         """MicroVMs require only an image ARN — skip EC2-specific validation."""
-        if not template.image_id:
+        if not template.machine_image:
             raise AWSValidationError(
                 "image_id is required for MicroVM templates (MicroVM image ARN)"
             )
@@ -112,7 +112,7 @@ class MicroVMHandler(AWSHandler):
         self._logger.info(
             "Launching %d MicroVM(s) from image %s",
             count,
-            aws_template.image_id,
+            aws_template.machine_image,
         )
 
         results = self._run_microvms_parallel(params, count)
@@ -155,7 +155,7 @@ class MicroVMHandler(AWSHandler):
         the scheduler field mapper) and translates to AWS API camelCase.
         """
         metadata = aws_template.metadata or {}
-        params: dict[str, Any] = {"imageIdentifier": aws_template.image_id}
+        params: dict[str, Any] = {"imageIdentifier": aws_template.machine_image}
 
         for internal_key, api_key in self._METADATA_TO_API.items():
             value = metadata.get(internal_key)

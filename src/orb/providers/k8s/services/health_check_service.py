@@ -45,7 +45,7 @@ class K8sHealthCheckService:
     # Health check
     # ------------------------------------------------------------------
 
-    def check_health(self, kubernetes_client: "K8sClient") -> ProviderHealthStatus:
+    def check_health(self, kubernetes_client: K8sClient) -> ProviderHealthStatus:
         """Probe the Kubernetes API server via ``CoreV1Api.get_api_resources``.
 
         On success the status message and ``error_details`` dict are
@@ -132,8 +132,8 @@ class K8sHealthCheckService:
 
     def register_health_checks(
         self,
-        health_check: "HealthCheck",
-        kubernetes_client: "K8sClient",
+        health_check: HealthCheck,
+        kubernetes_client: K8sClient,
     ) -> None:
         """Register Kubernetes-specific health checks."""
         from orb.providers.k8s.health import register_k8s_health_checks

@@ -385,7 +385,11 @@ class TemplateConfigurationManager:
         """Extract unique image specifications from templates."""
         specifications = set()
         for template_dict in templates:
-            image_id = template_dict.get("image_id") or template_dict.get("imageId")
+            image_id = (
+                template_dict.get("machine_image")
+                or template_dict.get("image_id")
+                or template_dict.get("imageId")
+            )
             if image_id and image_id.startswith("/aws/service/"):
                 specifications.add(image_id)
         return list(specifications)
@@ -432,10 +436,17 @@ class TemplateConfigurationManager:
         for template_dict in templates:
             resolved_template = template_dict.copy()
 
-            image_id = resolved_template.get("image_id") or resolved_template.get("imageId")
+            image_id = (
+                resolved_template.get("machine_image")
+                or resolved_template.get("image_id")
+                or resolved_template.get("imageId")
+            )
             if image_id and image_id in resolved_images:
                 resolved_ami = resolved_images[image_id]
-                resolved_template["image_id"] = resolved_ami
+                if "machine_image" in resolved_template:
+                    resolved_template["machine_image"] = resolved_ami
+                if "image_id" in resolved_template:
+                    resolved_template["image_id"] = resolved_ami
                 if "imageId" in resolved_template:
                     resolved_template["imageId"] = resolved_ami
 

@@ -174,9 +174,10 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     def format_template_for_display(self, template: Any) -> dict[str, Any]:
         """Format template for display, adding required schema fields."""
         d = template.to_dict()
-        # Schema requires max_capacity (alias for max_instances)
+        # Schema requires max_capacity (alias for the machine cap).  Accept
+        # either the DTO's original field name or the renamed domain field.
         if "max_capacity" not in d:
-            d["max_capacity"] = d.get("max_instances", 1)
+            d["max_capacity"] = d.get("max_machines", d.get("max_instances", 1))
         # Schema requires instance_type - derive from machine_types if available
         if "instance_type" not in d:
             machine_types = d.get("machine_types", {})

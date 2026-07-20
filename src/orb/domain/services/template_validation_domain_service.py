@@ -216,11 +216,15 @@ class TemplateValidationDomainService:
         api_caps = api_capabilities.get(template.provider_api, {})
         max_instances = api_caps.get("max_instances", float("inf"))
 
-        if template.max_instances > max_instances:
+        # Accept both the renamed domain attribute (``max_machines``) and the
+        # original name still used by the application ``TemplateDTO`` seam.
+        requested = getattr(template, "max_machines", None)
+        if requested is None:
+            requested = getattr(template, "max_instances", 0)
+
+        if requested > max_instances:
             result.errors.append(
-                f"Requested {template.max_instances} instances exceeds API limit of {max_instances}"
+                f"Requested {requested} instances exceeds API limit of {max_instances}"
             )
         else:
-            result.supported_features.append(
-                f"Instance count: {template.max_instances} (within limit)"
-            )
+            result.supported_features.append(f"Instance count: {requested} (within limit)")
