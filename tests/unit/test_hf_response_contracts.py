@@ -10,9 +10,6 @@ from unittest.mock import MagicMock
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
 )
-from orb.infrastructure.scheduler.hostfactory.response_formatter import (
-    HostFactoryResponseFormatter,
-)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -257,84 +254,5 @@ class TestFormatRequestStatusResponseShape:
     def test_entry_has_status_and_machines(self):
         result = self.strategy.format_request_status_response([self._make_dto("req-1")])
         entry = result["requests"][0]
-        assert "status" in entry
-        assert "machines" in entry
-
-
-# ---------------------------------------------------------------------------
-# HostFactoryResponseFormatter (standalone formatter class)
-# ---------------------------------------------------------------------------
-
-
-class TestResponseFormatterShape:
-    """HostFactoryResponseFormatter must produce the same HF-compliant shapes."""
-
-    def setup_method(self):
-        self.formatter = HostFactoryResponseFormatter()
-
-    def _unwrap(self, raw_id):
-        return raw_id if isinstance(raw_id, str) else str(raw_id)
-
-    def _coerce(self, data):
-        return data if isinstance(data, dict) else {}
-
-    def test_failed_request_has_requestId_and_message(self):
-        result = self.formatter.format_request_response(
-            {"request_id": "req-abc", "status": "failed", "status_message": "out of capacity"},
-            unwrap_id_fn=self._unwrap,
-            coerce_fn=self._coerce,
-        )
-        assert "requestId" in result
-        assert "message" in result
-        assert "error" not in result
-        assert "error_message" not in result
-
-    def test_pending_request_has_requestId_and_message(self):
-        result = self.formatter.format_request_response(
-            {"request_id": "req-abc", "status": "pending"},
-            unwrap_id_fn=self._unwrap,
-            coerce_fn=self._coerce,
-        )
-        assert "requestId" in result
-        assert "message" in result
-
-    def test_get_request_status_dto_path_has_requestId(self):
-        dto = MagicMock()
-        dto.request_id = "req-abc"
-        dto.status = "completed"
-        dto.to_dict.return_value = {
-            "request_id": "req-abc",
-            "status": "completed",
-            "machines": [],
-            "request_type": "provision",
-        }
-
-        formatter = HostFactoryResponseFormatter()
-        result = formatter.format_get_request_status(
-            data=dto,
-            format_machines_fn=lambda machines, request_type=None: [],
-            map_status_fn=lambda s: "complete",
-            generate_message_fn=lambda s, n: "",
-        )
-        entry = result["requests"][0]
-        assert "requestId" in entry
-        assert "request_id" not in entry
-
-    def test_format_request_status_response_entry_shape(self):
-        dto = MagicMock()
-        dto.to_dict.return_value = {
-            "request_id": "req-abc",
-            "status": "pending",
-            "machines": [],
-            "message": "",
-        }
-        result = self.formatter.format_request_status_response(
-            requests=[dto],
-            format_machines_fn=lambda machines, request_type=None: [],
-            map_status_fn=lambda s: "running",
-        )
-        entry = result["requests"][0]
-        assert "requestId" in entry
-        assert "request_id" not in entry
         assert "status" in entry
         assert "machines" in entry

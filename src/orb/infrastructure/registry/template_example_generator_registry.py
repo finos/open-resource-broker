@@ -4,17 +4,20 @@ Populated by provider registration modules at startup. Callers resolve the
 generator for a specific ``provider_type``; missing providers return ``None``
 so the caller can decide fallback behaviour.
 
-Follows the same lightweight class-variable pattern as :class:`CLISpecRegistry`
-and :class:`DefaultsLoaderRegistry`.
+Built on the shared :class:`SimpleRegistry` base (register/all/clear/
+registered_keys/get_or_none), with a ``get`` override that returns ``None`` on
+a miss to satisfy :class:`TemplateExampleGeneratorResolverPort` — the
+application layer checks for ``None`` and raises with context.
 """
 
 from __future__ import annotations
 
 from orb.domain.base.ports.template_example_generator_port import TemplateExampleGeneratorPort
+from orb.infrastructure.registry.simple_registry import SimpleRegistry
 
 
-class TemplateExampleGeneratorRegistry:
-    """Simple registry mapping provider type strings to
+class TemplateExampleGeneratorRegistry(SimpleRegistry[TemplateExampleGeneratorPort]):
+    """Registry mapping provider type strings to
     :class:`TemplateExampleGeneratorPort` implementations.
 
     Usage::
@@ -29,47 +32,22 @@ class TemplateExampleGeneratorRegistry:
         templates = generator.generate_example_templates(provider_name, provider_api)
     """
 
-    _generators: dict[str, TemplateExampleGeneratorPort] = {}
+    _registry_name = "TemplateExampleGeneratorRegistry"
+    _store: dict[str, TemplateExampleGeneratorPort] = {}
 
     @classmethod
-    def register(cls, provider_type: str, generator: TemplateExampleGeneratorPort) -> None:
-        """Register a generator for *provider_type*.
-
-        Re-registering the same provider type silently overwrites the previous
-        entry.
-        """
-        cls._generators[provider_type] = generator
-
-    @classmethod
-    def get(cls, provider_type: str) -> TemplateExampleGeneratorPort | None:
+    def get(cls, provider_type: str) -> TemplateExampleGeneratorPort | None:  # type: ignore[override]
         """Return the generator for *provider_type*, or ``None`` if not registered.
 
-        Returns None on miss to satisfy :class:`TemplateExampleGeneratorResolverPort`
-        — the application layer checks for None and raises with context.  Use
-        ``get_or_none`` when calling code explicitly documents "optional" intent.
+        Overrides :meth:`SimpleRegistry.get` (which raises on miss) so this
+        registry satisfies :class:`TemplateExampleGeneratorResolverPort`, whose
+        callers treat an absent generator as a legitimate "not applicable" case
+        and raise with their own context.  The parameter name matches the port
+        (``provider_type``) so the structural Protocol match holds.
         """
-        return cls._generators.get(provider_type)
-
-    @classmethod
-    def get_or_none(cls, provider_type: str) -> TemplateExampleGeneratorPort | None:
-        """Explicit optional lookup — returns ``None`` when not registered.
-
-        Prefer this over ``get`` when the absence of a generator is a legitimate
-        "not applicable" case rather than a misconfiguration.
-        """
-        return cls._generators.get(provider_type)
-
-    @classmethod
-    def all(cls) -> dict[str, TemplateExampleGeneratorPort]:
-        """Return all registered generators keyed by provider type."""
-        return dict(cls._generators)
+        return cls._store.get(provider_type)
 
     @classmethod
     def registered_providers(cls) -> list[str]:
         """Return all registered provider type strings."""
-        return list(cls._generators.keys())
-
-    @classmethod
-    def clear(cls) -> None:
-        """Remove all registrations (primarily for use in tests)."""
-        cls._generators.clear()
+        return cls.registered_keys()

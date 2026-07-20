@@ -134,6 +134,18 @@ class TestSDKConfigFromDict:
         assert config.provider_config.get("region") == "eu-central-1"
         assert "region" not in config.custom_config
 
+    def test_legacy_top_level_keys_emit_operator_facing_log(self, caplog):
+        # from_file() feeds config-file contents through from_dict(), and
+        # warnings.warn is filtered in production, so an operator-visible
+        # logger.warning must also fire on the deprecated top-level keys.
+        with caplog.at_level("WARNING", logger="orb.sdk.config"):
+            with pytest.warns(DeprecationWarning):
+                SDKConfig.from_dict({"provider": "aws", "profile": "prod"})
+        assert any(
+            "profile" in record.message and "deprecated" in record.message
+            for record in caplog.records
+        )
+
 
 class TestSDKConfigFromFile:
     def test_loads_json_file(self, tmp_path):

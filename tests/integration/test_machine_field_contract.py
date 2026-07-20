@@ -6,6 +6,7 @@ Guards against silent field-drop across:
 
 import json
 from datetime import datetime, timezone
+from unittest.mock import MagicMock
 
 from orb.application.factories.request_dto_factory import RequestDTOFactory
 from orb.domain.base.value_objects import InstanceType, Tags
@@ -14,9 +15,21 @@ from orb.domain.machine.machine_identifiers import MachineId
 from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestType as RequestTypeVO
-from orb.infrastructure.scheduler.hostfactory.response_formatter import (
-    HostFactoryResponseFormatter,
+from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+    HostFactorySchedulerStrategy,
 )
+
+
+def _make_strategy() -> HostFactorySchedulerStrategy:
+    """Return an HF strategy with external dependencies mocked out."""
+    strategy = HostFactorySchedulerStrategy.__new__(HostFactorySchedulerStrategy)
+    strategy._template_defaults_service = None
+    strategy._field_mapper = None
+    strategy._config_manager = None
+    strategy._provider_registry_service = None
+    strategy._logger = MagicMock()
+    return strategy
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -67,7 +80,7 @@ class TestMachineFieldContract:
 
     def setup_method(self):
         self.factory = RequestDTOFactory()
-        self.formatter = HostFactoryResponseFormatter()
+        self.formatter = _make_strategy()
 
     def test_all_hf_fields_survive_machine_to_wire(self):
         """A fully populated Machine produces an HF response with all expected fields."""
@@ -96,11 +109,7 @@ class TestMachineFieldContract:
         assert ref.cloud_host_id == "cloud-host-abc"
 
         # --- Layer 2: RequestDTO → HF wire via format_request_status_response ---
-        wire = self.formatter.format_request_status_response(
-            [request_dto],
-            format_machines_fn=self.formatter.format_machines_for_hostfactory,
-            map_status_fn=self.formatter.map_domain_status_to_hostfactory,
-        )
+        wire = self.formatter.format_request_status_response([request_dto])
 
         assert "requests" in wire
         assert len(wire["requests"]) == 1
@@ -153,11 +162,7 @@ class TestMachineFieldContract:
         )
 
         request_dto = self.factory.create_from_domain(request, [machine])
-        wire = self.formatter.format_request_status_response(
-            [request_dto],
-            format_machines_fn=self.formatter.format_machines_for_hostfactory,
-            map_status_fn=self.formatter.map_domain_status_to_hostfactory,
-        )
+        wire = self.formatter.format_request_status_response([request_dto])
 
         m = wire["requests"][0]["machines"][0]
 
@@ -189,11 +194,7 @@ class TestMachineFieldContract:
         ref = request_dto.machine_references[0]
         assert ref.tags == {"Zebra": "z", "Alpha": "a", "Middle": "m"}
 
-        wire = self.formatter.format_request_status_response(
-            [request_dto],
-            format_machines_fn=self.formatter.format_machines_for_hostfactory,
-            map_status_fn=self.formatter.map_domain_status_to_hostfactory,
-        )
+        wire = self.formatter.format_request_status_response([request_dto])
         m = wire["requests"][0]["machines"][0]
         assert isinstance(m["instanceTags"], str), "instanceTags must be a JSON string in wire"
         parsed = json.loads(m["instanceTags"])

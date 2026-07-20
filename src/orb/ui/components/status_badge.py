@@ -89,9 +89,9 @@ def machine_status_badge(status: str | rx.Var) -> rx.Component:
 
 
 _HF_STATUS_REVERSE_MAP: dict[str, str] = {
-    # The REST API currently runs requests through the HostFactory response
-    # formatter (orb.infrastructure.scheduler.hostfactory.response_formatter),
-    # which collapses every non-success terminal state to "complete_with_error"
+    # The REST API currently runs requests through the HostFactory scheduler
+    # strategy's response formatting, which collapses every non-success
+    # terminal state to "complete_with_error"
     # to satisfy Symphony HF's wire spec. That's correct for HF CLI consumers
     # but unhelpful for the UI — we want to see the real state. Reverse-map
     # the HF buckets back to the closest internal RequestStatus value.

@@ -6,12 +6,18 @@ SDK-specific configuration options and validation.
 """
 
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
 from .exceptions import ConfigurationError
+
+# The SDK is deliberately decoupled from ``orb.*`` (no DI, no LoggingPort), so
+# the standard-library logger is the correct tool for operator-facing signals
+# on the config-file load path.
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -172,13 +178,17 @@ class SDKConfig:
         if legacy_region is not None or legacy_profile is not None:
             import warnings
 
-            warnings.warn(
-                "SDKConfig.from_dict() with top-level 'region' or 'profile' keys is deprecated "
+            deprecation_message = (
+                "SDKConfig top-level 'region'/'profile' keys are deprecated "
                 "and will be removed in the next major release; move them into "
-                "provider_config={'region': ..., 'profile': ...}.",
-                DeprecationWarning,
-                stacklevel=2,
+                "provider_config={'region': ..., 'profile': ...}."
             )
+            # Developer-facing signal (surfaced by test runners / python -W).
+            warnings.warn(deprecation_message, DeprecationWarning, stacklevel=2)
+            # Operator-facing signal: from_file() feeds config-file contents
+            # through here, and warnings.warn is filtered in production, so also
+            # emit a logger.warning that reaches operators reading logs.
+            _logger.warning(deprecation_message)
             # Remove legacy keys so they do not land in custom_config.
             config = {k: v for k, v in config.items() if k not in ("region", "profile")}
             pc: dict[str, Any] = dict(config.get("provider_config") or {})
