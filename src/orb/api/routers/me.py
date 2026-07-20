@@ -14,6 +14,7 @@ router = APIRouter(prefix="/me", tags=["Auth"])
 
 @router.get(
     "/",
+    operation_id="getCurrentUser",
     summary="Current user identity and role",
     response_description="The authenticated caller's username, role, and derived permissions.",
 )

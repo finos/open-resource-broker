@@ -1,0 +1,463 @@
+name: SDK
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'sdk/**'
+      - '.github/workflows/sdk.yml'
+      # API source that shapes the exported OpenAPI spec.  The spec-drift-guard
+      # job re-exports /openapi.json from a live orb and diffs it against the
+      # committed sdk/spec/openapi.json; a route/schema change here that forgets
+      # to regenerate the spec is exactly the drift this workflow exists to
+      # catch, so these paths must trigger it (they were previously invisible
+      # because the filter only watched sdk/**).
+      - 'src/orb/api/routers/**'          # route declarations (method/path/operationId)
+      - 'src/orb/api/models/**'           # request/response models = spec schemas
+      - 'src/orb/api/documentation/**'    # configure_openapi() shapes the schema
+      - 'src/orb/api/server.py'           # inline /health,/metrics,/info operations + router registration
+      - 'src/orb/api/dependencies.py'     # response-model deps wired into routes
+      - 'dev-tools/release/export_openapi_spec.sh'  # the exporter itself
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'sdk/**'
+      - '.github/workflows/sdk.yml'
+      # See the push filter above — the same API-source paths must trigger the
+      # spec-drift-guard on PRs so a route change without a spec regen fails at
+      # PR time rather than silently drifting all five SDKs from the real API.
+      - 'src/orb/api/routers/**'
+      - 'src/orb/api/models/**'
+      - 'src/orb/api/documentation/**'
+      - 'src/orb/api/server.py'
+      - 'src/orb/api/dependencies.py'
+      - 'dev-tools/release/export_openapi_spec.sh'
+  schedule:
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: read
+
+# Per-ref concurrency: prevents stale SDK CI runs from blocking a newer push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Single source of truth for the default Python version (from .project.yml)
+  # so this workflow never drifts from the rest of CI.
+  # ---------------------------------------------------------------------------
+  config:
+    name: Configuration
+    uses: ./.github/workflows/shared-config.yml
+
+  # ---------------------------------------------------------------------------
+  # Static spec-conformance: asserts sdk/parity/scenario.json matches the
+  # hardened OpenAPI spec (method/path/operationId).  Needs no server or SDK
+  # build, so it is a fast fail-early gate that wires the parity fixture into CI.
+  # ---------------------------------------------------------------------------
+  spec-conformance:
+    name: SDK Spec Conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Check parity scenario against the OpenAPI spec
+        run: python3 dev-tools/quality/validate_sdk_spec_conformance.py
+
+  # ---------------------------------------------------------------------------
+  # Spec-drift guard: boot a fresh orb, re-export /openapi.json, and fail if the
+  # committed sdk/spec/openapi.json no longer matches the live routes.  The
+  # committed spec is the single source every SDK generates from, so a route or
+  # schema change that lands in the app without a spec regen would silently drift
+  # ALL five SDKs from the real API.  This gate catches that at PR time.
+  # ---------------------------------------------------------------------------
+  spec-drift-guard:
+    name: SDK Spec Drift Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [config, build-orb-wheel]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python (for orb)
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: ${{ needs.config.outputs.default-python-version }}
+
+      - name: Download orb wheel
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: orb-wheel-sdk-${{ github.run_id }}
+          path: /tmp/orb-dist
+
+      - name: Install orb from wheel
+        # The [api] extra provides fastapi + uvicorn so the server can serve
+        # /openapi.json; export_openapi_spec.sh boots `orb server start
+        # --api-only` over a UDS and fetches the spec from it.
+        run: |
+          WHEEL=$(ls /tmp/orb-dist/*.whl)
+          pip install "${WHEEL}[api]"
+
+      - name: Re-export spec and fail on drift
+        # sdk-spec-drift-guard runs sdk-go-export-spec (boots a fresh orb, writes
+        # sdk/spec/openapi.json with canonical formatting) then `git diff
+        # --exit-code` against the committed spec.  export_openapi_spec.sh detects
+        # no uv here and runs orb directly from the pip install on PATH.
+        run: make sdk-spec-drift-guard
+
+  # ---------------------------------------------------------------------------
+  # Build the orb wheel once.  All non-Go SDK legs download the same artifact
+  # and pip-install it so they run against an identical, hermetically-built orb
+  # binary without needing a services: sidecar (which cannot share a UDS socket
+  # with the job container).
+  # ---------------------------------------------------------------------------
+  build-orb-wheel:
+    name: Build orb Wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python and UV
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache-key: sdk-wheel-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          fail-on-cache-miss: false
+
+      - name: Build orb wheel (no UI)
+        env:
+          ORB_SKIP_UI_BUILD: "1"
+        run: make build
+
+      - name: Upload orb wheel artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: orb-wheel-sdk-${{ github.run_id }}
+          path: dist/*.whl
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------
+  # Matrix: build and test all five SDKs in parallel.
+  # Generated code is NOT committed — each leg runs `make sdk-<lang>-generate`
+  # before building so the published artifacts always ship the models.
+  # ---------------------------------------------------------------------------
+  build-and-test:
+    name: ${{ matrix.display-name }} SDK Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [config, build-orb-wheel]
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        lang: [ go, typescript, java, kotlin, dotnet ]
+        include:
+          - lang: go
+            display-name: Go
+            sdk-path: sdk/go
+            # check-drift-target runs generate + build via make (spec→generate→
+            # build consistency), wiring the sdk-<lang>-check-drift make targets
+            # into CI so a spec change that produces uncompilable code fails here.
+            check-drift-target: sdk-go-check-drift
+            # Go runs real-orb contract tests too: the pip-installed orb console
+            # script is on PATH, which testutil.StartORB spawns over a UDS.
+            needs-orb: true
+            orb-env-var: ORB_BINARY
+
+          - lang: typescript
+            display-name: TypeScript
+            sdk-path: sdk/typescript
+            check-drift-target: sdk-typescript-check-drift
+            needs-orb: true
+            orb-env-var: ORB_BINARY
+
+          - lang: java
+            display-name: Java
+            sdk-path: sdk/java
+            check-drift-target: sdk-java-check-drift
+            needs-orb: true
+            orb-env-var: ORB_BINARY
+
+          - lang: kotlin
+            display-name: Kotlin
+            sdk-path: sdk/kotlin
+            check-drift-target: sdk-kotlin-check-drift
+            needs-orb: true
+            orb-env-var: ORB_BINARY
+
+          - lang: dotnet
+            display-name: .NET
+            sdk-path: sdk/csharp
+            check-drift-target: sdk-csharp-check-drift
+            needs-orb: true
+            orb-env-var: ORB_PYTHON
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      # -----------------------------------------------------------------------
+      # Toolchain setup
+      # Java (Corretto 17) is needed by all langs for openapi-generator.
+      # For java/kotlin it also drives the SDK build (add Gradle cache).
+      # -----------------------------------------------------------------------
+      - name: Set up Java (Corretto 17) — SDK build + openapi-generator
+        if: matrix.lang == 'java' || matrix.lang == 'kotlin'
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9  # v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Set up Java (Corretto 17) — openapi-generator only
+        if: matrix.lang != 'java' && matrix.lang != 'kotlin'
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9  # v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+
+      - name: Set up Go
+        if: matrix.lang == 'go'
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16  # v6
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Node.js 20
+        if: matrix.lang == 'typescript'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Set up .NET 8
+        if: matrix.lang == 'dotnet'
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9  # v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # -----------------------------------------------------------------------
+      # openapi-generator (required for all langs — generated dirs are gitignored)
+      # -----------------------------------------------------------------------
+      - name: Set up Node for openapi-generator-cli jar resolution
+        if: matrix.lang != 'typescript'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: '20'
+
+      - name: Install openapi-generator-cli
+        run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
+
+      # -----------------------------------------------------------------------
+      # orb Python wheel (all langs except Go)
+      # -----------------------------------------------------------------------
+      - name: Set up Python (for orb)
+        if: matrix.needs-orb
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: ${{ needs.config.outputs.default-python-version }}
+
+      - name: Download orb wheel
+        if: matrix.needs-orb
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: orb-wheel-sdk-${{ github.run_id }}
+          path: /tmp/orb-dist
+
+      - name: Install orb from wheel
+        if: matrix.needs-orb
+        # Install the [api] extra so the REST API server (fastapi + uvicorn) is
+        # available.  Contract tests spawn `orb server start --api-only`; without
+        # these deps the server raises ImportError and never becomes healthy,
+        # which fails every contract test.  Resolve the wheel path first — a bare
+        # `*.whl[api]` glob is misread by the shell as a character class.
+        run: |
+          WHEEL=$(ls /tmp/orb-dist/*.whl)
+          pip install "${WHEEL}[api]"
+
+      # -----------------------------------------------------------------------
+      # Generate + build via the make sdk-<lang>-check-drift target.
+      # These targets run `make sdk-<lang>-generate` (REQUIRED — generated dirs
+      # are gitignored) then compile the SDK, so this single step both produces
+      # the models and proves the current spec generates buildable code.  Wiring
+      # the make targets here (rather than inlining go build / gradlew / dotnet)
+      # keeps CI and `make sdk-check-drift` in lock-step: what a maintainer runs
+      # locally is exactly what CI runs.
+      # -----------------------------------------------------------------------
+      - name: Generate + build SDK (make ${{ matrix.check-drift-target }})
+        run: make ${{ matrix.check-drift-target }}
+
+      # -----------------------------------------------------------------------
+      # Unit tests
+      # -----------------------------------------------------------------------
+      - name: Run Go SDK tests
+        if: matrix.lang == 'go'
+        run: cd sdk/go && go test ./...
+
+      - name: Run TypeScript SDK unit tests
+        if: matrix.lang == 'typescript'
+        run: cd sdk/typescript && npm test
+
+      - name: Run Java SDK unit tests
+        if: matrix.lang == 'java'
+        run: cd sdk/java && ./gradlew --no-daemon test --rerun-tasks
+
+      - name: Run Kotlin SDK unit tests
+        if: matrix.lang == 'kotlin'
+        run: cd sdk/kotlin && ./gradlew --no-daemon test --rerun-tasks
+
+      - name: Run .NET SDK unit tests
+        if: matrix.lang == 'dotnet'
+        run: dotnet test sdk/csharp/tests/unit/UnitTests.csproj --no-build --configuration Release --verbosity normal
+
+      # -----------------------------------------------------------------------
+      # Contract tests — spawn real orb over UDS.
+      # Every SDK, Go included, runs its real-orb contract suite here.  Go's
+      # real-orb tests are guarded by the `integration` build tag, so the plain
+      # `go test ./...` unit step above does NOT run them; this step passes
+      # `-tags integration` to exercise route reachability against a live orb.
+      # dotnet uses ORB_PYTHON; all other langs use ORB_BINARY.
+      # -----------------------------------------------------------------------
+      - name: Run Go SDK contract tests
+        if: matrix.lang == 'go'
+        env:
+          # testutil.StartORB spawns the wheel-installed `orb` console script
+          # over a UDS.  Point ORB_BINARY at the interpreter's bin dir so the
+          # binary resolves deterministically instead of via PATH ordering.
+          # testutil also writes a minimal --config (auth: none, json storage,
+          # aws-stub provider); without it a bare `orb server start` in a fresh
+          # checkout exits 1 with "Configuration file not found".  The
+          # `integration` build tag gates the real-orb tests in
+          # sdk/go/orb/*_test.go.
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/orb
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/go && go test -tags integration -timeout 120s ./...
+
+      - name: Run TypeScript SDK contract tests
+        if: matrix.lang == 'typescript'
+        env:
+          # The contract test invokes: python -m orb ... --socket-path <uds>
+          # Both the orb process and the Node test share the same runner
+          # filesystem, which is required for UDS communication.
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/typescript && npm run test:contract
+
+      - name: Run Java SDK contract tests
+        if: matrix.lang == 'java'
+        env:
+          # ORB_BINARY points at the pip-installed python interpreter so the
+          # contract test fixture can invoke: python -m orb ... --socket-path <uds>
+          # The orb process and test JVM share the same runner filesystem, which
+          # is required for UDS — a services: sidecar cannot share the socket.
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/java && ./gradlew --no-daemon contractTest --rerun-tasks
+
+      - name: Run Kotlin SDK contract tests
+        if: matrix.lang == 'kotlin'
+        env:
+          # ORB_BINARY points at the pip-installed python interpreter so the
+          # contract test can invoke: python -m orb ... --socket-path <uds>
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/kotlin && ./gradlew --no-daemon contractTest --rerun-tasks
+
+      - name: Run .NET SDK contract tests
+        if: matrix.lang == 'dotnet'
+        env:
+          # OrbFixture reads ORB_PYTHON to locate the interpreter; it then
+          # invokes: python -m orb ... --socket-path <uds>
+          # Sharing the same runner filesystem is required for UDS.
+          ORB_PYTHON: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: dotnet test sdk/csharp/tests/contract/ContractTests.csproj --no-build --configuration Release --verbosity normal
+
+      # -----------------------------------------------------------------------
+      # Parity tests — LOAD sdk/parity/scenario.json and drive its six ordered
+      # steps against the same real orb (over UDS), dispatching each step via the
+      # fixture's sdk_methods.<lang> mapping and asserting the per-step expected
+      # status/shape + skip rules.  This is the runtime, per-language half of the
+      # parity guard (the static half is the SDK Spec Conformance job).  Each leg
+      # reuses that SDK's contract-test orb-spawn setup, so the env is identical
+      # to the contract step above (ORB_BINARY, or ORB_PYTHON for .NET).
+      # -----------------------------------------------------------------------
+      - name: Run Go SDK parity test
+        if: matrix.lang == 'go'
+        env:
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/orb
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/go && go test -tags integration -run TestParityScenario -timeout 150s ./orb/
+
+      - name: Run TypeScript SDK parity test
+        if: matrix.lang == 'typescript'
+        env:
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/typescript && npm run test:parity
+
+      - name: Run Java SDK parity test
+        if: matrix.lang == 'java'
+        env:
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/java && ./gradlew --no-daemon parityTest --rerun-tasks
+
+      - name: Run Kotlin SDK parity test
+        if: matrix.lang == 'kotlin'
+        env:
+          ORB_BINARY: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: cd sdk/kotlin && ./gradlew --no-daemon parityTest --rerun-tasks
+
+      - name: Run .NET SDK parity test
+        if: matrix.lang == 'dotnet'
+        env:
+          ORB_PYTHON: ${{ env.pythonLocation }}/bin/python
+          TESTING: "true"
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+        run: dotnet test sdk/csharp/tests/parity/ParityTests.csproj --no-build --configuration Release --verbosity normal

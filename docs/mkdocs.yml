@@ -188,7 +188,11 @@ nav:
     - Tools Mode: mcp/tools-mode.md
     - API Reference: mcp/api-reference.md
   - SDK & Development:
-    - SDK Quickstart: sdk/quickstart.md
+    - SDKs:
+      - Overview: sdk/index.md
+      - Python SDK: sdk/quickstart.md
+      - Parameter & Method Reference: sdk/api-reference.md
+      - Generate Your Own SDK: sdk/generating-sdks.md
     - Security Scanning: security/security-scanning.md
   - Reference:
     - API Reference:

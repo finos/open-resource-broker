@@ -31,7 +31,29 @@ _DEFAULT_CONFIG = Config(
 
 @injectable
 class IAMAuthStrategy(AuthPort):
-    """Authentication strategy using AWS IAM credentials and policies."""
+    """Server-ambient IAM authentication strategy.
+
+    This strategy authorizes requests by verifying the *server's own* AWS
+    identity — the IAM role or user attached to the host running ORB (e.g. an
+    EC2 instance role, ECS task role, or credentials sourced from the standard
+    AWS credential chain on the server).  It calls ``sts:GetCallerIdentity``
+    using the server-side STS client that is initialized from the server's
+    session in ``__init__``.
+
+    **Important**: the SDK client's ``WithAWSSigV4`` / ``SigV4`` auth option
+    signs the *outgoing HTTP request* with the *client's* AWS credentials.
+    This signed request is only meaningful when ORB is deployed behind AWS API
+    Gateway (which validates the SigV4 signature before forwarding).  When a
+    client connects directly to ORB with the ``iam`` server strategy active,
+    the SigV4 ``Authorization`` header sent by the SDK is NOT inspected here —
+    use ``WithNoAuth`` or ``WithBearerToken`` for direct connections.
+
+    This design (Option A from the auth architecture decision) is intentional:
+    server-ambient IAM is the correct model for intra-AWS deployments where the
+    host's IAM role is the authorization boundary.  Caller-identity validation
+    from a client-supplied SigV4 header (Option B) would require threading
+    request context through the auth chain and is not implemented.
+    """
 
     _DEFAULT_ADMIN_ROLE_PATTERNS: frozenset[str] = frozenset({"Admin", "Administrator", "OrbAdmin"})
 

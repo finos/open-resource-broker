@@ -1,0 +1,39 @@
+# openapi-generator configuration for the Go SDK.
+#
+# Generator: go (openapi-generator v7.23.0)
+# Invoked by: make sdk-go-generate  (see makefiles/sdk.mk)
+#
+# Design rationale:
+#   - withGoMod=false: this SDK lives inside the root Go module
+#     (github.com/finos/open-resource-broker); no sub-module is needed.
+#   - generateModelTests / generateApiTests=false: we hand-write tests that
+#     exercise the full hybrid client (transport + generated models together).
+#   - enumClassPrefix=true, structPrefix=true: avoids name collisions when
+#     multiple schemas share enum names.
+#   - The api_*.go and client.go outputs are REMOVED after generation (see the
+#     sdk-go-generate Makefile target) because the hand-written transport in
+#     sdk/go/orb/ provides those layers.
+#
+# SSE exclusions:
+#   The streamEvents operation (GET /api/v1/events/) returns
+#   text/event-stream.  openapi-generator cannot model SSE properly, so it is
+#   excluded from generation.  The hand-written SSE layer in
+#   sdk/go/internal/sse/ handles both /api/v1/requests/{id}/stream and
+#   /api/v1/events/.
+
+generatorName: go
+inputSpec: ../spec/openapi.json
+outputDir: internal/generated
+
+additionalProperties:
+  packageName: generated
+  withGoMod: false
+  generateModelTests: false
+  generateApiTests: false
+  enumClassPrefix: true
+  structPrefix: true
+
+# Exclude SSE streaming endpoint from generation.
+# The Go generator does not support text/event-stream responses; the
+# hand-written sse.Reader in internal/sse/ provides that capability.
+skipOperationExample: true

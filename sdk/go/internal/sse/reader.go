@@ -1,3 +1,4 @@
+// Layer 5: SSE Reader + Reconnect
 package sse
 
 import (
@@ -25,9 +26,14 @@ type Reader struct {
 }
 
 // NewReader creates a new SSE Reader from an HTTP response body.
+// The scanner buffer is pre-sized to 512 KiB (initial) with a 4 MiB maximum
+// so that a single SSE data line up to 4 MiB does not trigger
+// bufio.ErrTooLong (the default cap is only 64 KiB).
 func NewReader(body io.ReadCloser) *Reader {
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 512*1024), 4*1024*1024)
 	return &Reader{
-		scanner: bufio.NewScanner(body),
+		scanner: scanner,
 		body:    body,
 	}
 }

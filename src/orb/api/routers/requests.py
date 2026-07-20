@@ -68,6 +68,7 @@ def _is_terminal_status(status: str) -> bool:
 
 @router.get(
     "/",
+    operation_id="listRequests",
     summary="List Requests",
     description="List requests with optional filtering",
     response_model=RequestStatusResponse,
@@ -121,6 +122,7 @@ async def list_requests(
 
 @router.get(
     "/return",
+    operation_id="listReturnRequests",
     summary="List Return Requests",
     description="List requests pending return",
     response_model=RequestStatusResponse,
@@ -165,7 +167,42 @@ async def list_return_requests(
 
 
 @router.get(
+    "/{request_id}",
+    operation_id="getRequest",
+    summary="Get Request",
+    description=(
+        "Fetch a single request by ID and return its full status snapshot. "
+        "Equivalent to GET /{request_id}/status with verbose=True."
+    ),
+    response_model=RequestStatusResponse,
+)
+@handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}", method="GET")
+async def get_request(
+    request_id: str,
+    verbose: bool = Query(True, description="Include detailed info and refresh provider state"),
+    _user=Depends(require_role("viewer")),
+    orchestrator=STATUS_ORCHESTRATOR,
+    formatter=FORMATTER,
+) -> JSONResponse:
+    """
+    Get a single request by ID.
+
+    Delegates to the same orchestrator as GET /{request_id}/status so the
+    response shape is identical. The Go SDK's GetRequest method targets this
+    route.
+
+    - **request_id**: Request identifier
+    - **verbose**: Include detailed information about the request
+    """
+    result = await orchestrator.execute(
+        GetRequestStatusInput(request_ids=[request_id], verbose=verbose)
+    )
+    return JSONResponse(content=formatter.format_request_status(result.requests).data)
+
+
+@router.get(
     "/{request_id}/status",
+    operation_id="getRequestStatus",
     summary="Get Request Status",
     description="Get status of a specific request",
     response_model=RequestStatusResponse,
@@ -205,6 +242,7 @@ class BatchRequestStatusBody(APIRequest):
 
 @router.post(
     "/status",
+    operation_id="batchGetRequestStatus",
     summary="Batch Get Request Status",
     description="Read-through-sync a batch of requests by ID.",
     response_model=RequestStatusResponse,
@@ -231,6 +269,7 @@ async def batch_get_request_status(
 
 @router.get(
     "/{request_id}/stream",
+    operation_id="streamRequest",
     summary="Stream Request Status",
     description="Stream request status updates as Server-Sent Events",
 )
@@ -274,6 +313,7 @@ async def stream_request_status(
 
 @router.delete(
     "/{request_id}",
+    operation_id="cancelRequest",
     summary="Cancel Request",
     description="Cancel a pending request.",
     response_model=RequestOperationResponse,
@@ -302,6 +342,7 @@ async def cancel_request(
 
 @router.post(
     "/{request_id}/purge",
+    operation_id="purgeRequest",
     summary="Purge Request",
     description=(
         "Hard-delete a request row from storage. Requires "

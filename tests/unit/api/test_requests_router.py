@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from orb.api.dependencies import (
     get_list_return_requests_orchestrator,
+    get_request_formatter,
     get_request_status_orchestrator,
     get_scheduler_strategy,
 )
@@ -48,9 +49,17 @@ def _make_scheduler():
     return scheduler
 
 
+def _make_formatter():
+    formatter = MagicMock()
+    formatter.format_request_status.return_value = MagicMock(data={"requests": []})
+    return formatter
+
+
 def _make_client(app, overrides=None):
     scheduler = _make_scheduler()
+    formatter = _make_formatter()
     app.dependency_overrides[get_scheduler_strategy] = lambda: scheduler
+    app.dependency_overrides[get_request_formatter] = lambda: formatter
     for dep, factory in (overrides or {}).items():
         app.dependency_overrides[dep] = factory
     return TestClient(app, raise_server_exceptions=False)
@@ -59,15 +68,39 @@ def _make_client(app, overrides=None):
 @pytest.mark.unit
 @pytest.mark.api
 class TestGetRequestDetailsRemoved:
-    """GET /{request_id} route exists and returns request details with detailed=True."""
+    """GET /{request_id} route now exists and returns request details."""
 
-    def test_get_request_details_route_removed(self, requests_app):
-        """GET /requests/req-123 (no /status) must return 404 or 405 — route removed."""
-        client = _make_client(requests_app)
+    def test_get_request_route_exists(self, requests_app):
+        """GET /requests/req-123 (without /status) must return 200 — route re-added."""
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(return_value=GetRequestStatusOutput(requests=[]))
+        client = _make_client(requests_app, {get_request_status_orchestrator: lambda: orchestrator})
 
         resp = client.get("/requests/req-123")
 
-        assert resp.status_code in (404, 405)
+        assert resp.status_code == 200
+
+    def test_get_request_passes_request_id(self, requests_app):
+        """GET /requests/req-xyz → request_ids=['req-xyz']."""
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(return_value=GetRequestStatusOutput(requests=[]))
+        client = _make_client(requests_app, {get_request_status_orchestrator: lambda: orchestrator})
+
+        client.get("/requests/req-xyz")
+
+        call_input = orchestrator.execute.call_args[0][0]
+        assert call_input.request_ids == ["req-xyz"]
+
+    def test_get_request_verbose_true_by_default(self, requests_app):
+        """GET /requests/{id} with no ?verbose= → verbose=True (default)."""
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(return_value=GetRequestStatusOutput(requests=[]))
+        client = _make_client(requests_app, {get_request_status_orchestrator: lambda: orchestrator})
+
+        client.get("/requests/req-123")
+
+        call_input = orchestrator.execute.call_args[0][0]
+        assert call_input.verbose is True
 
     def test_get_request_status_route_exists(self, requests_app):
         """GET /requests/req-123/status must return 200."""

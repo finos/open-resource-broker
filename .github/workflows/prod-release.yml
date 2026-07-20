@@ -551,6 +551,16 @@ jobs:
       with:
         subject-path: 'dist/*.whl, dist/*.tar.gz'
 
+    - name: Attest OpenAPI spec provenance
+      # Attach the same SLSA Build L2 attestation to the OpenAPI spec so
+      # external codegen consumers can verify the spec's supply-chain.
+      # The spec is published as a release asset (next step) with a stable
+      # versioned filename so consumers can pin a URL.
+      id: attest-spec
+      uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
+      with:
+        subject-path: 'sdk/spec/openapi.json'
+
     - name: Upload release assets
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -560,6 +570,12 @@ jobs:
 
         # Upload wheel and sdist
         gh release upload "$RELEASE_TAG" dist/*.whl dist/*.tar.gz --clobber
+
+        # Upload the authoritative OpenAPI spec as a stable versioned asset.
+        # External SDK consumers and codegen pipelines can reference this URL:
+        #   https://github.com/<owner>/<repo>/releases/download/v<VERSION>/openapi-v<VERSION>.json
+        cp sdk/spec/openapi.json "openapi-v${VERSION}.json"
+        gh release upload "$RELEASE_TAG" "openapi-v${VERSION}.json" --clobber
 
         # Upload SBOM files if present.
         # sbom-generate produces: python-sbom-cyclonedx.json (CycloneDX),
@@ -580,3 +596,338 @@ jobs:
         BUNDLE_DEST="attestation-v${VERSION}.intoto.jsonl"
         cp "$BUNDLE_SRC" "$BUNDLE_DEST"
         gh release upload "$RELEASE_TAG" "$BUNDLE_DEST" --clobber
+
+  # ---------------------------------------------------------------------------
+  # SDK publish jobs — all gated on github.event_name == 'release' to match
+  # prod-pypi's gating pattern exactly.  Each job is self-contained so that a
+  # single registry failure does not block the others.
+  #
+  # Go SDK distribution note:
+  #   There is no sdk-publish-go job.  Go distribution is tag-based: the Go
+  #   module proxy (proxy.golang.org) serves the SDK at
+  #   github.com/finos/open-resource-broker/sdk/go when the git tag
+  #   sdk/go/vX.Y.Z exists on the default branch.  The make sdk-go-update-version
+  #   target (makefiles/ci.mk) creates and pushes this tag automatically as part
+  #   of the release commit.  No registry credentials are needed.
+  # ---------------------------------------------------------------------------
+
+  # Gate every SDK publish job on a passing static spec-conformance check for
+  # THIS release commit.  The SDK build+contract workflow (sdk.yml) is
+  # path-filtered (sdk/** plus the API source that shapes the exported spec), so
+  # a release commit that touched none of those paths would never have run it —
+  # without this gate a tagged release could publish SDKs whose spec conformance
+  # was never verified for the released commit.
+  sdk-spec-conformance:
+    name: SDK Spec Conformance Gate
+    needs: config
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+    - name: Check parity scenario against the OpenAPI spec
+      run: python3 dev-tools/quality/validate_sdk_spec_conformance.py
+
+  sdk-publish-npm:
+    name: Publish TypeScript SDK to npm
+    needs: [config, github-assets, sdk-spec-conformance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Mirror prod-pypi: only publish on a real GitHub Release, never on
+    # manual workflow_dispatch (which would push a dev-version to npm).
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+      id-token: write    # npm provenance attestation
+
+    # Required secrets:
+    #   NODE_AUTH_TOKEN — npm automation token scoped to the @finos org.
+    #   Configure at: https://www.npmjs.com/settings/<org>/tokens
+    #   Add to repo: Settings > Secrets > Actions > NODE_AUTH_TOKEN
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+    - name: Set up Node.js 20 (with npm registry auth)
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      with:
+        node-version: '20'
+        registry-url: 'https://registry.npmjs.org'
+
+    # openapi-generator needs a JVM; generated models are gitignored and MUST be
+    # produced here or the published package ships with no model types.
+    - name: Set up Java (Corretto 17) — openapi-generator
+      uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9  # v4
+      with:
+        java-version: '17'
+        distribution: 'corretto'
+
+    - name: Install openapi-generator-cli
+      run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
+
+    # REQUIRED: generated models are gitignored (0 committed files). Without this
+    # step the published npm package would contain no model types and fail to build.
+    - name: Generate TypeScript SDK models
+      run: make sdk-typescript-generate
+
+    - name: Install TypeScript SDK dependencies
+      run: cd sdk/typescript && npm ci
+
+    - name: Set SDK version from release tag
+      # Release tags are v<VERSION>; strip the leading 'v' for npm.
+      run: |
+        VERSION="${{ needs.config.outputs.package-version }}"
+        cd sdk/typescript && npm version "$VERSION" --no-git-tag-version
+
+    - name: Build TypeScript SDK
+      run: cd sdk/typescript && npm run build
+
+    - name: Publish to npm
+      # NODE_AUTH_TOKEN is injected by actions/setup-node's registry-url.
+      # --provenance attaches an npm sigstore provenance statement (requires
+      # id-token: write).  The job no-ops (succeeds) when NODE_AUTH_TOKEN is
+      # empty so CI does not block on missing secrets — mirrors the maven,
+      # gradle-kotlin, and nuget publish guards.  Provision NODE_AUTH_TOKEN to
+      # enable publishing.
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+      run: |
+        if [[ -z "$NODE_AUTH_TOKEN" ]]; then
+          echo "NODE_AUTH_TOKEN is not set — skipping npm publish."
+          echo "Provision NODE_AUTH_TOKEN to enable publishing."
+          exit 0
+        fi
+        cd sdk/typescript && npm publish --access public --provenance
+
+  sdk-publish-maven:
+    name: Publish Java SDK to Maven Central
+    needs: [config, github-assets, sdk-spec-conformance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+
+    # Required secrets (all under org.finos on Maven Central / OSSRH):
+    #   MAVEN_CENTRAL_USERNAME — Sonatype OSSRH / Central Portal username
+    #   MAVEN_CENTRAL_PASSWORD — Sonatype OSSRH / Central Portal token
+    #   MAVEN_GPG_PRIVATE_KEY  — ASCII-armored GPG private key for signing
+    #   MAVEN_GPG_PASSPHRASE   — passphrase for the GPG key
+    #
+    # Register the component at: https://central.sonatype.com/publishing/namespaces
+    # Group ID: org.finos.openresourcebroker
+    # See: https://central.sonatype.org/publish/publish-portal-guide/
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+    - name: Set up Java (Corretto 17, with GPG signing)
+      uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9  # v4
+      with:
+        java-version: '17'
+        distribution: 'corretto'
+
+    # openapi-generator-cli resolves its jar via the npm package cache; Node is
+    # required even though the SDK itself builds with Gradle.
+    - name: Set up Node.js 20 (openapi-generator-cli)
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      with:
+        node-version: '20'
+
+    - name: Install openapi-generator-cli
+      run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
+
+    # REQUIRED: generated model classes are gitignored (0 committed files).
+    # Without this step the published jar would contain no model types.
+    - name: Generate Java SDK models
+      run: make sdk-java-generate
+
+    - name: Import GPG key
+      # No-ops gracefully when MAVEN_GPG_PRIVATE_KEY is empty; the publish
+      # step surfaces the missing secret via a 401 / signing error if needed.
+      env:
+        MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+      run: |
+        if [[ -n "$MAVEN_GPG_PRIVATE_KEY" ]]; then
+          echo "$MAVEN_GPG_PRIVATE_KEY" | gpg --batch --import
+        fi
+
+    - name: Set SDK version from release tag
+      run: |
+        VERSION="${{ needs.config.outputs.package-version }}"
+        sed -i "s/^version = .*/version = '$VERSION'/" sdk/java/build.gradle
+
+    - name: Publish Java SDK to Maven Central
+      # Requires MAVEN_CENTRAL_USERNAME / MAVEN_CENTRAL_PASSWORD and the GPG
+      # secrets wired above.  The job no-ops (succeeds silently) when
+      # MAVEN_CENTRAL_USERNAME is empty so CI does not block on missing secrets;
+      # provision the secrets when ready to publish.
+      env:
+        MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+        MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+      run: |
+        if [[ -z "$MAVEN_CENTRAL_USERNAME" ]]; then
+          echo "MAVEN_CENTRAL_USERNAME is not set — skipping Maven Central publish."
+          echo "Provision MAVEN_CENTRAL_USERNAME, MAVEN_CENTRAL_PASSWORD, MAVEN_GPG_PRIVATE_KEY,"
+          echo "and MAVEN_GPG_PASSPHRASE to enable publishing."
+          exit 0
+        fi
+        cd sdk/java && ./gradlew --no-daemon publish \
+          -PmavenCentralUsername="$MAVEN_CENTRAL_USERNAME" \
+          -PmavenCentralPassword="$MAVEN_CENTRAL_PASSWORD" \
+          -Psigning.gnupg.passphrase="$MAVEN_GPG_PASSPHRASE"
+
+  sdk-publish-gradle-kotlin:
+    name: Publish Kotlin SDK to Maven Central
+    needs: [config, github-assets, sdk-spec-conformance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+
+    # Required secrets (same set as sdk-publish-maven; org.finos namespace):
+    #   MAVEN_CENTRAL_USERNAME — Sonatype OSSRH / Central Portal username
+    #   MAVEN_CENTRAL_PASSWORD — Sonatype OSSRH / Central Portal token
+    #   MAVEN_GPG_PRIVATE_KEY  — ASCII-armored GPG private key for signing
+    #   MAVEN_GPG_PASSPHRASE   — passphrase for the GPG key
+    #
+    # Artifact coordinates: org.finos.openresourcebroker:open-resource-broker-kotlin
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+    - name: Set up Java (Corretto 17, Kotlin runs on JVM)
+      uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9  # v4
+      with:
+        java-version: '17'
+        distribution: 'corretto'
+
+    # openapi-generator-cli resolves its jar via the npm package cache; Node is
+    # required even though the SDK itself builds with Gradle.
+    - name: Set up Node.js 20 (openapi-generator-cli)
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      with:
+        node-version: '20'
+
+    - name: Install openapi-generator-cli
+      run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
+
+    # REQUIRED: generated model classes are gitignored (0 committed files).
+    # Without this step the published jar would contain no model types.
+    - name: Generate Kotlin SDK models
+      run: make sdk-kotlin-generate
+
+    - name: Import GPG key
+      env:
+        MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+      run: |
+        if [[ -n "$MAVEN_GPG_PRIVATE_KEY" ]]; then
+          echo "$MAVEN_GPG_PRIVATE_KEY" | gpg --batch --import
+        fi
+
+    - name: Set SDK version from release tag
+      run: |
+        VERSION="${{ needs.config.outputs.package-version }}"
+        sed -i "s/^version = .*/version = \"$VERSION\"/" sdk/kotlin/build.gradle.kts
+
+    - name: Publish Kotlin SDK to Maven Central
+      env:
+        MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+        MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+      run: |
+        if [[ -z "$MAVEN_CENTRAL_USERNAME" ]]; then
+          echo "MAVEN_CENTRAL_USERNAME is not set — skipping Maven Central publish."
+          echo "Provision MAVEN_CENTRAL_USERNAME, MAVEN_CENTRAL_PASSWORD, MAVEN_GPG_PRIVATE_KEY,"
+          echo "and MAVEN_GPG_PASSPHRASE to enable publishing."
+          exit 0
+        fi
+        cd sdk/kotlin && ./gradlew --no-daemon publish \
+          -PmavenCentralUsername="$MAVEN_CENTRAL_USERNAME" \
+          -PmavenCentralPassword="$MAVEN_CENTRAL_PASSWORD" \
+          -Psigning.gnupg.passphrase="$MAVEN_GPG_PASSPHRASE"
+
+  sdk-publish-nuget:
+    name: Publish .NET SDK to NuGet
+    needs: [config, github-assets, sdk-spec-conformance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+
+    # Required secrets:
+    #   NUGET_API_KEY — NuGet.org API key scoped to FINOS.OpenResourceBroker.
+    #   Obtain at: https://www.nuget.org/account/apikeys
+    #   Add to repo: Settings > Secrets > Actions > NUGET_API_KEY
+    #
+    # Package ID: FINOS.OpenResourceBroker
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+    - name: Set up .NET 8
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9  # v4
+      with:
+        dotnet-version: '8.0.x'
+
+    # openapi-generator needs a JVM + the openapi-generator-cli npm wrapper;
+    # generated models are gitignored (0 committed files) and MUST be produced
+    # here or the packed nupkg ships with no model types.  Mirrors the npm,
+    # maven, and kotlin publish jobs.
+    - name: Set up openapi-generator toolchain
+      uses: ./.github/actions/setup-openapi-generator
+
+    # REQUIRED: generated model classes are gitignored (0 committed files).
+    # Without this step the packed nupkg would contain no model types and the
+    # hand-written client would not compile.
+    - name: Generate C# SDK models
+      run: make sdk-csharp-generate
+
+    - name: Set SDK version from release tag
+      run: |
+        VERSION="${{ needs.config.outputs.package-version }}"
+        # Version the hand-written client package.
+        sed -i "s|<Version>.*</Version>|<Version>$VERSION</Version>|" \
+          sdk/csharp/src/FINOS.OpenResourceBroker/FINOS.OpenResourceBroker.csproj
+        # Version the generated model assembly too so its embedded DLL carries
+        # the release version (the client embeds this DLL into its own nupkg).
+        sed -i "s|<Version>.*</Version>|<Version>$VERSION</Version>|" \
+          sdk/csharp/generated/src/OpenResourceBroker.Sdk/OpenResourceBroker.Sdk.csproj
+
+    - name: Build and pack .NET SDK
+      # Pack the client project.  Its ProjectReference to the generated model
+      # assembly is PrivateAssets="all" + an IncludeGeneratedModelsInPackage
+      # target embeds the generated DLL into lib/net8.0/, so the models ship
+      # inside the nupkg with no dangling package dependency.
+      run: |
+        dotnet pack sdk/csharp/src/FINOS.OpenResourceBroker/FINOS.OpenResourceBroker.csproj \
+          --configuration Release \
+          --output /tmp/nuget-packages
+
+    - name: Publish to NuGet
+      # If NUGET_API_KEY is not provisioned the push will fail with a 401 —
+      # all prior build/pack steps pass so the missing secret is immediately
+      # visible in the job log.
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      run: |
+        if [[ -z "$NUGET_API_KEY" ]]; then
+          echo "NUGET_API_KEY is not set — skipping NuGet publish."
+          echo "Provision NUGET_API_KEY to enable publishing."
+          exit 0
+        fi
+        dotnet nuget push /tmp/nuget-packages/*.nupkg \
+          --api-key "$NUGET_API_KEY" \
+          --source https://api.nuget.org/v3/index.json \
+          --skip-duplicate

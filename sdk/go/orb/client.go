@@ -79,6 +79,7 @@ func NewClient(opts ...Option) (*Client, error) {
 		}
 		pm := process.New(process.Config{
 			Binary:       cfg.process.Binary,
+			ConfigPath:   cfg.process.ConfigPath,
 			Args:         cfg.process.Args,
 			Env:          cfg.process.Env,
 			SocketPath:   cfg.process.SocketPath,
@@ -117,7 +118,7 @@ func (c *Client) Healthy() bool {
 // checkHealth returns ErrORBUnavailable if the managed process is unhealthy.
 func (c *Client) checkHealth() error {
 	if c.proc != nil && !c.proc.Healthy() {
-		return &APIError{sentinel: ErrORBUnavailable, Message: "managed ORB process is unhealthy"}
+		return &OrbApiError{OrbError: OrbError{sentinel: ErrORBUnavailable, Message: "managed ORB process is unhealthy"}}
 	}
 	return nil
 }
@@ -181,6 +182,32 @@ func (c *Client) delete(ctx context.Context, path string) error {
 	return c.do(req, nil)
 }
 
+// newGetRequest builds an *http.Request for a GET to the given absolute URL.
+// Used by methods that need custom Accept headers (e.g. text/plain for /metrics).
+func newGetRequest(ctx context.Context, absURL string) (*http.Request, error) {
+	return http.NewRequestWithContext(ctx, http.MethodGet, absURL, nil)
+}
+
+// doText executes req and decodes the response body as a plain string.
+func (c *Client) doText(req *http.Request, out *string) error {
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return mapError(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return parseAPIError(resp)
+	}
+	if out != nil {
+		b, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		*out = string(b)
+	}
+	return nil
+}
+
 func (c *Client) do(req *http.Request, out any) error {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -198,26 +225,41 @@ func (c *Client) do(req *http.Request, out any) error {
 	return nil
 }
 
+// requestIDFromResponse extracts the server-assigned request ID from the
+// response headers for support/correlation. ORB emits X-Request-ID; we also
+// accept the common X-Request-Id / X-Correlation-ID spellings.
+func requestIDFromResponse(resp *http.Response) string {
+	for _, h := range []string{"X-Request-ID", "X-Request-Id", "X-Correlation-ID"} {
+		if v := resp.Header.Get(h); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 func parseAPIError(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body)
+	requestID := requestIDFromResponse(resp)
 	var orbErr struct {
 		Error struct {
 			Code    string `json:"code"`
 			Message string `json:"message"`
+			Details any    `json:"details"`
 		} `json:"error"`
 	}
 	if json.Unmarshal(body, &orbErr) == nil && orbErr.Error.Message != "" {
-		return &APIError{
+		return &OrbApiError{
+			OrbError:   OrbError{Message: orbErr.Error.Message, sentinel: sentinelForStatus(resp.StatusCode)},
 			StatusCode: resp.StatusCode,
 			Code:       orbErr.Error.Code,
-			Message:    orbErr.Error.Message,
-			sentinel:   sentinelForStatus(resp.StatusCode),
+			RequestID:  requestID,
+			Details:    orbErr.Error.Details,
 		}
 	}
-	return &APIError{
+	return &OrbApiError{
+		OrbError:   OrbError{Message: http.StatusText(resp.StatusCode), sentinel: sentinelForStatus(resp.StatusCode)},
 		StatusCode: resp.StatusCode,
-		Message:    http.StatusText(resp.StatusCode),
-		sentinel:   sentinelForStatus(resp.StatusCode),
+		RequestID:  requestID,
 	}
 }
 
@@ -265,7 +307,7 @@ func (c *Client) ListTemplates(ctx context.Context) ([]Template, error) {
 // GetTemplate returns a single template by ID.
 func (c *Client) GetTemplate(ctx context.Context, id string) (*Template, error) {
 	var t templateJSON
-	if err := c.get(ctx, "/api/v1/templates/"+id, &t); err != nil {
+	if err := c.get(ctx, "/api/v1/templates/"+url.PathEscape(id), &t); err != nil {
 		return nil, err
 	}
 	tmpl := templateFromJSON(t)
@@ -290,12 +332,12 @@ func (c *Client) UpdateTemplate(ctx context.Context, id string, req UpdateTempla
 		"description": req.Description,
 		"config":      req.Config,
 	}
-	return c.put(ctx, "/api/v1/templates/"+id, body, nil)
+	return c.put(ctx, "/api/v1/templates/"+url.PathEscape(id), body, nil)
 }
 
 // DeleteTemplate deletes a template by ID.
 func (c *Client) DeleteTemplate(ctx context.Context, id string) error {
-	return c.delete(ctx, "/api/v1/templates/"+id)
+	return c.delete(ctx, "/api/v1/templates/"+url.PathEscape(id))
 }
 
 // --- Machines ---
@@ -319,11 +361,13 @@ type requestMachinesResponseHF struct {
 }
 
 // machineJSONHF is the HostFactory camelCase machine payload.
+// The server emits privateIpAddress / publicIpAddress (not privateIp / publicIp)
+// in the HostFactory response format; tags must match the wire shape exactly.
 type machineJSONHF struct {
 	MachineID  string `json:"machineId"`
 	VMType     string `json:"vmType"`
-	PrivateIP  string `json:"privateIp"`
-	PublicIP   string `json:"publicIp"`
+	PrivateIP  string `json:"privateIpAddress"`
+	PublicIP   string `json:"publicIpAddress"`
 	TemplateID string `json:"templateId"`
 	RequestID  string `json:"requestId"`
 }
@@ -376,7 +420,7 @@ func (c *Client) RequestMachines(ctx context.Context, req RequestMachinesRequest
 	}
 	if c.scheduler == SchedulerHostFactory {
 		var resp requestMachinesResponseHF
-		if err := c.post(ctx, "/api/v1/machines/request/", body, &resp); err != nil {
+		if err := c.post(ctx, "/api/v1/machines/request", body, &resp); err != nil {
 			return nil, err
 		}
 		return &MachineRequest{
@@ -385,7 +429,7 @@ func (c *Client) RequestMachines(ctx context.Context, req RequestMachinesRequest
 		}, nil
 	}
 	var resp requestMachinesResponse
-	if err := c.post(ctx, "/api/v1/machines/request/", body, &resp); err != nil {
+	if err := c.post(ctx, "/api/v1/machines/request", body, &resp); err != nil {
 		return nil, err
 	}
 	id := resp.RequestID
@@ -401,7 +445,7 @@ func (c *Client) RequestMachines(ctx context.Context, req RequestMachinesRequest
 // ReturnMachines releases machines back to the pool.
 func (c *Client) ReturnMachines(ctx context.Context, machineIDs []string) error {
 	body := map[string]any{"machineIds": machineIDs}
-	return c.post(ctx, "/api/v1/machines/return/", body, nil)
+	return c.post(ctx, "/api/v1/machines/return", body, nil)
 }
 
 type listMachinesResponse struct {
@@ -488,14 +532,14 @@ func (c *Client) ListMachines(ctx context.Context, opts ...ListMachinesOption) (
 func (c *Client) GetMachine(ctx context.Context, id string) (*Machine, error) {
 	if c.scheduler == SchedulerHostFactory {
 		var m machineJSONHF
-		if err := c.get(ctx, "/api/v1/machines/"+id, &m); err != nil {
+		if err := c.get(ctx, "/api/v1/machines/"+url.PathEscape(id), &m); err != nil {
 			return nil, err
 		}
 		machine := machineFromJSONHF(m)
 		return &machine, nil
 	}
 	var m machineJSON
-	if err := c.get(ctx, "/api/v1/machines/"+id, &m); err != nil {
+	if err := c.get(ctx, "/api/v1/machines/"+url.PathEscape(id), &m); err != nil {
 		return nil, err
 	}
 	machine := machineFromJSON(m)
@@ -541,20 +585,37 @@ func requestFromJSON(r requestJSON) Request {
 }
 
 // GetRequest returns a single request by ID.
+//
+// It targets GET /api/v1/requests/{request_id} (the getRequest operation),
+// which returns the same {"requests": [...]} envelope as ListRequests and
+// GetRequestStatus. We decode into the envelope and extract the first element.
+// This is distinct from GetRequestStatus, which targets the /status subroute
+// (the getRequestStatus operation).
 func (c *Client) GetRequest(ctx context.Context, id string) (*Request, error) {
+	path := "/api/v1/requests/" + url.PathEscape(id)
 	if c.scheduler == SchedulerHostFactory {
-		var r requestJSONHF
-		if err := c.get(ctx, "/api/v1/requests/"+id, &r); err != nil {
+		var envelope struct {
+			Requests []requestJSONHF `json:"requests"`
+		}
+		if err := c.get(ctx, path, &envelope); err != nil {
 			return nil, err
 		}
-		req := requestFromJSONHF(r)
+		if len(envelope.Requests) == 0 {
+			return nil, &OrbApiError{OrbError: OrbError{Message: "request not found", sentinel: ErrNotFound}, StatusCode: 404}
+		}
+		req := requestFromJSONHF(envelope.Requests[0])
 		return &req, nil
 	}
-	var r requestJSON
-	if err := c.get(ctx, "/api/v1/requests/"+id, &r); err != nil {
+	var envelope struct {
+		Requests []requestJSON `json:"requests"`
+	}
+	if err := c.get(ctx, path, &envelope); err != nil {
 		return nil, err
 	}
-	req := requestFromJSON(r)
+	if len(envelope.Requests) == 0 {
+		return nil, &OrbApiError{OrbError: OrbError{Message: "request not found", sentinel: ErrNotFound}, StatusCode: 404}
+	}
+	req := requestFromJSON(envelope.Requests[0])
 	return &req, nil
 }
 
@@ -564,6 +625,51 @@ type ListRequestsOption func(url.Values)
 // WithRequestStatus filters requests by status.
 func WithRequestStatus(status string) ListRequestsOption {
 	return func(q url.Values) { q.Set("status", status) }
+}
+
+// WithRequestLimit limits the number of requests returned.
+func WithRequestLimit(n int) ListRequestsOption {
+	return func(q url.Values) { q.Set("limit", strconv.Itoa(n)) }
+}
+
+// WithRequestOffset sets the pagination offset.
+func WithRequestOffset(n int) ListRequestsOption {
+	return func(q url.Values) { q.Set("offset", strconv.Itoa(n)) }
+}
+
+// WithRequestCursor sets the cursor for cursor-based pagination.
+func WithRequestCursor(cursor string) ListRequestsOption {
+	return func(q url.Values) { q.Set("cursor", cursor) }
+}
+
+// WithRequestQuery sets a free-text search filter.
+func WithRequestQuery(query string) ListRequestsOption {
+	return func(q url.Values) { q.Set("q", query) }
+}
+
+// WithRequestSort sets the sort order (e.g. "created_at", "-created_at").
+func WithRequestSort(sort string) ListRequestsOption {
+	return func(q url.Values) { q.Set("sort", sort) }
+}
+
+// WithRequestProviderName filters requests by provider name.
+func WithRequestProviderName(name string) ListRequestsOption {
+	return func(q url.Values) { q.Set("provider_name", name) }
+}
+
+// WithRequestProviderType filters requests by provider type.
+func WithRequestProviderType(pt string) ListRequestsOption {
+	return func(q url.Values) { q.Set("provider_type", pt) }
+}
+
+// WithRequestTemplateID filters requests by template ID.
+func WithRequestTemplateID(id string) ListRequestsOption {
+	return func(q url.Values) { q.Set("template_id", id) }
+}
+
+// WithRequestType filters requests by request type.
+func WithRequestType(rt string) ListRequestsOption {
+	return func(q url.Values) { q.Set("request_type", rt) }
 }
 
 // ListRequests returns all requests, optionally filtered.
@@ -589,16 +695,41 @@ func (c *Client) ListRequests(ctx context.Context, opts ...ListRequestsOption) (
 	return out, nil
 }
 
-// CancelRequest cancels a pending request.
-func (c *Client) CancelRequest(ctx context.Context, id string) error {
-	return c.delete(ctx, "/api/v1/requests/"+id)
+// CancelRequestOption configures a CancelRequest call.
+type CancelRequestOption func(url.Values)
+
+// WithCancelReason sets the optional cancellation reason recorded server-side.
+func WithCancelReason(reason string) CancelRequestOption {
+	return func(q url.Values) { q.Set("reason", reason) }
+}
+
+// CancelRequest cancels a pending request. An optional reason may be supplied
+// via WithCancelReason and is recorded on the server.
+func (c *Client) CancelRequest(ctx context.Context, id string, opts ...CancelRequestOption) error {
+	q := url.Values{}
+	for _, o := range opts {
+		o(q)
+	}
+	path := "/api/v1/requests/" + url.PathEscape(id)
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	return c.delete(ctx, path)
 }
 
 // --- Streaming ---
 
-// StreamRequest opens an SSE stream for the given request ID.
+// StreamRequestStatus opens an SSE stream for the given request ID.
 // Call stream.Next() in a loop; call stream.Close() when done.
+//
+// Deprecated: StreamRequest is a deprecated alias; use StreamRequestStatus.
 func (c *Client) StreamRequest(ctx context.Context, id string, opts ...StreamOption) (*RequestStream, error) {
+	return c.StreamRequestStatus(ctx, id, opts...)
+}
+
+// StreamRequestStatus opens an SSE stream for the given request ID.
+// Call stream.Next() in a loop; call stream.Close() when done.
+func (c *Client) StreamRequestStatus(ctx context.Context, id string, opts ...StreamOption) (*RequestStream, error) {
 	if err := c.checkHealth(); err != nil {
 		return nil, err
 	}
@@ -627,6 +758,17 @@ func (c *Client) StreamRequest(ctx context.Context, id string, opts ...StreamOpt
 	return s, nil
 }
 
+// sseClient returns an HTTP client for SSE streaming. It shares the main
+// client's transport chain (auth, retry, UDS/TLS) but sets Timeout:0 so a
+// long-lived stream is bounded only by the request context and the server-side
+// stream timeout — not clipped at the 30s default client timeout.
+func (c *Client) sseClient() *http.Client {
+	return &http.Client{
+		Transport: c.httpClient.Transport,
+		Timeout:   0,
+	}
+}
+
 func (c *Client) runSSEProducer(ctx context.Context, id string, scfg streamConfig, ch chan<- StreamEvent, s *RequestStream) {
 	backoff := time.Second
 	maxBackoff := 30 * time.Second
@@ -639,7 +781,7 @@ func (c *Client) runSSEProducer(ctx context.Context, id string, scfg streamConfi
 		}
 
 		path := fmt.Sprintf("/api/v1/requests/%s/stream?interval=%.1f&timeout=%.1f",
-			id,
+			url.PathEscape(id),
 			scfg.interval.Seconds(),
 			scfg.timeout.Seconds(),
 		)
@@ -650,7 +792,7 @@ func (c *Client) runSSEProducer(ctx context.Context, id string, scfg streamConfi
 		}
 		req.Header.Set("Accept", "text/event-stream")
 
-		resp, err := c.httpClient.Do(req)
+		resp, err := c.sseClient().Do(req)
 		if err != nil {
 			select {
 			case <-ctx.Done():
@@ -661,7 +803,34 @@ func (c *Client) runSSEProducer(ctx context.Context, id string, scfg streamConfi
 			}
 		}
 
-		terminal, gotEvents := c.consumeSSE(ctx, resp, ch)
+		// Inspect the connect status BEFORE treating the body as SSE frames.
+		// A 4xx means the request is fundamentally wrong (auth, not-found, bad
+		// params) — the body is a JSON error, not an event stream, and there is
+		// nothing to gain by reconnecting, so surface a typed terminal error.
+		// A 5xx is a transient server-side failure: close the body and reconnect
+		// with backoff.
+		if resp.StatusCode >= 400 {
+			if resp.StatusCode < 500 {
+				err := parseAPIError(resp)
+				resp.Body.Close()
+				s.setErr(err)
+				select {
+				case ch <- StreamEvent{Err: err}:
+				case <-ctx.Done():
+				}
+				return
+			}
+			resp.Body.Close()
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(backoff):
+				backoff = min(backoff*2, maxBackoff)
+				continue
+			}
+		}
+
+		terminal, gotEvents := c.consumeSSE(ctx, resp, ch, s)
 		resp.Body.Close()
 
 		if terminal {
@@ -685,7 +854,7 @@ func (c *Client) runSSEProducer(ctx context.Context, id string, scfg streamConfi
 // consumeSSE reads SSE frames from resp and sends them to ch.
 // Returns (terminal, gotEvents): terminal=true means no reconnect needed;
 // gotEvents=true means at least one event was delivered (used to reset backoff).
-func (c *Client) consumeSSE(ctx context.Context, resp *http.Response, ch chan<- StreamEvent) (bool, bool) {
+func (c *Client) consumeSSE(ctx context.Context, resp *http.Response, ch chan<- StreamEvent, s *RequestStream) (bool, bool) {
 	reader := sse.NewReader(resp.Body)
 	defer reader.Close()
 
@@ -700,7 +869,18 @@ func (c *Client) consumeSSE(ctx context.Context, resp *http.Response, ch chan<- 
 
 		frame := reader.Next()
 		if frame == nil {
-			return false, gotEvents // EOF — reconnect
+			// Check for a scanner-level error (e.g. bufio.ErrTooLong on an
+			// oversized frame). Surface it as a non-retryable stream error
+			// rather than silently reconnecting, which would loop forever.
+			if sErr := reader.Err(); sErr != nil {
+				s.setErr(sErr)
+				select {
+				case ch <- StreamEvent{Err: sErr}:
+				case <-ctx.Done():
+				}
+				return true, gotEvents
+			}
+			return false, gotEvents // clean EOF — reconnect
 		}
 
 		if sse.IsSentinel(frame) {
@@ -753,7 +933,7 @@ func (c *Client) consumeSSE(ctx context.Context, resp *http.Response, ch chan<- 
 // WaitForCompletion streams a request until it reaches a terminal status.
 // Returns the final StreamEvent.
 func (c *Client) WaitForCompletion(ctx context.Context, id string, opts ...StreamOption) (StreamEvent, error) {
-	stream, err := c.StreamRequest(ctx, id, opts...)
+	stream, err := c.StreamRequestStatus(ctx, id, opts...)
 	if err != nil {
 		return StreamEvent{}, err
 	}
@@ -768,4 +948,168 @@ func (c *Client) WaitForCompletion(ctx context.Context, id string, opts ...Strea
 		last = event
 	}
 	return last, stream.Err()
+}
+
+// StreamEventsOption configures a StreamEvents call.
+type StreamEventsOption func(url.Values)
+
+// WithEventsSince replays events newer than the given ISO-8601 timestamp.
+func WithEventsSince(ts string) StreamEventsOption {
+	return func(q url.Values) { q.Set("since", ts) }
+}
+
+// WithEventsSinceSeq, combined with WithEventsSince, sets the sequence_id of the
+// last event the client received, enabling gap detection on replay.
+func WithEventsSinceSeq(seq int) StreamEventsOption {
+	return func(q url.Values) { q.Set("since_seq", strconv.Itoa(seq)) }
+}
+
+// WithEventsType filters the global event stream to a single event type.
+func WithEventsType(t string) StreamEventsOption {
+	return func(q url.Values) { q.Set("type", t) }
+}
+
+// StreamEvents opens the global ORB event bus (GET /api/v1/events/) and streams
+// raw SSE frames. Call stream.Next() in a loop; call stream.Close() when done.
+//
+// A 4xx connect status is terminal (surfaced as a typed error on the event and
+// via stream.Err()); a 5xx triggers reconnect with backoff, matching the
+// per-request status stream and the other SDKs.
+func (c *Client) StreamEvents(ctx context.Context, opts ...StreamEventsOption) (*EventStream, error) {
+	if err := c.checkHealth(); err != nil {
+		return nil, err
+	}
+
+	q := url.Values{}
+	for _, o := range opts {
+		o(q)
+	}
+	path := "/api/v1/events/"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+
+	streamCtx, cancel := context.WithCancel(ctx)
+	ch := make(chan Event, 64)
+	done := make(chan struct{})
+
+	s := &EventStream{ch: ch, cancel: cancel, done: done}
+
+	go func() {
+		defer close(done)
+		defer close(ch)
+		c.runEventProducer(streamCtx, path, ch, s)
+	}()
+
+	return s, nil
+}
+
+func (c *Client) runEventProducer(ctx context.Context, path string, ch chan<- Event, s *EventStream) {
+	backoff := time.Second
+	maxBackoff := 30 * time.Second
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+		if err != nil {
+			return
+		}
+		req.Header.Set("Accept", "text/event-stream")
+
+		resp, err := c.sseClient().Do(req)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(backoff):
+				backoff = min(backoff*2, maxBackoff)
+				continue
+			}
+		}
+
+		if resp.StatusCode >= 400 {
+			if resp.StatusCode < 500 {
+				perr := parseAPIError(resp)
+				resp.Body.Close()
+				s.setErr(perr)
+				select {
+				case ch <- Event{Err: perr}:
+				case <-ctx.Done():
+				}
+				return
+			}
+			resp.Body.Close()
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(backoff):
+				backoff = min(backoff*2, maxBackoff)
+				continue
+			}
+		}
+
+		terminal, gotEvents := c.consumeEvents(ctx, resp, ch, s)
+		resp.Body.Close()
+
+		if terminal {
+			return
+		}
+		if gotEvents {
+			backoff = time.Second
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(backoff):
+			backoff = min(backoff*2, maxBackoff)
+		}
+	}
+}
+
+func (c *Client) consumeEvents(ctx context.Context, resp *http.Response, ch chan<- Event, s *EventStream) (bool, bool) {
+	reader := sse.NewReader(resp.Body)
+	defer reader.Close()
+
+	var gotEvents bool
+	for {
+		select {
+		case <-ctx.Done():
+			return true, gotEvents
+		default:
+		}
+
+		frame := reader.Next()
+		if frame == nil {
+			if sErr := reader.Err(); sErr != nil {
+				s.setErr(sErr)
+				select {
+				case ch <- Event{Err: sErr}:
+				case <-ctx.Done():
+				}
+				return true, gotEvents
+			}
+			return false, gotEvents // clean EOF — reconnect
+		}
+
+		if sse.IsSentinel(frame) {
+			return true, gotEvents
+		}
+
+		// Deliver a copy of the raw data: the reader reuses its buffer.
+		data := make([]byte, len(frame.Data))
+		copy(data, frame.Data)
+
+		select {
+		case ch <- Event{Data: data}:
+			gotEvents = true
+		case <-ctx.Done():
+			return true, gotEvents
+		}
+	}
 }

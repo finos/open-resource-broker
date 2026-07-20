@@ -33,6 +33,7 @@ def _serialisable(obj: Any) -> Any:
 
 @router.get(
     "/dashboard",
+    operation_id="getDashboardSummary",
     summary="Dashboard Summary",
     description="Aggregate counts for machines, requests and templates for the UI dashboard.",
 )

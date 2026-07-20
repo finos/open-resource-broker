@@ -34,6 +34,47 @@ func WithBearerTokenFunc(fn func(ctx context.Context) (string, error)) AuthOptio
 	return bearerAuth{tokenFn: fn}
 }
 
+// WithCustomAuth creates an AuthOption from an arbitrary signing function.
+// fn receives a clone of the outgoing request and may mutate its headers freely.
+// Use this to implement auth strategies not provided by the SDK — for example
+// Azure Workload Identity, GCP service-account tokens, or OIDC exchange flows.
+//
+// Example:
+//
+//	client := orb.New(orb.WithCustomAuth(func(req *http.Request) error {
+//	    token, err := myTokenProvider.GetToken(req.Context())
+//	    if err != nil {
+//	        return fmt.Errorf("custom auth: %w", err)
+//	    }
+//	    req.Header.Set("Authorization", "Bearer "+token)
+//	    return nil
+//	}))
+func WithCustomAuth(fn func(req *http.Request) error) AuthOption {
+	return customAuth{fn: fn}
+}
+
+// customAuth wraps an arbitrary signing function as an authOption.
+type customAuth struct {
+	fn func(req *http.Request) error
+}
+
+func (a customAuth) wrap(next http.RoundTripper) http.RoundTripper {
+	return &customTransport{fn: a.fn, next: next}
+}
+
+type customTransport struct {
+	fn   func(req *http.Request) error
+	next http.RoundTripper
+}
+
+func (t *customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	if err := t.fn(req); err != nil {
+		return nil, fmt.Errorf("custom auth: %w", err)
+	}
+	return t.next.RoundTrip(req)
+}
+
 // noAuth is a pass-through transport.
 type noAuth struct{}
 

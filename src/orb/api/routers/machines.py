@@ -95,6 +95,7 @@ class ReturnMachinesRequest(APIRequest):
 
 @router.post(
     "/request",
+    operation_id="requestMachines",
     summary="Request Machines",
     description="Request new machines from a template",
     status_code=202,
@@ -135,6 +136,7 @@ async def request_machines(
 
 @router.post(
     "/return",
+    operation_id="returnMachines",
     summary="Return Machines",
     description="Return machines to the provider",
     response_model=RequestOperationResponse,
@@ -175,6 +177,7 @@ async def return_machines(
 
 @router.get(
     "/",
+    operation_id="listMachines",
     summary="List Machines",
     description="List machines with optional filtering",
     response_model=MachineListResponse,
@@ -234,6 +237,7 @@ async def list_machines(
 
 @router.get(
     "/{machine_id}/status",
+    operation_id="syncMachineStatus",
     summary="Sync Machine Status",
     description="Refresh a single machine from the provider and return the up-to-date DTO.",
     response_model=MachineListResponse,
@@ -265,6 +269,7 @@ async def sync_machine_status(
 
 @router.get(
     "/{machine_id}",
+    operation_id="getMachine",
     summary="Get Machine",
     description="Get specific machine details",
     response_model=MachineListResponse,
@@ -288,6 +293,7 @@ async def get_machine(
 
 @router.delete(
     "/{machine_id}",
+    operation_id="purgeMachine",
     summary="Purge Machine",
     description=(
         "Hard-delete a single machine row from storage. "

@@ -1,0 +1,23 @@
+# Gradle build output
+build/
+.gradle/
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Local properties
+local.properties
+
+# macOS
+.DS_Store
+
+# Compiled class files
+*.class
+
+# Generated code — produce on build, not committed.
+# Run `make sdk-kotlin-generate` (or `make sdk-generate`) to regenerate.
+generated/

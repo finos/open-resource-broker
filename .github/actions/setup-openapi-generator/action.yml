@@ -1,0 +1,52 @@
+name: Setup openapi-generator toolchain
+description: >-
+  Install the toolchain needed to run `make sdk-<lang>-generate`: a JVM
+  (openapi-generator is a Java tool), Node.js (the openapi-generator-cli npm
+  wrapper resolves/downloads the pinned jar), and the pinned openapi-generator
+  version.  Generated SDK models are gitignored (generate-on-build), so every
+  publish job MUST run this before building/packing or the artifact ships with
+  no model types.
+
+inputs:
+  java-version:
+    description: JDK major version for the openapi-generator JVM.
+    required: false
+    default: '17'
+  java-distribution:
+    description: JDK distribution (actions/setup-java `distribution`).
+    required: false
+    default: 'corretto'
+  node-version:
+    description: Node.js version for the openapi-generator-cli npm wrapper.
+    required: false
+    default: '20'
+  node-registry-url:
+    description: >-
+      Optional npm registry URL to configure on setup-node (used by the npm
+      publish job so NODE_AUTH_TOKEN authenticates against the registry).  Leave
+      empty for jobs that only need openapi-generator (maven, kotlin, nuget).
+    required: false
+    default: ''
+  openapi-generator-version:
+    description: Pinned openapi-generator-cli version to install.
+    required: false
+    default: '7.23.0'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Java (openapi-generator JVM)
+      uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9  # v4
+      with:
+        java-version: ${{ inputs.java-version }}
+        distribution: ${{ inputs.java-distribution }}
+
+    - name: Set up Node.js (openapi-generator-cli wrapper)
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        registry-url: ${{ inputs.node-registry-url }}
+
+    - name: Install openapi-generator-cli
+      shell: bash
+      run: npx --yes @openapitools/openapi-generator-cli version-manager set ${{ inputs.openapi-generator-version }}

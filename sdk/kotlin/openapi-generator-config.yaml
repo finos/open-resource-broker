@@ -1,0 +1,42 @@
+# openapi-generator configuration for the Kotlin SDK.
+#
+# Generator: kotlin (openapi-generator v7.23.0)
+# Invoked by: make sdk-kotlin-generate  (see makefiles/sdk.mk)
+#
+# Design rationale:
+#   - library=jvm-okhttp4: OkHttp 4 is the de-facto standard on JVM Kotlin
+#     projects, widely used with Android and server-side Kotlin (Ktor, Spring).
+#     It supports UNIX domain socket connections via okhttp3.OkHttpClient with a
+#     custom SocketFactory, which the hand-written transport layer leverages for
+#     UDS mode.
+#   - Kotlin 1.9+ / coroutines: the generated stubs should use suspend functions
+#     where possible to align with modern Kotlin idioms.
+#   - The generated API stubs and models are the starting point.  The
+#     hand-written transport (UDS, SigV4, SSE reconnect, subprocess manager)
+#     is layered on top — see sdk/ARCHITECTURE.md.
+#
+# SSE exclusions:
+#   stream_events and stream_request_status use text/event-stream; these are
+#   handled by the hand-written SSE layer and not generated.
+
+generatorName: kotlin
+inputSpec: ../spec/openapi.json
+outputDir: generated
+
+additionalProperties:
+  groupId: org.finos.openresourcebroker
+  artifactId: orb-sdk-kotlin
+  artifactVersion: 0.1.0
+  packageName: org.finos.openresourcebroker.sdk
+  apiPackage: org.finos.openresourcebroker.sdk.api
+  modelPackage: org.finos.openresourcebroker.sdk.model
+  library: jvm-okhttp4
+  useCoroutines: true
+  generateModelTests: false
+  generateApiTests: false
+  generateModelDocumentation: false
+  generateApiDocumentation: false
+  enumPropertyNaming: UPPERCASE
+  # Kotlin null-safety: prefer non-nullable types for required fields.
+  nullableReturnType: false
+  serializationLibrary: gson

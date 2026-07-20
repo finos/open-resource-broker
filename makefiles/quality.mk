@@ -156,7 +156,11 @@ validate-shell-scripts: dev-install  ## Validate shell scripts with shellcheck
 	$(PYTHON) ./dev-tools/setup/install_dev_tools.py --tool shellcheck
 	./dev-tools/quality/validate_shell_scripts.py
 
-validate-all-workflows: validate-workflow-syntax validate-workflow-logic  ## Run all workflow validation checks
+validate-action-sha-consistency:  ## Assert identical action@version pins share one SHA across workflows
+	@echo "Validating GitHub Actions SHA consistency across workflows..."
+	$(PYTHON) ./dev-tools/quality/validate_action_sha_consistency.py
+
+validate-all-workflows: validate-workflow-syntax validate-workflow-logic validate-action-sha-consistency  ## Run all workflow validation checks
 
 validate-all-files: validate-all-workflows validate-shell-scripts  ## Run all validation checks
 

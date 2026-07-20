@@ -497,7 +497,7 @@ def create_fastapi_app(server_config: Any) -> Any:
     # Add health check endpoint
     from orb.api.dependencies import get_health_check_port
 
-    @app.get("/health", tags=["System"])
+    @app.get("/health", tags=["System"], operation_id="healthCheck")
     async def health_check(health_port: Any = Depends(get_health_check_port)) -> Any:  # type: ignore[misc]
         """Health check endpoint."""
         try:
@@ -511,7 +511,7 @@ def create_fastapi_app(server_config: Any) -> Any:
         return JSONResponse(content=status, status_code=http_status)  # type: ignore[misc]
 
     # Add metrics endpoint
-    @app.get("/metrics", tags=["System"])
+    @app.get("/metrics", tags=["System"], operation_id="getMetrics")
     async def metrics() -> Any:
         """Prometheus metrics endpoint.
 
@@ -540,7 +540,7 @@ def create_fastapi_app(server_config: Any) -> Any:
         return Response(content=body, media_type="text/plain; version=0.0.4")  # type: ignore[misc]
 
     # Add info endpoint
-    @app.get("/info", tags=["System"])
+    @app.get("/info", tags=["System"], operation_id="getServiceInfo")
     async def info() -> dict[str, Any]:
         """Service information endpoint.
 

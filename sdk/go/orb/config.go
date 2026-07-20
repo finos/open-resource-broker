@@ -9,6 +9,11 @@ import (
 type ProcessConfig struct {
 	// Binary is the path to the orb executable (default: "orb").
 	Binary string
+	// ConfigPath, if set, is passed as the global "--config <path>" option
+	// before the "server" subcommand. Supply this when running against a fresh
+	// environment that has no orb config directory (e.g. CI), otherwise
+	// "orb server start" exits with "Configuration file not found".
+	ConfigPath string
 	// Args are extra arguments passed after "server start --foreground --api-only"
 	// (e.g. ["--port", "18080"]).
 	Args []string
@@ -106,7 +111,7 @@ func WithUnixSocket(path string) Option {
 	}
 }
 
-// StreamOption configures a StreamRequest call.
+// StreamOption configures a StreamRequestStatus call.
 type StreamOption func(*streamConfig)
 
 type streamConfig struct {

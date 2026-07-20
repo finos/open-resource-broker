@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/finos/open-resource-broker/sdk/go/orb"
@@ -64,9 +65,9 @@ func TestGetTemplateNotFound(t *testing.T) {
 	if !errors.Is(err, orb.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got: %v", err)
 	}
-	var apiErr *orb.APIError
+	var apiErr *orb.OrbApiError
 	if !errors.As(err, &apiErr) {
-		t.Fatalf("expected *APIError, got: %T", err)
+		t.Fatalf("expected *OrbApiError, got: %T", err)
 	}
 	if apiErr.Code != "TEMPLATE_NOT_FOUND" {
 		t.Fatalf("expected code TEMPLATE_NOT_FOUND, got: %s", apiErr.Code)
@@ -142,6 +143,48 @@ func TestBearerTokenSentPerRequest(t *testing.T) {
 		t.Fatalf("expected token func called 3 times, got %d", tokenCallCount)
 	}
 	_ = callCount
+}
+
+// TestPathEscapingIDsWithSlash verifies that user-supplied IDs containing a
+// slash are percent-encoded before being embedded in request URL paths, so that
+// a value like "a/b" is sent as "a%2Fb" and does not inject an extra path
+// segment. This mirrors the encodeURIComponent behaviour in the TypeScript SDK.
+func TestPathEscapingIDsWithSlash(t *testing.T) {
+	slashID := "tem/plate-with/slash"
+
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RawPath // Go only populates RawPath when escaping is present
+		if gotPath == "" {
+			gotPath = r.URL.Path
+		}
+		w.Header().Set("Content-Type", "application/json")
+		// Return a minimal valid template so the client can decode the response.
+		json.NewEncoder(w).Encode(map[string]any{
+			"template_id": slashID,
+			"name":        "test",
+			"description": "",
+			"provider":    "aws",
+			"config":      map[string]any{},
+		})
+	}))
+	defer srv.Close()
+
+	c, err := orb.NewClient(orb.WithBaseURL(srv.URL), orb.WithAuth(orb.WithNoAuth()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	// GetTemplate dispatches GET /api/v1/templates/<id>
+	_, _ = c.GetTemplate(context.Background(), slashID)
+
+	if strings.Contains(gotPath, "//") {
+		t.Errorf("slash in ID was not escaped: server received path %q; expected %%2F not a literal /", gotPath)
+	}
+	if !strings.Contains(gotPath, "%2F") {
+		t.Errorf("expected %%2F in server-received path but got %q", gotPath)
+	}
 }
 
 func TestHealthyReturnsTrueWithoutManagedProcess(t *testing.T) {

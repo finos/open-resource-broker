@@ -1,3 +1,4 @@
+// Layer 2: UDS Transport
 package transport
 
 import (

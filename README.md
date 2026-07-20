@@ -31,7 +31,7 @@
 
 ---
 
-Open Resource Broker (ORB) is a unified API for orchestrating and provisioning compute capacity programmatically. Define what you need in a template, request it, track it, return it — through a CLI, REST API, Python SDK, or MCP server.
+Open Resource Broker (ORB) is a unified API for orchestrating and provisioning compute capacity programmatically. Define what you need in a template, request it, track it, return it — through a CLI, REST API, MCP server, or native SDKs in six languages (Python, Go, TypeScript, Java, Kotlin, .NET).
 
 Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet, Lambda MicroVMs), with an extensible provider system for adding new cloud backends.
 
@@ -229,7 +229,7 @@ Install with `pip install "orb-py[k8s]"`. Minimum RBAC is in [`docs/root/provide
 
 ## Interfaces
 
-ORB provides four ways to interact with your infrastructure.
+ORB provides multiple ways to interact with your infrastructure — a CLI, a REST API, an MCP server, and native SDKs in six languages.
 
 <details>
 <summary>CLI Reference</summary>
@@ -286,28 +286,32 @@ curl -X GET "http://localhost:8000/api/v1/requests/req-12345"
 </details>
 
 <details>
-<summary>Python SDK</summary>
+<summary>SDKs (Python, Go, TypeScript, Java, Kotlin, .NET)</summary>
 
-Async-first programmatic access via `ORBClient`.
+Native client libraries in six languages. Python is async-first and in-process; the other five drive a managed `orb` server over a local socket, so they share one OpenAPI contract and behave identically.
+
+| Language | Install | Entry point |
+|---|---|---|
+| Python | `pip install orb-py` | `orb.ORBClient` |
+| Go | `go get github.com/finos/open-resource-broker/sdk/go` | `orb.Client` |
+| TypeScript / Node | `npm install @finos/open-resource-broker` | `OrbClient` |
+| Java | `org.finos.openresourcebroker:open-resource-broker-java` | `OrbClient` |
+| Kotlin | `org.finos.openresourcebroker:open-resource-broker-kotlin` | `OrbClient` |
+| .NET / C# | `dotnet add package FINOS.OpenResourceBroker` | `OrbClient` |
 
 ```python
 from orb import ORBClient as orb
 
 async with orb(provider="aws") as sdk:
-    # List templates
     templates = await sdk.list_templates(active_only=True)
-
-    # Request machines
     request = await sdk.request_machines(
-        template_id=templates[0]["template_id"],
-        count=3
+        template_id=templates["templates"][0]["template_id"],
+        count=3,
     )
-
-    # Check status
-    status = await sdk.get_request_status(request_id=request["created_request_id"])
+    status = await sdk.get_request_status(request_id=request["request_id"])
 ```
 
-See the [SDK Quickstart](docs/root/sdk/quickstart.md) for the full guide.
+See the [SDK documentation](docs/root/sdk/index.md) for per-language install and usage guides, the [Python SDK Quickstart](docs/root/sdk/quickstart.md), and [Generate Your Own SDK](docs/root/sdk/generating-sdks.md).
 
 </details>
 

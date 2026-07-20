@@ -45,8 +45,14 @@ func NewServer() *Server {
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/api/v1/templates", s.handleTemplates)
 	mux.HandleFunc("/api/v1/templates/", s.handleTemplate)
-	mux.HandleFunc("/api/v1/machines/request/", s.handleRequestMachines)
-	mux.HandleFunc("/api/v1/machines/return/", s.handleReturnMachines)
+	// Register the exact paths the client posts to (no trailing slash).
+	// Registering a trailing-slash subtree pattern here would make ServeMux
+	// issue a 301 redirect for the client's slash-less POST, and older Go
+	// toolchains downgrade a 301-redirected POST to GET — which the POST-only
+	// handlers reject with 405.  Matching the client's real paths exactly
+	// avoids the redirect altogether and works across all Go versions.
+	mux.HandleFunc("/api/v1/machines/request", s.handleRequestMachines)
+	mux.HandleFunc("/api/v1/machines/return", s.handleReturnMachines)
 	mux.HandleFunc("/api/v1/machines", s.handleMachines)
 	mux.HandleFunc("/api/v1/machines/", s.handleMachine)
 	mux.HandleFunc("/api/v1/requests", s.handleRequests)
@@ -234,9 +240,10 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		s.handleSSE(w, r, id)
 		return
 	}
-	id := path
-	switch r.Method {
-	case http.MethodGet:
+	// GET /api/v1/requests/{id}/status is the single-read endpoint; it returns
+	// the {"requests": [...]} envelope the client decodes.
+	if strings.HasSuffix(path, "/status") {
+		id := strings.TrimSuffix(path, "/status")
 		s.mu.RLock()
 		st, ok := s.requests[id]
 		s.mu.RUnlock()
@@ -245,11 +252,18 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"request_id": id,
-			"status":     st.status,
-			"message":    st.message,
-			"machines":   st.machines,
+			"requests": []map[string]any{
+				{
+					"request_id": id,
+					"status":     st.status,
+					"message":    st.message,
+					"machines":   st.machines,
+				},
+			},
 		})
+		return
+	}
+	switch r.Method {
 	case http.MethodDelete:
 		w.WriteHeader(http.StatusNoContent)
 	default:
