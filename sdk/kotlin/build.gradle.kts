@@ -190,12 +190,26 @@ publishing {
                 password = findProperty("mavenCentralPassword") as String?
             }
         }
+        maven {
+            name = "GitHubPackages"
+            // GitHub Packages Maven registry for finos/open-resource-broker.
+            // Auth uses the CI GITHUB_TOKEN (packages: write) — no GPG required.
+            url = uri("https://maven.pkg.github.com/finos/open-resource-broker")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR") ?: findProperty("gprUser") as String?
+                password = System.getenv("GITHUB_TOKEN")
+                    ?: (findProperty("gprKey") ?: findProperty("githubToken")) as String?
+            }
+        }
     }
 }
 
 // Signs all Maven publications using the GPG key passed via -Psigning.gnupg.passphrase.
-// When the signing key is absent (e.g. local dev builds) signing is skipped automatically
-// because required() is not set.
-signing {
-    sign(publishing.publications["maven"])
+// Signing is conditional: it is only wired in when a GPG key/passphrase is present
+// (Maven Central release). GitHub Packages accepts unsigned artifacts, so builds that
+// publish only to GitHubPackages (auth via GITHUB_TOKEN, no GPG) do not fail here.
+if (project.hasProperty("signing.gnupg.passphrase") || System.getenv("MAVEN_GPG_PASSPHRASE") != null) {
+    signing {
+        sign(publishing.publications["maven"])
+    }
 }
