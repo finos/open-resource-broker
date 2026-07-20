@@ -66,7 +66,7 @@ async def handle_validate_storage_config(  # type: ignore[return]
         from orb.infrastructure.di.buses import QueryBus
 
         query_bus = container.get(QueryBus)
-        from orb.application.dto.queries import GetStorageHealthQuery  # type: ignore[attr-defined]
+        from orb.application.queries.storage import GetStorageHealthQuery
 
         result = await query_bus.execute(GetStorageHealthQuery())
         raw = result if isinstance(result, dict) else {"status": "healthy"}

@@ -60,6 +60,44 @@ def reset_provider_registry() -> None:
     )
 
 
+def _restore_canonical_container_factory() -> None:
+    """Restore the composition-root factory hook to the canonical one.
+
+    ``reset_container()`` clears the built container instance but deliberately
+    leaves the module-level ``_container_factory`` untouched.  Tests that call
+    ``set_container_factory(<something-else>)`` (e.g. a no-op or MagicMock to
+    exercise the singleton plumbing) therefore leave a broken factory in place;
+    the next ``get_container()`` then builds a container missing every port.
+
+    Importing ``orb.bootstrap`` re-runs ``set_container_factory(register_all_services)``
+    at import time, so re-establishing the canonical factory is a cheap, idempotent
+    way to undo any such leak between tests.
+    """
+    try:
+        from orb.bootstrap.services import register_all_services
+        from orb.infrastructure.di.container import set_container_factory
+
+        set_container_factory(register_all_services)
+    except ImportError:
+        pass  # bootstrap not importable in this environment; skip
+
+
+def _reset_domain_container() -> None:
+    """Clear the module-level domain container set during app bootstrap.
+
+    ``orb.bootstrap.Application`` calls ``set_domain_container(self._container)``
+    the first time it wires up the container.  Tests that build an Application (or
+    call ``_ensure_container``) with a mock container leak that mock into the
+    global, breaking later tests that assert the default is ``None``.
+    """
+    try:
+        from orb.domain.base.decorators import set_domain_container
+
+        set_domain_container(None)  # type: ignore[arg-type]
+    except ImportError:
+        pass  # decorators module not present; skip
+
+
 def reset_all_singletons() -> None:
     """
     Reset all singletons for testing.
@@ -74,6 +112,12 @@ def reset_all_singletons() -> None:
         reset_container()
     except ImportError:
         pass  # DI container module may not be present in all test environments; skip reset
+
+    # Restore the canonical container factory in case a test replaced it.
+    _restore_canonical_container_factory()
+
+    # Clear the leaked domain-container global set during app bootstrap.
+    _reset_domain_container()
 
     # Reset circuit breaker shared state
     _reset_circuit_breaker_states()

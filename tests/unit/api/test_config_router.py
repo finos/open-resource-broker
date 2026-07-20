@@ -102,9 +102,8 @@ class TestGetFullConfig:
         """GET /config/ returns the full config dict with 200."""
         port = _make_config_port()
 
-        with patch("orb.api.routers.config.get_config_manager", return_value=port):
-            client = TestClient(config_app)
-            r = client.get("/config/")
+        client = _client_with_port(config_app, port)
+        r = client.get("/config/")
 
         assert r.status_code == 200
         body = r.json()
@@ -132,9 +131,8 @@ class TestGetConfigValue:
         """GET /config/server.port returns the value for a dot-notation key."""
         port = _make_config_port()
 
-        with patch("orb.api.routers.config.get_config_manager", return_value=port):
-            client = TestClient(config_app)
-            r = client.get("/config/server.port")
+        client = _client_with_port(config_app, port)
+        r = client.get("/config/server.port")
 
         assert r.status_code == 200
         body = r.json()
@@ -144,11 +142,11 @@ class TestGetConfigValue:
     def test_returns_404_for_missing_key(self, config_app):
         """GET /config/{key} returns 404 when the key is not found."""
         port = _make_config_port()
-        # Override so missing key returns the sentinel (no-op; default handles it)
+        # Missing key returns the sentinel (default handles it -> 404)
 
-        with patch("orb.api.routers.config.get_config_manager", return_value=port):
-            client = TestClient(config_app, raise_server_exceptions=False)
-            r = client.get("/config/nonexistent.key")
+        config_app.dependency_overrides[get_config_manager] = lambda: port
+        client = TestClient(config_app, raise_server_exceptions=False)
+        r = client.get("/config/nonexistent.key")
 
         assert r.status_code == 404
         body = r.json()
@@ -188,9 +186,9 @@ class TestSetConfigValue:
         """PUT /config/{key} with no body returns 422 (unprocessable)."""
         port = _make_config_port()
 
-        with patch("orb.api.routers.config.get_config_manager", return_value=port):
-            client = TestClient(config_app, raise_server_exceptions=False)
-            r = client.put("/config/server.port")
+        config_app.dependency_overrides[get_config_manager] = lambda: port
+        client = TestClient(config_app, raise_server_exceptions=False)
+        r = client.put("/config/server.port")
 
         # FastAPI/pydantic returns 422 for missing required body
         assert r.status_code == 422
@@ -209,9 +207,8 @@ class TestSetConfigValue:
         """Response note warns that the change is in-memory only."""
         port = _make_config_port()
 
-        with patch("orb.api.routers.config.get_config_manager", return_value=port):
-            client = TestClient(config_app)
-            r = client.put("/config/server.port", json={"value": 9090})
+        client = _client_with_port(config_app, port)
+        r = client.put("/config/server.port", json={"value": 9090})
 
         body = r.json()
         assert "in-memory" in body["note"].lower() or "revert" in body["note"].lower()
