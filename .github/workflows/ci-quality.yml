@@ -254,7 +254,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        check: [cqrs, clean, imports, file-sizes]
+        check: [cqrs, clean, imports, lint-imports, file-sizes]
         include:
           - check: cqrs
             description: "CQRS Pattern Validation"
@@ -262,6 +262,8 @@ jobs:
             description: "Clean Architecture Dependencies"
           - check: imports
             description: "Import Validation"
+          - check: lint-imports
+            description: "Import-Linter Layer Contracts"
           - check: file-sizes
             description: "File Size Compliance"
     steps:

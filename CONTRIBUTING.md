@@ -191,11 +191,13 @@ make ci-quality-ruff
 # or: uv run ruff check src/
 
 # 3. Architecture checks (must pass — enforced in CI)
-make ci-arch-clean    # Clean Architecture layer boundaries
-make ci-arch-cqrs     # CQRS pattern compliance
-make ci-arch-imports  # Import validation
+make ci-arch-clean        # Clean Architecture layer boundaries
+make ci-arch-cqrs         # CQRS pattern compliance
+make ci-arch-imports      # Import validation
+make ci-arch-lint-imports # import-linter layer-boundary contracts
 # or: uv run ./dev-tools/scripts/check_architecture.py
 #     uv run ./dev-tools/scripts/validate_cqrs.py
+#     uv run lint-imports
 
 # 4. Unit tests (must pass — enforced in CI)
 make ci-tests-unit
@@ -204,6 +206,31 @@ make ci-tests-unit
 # Run everything in one shot
 make ci-check
 ```
+
+### Layer-Boundary Contracts (import-linter)
+
+Clean Architecture layering is enforced statically by
+[import-linter](https://import-linter.readthedocs.io/). The contracts live in
+`.importlinter` at the repo root and are checked in CI (the `lint-imports` leg
+of the architecture-validation matrix) and locally via
+`make ci-arch-lint-imports`.
+
+Three `forbidden` contracts guard the dependency direction:
+
+- **Domain layer is clean** — `orb.domain` must not import from
+  `orb.application`, `orb.infrastructure`, `orb.interface`, `orb.providers`,
+  `orb.monitoring`, `orb.cli`, or `argparse`. The domain holds pure business
+  logic and stays free of outer layers and CLI frameworks.
+- **Application does not import infrastructure concretes** — `orb.application`
+  must not import `orb.infrastructure`, `orb.providers`, or `orb.monitoring`.
+  Handlers depend on abstract ports only; concretes are wired via DI.
+- **Infrastructure does not import upward** — `orb.infrastructure` must not
+  import `orb.interface` or `orb.cli`.
+
+The contracts are currently **green with zero violations** — the tree already
+satisfies them. Treat any new failure as a real layering regression: fix the
+offending import (invert the dependency, move the shared type to a lower layer,
+or inject via a port) rather than relaxing the contract.
 
 ### Formatting and Linting
 
