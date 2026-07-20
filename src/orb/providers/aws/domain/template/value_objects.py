@@ -206,6 +206,7 @@ class ProviderApi(str, Enum):
             "SpotFleet": "SpotFleet",
             "ASG": "ASG",
             "RunInstances": "RunInstances",
+            "MicroVM": "MicroVM",
         }
 
         if value in known_values:
@@ -221,6 +222,7 @@ class ProviderApi(str, Enum):
     SPOT_FLEET = "SpotFleet"
     ASG = "ASG"
     RUN_INSTANCES = "RunInstances"
+    MICRO_VM = "MicroVM"
 
 
 class AWSFleetType(str, Enum):

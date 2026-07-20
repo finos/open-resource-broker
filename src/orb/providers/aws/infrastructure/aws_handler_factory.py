@@ -207,6 +207,9 @@ class AWSHandlerFactory:
         from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import (
             EC2FleetHandler,
         )
+        from orb.providers.aws.infrastructure.handlers.microvm.handler import (
+            MicroVMHandler,
+        )
         from orb.providers.aws.infrastructure.handlers.run_instances.handler import (
             RunInstancesHandler,
         )
@@ -220,6 +223,7 @@ class AWSHandlerFactory:
             ProviderApi.SPOT_FLEET.value: SpotFleetHandler,
             ProviderApi.ASG.value: ASGHandler,
             ProviderApi.RUN_INSTANCES.value: RunInstancesHandler,
+            ProviderApi.MICRO_VM.value: MicroVMHandler,
         }
 
         self._logger.debug("Registered handler classes: %s", list(self._handler_classes.keys()))

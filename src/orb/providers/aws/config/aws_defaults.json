@@ -52,6 +52,11 @@
             "handler_class": "RunInstancesHandler",
             "supports_spot": false,
             "supports_ondemand": true
+          },
+          "MicroVM": {
+            "handler_class": "MicroVMHandler",
+            "supports_spot": false,
+            "supports_ondemand": true
           }
         },
         "template_defaults": {

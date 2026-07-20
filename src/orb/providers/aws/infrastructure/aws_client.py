@@ -179,6 +179,7 @@ class AWSClient:
             self._ssm_client = None
             self._dynamodb_client = None
             self._dynamodb_resource = None
+            self._microvm_client = None
             self._account_id = None
             self._credentials_validated = False
 
@@ -476,6 +477,18 @@ class AWSClient:
             self._logger.debug("Initializing DynamoDB resource on first use")
             self._dynamodb_resource = self.session.resource("dynamodb", config=self.boto_config)
         return self._dynamodb_resource
+
+    @property
+    def microvm_client(self):
+        """Lazy initialization of Lambda MicroVMs client."""
+        if self._microvm_client is None:
+            with self._cache_lock:
+                if self._microvm_client is None:
+                    self._logger.debug("Initializing Lambda MicroVMs client on first use")
+                    self._microvm_client = self.session.client(
+                        "lambda-microvms", config=self.boto_config
+                    )
+        return self._microvm_client
 
     def _get_aws_metrics_config(self) -> dict:
         """Return the provider_metrics sub-section of the metrics config."""

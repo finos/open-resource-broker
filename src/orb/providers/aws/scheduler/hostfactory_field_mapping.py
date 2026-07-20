@@ -32,6 +32,14 @@ class AWSFieldMapping:
         "instanceProfile": "machine_role",
         "launchTemplateId": "launch_template_id",
         "userDataScript": "user_data",
+        # AWS MicroVM configuration (routed into metadata via dotted paths)
+        "imageVersion": "metadata.image_version",
+        "executionRoleArn": "metadata.execution_role_arn",
+        "idlePolicy": "metadata.idle_policy",
+        "maximumDurationInSeconds": "metadata.maximum_duration_in_seconds",
+        "ingressNetworkConnectors": "metadata.ingress_network_connectors",
+        "egressNetworkConnectors": "metadata.egress_network_connectors",
+        "runHookPayload": "metadata.run_hook_payload",
     }
 
     def get_mappings(self) -> dict[str, str]:

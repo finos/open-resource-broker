@@ -174,34 +174,39 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             Dictionary mapping field names to validation error messages
         """
         errors = {}
+        is_microvm = getattr(template, "provider_api", None) == "MicroVM"
 
         # Validate image ID
         if not template.image_id:
             errors["image_id"] = "Image ID is required"
+        elif is_microvm:
+            if not template.image_id.startswith("arn:"):
+                errors["image_id"] = f"MicroVM image_id must be an ARN: {template.image_id}"
         elif not self._is_valid_ami_format(template.image_id):
             errors["image_id"] = f"Invalid AMI ID format: {template.image_id}"
 
-        # Validate instance type(s)
-        machine_types_map = template.machine_types
-        abis = getattr(template, "abis_instance_requirements", None)
-        if not (machine_types_map or abis):
-            errors["machine_types"] = (
-                "Either machine_types or abis_instance_requirements must be specified"
-            )
-        elif machine_types_map:
-            for itype in machine_types_map.keys():
-                if not self._is_valid_instance_type(itype):
-                    errors["machine_types"] = f"Invalid instance type in machine_types: {itype}"
-                    break
+        if not is_microvm:
+            # Validate instance type(s) — not applicable to MicroVM
+            machine_types_map = template.machine_types
+            abis = getattr(template, "abis_instance_requirements", None)
+            if not (machine_types_map or abis):
+                errors["machine_types"] = (
+                    "Either machine_types or abis_instance_requirements must be specified"
+                )
+            elif machine_types_map:
+                for itype in machine_types_map.keys():
+                    if not self._is_valid_instance_type(itype):
+                        errors["machine_types"] = f"Invalid instance type in machine_types: {itype}"
+                        break
 
-        # Validate subnet IDs
-        if not template.subnet_ids or len(template.subnet_ids) == 0:
-            errors["subnet_ids"] = "At least one subnet ID is required"
-        else:
-            for subnet_id in template.subnet_ids:
-                if not self._is_valid_subnet_format(subnet_id):
-                    errors["subnet_ids"] = f"Invalid subnet ID format: {subnet_id}"
-                    break
+            # Validate subnet IDs — not applicable to MicroVM
+            if not template.subnet_ids or len(template.subnet_ids) == 0:
+                errors["subnet_ids"] = "At least one subnet ID is required"
+            else:
+                for subnet_id in template.subnet_ids:
+                    if not self._is_valid_subnet_format(subnet_id):
+                        errors["subnet_ids"] = f"Invalid subnet ID format: {subnet_id}"
+                        break
 
         # Validate security group IDs
         if template.security_group_ids:
@@ -386,11 +391,15 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         if not template.image_id:
             errors.append("Image ID is required for AWS templates")
 
-        if not template.machine_types:
-            errors.append("Machine types are required for AWS templates")
+        # MicroVM templates are individual Firecracker sandboxes launched from an
+        # image ARN — they have no machine type or subnet, so those EC2-only
+        # requirements are skipped here (mirrors validate_field_values).
+        if getattr(template, "provider_api", None) != "MicroVM":
+            if not template.machine_types:
+                errors.append("Machine types are required for AWS templates")
 
-        if not template.subnet_ids or len(template.subnet_ids) == 0:
-            errors.append("At least one subnet ID is required for AWS templates")
+            if not template.subnet_ids or len(template.subnet_ids) == 0:
+                errors.append("At least one subnet ID is required for AWS templates")
 
         return errors
 

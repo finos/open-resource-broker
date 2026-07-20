@@ -46,7 +46,15 @@ from ..state import AppState
 # ---------------------------------------------------------------------------
 
 # Filter options matching the React PoC TYPE_FILTERS list
-PROVIDER_FILTER_OPTIONS: list[str] = ["All", "aws", "RunInstances", "EC2Fleet", "SpotFleet", "ASG"]
+PROVIDER_FILTER_OPTIONS: list[str] = [
+    "All",
+    "aws",
+    "RunInstances",
+    "EC2Fleet",
+    "SpotFleet",
+    "ASG",
+    "MicroVM",
+]
 
 # Color mapping for provider_api badges
 PROVIDER_COLOR_MAP: dict[str, str] = {
@@ -54,6 +62,7 @@ PROVIDER_COLOR_MAP: dict[str, str] = {
     "EC2Fleet": "blue",
     "RunInstances": "teal",
     "ASG": "orange",
+    "MicroVM": "cyan",
     "aws": "indigo",
 }
 

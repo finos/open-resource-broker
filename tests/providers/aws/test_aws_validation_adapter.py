@@ -77,7 +77,8 @@ class TestAWSValidationAdapter:
         assert "SpotFleet" in supported_apis
         assert "ASG" in supported_apis
         assert "RunInstances" in supported_apis
-        assert len(supported_apis) == 4
+        assert "MicroVM" in supported_apis
+        assert len(supported_apis) == 5
 
     def test_get_default_fleet_type_for_api(self, validation_adapter):
         """Test getting default fleet type for API."""
