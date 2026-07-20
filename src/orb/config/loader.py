@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar
 
@@ -121,24 +120,26 @@ class ConfigurationLoader:
             else:
                 get_config_logger().warning("User configuration file not found: %s", config_path)
 
-        # Warn if deprecated storage.dynamodb_strategy key is present
+        # Warn if deprecated storage.dynamodb_strategy key is present.
+        # This is an operator-facing config-key deprecation detected while loading
+        # a config dict at startup, so it must emit a logger.warning (not
+        # warnings.warn, which is filtered by ``filterwarnings`` in production and
+        # CI and never reaches operators). See docs/root/developer_guide/deprecation.md
+        # (Pattern 2).
         if isinstance(config, dict) and "dynamodb_strategy" in config.get("storage", {}):
-            warnings.warn(
-                "storage.dynamodb_strategy in config root is deprecated since ORB 2.x. "
-                "Move it to provider.providers[N].config.storage.dynamodb. "
-                "This key will be removed in ORB 3.0.",
-                DeprecationWarning,
-                stacklevel=2,
+            get_config_logger().warning(
+                "Config key 'storage.dynamodb_strategy' is deprecated since ORB 2.x "
+                "and will be removed in ORB 3.0; move it under "
+                "provider.providers[N].config.storage.dynamodb."
             )
 
-        # Warn if deprecated performance.batch_sizes key is present
+        # Warn if deprecated performance.batch_sizes key is present (operator-facing
+        # config-key deprecation — see the note above and deprecation.md Pattern 2).
         if isinstance(config, dict) and "batch_sizes" in config.get("performance", {}):
-            warnings.warn(
-                "performance.batch_sizes is deprecated since ORB 2.x. "
-                "Move it to provider.providers[N].config.batch_sizes. "
-                "This key will be removed in ORB 3.0.",
-                DeprecationWarning,
-                stacklevel=2,
+            get_config_logger().warning(
+                "Config key 'performance.batch_sizes' is deprecated since ORB 2.x "
+                "and will be removed in ORB 3.0; move it under "
+                "provider.providers[N].config.batch_sizes."
             )
 
         # Override with environment variables (highest precedence)
