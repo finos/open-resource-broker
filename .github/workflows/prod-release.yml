@@ -672,6 +672,16 @@ jobs:
     name: Publish SDKs (release)
     needs: [config, github-assets, sdk-spec-conformance]
     if: github.event_name == 'release'
+    # A reusable workflow can only DOWNGRADE the caller's token, never elevate
+    # it. The top-level permissions block omits id-token (=none), so without
+    # this job-level grant the reusable's sdk-publish-npm job cannot get
+    # id-token: write and `npm publish --provenance` hard-fails. Grant exactly
+    # what the reusable's jobs need here (least-privilege — only this caller and
+    # sdk-bootstrap get id-token, not the whole workflow).
+    permissions:
+      contents: read
+      packages: write    # GitHub Packages push (github destination)
+      id-token: write    # npm provenance attestation + OIDC (npmjs destination)
     uses: ./.github/workflows/reusable-sdk-publish.yml
     secrets: inherit
     with:
@@ -693,6 +703,13 @@ jobs:
   sdk-bootstrap:
     name: Bootstrap one SDK (${{ github.event.inputs.bootstrap_sdk }} -> ${{ github.event.inputs.bootstrap_destination }})
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.bootstrap_sdk != 'none'
+    # Same rationale as sdk-publish: the reusable workflow cannot elevate the
+    # caller's token, so grant id-token: write here or `npm publish
+    # --provenance` fails when bootstrapping the npmjs destination.
+    permissions:
+      contents: read
+      packages: write    # GitHub Packages push (github destination)
+      id-token: write    # npm provenance attestation + OIDC (npmjs destination)
     uses: ./.github/workflows/reusable-sdk-publish.yml
     secrets: inherit
     with:
@@ -826,6 +843,7 @@ jobs:
       - github-assets
       - sdk-spec-conformance
       - sdk-publish
+      - sdk-bootstrap
       - sdk-assets
 
     steps:
@@ -844,6 +862,7 @@ jobs:
           echo "| github-assets | ${{ needs.github-assets.result }} |"
           echo "| sdk-spec-conformance | ${{ needs.sdk-spec-conformance.result }} |"
           echo "| sdk-publish | ${{ needs.sdk-publish.result }} |"
+          echo "| sdk-bootstrap | ${{ needs.sdk-bootstrap.result }} |"
           echo "| sdk-assets | ${{ needs.sdk-assets.result }} |"
         } >> "$GITHUB_STEP_SUMMARY"
 
@@ -855,4 +874,8 @@ jobs:
       uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe  # v1.2.2
       with:
         jobs: ${{ toJSON(needs) }}
-        allowed-skips: prod-containers, prod-manifests, prod-pypi, github-assets, sdk-spec-conformance, sdk-publish, sdk-assets
+        # sdk-bootstrap is an ALLOWED SKIP: on a normal release it never runs
+        # (dispatch-gated), so it must not fail the gate. alls-green still fails
+        # on a 'failure' result regardless of allowed-skips, so a dispatch where
+        # the bootstrap actually runs and FAILS still fails the release gate.
+        allowed-skips: prod-containers, prod-manifests, prod-pypi, github-assets, sdk-spec-conformance, sdk-publish, sdk-bootstrap, sdk-assets

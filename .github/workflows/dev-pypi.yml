@@ -16,12 +16,21 @@ env:
 
 on:
   # Trigger only after Unit Tests pass so TestPyPI always receives a package
-  # that has passed the quality gate.  Using a single sentinel workflow avoids
+  # that has passed the test suite.  Using a single sentinel workflow avoids
   # the double-fire that occurs when multiple entries in the workflows list
   # complete independently on the same push — both would fire and the second
   # publish attempt would fail with "version already exists".
-  # Unit Tests is the right sentinel: it is the comprehensive per-push gate
-  # and its completion implies the Quality Checks gate ran first (via needs).
+  #
+  # Unit Tests is the single sentinel by design.  It does NOT run the Quality
+  # Checks (ruff / pyright / architecture validation): those live in the
+  # separate "Quality Checks" workflow (ci-quality.yml), which runs in parallel
+  # and is NOT a `needs:` dependency of Unit Tests — a job cannot depend on a
+  # job in a different workflow file.  A push that passes Unit Tests but fails
+  # a quality check would therefore still reach this workflow.  To close that
+  # gap WITHOUT adding a second workflow_run sentinel (which would reintroduce
+  # the double-fire / double-publish described above), the `quality-gate` job
+  # below queries the GitHub API for the Quality Checks run on this exact commit
+  # (workflow_run.head_sha) and blocks the release unless it concluded 'success'.
   workflow_run:
     workflows: ["Unit Tests"]
     types: [completed]
@@ -39,10 +48,84 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Cross-workflow quality gate.  Unit Tests (the workflow_run sentinel) does
+  # NOT include ruff / pyright / architecture validation — those run in the
+  # separate "Quality Checks" workflow.  Because a job cannot `needs:` a job in
+  # another workflow file, we enforce the dependency here at runtime: block the
+  # release unless the Quality Checks run for THIS commit concluded 'success'.
+  # This preserves the single-sentinel design (no second workflow_run trigger,
+  # so no double-fire / double-publish) while closing the gate hole.
+  quality-gate:
+    name: Quality Checks Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Same guard as config: skip when the sentinel Unit Tests run did not
+    # succeed.  For manual workflow_dispatch there is no upstream run to
+    # inspect, so the API step below is skipped and this job passes as a
+    # deliberate no-op (manual publish is an authorized override).
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      actions: read   # read the Quality Checks workflow run conclusion
+      contents: read
+    steps:
+    - name: Require Quality Checks success on this commit
+      if: github.event_name == 'workflow_run'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      run: |
+        set -euo pipefail
+
+        # Look up the "Quality Checks" run (ci-quality.yml) for the exact commit
+        # that the sentinel Unit Tests run tested.  Quality Checks runs in
+        # parallel with Unit Tests and usually finishes first, but it may lag,
+        # so poll for a bounded window before deciding.
+        attempts=30
+        sleep_s=20
+        latest=""
+        for i in $(seq 1 "$attempts"); do
+          latest=$(gh api \
+            "/repos/${REPO}/actions/workflows/ci-quality.yml/runs?head_sha=${HEAD_SHA}&per_page=100" \
+            --jq '[.workflow_runs[]] | sort_by(.created_at) | last // empty | {status: .status, conclusion: .conclusion}')
+
+          if [ -z "$latest" ]; then
+            # No Quality Checks run exists for this commit.  Quality Checks has a
+            # path filter (src/**, tests/**, pyproject.toml, requirements*.txt,
+            # uv.lock, .ruff.toml) that is a superset of everything affecting
+            # ruff/pyright/arch outcomes.  No run means no quality-relevant file
+            # changed on this commit, so the quality status is unchanged and it
+            # is safe to proceed.
+            echo "No Quality Checks run for ${HEAD_SHA}; no quality-relevant paths changed. Allowing release."
+            exit 0
+          fi
+
+          status=$(echo "$latest" | jq -r '.status')
+          if [ "$status" = "completed" ]; then
+            break
+          fi
+          echo "Quality Checks still running for ${HEAD_SHA} (attempt ${i}/${attempts}); waiting ${sleep_s}s..."
+          sleep "$sleep_s"
+        done
+
+        status=$(echo "$latest" | jq -r '.status')
+        conclusion=$(echo "$latest" | jq -r '.conclusion')
+
+        if [ "$status" != "completed" ]; then
+          echo "::error::Quality Checks did not complete for ${HEAD_SHA} within the wait window. Blocking release."
+          exit 1
+        fi
+        if [ "$conclusion" != "success" ]; then
+          echo "::error::Quality Checks concluded '${conclusion}' (not success) for ${HEAD_SHA}. Blocking release."
+          exit 1
+        fi
+        echo "Quality Checks succeeded for ${HEAD_SHA}. Proceeding with release."
+
   config:
     name: Get Configuration
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [quality-gate]
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     outputs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}

@@ -52,11 +52,23 @@ jobs:
     # Guard the workflow_run path on a successful upstream run, exactly like
     # dev-pypi.yml.  workflow_dispatch (force) always runs.
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read  # only needs to read the repo to derive the dev version
     outputs:
       package-version: ${{ steps.config.outputs.package-version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      with:
+        # Pin to the exact commit Unit Tests validated.  On workflow_run the
+        # default checkout resolves to the default-branch HEAD at execution
+        # time, so `make get-version` (which derives the dev version from
+        # `git rev-parse HEAD`) would compute the version off the WRONG commit
+        # — and could build/publish an untested commit if main advanced, or
+        # race with another dev-sdk run to a colliding version.  The
+        # `|| github.sha` fallback keeps workflow_dispatch working, where
+        # workflow_run.head_sha is empty.
+        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
     - name: Get project configuration
       id: config
@@ -73,6 +85,17 @@ jobs:
     # push produces a UNIQUE version — GitHub Packages never sees a duplicate
     # and the publish never collides with a prior dev build.
     uses: ./.github/workflows/reusable-sdk-publish.yml
+    # A reusable workflow cannot elevate beyond the token permissions of its
+    # caller, so the caller job must grant everything the reusable jobs need.
+    # Without this block the publish job would inherit only the repository
+    # DEFAULT permissions, capping the reusable jobs' `packages: write`
+    # (GitHub Packages push would be denied) and `id-token: write` (npm
+    # provenance would fail).  prod-release.yml grants these explicitly; the
+    # test channel must too.
+    permissions:
+      contents: read
+      packages: write   # push dev SDKs to GitHub Packages (the test channel)
+      id-token: write   # npm provenance / OIDC parity with the release channel
     secrets: inherit
     with:
       channel: test

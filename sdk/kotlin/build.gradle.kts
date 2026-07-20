@@ -208,7 +208,12 @@ publishing {
 // Signing is conditional: it is only wired in when a GPG key/passphrase is present
 // (Maven Central release). GitHub Packages accepts unsigned artifacts, so builds that
 // publish only to GitHubPackages (auth via GITHUB_TOKEN, no GPG) do not fail here.
-if (project.hasProperty("signing.gnupg.passphrase") || System.getenv("MAVEN_GPG_PASSPHRASE") != null) {
+// NOTE: In CI the publish step declares MAVEN_GPG_PASSPHRASE via `${{ secrets.* }}`.
+// When the secret is absent GitHub Actions sets the env var to the EMPTY STRING "" —
+// not unset — so a bare `!= null` check is always true and would wire signing on the
+// GitHub Packages (unsigned) path, breaking it. Require a NON-EMPTY passphrase instead.
+val gpgPass = System.getenv("MAVEN_GPG_PASSPHRASE")
+if (project.hasProperty("signing.gnupg.passphrase") || !gpgPass.isNullOrBlank()) {
     signing {
         sign(publishing.publications["maven"])
     }
