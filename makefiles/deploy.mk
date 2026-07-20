@@ -73,6 +73,16 @@ build-with-version: clean dev-install  ## Build package with explicit version (s
 	@BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh
 
 semantic-release-build:  ## Build package for semantic-release (runs inside the action's container; bypasses run_tool.sh)
+	# Stamp the Go SDK version.go + spec info.version to the version PSR is about
+	# to commit+tag.  PSR injects NEW_VERSION into this hook's environment and runs
+	# it BEFORE it stages+commits+tags, and sdk/go/orb/version.go + sdk/spec/openapi.json
+	# are listed in [tool.semantic_release] assets — so both files land in the tagged
+	# vX.Y.Z release commit.  Guard on NEW_VERSION so a plain `make semantic-release-build`
+	# outside PSR (or PSR --noop, which does not set it) is a no-op for the stamp.
+	@if [ -n "$$NEW_VERSION" ]; then \
+		echo "Stamping Go SDK + spec to $$NEW_VERSION for the release commit..."; \
+		$(MAKE) sdk-go-stamp-version VERSION="$$NEW_VERSION"; \
+	fi
 	rm -rf dist/ build/ ./*.egg-info/
 	python3 -m pip install --quiet build
 	# Let `build` create its own isolated env satisfying pyproject's
