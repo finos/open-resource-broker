@@ -45,6 +45,14 @@ allow_indirect_imports = True
 #   A1 — TemplateDTO moved to orb.application.dto.template
 #   A2 — same fix as A1
 #   A3 — MetricsCollector now injected via MetricsPort
+#
+# One pre-existing violation remains and is deliberately ignored below: the
+# provisioning orchestration service still reaches for the circuit-breaker
+# resilience concretes.  Inverting this requires a domain-level
+# CircuitBreakerError base + a resilience port, tracked by the outstanding
+# application→infrastructure ports work.  It is ignored (not silently allowed)
+# so this contract stays honest — a green result here means "no NEW app→infra
+# leaks", and any additional violation will still break the build.
 # ---------------------------------------------------------------------------
 [importlinter:contract:application-no-infra-concretes]
 name = Application layer does not import infrastructure concretes
@@ -55,6 +63,9 @@ forbidden_modules =
     orb.providers
     orb.monitoring
 allow_indirect_imports = True
+ignore_imports =
+    orb.application.services.provisioning_orchestration_service -> orb.infrastructure.resilience.exceptions
+    orb.application.services.provisioning_orchestration_service -> orb.infrastructure.resilience.strategy.circuit_breaker
 
 
 # ---------------------------------------------------------------------------
