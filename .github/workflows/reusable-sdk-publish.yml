@@ -61,13 +61,24 @@ jobs:
     name: Publish TypeScript SDK to npm (${{ matrix.destination }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Skip the whole job when there are no npm destinations. A caller passes
+    # '[]' when this SDK is not selected (e.g. the bootstrap dispatch, which
+    # enables exactly one SDK, or a language with every destination disabled in
+    # .project.yml). GitHub rejects a run at compile time with startup_failure
+    # if ANY matrix is empty — a job-level if: alone does NOT save us because
+    # the matrix is expanded before the if: gate. So we skip here AND make the
+    # matrix below non-empty via a sentinel that this if: prevents from running.
+    if: inputs.npm-targets != '[]' && inputs.npm-targets != ''
     # Destination matrix driven by the caller's npm-targets input.
     # Each enabled destination ("github", "npmjs") runs as its own leg.
     # fail-fast: false so one destination's failure does not cancel the others.
+    # When npm-targets is empty ('[]' or ''), fall back to a one-element
+    # "__none__" sentinel so the matrix is never empty (empty => startup_failure);
+    # the job-level if: above then skips the job, so the sentinel never executes.
     strategy:
       fail-fast: false
       matrix:
-        destination: ${{ fromJSON(inputs.npm-targets) }}
+        destination: ${{ (inputs.npm-targets != '[]' && inputs.npm-targets != '') && fromJSON(inputs.npm-targets) || fromJSON('["__none__"]') }}
     permissions:
       contents: read
       packages: write    # GITHUB_TOKEN push to GitHub Packages (github destination)
@@ -149,12 +160,17 @@ jobs:
     name: Publish Java SDK to Maven (${{ matrix.destination }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Skip when there are no maven destinations (see sdk-publish-npm for the
+    # full rationale: an empty matrix is a compile-time startup_failure, so the
+    # if: guard and the sentinel fallback in the matrix below must go together).
+    if: inputs.maven-targets != '[]' && inputs.maven-targets != ''
     # Destination matrix driven by the caller's maven-targets input.
     # Each enabled destination ("github", "central") runs as its own leg.
+    # Sentinel fallback keeps the matrix non-empty when skipped (see npm job).
     strategy:
       fail-fast: false
       matrix:
-        destination: ${{ fromJSON(inputs.maven-targets) }}
+        destination: ${{ (inputs.maven-targets != '[]' && inputs.maven-targets != '') && fromJSON(inputs.maven-targets) || fromJSON('["__none__"]') }}
     permissions:
       contents: read
       packages: write    # GITHUB_TOKEN push to GitHub Packages (github destination)
@@ -248,12 +264,16 @@ jobs:
     name: Publish Kotlin SDK to Maven (${{ matrix.destination }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Skip when there are no maven destinations (see sdk-publish-npm for the
+    # full rationale: empty matrix => startup_failure, so if: + sentinel).
+    if: inputs.maven-targets != '[]' && inputs.maven-targets != ''
     # Destination matrix driven by the caller's maven-targets input
     # (shared with the Java SDK — the block covers BOTH java and kotlin).
+    # Sentinel fallback keeps the matrix non-empty when skipped (see npm job).
     strategy:
       fail-fast: false
       matrix:
-        destination: ${{ fromJSON(inputs.maven-targets) }}
+        destination: ${{ (inputs.maven-targets != '[]' && inputs.maven-targets != '') && fromJSON(inputs.maven-targets) || fromJSON('["__none__"]') }}
     permissions:
       contents: read
       packages: write    # GITHUB_TOKEN push to GitHub Packages (github destination)
@@ -343,12 +363,16 @@ jobs:
     name: Publish .NET SDK to NuGet (${{ matrix.destination }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Skip when there are no nuget destinations (see sdk-publish-npm for the
+    # full rationale: empty matrix => startup_failure, so if: + sentinel).
+    if: inputs.nuget-targets != '[]' && inputs.nuget-targets != ''
     # Destination matrix driven by the caller's nuget-targets input.
     # Each enabled destination ("github", "nuget_org") runs as its own leg.
+    # Sentinel fallback keeps the matrix non-empty when skipped (see npm job).
     strategy:
       fail-fast: false
       matrix:
-        destination: ${{ fromJSON(inputs.nuget-targets) }}
+        destination: ${{ (inputs.nuget-targets != '[]' && inputs.nuget-targets != '') && fromJSON(inputs.nuget-targets) || fromJSON('["__none__"]') }}
     permissions:
       contents: read
       packages: write    # GITHUB_TOKEN push to GitHub Packages (github destination)
