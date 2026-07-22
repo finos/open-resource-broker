@@ -63,7 +63,9 @@ jobs:
   # Parallel test-group matrix (T2613): splits the non-provider test corpus
   # into independent legs that each run on their own runner with xdist within
   # the leg.  Legs: unit (tests/unit), infrastructure (tests/infrastructure),
-  # integration (tests/integration).  Provider legs are handled by the
+  # integration (tests/integration), k8s-legacy (src/orb/k8s_legacy/tests/unit —
+  # the legacy HostFactory plugin's own unit suite, whose heavy deps are already
+  # in the shared `test` dependency-group).  Provider legs are handled by the
   # providers-tests matrix below and remain driven by discovery.
   #
   # The standalone `tests`, `integration-tests`, and `infrastructure-tests` jobs
@@ -77,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-group: [unit, infrastructure, integration]
+        test-group: [unit, infrastructure, integration, k8s-legacy]
     uses: ./.github/workflows/reusable-test.yml
     secrets: inherit
     with:

@@ -21,9 +21,8 @@ comment:
   behavior: default
   require_changes: true
 
-# Coverage is uploaded as a single unflagged combined report, so carryforward
-# must stay off — a stale flagged session must never be merged over or resurrected
-# alongside the current combined upload.
+# Coverage is a single unflagged combined report; carryforward stays off so no
+# prior session is merged into it.
 flag_management:
   default_rules:
     carryforward: false
@@ -34,7 +33,6 @@ ignore:
   - "tests/"
   - "docs/"
   - "scripts/"
-  - "src/orb/k8s_legacy/**"  # own separate test suite; runs outside the main legs
   - "**/tests/**"            # test files under src/ are not production source
   - "src/orb/__main__.py"    # thin process entrypoints — not unit-tested
   - "src/orb/run.py"
