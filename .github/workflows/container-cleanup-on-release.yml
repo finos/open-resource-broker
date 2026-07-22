@@ -29,7 +29,6 @@ on:
         type: string
 
 permissions:
-  packages: write
   contents: read
 
 concurrency:
@@ -43,6 +42,9 @@ jobs:
     name: Prune Pre-Release Dev Container Tags
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Resolve release timestamp
         id: release

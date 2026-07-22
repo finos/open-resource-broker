@@ -66,6 +66,9 @@ on:
     # NUGET_API_KEY / GITHUB_TOKEN / GH_APP_* are all visible here without an
     # explicit secrets: declaration.
 
+permissions:
+  contents: read
+
 jobs:
   sdk-publish-npm:
     name: Publish TypeScript SDK to npm (${{ matrix.destination }})

@@ -44,6 +44,9 @@ concurrency:
   group: "sdk-dev-publishing"
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   config:
     name: Get Configuration
@@ -60,15 +63,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       with:
-        # Pin to the exact commit Unit Tests validated.  On workflow_run the
-        # default checkout resolves to the default-branch HEAD at execution
-        # time, so `make get-version` (which derives the dev version from
-        # `git rev-parse HEAD`) would compute the version off the WRONG commit
-        # — and could build/publish an untested commit if main advanced, or
-        # race with another dev-sdk run to a colliding version.  The
-        # `|| github.sha` fallback keeps workflow_dispatch working, where
-        # workflow_run.head_sha is empty.
-        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+        ref: ${{ github.sha }}
+
+    - name: Guard against publishing an untested commit
+      # On a workflow_run event github.sha is the default-branch HEAD at dispatch
+      # time, which differs from the commit Unit Tests validated
+      # (workflow_run.head_sha) when main advances mid-window. Publishing the
+      # dev SDKs from an unvalidated commit is not acceptable, so stop if they
+      # diverge; the next push re-triggers cleanly.
+      if: github.event_name == 'workflow_run' && github.sha != github.event.workflow_run.head_sha
+      run: |
+        echo "::error::main advanced (${{ github.sha }}) since Unit Tests validated ${{ github.event.workflow_run.head_sha }}; skipping dev publish"
+        exit 1
 
     - name: Get project configuration
       id: config

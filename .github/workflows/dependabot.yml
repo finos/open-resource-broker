@@ -12,6 +12,9 @@ concurrency:
   group: "dependency-updates-${{ github.ref }}"
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   config:
     name: Get Configuration

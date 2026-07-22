@@ -28,7 +28,7 @@ on:
         type: string
 
 permissions:
-  packages: write
+  contents: read
 
 concurrency:
   # Distinct from container-cleanup-on-release so both can run concurrently without blocking.
@@ -40,6 +40,8 @@ jobs:
     name: Prune Dev Container Tags
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      packages: write
     steps:
       - name: Cleanup dev container versions
         shell: bash

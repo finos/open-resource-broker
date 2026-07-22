@@ -47,6 +47,9 @@ concurrency:
   group: "pypi-publishing"
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   # Cross-workflow quality gate.  Unit Tests (the workflow_run sentinel) does
   # NOT include ruff / pyright / architecture validation — those run in the
