@@ -137,6 +137,18 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      with:
+        ref: ${{ github.sha }}
+
+    - name: Guard against publishing an untested commit
+      # On a workflow_run event github.sha is the default-branch HEAD at dispatch
+      # time, which differs from the commit Unit Tests validated
+      # (workflow_run.head_sha) when main advances mid-window. Stop rather than
+      # publish an unvalidated commit; the next push re-triggers cleanly.
+      if: github.event_name == 'workflow_run' && github.sha != github.event.workflow_run.head_sha
+      run: |
+        echo "::error::main advanced (${{ github.sha }}) since Unit Tests validated ${{ github.event.workflow_run.head_sha }}; skipping dev publish"
+        exit 1
 
     - name: Get project configuration
       id: config
