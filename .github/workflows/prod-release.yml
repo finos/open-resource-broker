@@ -27,6 +27,18 @@ on:
         default: 'github'
         type: choice
         options: [github, npmjs, central, nuget_org]
+      auth_mode:
+        # Bootstrap's main use is the one-off token seed: npm/NuGet trusted
+        # publishing both require the package to already exist before a
+        # trusted-publisher policy can be attached, so the FIRST publish must use
+        # a token. Defaults to 'token' for that reason; pick 'trusted' to bootstrap
+        # via OIDC once a policy exists. Applies to npm + NuGet only (maven is
+        # always token+GPG).
+        description: 'One-off: publishing auth for the chosen SDK (npm/NuGet only)'
+        required: false
+        default: 'token'
+        type: choice
+        options: [trusted, token]
 
 permissions:
   contents: read
@@ -690,6 +702,9 @@ jobs:
       npm-targets: ${{ needs.config.outputs.npm-targets }}
       maven-targets: ${{ needs.config.outputs.maven-targets }}
       nuget-targets: ${{ needs.config.outputs.nuget-targets }}
+      # The automatic release always publishes npm/NuGet via OIDC trusted
+      # publishing (explicit — not relying on the reusable's default).
+      auth-mode: trusted
 
   # ---------------------------------------------------------------------------
   # One-off SDK bootstrap (manual dispatch only). Publishes exactly ONE SDK to
@@ -721,6 +736,10 @@ jobs:
       npm-targets: ${{ github.event.inputs.bootstrap_sdk == 'npm' && format('["{0}"]', github.event.inputs.bootstrap_destination) || '[]' }}
       maven-targets: ${{ github.event.inputs.bootstrap_sdk == 'maven' && format('["{0}"]', github.event.inputs.bootstrap_destination) || '[]' }}
       nuget-targets: ${{ github.event.inputs.bootstrap_sdk == 'nuget' && format('["{0}"]', github.event.inputs.bootstrap_destination) || '[]' }}
+      # Bootstrap chooses auth explicitly via the dispatch input (default 'token'
+      # for the seed; 'trusted' once a trusted-publisher policy exists). Irrelevant
+      # to maven (always token+GPG).
+      auth-mode: ${{ github.event.inputs.auth_mode }}
 
   # ---------------------------------------------------------------------------
   # SDK archival assets — attach the built SDK artifacts (npm .tgz, java +
