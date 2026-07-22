@@ -1,0 +1,53 @@
+name: PR SDK Publish Dry-Run
+
+# Exercise the full SDK publish pipeline on pull requests — generate models,
+# build, package, and validate the publish command for every SDK — without
+# pushing anything. Catches publish-path regressions (build breaks, packaging
+# errors, workflow-compile issues) on the PR that introduces them instead of
+# only at release time.
+
+on:
+  pull_request:
+    paths:
+      - 'sdk/**'
+      - '.github/workflows/reusable-sdk-publish.yml'
+      - '.github/workflows/pr-sdk-dryrun.yml'
+      - 'makefiles/sdk.mk'
+  workflow_dispatch:
+
+concurrency:
+  group: pr-sdk-dryrun-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  config:
+    name: Get Configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      package-version: ${{ steps.config.outputs.package-version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+    - name: Get project configuration
+      id: config
+      uses: ./.github/actions/get-config
+
+  dry-run:
+    name: SDK Publish Dry-Run
+    needs: [config]
+    permissions:
+      contents: write   # ceiling must cover the reusable Go-tag job's declared permission (validated at compile time even though that job is skipped on dry-run)
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/reusable-sdk-publish.yml
+    with:
+      channel: test
+      version: ${{ needs.config.outputs.package-version }}
+      npm-targets: '["github"]'
+      maven-targets: '["github"]'
+      nuget-targets: '["github"]'
+      dry-run: true

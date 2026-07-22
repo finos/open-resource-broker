@@ -85,17 +85,13 @@ jobs:
     # push produces a UNIQUE version — GitHub Packages never sees a duplicate
     # and the publish never collides with a prior dev build.
     uses: ./.github/workflows/reusable-sdk-publish.yml
-    # A reusable workflow cannot elevate beyond the token permissions of its
-    # caller, so the caller job must grant everything the reusable jobs need.
-    # Without this block the publish job would inherit only the repository
-    # DEFAULT permissions, capping the reusable jobs' `packages: write`
-    # (GitHub Packages push would be denied) and `id-token: write` (npm
-    # provenance would fail).  prod-release.yml grants these explicitly; the
-    # test channel must too.
+    # Must cover every permission the reusable jobs declare — a reusable workflow
+    # can only reduce the caller's token, never elevate it, and this ceiling is
+    # checked at compile time regardless of which jobs actually run.
     permissions:
-      contents: read
-      packages: write   # push dev SDKs to GitHub Packages (the test channel)
-      id-token: write   # npm provenance / OIDC parity with the release channel
+      contents: write   # sdk-publish-go declares contents: write (skipped on test, but the ceiling must still cover it)
+      packages: write   # GitHub Packages push
+      id-token: write   # npm provenance / OIDC
     secrets: inherit
     with:
       channel: test

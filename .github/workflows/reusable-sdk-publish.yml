@@ -52,6 +52,16 @@ on:
         required: false
         type: string
         default: '["github"]'
+      dry-run:
+        description: "When true, run the full generate/build/package path and validate the publish, but push nothing (npm publish --dry-run, dotnet pack without push, gradle publishToMavenLocal, no Go tag). Used on pull requests to exercise the pipeline without shipping."
+        required: false
+        type: boolean
+        default: false
+      auth-mode:
+        description: "'trusted' (OIDC trusted publishing, default, used by automatic releases) or 'token' (use the registry's API-key/token secret — for the one-off manual bootstrap seed before a trusted-publisher policy exists). Applies to npm + NuGet only; Maven Central always uses token+GPG."
+        required: false
+        type: string
+        default: 'trusted'
     # secrets: inherit is used by every caller, so NODE_AUTH_TOKEN / MAVEN_* /
     # NUGET_API_KEY / GITHUB_TOKEN / GH_APP_* are all visible here without an
     # explicit secrets: declaration.
@@ -61,13 +71,16 @@ jobs:
     name: Publish TypeScript SDK to npm (${{ matrix.destination }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Destination matrix driven by the caller's npm-targets input.
-    # Each enabled destination ("github", "npmjs") runs as its own leg.
-    # fail-fast: false so one destination's failure does not cancel the others.
+    # Scope the public leg to the npmjs environment; the github leg and the
+    # sentinel leg resolve to null (no environment).
+    environment: ${{ matrix.destination == 'npmjs' && 'npmjs' || null }}
+    # Skip when there are no npm destinations. An empty matrix is a compile-time
+    # error, so the matrix falls back to a single sentinel value the if: skips.
+    if: inputs.npm-targets != '[]' && inputs.npm-targets != ''
     strategy:
       fail-fast: false
       matrix:
-        destination: ${{ fromJSON(inputs.npm-targets) }}
+        destination: ${{ (inputs.npm-targets != '[]' && inputs.npm-targets != '') && fromJSON(inputs.npm-targets) || fromJSON('["__none__"]') }}
     permissions:
       contents: read
       packages: write    # GITHUB_TOKEN push to GitHub Packages (github destination)
@@ -89,7 +102,15 @@ jobs:
         node-version: '20'
         # Point npm at the destination registry so setup-node writes the matching
         # auth line into .npmrc for NODE_AUTH_TOKEN.
-        registry-url: ${{ matrix.destination == 'github' && 'https://npm.pkg.github.com' || 'https://registry.npmjs.org' }}
+        #   github            -> npm.pkg.github.com  (GITHUB_TOKEN auth)
+        #   npmjs + token     -> registry.npmjs.org  (NODE_AUTH_TOKEN auth line)
+        #   npmjs + trusted   -> registry-url OMITTED (empty). setup-node only
+        #     writes the `//registry/:_authToken=${NODE_AUTH_TOKEN}` line when a
+        #     registry-url is given; on the OIDC trusted path we must NOT have
+        #     that line — an empty _authToken (NODE_AUTH_TOKEN unset on trusted)
+        #     breaks OIDC trusted publishing. registry.npmjs.org is npm's default
+        #     publish registry anyway, so `npm publish` still targets it.
+        registry-url: ${{ matrix.destination == 'github' && 'https://npm.pkg.github.com' || (inputs.auth-mode == 'token' && 'https://registry.npmjs.org' || '') }}
 
     # openapi-generator needs a JVM; generated models are gitignored and MUST be
     # produced here or the published package ships with no model types.
@@ -111,50 +132,80 @@ jobs:
       run: cd sdk/typescript && npm ci
 
     - name: Set SDK version
-      # Strip any leading 'v' for npm.
+      # The version may be a PEP 440 dev build (e.g. 1.8.3.dev850) on the test
+      # channel; npm/SemVer requires a hyphenated prerelease (1.8.3-dev.850).
+      # Release versions (X.Y.Z) pass through unchanged.
       run: |
-        VERSION="${{ inputs.version }}"
+        VERSION=$(echo "${{ inputs.version }}" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
         cd sdk/typescript && npm version "$VERSION" --no-git-tag-version
 
     - name: Build TypeScript SDK
       run: cd sdk/typescript && npm run build
 
+    - name: Upgrade npm CLI for OIDC trusted publishing (>= 11.5.1)
+      # OIDC trusted publishing to registry.npmjs.org requires npm CLI >= 11.5.1;
+      # the Node 20 runner ships an older npm (10.x), so upgrade before publish.
+      # Only needed on the npmjs + trusted path (github uses GITHUB_TOKEN, and
+      # the npmjs + token path uses the NODE_AUTH_TOKEN auth line, neither of
+      # which needs the newer OIDC-capable npm).
+      if: matrix.destination != 'github' && inputs.auth-mode != 'token'
+      run: npm install -g npm@^11.5.1
+
     - name: Publish to npm (${{ matrix.destination }})
-      # Branch on matrix.destination:
+      # Branch on matrix.destination, then (for npmjs) on inputs.auth-mode:
       #   github — GitHub Packages (https://npm.pkg.github.com), auth via
       #     GITHUB_TOKEN (packages: write); always present, never skips. No
       #     --provenance (GitHub Packages does not accept the npm provenance
-      #     statement).  Scope @finos already matches owner finos.
-      #   npmjs  — public registry.npmjs.org, auth via NODE_AUTH_TOKEN, publishes
-      #     with --provenance (requires id-token: write).  LOUD fail if the
-      #     secret is missing — no silent skip.
+      #     statement).  Scope @finos already matches owner finos. Unchanged.
+      #   npmjs + token   — public registry.npmjs.org, auth via NODE_AUTH_TOKEN
+      #     (the operator explicitly chose token, e.g. the one-off bootstrap seed
+      #     before a trusted-publisher policy can be attached).  LOUD fail if the
+      #     secret is empty — no silent skip.
+      #   npmjs + trusted — public registry.npmjs.org via OIDC trusted publishing
+      #     (default; automatic releases). NO token in env — id-token: write is
+      #     granted on this job and setup-node wrote no .npmrc auth line on this
+      #     path (registry-url omitted above), so the auth context is clean.
+      # On the trusted path NODE_AUTH_TOKEN is deliberately left UNSET: an empty
+      # _authToken can break OIDC trusted publishing.
       env:
-        NODE_AUTH_TOKEN: ${{ matrix.destination == 'github' && secrets.GITHUB_TOKEN || secrets.NODE_AUTH_TOKEN }}
+        NODE_AUTH_TOKEN: ${{ matrix.destination == 'github' && secrets.GITHUB_TOKEN || (inputs.auth-mode == 'token' && secrets.NODE_AUTH_TOKEN || '') }}
       run: |
         cd sdk/typescript
+        if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+          npm publish --access public --dry-run
+          echo "npm -> ${{ matrix.destination }}: dry-run OK (nothing published)"
+          exit 0
+        fi
         if [[ "${{ matrix.destination }}" == "github" ]]; then
           npm publish --access public
           echo "npm -> github: published"
-        else
+        elif [[ "${{ inputs.auth-mode }}" == "token" ]]; then
           if [[ -z "$NODE_AUTH_TOKEN" ]]; then
-            echo "::error::npm -> npmjs: required secret NODE_AUTH_TOKEN not set"
+            echo "::error::npm -> npmjs: auth-mode=token but required secret NODE_AUTH_TOKEN is not set"
             echo "npm -> npmjs: failed: NODE_AUTH_TOKEN not set"
             exit 1
           fi
           npm publish --access public --provenance
-          echo "npm -> npmjs: published"
+          echo "npm -> npmjs: published (token)"
+        else
+          # Trusted publishing (OIDC). No token in env; npm CLI >= 11.5.1
+          # (upgraded above) performs the OIDC exchange with registry.npmjs.org.
+          npm publish --access public --provenance
+          echo "npm -> npmjs: published (OIDC trusted publishing)"
         fi
 
   sdk-publish-maven:
     name: Publish Java SDK to Maven (${{ matrix.destination }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Destination matrix driven by the caller's maven-targets input.
-    # Each enabled destination ("github", "central") runs as its own leg.
+    # Scope the public leg to the maven-central environment; other legs resolve
+    # to null (no environment).
+    environment: ${{ matrix.destination == 'central' && 'maven-central' || null }}
+    if: inputs.maven-targets != '[]' && inputs.maven-targets != ''
     strategy:
       fail-fast: false
       matrix:
-        destination: ${{ fromJSON(inputs.maven-targets) }}
+        destination: ${{ (inputs.maven-targets != '[]' && inputs.maven-targets != '') && fromJSON(inputs.maven-targets) || fromJSON('["__none__"]') }}
     permissions:
       contents: read
       packages: write    # GITHUB_TOKEN push to GitHub Packages (github destination)
@@ -209,8 +260,10 @@ jobs:
         fi
 
     - name: Set SDK version
+      # Normalize a PEP 440 dev build (1.8.3.dev850) to a SemVer prerelease
+      # (1.8.3-dev.850) for Maven; release versions pass through unchanged.
       run: |
-        VERSION="${{ inputs.version }}"
+        VERSION=$(echo "${{ inputs.version }}" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
         sed -i "s/^version = .*/version = '$VERSION'/" sdk/java/build.gradle
 
     - name: Publish Java SDK to Maven (${{ matrix.destination }})
@@ -228,6 +281,11 @@ jobs:
         MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
       run: |
         cd sdk/java
+        if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+          ./gradlew --no-daemon publishMavenPublicationToMavenLocal
+          echo "java -> ${{ matrix.destination }}: dry-run OK (published to local repo only)"
+          exit 0
+        fi
         if [[ "${{ matrix.destination }}" == "github" ]]; then
           ./gradlew --no-daemon publishMavenPublicationToGitHubPackagesRepository
           echo "java -> github: published"
@@ -248,12 +306,14 @@ jobs:
     name: Publish Kotlin SDK to Maven (${{ matrix.destination }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Destination matrix driven by the caller's maven-targets input
-    # (shared with the Java SDK — the block covers BOTH java and kotlin).
+    # Scope the public leg to the maven-central environment; other legs resolve
+    # to null (no environment).
+    environment: ${{ matrix.destination == 'central' && 'maven-central' || null }}
+    if: inputs.maven-targets != '[]' && inputs.maven-targets != ''
     strategy:
       fail-fast: false
       matrix:
-        destination: ${{ fromJSON(inputs.maven-targets) }}
+        destination: ${{ (inputs.maven-targets != '[]' && inputs.maven-targets != '') && fromJSON(inputs.maven-targets) || fromJSON('["__none__"]') }}
     permissions:
       contents: read
       packages: write    # GITHUB_TOKEN push to GitHub Packages (github destination)
@@ -305,8 +365,10 @@ jobs:
         fi
 
     - name: Set SDK version
+      # Normalize a PEP 440 dev build (1.8.3.dev850) to a SemVer prerelease
+      # (1.8.3-dev.850) for Maven; release versions pass through unchanged.
       run: |
-        VERSION="${{ inputs.version }}"
+        VERSION=$(echo "${{ inputs.version }}" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
         sed -i "s/^version = .*/version = \"$VERSION\"/" sdk/kotlin/build.gradle.kts
 
     - name: Publish Kotlin SDK to Maven (${{ matrix.destination }})
@@ -323,6 +385,11 @@ jobs:
         MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
       run: |
         cd sdk/kotlin
+        if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+          ./gradlew --no-daemon publishMavenPublicationToMavenLocal
+          echo "kotlin -> ${{ matrix.destination }}: dry-run OK (published to local repo only)"
+          exit 0
+        fi
         if [[ "${{ matrix.destination }}" == "github" ]]; then
           ./gradlew --no-daemon publishMavenPublicationToGitHubPackagesRepository
           echo "kotlin -> github: published"
@@ -343,15 +410,18 @@ jobs:
     name: Publish .NET SDK to NuGet (${{ matrix.destination }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Destination matrix driven by the caller's nuget-targets input.
-    # Each enabled destination ("github", "nuget_org") runs as its own leg.
+    # Scope the public leg to the nuget environment; other legs resolve to null
+    # (no environment).
+    environment: ${{ matrix.destination == 'nuget_org' && 'nuget' || null }}
+    if: inputs.nuget-targets != '[]' && inputs.nuget-targets != ''
     strategy:
       fail-fast: false
       matrix:
-        destination: ${{ fromJSON(inputs.nuget-targets) }}
+        destination: ${{ (inputs.nuget-targets != '[]' && inputs.nuget-targets != '') && fromJSON(inputs.nuget-targets) || fromJSON('["__none__"]') }}
     permissions:
       contents: read
       packages: write    # GITHUB_TOKEN push to GitHub Packages (github destination)
+      id-token: write    # OIDC token exchange for NuGet trusted publishing (nuget_org, trusted)
 
     # Required secrets:
     #   github    destination — GITHUB_TOKEN (always present, never skips).
@@ -385,8 +455,10 @@ jobs:
       run: make sdk-csharp-generate
 
     - name: Set SDK version
+      # Normalize a PEP 440 dev build (1.8.3.dev850) to a NuGet-valid prerelease
+      # (1.8.3-dev.850); release versions pass through unchanged.
       run: |
-        VERSION="${{ inputs.version }}"
+        VERSION=$(echo "${{ inputs.version }}" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
         # Version the hand-written client package.
         sed -i "s|<Version>.*</Version>|<Version>$VERSION</Version>|" \
           sdk/csharp/src/FINOS.OpenResourceBroker/FINOS.OpenResourceBroker.csproj
@@ -405,26 +477,51 @@ jobs:
           --configuration Release \
           --output /tmp/nuget-packages
 
+    - name: NuGet trusted-publishing login (OIDC)
+      # nuget_org + trusted only (the default path; automatic releases). Exchanges
+      # the GitHub Actions OIDC token (id-token: write) for a short-lived NuGet API
+      # key, exposed as steps.nuget-login.outputs.NUGET_API_KEY. Skipped on the
+      # github destination and on the nuget_org + token path (which uses the
+      # long-lived NUGET_API_KEY secret instead).
+      #   user: the nuget.org account username that owns the trusted-publisher
+      #   policy for FINOS.OpenResourceBroker (set as the NUGET_USER repo secret).
+      # SHA-pinned to NuGet/login v1.2.0 (v1 tag -> 8d19675 at time of writing).
+      if: matrix.destination == 'nuget_org' && inputs.auth-mode != 'token' && inputs.dry-run != true
+      id: nuget-login
+      uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841  # v1.2.0
+      with:
+        user: ${{ secrets.NUGET_USER }}
+
     - name: Publish to NuGet (${{ matrix.destination }})
-      # Branch on matrix.destination:
-      #   github    — dotnet nuget push to https://nuget.pkg.github.com/finos/index.json
-      #     with --api-key GITHUB_TOKEN (packages: write).  Always present, never
-      #     skips.
-      #   nuget_org — dotnet nuget push to nuget.org with NUGET_API_KEY.  LOUD
-      #     fail if the secret is missing — no silent skip.
+      # Branch on matrix.destination, then (for nuget_org) on inputs.auth-mode:
+      #   github          — dotnet nuget push to
+      #     https://nuget.pkg.github.com/finos/index.json with --api-key
+      #     GITHUB_TOKEN (packages: write). Always present, never skips. Unchanged.
+      #   nuget_org + token   — dotnet nuget push to nuget.org with the long-lived
+      #     NUGET_API_KEY secret (operator explicitly chose token, e.g. the
+      #     bootstrap seed). LOUD fail if the secret is empty — no silent skip.
+      #   nuget_org + trusted — dotnet nuget push to nuget.org with the temporary
+      #     OIDC key minted by the NuGet/login step above (default; automatic
+      #     releases). nuget.org trusted publishing is already configured.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        NUGET_OIDC_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
       run: |
+        if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+          ls -la /tmp/nuget-packages/*.nupkg
+          echo "nuget -> ${{ matrix.destination }}: dry-run OK (packed, nothing pushed)"
+          exit 0
+        fi
         if [[ "${{ matrix.destination }}" == "github" ]]; then
           dotnet nuget push /tmp/nuget-packages/*.nupkg \
             --api-key "$GITHUB_TOKEN" \
             --source https://nuget.pkg.github.com/finos/index.json \
             --skip-duplicate
           echo "nuget -> github: published"
-        else
+        elif [[ "${{ inputs.auth-mode }}" == "token" ]]; then
           if [[ -z "$NUGET_API_KEY" ]]; then
-            echo "::error::nuget -> nuget_org: required secret NUGET_API_KEY not set"
+            echo "::error::nuget -> nuget_org: auth-mode=token but required secret NUGET_API_KEY is not set"
             echo "nuget -> nuget_org: failed: NUGET_API_KEY not set"
             exit 1
           fi
@@ -432,7 +529,14 @@ jobs:
             --api-key "$NUGET_API_KEY" \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
-          echo "nuget -> nuget_org: published"
+          echo "nuget -> nuget_org: published (token)"
+        else
+          # Trusted publishing (OIDC): use the temporary key from NuGet/login.
+          dotnet nuget push /tmp/nuget-packages/*.nupkg \
+            --api-key "$NUGET_OIDC_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+          echo "nuget -> nuget_org: published (OIDC trusted publishing)"
         fi
 
   # ---------------------------------------------------------------------------
@@ -463,7 +567,7 @@ jobs:
     # are served by the module proxy straight off the commit — nothing to
     # publish), and on the bootstrap channel only the single chosen registry SDK
     # is published, so this job does not run there either.
-    if: inputs.channel == 'release'
+    if: inputs.channel == 'release' && inputs.dry-run != true
     permissions:
       contents: write    # push the sdk/go/vX.Y.Z tag
 

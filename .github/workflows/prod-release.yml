@@ -27,11 +27,24 @@ on:
         default: 'github'
         type: choice
         options: [github, npmjs, central, nuget_org]
+      auth_mode:
+        # Bootstrap's main use is the one-off token seed: npm/NuGet trusted
+        # publishing both require the package to already exist before a
+        # trusted-publisher policy can be attached, so the FIRST publish must use
+        # a token. Defaults to 'token' for that reason; pick 'trusted' to bootstrap
+        # via OIDC once a policy exists. Applies to npm + NuGet only (maven is
+        # always token+GPG).
+        description: 'One-off: publishing auth for the chosen SDK (npm/NuGet only)'
+        required: false
+        default: 'token'
+        type: choice
+        options: [trusted, token]
 
 permissions:
-  contents: read
+  contents: write   # sdk-publish-go pushes the sdk/go/vX.Y.Z tag via the reusable workflow
   packages: write
   pages: write
+  id-token: write   # npm provenance + NuGet OIDC trusted publishing
 
 concurrency:
   group: production-release-${{ github.event.release.tag_name || inputs.version }}
@@ -457,6 +470,7 @@ jobs:
   prod-docs:
     name: Deploy Production Documentation
     needs: config
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -672,16 +686,6 @@ jobs:
     name: Publish SDKs (release)
     needs: [config, github-assets, sdk-spec-conformance]
     if: github.event_name == 'release'
-    # A reusable workflow can only DOWNGRADE the caller's token, never elevate
-    # it. The top-level permissions block omits id-token (=none), so without
-    # this job-level grant the reusable's sdk-publish-npm job cannot get
-    # id-token: write and `npm publish --provenance` hard-fails. Grant exactly
-    # what the reusable's jobs need here (least-privilege — only this caller and
-    # sdk-bootstrap get id-token, not the whole workflow).
-    permissions:
-      contents: read
-      packages: write    # GitHub Packages push (github destination)
-      id-token: write    # npm provenance attestation + OIDC (npmjs destination)
     uses: ./.github/workflows/reusable-sdk-publish.yml
     secrets: inherit
     with:
@@ -690,6 +694,9 @@ jobs:
       npm-targets: ${{ needs.config.outputs.npm-targets }}
       maven-targets: ${{ needs.config.outputs.maven-targets }}
       nuget-targets: ${{ needs.config.outputs.nuget-targets }}
+      # The automatic release always publishes npm/NuGet via OIDC trusted
+      # publishing (explicit — not relying on the reusable's default).
+      auth-mode: trusted
 
   # ---------------------------------------------------------------------------
   # One-off SDK bootstrap (manual dispatch only). Publishes exactly ONE SDK to
@@ -703,13 +710,6 @@ jobs:
   sdk-bootstrap:
     name: Bootstrap one SDK (${{ github.event.inputs.bootstrap_sdk }} -> ${{ github.event.inputs.bootstrap_destination }})
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.bootstrap_sdk != 'none'
-    # Same rationale as sdk-publish: the reusable workflow cannot elevate the
-    # caller's token, so grant id-token: write here or `npm publish
-    # --provenance` fails when bootstrapping the npmjs destination.
-    permissions:
-      contents: read
-      packages: write    # GitHub Packages push (github destination)
-      id-token: write    # npm provenance attestation + OIDC (npmjs destination)
     uses: ./.github/workflows/reusable-sdk-publish.yml
     secrets: inherit
     with:
@@ -721,6 +721,10 @@ jobs:
       npm-targets: ${{ github.event.inputs.bootstrap_sdk == 'npm' && format('["{0}"]', github.event.inputs.bootstrap_destination) || '[]' }}
       maven-targets: ${{ github.event.inputs.bootstrap_sdk == 'maven' && format('["{0}"]', github.event.inputs.bootstrap_destination) || '[]' }}
       nuget-targets: ${{ github.event.inputs.bootstrap_sdk == 'nuget' && format('["{0}"]', github.event.inputs.bootstrap_destination) || '[]' }}
+      # Bootstrap chooses auth explicitly via the dispatch input (default 'token'
+      # for the seed; 'trusted' once a trusted-publisher policy exists). Irrelevant
+      # to maven (always token+GPG).
+      auth-mode: ${{ github.event.inputs.auth_mode }}
 
   # ---------------------------------------------------------------------------
   # SDK archival assets — attach the built SDK artifacts (npm .tgz, java +
@@ -840,11 +844,13 @@ jobs:
       - prod-containers
       - prod-manifests
       - prod-pypi
+      - prod-docs
       - github-assets
       - sdk-spec-conformance
       - sdk-publish
       - sdk-bootstrap
       - sdk-assets
+      - container-cleanup
 
     steps:
     - name: Write release train summary
@@ -859,11 +865,13 @@ jobs:
           echo "| prod-containers | ${{ needs.prod-containers.result }} |"
           echo "| prod-manifests | ${{ needs.prod-manifests.result }} |"
           echo "| prod-pypi | ${{ needs.prod-pypi.result }} |"
+          echo "| prod-docs | ${{ needs.prod-docs.result }} |"
           echo "| github-assets | ${{ needs.github-assets.result }} |"
           echo "| sdk-spec-conformance | ${{ needs.sdk-spec-conformance.result }} |"
           echo "| sdk-publish | ${{ needs.sdk-publish.result }} |"
           echo "| sdk-bootstrap | ${{ needs.sdk-bootstrap.result }} |"
           echo "| sdk-assets | ${{ needs.sdk-assets.result }} |"
+          echo "| container-cleanup | ${{ needs.container-cleanup.result }} |"
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Fail if any release job failed or was cancelled
@@ -878,4 +886,4 @@ jobs:
         # (dispatch-gated), so it must not fail the gate. alls-green still fails
         # on a 'failure' result regardless of allowed-skips, so a dispatch where
         # the bootstrap actually runs and FAILS still fails the release gate.
-        allowed-skips: prod-containers, prod-manifests, prod-pypi, github-assets, sdk-spec-conformance, sdk-publish, sdk-bootstrap, sdk-assets
+        allowed-skips: prod-containers, prod-manifests, prod-pypi, prod-docs, github-assets, sdk-spec-conformance, sdk-publish, sdk-bootstrap, sdk-assets, container-cleanup
