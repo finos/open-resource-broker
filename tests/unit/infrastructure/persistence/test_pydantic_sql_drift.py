@@ -101,7 +101,6 @@ NULLABLE_WITH_COERCION: dict[type[BaseModel], dict[str, str]] = {
         # TemplateSerializer._apply_nullable_defaults coerces all of these.
         "tags": "TemplateSerializer._apply_nullable_defaults",
         "metadata": "TemplateSerializer._apply_nullable_defaults",
-        "provider_data": "TemplateSerializer._apply_nullable_defaults",
         "security_group_ids": "TemplateSerializer._apply_nullable_defaults",
         "subnet_ids": "TemplateSerializer._apply_nullable_defaults",
         "network_zones": "TemplateSerializer._apply_nullable_defaults",

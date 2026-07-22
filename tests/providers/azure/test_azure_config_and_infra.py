@@ -320,7 +320,7 @@ class TestAzureHandlerFactory:
 
         assert isinstance(template, AzureTemplate)
         assert template.vm_size == "Standard_B1s"
-        assert template.provider_data == {}
+        assert "provider_data" not in AzureTemplate.model_fields
 
     def test_template_factory_does_not_downgrade_invalid_azure_template(self):
         container = DIContainer()

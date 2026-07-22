@@ -1,8 +1,13 @@
 """Tests for the Azure domain template aggregate, value objects, and ARM mapper."""
 
+import argparse
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
+from orb.domain.template.template_aggregate import Template
+from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import (
     AzureAllocationStrategy,
@@ -41,6 +46,14 @@ _SPOT_DEFAULTS = {
     "eviction_policy": "Deallocate",
 }
 
+_AZURE_ONLY_TEMPLATE_FIELDS = {
+    "vm_size",
+    "placement_split_strategy",
+    "placement_primary_share_percent",
+    "placement_regions",
+    "placement_zones",
+}
+
 
 # ---------------------------------------------------------------------------
 # AzureTemplate basic construction
@@ -48,6 +61,24 @@ _SPOT_DEFAULTS = {
 
 
 class TestAzureTemplateConstruction:
+    def test_azure_fields_do_not_leak_into_shared_template(self):
+        assert _AZURE_ONLY_TEMPLATE_FIELDS <= AzureTemplate.model_fields.keys()
+        assert _AZURE_ONLY_TEMPLATE_FIELDS.isdisjoint(Template.model_fields)
+
+    def test_shared_template_does_not_own_provider_runtime_data(self):
+        assert "provider_data" not in Template.model_fields
+
+    def test_azure_cli_arguments_are_owned_by_azure_cli_spec(self):
+        parser = argparse.ArgumentParser()
+        AzureCLISpec().add_arguments(parser)
+
+        option_strings = {option for action in parser._actions for option in action.option_strings}
+        assert "--azure-subscription-id" in option_strings
+        assert "--azure-resource-group" in option_strings
+
+        shared_args_path = Path(__file__).parents[3] / "src/orb/cli/args.py"
+        assert "--azure-" not in shared_args_path.read_text()
+
     def test_minimal_template(self):
         t = AzureTemplate(**_BASE_FIELDS)
         assert t.template_id == "test-template"
@@ -62,6 +93,7 @@ class TestAzureTemplateConstruction:
             "provider_type": "azure",
             "provider_api": "SingleVM",
             "version": "catalog-v1",
+            "provider_data": {},
             "provider_config": {
                 "vm_size": "Standard_D4s_v5",
                 "resource_group": "test-rg",
@@ -82,6 +114,10 @@ class TestAzureTemplateConstruction:
         assert t.version == "catalog-v1"
         assert t.image is not None
         assert t.image.publisher == "Canonical"
+
+    def test_rejects_non_empty_template_provider_data(self):
+        with pytest.raises(ValueError, match="put Azure template configuration in provider_config"):
+            AzureTemplate(**_BASE_FIELDS, provider_data={"vm_size": "Standard_B1s"})
 
     def test_rejects_missing_ssh_keys(self):
         """SSH access is required — no password fallback (mirrors AWS key_name pattern)."""

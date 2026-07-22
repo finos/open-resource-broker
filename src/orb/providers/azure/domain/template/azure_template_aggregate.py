@@ -475,6 +475,13 @@ class AzureTemplate(Template):
             return data
 
         data = dict(data)
+        provider_data = data.pop("provider_data", None)
+        if provider_data:
+            raise ValueError(
+                "Azure templates do not accept provider_data; put Azure template "
+                "configuration in provider_config"
+            )
+
         raw_provider_config = data.pop("provider_config", None)
         if raw_provider_config is not None:
             if hasattr(raw_provider_config, "model_dump"):
