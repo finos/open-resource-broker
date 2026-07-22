@@ -21,11 +21,12 @@ comment:
   behavior: default
   require_changes: true
 
-flags:
-  unit:
-    paths:
-      - src/orb/
-    carryforward: true
+# Coverage is uploaded as a single unflagged combined report, so carryforward
+# must stay off — a stale flagged session must never be merged over or resurrected
+# alongside the current combined upload.
+flag_management:
+  default_rules:
+    carryforward: false
 
 # Kept in sync with [tool.coverage.run] omit in pyproject.toml so Codecov's
 # view matches the combined report we upload.
