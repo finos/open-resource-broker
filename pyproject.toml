@@ -779,6 +779,16 @@ venv = ".venv"
 version_toml = ["pyproject.toml:project.version"]
 version_variables = [".project.yml:version"]
 build_command = "make semantic-release-build"
+# Extra files to fold into the tagged release commit.  The build_command
+# (make semantic-release-build) stamps these to NEW_VERSION before PSR stages
+# and commits, so the vX.Y.Z tag is self-contained: it carries the bumped Go SDK
+# MinCompatibleVersion and the version-stamped OpenAPI spec.  This is what lets
+# `go get .../sdk/go@vX.Y.Z` resolve a version.go that matches the tag, with no
+# separate post-tag chore(sdk/go) commit polluting the next release's range.
+assets = [
+    "sdk/go/orb/version.go",
+    "sdk/spec/openapi.json",
+]
 major_on_zero = true
 allow_zero_version = true
 tag_format = "v{version}"

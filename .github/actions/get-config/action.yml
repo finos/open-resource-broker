@@ -28,6 +28,15 @@ outputs:
   short-name:
     description: 'Short CLI command name (project.short_name in .project.yml)'
     value: ${{ steps.config.outputs.short-name }}
+  npm-targets:
+    description: 'JSON array of enabled npm publish destinations (e.g. ["github","npmjs"])'
+    value: ${{ steps.config.outputs.npm-targets }}
+  maven-targets:
+    description: 'JSON array of enabled maven publish destinations (e.g. ["github","central"])'
+    value: ${{ steps.config.outputs.maven-targets }}
+  nuget-targets:
+    description: 'JSON array of enabled nuget publish destinations (e.g. ["github","nuget_org"])'
+    value: ${{ steps.config.outputs.nuget-targets }}
 runs:
   using: 'composite'
   steps:
@@ -48,7 +57,27 @@ runs:
         PYPI_NAME=$(yq '.project.pypi_name' .project.yml)
         BUILD_PLATFORMS=$(yq '.build.platforms | join(",")' .project.yml)
         SHORT_NAME=$(yq '.project.short_name' .project.yml)
-        
+
+        # SDK publish targets: emit a compact JSON array of only the enabled
+        # destinations per language, read from the .sdk_publish booleans.
+        # 'github' is the always-on default; public destinations flip on when
+        # their booleans are set to true. Missing/false keys are omitted.
+        # fromJSON(...) in the workflows turns each array into a job matrix.
+        build_targets() {
+          # $1 = yq path to the destination block, remaining args = dest names
+          local path="$1"; shift
+          local items=""
+          for dest in "$@"; do
+            if [[ "$(yq "(${path}.${dest} // false) == true" .project.yml)" == "true" ]]; then
+              items="${items:+$items,}\"$dest\""
+            fi
+          done
+          echo "[$items]"
+        }
+        NPM_TARGETS=$(build_targets ".sdk_publish.npm" github npmjs)
+        MAVEN_TARGETS=$(build_targets ".sdk_publish.maven" github central)
+        NUGET_TARGETS=$(build_targets ".sdk_publish.nuget" github nuget_org)
+
         # Centralized version generation using Makefile infrastructure
         if [[ "${{ github.event_name }}" == "release" ]]; then
           # Only actual release events are treated as releases
@@ -70,6 +99,9 @@ runs:
           echo "pypi-name=$PYPI_NAME"
           echo "build-platforms=$BUILD_PLATFORMS"
           echo "short-name=$SHORT_NAME"
+          echo "npm-targets=$NPM_TARGETS"
+          echo "maven-targets=$MAVEN_TARGETS"
+          echo "nuget-targets=$NUGET_TARGETS"
         } >> "$GITHUB_OUTPUT"
 
         echo "Default Python version: $DEFAULT_PYTHON_VERSION"
@@ -81,3 +113,6 @@ runs:
         echo "PyPI name: $PYPI_NAME"
         echo "Build platforms: $BUILD_PLATFORMS"
         echo "Short name: $SHORT_NAME"
+        echo "npm targets: $NPM_TARGETS"
+        echo "maven targets: $MAVEN_TARGETS"
+        echo "nuget targets: $NUGET_TARGETS"

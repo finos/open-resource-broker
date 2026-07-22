@@ -323,13 +323,35 @@ local-clean: ; @$(MAKE) local-workflow clean
 # (the SDK module has its own go.mod; those targets cd into sdk/go so the build
 # resolves against the SDK module, not the repo-root module).
 
-sdk-go-update-version:  ## Update Go SDK version file and commit (usage: make sdk-go-update-version VERSION=1.6.0)
+# The Go SDK version bump + spec stamp are folded into the semantic-release
+# BUILD hook (make semantic-release-build), so they land in the SAME commit
+# python-semantic-release tags vX.Y.Z (see [tool.semantic_release] assets in
+# pyproject.toml).  This keeps the release tag self-contained — the tagged
+# commit already carries the bumped version.go and the version-stamped spec —
+# and eliminates the standalone post-tag chore(sdk/go) commit that used to land
+# on main and pollute the next release's commit range.
+
+sdk-go-stamp-version:  ## Stamp Go SDK version.go + spec info.version to VERSION (no git). Usage: make sdk-go-stamp-version VERSION=1.6.0
+	@# Stamp-only: no git.  Called by the semantic-release build hook so the
+	@# result is committed+tagged as part of the release commit.  Idempotent —
+	@# re-stamping the same version reproduces byte-identical files (the spec is
+	@# re-serialised with the same canonical indent=2/trailing-newline formatting
+	@# export_openapi_spec.sh writes), so the sdk-spec-drift-guard still passes.
+	@# The committed spec's ROUTES are kept fresh on every PR by that guard, so at
+	@# release time only info.version changes — no server boot needed (this runs in
+	@# the slim build container that has no uv/orb).
+	@if [ -z "$(VERSION)" ]; then echo "ERROR: VERSION is required"; exit 1; fi
 	sed -i "s/MinCompatibleVersion = \".*\"/MinCompatibleVersion = \"$(VERSION)\"/" sdk/go/orb/version.go
-	git add sdk/spec/openapi.json sdk/go/orb/version.go
-	git diff --cached --quiet || git commit -m "chore(sdk/go): update for v$(VERSION) [skip ci]"
-	git push
-	# Push a submodule-scoped tag so the Go module proxy can serve
-	# go get github.com/finos/open-resource-broker/sdk/go@vX.Y.Z
+	@python3 -c "import json,sys; p='sdk/spec/openapi.json'; d=json.load(open(p,encoding='utf-8')); d['info']['version']=sys.argv[1]; f=open(p,'w',encoding='utf-8'); f.write(json.dumps(d,indent=2,ensure_ascii=True)+chr(10)); f.close()" "$(VERSION)"
+
+sdk-go-tag:  ## Tag the current release commit as sdk/go/vX.Y.Z and push it (no commit). Usage: make sdk-go-tag VERSION=1.6.0
+	@# Tag-only: points a submodule-scoped tag at the CURRENT HEAD, which is the
+	@# release commit python-semantic-release just created and tagged vX.Y.Z.  The
+	@# Go module proxy serves
+	@# go get github.com/finos/open-resource-broker/sdk/go@vX.Y.Z off this tag.
+	@# No commit and no branch push here: PSR already pushed the release commit, so
+	@# nothing extra lands on main.
+	@if [ -z "$(VERSION)" ]; then echo "ERROR: VERSION is required"; exit 1; fi
 	git tag sdk/go/v$(VERSION)
 	git push origin sdk/go/v$(VERSION)
 

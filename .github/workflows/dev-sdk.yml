@@ -1,0 +1,105 @@
+name: Dev SDK Publishing
+
+# ---------------------------------------------------------------------------
+# SDK TEST CHANNEL — the SDK equivalent of the TestPyPI wheel (dev-pypi.yml).
+#
+# This workflow publishes DEV-versioned SDKs (1.x.y.devN) to GitHub Packages
+# ONLY, on every main push that passes CI.  It is the symmetric counterpart to
+# dev-pypi.yml: where that publishes the dev wheel to TestPyPI, this publishes
+# the dev SDKs to GitHub Packages so consumers can smoke-test the latest SDKs
+# straight off main before a release.
+#
+# GitHub Packages only: public registries (npm.js, Maven Central, NuGet.org) are
+# the PRODUCTION distribution channels and are handled exclusively by
+# prod-release.yml on a real GitHub Release.  This test channel never touches
+# them — it passes ["github"] for every language so only GitHub Packages
+# receives the dev build.  Go is a no-op on the test channel (its dev
+# distribution is pseudo-versions served by the module proxy straight off the
+# commit — `go get .../sdk/go@<commit>` — so nothing needs publishing).
+#
+# The actual publish logic lives in reusable-sdk-publish.yml (shared with the
+# release channel) so it is defined ONCE.
+# ---------------------------------------------------------------------------
+
+on:
+  # Trigger only after Unit Tests pass so GitHub Packages always receives SDKs
+  # that have passed the quality gate.  Using the single "Unit Tests" sentinel
+  # (rather than several workflows) avoids the double-fire that occurs when
+  # multiple entries in the workflows list complete independently on the same
+  # push.  This mirrors dev-pypi.yml exactly so the TestPyPI wheel and the dev
+  # SDKs publish off the same gate.
+  workflow_run:
+    workflows: ["Unit Tests"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force publish even if version exists'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: "sdk-dev-publishing"
+  cancel-in-progress: false
+
+jobs:
+  config:
+    name: Get Configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Guard the workflow_run path on a successful upstream run, exactly like
+    # dev-pypi.yml.  workflow_dispatch (force) always runs.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read  # only needs to read the repo to derive the dev version
+    outputs:
+      package-version: ${{ steps.config.outputs.package-version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      with:
+        # Pin to the exact commit Unit Tests validated.  On workflow_run the
+        # default checkout resolves to the default-branch HEAD at execution
+        # time, so `make get-version` (which derives the dev version from
+        # `git rev-parse HEAD`) would compute the version off the WRONG commit
+        # — and could build/publish an untested commit if main advanced, or
+        # race with another dev-sdk run to a colliding version.  The
+        # `|| github.sha` fallback keeps workflow_dispatch working, where
+        # workflow_run.head_sha is empty.
+        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+    - name: Get project configuration
+      id: config
+      uses: ./.github/actions/get-config
+
+  publish:
+    name: Publish Dev SDKs to GitHub Packages
+    needs: [config]
+    # Reuse the same publish logic as the release channel.  channel: test forces
+    # the github-only destinations and makes the Go job a no-op.
+    #
+    # Version collision: the config job computes a SHA-derived dev version
+    # (1.x.y.devN) via `make get-version` for non-release events, so every main
+    # push produces a UNIQUE version — GitHub Packages never sees a duplicate
+    # and the publish never collides with a prior dev build.
+    uses: ./.github/workflows/reusable-sdk-publish.yml
+    # A reusable workflow cannot elevate beyond the token permissions of its
+    # caller, so the caller job must grant everything the reusable jobs need.
+    # Without this block the publish job would inherit only the repository
+    # DEFAULT permissions, capping the reusable jobs' `packages: write`
+    # (GitHub Packages push would be denied) and `id-token: write` (npm
+    # provenance would fail).  prod-release.yml grants these explicitly; the
+    # test channel must too.
+    permissions:
+      contents: read
+      packages: write   # push dev SDKs to GitHub Packages (the test channel)
+      id-token: write   # npm provenance / OIDC parity with the release channel
+    secrets: inherit
+    with:
+      channel: test
+      version: ${{ needs.config.outputs.package-version }}
+      npm-targets: '["github"]'
+      maven-targets: '["github"]'
+      nuget-targets: '["github"]'

@@ -18,6 +18,12 @@ repository:
   org: finos
   name: open-resource-broker
   registry: ghcr.io # Container registry
+sdk_publish:
+  # GitHub Packages is the always-on default (auth via GITHUB_TOKEN, no external secret).
+  # The public flags flip on once their publishing secrets are provisioned.
+  npm: { github: true, npmjs: false }
+  maven: { github: true, central: false } # covers BOTH java and kotlin
+  nuget: { github: true, nuget_org: false }
 build:
   platforms: [linux/amd64, linux/arm64] # Container platforms
   package_root: src/orb
