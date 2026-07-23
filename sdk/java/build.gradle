@@ -229,6 +229,11 @@ publishing {
 def gpgPass = System.getenv('MAVEN_GPG_PASSPHRASE')
 if (project.hasProperty('signing.gnupg.passphrase') || (gpgPass != null && !gpgPass.trim().isEmpty())) {
     signing {
+        // Use the gpg command-line signatory so the GPG key imported into the
+        // agent (and -Psigning.gnupg.passphrase) is used; without useGpgCmd()
+        // gradle expects an in-memory key (signing.keyId/secretKeyRingFile) and
+        // fails with "no configured signatory".
+        useGpgCmd()
         sign publishing.publications.maven
     }
 }

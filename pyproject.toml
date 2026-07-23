@@ -256,6 +256,7 @@ dev = [
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
     "nltk>=3.9.3",
+    "gitpython>=3.1.52",
     "watchdog",
     "tenacity",
     "pg8000",
@@ -375,6 +376,10 @@ test = [
     "werkzeug>=3.1.6",
     # Security override for safety's vulnerable nltk dependency (GHSA-7p94-766c-hgjp)
     "nltk>=3.9.3",
+    # Security override for python-semantic-release's vulnerable gitpython
+    # (GHSA-956x-8gvw-wg5v, GHSA-2f96-g7mh-g2hx, GHSA-v396-v7q4-x2qj argument
+    # injection; GHSA-rwj8-pgh3-r573 os.path.expandvars in polish_url)
+    "gitpython>=3.1.52",
     # k8s-legacy extra deps — required for tests/integration/k8s_legacy/
     "kubernetes",
     "watchdog",
@@ -822,7 +827,10 @@ output_format = "md"
 [tool.semantic_release.commit_parser_options]
 minor_tags = ["feat"]
 patch_tags = ["fix", "perf"]
-major_tags = ["release"]
+# Major bumps come from a "!" or a BREAKING CHANGE footer (conventional-commit
+# rule). The conventional parser has no major_tags option; a "release:" commit
+# is a trigger marker only and contributes nothing to the computed bump — the
+# size is decided by the feat/fix/breaking commits in the range.
 default_bump_level = 2
 
 [tool.semantic_release.remote]

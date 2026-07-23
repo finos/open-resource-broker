@@ -1294,14 +1294,14 @@ wheels = [
 
 [[package]]
 name = "gitpython"
-version = "3.1.50"
+version = "3.1.55"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gitdb" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/33/f6/354ae6491228b5eb40e10d89c4d13c651fe1cf7556e35ebdded50cff57ce/gitpython-3.1.50.tar.gz", hash = "sha256:80da2d12504d52e1f998772dc5baf6e553f8d2fcfe1fcc226c9d9a2ee3372dcc", size = 219798, upload-time = "2026-05-06T04:01:26.571Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/ab/ba0d29f2fa2277ed6256b2ac09003494045355f3a10bf32f351761287870/gitpython-3.1.55.tar.gz", hash = "sha256:781e3b1624dad81b24e9524bf0297b69786a0706db2cbceec1e2b05c38e5152f", size = 225071, upload-time = "2026-07-23T02:52:43.246Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/7a/1c6e3562dfd8950adbb11ffbc65d21e7c89d01a6e4f137fa981056de25c5/gitpython-3.1.50-py3-none-any.whl", hash = "sha256:d352abe2908d07355014abdd21ddf798c2a961469239afec4962e9da884858f9", size = 212507, upload-time = "2026-05-06T04:01:23.799Z" },
+    { url = "https://files.pythonhosted.org/packages/20/6a/d3b8208d2f8aac66abe8ccc1c23fa2c89464ec42cc71a601e95d05902428/gitpython-3.1.55-py3-none-any.whl", hash = "sha256:7c9ec1e69c158c081632ab35c41471e302c96db2ae42165036a5d2403378812e", size = 216590, upload-time = "2026-07-23T02:52:41.932Z" },
 ]
 
 [[package]]
@@ -3204,7 +3204,7 @@ wheels = [
 
 [[package]]
 name = "orb-py"
-version = "1.8.3"
+version = "1.8.4"
 source = { editable = "." }
 dependencies = [
     { name = "boto3" },
@@ -3278,6 +3278,7 @@ dev = [
     { name = "cyclonedx-bom" },
     { name = "fastapi" },
     { name = "git-changelog" },
+    { name = "gitpython" },
     { name = "httpx" },
     { name = "import-linter" },
     { name = "ipdb" },
@@ -3436,6 +3437,7 @@ ci = [
     { name = "coverage" },
     { name = "cyclonedx-bom" },
     { name = "fastapi" },
+    { name = "gitpython" },
     { name = "httpx" },
     { name = "import-linter" },
     { name = "jinja2" },
@@ -3503,6 +3505,7 @@ dev = [
     { name = "cyclonedx-bom" },
     { name = "fastapi" },
     { name = "git-changelog" },
+    { name = "gitpython" },
     { name = "httpx" },
     { name = "import-linter" },
     { name = "ipdb" },
@@ -3600,6 +3603,7 @@ test = [
     { name = "alembic" },
     { name = "coverage" },
     { name = "fastapi" },
+    { name = "gitpython" },
     { name = "httpx" },
     { name = "jinja2" },
     { name = "joserfc" },
@@ -3663,6 +3667,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'k8s-legacy'", specifier = ">=0.128.0" },
     { name = "filelock", specifier = ">=3.20.1" },
     { name = "git-changelog", marker = "extra == 'dev'", specifier = ">=2.6.0,<3.0.0" },
+    { name = "gitpython", marker = "extra == 'dev'", specifier = ">=3.1.52" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
     { name = "import-linter", marker = "extra == 'dev'", specifier = ">=2.0,<3.0.0" },
     { name = "ipdb", marker = "extra == 'dev'", specifier = ">=0.13.13,<1.0.0" },
@@ -3785,6 +3790,7 @@ ci = [
     { name = "coverage", specifier = ">=7.3.2,<8.0.0" },
     { name = "cyclonedx-bom", specifier = ">=4.0.0,<8.0.0" },
     { name = "fastapi", specifier = ">=0.128.0" },
+    { name = "gitpython", specifier = ">=3.1.52" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "import-linter", specifier = ">=2.0,<3.0.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
@@ -3851,6 +3857,7 @@ dev = [
     { name = "cyclonedx-bom", specifier = ">=4.0.0,<8.0.0" },
     { name = "fastapi", specifier = ">=0.128.0" },
     { name = "git-changelog", specifier = ">=2.6.0,<3.0.0" },
+    { name = "gitpython", specifier = ">=3.1.52" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "import-linter", specifier = ">=2.0,<3.0.0" },
     { name = "ipdb", specifier = ">=0.13.13,<1.0.0" },
@@ -3947,6 +3954,7 @@ test = [
     { name = "alembic", specifier = ">=1.13" },
     { name = "coverage", specifier = ">=7.3.2,<8.0.0" },
     { name = "fastapi", specifier = ">=0.128.0" },
+    { name = "gitpython", specifier = ">=3.1.52" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "joserfc", specifier = ">=1.6.1" },

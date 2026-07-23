@@ -43,13 +43,16 @@ jobs:
       contents: write
       packages: write
       id-token: write
-    # Only release from main: guard workflow_dispatch against feature-branch runs.
-    # No release: commit-message filter — python-semantic-release does not emit
-    # such commits, so the gate would be dead; the release-approval environment
-    # on the release job is the human gate.
+    # Release only on explicit intent: a manual dispatch from main, or a push
+    # whose commit message contains 'release:'. The workflow_run path must be a
+    # push-originated upstream run (never a schedule/cron run) that succeeded and
+    # carried a 'release:' commit — so nightly Unit Tests never drive a release.
     if: |
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      (github.event_name == 'workflow_run'
+        && github.event.workflow_run.conclusion == 'success'
+        && github.event.workflow_run.event == 'push'
+        && contains(github.event.workflow_run.head_commit.message, 'release:'))
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0

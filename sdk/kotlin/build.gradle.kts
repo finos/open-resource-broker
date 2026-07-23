@@ -215,6 +215,10 @@ publishing {
 val gpgPass = System.getenv("MAVEN_GPG_PASSPHRASE")
 if (project.hasProperty("signing.gnupg.passphrase") || !gpgPass.isNullOrBlank()) {
     signing {
+        // Use the gpg command-line signatory so the imported GPG key (and
+        // -Psigning.gnupg.passphrase) is used; without useGpgCmd() gradle
+        // expects an in-memory key and fails with "no configured signatory".
+        useGpgCmd()
         sign(publishing.publications["maven"])
     }
 }
