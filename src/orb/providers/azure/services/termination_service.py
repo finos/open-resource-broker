@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import builtins
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
@@ -14,7 +14,6 @@ from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequ
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureHandler,
     AzureReleaseContext,
-    AzureReleaseHostsResult,
     AzureReleaseProviderData,
 )
 from orb.providers.azure.services.operation_parsing import (
@@ -66,7 +65,6 @@ async def _dispatch_release_groups_async(
     default_resource_id: str,
     context: AzureReleaseContext,
     logger: LoggingPort,
-    record_pending_cleanup: Callable[[AzureReleaseHostsResult | None], None],
 ) -> _TerminationDispatchResult:
     """Fan out async release_hosts calls per resource and collect provider data.
 
@@ -117,7 +115,6 @@ async def _dispatch_release_groups_async(
                 exc_info=True,
             )
             continue
-        record_pending_cleanup(handler_result)
         if handler_result is None:
             continue
 
@@ -148,12 +145,10 @@ class AzureTerminationService:
         *,
         logger: LoggingPort,
         handler_provider: AzureProviderStrategy,
-        record_pending_cleanup: Callable[[AzureReleaseHostsResult | None], None],
         default_resource_group: Optional[str],
     ) -> None:
         self._logger = logger
         self._handler_provider = handler_provider
-        self._record_pending_cleanup = record_pending_cleanup
         self._default_resource_group = default_resource_group
 
     async def terminate_instances_async(
@@ -174,7 +169,6 @@ class AzureTerminationService:
             default_resource_id=context.default_resource_id,
             context=context.release_context,
             logger=self._logger,
-            record_pending_cleanup=self._record_pending_cleanup,
         )
         return _termination_result(context.instance_ids, dispatch_result)
 

@@ -29,7 +29,6 @@ from orb.providers.azure.infrastructure.error_utils import (
     canonical_azure_error_code,
     extract_azure_error_details,
 )
-from orb.providers.azure.infrastructure.vmss_cleanup import VmssCleanupCoordinator
 from orb.providers.azure.services.cyclecloud_request_context_service import (
     resolve_cyclecloud_request_metadata,
 )
@@ -122,7 +121,6 @@ class AzureProviderStrategy(ProviderStrategy):
             Callable[[], AzureDeploymentService | None]
         ] = None,
         azure_native_spec_service: Optional[AzureNativeSpecService] = None,
-        vmss_cleanup_coordinator: Optional[VmssCleanupCoordinator] = None,
     ) -> None:
         """Initialise the Azure strategy with config, logger, and optional client resolver."""
         if not isinstance(config, AzureProviderConfig):
@@ -163,16 +161,9 @@ class AzureProviderStrategy(ProviderStrategy):
         self._active_operations = 0
         self._cleanup_requested = False
         self._cleanup_wait_timeout_seconds = 30.0
-        self._vmss_cleanup_coordinator = vmss_cleanup_coordinator or VmssCleanupCoordinator(
-            logger=self._logger,
-            get_vmss_member_count=self._current_vmss_member_count_async,
-            vmss_exists=self._vmss_exists_async,
-            begin_delete_vmss=self._begin_delete_vmss_async,
-        )
         self._termination_service = AzureTerminationService(
             logger=logger,
             handler_provider=self,
-            record_pending_cleanup=self._vmss_cleanup_coordinator.record,
             default_resource_group=config.resource_group,
         )
         self._inventory_service = AzureInventoryService(
@@ -180,7 +171,6 @@ class AzureProviderStrategy(ProviderStrategy):
             provider_instance_name=provider_instance_name,
             resource_metadata_service=self._resource_metadata_service,
             handler_provider=self,
-            vmss_cleanup_coordinator=self._vmss_cleanup_coordinator,
         )
 
     # ------------------------------------------------------------------
@@ -605,7 +595,6 @@ class AzureProviderStrategy(ProviderStrategy):
 
             client = self._runtime.clear_cached_runtime()
             self._handlers = {}
-            self._vmss_cleanup_coordinator.clear()
             self._initialized = False
             return client
 
@@ -810,49 +799,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 "GET_INSTANCE_STATUS_ERROR",
                 exc,
             )
-
-    async def _current_vmss_member_count_async(
-        self,
-        *,
-        resource_group: str,
-        vmss_name: str,
-    ) -> Optional[int]:
-        if not self.resource_manager:
-            return None
-
-        return await self.resource_manager.get_vmss_member_count_async(
-            resource_group=resource_group,
-            vmss_name=vmss_name,
-        )
-
-    async def _vmss_exists_async(
-        self,
-        *,
-        resource_group: str,
-        vmss_name: str,
-    ) -> Optional[bool]:
-        if not self.resource_manager:
-            return None
-
-        return await self.resource_manager.vmss_exists_async(
-            resource_group=resource_group,
-            vmss_name=vmss_name,
-        )
-
-    async def _begin_delete_vmss_async(
-        self,
-        *,
-        resource_group: str,
-        vmss_name: str,
-    ) -> None:
-        azure_client = self.azure_client
-        if not azure_client:
-            raise RuntimeError("Azure client not available for VMSS cleanup delete")
-        compute = await azure_client.get_async_compute_client()
-        await compute.virtual_machine_scale_sets.begin_delete(
-            resource_group_name=resource_group,
-            vm_scale_set_name=vmss_name,
-        )
 
     # ------------------------------------------------------------------
     # DESCRIBE_RESOURCE_INSTANCES
