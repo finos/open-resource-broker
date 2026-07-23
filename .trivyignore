@@ -68,3 +68,8 @@ CVE-2026-48962
 CVE-2026-42496
 CVE-2026-42497
 CVE-2026-9538
+#
+# perl-base — CVE-2026-57433 (CRITICAL)
+# Storable signed integer overflow deserializing a crafted SX_HOOK record.
+# No fixed package in Debian 13.
+CVE-2026-57433
