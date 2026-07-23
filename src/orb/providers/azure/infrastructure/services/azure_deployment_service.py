@@ -40,7 +40,7 @@ class AzureDeploymentService:
         if len(name) <= 64:
             return name
 
-        digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:8]
+        digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:8]
         prefix = name[:55].rstrip("-")
         return f"{prefix}-{digest}"
 

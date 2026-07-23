@@ -10,17 +10,21 @@ from orb.providers.azure.infrastructure.services.azure_deployment_service import
 
 
 def test_build_deployment_name_normalizes_and_truncates_deterministically():
-    name = AzureDeploymentService.build_deployment_name(
+    parts = (
         "vm",
         "req with spaces",
         "template/with/slashes",
         "x" * 80,
     )
+    name = AzureDeploymentService.build_deployment_name(*parts)
+    distinct_name = AzureDeploymentService.build_deployment_name(*parts[:-1], f"{'x' * 79}y")
 
-    assert len(name) <= 64
+    assert len(name) == 64
     assert " " not in name
     assert "/" not in name
     assert name.startswith("vm-req-with-spaces-template-with-slashes-")
+    assert AzureDeploymentService.build_deployment_name(*parts) == name
+    assert distinct_name != name
 
 
 def test_resource_id_expression_targets_sibling_resource():
