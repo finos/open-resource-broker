@@ -10,31 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://finos.github.io/open-resource-broker/1.8/architecture/machine-discovery-flow/">
+        <link rel="canonical" href="https://finos.github.io/open-resource-broker/1.8/sdk/">
       
       
-        <link rel="prev" href="../lazy-loading-design/">
+        <link rel="prev" href="../mcp/api-reference/">
       
       
-        <link rel="next" href="../multi-provider-design/">
+        <link rel="next" href="quickstart/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/orb-icon.png">
+      <link rel="icon" href="../assets/orb-icon.png">
       <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.7.6">
     
     
       
-        <title>Machine Discovery Flow - Open Resource Broker</title>
+        <title>Overview - Open Resource Broker</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,11 +53,11 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="../../assets/extra.css">
+      <link rel="stylesheet" href="../assets/extra.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#machine-discovery-flow-architecture" class="md-skip">
+        <a href="#orb-sdk-overview" class="md-skip">
           Skip to content
         </a>
       
@@ -100,9 +100,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Open Resource Broker" class="md-header__button md-logo" aria-label="Open Resource Broker" data-md-component="logo">
+    <a href=".." title="Open Resource Broker" class="md-header__button md-logo" aria-label="Open Resource Broker" data-md-component="logo">
       
-  <img src="../../assets/orb-icon.svg" alt="logo">
+  <img src="../assets/orb-icon.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Machine Discovery Flow
+              Overview
             
           </span>
         </div>
@@ -235,7 +235,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../.." class="md-tabs__link">
+      <a href=".." class="md-tabs__link">
         
   
   
@@ -256,7 +256,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../getting_started/quick_start/" class="md-tabs__link">
+        <a href="../getting_started/quick_start/" class="md-tabs__link">
           
   
   
@@ -276,7 +276,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../user_guide/templates/" class="md-tabs__link">
+        <a href="../user_guide/templates/" class="md-tabs__link">
           
   
   
@@ -292,8 +292,6 @@
   
   
   
-    
-  
   
     
     
@@ -301,13 +299,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../system_overview/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../architecture/system_overview/" class="md-tabs__link">
           
   
   
@@ -337,7 +333,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../deployment/readme/" class="md-tabs__link">
+        <a href="../deployment/readme/" class="md-tabs__link">
           
   
   
@@ -367,7 +363,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../providers/k8s/" class="md-tabs__link">
+        <a href="../providers/k8s/" class="md-tabs__link">
           
   
   
@@ -390,7 +386,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../cli/" class="md-tabs__link">
+        <a href="../cli/" class="md-tabs__link">
           
   
   
@@ -410,7 +406,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../mcp/integration-guide/" class="md-tabs__link">
+        <a href="../mcp/integration-guide/" class="md-tabs__link">
           
   
   
@@ -426,6 +422,8 @@
   
   
   
+    
+  
   
     
     
@@ -433,11 +431,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../sdk/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
           
   
   
@@ -467,7 +467,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../api/readme/" class="md-tabs__link">
+        <a href="../api/readme/" class="md-tabs__link">
           
   
   
@@ -504,9 +504,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Open Resource Broker" class="md-nav__button md-logo" aria-label="Open Resource Broker" data-md-component="logo">
+    <a href=".." title="Open Resource Broker" class="md-nav__button md-logo" aria-label="Open Resource Broker" data-md-component="logo">
       
-  <img src="../../assets/orb-icon.svg" alt="logo">
+  <img src="../assets/orb-icon.svg" alt="logo">
 
     </a>
     Open Resource Broker
@@ -533,7 +533,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -614,7 +614,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting_started/quick_start/" class="md-nav__link">
+      <a href="../getting_started/quick_start/" class="md-nav__link">
         
   
   
@@ -642,7 +642,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/installation/" class="md-nav__link">
+      <a href="../user_guide/installation/" class="md-nav__link">
         
   
   
@@ -670,7 +670,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/configuration/" class="md-nav__link">
+      <a href="../user_guide/configuration/" class="md-nav__link">
         
   
   
@@ -759,7 +759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/templates/" class="md-nav__link">
+      <a href="../user_guide/templates/" class="md-nav__link">
         
   
   
@@ -787,7 +787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/requests/" class="md-nav__link">
+      <a href="../user_guide/requests/" class="md-nav__link">
         
   
   
@@ -815,7 +815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/storage_strategies/" class="md-nav__link">
+      <a href="../user_guide/storage_strategies/" class="md-nav__link">
         
   
   
@@ -843,7 +843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/monitoring/" class="md-nav__link">
+      <a href="../user_guide/monitoring/" class="md-nav__link">
         
   
   
@@ -871,7 +871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/troubleshooting/" class="md-nav__link">
+      <a href="../user_guide/troubleshooting/" class="md-nav__link">
         
   
   
@@ -899,7 +899,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/deployment/" class="md-nav__link">
+      <a href="../user_guide/deployment/" class="md-nav__link">
         
   
   
@@ -927,7 +927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/api_reference/" class="md-nav__link">
+      <a href="../user_guide/api_reference/" class="md-nav__link">
         
   
   
@@ -955,7 +955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/infrastructure-commands/" class="md-nav__link">
+      <a href="../user_guide/infrastructure-commands/" class="md-nav__link">
         
   
   
@@ -983,7 +983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user_guide/abis/" class="md-nav__link">
+      <a href="../user_guide/abis/" class="md-nav__link">
         
   
   
@@ -1015,31 +1015,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
@@ -1057,7 +1054,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1072,31 +1069,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_1" >
         
           
-          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
             
   
   
@@ -1114,7 +1108,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4_1">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1132,7 +1126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../system_overview/" class="md-nav__link">
+      <a href="../architecture/system_overview/" class="md-nav__link">
         
   
   
@@ -1160,7 +1154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clean_architecture/" class="md-nav__link">
+      <a href="../architecture/clean_architecture/" class="md-nav__link">
         
   
   
@@ -1188,7 +1182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../template-infrastructure/" class="md-nav__link">
+      <a href="../architecture/template-infrastructure/" class="md-nav__link">
         
   
   
@@ -1216,7 +1210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../system_diagrams/" class="md-nav__link">
+      <a href="../architecture/system_diagrams/" class="md-nav__link">
         
   
   
@@ -1244,7 +1238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cqrs_pattern/" class="md-nav__link">
+      <a href="../architecture/cqrs_pattern/" class="md-nav__link">
         
   
   
@@ -1272,7 +1266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dependency_injection/" class="md-nav__link">
+      <a href="../architecture/dependency_injection/" class="md-nav__link">
         
   
   
@@ -1300,7 +1294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lazy-loading-design/" class="md-nav__link">
+      <a href="../architecture/lazy-loading-design/" class="md-nav__link">
         
   
   
@@ -1325,37 +1319,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Machine Discovery Flow
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../architecture/machine-discovery-flow/" class="md-nav__link">
         
   
   
@@ -1371,287 +1338,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#current-problem" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current Problem
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#target-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Target Architecture
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Target Architecture">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#complete-request-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Request Flow
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#machine-discovery-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Machine Discovery Flow
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#handler-specific-discovery-methods" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Handler-Specific Discovery Methods
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Handler-Specific Discovery Methods">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#asg-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ASG Handler
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ec2fleet-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        EC2Fleet Handler
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#spotfleet-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SpotFleet Handler
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#runinstances-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        RunInstances Handler
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#data-storage-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Data Storage Architecture
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Data Storage Architecture">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-storage-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current Storage Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#target-storage-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Target Storage Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#implementation-requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Implementation Requirements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Implementation Requirements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#fix-1-store-provider-api-in-request" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fix 1: Store Provider API in Request
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fix-2-implement-machine-discovery" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fix 2: Implement Machine Discovery
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fix-3-batch-machine-storage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fix 3: Batch Machine Storage
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#error-scenarios" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Scenarios
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Error Scenarios">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#no-machines-found" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        No Machines Found
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#handler-not-found" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Handler Not Found
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#aws-api-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        AWS API Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1664,7 +1350,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../multi-provider-design/" class="md-nav__link">
+      <a href="../architecture/multi-provider-design/" class="md-nav__link">
         
   
   
@@ -1692,7 +1378,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../field_mapping_architecture/" class="md-nav__link">
+      <a href="../architecture/field_mapping_architecture/" class="md-nav__link">
         
   
   
@@ -1720,7 +1406,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../metrics_report/" class="md-nav__link">
+      <a href="../architecture/metrics_report/" class="md-nav__link">
         
   
   
@@ -1762,13 +1448,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1777,7 +1460,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
         
           
-          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
             
   
   
@@ -1813,7 +1496,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../patterns/strategy_pattern/" class="md-nav__link">
+      <a href="../patterns/strategy_pattern/" class="md-nav__link">
         
   
   
@@ -1841,7 +1524,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../patterns/factory_pattern/" class="md-nav__link">
+      <a href="../patterns/factory_pattern/" class="md-nav__link">
         
   
   
@@ -1869,7 +1552,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../patterns/repository_pattern/" class="md-nav__link">
+      <a href="../patterns/repository_pattern/" class="md-nav__link">
         
   
   
@@ -1897,7 +1580,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../patterns/ports_and_adapters/" class="md-nav__link">
+      <a href="../patterns/ports_and_adapters/" class="md-nav__link">
         
   
   
@@ -1939,13 +1622,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1954,7 +1634,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
         
           
-          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
             
   
   
@@ -1990,7 +1670,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../engineering/solid_principles/" class="md-nav__link">
+      <a href="../engineering/solid_principles/" class="md-nav__link">
         
   
   
@@ -2018,7 +1698,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../engineering/dry_principle/" class="md-nav__link">
+      <a href="../engineering/dry_principle/" class="md-nav__link">
         
   
   
@@ -2046,7 +1726,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../engineering/separation_of_concerns/" class="md-nav__link">
+      <a href="../engineering/separation_of_concerns/" class="md-nav__link">
         
   
   
@@ -2074,7 +1754,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../engineering/dependency_inversion/" class="md-nav__link">
+      <a href="../engineering/dependency_inversion/" class="md-nav__link">
         
   
   
@@ -2116,13 +1796,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -2131,7 +1808,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4" >
         
           
-          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
             
   
   
@@ -2167,7 +1844,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/architecture/" class="md-nav__link">
+      <a href="../developer_guide/architecture/" class="md-nav__link">
         
   
   
@@ -2195,7 +1872,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/cqrs/" class="md-nav__link">
+      <a href="../developer_guide/cqrs/" class="md-nav__link">
         
   
   
@@ -2223,7 +1900,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/dependency_injection/" class="md-nav__link">
+      <a href="../developer_guide/dependency_injection/" class="md-nav__link">
         
   
   
@@ -2251,7 +1928,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/data_models/" class="md-nav__link">
+      <a href="../developer_guide/data_models/" class="md-nav__link">
         
   
   
@@ -2279,7 +1956,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/events/" class="md-nav__link">
+      <a href="../developer_guide/events/" class="md-nav__link">
         
   
   
@@ -2307,7 +1984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/providers/" class="md-nav__link">
+      <a href="../developer_guide/providers/" class="md-nav__link">
         
   
   
@@ -2335,7 +2012,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/resilience/" class="md-nav__link">
+      <a href="../developer_guide/resilience/" class="md-nav__link">
         
   
   
@@ -2363,7 +2040,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/performance-optimization/" class="md-nav__link">
+      <a href="../developer_guide/performance-optimization/" class="md-nav__link">
         
   
   
@@ -2391,7 +2068,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/development/" class="md-nav__link">
+      <a href="../developer_guide/development/" class="md-nav__link">
         
   
   
@@ -2419,7 +2096,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/basesettings-providers/" class="md-nav__link">
+      <a href="../developer_guide/basesettings-providers/" class="md-nav__link">
         
   
   
@@ -2447,7 +2124,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/deprecation/" class="md-nav__link">
+      <a href="../developer_guide/deprecation/" class="md-nav__link">
         
   
   
@@ -2475,7 +2152,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/changelog_management/" class="md-nav__link">
+      <a href="../developer_guide/changelog_management/" class="md-nav__link">
         
   
   
@@ -2503,7 +2180,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/releases/" class="md-nav__link">
+      <a href="../developer_guide/releases/" class="md-nav__link">
         
   
   
@@ -2531,7 +2208,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer_guide/testing/" class="md-nav__link">
+      <a href="../developer_guide/testing/" class="md-nav__link">
         
   
   
@@ -2559,7 +2236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/testing/" class="md-nav__link">
+      <a href="../development/testing/" class="md-nav__link">
         
   
   
@@ -2710,7 +2387,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deployment/readme/" class="md-nav__link">
+      <a href="../deployment/readme/" class="md-nav__link">
         
   
   
@@ -2738,7 +2415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deployment/docker/" class="md-nav__link">
+      <a href="../deployment/docker/" class="md-nav__link">
         
   
   
@@ -2766,7 +2443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deployment/cloud_platforms/" class="md-nav__link">
+      <a href="../deployment/cloud_platforms/" class="md-nav__link">
         
   
   
@@ -2794,7 +2471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deployment/traditional/" class="md-nav__link">
+      <a href="../deployment/traditional/" class="md-nav__link">
         
   
   
@@ -2822,7 +2499,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deployment/pypi-setup/" class="md-nav__link">
+      <a href="../deployment/pypi-setup/" class="md-nav__link">
         
   
   
@@ -2850,7 +2527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deployment/security/" class="md-nav__link">
+      <a href="../deployment/security/" class="md-nav__link">
         
   
   
@@ -2878,7 +2555,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deployment/iam-permissions/" class="md-nav__link">
+      <a href="../deployment/iam-permissions/" class="md-nav__link">
         
   
   
@@ -2906,7 +2583,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deployment/monitoring/" class="md-nav__link">
+      <a href="../deployment/monitoring/" class="md-nav__link">
         
   
   
@@ -2934,7 +2611,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deployment/dev_deployment_documentation/" class="md-nav__link">
+      <a href="../deployment/dev_deployment_documentation/" class="md-nav__link">
         
   
   
@@ -3024,7 +2701,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operational/backup_recovery/" class="md-nav__link">
+      <a href="../operational/backup_recovery/" class="md-nav__link">
         
   
   
@@ -3052,7 +2729,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operational/migration/" class="md-nav__link">
+      <a href="../operational/migration/" class="md-nav__link">
         
   
   
@@ -3080,7 +2757,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operational/from-open-resource-broker/" class="md-nav__link">
+      <a href="../operational/from-open-resource-broker/" class="md-nav__link">
         
   
   
@@ -3108,7 +2785,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operational/performance/" class="md-nav__link">
+      <a href="../operational/performance/" class="md-nav__link">
         
   
   
@@ -3136,7 +2813,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operational/monitoring/" class="md-nav__link">
+      <a href="../operational/monitoring/" class="md-nav__link">
         
   
   
@@ -3164,7 +2841,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operational/tools/" class="md-nav__link">
+      <a href="../operational/tools/" class="md-nav__link">
         
   
   
@@ -3254,7 +2931,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../hostfactory/integration_guide/" class="md-nav__link">
+      <a href="../hostfactory/integration_guide/" class="md-nav__link">
         
   
   
@@ -3282,7 +2959,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../hostfactory/requirements_compliance/" class="md-nav__link">
+      <a href="../hostfactory/requirements_compliance/" class="md-nav__link">
         
   
   
@@ -3310,7 +2987,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../hostfactory/feature_mapping/" class="md-nav__link">
+      <a href="../hostfactory/feature_mapping/" class="md-nav__link">
         
   
   
@@ -3338,7 +3015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../hostfactory/deployment_scenarios/" class="md-nav__link">
+      <a href="../hostfactory/deployment_scenarios/" class="md-nav__link">
         
   
   
@@ -3366,7 +3043,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../hostfactory/supported-apis/" class="md-nav__link">
+      <a href="../hostfactory/supported-apis/" class="md-nav__link">
         
   
   
@@ -3517,7 +3194,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../providers/k8s/" class="md-nav__link">
+      <a href="../providers/k8s/" class="md-nav__link">
         
   
   
@@ -3545,7 +3222,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../providers/k8s/discovery/" class="md-nav__link">
+      <a href="../providers/k8s/discovery/" class="md-nav__link">
         
   
   
@@ -3573,7 +3250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../providers/k8s/configuration/" class="md-nav__link">
+      <a href="../providers/k8s/configuration/" class="md-nav__link">
         
   
   
@@ -3601,7 +3278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../providers/k8s/handlers/" class="md-nav__link">
+      <a href="../providers/k8s/handlers/" class="md-nav__link">
         
   
   
@@ -3629,7 +3306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../providers/k8s/auth/" class="md-nav__link">
+      <a href="../providers/k8s/auth/" class="md-nav__link">
         
   
   
@@ -3657,7 +3334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../providers/k8s/migrating-from-k8s-legacy/" class="md-nav__link">
+      <a href="../providers/k8s/migrating-from-k8s-legacy/" class="md-nav__link">
         
   
   
@@ -3685,7 +3362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../providers/k8s/plugin-authoring/" class="md-nav__link">
+      <a href="../providers/k8s/plugin-authoring/" class="md-nav__link">
         
   
   
@@ -3782,7 +3459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/" class="md-nav__link">
+      <a href="../cli/" class="md-nav__link">
         
   
   
@@ -3810,7 +3487,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/cli-reference/" class="md-nav__link">
+      <a href="../cli/cli-reference/" class="md-nav__link">
         
   
   
@@ -3838,7 +3515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/template-commands/" class="md-nav__link">
+      <a href="../cli/template-commands/" class="md-nav__link">
         
   
   
@@ -3866,7 +3543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/scheduler-commands/" class="md-nav__link">
+      <a href="../cli/scheduler-commands/" class="md-nav__link">
         
   
   
@@ -3894,7 +3571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/infrastructure-commands/" class="md-nav__link">
+      <a href="../cli/infrastructure-commands/" class="md-nav__link">
         
   
   
@@ -3922,7 +3599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/multi-provider-templates/" class="md-nav__link">
+      <a href="../cli/multi-provider-templates/" class="md-nav__link">
         
   
   
@@ -3950,7 +3627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/provider-override/" class="md-nav__link">
+      <a href="../cli/provider-override/" class="md-nav__link">
         
   
   
@@ -3978,7 +3655,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cli/filtering/" class="md-nav__link">
+      <a href="../cli/filtering/" class="md-nav__link">
         
   
   
@@ -4067,7 +3744,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mcp/integration-guide/" class="md-nav__link">
+      <a href="../mcp/integration-guide/" class="md-nav__link">
         
   
   
@@ -4095,7 +3772,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mcp/tools-mode/" class="md-nav__link">
+      <a href="../mcp/tools-mode/" class="md-nav__link">
         
   
   
@@ -4123,7 +3800,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mcp/api-reference/" class="md-nav__link">
+      <a href="../mcp/api-reference/" class="md-nav__link">
         
   
   
@@ -4155,28 +3832,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
-        
-          
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -4194,7 +3874,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -4209,28 +3889,31 @@
                 
   
   
+    
   
   
+  
     
     
     
     
       
       
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
         
           
+          
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9_1" >
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_1" checked>
         
           
-          <label class="md-nav__link" for="__nav_9_1" id="__nav_9_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9_1" id="__nav_9_1_label" tabindex="">
             
   
   
@@ -4248,7 +3931,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9_1">
             <span class="md-nav__icon md-icon"></span>
             
@@ -4263,10 +3946,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../sdk/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -4282,6 +3992,136 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick-reference table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Go
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#typescript-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TypeScript / Node
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#java" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Java
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kotlin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kotlin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#net-c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .NET / C
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-language-parity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-language parity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-your-own-sdk-for-an-unsupported-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building your own SDK for an unsupported language
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -4294,7 +4134,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../sdk/quickstart/" class="md-nav__link">
+      <a href="quickstart/" class="md-nav__link">
         
   
   
@@ -4322,7 +4162,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../sdk/api-reference/" class="md-nav__link">
+      <a href="api-reference/" class="md-nav__link">
         
   
   
@@ -4350,7 +4190,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../sdk/generating-sdks/" class="md-nav__link">
+      <a href="generating-sdks/" class="md-nav__link">
         
   
   
@@ -4386,7 +4226,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../security/security-scanning/" class="md-nav__link">
+      <a href="../security/security-scanning/" class="md-nav__link">
         
   
   
@@ -4529,7 +4369,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/readme/" class="md-nav__link">
+      <a href="../api/readme/" class="md-nav__link">
         
   
   
@@ -4557,7 +4397,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/native-spec-reference/" class="md-nav__link">
+      <a href="../api/native-spec-reference/" class="md-nav__link">
         
   
   
@@ -4585,7 +4425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/multi-provider-api/" class="md-nav__link">
+      <a href="../api/multi-provider-api/" class="md-nav__link">
         
   
   
@@ -4675,7 +4515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration-guide/" class="md-nav__link">
+      <a href="../configuration-guide/" class="md-nav__link">
         
   
   
@@ -4703,7 +4543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration/examples/" class="md-nav__link">
+      <a href="../configuration/examples/" class="md-nav__link">
         
   
   
@@ -4731,7 +4571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration/native-spec-config/" class="md-nav__link">
+      <a href="../configuration/native-spec-config/" class="md-nav__link">
         
   
   
@@ -4759,7 +4599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration/environment-variables/" class="md-nav__link">
+      <a href="../configuration/environment-variables/" class="md-nav__link">
         
   
   
@@ -4787,7 +4627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration/multi-provider/" class="md-nav__link">
+      <a href="../configuration/multi-provider/" class="md-nav__link">
         
   
   
@@ -4815,7 +4655,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration/provider-naming-guide/" class="md-nav__link">
+      <a href="../configuration/provider-naming-guide/" class="md-nav__link">
         
   
   
@@ -4905,7 +4745,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../testing/readme/" class="md-nav__link">
+      <a href="../testing/readme/" class="md-nav__link">
         
   
   
@@ -4933,7 +4773,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../testing/system-tests-onaws/" class="md-nav__link">
+      <a href="../testing/system-tests-onaws/" class="md-nav__link">
         
   
   
@@ -5023,7 +4863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../native-spec-guide/" class="md-nav__link">
+      <a href="../native-spec-guide/" class="md-nav__link">
         
   
   
@@ -5051,7 +4891,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../provider_strategy_guide/" class="md-nav__link">
+      <a href="../provider_strategy_guide/" class="md-nav__link">
         
   
   
@@ -5079,7 +4919,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../storage_registry_pattern/" class="md-nav__link">
+      <a href="../storage_registry_pattern/" class="md-nav__link">
         
   
   
@@ -5107,7 +4947,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../unified_format_system/" class="md-nav__link">
+      <a href="../unified_format_system/" class="md-nav__link">
         
   
   
@@ -5135,7 +4975,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../import_guidelines/" class="md-nav__link">
+      <a href="../import_guidelines/" class="md-nav__link">
         
   
   
@@ -5163,7 +5003,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../versioning_guide/" class="md-nav__link">
+      <a href="../versioning_guide/" class="md-nav__link">
         
   
   
@@ -5191,7 +5031,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../architectural_assessment/" class="md-nav__link">
+      <a href="../architectural_assessment/" class="md-nav__link">
         
   
   
@@ -5254,10 +5094,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#quick-reference-table" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Quick-reference table
       
     </span>
   </a>
@@ -5265,10 +5105,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-problem" class="md-nav__link">
+  <a href="#python" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current Problem
+        Python
       
     </span>
   </a>
@@ -5276,241 +5116,90 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#target-architecture" class="md-nav__link">
+  <a href="#go" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Target Architecture
+        Go
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Target Architecture">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#complete-request-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Complete Request Flow
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#machine-discovery-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Machine Discovery Flow
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#handler-specific-discovery-methods" class="md-nav__link">
+  <a href="#typescript-node" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Handler-Specific Discovery Methods
+        TypeScript / Node
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Handler-Specific Discovery Methods">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#asg-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ASG Handler
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ec2fleet-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        EC2Fleet Handler
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#spotfleet-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SpotFleet Handler
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#runinstances-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        RunInstances Handler
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#data-storage-architecture" class="md-nav__link">
+  <a href="#java" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Data Storage Architecture
+        Java
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Data Storage Architecture">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-storage-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current Storage Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#target-storage-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Target Storage Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#implementation-requirements" class="md-nav__link">
+  <a href="#kotlin" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation Requirements
+        Kotlin
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Implementation Requirements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#fix-1-store-provider-api-in-request" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fix 1: Store Provider API in Request
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fix-2-implement-machine-discovery" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fix 2: Implement Machine Discovery
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fix-3-batch-machine-storage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fix 3: Batch Machine Storage
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#error-scenarios" class="md-nav__link">
+  <a href="#net-c" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error Scenarios
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Error Scenarios">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#no-machines-found" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        No Machines Found
+        .NET / C
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#handler-not-found" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#architecture-overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Handler Not Found
+        Architecture overview
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#aws-api-errors" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#cross-language-parity" class="md-nav__link">
     <span class="md-ellipsis">
       
-        AWS API Errors
+        Cross-language parity
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#building-your-own-sdk-for-an-unsupported-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building your own SDK for an unsupported language
+      
+    </span>
+  </a>
   
 </li>
       
@@ -5534,148 +5223,228 @@
   
 
 
-<h1 id="machine-discovery-flow-architecture">Machine Discovery Flow Architecture<a class="headerlink" href="#machine-discovery-flow-architecture" title="Permanent link">&para;</a></h1>
-<p>This document describes the complete end-to-end flow for machine discovery and status checking in the Open Resource Broker.</p>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>The machine discovery flow consists of three main phases:
-1. Request Creation - Create AWS resources and store request
-2. Machine Discovery - Discover instances from AWS resources<br />
-3. Status Reporting - Return comprehensive status with machine details</p>
-<h2 id="current-problem">Current Problem<a class="headerlink" href="#current-problem" title="Permanent link">&para;</a></h2>
-<p>The status check flow is broken because:
-1. No machines are created after successful AWS resource provisioning
-2. Query handler uses wrong operation type with incorrect parameters
-3. Missing provider API information needed for handler selection</p>
-<h2 id="target-architecture">Target Architecture<a class="headerlink" href="#target-architecture" title="Permanent link">&para;</a></h2>
-<h3 id="complete-request-flow">Complete Request Flow<a class="headerlink" href="#complete-request-flow" title="Permanent link">&para;</a></h3>
-<pre class="mermaid"><code>sequenceDiagram
-    participant HF as HostFactory
-    participant CLI as CLI/API
-    participant CMD as CreateRequestHandler
-    participant AWS as AWS Provider
-    participant DB as Storage
-
-    HF-&gt;&gt;CLI: requestMachines.sh basic-template 2
-    CLI-&gt;&gt;CMD: CreateRequestCommand
-    CMD-&gt;&gt;AWS: CREATE_INSTANCES operation
-    AWS-&gt;&gt;AWS: Create ASG/Fleet/etc (resource_id)
-    AWS--&gt;&gt;CMD: Success + resource_id
-    CMD-&gt;&gt;DB: Save Request (with resource_id + provider_api)
-    CMD--&gt;&gt;CLI: request_id
-    CLI--&gt;&gt;HF: SUCCESS: req-12345</code></pre>
-<h3 id="machine-discovery-flow">Machine Discovery Flow<a class="headerlink" href="#machine-discovery-flow" title="Permanent link">&para;</a></h3>
-<pre class="mermaid"><code>sequenceDiagram
-    participant HF as HostFactory
-    participant CLI as CLI/API
-    participant QRY as SyncAndGetRequestHandler
-    participant DB as Storage
-    participant AWS as AWS Provider
-    participant HAND as AWS Handler
-
-    HF-&gt;&gt;CLI: getRequestStatus.sh req-12345
-    CLI-&gt;&gt;QRY: SyncAndGetRequestQuery
-    QRY-&gt;&gt;DB: Find request by ID
-    DB--&gt;&gt;QRY: Request (with resource_ids + provider_api)
-    QRY-&gt;&gt;DB: Find machines by request_id
-    DB--&gt;&gt;QRY: [] (empty - first time)
-
-    QRY-&gt;&gt;AWS: Get handler for provider_api
-    AWS--&gt;&gt;QRY: ASGHandler/EC2FleetHandler/etc
-    QRY-&gt;&gt;HAND: check_hosts_status(request)
-    HAND-&gt;&gt;HAND: describe_auto_scaling_groups(resource_id)
-    HAND-&gt;&gt;HAND: Extract instance_ids from ASG
-    HAND-&gt;&gt;HAND: describe_instances(instance_ids)
-    HAND--&gt;&gt;QRY: List[instance_details]
-
-    QRY-&gt;&gt;QRY: Create Machine aggregates
-    QRY-&gt;&gt;DB: save_batch(machines)
-
-    QRY--&gt;&gt;CLI: Request + Machines
-    CLI--&gt;&gt;HF: Full status with machine details</code></pre>
-<h2 id="handler-specific-discovery-methods">Handler-Specific Discovery Methods<a class="headerlink" href="#handler-specific-discovery-methods" title="Permanent link">&para;</a></h2>
-<p>Each AWS handler implements resource-to-instance discovery:</p>
-<h3 id="asg-handler">ASG Handler<a class="headerlink" href="#asg-handler" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Uses <code>describe_auto_scaling_groups()</code> with ASG name</li>
-<li>Extracts instance IDs from ASG instances list</li>
-<li>Calls <code>describe_instances()</code> for detailed information</li>
-</ul>
-<h3 id="ec2fleet-handler">EC2Fleet Handler<a class="headerlink" href="#ec2fleet-handler" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Uses <code>describe_fleets()</code> with Fleet ID</li>
-<li>For instant fleets: gets instance IDs from creation metadata</li>
-<li>For maintain/request fleets: uses <code>describe_fleet_instances()</code></li>
-<li>Calls <code>describe_instances()</code> for detailed information</li>
-</ul>
-<h3 id="spotfleet-handler">SpotFleet Handler<a class="headerlink" href="#spotfleet-handler" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Uses <code>describe_spot_fleet_requests()</code> with Spot Fleet ID</li>
-<li>Uses <code>describe_spot_fleet_instances()</code> to get instance IDs</li>
-<li>Calls <code>describe_instances()</code> for detailed information</li>
-</ul>
-<h3 id="runinstances-handler">RunInstances Handler<a class="headerlink" href="#runinstances-handler" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Instance IDs available immediately from creation response</li>
-<li>Directly calls <code>describe_instances()</code> for status updates</li>
-</ul>
-<h2 id="data-storage-architecture">Data Storage Architecture<a class="headerlink" href="#data-storage-architecture" title="Permanent link">&para;</a></h2>
-<h3 id="current-storage-structure">Current Storage Structure<a class="headerlink" href="#current-storage-structure" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>data/storage.json:
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>{
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  &quot;req-12345&quot;: {
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    &quot;request_id&quot;: &quot;req-12345&quot;,
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    &quot;resource_ids&quot;: [&quot;asg-hf-req-12345&quot;],
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    &quot;machine_ids&quot;: [],  // Empty - this is the problem
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    &quot;status&quot;: &quot;in_progress&quot;
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  }
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>}
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>machines.json: {} // Empty file
+<h1 id="orb-sdk-overview">ORB SDK Overview<a class="headerlink" href="#orb-sdk-overview" title="Permanent link">&para;</a></h1>
+<p>The Open Resource Broker ships six official language SDKs. All six implement
+the same <a href="https://github.com/finos/open-resource-broker/blob/main/sdk/ARCHITECTURE.md">hybrid architecture</a>: generated typed
+models from the OpenAPI spec, plus five hand-written layers for subprocess
+management, UNIX domain socket transport, retry, AWS SigV4 auth, and SSE
+streaming.</p>
+<p>Each SDK covers all 45 operations in the current API spec
+(<code>sdk/spec/openapi.json</code>).</p>
+<h2 id="quick-reference-table">Quick-reference table<a class="headerlink" href="#quick-reference-table" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Install</th>
+<th>Client class</th>
+<th>Min runtime</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#python">Python</a></td>
+<td><code>pip install orb-py</code></td>
+<td><code>orb.ORBClient</code></td>
+<td>Python 3.11</td>
+</tr>
+<tr>
+<td><a href="#go">Go</a></td>
+<td><code>go get github.com/finos/open-resource-broker/sdk/go</code></td>
+<td><code>orb.Client</code></td>
+<td>Go 1.24</td>
+</tr>
+<tr>
+<td><a href="#typescript--node">TypeScript / Node</a></td>
+<td><code>npm install @finos/open-resource-broker</code></td>
+<td><code>OrbClient</code></td>
+<td>Node 18</td>
+</tr>
+<tr>
+<td><a href="#java">Java</a></td>
+<td><code>org.finos.openresourcebroker:open-resource-broker-java:0.1.0</code></td>
+<td><code>OrbClient</code></td>
+<td>Java 17</td>
+</tr>
+<tr>
+<td><a href="#kotlin">Kotlin</a></td>
+<td><code>org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0</code></td>
+<td><code>OrbClient</code></td>
+<td>JVM 17</td>
+</tr>
+<tr>
+<td><a href="#net--c">.NET / C#</a></td>
+<td><code>dotnet add package FINOS.OpenResourceBroker</code></td>
+<td><code>OrbClient</code></td>
+<td>.NET 8</td>
+</tr>
+</tbody>
+</table>
+<p>For languages not listed here, see the
+<a href="generating-sdks/">Generate Your Own SDK</a> guide.</p>
+<hr />
+<h2 id="python">Python<a class="headerlink" href="#python" title="Permanent link">&para;</a></h2>
+<p><strong>Package:</strong> <code>orb-py</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>orb-py
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>orb-py
 </code></pre></div>
-<h3 id="target-storage-structure">Target Storage Structure<a class="headerlink" href="#target-storage-structure" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>data/storage.json:
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>{
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  &quot;req-12345&quot;: {
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    &quot;request_id&quot;: &quot;req-12345&quot;, 
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    &quot;resource_ids&quot;: [&quot;asg-hf-req-12345&quot;],
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    &quot;machine_ids&quot;: [&quot;i-abc123&quot;, &quot;i-def456&quot;],
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    &quot;provider_api&quot;: &quot;ASG&quot;,  // Added for handler selection
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    &quot;status&quot;: &quot;completed&quot;
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  }
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>}
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>machines.json:
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>{
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>  &quot;i-abc123&quot;: {
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    &quot;instance_id&quot;: &quot;i-abc123&quot;,
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    &quot;request_id&quot;: &quot;req-12345&quot;,
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    &quot;resource_id&quot;: &quot;asg-hf-req-12345&quot;,
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    &quot;status&quot;: &quot;running&quot;,
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    &quot;private_ip&quot;: &quot;10.0.1.100&quot;
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>  },
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>  &quot;i-def456&quot;: {
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    &quot;instance_id&quot;: &quot;i-def456&quot;, 
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    &quot;request_id&quot;: &quot;req-12345&quot;,
-<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>    &quot;resource_id&quot;: &quot;asg-hf-req-12345&quot;,
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    &quot;status&quot;: &quot;running&quot;,
-<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>    &quot;private_ip&quot;: &quot;10.0.1.101&quot;
-<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>  }
-<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>}
+<p><strong>Five-line usage example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb</span><span class="w"> </span><span class="kn">import</span> <span class="n">ORBClient</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">ORBClient</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">&quot;aws&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">templates</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">list_templates</span><span class="p">(</span><span class="n">active_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">templates</span><span class="p">[</span><span class="s2">&quot;templates&quot;</span><span class="p">]:</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No templates registered&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>            <span class="k">return</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="n">req</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">request_machines</span><span class="p">(</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>            <span class="n">template_id</span><span class="o">=</span><span class="n">templates</span><span class="p">[</span><span class="s2">&quot;templates&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;template_id&quot;</span><span class="p">],</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>            <span class="n">count</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="p">)</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Request submitted: </span><span class="si">{</span><span class="n">req</span><span class="p">[</span><span class="s1">&#39;request_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        <span class="n">status</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">get_request_status</span><span class="p">(</span><span class="n">request_id</span><span class="o">=</span><span class="n">req</span><span class="p">[</span><span class="s2">&quot;request_id&quot;</span><span class="p">])</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Status: </span><span class="si">{</span><span class="n">status</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
 </code></pre></div>
-<h2 id="implementation-requirements">Implementation Requirements<a class="headerlink" href="#implementation-requirements" title="Permanent link">&para;</a></h2>
-<h3 id="fix-1-store-provider-api-in-request">Fix 1: Store Provider API in Request<a class="headerlink" href="#fix-1-store-provider-api-in-request" title="Permanent link">&para;</a></h3>
-<p>Store the provider API type during request creation to enable appropriate handler selection during status checks.</p>
-<h3 id="fix-2-implement-machine-discovery">Fix 2: Implement Machine Discovery<a class="headerlink" href="#fix-2-implement-machine-discovery" title="Permanent link">&para;</a></h3>
-<p>Replace the broken provider operation approach with direct handler method calls that already implement resource-to-instance discovery.</p>
-<h3 id="fix-3-batch-machine-storage">Fix 3: Batch Machine Storage<a class="headerlink" href="#fix-3-batch-machine-storage" title="Permanent link">&para;</a></h3>
-<p>Use the existing <code>save_batch()</code> method for efficient machine storage instead of individual saves.</p>
-<h2 id="error-scenarios">Error Scenarios<a class="headerlink" href="#error-scenarios" title="Permanent link">&para;</a></h2>
-<h3 id="no-machines-found">No Machines Found<a class="headerlink" href="#no-machines-found" title="Permanent link">&para;</a></h3>
-<p>When no instances are discovered from AWS resources, return request status with empty machines list and appropriate status message.</p>
-<h3 id="handler-not-found">Handler Not Found<a class="headerlink" href="#handler-not-found" title="Permanent link">&para;</a></h3>
-<p>When provider API is not recognized, fall back to RunInstances handler or return error with clear message.</p>
-<h3 id="aws-api-errors">AWS API Errors<a class="headerlink" href="#aws-api-errors" title="Permanent link">&para;</a></h3>
-<p>Handle AWS API failures gracefully and return partial results when possible.</p>
+<p>The Python SDK is in-process: it runs inside the ORB server process and calls
+CQRS handlers directly rather than going over HTTP. There is no subprocess to
+manage.</p>
+<p>Full reference: <a href="quickstart/">Python SDK Quickstart</a></p>
+<hr />
+<h2 id="go">Go<a class="headerlink" href="#go" title="Permanent link">&para;</a></h2>
+<p><strong>Module:</strong> <code>github.com/finos/open-resource-broker/sdk/go</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>go<span class="w"> </span>get<span class="w"> </span>github.com/finos/open-resource-broker/sdk/go@v1.8.3
+</code></pre></div>
+<p><strong>Five-line usage example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="s">&quot;github.com/finos/open-resource-broker/sdk/go/orb&quot;</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">orb</span><span class="p">.</span><span class="nx">NewClient</span><span class="p">(</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nx">orb</span><span class="p">.</span><span class="nx">WithManagedProcess</span><span class="p">(</span><span class="nx">orb</span><span class="p">.</span><span class="nx">ProcessConfig</span><span class="p">{</span><span class="nx">Binary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;orb&quot;</span><span class="p">}),</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nx">orb</span><span class="p">.</span><span class="nx">WithAuth</span><span class="p">(</span><span class="nx">orb</span><span class="p">.</span><span class="nx">WithNoAuth</span><span class="p">()),</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="k">defer</span><span class="w"> </span><span class="nx">c</span><span class="p">.</span><span class="nx">Close</span><span class="p">()</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="nx">templates</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">c</span><span class="p">.</span><span class="nx">ListTemplates</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nx">mr</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w">        </span><span class="o">:=</span><span class="w"> </span><span class="nx">c</span><span class="p">.</span><span class="nx">RequestMachines</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">orb</span><span class="p">.</span><span class="nx">RequestMachinesRequest</span><span class="p">{</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="nx">TemplateID</span><span class="p">:</span><span class="w"> </span><span class="nx">templates</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">TemplateID</span><span class="p">,</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="nx">Count</span><span class="p">:</span><span class="w">      </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="p">})</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="nx">final</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">c</span><span class="p">.</span><span class="nx">WaitForCompletion</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">mr</span><span class="p">.</span><span class="nx">RequestID</span><span class="p">)</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">final</span><span class="p">.</span><span class="nx">Status</span><span class="p">,</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="nx">final</span><span class="p">.</span><span class="nx">Machines</span><span class="p">))</span>
+</code></pre></div>
+<p>Full reference: <a href="https://github.com/finos/open-resource-broker/blob/main/sdk/go/README.md"><code>sdk/go/README.md</code></a></p>
+<hr />
+<h2 id="typescript-node">TypeScript / Node<a class="headerlink" href="#typescript-node" title="Permanent link">&para;</a></h2>
+<p><strong>Package:</strong> <code>@finos/open-resource-broker</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>npm<span class="w"> </span>install<span class="w"> </span>@finos/open-resource-broker
+</code></pre></div>
+<p><strong>Five-line usage example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">OrbClient</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;@finos/open-resource-broker&quot;</span><span class="p">;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">OrbClient</span><span class="p">.</span><span class="nx">create</span><span class="p">({</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nx">process</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">binary</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;orb&quot;</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nx">auth</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;none&quot;</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">});</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">templates</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">listTemplates</span><span class="p">();</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="kd">const</span><span class="w"> </span><span class="nx">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">requestMachines</span><span class="p">({</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="nx">templateId</span><span class="o">:</span><span class="w"> </span><span class="kt">templates</span><span class="p">[</span><span class="mf">0</span><span class="p">].</span><span class="nx">templateId</span><span class="p">,</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="kt">2</span><span class="p">,</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="p">});</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="kd">const</span><span class="w"> </span><span class="kr">final</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">waitForCompletion</span><span class="p">(</span><span class="nx">op</span><span class="p">.</span><span class="nx">requestId</span><span class="p">);</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="kr">final</span><span class="p">.</span><span class="nx">status</span><span class="p">,</span><span class="w"> </span><span class="kr">final</span><span class="p">.</span><span class="nx">machines</span><span class="p">.</span><span class="nx">length</span><span class="p">);</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="k">await</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">close</span><span class="p">();</span>
+</code></pre></div>
+<p>Full reference: <a href="https://github.com/finos/open-resource-broker/blob/main/sdk/typescript/README.md"><code>sdk/typescript/README.md</code></a></p>
+<hr />
+<h2 id="java">Java<a class="headerlink" href="#java" title="Permanent link">&para;</a></h2>
+<p><strong>Coordinates:</strong> <code>org.finos.openresourcebroker:open-resource-broker-java:0.1.0</code></p>
+<p>Gradle:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">implementation</span><span class="w"> </span><span class="s1">&#39;org.finos.openresourcebroker:open-resource-broker-java:0.1.0&#39;</span>
+</code></pre></div>
+<p>Maven:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">&lt;dependency&gt;</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">&lt;groupId&gt;</span>org.finos.openresourcebroker<span class="nt">&lt;/groupId&gt;</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>open-resource-broker-java<span class="nt">&lt;/artifactId&gt;</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">&lt;version&gt;</span>0.1.0<span class="nt">&lt;/version&gt;</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nt">&lt;/dependency&gt;</span>
+</code></pre></div>
+<p><strong>Five-line usage example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">org.finos.openresourcebroker.sdk.client.OrbClient</span><span class="p">;</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">org.finos.openresourcebroker.sdk.model.*</span><span class="p">;</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="k">try</span><span class="w"> </span><span class="p">(</span><span class="n">OrbClient</span><span class="w"> </span><span class="n">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OrbClient</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">        </span><span class="p">.</span><span class="na">process</span><span class="p">(</span><span class="n">ProcessConfig</span><span class="p">.</span><span class="na">builder</span><span class="p">().</span><span class="na">binary</span><span class="p">(</span><span class="s">&quot;orb&quot;</span><span class="p">).</span><span class="na">build</span><span class="p">())</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="n">TemplateListResponse</span><span class="w"> </span><span class="n">templates</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="na">listTemplates</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">);</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="n">RequestOperationResponse</span><span class="w"> </span><span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="na">requestMachines</span><span class="p">(</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">        </span><span class="k">new</span><span class="w"> </span><span class="n">RequestMachinesRequest</span><span class="p">()</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">            </span><span class="p">.</span><span class="na">templateId</span><span class="p">(</span><span class="n">templates</span><span class="p">.</span><span class="na">getTemplates</span><span class="p">().</span><span class="na">get</span><span class="p">(</span><span class="mi">0</span><span class="p">).</span><span class="na">getTemplateId</span><span class="p">())</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">            </span><span class="p">.</span><span class="na">count</span><span class="p">(</span><span class="mi">2</span><span class="p">));</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">    </span><span class="n">StreamEvent</span><span class="w"> </span><span class="n">final_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="na">waitForCompletion</span><span class="p">(</span><span class="n">op</span><span class="p">.</span><span class="na">getRequestId</span><span class="p">(),</span><span class="w"> </span><span class="mf">2.0</span><span class="p">,</span><span class="w"> </span><span class="mf">300.0</span><span class="p">);</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">    </span><span class="n">System</span><span class="p">.</span><span class="na">out</span><span class="p">.</span><span class="na">println</span><span class="p">(</span><span class="n">final_</span><span class="p">.</span><span class="na">getStatus</span><span class="p">());</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="p">}</span>
+</code></pre></div>
+<p>Full reference: <a href="https://github.com/finos/open-resource-broker/blob/main/sdk/java/README.md"><code>sdk/java/README.md</code></a></p>
+<hr />
+<h2 id="kotlin">Kotlin<a class="headerlink" href="#kotlin" title="Permanent link">&para;</a></h2>
+<p><strong>Coordinates:</strong> <code>org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0</code></p>
+<p>Gradle (Kotlin DSL):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">implementation</span><span class="p">(</span><span class="s">&quot;org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Five-line usage example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">import</span><span class="w"> </span><span class="nn">org.finos.openresourcebroker.sdk.client.OrbClient</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">import</span><span class="w"> </span><span class="nn">org.finos.openresourcebroker.sdk.model.*</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="kd">val</span><span class="w"> </span><span class="nv">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OrbClient</span><span class="p">.</span><span class="na">create</span><span class="p">(</span><span class="n">ClientConfig</span><span class="p">(</span><span class="n">process</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ProcessConfig</span><span class="p">(</span><span class="s">&quot;orb&quot;</span><span class="p">)))</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="kd">val</span><span class="w"> </span><span class="nv">templates</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="na">listTemplates</span><span class="p">()</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="kd">val</span><span class="w"> </span><span class="nv">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="na">requestMachines</span><span class="p">(</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">    </span><span class="n">RequestMachinesRequest</span><span class="p">(</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">        </span><span class="n">templateId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">templates</span><span class="p">.</span><span class="na">templates</span><span class="p">.</span><span class="na">first</span><span class="p">().</span><span class="na">templateId</span><span class="p">,</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">        </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="p">,</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="p">)</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="p">)</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="kd">val</span><span class="w"> </span><span class="nv">final</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="na">waitForCompletion</span><span class="p">(</span><span class="n">op</span><span class="p">.</span><span class="na">requestId</span><span class="p">)</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="n">println</span><span class="p">(</span><span class="s">&quot;</span><span class="si">${</span><span class="n">final</span><span class="o">?.</span><span class="na">status</span><span class="si">}</span><span class="s"> — </span><span class="si">${</span><span class="n">final</span><span class="o">?.</span><span class="na">machines</span><span class="o">?.</span><span class="na">size</span><span class="si">}</span><span class="s"> machines&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="n">client</span><span class="p">.</span><span class="na">close</span><span class="p">()</span>
+</code></pre></div>
+<p>Full reference: <a href="https://github.com/finos/open-resource-broker/blob/main/sdk/kotlin/README.md"><code>sdk/kotlin/README.md</code></a></p>
+<hr />
+<h2 id="net-c">.NET / C<a class="headerlink" href="#net-c" title="Permanent link">&para;</a></h2>
+<p><strong>Package:</strong> <code>FINOS.OpenResourceBroker</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>dotnet<span class="w"> </span>add<span class="w"> </span>package<span class="w"> </span>FINOS.OpenResourceBroker
+</code></pre></div>
+<p><strong>Five-line usage example:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">using</span><span class="w"> </span><span class="nn">FINOS.OpenResourceBroker</span><span class="p">;</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="k">using</span><span class="w"> </span><span class="nn">FINOS.OpenResourceBroker.Models</span><span class="p">;</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="k">await</span><span class="w"> </span><span class="k">using</span><span class="w"> </span><span class="nn">var</span><span class="w"> </span><span class="n">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="n">OrbClient</span><span class="p">.</span><span class="n">CreateAsync</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">ClientConfig</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="n">Process</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">ProcessConfig</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">Binary</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;orb&quot;</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="p">});</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="kt">var</span><span class="w"> </span><span class="n">templates</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="n">ListTemplatesAsync</span><span class="p">();</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="kt">var</span><span class="w"> </span><span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="n">RequestMachinesAsync</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">RequestMachinesRequest</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span><span class="n">TemplateId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">templates</span><span class="p">.</span><span class="n">Templates</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">TemplateId</span><span class="p">,</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">    </span><span class="n">Count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="p">});</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="kt">var</span><span class="w"> </span><span class="n">final</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="n">WaitForCompletionAsync</span><span class="p">(</span><span class="n">op</span><span class="p">.</span><span class="n">RequestId</span><span class="p">);</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="n">Console</span><span class="p">.</span><span class="n">WriteLine</span><span class="p">(</span><span class="s">$&quot;{final.Status} — {final.Machines.Count} machines&quot;</span><span class="p">);</span>
+</code></pre></div>
+<p>Full reference: <a href="https://github.com/finos/open-resource-broker/blob/main/sdk/csharp/README.md"><code>sdk/csharp/README.md</code></a></p>
+<hr />
+<h2 id="architecture-overview">Architecture overview<a class="headerlink" href="#architecture-overview" title="Permanent link">&para;</a></h2>
+<p>All official SDKs share the same five-layer design. See
+<a href="https://github.com/finos/open-resource-broker/blob/main/sdk/ARCHITECTURE.md"><code>sdk/ARCHITECTURE.md</code></a> for the full specification
+of each layer and language-specific implementation notes.</p>
+<h2 id="cross-language-parity">Cross-language parity<a class="headerlink" href="#cross-language-parity" title="Permanent link">&para;</a></h2>
+<p>All SDKs are validated against the same canonical scenario defined in
+<a href="https://github.com/finos/open-resource-broker/blob/main/sdk/parity/scenario.json"><code>sdk/parity/scenario.json</code></a>. The scenario
+covers: health check, list templates, request machines, poll request status,
+and return machines. See <a href="https://github.com/finos/open-resource-broker/blob/main/sdk/parity/README.md"><code>sdk/parity/README.md</code></a>
+for how to run parity checks per SDK.</p>
+<h2 id="building-your-own-sdk-for-an-unsupported-language">Building your own SDK for an unsupported language<a class="headerlink" href="#building-your-own-sdk-for-an-unsupported-language" title="Permanent link">&para;</a></h2>
+<p>See <a href="generating-sdks/">Generating Your Own SDK</a>.</p>
 
 
 
@@ -5733,10 +5502,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.annotate", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.annotate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

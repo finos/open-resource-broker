@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://finos.github.io/open-resource-broker/1.8/cli/template-commands/">
+        <link rel="canonical" href="https://finos.github.io/open-resource-broker/1.8/sdk/generating-sdks/">
       
       
-        <link rel="prev" href="../cli-reference/">
+        <link rel="prev" href="../api-reference/">
       
       
-        <link rel="next" href="../scheduler-commands/">
+        <link rel="next" href="../../security/security-scanning/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Template Commands - Open Resource Broker</title>
+        <title>Generate Your Own SDK - Open Resource Broker</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#template-management-commands" class="md-skip">
+        <a href="#generate-your-own-sdk" class="md-skip">
           Skip to content
         </a>
       
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Template Commands
+              Generate Your Own SDK
             
           </span>
         </div>
@@ -382,13 +382,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../cli/" class="md-tabs__link">
           
   
   
@@ -424,6 +422,8 @@
   
   
   
+    
+  
   
     
     
@@ -431,11 +431,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../sdk/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -3400,31 +3402,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -3442,7 +3441,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -3460,7 +3459,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../cli/" class="md-nav__link">
         
   
   
@@ -3488,7 +3487,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cli-reference/" class="md-nav__link">
+      <a href="../../cli/cli-reference/" class="md-nav__link">
         
   
   
@@ -3513,37 +3512,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Template Commands
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../cli/template-commands/" class="md-nav__link">
         
   
   
@@ -3559,348 +3531,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#available-commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Available Commands
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Available Commands">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#list-templates" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        List Templates
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#show-template-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Show Template Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#create-template" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Create Template
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Create Template">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#template-configuration-file-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Configuration File Format
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#update-template" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Update Template
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#delete-template" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Delete Template
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#validate-template" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Validate Template
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#refresh-templates" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Refresh Templates
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#template-file-hierarchy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template File Hierarchy
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Examples">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#basic-usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic Usage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-creation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Creation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-validation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Validation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Management
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#table-format-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Table Format Output
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Handling
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Error Handling">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#template-not-found" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Not Found
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#invalid-template-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Invalid Template Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#file-access-issues" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        File Access Issues
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#integration-with-other-commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Integration with Other Commands
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Integration with Other Commands">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#global-scheduler-override" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Global Scheduler Override
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#additional-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Additional Features
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Additional Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#caching" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Caching
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#provider-specific-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider-Specific Files
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-merging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Merging
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3913,7 +3543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scheduler-commands/" class="md-nav__link">
+      <a href="../../cli/scheduler-commands/" class="md-nav__link">
         
   
   
@@ -3941,7 +3571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../infrastructure-commands/" class="md-nav__link">
+      <a href="../../cli/infrastructure-commands/" class="md-nav__link">
         
   
   
@@ -3969,7 +3599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../multi-provider-templates/" class="md-nav__link">
+      <a href="../../cli/multi-provider-templates/" class="md-nav__link">
         
   
   
@@ -3997,7 +3627,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../provider-override/" class="md-nav__link">
+      <a href="../../cli/provider-override/" class="md-nav__link">
         
   
   
@@ -4025,7 +3655,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../filtering/" class="md-nav__link">
+      <a href="../../cli/filtering/" class="md-nav__link">
         
   
   
@@ -4202,28 +3832,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
-        
-          
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -4241,7 +3874,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -4256,28 +3889,31 @@
                 
   
   
+    
   
   
+  
     
     
     
     
       
       
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
         
           
+          
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9_1" >
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_1" checked>
         
           
-          <label class="md-nav__link" for="__nav_9_1" id="__nav_9_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9_1" id="__nav_9_1_label" tabindex="">
             
   
   
@@ -4295,7 +3931,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9_1">
             <span class="md-nav__icon md-icon"></span>
             
@@ -4313,7 +3949,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../sdk/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -4341,7 +3977,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../sdk/quickstart/" class="md-nav__link">
+      <a href="../quickstart/" class="md-nav__link">
         
   
   
@@ -4369,7 +4005,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../sdk/api-reference/" class="md-nav__link">
+      <a href="../api-reference/" class="md-nav__link">
         
   
   
@@ -4394,10 +4030,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../sdk/generating-sdks/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate Your Own SDK
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -4413,6 +4076,303 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#officially-supported-vs-self-serve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Officially supported vs. self-serve
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-get-the-openapi-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to get the OpenAPI spec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where to get the OpenAPI spec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-a-github-release-recommended-for-production-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a GitHub Release (recommended for production use)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-the-repository-for-development-against-head" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From the repository (for development against HEAD)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generating-typed-models-with-openapi-generator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating typed models with openapi-generator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generating typed models with openapi-generator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pinned-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinned version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-docker-no-local-jvm-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Docker (no local JVM required)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-npx-node-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using npx (Node 18+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-scala-scala-akka" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — Scala (scala-akka)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-rust" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — Rust
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-ruby" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — Ruby
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-php" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — PHP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notable-supported-generators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notable supported generators
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-get-and-what-you-still-need-to-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you get — and what you still need to write
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What you get — and what you still need to write">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-generator-produces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the generator produces
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-generator-does-not-produce-the-five-hand-written-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the generator does NOT produce — the five hand-written layers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication headers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Authentication headers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bearer-token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bearer token
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aws-sigv4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS SigV4
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-x-orb-scheduler-header-hostfactory-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The X-ORB-Scheduler header (HostFactory mode)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regenerating-after-a-spec-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating after a spec update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-for-spec-drift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking for spec drift
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -5301,22 +5261,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#available-commands" class="md-nav__link">
+  <a href="#officially-supported-vs-self-serve" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Available Commands
+        Officially supported vs. self-serve
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Available Commands">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-get-the-openapi-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to get the OpenAPI spec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where to get the OpenAPI spec">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#list-templates" class="md-nav__link">
+  <a href="#from-a-github-release-recommended-for-production-use" class="md-nav__link">
     <span class="md-ellipsis">
       
-        List Templates
+        From a GitHub Release (recommended for production use)
       
     </span>
   </a>
@@ -5324,82 +5295,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#show-template-details" class="md-nav__link">
+  <a href="#from-the-repository-for-development-against-head" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Show Template Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#create-template" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Create Template
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Create Template">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#template-configuration-file-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Configuration File Format
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#update-template" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Update Template
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#delete-template" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Delete Template
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#validate-template" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Validate Template
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#refresh-templates" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Refresh Templates
+        From the repository (for development against HEAD)
       
     </span>
   </a>
@@ -5412,33 +5311,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#template-file-hierarchy" class="md-nav__link">
+  <a href="#generating-typed-models-with-openapi-generator" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Template File Hierarchy
+        Generating typed models with openapi-generator
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Examples">
+    <nav class="md-nav" aria-label="Generating typed models with openapi-generator">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#basic-usage" class="md-nav__link">
+  <a href="#pinned-version" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Basic Usage
+        Pinned version
       
     </span>
   </a>
@@ -5446,10 +5334,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#template-creation" class="md-nav__link">
+  <a href="#using-docker-no-local-jvm-required" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Template Creation
+        Using Docker (no local JVM required)
       
     </span>
   </a>
@@ -5457,10 +5345,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#template-validation" class="md-nav__link">
+  <a href="#using-npx-node-18" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Template Validation
+        Using npx (Node 18+)
       
     </span>
   </a>
@@ -5468,10 +5356,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#template-management" class="md-nav__link">
+  <a href="#example-scala-scala-akka" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Template Management
+        Example — Scala (scala-akka)
       
     </span>
   </a>
@@ -5479,10 +5367,43 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#table-format-output" class="md-nav__link">
+  <a href="#example-rust" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Table Format Output
+        Example — Rust
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-ruby" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — Ruby
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-php" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example — PHP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notable-supported-generators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notable supported generators
       
     </span>
   </a>
@@ -5495,22 +5416,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
+  <a href="#what-you-get-and-what-you-still-need-to-write" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error Handling
+        What you get — and what you still need to write
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Error Handling">
+    <nav class="md-nav" aria-label="What you get — and what you still need to write">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#template-not-found" class="md-nav__link">
+  <a href="#what-the-generator-produces" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Template Not Found
+        What the generator produces
       
     </span>
   </a>
@@ -5518,21 +5439,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#invalid-template-configuration" class="md-nav__link">
+  <a href="#what-the-generator-does-not-produce-the-five-hand-written-layers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Invalid Template Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#file-access-issues" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        File Access Issues
+        What the generator does NOT produce — the five hand-written layers
       
     </span>
   </a>
@@ -5545,22 +5455,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#integration-with-other-commands" class="md-nav__link">
+  <a href="#authentication-headers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Integration with Other Commands
+        Authentication headers
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Integration with Other Commands">
+    <nav class="md-nav" aria-label="Authentication headers">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#global-scheduler-override" class="md-nav__link">
+  <a href="#bearer-token" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Global Scheduler Override
+        Bearer token
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aws-sigv4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS SigV4
       
     </span>
   </a>
@@ -5573,52 +5494,46 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#additional-features" class="md-nav__link">
+  <a href="#the-x-orb-scheduler-header-hostfactory-mode" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Additional Features
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Additional Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#caching" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Caching
+        The X-ORB-Scheduler header (HostFactory mode)
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#provider-specific-files" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#regenerating-after-a-spec-update" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Provider-Specific Files
+        Regenerating after a spec update
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#template-merging" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#checking-for-spec-drift" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Template Merging
+        Checking for spec drift
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
   
 </li>
       
@@ -5642,294 +5557,342 @@
   
 
 
-<h1 id="template-management-commands">Template Management Commands<a class="headerlink" href="#template-management-commands" title="Permanent link">&para;</a></h1>
-<p>The template management commands provide CRUD (Create, Read, Update, Delete) operations for compute templates in the Open Resource Broker. These commands use the TemplateConfigurationManager as the single source of truth.</p>
-<blockquote>
-<p><strong>Note:</strong> For complete CLI reference including all flags and argument patterns, see <a href="../cli-reference/">CLI Reference</a>.</p>
-</blockquote>
-<h2 id="available-commands">Available Commands<a class="headerlink" href="#available-commands" title="Permanent link">&para;</a></h2>
-<h3 id="list-templates">List Templates<a class="headerlink" href="#list-templates" title="Permanent link">&para;</a></h3>
-<p>List all available templates:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>list
+<h1 id="generate-your-own-sdk">Generate Your Own SDK<a class="headerlink" href="#generate-your-own-sdk" title="Permanent link">&para;</a></h1>
+<p>This guide explains how to produce a typed client for any language that
+<a href="https://github.com/OpenAPITools/openapi-generator">openapi-generator</a> supports
+but that ORB does not officially ship.</p>
+<h2 id="officially-supported-vs-self-serve">Officially supported vs. self-serve<a class="headerlink" href="#officially-supported-vs-self-serve" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Status</th>
+<th>Package</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python</td>
+<td>Official</td>
+<td><code>pip install orb-py</code></td>
+</tr>
+<tr>
+<td>Go</td>
+<td>Official</td>
+<td><code>go get github.com/finos/open-resource-broker/sdk/go</code></td>
+</tr>
+<tr>
+<td>TypeScript / Node</td>
+<td>Official</td>
+<td><code>npm install @finos/open-resource-broker</code></td>
+</tr>
+<tr>
+<td>Java (17+)</td>
+<td>Official</td>
+<td>Maven / Gradle: <code>org.finos.openresourcebroker:open-resource-broker-java</code></td>
+</tr>
+<tr>
+<td>Kotlin</td>
+<td>Official</td>
+<td>Maven / Gradle: <code>org.finos.openresourcebroker:open-resource-broker-kotlin</code></td>
+</tr>
+<tr>
+<td>.NET / C#</td>
+<td>Official</td>
+<td>NuGet: <code>FINOS.OpenResourceBroker</code></td>
+</tr>
+<tr>
+<td>Scala, Rust, Ruby, PHP, C++, Swift, Dart, …</td>
+<td>Self-serve</td>
+<td>See this guide</td>
+</tr>
+</tbody>
+</table>
+<p>For the six official SDKs, <code>openapi-generator</code> output is produced on demand at
+build time (generate-on-build; the generated directories are gitignored, not
+committed) and the five hand-written layers (subprocess manager, UDS transport,
+retry, auth, SSE) are already implemented. For every other language you must
+generate the models yourself and then hand-write those five layers.</p>
+<h2 id="where-to-get-the-openapi-spec">Where to get the OpenAPI spec<a class="headerlink" href="#where-to-get-the-openapi-spec" title="Permanent link">&para;</a></h2>
+<h3 id="from-a-github-release-recommended-for-production-use">From a GitHub Release (recommended for production use)<a class="headerlink" href="#from-a-github-release-recommended-for-production-use" title="Permanent link">&para;</a></h3>
+<p>Every ORB release publishes the spec as a release artifact at a stable URL:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>https://github.com/finos/open-resource-broker/releases/download/v&lt;version&gt;/openapi-v&lt;version&gt;.json
 </code></pre></div>
-<p>List with detailed configuration fields:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--long
+<p>Example — download the spec for v1.8.3:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>https://github.com/finos/open-resource-broker/releases/download/v1.8.3/openapi-v1.8.3.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-o<span class="w"> </span>openapi.json
 </code></pre></div>
-<p>Filter by provider API:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--provider-api<span class="w"> </span>aws
+<h3 id="from-the-repository-for-development-against-head">From the repository (for development against HEAD)<a class="headerlink" href="#from-the-repository-for-development-against-head" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sdk/spec/openapi.json
 </code></pre></div>
-<p>Output formats:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>table
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>yaml
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>json
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>list
+<p>This file is generated at release time by running a live ORB server and calling
+<code>GET /openapi.json</code>. It is committed to source control and is the single source
+of truth for all six official SDKs. If you are working from a clone of the
+repository, use this path directly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># From inside the repository root</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">INPUT_SPEC</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">/sdk/spec/openapi.json&quot;</span>
 </code></pre></div>
-<h3 id="show-template-details">Show Template Details<a class="headerlink" href="#show-template-details" title="Permanent link">&para;</a></h3>
-<p>Show detailed information about a specific template:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>TEMPLATE_ID
+<p>The spec covers <strong>45 operations</strong> across templates, machines, requests,
+providers, config, admin, and observability endpoints.</p>
+<h2 id="generating-typed-models-with-openapi-generator">Generating typed models with openapi-generator<a class="headerlink" href="#generating-typed-models-with-openapi-generator" title="Permanent link">&para;</a></h2>
+<h3 id="pinned-version">Pinned version<a class="headerlink" href="#pinned-version" title="Permanent link">&para;</a></h3>
+<p>All official SDKs pin openapi-generator to <strong>v7.23.0</strong>. Pin to the same
+version to ensure generated model shapes match what the server expects.</p>
+<h3 id="using-docker-no-local-jvm-required">Using Docker (no local JVM required)<a class="headerlink" href="#using-docker-no-local-jvm-required" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>-g<span class="w"> </span>&lt;GENERATOR_NAME&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated/&lt;lang&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span>--additional-properties<span class="o">=</span>&lt;<span class="nv">key</span><span class="o">=</span>value,...&gt;
 </code></pre></div>
-<p>Show with different output formats:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>my-template<span class="w"> </span>--format<span class="w"> </span>yaml
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>my-template<span class="w"> </span>--format<span class="w"> </span>table
+<h3 id="using-npx-node-18">Using npx (Node 18+)<a class="headerlink" href="#using-npx-node-18" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>npx<span class="w"> </span>@openapitools/openapi-generator-cli@2.15.3<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-i<span class="w"> </span>openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-g<span class="w"> </span>&lt;GENERATOR_NAME&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>-o<span class="w"> </span>generated/&lt;lang&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--additional-properties<span class="o">=</span>&lt;<span class="nv">key</span><span class="o">=</span>value,...&gt;
 </code></pre></div>
-<h3 id="create-template">Create Template<a class="headerlink" href="#create-template" title="Permanent link">&para;</a></h3>
-<p>Create a new template from a configuration file:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>create<span class="w"> </span>--file<span class="w"> </span>template.json
+<p>The npm package <code>@openapitools/openapi-generator-cli@2.15.3</code> wraps
+openapi-generator-cli v7.23.0. Verify with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>npx<span class="w"> </span>@openapitools/openapi-generator-cli@2.15.3<span class="w"> </span>version
 </code></pre></div>
-<p>Create with validation only (don't save):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>create<span class="w"> </span>--file<span class="w"> </span>template.json<span class="w"> </span>--validate-only
+<h3 id="example-scala-scala-akka">Example — Scala (scala-akka)<a class="headerlink" href="#example-scala-scala-akka" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>-g<span class="w"> </span>scala-akka<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated/scala<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span>--additional-properties<span class="o">=</span><span class="nv">groupId</span><span class="o">=</span>org.finos,artifactId<span class="o">=</span>orb-sdk-scala,artifactVersion<span class="o">=</span><span class="m">0</span>.1.0,generateModelTests<span class="o">=</span>false,generateApiTests<span class="o">=</span><span class="nb">false</span>
 </code></pre></div>
-<h4 id="template-configuration-file-format">Template Configuration File Format<a class="headerlink" href="#template-configuration-file-format" title="Permanent link">&para;</a></h4>
-<p>Templates can be defined in JSON or YAML format:</p>
-<p><strong>JSON Format:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">&quot;template_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my-aws-template&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;My AWS Template&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">&quot;provider_api&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;aws&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">&quot;image_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ami-12345678&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">&quot;machine_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;t3.medium&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="nt">&quot;key_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my-keypair&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nt">&quot;security_group_ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sg-12345678&quot;</span><span class="p">],</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="nt">&quot;subnet_ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;subnet-12345678&quot;</span><span class="p">],</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span><span class="nt">&quot;user_data&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;#!/bin/bash\necho &#39;Hello World&#39;&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">    </span><span class="nt">&quot;Environment&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;development&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">    </span><span class="nt">&quot;Project&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hostfactory&quot;</span>
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0&quot;</span>
-<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="p">}</span>
-</code></pre></div></p>
-<p><strong>YAML Format:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">template_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-aws-template</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">My AWS Template</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nt">provider_api</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aws</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="nt">image_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ami-12345678</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nt">machine_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">t3.medium</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="nt">key_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-keypair</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="nt">security_group_ids</span><span class="p">:</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sg-12345678</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="nt">subnet_ids</span><span class="p">:</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subnet-12345678</span>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="nt">user_data</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span><span class="no">#!/bin/bash</span>
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span><span class="no">echo &#39;Hello World&#39;</span>
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="nt">tags</span><span class="p">:</span>
-<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">  </span><span class="nt">Environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">development</span>
-<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">  </span><span class="nt">Project</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hostfactory</span>
-<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
-</code></pre></div></p>
-<h3 id="update-template">Update Template<a class="headerlink" href="#update-template" title="Permanent link">&para;</a></h3>
-<p>Update an existing template:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>update<span class="w"> </span>TEMPLATE_ID<span class="w"> </span>--file<span class="w"> </span>updated-template.json
+<h3 id="example-rust">Example — Rust<a class="headerlink" href="#example-rust" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span>-g<span class="w"> </span>rust<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated/rust<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span>--additional-properties<span class="o">=</span><span class="nv">packageName</span><span class="o">=</span>orb-sdk,generateModelTests<span class="o">=</span>false,generateApiTests<span class="o">=</span><span class="nb">false</span>
 </code></pre></div>
-<h3 id="delete-template">Delete Template<a class="headerlink" href="#delete-template" title="Permanent link">&para;</a></h3>
-<p>Delete a template:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>delete<span class="w"> </span>TEMPLATE_ID
+<h3 id="example-ruby">Example — Ruby<a class="headerlink" href="#example-ruby" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span>-g<span class="w"> </span>ruby<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated/ruby<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>--additional-properties<span class="o">=</span><span class="nv">gemName</span><span class="o">=</span>orb_sdk,gemVersion<span class="o">=</span><span class="m">0</span>.1.0,generateModelTests<span class="o">=</span>false,generateApiTests<span class="o">=</span><span class="nb">false</span>
 </code></pre></div>
-<p>Force deletion without confirmation:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>delete<span class="w"> </span>TEMPLATE_ID<span class="w"> </span>--force
+<h3 id="example-php">Example — PHP<a class="headerlink" href="#example-php" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span>-g<span class="w"> </span>php<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated/php<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span>--additional-properties<span class="o">=</span><span class="nv">invokerPackage</span><span class="o">=</span>FINOS<span class="se">\\</span>OpenResourceBroker,packageName<span class="o">=</span>finos/orb-sdk,generateModelTests<span class="o">=</span>false,generateApiTests<span class="o">=</span><span class="nb">false</span>
 </code></pre></div>
-<h3 id="validate-template">Validate Template<a class="headerlink" href="#validate-template" title="Permanent link">&para;</a></h3>
-<p>Validate a template configuration file:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>validate<span class="w"> </span>--file<span class="w"> </span>template.json
+<h3 id="notable-supported-generators">Notable supported generators<a class="headerlink" href="#notable-supported-generators" title="Permanent link">&para;</a></h3>
+<p>Run <code>docker run --rm openapitools/openapi-generator-cli:v7.23.0 list</code> for the
+complete list. A representative subset:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Generators</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JVM</td>
+<td><code>java</code>, <code>kotlin</code>, <code>scala-akka</code>, <code>scala-http4s</code>, <code>groovy</code></td>
+</tr>
+<tr>
+<td>.NET</td>
+<td><code>csharp</code>, <code>fsharp</code></td>
+</tr>
+<tr>
+<td>JavaScript / TypeScript</td>
+<td><code>typescript-axios</code>, <code>typescript-fetch</code>, <code>typescript-node</code>, <code>javascript</code></td>
+</tr>
+<tr>
+<td>Python</td>
+<td><code>python</code></td>
+</tr>
+<tr>
+<td>Ruby</td>
+<td><code>ruby</code></td>
+</tr>
+<tr>
+<td>PHP</td>
+<td><code>php</code>, <code>php-symfony</code></td>
+</tr>
+<tr>
+<td>Go</td>
+<td><code>go</code></td>
+</tr>
+<tr>
+<td>Rust</td>
+<td><code>rust</code></td>
+</tr>
+<tr>
+<td>Swift</td>
+<td><code>swift5</code>, <code>swift6</code></td>
+</tr>
+<tr>
+<td>Dart / Flutter</td>
+<td><code>dart</code>, <code>dart-dio</code></td>
+</tr>
+<tr>
+<td>C++</td>
+<td><code>cpp-restbed</code>, <code>cpp-ue4</code></td>
+</tr>
+<tr>
+<td>Other</td>
+<td><code>r</code>, <code>perl</code>, <code>bash</code>, <code>powershell</code>, <code>elm</code>, <code>erlang-proper</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-you-get-and-what-you-still-need-to-write">What you get — and what you still need to write<a class="headerlink" href="#what-you-get-and-what-you-still-need-to-write" title="Permanent link">&para;</a></h2>
+<h3 id="what-the-generator-produces">What the generator produces<a class="headerlink" href="#what-the-generator-produces" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Typed model classes</strong> — one class/struct per OpenAPI schema component (e.g.
+  <code>TemplateItem</code>, <code>RequestMachinesRequest</code>, <code>RequestOperationResponse</code>).</li>
+<li><strong>API stub methods</strong> — one method per operation with typed parameters and
+  return types. These stubs call a generated HTTP client that issues plain
+  TCP/HTTPS requests.</li>
+<li><strong>Serialization helpers</strong> — JSON marshal/unmarshal wired to the model classes.</li>
+</ul>
+<p>This is sufficient if you only need to connect to a <strong>remote ORB server over
+HTTP/HTTPS</strong> and do not use the managed-subprocess or UNIX socket modes.</p>
+<h3 id="what-the-generator-does-not-produce-the-five-hand-written-layers">What the generator does NOT produce — the five hand-written layers<a class="headerlink" href="#what-the-generator-does-not-produce-the-five-hand-written-layers" title="Permanent link">&para;</a></h3>
+<p>The generator cannot produce ORB's core value. For a complete, production-grade
+SDK you must hand-write the five layers documented in
+<a href="https://github.com/finos/open-resource-broker/blob/main/sdk/ARCHITECTURE.md"><code>sdk/ARCHITECTURE.md</code></a>:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What it does</th>
+<th>Reference implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Subprocess Manager</td>
+<td>Spawns and supervises a local ORB process; polls <code>/health</code> until healthy; SIGTERM/SIGKILL on shutdown</td>
+<td><code>sdk/go/internal/process/manager.go</code></td>
+</tr>
+<tr>
+<td>2. UDS Transport</td>
+<td>Dials a UNIX domain socket and wraps it as a standard HTTP transport</td>
+<td><code>sdk/go/internal/transport/uds.go</code></td>
+</tr>
+<tr>
+<td>3. Retry Transport</td>
+<td>Transparent retry on network errors and HTTP 5xx with exponential back-off and jitter</td>
+<td><code>sdk/go/internal/transport/retry.go</code></td>
+</tr>
+<tr>
+<td>4. AWS SigV4 Auth</td>
+<td>Signs outgoing requests using the standard AWS credential chain; supports static credentials and dynamic providers</td>
+<td><code>sdk/go/internal/transport/sigv4.go</code></td>
+</tr>
+<tr>
+<td>5. SSE Reader + Reconnect</td>
+<td>Parses <code>data:</code> frames, honours <code>retry:</code> directives, reconnects with back-off, detects the terminal sentinel event</td>
+<td><code>sdk/go/internal/sse/reader.go</code></td>
+</tr>
+</tbody>
+</table>
+<p>The TypeScript SDK (<code>sdk/typescript/</code>) is the most fully commented reference
+implementation and is a good starting point for languages in that family. The
+Go SDK (<code>sdk/go/</code>) is the canonical reference for all five layers.</p>
+<p><strong>The generated HTTP client talks to a remote ORB server over TCP.</strong> It will
+not start ORB as a subprocess, will not dial a UNIX socket, will not reconnect
+an SSE stream, and will not sign requests with AWS SigV4. If your use-case
+requires those capabilities, you must port the five layers from the reference
+implementations.</p>
+<h2 id="authentication-headers">Authentication headers<a class="headerlink" href="#authentication-headers" title="Permanent link">&para;</a></h2>
+<p>All requests to a remote ORB server must include an <code>Authorization</code> header.</p>
+<h3 id="bearer-token">Bearer token<a class="headerlink" href="#bearer-token" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Authorization: Bearer &lt;token&gt;
 </code></pre></div>
-<h3 id="refresh-templates">Refresh Templates<a class="headerlink" href="#refresh-templates" title="Permanent link">&para;</a></h3>
-<p>Refresh the template cache and reload from files:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>refresh
+<h3 id="aws-sigv4">AWS SigV4<a class="headerlink" href="#aws-sigv4" title="Permanent link">&para;</a></h3>
+<p>Use the standard AWS Signature Version 4 signing procedure with:</p>
+<ul>
+<li>Service name: <code>execute-api</code> (AWS API Gateway-fronted deployments) or as
+  configured by the operator.</li>
+<li>Region: the AWS region of the ORB deployment.</li>
+<li>Credentials: read from the standard AWS credential chain (environment
+  variables, <code>~/.aws/credentials</code>, or instance/task metadata).</li>
+</ul>
+<p>Prefer the language-native AWS SDK for signing rather than a hand-rolled
+implementation. See <code>sdk/ARCHITECTURE.md</code> Layer 4 for per-language guidance.</p>
+<h2 id="the-x-orb-scheduler-header-hostfactory-mode">The X-ORB-Scheduler header (HostFactory mode)<a class="headerlink" href="#the-x-orb-scheduler-header-hostfactory-mode" title="Permanent link">&para;</a></h2>
+<p>When connecting to a remote ORB server that is running with
+<code>--scheduler hostfactory</code>, every request must carry:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>X-ORB-Scheduler: hostfactory
 </code></pre></div>
-<p>Force complete refresh:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>orb<span class="w"> </span>templates<span class="w"> </span>refresh<span class="w"> </span>--force
-</code></pre></div>
-<h2 id="template-file-hierarchy">Template File Hierarchy<a class="headerlink" href="#template-file-hierarchy" title="Permanent link">&para;</a></h2>
-<p>The system supports provider-specific template files with hierarchical loading:</p>
+<p>The server reads this header to select the HostFactory scheduler backend.
+Without it the default scheduler is used. The header is ignored if the server
+was not started with <code>--scheduler hostfactory</code>.</p>
+<p>When using the default scheduler, omit the header entirely.</p>
+<h2 id="regenerating-after-a-spec-update">Regenerating after a spec update<a class="headerlink" href="#regenerating-after-a-spec-update" title="Permanent link">&para;</a></h2>
+<p>The spec can change between ORB releases. To regenerate models after an
+upgrade:</p>
 <ol>
-<li><strong>Instance Files</strong>: <code>{provider}inst_templates.json</code> (Priority 1)</li>
-<li><strong>Type Files</strong>: <code>{provider}type_templates.json</code> (Priority 2)</li>
-<li><strong>Main Files</strong>: <code>{provider}prov_templates.json</code> (Priority 3)</li>
-<li><strong>Legacy Files</strong>: <code>templates.json</code> (Priority 4)</li>
+<li>Download the new spec from the release artifact URL shown above.</li>
+<li>Re-run the same <code>docker run</code> / <code>npx</code> command with the updated spec.</li>
+<li>Commit the diff to generated files alongside your application code.</li>
+<li>Review the diff for any new or renamed operations that require updates to
+   your hand-written transport wiring.</li>
 </ol>
-<p>Templates are merged with higher priority files overriding lower priority ones.</p>
-<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
-<h3 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># List all templates</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>list
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="o">{</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>true,
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">  </span><span class="s2">&quot;templates&quot;</span>:<span class="w"> </span><span class="o">[</span>
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">    </span><span class="o">{</span>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">      </span><span class="s2">&quot;template_id&quot;</span>:<span class="w"> </span><span class="s2">&quot;aws-basic&quot;</span>,
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">      </span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;Basic AWS Template&quot;</span>,
-<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">      </span><span class="s2">&quot;provider_api&quot;</span>:<span class="w"> </span><span class="s2">&quot;aws&quot;</span>,
-<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">      </span><span class="s2">&quot;image_id&quot;</span>:<span class="w"> </span><span class="s2">&quot;ami-12345678&quot;</span>,
-<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="w">      </span><span class="s2">&quot;machine_type&quot;</span>:<span class="w"> </span><span class="s2">&quot;t3.medium&quot;</span>
-<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="w">    </span><span class="o">}</span>
-<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a><span class="w">  </span><span class="o">]</span>,
-<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="w">  </span><span class="s2">&quot;total_count&quot;</span>:<span class="w"> </span><span class="m">1</span>,
-<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="w">  </span><span class="s2">&quot;message&quot;</span>:<span class="w"> </span><span class="s2">&quot;Retrieved 1 templates successfully&quot;</span>
-<a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a><span class="o">}</span>
-<a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a>
-<a id="__codelineno-16-18" name="__codelineno-16-18" href="#__codelineno-16-18"></a><span class="c1"># Show specific template</span>
-<a id="__codelineno-16-19" name="__codelineno-16-19" href="#__codelineno-16-19"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>aws-basic
-<a id="__codelineno-16-20" name="__codelineno-16-20" href="#__codelineno-16-20"></a><span class="o">{</span>
-<a id="__codelineno-16-21" name="__codelineno-16-21" href="#__codelineno-16-21"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>true,
-<a id="__codelineno-16-22" name="__codelineno-16-22" href="#__codelineno-16-22"></a><span class="w">  </span><span class="s2">&quot;template&quot;</span>:<span class="w"> </span><span class="o">{</span>
-<a id="__codelineno-16-23" name="__codelineno-16-23" href="#__codelineno-16-23"></a><span class="w">    </span><span class="s2">&quot;template_id&quot;</span>:<span class="w"> </span><span class="s2">&quot;aws-basic&quot;</span>,
-<a id="__codelineno-16-24" name="__codelineno-16-24" href="#__codelineno-16-24"></a><span class="w">    </span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;Basic AWS Template&quot;</span>,
-<a id="__codelineno-16-25" name="__codelineno-16-25" href="#__codelineno-16-25"></a><span class="w">    </span><span class="s2">&quot;provider_api&quot;</span>:<span class="w"> </span><span class="s2">&quot;aws&quot;</span>,
-<a id="__codelineno-16-26" name="__codelineno-16-26" href="#__codelineno-16-26"></a><span class="w">    </span><span class="s2">&quot;image_id&quot;</span>:<span class="w"> </span><span class="s2">&quot;ami-12345678&quot;</span>,
-<a id="__codelineno-16-27" name="__codelineno-16-27" href="#__codelineno-16-27"></a><span class="w">    </span><span class="s2">&quot;machine_type&quot;</span>:<span class="w"> </span><span class="s2">&quot;t3.medium&quot;</span>,
-<a id="__codelineno-16-28" name="__codelineno-16-28" href="#__codelineno-16-28"></a><span class="w">    </span><span class="s2">&quot;key_name&quot;</span>:<span class="w"> </span><span class="s2">&quot;my-keypair&quot;</span>,
-<a id="__codelineno-16-29" name="__codelineno-16-29" href="#__codelineno-16-29"></a><span class="w">    </span><span class="s2">&quot;security_group_ids&quot;</span>:<span class="w"> </span><span class="o">[</span><span class="s2">&quot;sg-12345678&quot;</span><span class="o">]</span>,
-<a id="__codelineno-16-30" name="__codelineno-16-30" href="#__codelineno-16-30"></a><span class="w">    </span><span class="s2">&quot;subnet_ids&quot;</span>:<span class="w"> </span><span class="o">[</span><span class="s2">&quot;subnet-12345678&quot;</span><span class="o">]</span>,
-<a id="__codelineno-16-31" name="__codelineno-16-31" href="#__codelineno-16-31"></a><span class="w">    </span><span class="s2">&quot;tags&quot;</span>:<span class="w"> </span><span class="o">{</span>
-<a id="__codelineno-16-32" name="__codelineno-16-32" href="#__codelineno-16-32"></a><span class="w">      </span><span class="s2">&quot;Environment&quot;</span>:<span class="w"> </span><span class="s2">&quot;production&quot;</span>
-<a id="__codelineno-16-33" name="__codelineno-16-33" href="#__codelineno-16-33"></a><span class="w">    </span><span class="o">}</span>
-<a id="__codelineno-16-34" name="__codelineno-16-34" href="#__codelineno-16-34"></a><span class="w">  </span><span class="o">}</span>,
-<a id="__codelineno-16-35" name="__codelineno-16-35" href="#__codelineno-16-35"></a><span class="w">  </span><span class="s2">&quot;message&quot;</span>:<span class="w"> </span><span class="s2">&quot;Retrieved template aws-basic successfully&quot;</span>
-<a id="__codelineno-16-36" name="__codelineno-16-36" href="#__codelineno-16-36"></a><span class="o">}</span>
+<p>To check which operations exist in a given spec version:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># List all operationIds in the spec (requires Python 3)</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="s2">import json, sys</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="s2">spec = json.load(open(&#39;openapi.json&#39;))</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="s2">for path, methods in spec[&#39;paths&#39;].items():</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="s2">    for method, op in methods.items():</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="s2">        print(op.get(&#39;operationId&#39;, f&#39;{method.upper()} {path}&#39;))</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort
 </code></pre></div>
-<h3 id="template-creation">Template Creation<a class="headerlink" href="#template-creation" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Create template from file</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>create<span class="w"> </span>--file<span class="w"> </span>new-template.json
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="o">{</span>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>true,
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="s2">&quot;message&quot;</span>:<span class="w"> </span><span class="s2">&quot;Template created successfully&quot;</span>,
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span><span class="s2">&quot;template_id&quot;</span>:<span class="w"> </span><span class="s2">&quot;new-aws-template&quot;</span>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="o">}</span>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="c1"># Validate template without creating</span>
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>create<span class="w"> </span>--file<span class="w"> </span>new-template.json<span class="w"> </span>--validate-only
-<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a><span class="o">{</span>
-<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>true,
-<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="w">  </span><span class="s2">&quot;message&quot;</span>:<span class="w"> </span><span class="s2">&quot;Template validation successful&quot;</span>,
-<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a><span class="w">  </span><span class="s2">&quot;template_id&quot;</span>:<span class="w"> </span><span class="s2">&quot;new-aws-template&quot;</span>
-<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a><span class="o">}</span>
+<p>The current spec (v1.8.x) exposes <strong>45 operations</strong>. The full list is in
+<a href="https://github.com/finos/open-resource-broker/blob/main/sdk/spec/openapi.json"><code>sdk/spec/openapi.json</code></a>.</p>
+<h2 id="checking-for-spec-drift">Checking for spec drift<a class="headerlink" href="#checking-for-spec-drift" title="Permanent link">&para;</a></h2>
+<p>The official SDKs do not commit generated models; instead each build regenerates
+them from the spec, so "drift" surfaces as a build failure rather than a diff.
+For a self-serve SDK where you <em>do</em> commit the generated models, you can detect
+drift against a newer spec by running the generator again and checking the diff:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Regenerate into a temp directory and diff</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/workspace&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span>openapitools/openapi-generator-cli:v7.23.0<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span>-i<span class="w"> </span>/workspace/openapi.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span>-g<span class="w"> </span>&lt;GENERATOR_NAME&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span>-o<span class="w"> </span>/workspace/generated-new/&lt;lang&gt;
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>diff<span class="w"> </span>-rq<span class="w"> </span>generated/&lt;lang&gt;<span class="w"> </span>generated-new/&lt;lang&gt;
 </code></pre></div>
-<h3 id="template-validation">Template Validation<a class="headerlink" href="#template-validation" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Validate template file</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>validate<span class="w"> </span>--file<span class="w"> </span>template.json
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="o">{</span>
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>true,
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span><span class="s2">&quot;valid&quot;</span>:<span class="w"> </span>true,
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">  </span><span class="s2">&quot;validation_errors&quot;</span>:<span class="w"> </span><span class="o">[]</span>,
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="w">  </span><span class="s2">&quot;validation_warnings&quot;</span>:<span class="w"> </span><span class="o">[]</span>,
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">  </span><span class="s2">&quot;template_id&quot;</span>:<span class="w"> </span><span class="s2">&quot;my-template&quot;</span>,
-<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="w">  </span><span class="s2">&quot;message&quot;</span>:<span class="w"> </span><span class="s2">&quot;Validation completed&quot;</span>
-<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="o">}</span>
-<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>
-<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="c1"># Validation with errors</span>
-<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>validate<span class="w"> </span>--file<span class="w"> </span>invalid-template.json
-<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="o">{</span>
-<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>false,
-<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="w">  </span><span class="s2">&quot;valid&quot;</span>:<span class="w"> </span>false,
-<a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a><span class="w">  </span><span class="s2">&quot;validation_errors&quot;</span>:<span class="w"> </span><span class="o">[</span>
-<a id="__codelineno-18-18" name="__codelineno-18-18" href="#__codelineno-18-18"></a><span class="w">    </span><span class="s2">&quot;Missing required field: template_id&quot;</span>,
-<a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a><span class="w">    </span><span class="s2">&quot;Invalid machine_type: must be a valid instance type&quot;</span>
-<a id="__codelineno-18-20" name="__codelineno-18-20" href="#__codelineno-18-20"></a><span class="w">  </span><span class="o">]</span>,
-<a id="__codelineno-18-21" name="__codelineno-18-21" href="#__codelineno-18-21"></a><span class="w">  </span><span class="s2">&quot;validation_warnings&quot;</span>:<span class="w"> </span><span class="o">[</span>
-<a id="__codelineno-18-22" name="__codelineno-18-22" href="#__codelineno-18-22"></a><span class="w">    </span><span class="s2">&quot;No tags specified: recommended for resource management&quot;</span>
-<a id="__codelineno-18-23" name="__codelineno-18-23" href="#__codelineno-18-23"></a><span class="w">  </span><span class="o">]</span>,
-<a id="__codelineno-18-24" name="__codelineno-18-24" href="#__codelineno-18-24"></a><span class="w">  </span><span class="s2">&quot;message&quot;</span>:<span class="w"> </span><span class="s2">&quot;Validation failed&quot;</span>
-<a id="__codelineno-18-25" name="__codelineno-18-25" href="#__codelineno-18-25"></a><span class="o">}</span>
-</code></pre></div>
-<h3 id="template-management">Template Management<a class="headerlink" href="#template-management" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Update template</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>update<span class="w"> </span>aws-basic<span class="w"> </span>--file<span class="w"> </span>updated-template.json
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="o">{</span>
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>true,
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">  </span><span class="s2">&quot;message&quot;</span>:<span class="w"> </span><span class="s2">&quot;Template updated successfully&quot;</span>,
-<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">  </span><span class="s2">&quot;template_id&quot;</span>:<span class="w"> </span><span class="s2">&quot;aws-basic&quot;</span>
-<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="o">}</span>
-<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>
-<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="c1"># Delete template</span>
-<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>delete<span class="w"> </span>old-template
-<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="o">{</span>
-<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>true,
-<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="w">  </span><span class="s2">&quot;message&quot;</span>:<span class="w"> </span><span class="s2">&quot;Template deleted successfully&quot;</span>,
-<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a><span class="w">  </span><span class="s2">&quot;template_id&quot;</span>:<span class="w"> </span><span class="s2">&quot;old-template&quot;</span>
-<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a><span class="o">}</span>
-<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>
-<a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a><span class="c1"># Refresh template cache</span>
-<a id="__codelineno-19-18" name="__codelineno-19-18" href="#__codelineno-19-18"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>refresh
-<a id="__codelineno-19-19" name="__codelineno-19-19" href="#__codelineno-19-19"></a><span class="o">{</span>
-<a id="__codelineno-19-20" name="__codelineno-19-20" href="#__codelineno-19-20"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>true,
-<a id="__codelineno-19-21" name="__codelineno-19-21" href="#__codelineno-19-21"></a><span class="w">  </span><span class="s2">&quot;message&quot;</span>:<span class="w"> </span><span class="s2">&quot;Templates refreshed successfully&quot;</span>,
-<a id="__codelineno-19-22" name="__codelineno-19-22" href="#__codelineno-19-22"></a><span class="w">  </span><span class="s2">&quot;template_count&quot;</span>:<span class="w"> </span><span class="m">5</span>,
-<a id="__codelineno-19-23" name="__codelineno-19-23" href="#__codelineno-19-23"></a><span class="w">  </span><span class="s2">&quot;cache_stats&quot;</span>:<span class="w"> </span><span class="o">{</span>
-<a id="__codelineno-19-24" name="__codelineno-19-24" href="#__codelineno-19-24"></a><span class="w">    </span><span class="s2">&quot;cache_hits&quot;</span>:<span class="w"> </span><span class="m">0</span>,
-<a id="__codelineno-19-25" name="__codelineno-19-25" href="#__codelineno-19-25"></a><span class="w">    </span><span class="s2">&quot;cache_misses&quot;</span>:<span class="w"> </span><span class="m">5</span>,
-<a id="__codelineno-19-26" name="__codelineno-19-26" href="#__codelineno-19-26"></a><span class="w">    </span><span class="s2">&quot;files_loaded&quot;</span>:<span class="w"> </span><span class="m">3</span>
-<a id="__codelineno-19-27" name="__codelineno-19-27" href="#__codelineno-19-27"></a><span class="w">  </span><span class="o">}</span>
-<a id="__codelineno-19-28" name="__codelineno-19-28" href="#__codelineno-19-28"></a><span class="o">}</span>
-</code></pre></div>
-<h3 id="table-format-output">Table Format Output<a class="headerlink" href="#table-format-output" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>table
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>+---------------+--------------------+------------+---------------+-------------+
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>│<span class="w"> </span>Template<span class="w"> </span>ID<span class="w">     </span>│<span class="w"> </span>Name<span class="w">                 </span>│<span class="w"> </span>Provider<span class="w"> </span>API<span class="w"> </span>│<span class="w"> </span>Image<span class="w"> </span>ID<span class="w">        </span>│<span class="w"> </span>Machine<span class="w"> </span>Type<span class="w">  </span>│
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>+---------------+--------------------+------------+---------------+-------------+
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>│<span class="w"> </span>aws-basic<span class="w">       </span>│<span class="w"> </span>Basic<span class="w"> </span>AWS<span class="w"> </span>Template<span class="w">   </span>│<span class="w"> </span>aws<span class="w">          </span>│<span class="w"> </span>ami-12345678<span class="w">    </span>│<span class="w"> </span>t3.medium<span class="w">     </span>│
-<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>│<span class="w"> </span>aws-spot<span class="w">        </span>│<span class="w"> </span>Spot<span class="w"> </span>Instance<span class="w"> </span>Temp<span class="w">   </span>│<span class="w"> </span>aws<span class="w">          </span>│<span class="w"> </span>ami-87654321<span class="w">    </span>│<span class="w"> </span>t3.large<span class="w">      </span>│
-<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>│<span class="w"> </span>aws-gpu<span class="w">         </span>│<span class="w"> </span>GPU<span class="w"> </span>Instance<span class="w"> </span>Temp<span class="w">    </span>│<span class="w"> </span>aws<span class="w">          </span>│<span class="w"> </span>ami-11111111<span class="w">    </span>│<span class="w"> </span>p3.2xlarge<span class="w">    </span>│
-<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>+---------------+--------------------+------------+---------------+-------------+
-</code></pre></div>
-<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
-<p>The template commands provide detailed error messages for common issues:</p>
-<h3 id="template-not-found">Template Not Found<a class="headerlink" href="#template-not-found" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>nonexistent-template
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="o">{</span>
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>false,
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span><span class="s2">&quot;error&quot;</span>:<span class="w"> </span><span class="s2">&quot;Template not found: nonexistent-template&quot;</span>,
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span><span class="s2">&quot;template&quot;</span>:<span class="w"> </span>null
-<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="o">}</span>
-</code></pre></div>
-<h3 id="invalid-template-configuration">Invalid Template Configuration<a class="headerlink" href="#invalid-template-configuration" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>create<span class="w"> </span>--file<span class="w"> </span>invalid.json
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="o">{</span>
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>false,
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">  </span><span class="s2">&quot;error&quot;</span>:<span class="w"> </span><span class="s2">&quot;Invalid template configuration: Missing required field &#39;template_id&#39;&quot;</span>
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="o">}</span>
-</code></pre></div>
-<h3 id="file-access-issues">File Access Issues<a class="headerlink" href="#file-access-issues" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>$<span class="w"> </span>orb<span class="w"> </span>templates<span class="w"> </span>create<span class="w"> </span>--file<span class="w"> </span>missing-file.json
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="o">{</span>
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="s2">&quot;success&quot;</span>:<span class="w"> </span>false,
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span><span class="s2">&quot;error&quot;</span>:<span class="w"> </span><span class="s2">&quot;Template file not found: missing-file.json&quot;</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="o">}</span>
-</code></pre></div>
-<h2 id="integration-with-other-commands">Integration with Other Commands<a class="headerlink" href="#integration-with-other-commands" title="Permanent link">&para;</a></h2>
-<p>Template commands integrate seamlessly with other CLI operations:</p>
-<ul>
-<li><strong>Machine Requests</strong>: Use template IDs from <code>templates list</code> in <code>machines request</code></li>
-<li><strong>Provider Operations</strong>: Templates are provider-specific and work with provider commands</li>
-<li><strong>Scheduler Integration</strong>: Templates work with all scheduler strategies via global <code>--scheduler</code> flag</li>
-</ul>
-<h3 id="global-scheduler-override">Global Scheduler Override<a class="headerlink" href="#global-scheduler-override" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Use different scheduler for template operations</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>default<span class="w"> </span>templates<span class="w"> </span>list
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>hostfactory<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>aws-basic
-</code></pre></div>
-<h2 id="additional-features">Additional Features<a class="headerlink" href="#additional-features" title="Permanent link">&para;</a></h2>
-<h3 id="caching">Caching<a class="headerlink" href="#caching" title="Permanent link">&para;</a></h3>
-<p>The template system includes effective caching:</p>
-<ul>
-<li><strong>File Modification Tracking</strong>: Automatically detects file changes</li>
-<li><strong>TTL-based Expiration</strong>: Configurable cache timeout</li>
-<li><strong>Manual Refresh</strong>: Force cache refresh with <code>templates refresh</code></li>
-</ul>
-<h3 id="provider-specific-files">Provider-Specific Files<a class="headerlink" href="#provider-specific-files" title="Permanent link">&para;</a></h3>
-<p>Templates are organized by provider with hierarchical loading:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>config/
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>├── awsinst_templates.json    # AWS instance-specific (highest priority)
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>├── awstype_templates.json    # AWS type-specific
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>├── awsprov_templates.json    # AWS provider templates
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>└── templates.json            # Legacy templates (lowest priority)
-</code></pre></div>
-<h3 id="template-merging">Template Merging<a class="headerlink" href="#template-merging" title="Permanent link">&para;</a></h3>
-<p>Templates from multiple files are merged with priority:
-1. Higher priority files override lower priority
-2. Individual fields are merged (not whole templates)
-3. Arrays and objects are merged intelligently</p>
-<p>This allows for flexible template organization and inheritance patterns.</p>
+<p>To run this check as a make target, add a target analogous to the existing
+<code>sdk-&lt;lang&gt;-check-drift</code> targets (defined in <code>makefiles/sdk.mk</code>), which
+regenerate from the spec and then build to prove the spec still produces
+compilable code.</p>
+<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p>After generating models and implementing the five hand-written layers:</p>
+<ol>
+<li>Implement unit tests (mock HTTP server, no real ORB process).</li>
+<li>Implement contract tests against a real ORB instance, following the pattern
+   in <code>sdk/typescript/tests/contract/contract.test.ts</code>.</li>
+<li>Run the cross-language parity scenario in <code>sdk/parity/scenario.json</code> to
+   verify behavioral equivalence with the official SDKs.</li>
+<li>Open a pull request on the FINOS repository. The contribution guide is in
+   <code>CONTRIBUTING.md</code>.</li>
+</ol>
 
 
 
