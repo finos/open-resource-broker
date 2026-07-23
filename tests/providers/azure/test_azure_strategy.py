@@ -200,55 +200,6 @@ class TestCapacityMetadata:
         assert result.data["instances"][0]["status"] == "running"
         assert "InstanceId" not in result.data["instances"][0]
 
-    def test_get_instance_status_reconciles_empty_flexible_vmss_return(self, strategy_harness):
-        strategy = strategy_harness.strategy
-        handler = MagicMock()
-        handler.check_hosts_status_async = AsyncMock(return_value=[])
-        strategy_harness.handlers["VMSS"] = handler
-
-        compute_client = MagicMock()
-        compute_client.virtual_machine_scale_sets.begin_delete = AsyncMock()
-        azure_client = MagicMock()
-        azure_client.compute_client = compute_client
-        azure_client.get_async_compute_client = AsyncMock(return_value=compute_client)
-        strategy_harness.azure_client = azure_client
-        resource_manager = MagicMock()
-        resource_manager.get_vmss_member_count_async = AsyncMock(return_value=0)
-        strategy_harness.resource_manager = resource_manager
-
-        op = ProviderOperation(
-            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
-            parameters={
-                "instance_ids": ["vmss-demo_000001"],
-                "provider_api": "VMSS",
-                "template_id": "tmpl-1",
-                "resource_id": "vmss-demo",
-                "resource_mapping": {"vmss-demo_000001": ("vmss-demo", 1)},
-                "request_metadata": {
-                    "resource_group": "test-rg",
-                    "termination_requests": [
-                        {
-                            "pending_resource_cleanup": {
-                                "resource_group": "test-rg",
-                                "vmss_name": "vmss-demo",
-                                "machine_ids": ["vmss-demo_000001"],
-                                "delete_vmss_when_empty": True,
-                            }
-                        }
-                    ],
-                },
-            },
-        )
-
-        result = run_operation(strategy.execute_operation(op))
-
-        assert result.success
-        compute_client.virtual_machine_scale_sets.begin_delete.assert_awaited_once_with(
-            resource_group_name="test-rg",
-            vm_scale_set_name="vmss-demo",
-        )
-        assert result.metadata["termination_follow_up_pending"] is True
-
     def test_describe_resource_instances_adds_shortfall_summary(self, strategy_harness):
         strategy = strategy_harness.strategy
         handler = MagicMock()

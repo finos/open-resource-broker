@@ -24,7 +24,6 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureHandler,
     AzureHandlerStatusResult,
 )
-from orb.providers.azure.infrastructure.vmss_cleanup import VmssCleanupCoordinator
 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
 from orb.providers.azure.services.operation_parsing import (
     group_instance_ids_by_resource,
@@ -138,14 +137,6 @@ def status_candidate_ids(result: AzureHandlerStatusResult) -> set[str]:
     }
     candidate_ids.discard("")
     return candidate_ids
-
-
-def observed_status_ids(instance_details: list[AzureHandlerStatusResult]) -> set[str]:
-    """Collect all candidate identifiers across a list of instance detail dicts."""
-    observed_ids: set[str] = set()
-    for instance in instance_details:
-        observed_ids.update(status_candidate_ids(instance))
-    return observed_ids
 
 
 def filter_status_results(
@@ -347,20 +338,17 @@ class AzureInventoryService:
         provider_instance_name: str,
         resource_metadata_service: AzureResourceMetadataService,
         handler_provider: AzureProviderStrategy,
-        vmss_cleanup_coordinator: VmssCleanupCoordinator,
     ) -> None:
         self._logger = logger
         self._provider_instance_name = provider_instance_name
         self._resource_metadata_service = resource_metadata_service
         self._handler_provider = handler_provider
-        self._vmss_cleanup_coordinator = vmss_cleanup_coordinator
 
     async def get_instance_status_async(
         self,
         read_context: AzureReadOperationContext,
     ) -> ProviderResult:
-        """Resolve instance status through the async Azure handler contract."""
-        self._vmss_cleanup_coordinator.restore_from_request_metadata(read_context.request_metadata)
+        """Resolve instance status without driving VMSS cleanup side effects."""
         handler_machines = await self._get_instance_status_via_handlers_async(read_context)
         if handler_machines is not None:
             return await self._build_instance_status_result(
@@ -380,33 +368,12 @@ class AzureInventoryService:
         resource_manager: Optional[AzureResourceManager],
         deployment_service: AzureDeploymentStatusServiceProtocol | None,
     ) -> ProviderResult:
-        """Describe Azure resource-backed instances through the async handler contract."""
-        resource_group = read_context.resource_group
-        is_vmss = self._prepare_describe_context(read_context)
+        """Describe resource instances without driving VMSS cleanup side effects."""
         result = await self._describe_resource_instances_via_handler_async(
             read_context=read_context,
             resource_manager=resource_manager,
             deployment_service=deployment_service,
         )
-
-        if result.success and is_vmss and resource_group:
-            instance_details = result.data.get("instances", []) if result.data else []
-            await self._vmss_cleanup_coordinator.reconcile(
-                resource_group=resource_group,
-                resource_ids=read_context.resource_ids,
-                observed_ids=observed_status_ids(instance_details),
-            )
-            return result.model_copy(
-                update={
-                    "metadata": {
-                        **(result.metadata or {}),
-                        **self._vmss_cleanup_coordinator.status_metadata(
-                            resource_group=resource_group,
-                            resource_ids=read_context.resource_ids,
-                        ),
-                    }
-                }
-            )
 
         return result
 
@@ -511,10 +478,6 @@ class AzureInventoryService:
         handler_machines: list[AzureHandlerStatusResult],
     ) -> ProviderResult:
         """Build the normalized handler-backed instance-status result."""
-        is_vmss = read_context.provider_api in (
-            AzureProviderApi.VMSS,
-            AzureProviderApi.VMSS_UNIFORM,
-        )
         metadata: dict[str, Any] = {
             "operation": "get_instance_status",
             "instance_ids": read_context.instance_ids,
@@ -532,40 +495,7 @@ class AzureInventoryService:
             },
             metadata,
         )
-        if is_vmss and read_context.resource_group and read_context.resource_ids:
-            await self._vmss_cleanup_coordinator.reconcile(
-                resource_group=read_context.resource_group,
-                resource_ids=read_context.resource_ids,
-                observed_ids=observed_status_ids(handler_machines),
-            )
-            return result.model_copy(
-                update={
-                    "metadata": {
-                        **(result.metadata or {}),
-                        **self._vmss_cleanup_coordinator.status_metadata(
-                            resource_group=read_context.resource_group,
-                            resource_ids=read_context.resource_ids,
-                        ),
-                    }
-                }
-            )
         return result
-
-    def _prepare_describe_context(
-        self,
-        read_context: AzureReadOperationContext,
-    ) -> bool:
-        """Restore VMSS cleanup state and set the describe status failure policy."""
-        is_vmss = read_context.provider_api in (
-            AzureProviderApi.VMSS,
-            AzureProviderApi.VMSS_UNIFORM,
-        )
-        self._vmss_cleanup_coordinator.restore_from_request_metadata(read_context.request_metadata)
-        read_context.raise_on_status_error = is_vmss and self._vmss_cleanup_coordinator.has_pending(
-            resource_group=read_context.resource_group,
-            resource_ids=read_context.resource_ids,
-        )
-        return is_vmss
 
     def _build_describe_handler_request(
         self,

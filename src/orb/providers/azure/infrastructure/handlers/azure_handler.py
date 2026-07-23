@@ -125,19 +125,6 @@ class AzureSubmittedDeletion(TypedDict, total=False):
     error: str
 
 
-class AzurePendingResourceCleanupMetadata(TypedDict, total=False):
-    """Durable VMSS cleanup metadata persisted for follow-up reconciliation."""
-
-    resource_group: str
-    vmss_name: str
-    machine_ids: list[str]
-    delete_vmss_when_empty: bool
-    member_delete_submitted: bool
-    delete_submitted: bool
-    delete_retry_pending: bool
-    last_delete_error: str
-
-
 class AzureVmssReleaseProviderData(TypedDict, total=False):
     """Provider data returned when a VMSS termination request is submitted."""
 
@@ -147,7 +134,6 @@ class AzureVmssReleaseProviderData(TypedDict, total=False):
     submitted_deletions: list[AzureSubmittedDeletion]
     failed_deletions: list[AzureSubmittedDeletion]
     resolved_instance_ids: list[str]
-    pending_resource_cleanup: AzurePendingResourceCleanupMetadata
 
 
 class AzureSingleVmReleaseProviderData(TypedDict, total=False):

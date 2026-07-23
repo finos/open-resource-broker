@@ -81,12 +81,10 @@ async def _terminate_with_handler(
     resource_mapping: dict[str, tuple[str, int]] | None = None,
     resource_id: str | None = None,
     logger: MagicMock | None = None,
-    cleanup_recorder: MagicMock | None = None,
 ):
     service = AzureTerminationService(
         logger=logger or MagicMock(),
         handler_provider=_handler_provider(handler),
-        record_pending_cleanup=cleanup_recorder or MagicMock(),
         default_resource_group="test-rg",
     )
     return await service.terminate_instances_async(
@@ -111,8 +109,7 @@ def resource_metadata_service() -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_dispatch_collects_provider_data_and_records_cleanup():
-    cleanup_recorder = MagicMock()
+async def test_dispatch_collects_provider_data():
     handler = MagicMock()
     handler.release_hosts_async = AsyncMock(
         return_value={"provider_data": {"operation_status": "submitted"}}
@@ -122,19 +119,16 @@ async def test_dispatch_collects_provider_data_and_records_cleanup():
         handler=handler,
         instance_ids=["vm-1"],
         resource_mapping={"vm-1": ("vmss-1", 1)},
-        cleanup_recorder=cleanup_recorder,
     )
 
     assert result.success is True
     assert result.metadata["provider_data"]["termination_requests"] == [
         {"operation_status": "submitted"}
     ]
-    cleanup_recorder.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_dispatch_fans_out_across_multiple_resource_groups():
-    cleanup_recorder = MagicMock()
     handler = MagicMock()
     handler.release_hosts_async = AsyncMock(
         side_effect=[
@@ -147,7 +141,6 @@ async def test_dispatch_fans_out_across_multiple_resource_groups():
         handler=handler,
         instance_ids=["vm-1", "vm-2"],
         resource_mapping={"vm-1": ("vmss-1", 1), "vm-2": ("vmss-2", 1)},
-        cleanup_recorder=cleanup_recorder,
     )
 
     assert result.success is True
@@ -156,12 +149,10 @@ async def test_dispatch_fans_out_across_multiple_resource_groups():
         {"resource_id": "vmss-2"},
     ]
     assert handler.release_hosts_async.await_count == 2
-    cleanup_recorder.assert_called()
 
 
 @pytest.mark.asyncio
 async def test_dispatch_preserves_group_order_when_release_calls_complete_out_of_order():
-    cleanup_recorder = MagicMock()
     handler = MagicMock()
 
     async def release_hosts_async(*, machine_ids, resource_id, context):
@@ -176,7 +167,6 @@ async def test_dispatch_preserves_group_order_when_release_calls_complete_out_of
         handler=handler,
         instance_ids=["vm-1", "vm-2"],
         resource_mapping={"vm-1": ("vmss-1", 1), "vm-2": ("vmss-2", 1)},
-        cleanup_recorder=cleanup_recorder,
     )
 
     assert result.success is True
@@ -184,13 +174,10 @@ async def test_dispatch_preserves_group_order_when_release_calls_complete_out_of
         {"resource_id": "vmss-1"},
         {"resource_id": "vmss-2"},
     ]
-    assert cleanup_recorder.call_args_list[0].args[0]["provider_data"]["resource_id"] == "vmss-1"
-    assert cleanup_recorder.call_args_list[1].args[0]["provider_data"]["resource_id"] == "vmss-2"
 
 
 @pytest.mark.asyncio
 async def test_dispatch_reports_partial_failure_when_one_group_fails():
-    cleanup_recorder = MagicMock()
     logger = MagicMock()
     handler = MagicMock()
     handler.release_hosts_async = AsyncMock(
@@ -205,7 +192,6 @@ async def test_dispatch_reports_partial_failure_when_one_group_fails():
         instance_ids=["vm-1", "vm-2"],
         resource_mapping={"vm-1": ("vmss-1", 1), "vm-2": ("vmss-2", 1)},
         logger=logger,
-        cleanup_recorder=cleanup_recorder,
     )
 
     assert result.success is False
@@ -221,7 +207,6 @@ async def test_dispatch_reports_partial_failure_when_one_group_fails():
             "error_type": "RuntimeError",
         }
     ]
-    cleanup_recorder.assert_called_once()
     logger.warning.assert_called()
 
 
@@ -250,7 +235,6 @@ async def test_dispatch_treats_success_without_provider_data_as_successful_group
 
 @pytest.mark.asyncio
 async def test_terminate_instances_async_reports_partial_dispatch_failure():
-    cleanup_recorder = MagicMock()
     handler = MagicMock()
     handler.release_hosts_async = AsyncMock(
         side_effect=[
@@ -262,7 +246,6 @@ async def test_terminate_instances_async_reports_partial_dispatch_failure():
         handler=handler,
         instance_ids=["vm-1", "vm-2"],
         resource_mapping={"vm-1": ("vmss-1", 1), "vm-2": ("vmss-2", 1)},
-        cleanup_recorder=cleanup_recorder,
     )
 
     assert result.success is False
@@ -376,7 +359,6 @@ async def test_get_instance_status_async_uses_async_handler_dispatch(resource_me
         provider_instance_name="azure-default",
         resource_metadata_service=resource_metadata_service,
         handler_provider=_handler_provider(handler),
-        vmss_cleanup_coordinator=MagicMock(),
     )
     read_context = AzureReadOperationContext(
         operation_name="get_instance_status",
@@ -408,7 +390,6 @@ async def test_get_instance_status_async_rejects_queries_without_provider_api(
         provider_instance_name="azure-default",
         resource_metadata_service=resource_metadata_service,
         handler_provider=_handler_provider(None),
-        vmss_cleanup_coordinator=MagicMock(),
     )
     read_context = AzureReadOperationContext(
         operation_name="get_instance_status",
@@ -438,7 +419,6 @@ async def test_describe_resource_instances_async_builds_result_from_async_handle
         provider_instance_name="azure-default",
         resource_metadata_service=resource_metadata_service,
         handler_provider=_handler_provider(handler),
-        vmss_cleanup_coordinator=MagicMock(),
     )
     read_context = AzureReadOperationContext(
         operation_name="describe_resource_instances",
@@ -514,7 +494,7 @@ async def test_get_deployment_status_async_extracts_provisioning_and_error_field
 
 
 @pytest.mark.asyncio
-async def test_describe_resource_instances_async_awaits_vmss_async_metadata_and_cleanup(
+async def test_describe_resource_instances_async_awaits_vmss_metadata(
     resource_metadata_service,
 ):
     handler = MagicMock()
@@ -522,14 +502,11 @@ async def test_describe_resource_instances_async_awaits_vmss_async_metadata_and_
     handler.get_vmss_resource_errors_async = AsyncMock(
         return_value=[{"error_code": "ProvisioningStateFailed"}]
     )
-    cleanup = MagicMock()
-    cleanup.reconcile = AsyncMock()
     service = AzureInventoryService(
         logger=MagicMock(),
         provider_instance_name="azure-default",
         resource_metadata_service=resource_metadata_service,
         handler_provider=_handler_provider(handler),
-        vmss_cleanup_coordinator=cleanup,
     )
     read_context = AzureReadOperationContext(
         operation_name="describe_resource_instances",
@@ -553,7 +530,6 @@ async def test_describe_resource_instances_async_awaits_vmss_async_metadata_and_
     assert result.metadata["fleet_errors"] == [{"error_code": "ProvisioningStateFailed"}]
     handler.get_vmss_resource_errors_async.assert_awaited_once_with("test-rg", "vmss-1")
     resource_metadata_service.augment_vmss_capacity_metadata_async.assert_awaited_once()
-    cleanup.reconcile.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -568,7 +544,6 @@ async def test_describe_resource_instances_async_uses_empty_vmss_error_list_with
         provider_instance_name="azure-default",
         resource_metadata_service=resource_metadata_service,
         handler_provider=_handler_provider(handler),
-        vmss_cleanup_coordinator=MagicMock(reconcile=AsyncMock()),
     )
     read_context = AzureReadOperationContext(
         operation_name="describe_resource_instances",
@@ -605,7 +580,6 @@ async def test_describe_resource_instances_async_warns_when_vmss_handler_lacks_e
         provider_instance_name="azure-default",
         resource_metadata_service=resource_metadata_service,
         handler_provider=_handler_provider(handler),
-        vmss_cleanup_coordinator=MagicMock(reconcile=AsyncMock()),
     )
     read_context = AzureReadOperationContext(
         operation_name="describe_resource_instances",
