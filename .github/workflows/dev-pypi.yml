@@ -62,11 +62,13 @@ jobs:
     name: Quality Checks Gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Same guard as config: skip when the sentinel Unit Tests run did not
-    # succeed.  For manual workflow_dispatch there is no upstream run to
-    # inspect, so the API step below is skipped and this job passes as a
-    # deliberate no-op (manual publish is an authorized override).
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # Skip when the sentinel Unit Tests run did not succeed, and never run off a
+    # schedule/cron-originated upstream run — nightly Unit Tests must not drive
+    # dev publishing. Manual workflow_dispatch has no upstream run, so the API
+    # step below is skipped and this job passes as a deliberate no-op.
+    if: |
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     permissions:
       actions: read   # read the Quality Checks workflow run conclusion
       contents: read
