@@ -104,6 +104,10 @@ class AzureProviderStrategy(ProviderStrategy):
     AzureClient, AzureResourceManager) to the strategy pattern, enabling
     runtime provider switching and composition with the advanced strategy
     wrappers (fallback, composite, load-balancing).
+
+    Azure intentionally inherits the base ``None`` resource-ID pattern. Its
+    resource identifiers are opaque lifecycle tracking keys whose meaning is
+    selected by ``provider_api`` rather than a uniform ARM resource-ID format.
     """
 
     def __init__(
