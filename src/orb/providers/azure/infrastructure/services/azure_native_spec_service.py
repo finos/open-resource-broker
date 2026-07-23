@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -13,6 +14,7 @@ from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.utilities.common.deep_merge import deep_merge
 from orb.infrastructure.utilities.file.json_utils import read_json_file
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
+from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
 
 
 class _AzureNativeSpecConfig(BaseModel):
@@ -81,7 +83,7 @@ class AzureNativeSpecService:
         return None
 
     def _load_spec_file(self, file_path: str) -> dict[str, Any]:
-        """Load Azure native spec file."""
+        """Load an Azure native spec contained by its configured base directory."""
         provider_config = self.config_port.get_provider_config()
         azure_defaults = None
         if provider_config:
@@ -94,7 +96,20 @@ class AzureNativeSpecService:
             )
             base_path = azure_extensions.native_spec.spec_file_base_path
 
-        return read_json_file(f"{base_path}/{file_path}")
+        requested_path = Path(file_path)
+        if requested_path.is_absolute() or ".." in requested_path.parts:
+            raise AzureValidationError(
+                "Azure native spec file paths must be relative and must not contain '..'"
+            )
+
+        resolved_base_path = Path(base_path).resolve()
+        resolved_spec_path = (resolved_base_path / requested_path).resolve()
+        if not resolved_spec_path.is_relative_to(resolved_base_path):
+            raise AzureValidationError(
+                "Azure native spec file must resolve inside spec_file_base_path"
+            )
+
+        return read_json_file(str(resolved_spec_path))
 
     def _build_azure_context(self, template: AzureTemplate, request: Request) -> dict[str, Any]:
         """Build Azure-specific native spec rendering context."""

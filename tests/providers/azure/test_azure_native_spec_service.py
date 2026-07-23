@@ -1,13 +1,16 @@
 """Tests for Azure native spec processing."""
 
+from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
 from pydantic import ValidationError
 
 from orb.application.services.native_spec_service import NativeSpecService
 from orb.config.schemas.provider_strategy_schema import ProviderConfig
 from orb.domain.request.aggregate import Request
 from orb.domain.request.request_types import RequestType
+from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
     AzureNativeSpecService,
 )
@@ -124,7 +127,81 @@ def test_load_spec_file_uses_typed_provider_config_extensions_path():
         result = service._load_spec_file("vmss.json")
 
         assert result == {"location": "eastus2"}
-        mock_read.assert_called_once_with("config/specs/azure/vmss.json")
+        expected_path = Path("config/specs/azure/vmss.json").resolve()
+        mock_read.assert_called_once_with(str(expected_path))
+
+
+def test_load_spec_file_accepts_nested_file_inside_configured_base(tmp_path):
+    spec_base = tmp_path / "specs"
+    nested_spec = spec_base / "nested" / "vmss.json"
+    nested_spec.parent.mkdir(parents=True)
+    nested_spec.write_text('{"location": "eastus2"}', encoding="utf-8")
+
+    config_port = Mock()
+    config_port.get_provider_config.return_value = _make_provider_config(
+        azure_extensions={"native_spec": {"spec_file_base_path": str(spec_base)}}
+    )
+    service = AzureNativeSpecService(
+        NativeSpecService(config_port, Mock(), Mock()),
+        config_port,
+    )
+
+    assert service._load_spec_file("nested/vmss.json") == {"location": "eastus2"}
+
+
+def test_load_spec_file_rejects_absolute_path(tmp_path):
+    outside_spec = tmp_path / "outside.json"
+    outside_spec.write_text("{}", encoding="utf-8")
+
+    config_port = Mock()
+    config_port.get_provider_config.return_value = _make_provider_config(
+        azure_extensions={"native_spec": {"spec_file_base_path": str(tmp_path / "specs")}}
+    )
+    service = AzureNativeSpecService(
+        NativeSpecService(config_port, Mock(), Mock()),
+        config_port,
+    )
+
+    with pytest.raises(AzureValidationError, match="must be relative"):
+        service._load_spec_file(str(outside_spec))
+
+
+def test_load_spec_file_rejects_parent_traversal(tmp_path):
+    spec_base = tmp_path / "specs"
+    spec_base.mkdir()
+    (tmp_path / "outside.json").write_text("{}", encoding="utf-8")
+
+    config_port = Mock()
+    config_port.get_provider_config.return_value = _make_provider_config(
+        azure_extensions={"native_spec": {"spec_file_base_path": str(spec_base)}}
+    )
+    service = AzureNativeSpecService(
+        NativeSpecService(config_port, Mock(), Mock()),
+        config_port,
+    )
+
+    with pytest.raises(AzureValidationError, match=r"must not contain '\.\.'"):
+        service._load_spec_file("../outside.json")
+
+
+def test_load_spec_file_rejects_symlink_escape(tmp_path):
+    spec_base = tmp_path / "specs"
+    spec_base.mkdir()
+    outside_spec = tmp_path / "outside.json"
+    outside_spec.write_text("{}", encoding="utf-8")
+    (spec_base / "linked.json").symlink_to(outside_spec)
+
+    config_port = Mock()
+    config_port.get_provider_config.return_value = _make_provider_config(
+        azure_extensions={"native_spec": {"spec_file_base_path": str(spec_base)}}
+    )
+    service = AzureNativeSpecService(
+        NativeSpecService(config_port, Mock(), Mock()),
+        config_port,
+    )
+
+    with pytest.raises(AzureValidationError, match="resolve inside"):
+        service._load_spec_file("linked.json")
 
 
 def test_load_spec_file_rejects_non_object_native_spec_extensions():
