@@ -488,6 +488,10 @@ jobs:
       # long-lived NUGET_API_KEY secret instead).
       #   user: the nuget.org account username that owns the trusted-publisher
       #   policy for FINOS.OpenResourceBroker (set as the NUGET_USER repo secret).
+      # The nuget.org (and npm) trusted-publisher policy must name the workflow
+      # file that ACTUALLY runs this job — the OIDC job_workflow_ref claim is this
+      # reusable workflow, so the policy's workflow must be
+      # 'reusable-sdk-publish.yml', NOT the caller 'prod-release.yml'.
       # SHA-pinned to NuGet/login v1.2.0 (v1 tag -> 8d19675 at time of writing).
       if: matrix.destination == 'nuget_org' && inputs.auth-mode != 'token' && inputs.dry-run != true
       id: nuget-login
