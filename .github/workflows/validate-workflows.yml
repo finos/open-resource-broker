@@ -12,6 +12,9 @@ on:
       - 'Makefile'
       - 'makefiles/**'
 
+permissions:
+  contents: read
+
 jobs:
   config:
     name: Get Configuration

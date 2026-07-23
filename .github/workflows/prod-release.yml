@@ -41,10 +41,7 @@ on:
         options: [trusted, token]
 
 permissions:
-  contents: write   # sdk-publish-go pushes the sdk/go/vX.Y.Z tag via the reusable workflow
-  packages: write
-  pages: write
-  id-token: write   # npm provenance + NuGet OIDC trusted publishing
+  contents: read
 
 concurrency:
   group: production-release-${{ github.event.release.tag_name || inputs.version }}
@@ -686,6 +683,10 @@ jobs:
     name: Publish SDKs (release)
     needs: [config, github-assets, sdk-spec-conformance]
     if: github.event_name == 'release'
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
     uses: ./.github/workflows/reusable-sdk-publish.yml
     secrets: inherit
     with:
@@ -710,6 +711,10 @@ jobs:
   sdk-bootstrap:
     name: Bootstrap one SDK (${{ github.event.inputs.bootstrap_sdk }} -> ${{ github.event.inputs.bootstrap_destination }})
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.bootstrap_sdk != 'none'
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
     uses: ./.github/workflows/reusable-sdk-publish.yml
     secrets: inherit
     with:

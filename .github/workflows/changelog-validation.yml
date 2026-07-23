@@ -10,6 +10,9 @@ on:
       - '.github/workflows/changelog-validation.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   config:
     name: Get Configuration

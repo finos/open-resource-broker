@@ -21,11 +21,11 @@ comment:
   behavior: default
   require_changes: true
 
-flags:
-  unit:
-    paths:
-      - src/orb/
-    carryforward: true
+# Coverage is a single unflagged combined report; carryforward stays off so no
+# prior session is merged into it.
+flag_management:
+  default_rules:
+    carryforward: false
 
 # Kept in sync with [tool.coverage.run] omit in pyproject.toml so Codecov's
 # view matches the combined report we upload.
@@ -33,7 +33,6 @@ ignore:
   - "tests/"
   - "docs/"
   - "scripts/"
-  - "src/orb/k8s_legacy/**"  # own separate test suite; runs outside the main legs
   - "**/tests/**"            # test files under src/ are not production source
   - "src/orb/__main__.py"    # thin process entrypoints — not unit-tested
   - "src/orb/run.py"

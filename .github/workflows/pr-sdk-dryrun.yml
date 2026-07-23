@@ -19,6 +19,9 @@ concurrency:
   group: pr-sdk-dryrun-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   config:
     name: Get Configuration

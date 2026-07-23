@@ -29,8 +29,7 @@ on:
   # sufficient — it runs immediately and is path-scoped to docs-relevant files.
 
 permissions:
-  contents: write  # mike pushes to gh-pages branch
-  pages: write
+  contents: read
 
 concurrency:
   group: "pages"
@@ -69,6 +68,8 @@ jobs:
     needs: [config, setup-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write   # mike pushes versioned docs to gh-pages
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0

@@ -52,6 +52,9 @@ on:
         description: 'Short CLI command name (project.short_name in .project.yml)'
         value: ${{ jobs.get-config.outputs.short-name }}
 
+permissions:
+  contents: read
+
 jobs:
   get-config:
     name: Get Configuration

@@ -28,8 +28,7 @@ on:
           - prerelease
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 concurrency:
   group: "semantic-release"

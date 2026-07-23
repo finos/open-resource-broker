@@ -31,6 +31,9 @@ concurrency:
 env:
   ORB_SKIP_UI_BUILD: "1"
 
+permissions:
+  contents: read
+
 jobs:
   config:
     name: Configuration

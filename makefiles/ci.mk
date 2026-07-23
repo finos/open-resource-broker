@@ -175,6 +175,21 @@ ci-tests-infrastructure:  ## Run infrastructure tests only (matches ci.yml infra
 	@echo "Running infrastructure tests (parallel)..."
 	$(call run-tool,pytest,$(TESTS_INFRASTRUCTURE) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-infrastructure.xml --junitxml=junit-infrastructure.xml)
 
+# Legacy k8s HostFactory plugin unit suite.  It lives under
+# src/orb/k8s_legacy/tests/unit (outside the main tests/ tree) and needs the
+# heavy k8s deps (kubernetes, watchdog, kmock, …).  Those are already part of
+# the `test` dependency-group, so this leg installs the same group as the other
+# ci-tests-* legs and needs no special extra.  Its .coverage data is produced
+# with the identical PYTEST_COV_ARGS / xml / junit naming so the coverage-combine
+# fan-in job merges it exactly like every other leg.
+TESTS_K8S_LEGACY := src/orb/k8s_legacy/tests/unit
+ci-tests-k8s-legacy:  ## Run legacy k8s HostFactory unit tests (matches ci-tests.yml k8s-legacy leg)
+	@# Run serially (-n0): these tests share a fixed on-disk workdir
+	@# (get_workdir()) whose per-class tearDowns rmtree it, so parallel xdist
+	@# workers race and delete each other's directories.
+	@echo "Running legacy k8s HostFactory unit tests..."
+	$(call run-tool,pytest,$(TESTS_K8S_LEGACY) -n0 $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-k8s-legacy.xml --junitxml=junit-k8s-legacy.xml)
+
 ci-tests-coverage-check:  ## Combined-coverage gate: merge per-leg data + enforce threshold
 	@echo "Combining per-leg coverage data and checking combined threshold ($(COVERAGE_THRESHOLD)%)..."
 	$(call run-tool,coverage,combine)

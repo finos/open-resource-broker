@@ -104,6 +104,9 @@ env:
   # the SPA build hook (setup.py build_ui.sh) in test jobs.
   ORB_SKIP_UI_BUILD: "1"
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: ${{ inputs.test-type == 'unit' && 'Unit Tests' || inputs.test-type == 'integration' && 'Integration Tests' || inputs.test-type == 'e2e' && 'End-to-End Tests' || (inputs.test-type == 'providers' && inputs.provider != '') && format('Providers Tests ({0})', inputs.provider) || format('{0} Tests', inputs.test-type) }}
