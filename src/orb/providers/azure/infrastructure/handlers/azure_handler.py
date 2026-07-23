@@ -21,7 +21,13 @@ from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequ
 
 
 class _AzureAcquireHostsRequiredResult(TypedDict):
-    """Fields returned by every Azure create handler."""
+    """Fields returned by every Azure create handler.
+
+    ``resource_ids`` are opaque lifecycle tracking identifiers interpreted
+    using the request's ``provider_api``. VMSS uses scale-set names, SingleVM
+    uses VM names, and CycleCloud uses request IDs. They are intentionally not
+    constrained to ARM resource-ID syntax.
+    """
 
     success: bool
     resource_ids: list[str]
