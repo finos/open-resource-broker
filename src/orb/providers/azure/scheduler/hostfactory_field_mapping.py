@@ -62,11 +62,6 @@ class AzureFieldMapping:
         # Azure CycleCloud.
         "clusterName": "cluster_name",
         "nodeArray": "node_array",
-        "cyclecloudUrl": "cyclecloud_url",
-        "cyclecloudCredentialPath": "cyclecloud_credential_path",
-        "cyclecloudVerifySsl": "cyclecloud_verify_ssl",
-        "cyclecloudAuthMode": "cyclecloud_auth_mode",
-        "cyclecloudAadScope": "cyclecloud_aad_scope",
     }
 
     def get_mappings(self) -> dict[str, str]:

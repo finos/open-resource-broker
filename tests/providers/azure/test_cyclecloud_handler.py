@@ -38,10 +38,6 @@ _CC_TEMPLATE_FIELDS = {
     "provider_api": "CycleCloud",
     "cluster_name": "my-cluster",
     "node_array": "execute",
-    "cyclecloud_url": "https://cc.example.com",
-    "cyclecloud_auth_mode": "bearer",
-    "cyclecloud_aad_scope": "https://cc.example.com/.default",
-    "cyclecloud_verify_ssl": False,
 }
 
 
@@ -51,7 +47,16 @@ def _make_template(**overrides):
 
 def _make_handler():
     azure_client = MagicMock()
-    azure_client.get_provider_config.return_value = None
+    azure_client.get_provider_config.return_value = AzureProviderConfig(
+        region="eastus2",
+        resource_group="test-rg",
+        cyclecloud={
+            "url": "https://cc.example.com",
+            "verify_ssl": False,
+            "auth_mode": "bearer",
+            "aad_scope": "https://cc.example.com/.default",
+        },
+    )
     azure_client.get_async_credential = AsyncMock(return_value=None)
     logger = MagicMock()
     return CycleCloudHandler(azure_client=azure_client, logger=logger)
@@ -84,14 +89,12 @@ class _AsyncContextManager:
 def _make_async_session_context(
     *,
     base_url: str = "https://cc.example.com",
-    credential_path: str | None = None,
     verify_ssl: bool = False,
     auth_mode: str | None = "bearer",
 ):
     session_context = MagicMock()
     session_context.client = object()
     session_context.base_url = base_url
-    session_context.credential_path = credential_path
     session_context.verify_ssl = verify_ssl
     session_context.auth_mode = auth_mode
     return session_context
@@ -138,42 +141,6 @@ async def test_cc_request_async_wraps_invalid_json_with_connection_error():
 
 
 class TestCycleCloudTemplate:
-    def test_cyclecloud_template_omitted_verify_ssl_is_unset(self):
-        fields = {**_CC_TEMPLATE_FIELDS}
-        del fields["cyclecloud_verify_ssl"]
-        t = AzureTemplate(**fields)
-        assert t.cyclecloud_verify_ssl is None
-
-    def test_cyclecloud_template_accepts_explicit_verify_ssl_true(self):
-        t = _make_template(cyclecloud_verify_ssl=True)
-        assert t.cyclecloud_verify_ssl is True
-
-    def test_cyclecloud_template_accepts_credential_path(self):
-        t = _make_template(
-            cyclecloud_auth_mode=None,
-            cyclecloud_credential_path="config/cyclecloud-credentials.json",
-        )
-        assert t.cyclecloud_credential_path == "config/cyclecloud-credentials.json"
-
-    def test_cyclecloud_template_accepts_aad_scope_auth_fields(self):
-        t = _make_template(
-            cyclecloud_auth_mode="bearer",
-            cyclecloud_aad_scope="https://example/.default",
-        )
-        assert t.cyclecloud_auth_mode == "bearer"
-        assert t.cyclecloud_aad_scope == "https://example/.default"
-
-    def test_cyclecloud_template_rejects_inline_bearer_token_field(self):
-        with pytest.raises(ValueError, match="Extra inputs are not permitted"):
-            _make_template(cyclecloud_bearer_token="token-123")
-
-    def test_cyclecloud_template_rejects_inline_basic_auth_fields(self):
-        with pytest.raises(ValueError, match="Extra inputs are not permitted"):
-            _make_template(cyclecloud_username="admin")
-
-        with pytest.raises(ValueError, match="Extra inputs are not permitted"):
-            _make_template(cyclecloud_password="secret")
-
     def test_cyclecloud_template_requires_cluster_name(self):
         with pytest.raises(ValueError, match="cluster_name is required"):
             _make_template(cluster_name=None)
@@ -226,7 +193,6 @@ class TestCycleCloudHandlerAcquire:
         template = _make_template()
         request = _make_request(count=2)
         session_context = _make_async_session_context(
-            credential_path="config/cc.json",
             verify_ssl=False,
             auth_mode="bearer",
         )
@@ -277,7 +243,6 @@ class TestCycleCloudHandlerAcquire:
         session_context = MagicMock()
         session_context.client = object()
         session_context.base_url = "https://cc.example.com"
-        session_context.credential_path = "config/cc.json"
         session_context.verify_ssl = False
         session_context.auth_mode = "bearer"
         handler._async_cc_session_scope = MagicMock(
@@ -302,7 +267,6 @@ class TestCycleCloudHandlerAcquire:
 
         assert result["success"] is True
         assert result["provider_data"]["operation_id"] == "op-123"
-        assert result["provider_data"]["cyclecloud_auth_mode"] == "bearer"
         assert result["provider_data"]["submitted_count"] == 2
 
     def test_acquire_hosts_missing_cluster_name(self):
@@ -318,13 +282,16 @@ class TestCycleCloudHandlerAcquire:
             run_operation(handler.acquire_hosts_async(request, template))
 
     def test_acquire_hosts_missing_url(self):
-        """Should raise CycleCloudConnectionError if cyclecloud_url is missing."""
+        """Should raise CycleCloudConnectionError if the provider URL is missing."""
         handler = _make_handler()
         template = _make_template()
-        object.__setattr__(template, "cyclecloud_url", None)
+        handler.azure_client.get_provider_config.return_value = AzureProviderConfig(
+            region="eastus2",
+            resource_group="test-rg",
+        )
         request = _make_request()
 
-        with pytest.raises(CycleCloudConnectionError, match="cyclecloud_url is required"):
+        with pytest.raises(CycleCloudConnectionError, match=r"cyclecloud\.url is required"):
             run_operation(handler.acquire_hosts_async(request, template))
 
 
@@ -367,9 +334,6 @@ class TestCycleCloudHandlerStatus:
             metadata={
                 "cluster_name": "my-cluster",
                 "node_array": "execute",
-                "cyclecloud_url": "https://cc.example.com",
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://cc.example.com/.default",
             },
         )
 
@@ -385,21 +349,22 @@ class TestCycleCloudHandlerStatus:
 
     def test_check_hosts_status_no_cc_url(self):
         handler = _make_handler()
+        handler.azure_client.get_provider_config.return_value = AzureProviderConfig(
+            region="eastus2",
+            resource_group="test-rg",
+        )
         request = _make_request(
             resource_ids=["req-12345678-1234-1234-1234-123456789012"],
             metadata={"cluster_name": "my-cluster"},
         )
-        with pytest.raises(CycleCloudConnectionError, match="cyclecloud_url is required"):
+        with pytest.raises(CycleCloudConnectionError, match=r"cyclecloud\.url is required"):
             run_operation(handler.check_hosts_status_async(request))
 
     def test_check_hosts_status_requires_cyclecloud_request_identity(self):
         handler = _make_handler()
         request = _make_request(
             resource_ids=[""],
-            metadata={
-                "cluster_name": "my-cluster",
-                "cyclecloud_url": "https://cc.example.com",
-            },
+            metadata={"cluster_name": "my-cluster"},
         )
         with pytest.raises(CycleCloudConnectionError, match="request identity is required"):
             run_operation(handler.check_hosts_status_async(request))
@@ -408,7 +373,7 @@ class TestCycleCloudHandlerStatus:
         handler = _make_handler()
         request = _make_request(
             resource_ids=["req-12345678-1234-1234-1234-123456789012"],
-            metadata={"cyclecloud_url": "https://cc.example.com"},
+            metadata={},
         )
 
         with pytest.raises(CycleCloudConnectionError, match="cluster_name is required"):
@@ -429,10 +394,7 @@ class TestCycleCloudHandlerStatus:
 
         request = _make_request(
             resource_ids=["req-12345678-1234-1234-1234-123456789012"],
-            metadata={
-                "cluster_name": "my-cluster",
-                "cyclecloud_url": "https://cc.example.com",
-            },
+            metadata={"cluster_name": "my-cluster"},
         )
 
         with pytest.raises(CycleCloudConnectionError, match="Cannot connect to CycleCloud"):
@@ -472,7 +434,6 @@ class TestCycleCloudHandlerStatus:
                 "cluster_name": "my-cluster",
                 "node_array": "execute",
                 "node_ids": ["node-1"],
-                "cyclecloud_url": "https://cc.example.com",
             },
         )
 
@@ -508,9 +469,7 @@ class TestCycleCloudHandlerRelease:
                 resource_id="my-cluster",
                 context=AzureReleaseContext(
                     cyclecloud_request_context=CycleCloudRequestContext(
-                        cyclecloud_url="https://cc.example.com",
-                        cyclecloud_auth_mode="bearer",
-                        cyclecloud_aad_scope="https://cc.example.com/.default",
+                        cluster_name="my-cluster",
                     )
                 ),
             )
@@ -522,7 +481,11 @@ class TestCycleCloudHandlerRelease:
 
     def test_release_hosts_missing_url(self):
         handler = _make_handler()
-        with pytest.raises(TerminationError, match="cyclecloud_url is required"):
+        handler.azure_client.get_provider_config.return_value = AzureProviderConfig(
+            region="eastus2",
+            resource_group="test-rg",
+        )
+        with pytest.raises(TerminationError, match=r"cyclecloud\.url is required"):
             run_operation(
                 handler.release_hosts_async(
                     machine_ids=["node-1"],
@@ -554,7 +517,6 @@ class TestCycleCloudHandlerRelease:
             context=AzureReleaseContext(
                 cyclecloud_request_context=_make_cc_request_context(
                     cluster_name="my-cluster",
-                    cyclecloud_url="https://cc.example.com",
                 )
             ),
         )
@@ -616,11 +578,7 @@ class TestCycleCloudAuthModes:
             new=_CredentialProperty(),
             create=True,
         ):
-            session_context = await handler._build_async_cc_session(
-                cc_url="https://cc.example.com",
-                verify_ssl=False,
-                request_context=_make_cc_request_context(cyclecloud_auth_mode="bearer"),
-            )
+            session_context = await handler._build_async_cc_session()
 
         assert session_context.auth_mode == "bearer"
         await session_context.client.aclose()
@@ -636,11 +594,7 @@ class TestCycleCloudAuthModes:
             "resolve_async_auth",
             new=AsyncMock(return_value=({}, None, "none")),
         ):
-            session_context = await handler._build_async_cc_session(
-                cc_url="https://cc.example.com",
-                verify_ssl=False,
-                request_context=_make_cc_request_context(),
-            )
+            session_context = await handler._build_async_cc_session()
 
         handler._get_cc_request_timeout.assert_called_once_with()
         await session_context.client.aclose()
@@ -652,11 +606,7 @@ class TestCycleCloudAuthModes:
         async_credential.get_token = AsyncMock(return_value=MagicMock(token="tok-123"))
         handler.azure_client.get_async_credential = AsyncMock(return_value=async_credential)
 
-        session_context = await handler._build_async_cc_session(
-            cc_url="https://cc.example.com",
-            verify_ssl=True,
-            request_context=_make_cc_request_context(cyclecloud_auth_mode="bearer"),
-        )
+        session_context = await handler._build_async_cc_session()
 
         assert session_context.base_url == "https://cc.example.com"
         assert session_context.auth_mode == "bearer"
@@ -666,16 +616,20 @@ class TestCycleCloudAuthModes:
     @pytest.mark.asyncio
     async def test_build_async_cc_session_rejects_ssh_auth_mode(self):
         handler = _make_handler()
+        handler.azure_client.get_provider_config.return_value = AzureProviderConfig(
+            region="eastus2",
+            resource_group="test-rg",
+            cyclecloud={
+                "url": "https://cc.example.com",
+                "auth_mode": "ssh",
+            },
+        )
 
         with pytest.raises(
             CycleCloudConnectionError,
-            match="cyclecloud_auth_mode=ssh is not supported",
+            match=r"cyclecloud\.auth_mode=ssh is not supported",
         ):
-            await handler._build_async_cc_session(
-                cc_url="https://cc.example.com",
-                verify_ssl=True,
-                request_context=_make_cc_request_context(cyclecloud_auth_mode="ssh"),
-            )
+            await handler._build_async_cc_session()
 
     @pytest.mark.asyncio
     async def test_build_async_cc_session_propagates_auth_resolution_failures(self):
@@ -686,19 +640,15 @@ class TestCycleCloudAuthModes:
             "resolve_async_auth",
             new=AsyncMock(
                 side_effect=CycleCloudConnectionError(
-                    "cyclecloud_auth_mode=bearer requested but no bearer token could be resolved"
+                    "cyclecloud.auth_mode=bearer requested but no bearer token could be resolved"
                 )
             ),
         ):
             with pytest.raises(
                 CycleCloudConnectionError,
-                match="cyclecloud_auth_mode=bearer requested but no bearer token could be resolved",
+                match=r"cyclecloud\.auth_mode=bearer requested but no bearer token could be resolved",
             ):
-                await handler._build_async_cc_session(
-                    cc_url="https://cc.example.com",
-                    verify_ssl=True,
-                    request_context=_make_cc_request_context(cyclecloud_auth_mode="bearer"),
-                )
+                await handler._build_async_cc_session()
 
     @pytest.mark.asyncio
     async def test_build_async_cc_session_propagates_client_construction_failures(self):
@@ -716,11 +666,7 @@ class TestCycleCloudAuthModes:
             ),
         ):
             with pytest.raises(RuntimeError, match="client setup failed"):
-                await handler._build_async_cc_session(
-                    cc_url="https://cc.example.com",
-                    verify_ssl=True,
-                    request_context=_make_cc_request_context(cyclecloud_auth_mode="none"),
-                )
+                await handler._build_async_cc_session()
 
     @pytest.mark.asyncio
     async def test_async_cc_session_scope_builds_session_on_enter(self):
@@ -731,11 +677,7 @@ class TestCycleCloudAuthModes:
             "resolve_async_auth",
             new=AsyncMock(return_value=({}, None, "none")),
         ):
-            async with handler._async_cc_session_scope(
-                cc_url="https://cc.example.com",
-                verify_ssl=True,
-                request_context=_make_cc_request_context(cyclecloud_auth_mode="none"),
-            ) as session_context:
+            async with handler._async_cc_session_scope() as session_context:
                 assert session_context.base_url == "https://cc.example.com"
                 client = session_context.client
                 assert client.is_closed is False
@@ -762,26 +704,24 @@ class TestCycleCloudAuthModes:
                 password="changeme",
             ),
         ):
-            session_context = await handler._build_async_cc_session(
-                cc_url=None,
-                verify_ssl=None,
-            )
+            session_context = await handler._build_async_cc_session()
 
         assert session_context.base_url == "https://cc.example.com"
         assert session_context.verify_ssl is False
         assert session_context.auth_mode == "basic"
-        assert session_context.credential_path == "config/cyclecloud-credentials.json"
         await session_context.client.aclose()
 
     def test_build_settings_does_not_carry_raw_credentials_in_repr(self):
         builder = CycleCloudSessionBuilder(
-            cc_url="https://cc.example.com",
-            verify_ssl=False,
-            template=None,
-            request_context=CycleCloudRequestContext.from_mapping(
-                {"cyclecloud_credential_path": "/tmp/cyclecloud.json"}
+            provider_cfg=AzureProviderConfig(
+                region="eastus2",
+                resource_group="test-rg",
+                cyclecloud={
+                    "url": "https://cc.example.com",
+                    "credential_path": "/tmp/cyclecloud.json",
+                    "verify_ssl": False,
+                },
             ),
-            provider_cfg=None,
         )
         with patch.object(
             CycleCloudSessionBuilder,
@@ -796,3 +736,4 @@ class TestCycleCloudAuthModes:
         settings_repr = repr(settings)
         assert "cc_admin" not in settings_repr
         assert "changeme" not in settings_repr
+        assert "/tmp/cyclecloud.json" not in settings_repr

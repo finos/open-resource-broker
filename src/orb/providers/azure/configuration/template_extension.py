@@ -136,17 +136,6 @@ class AzureTemplateExtensionConfig(BaseModel):
     )
     cluster_name: Optional[str] = Field(default=None, description="CycleCloud cluster name")
     node_array: Optional[str] = Field(default=None, description="CycleCloud node array")
-    cyclecloud_url: Optional[str] = Field(default=None, description="CycleCloud API URL")
-    cyclecloud_credential_path: Optional[str] = Field(
-        default=None, description="CycleCloud credential reference path"
-    )
-    cyclecloud_verify_ssl: Optional[bool] = Field(
-        default=None, description="CycleCloud SSL verification setting"
-    )
-    cyclecloud_auth_mode: Optional[str] = Field(
-        default=None, description="CycleCloud auth mode override"
-    )
-    cyclecloud_aad_scope: Optional[str] = Field(default=None, description="CycleCloud AAD scope")
     provider_api: Optional[AzureProviderApi] = Field(default=None, description="Azure provider API")
 
     # VM configuration

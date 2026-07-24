@@ -2,12 +2,30 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
+from orb.domain.request.aggregate import Request
+from orb.domain.request.value_objects import RequestId, RequestType
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import CycleCloudConnectionError
 from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from tests.providers.azure.strategy_test_support import build_strategy_harness, run_operation
+
+
+def _cyclecloud_request(
+    *,
+    provider_data: dict[str, object],
+    resource_ids: list[str] | None = None,
+) -> Request:
+    return Request(
+        request_id=RequestId.generate(RequestType.ACQUIRE),
+        request_type=RequestType.ACQUIRE,
+        provider_type="azure",
+        provider_api="CycleCloud",
+        template_id="tmpl-1",
+        resource_ids=resource_ids or [],
+        provider_data=provider_data,
+    )
 
 
 class TestGetInstanceStatus:
@@ -262,10 +280,7 @@ class TestGetInstanceStatus:
                 "instance_ids": ["node-1"],
                 "provider_api": "CycleCloud",
                 "resource_id": "my-cluster",
-                "request_metadata": {
-                    "resource_group": "test-rg",
-                    "cyclecloud_url": "https://cc.example.com",
-                },
+                "request": _cyclecloud_request(provider_data={"cluster_name": "my-cluster"}),
             },
         )
 
@@ -396,32 +411,30 @@ class TestDescribeResourceInstances:
         assert not result.success
         assert result.error_code == "MISSING_PROVIDER_API"
 
-    def test_describe_resource_instances_forwards_cyclecloud_request_metadata(
+    def test_describe_resource_instances_rehydrates_cyclecloud_context_from_request(
         self, strategy_harness
     ):
         strategy = strategy_harness.strategy
         handler = MagicMock()
         handler.check_hosts_status_async = AsyncMock(return_value=[])
         strategy_harness.handlers["CycleCloud"] = handler
-
+        request = _cyclecloud_request(
+            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
+            provider_data={
+                "cluster_name": "my-cluster",
+                "node_array": "execute",
+                "node_ids": ["node-1"],
+                "operation_id": "op-123",
+                "operation_location": "https://cc.example.com/operations/op-123",
+            },
+        )
         op = ProviderOperation(
             operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
             parameters={
-                "resource_ids": ["req-12345678-1234-1234-1234-123456789012"],
-                "provider_api": "CycleCloud",
-                "template_id": "tmpl-1",
-                "request_metadata": {
-                    "resource_group": "test-rg",
-                    "cluster_name": "my-cluster",
-                    "node_array": "execute",
-                    "node_ids": ["node-1"],
-                    "operation_id": "op-123",
-                    "operation_location": "https://cc.example.com/operations/op-123",
-                    "cyclecloud_url": "https://cc.example.com",
-                    "cyclecloud_auth_mode": "bearer",
-                    "cyclecloud_aad_scope": "https://cc.example.com/.default",
-                    "cyclecloud_verify_ssl": False,
-                },
+                "resource_ids": request.resource_ids,
+                "provider_api": request.provider_api,
+                "template_id": request.template_id,
+                "request": request,
             },
         )
 
@@ -429,21 +442,30 @@ class TestDescribeResourceInstances:
 
         assert result.success
         forwarded_request = handler.check_hosts_status_async.await_args.args[0]
-        assert forwarded_request.resource_ids == ["req-12345678-1234-1234-1234-123456789012"]
-        assert forwarded_request.metadata["cluster_name"] == "my-cluster"
-        assert forwarded_request.metadata["node_array"] == "execute"
-        assert forwarded_request.metadata["node_ids"] == ["node-1"]
-        assert forwarded_request.metadata["operation_id"] == "op-123"
-        assert (
-            forwarded_request.metadata["operation_location"]
-            == "https://cc.example.com/operations/op-123"
+        assert forwarded_request.metadata == {
+            "resource_group": "test-rg",
+            "cluster_name": "my-cluster",
+            "node_array": "execute",
+            "node_ids": ["node-1"],
+            "operation_id": "op-123",
+            "operation_location": "https://cc.example.com/operations/op-123",
+            "raise_on_status_error": False,
+        }
+
+    def test_describe_cyclecloud_instances_requires_typed_request(self, strategy_harness):
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+            parameters={
+                "resource_ids": ["req-12345678-1234-1234-1234-123456789012"],
+                "provider_api": "CycleCloud",
+                "template_id": "tmpl-1",
+            },
         )
-        assert forwarded_request.metadata["cyclecloud_url"] == "https://cc.example.com"
-        assert forwarded_request.metadata["cyclecloud_auth_mode"] == "bearer"
-        assert (
-            forwarded_request.metadata["cyclecloud_aad_scope"] == "https://cc.example.com/.default"
-        )
-        assert forwarded_request.metadata["cyclecloud_verify_ssl"] is False
+
+        result = run_operation(strategy_harness.strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "MISSING_CYCLECLOUD_REQUEST"
 
     def test_get_instance_status_matches_cyclecloud_node_name_alias(self, strategy_harness):
         strategy = strategy_harness.strategy
@@ -473,14 +495,12 @@ class TestDescribeResourceInstances:
                 "resource_id": "contoso-slurm-lab-cluster",
                 "resource_mapping": {"dynamic-1": ("contoso-slurm-lab-cluster", 1)},
                 "template_id": "tmpl-1",
-                "request_metadata": {
-                    "resource_group": "test-rg",
-                    "cluster_name": "contoso-slurm-lab-cluster",
-                    "node_ids": ["dynamic-1"],
-                    "cyclecloud_url": "https://cc.example.com",
-                    "cyclecloud_auth_mode": "bearer",
-                    "cyclecloud_aad_scope": "https://cc.example.com/.default",
-                },
+                "request": _cyclecloud_request(
+                    provider_data={
+                        "cluster_name": "contoso-slurm-lab-cluster",
+                        "node_ids": ["dynamic-1"],
+                    }
+                ),
             },
         )
 
@@ -505,14 +525,12 @@ class TestDescribeResourceInstances:
                 "instance_ids": ["dynamic-1"],
                 "provider_api": "CycleCloud",
                 "template_id": "tmpl-1",
-                "request_metadata": {
-                    "resource_group": "test-rg",
-                    "cluster_name": "contoso-slurm-lab-cluster",
-                    "node_ids": ["dynamic-1"],
-                    "cyclecloud_url": "https://cc.example.com",
-                    "cyclecloud_auth_mode": "bearer",
-                    "cyclecloud_aad_scope": "https://cc.example.com/.default",
-                },
+                "request": _cyclecloud_request(
+                    provider_data={
+                        "cluster_name": "contoso-slurm-lab-cluster",
+                        "node_ids": ["dynamic-1"],
+                    }
+                ),
             },
         )
 
@@ -522,7 +540,7 @@ class TestDescribeResourceInstances:
         forwarded_request = handler.check_hosts_status_async.await_args.args[0]
         assert forwarded_request.resource_ids == ["contoso-slurm-lab-cluster"]
 
-    def test_get_instance_status_uses_cyclecloud_context_from_request_metadata(
+    def test_get_instance_status_uses_persisted_cyclecloud_request_context(
         self, azure_config, logger
     ):
         strategy_harness = build_strategy_harness(
@@ -542,13 +560,9 @@ class TestDescribeResourceInstances:
                 "provider_api": "CycleCloud",
                 "template_id": "tmpl-1",
                 "request_id": "req-11111111-1111-4111-8111-111111111111",
-                "request_metadata": {
-                    "resource_group": "test-rg",
-                    "cluster_name": "contoso-slurm-lab-cluster",
-                    "cyclecloud_url": "https://cc.example.com",
-                    "cyclecloud_auth_mode": "bearer",
-                    "cyclecloud_aad_scope": "https://cc.example.com/.default",
-                },
+                "request": _cyclecloud_request(
+                    provider_data={"cluster_name": "contoso-slurm-lab-cluster"}
+                ),
             },
         )
 

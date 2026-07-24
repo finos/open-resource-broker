@@ -392,11 +392,6 @@ class CycleCloudHandler(AzureHandler):
 
     async def _build_async_cc_session(
         self,
-        *,
-        cc_url: Optional[str],
-        verify_ssl: Optional[bool],
-        template: Optional[AzureTemplate] = None,
-        request_context: Optional[CycleCloudRequestContext] = None,
     ) -> AsyncCycleCloudSessionContext:
         provider_cfg = self._get_provider_cyclecloud_config()
         token_provider = None
@@ -407,10 +402,6 @@ class CycleCloudHandler(AzureHandler):
         if credential is not None:
             token_provider = AsyncAzureCredentialAccessTokenProvider(credential)
         session_builder = CycleCloudSessionBuilder(
-            cc_url=cc_url,
-            verify_ssl=verify_ssl,
-            template=template,
-            request_context=request_context,
             provider_cfg=provider_cfg,
             async_token_provider=token_provider,
         )
@@ -439,25 +430,14 @@ class CycleCloudHandler(AzureHandler):
             client=client,
             base_url=settings.base_url,
             auth_mode=resolved_auth_mode,
-            credential_path=settings.credential_path,
             verify_ssl=settings.verify_ssl,
         )
 
     @asynccontextmanager
     async def _async_cc_session_scope(
         self,
-        *,
-        cc_url: Optional[str],
-        verify_ssl: Optional[bool],
-        template: Optional[AzureTemplate] = None,
-        request_context: Optional[CycleCloudRequestContext] = None,
     ):
-        session_context = await self._build_async_cc_session(
-            cc_url=cc_url,
-            verify_ssl=verify_ssl,
-            template=template,
-            request_context=request_context,
-        )
+        session_context = await self._build_async_cc_session()
         try:
             yield session_context
         finally:
@@ -691,10 +671,6 @@ class CycleCloudHandler(AzureHandler):
         *,
         request_data: _CycleCloudAcquireRequest,
         template: AzureTemplate,
-        base_url: str,
-        credential_path: Optional[str],
-        verify_ssl: bool,
-        auth_mode: Optional[str],
         create_response: dict[str, Any],
     ) -> AzureAcquireHostsResult:
         """Build the normalized CycleCloud acquire response payload."""
@@ -743,11 +719,6 @@ class CycleCloudHandler(AzureHandler):
                 "location": template.location.value,
                 "error_codes": collect_provider_error_codes(fleet_errors),
                 "fleet_errors": fleet_errors,
-                "cyclecloud_url": base_url,
-                "cyclecloud_credential_path": credential_path,
-                "cyclecloud_verify_ssl": verify_ssl,
-                "cyclecloud_auth_mode": auth_mode,
-                "cyclecloud_aad_scope": template.cyclecloud_aad_scope,
             },
         }
 
@@ -767,7 +738,7 @@ class CycleCloudHandler(AzureHandler):
             self._logger.error(message)
             raise CycleCloudConnectionError(
                 message,
-                url=request_context.cyclecloud_url,
+                url=None,
                 details={"request_id": request.request_id},
             )
 
@@ -776,7 +747,7 @@ class CycleCloudHandler(AzureHandler):
             self._logger.error(message)
             raise CycleCloudConnectionError(
                 message,
-                url=request_context.cyclecloud_url,
+                url=None,
                 details={"resource_ids": resource_ids},
             )
 
@@ -896,11 +867,7 @@ class CycleCloudHandler(AzureHandler):
             acquire_request.vm_size,
         )
 
-        async with self._async_cc_session_scope(
-            cc_url=template.cyclecloud_url,
-            verify_ssl=template.cyclecloud_verify_ssl,
-            template=template,
-        ) as session_context:
+        async with self._async_cc_session_scope() as session_context:
             client = session_context.client
             base_url = session_context.base_url
 
@@ -931,10 +898,6 @@ class CycleCloudHandler(AzureHandler):
         return self._build_acquire_result(
             request_data=acquire_request,
             template=template,
-            base_url=base_url,
-            credential_path=session_context.credential_path,
-            verify_ssl=session_context.verify_ssl,
-            auth_mode=session_context.auth_mode,
             create_response=create_response,
         )
 
@@ -945,11 +908,7 @@ class CycleCloudHandler(AzureHandler):
             return []
 
         try:
-            async with self._async_cc_session_scope(
-                cc_url=status_request.request_context.cyclecloud_url,
-                verify_ssl=status_request.request_context.cyclecloud_verify_ssl,
-                request_context=status_request.request_context,
-            ) as session_context:
+            async with self._async_cc_session_scope() as session_context:
                 nodes_response = await self._cc_request_async(
                     session_context.client,
                     "GET",
@@ -981,11 +940,7 @@ class CycleCloudHandler(AzureHandler):
         cluster_name = str(request_context.cluster_name or resource_id)
 
         try:
-            async with self._async_cc_session_scope(
-                cc_url=request_context.cyclecloud_url,
-                verify_ssl=request_context.cyclecloud_verify_ssl,
-                request_context=request_context,
-            ) as session_context:
+            async with self._async_cc_session_scope() as session_context:
                 return await self._submit_release_request_async(
                     cluster_name=cluster_name,
                     machine_ids=machine_ids,
@@ -1028,7 +983,6 @@ class CycleCloudHandler(AzureHandler):
                 "location": "eastus2",
                 "cluster_name": "my-hpc-cluster",
                 "node_array": "hpc",
-                "cyclecloud_url": "https://cyclecloud.example.com",
                 "max_instances": 100,
             },
             {
@@ -1042,7 +996,6 @@ class CycleCloudHandler(AzureHandler):
                 "location": "eastus2",
                 "cluster_name": "my-htc-cluster",
                 "node_array": "htc",
-                "cyclecloud_url": "https://cyclecloud.example.com",
                 "max_instances": 500,
             },
         ]

@@ -560,9 +560,7 @@ class TestTerminateInstances:
         assert result.metadata["error_class"] == "TerminationError"
         assert result.metadata["provider_error"]["details"]["resource_ids"] == ["vmss-prod-b"]
 
-    def test_terminate_instances_forwards_cyclecloud_secret_reference_request_metadata(
-        self, azure_config, logger
-    ):
+    def test_terminate_cyclecloud_instances_uses_explicit_resource_id(self, azure_config, logger):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy
         handler = MagicMock()
@@ -574,14 +572,7 @@ class TestTerminateInstances:
             parameters={
                 "instance_ids": ["node-1"],
                 "provider_api": "CycleCloud",
-                "request_metadata": {
-                    "cluster_name": "my-cluster",
-                    "cyclecloud_url": "https://cc.example.com",
-                    "cyclecloud_credential_path": "config/cc.json",
-                    "cyclecloud_verify_ssl": False,
-                    "cyclecloud_auth_mode": "bearer",
-                    "cyclecloud_aad_scope": "https://cc.example.com/.default",
-                },
+                "resource_id": "my-cluster",
             },
         )
 
@@ -595,64 +586,7 @@ class TestTerminateInstances:
         assert kwargs["context"] == AzureReleaseContext(
             resource_group="test-rg",
             resource_id="my-cluster",
-            cyclecloud_request_context=CycleCloudRequestContext(
-                cluster_name="my-cluster",
-                cyclecloud_url="https://cc.example.com",
-                cyclecloud_credential_path="config/cc.json",
-                cyclecloud_verify_ssl=False,
-                cyclecloud_auth_mode="bearer",
-                cyclecloud_aad_scope="https://cc.example.com/.default",
-            ),
-        )
-
-    def test_terminate_instances_uses_cyclecloud_context_from_request_metadata(
-        self, azure_config, logger
-    ):
-        strategy_harness = build_strategy_harness(
-            config=azure_config,
-            logger=logger,
-            provider_instance_name="azure-default",
-        )
-        strategy = strategy_harness.strategy
-        handler = MagicMock()
-        handler.release_hosts_async = AsyncMock(return_value=None)
-        strategy_harness.handlers["CycleCloud"] = handler
-
-        op = ProviderOperation(
-            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
-            parameters={
-                "instance_ids": ["node-1"],
-                "provider_api": "CycleCloud",
-                "request_id": "req-11111111-1111-4111-8111-111111111111",
-                "request_metadata": {
-                    "cluster_name": "my-cluster",
-                    "cyclecloud_url": "https://cc.example.com",
-                    "cyclecloud_credential_path": "config/cc.json",
-                    "cyclecloud_verify_ssl": False,
-                    "cyclecloud_auth_mode": "bearer",
-                    "cyclecloud_aad_scope": "https://cc.example.com/.default",
-                },
-            },
-        )
-
-        result = run_operation(strategy.execute_operation(op))
-
-        assert result.success
-        handler.release_hosts_async.assert_awaited_once()
-        _, kwargs = handler.release_hosts_async.await_args
-        assert kwargs["machine_ids"] == ["node-1"]
-        assert kwargs["resource_id"] == "my-cluster"
-        assert kwargs["context"] == AzureReleaseContext(
-            resource_group="test-rg",
-            resource_id="my-cluster",
-            cyclecloud_request_context=CycleCloudRequestContext(
-                cluster_name="my-cluster",
-                cyclecloud_url="https://cc.example.com",
-                cyclecloud_credential_path="config/cc.json",
-                cyclecloud_verify_ssl=False,
-                cyclecloud_auth_mode="bearer",
-                cyclecloud_aad_scope="https://cc.example.com/.default",
-            ),
+            cyclecloud_request_context=CycleCloudRequestContext(),
         )
 
     def test_terminate_instances_accepts_enum_provider_api(self, azure_config, logger):
