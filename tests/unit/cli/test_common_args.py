@@ -263,9 +263,7 @@ def _leaf_subparser(
     Walks the two levels of ``_SubParsersAction`` (resource → action) so a test
     can introspect the exact parser that composes the shared parent parsers.
     """
-    resource_action = next(
-        a for a in parser._actions if isinstance(a, argparse._SubParsersAction)
-    )
+    resource_action = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
     resource_parser = resource_action.choices[resource]
     action_action = next(
         a for a in resource_parser._actions if isinstance(a, argparse._SubParsersAction)
