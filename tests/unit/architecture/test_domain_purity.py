@@ -38,6 +38,10 @@ _KNOWN_PYDANTIC_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("domain/base/events/base_events.py", "pydantic"),
         ("domain/base/events/domain_events.py", "pydantic"),
         ("domain/base/events/provider_events.py", "pydantic"),
+        # Diagnostic value objects use pydantic BaseModel deliberately: they
+        # round-trip to/from JSON TEXT for persistence and wire responses,
+        # consistent with the other aggregate value objects above.
+        ("domain/base/diagnostic.py", "pydantic"),
     }
 )
 
