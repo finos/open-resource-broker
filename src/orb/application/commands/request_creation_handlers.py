@@ -67,8 +67,20 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
 
         self._request_creation_service = RequestCreationService(logger)
         self._provisioning_service = provisioning_service
-        self._status_service = RequestStatusManagementService(uow_factory, logger)
+        self._status_service = RequestStatusManagementService(
+            uow_factory, logger, state_machine=self._resolve_state_machine(container)
+        )
         self._provider_validation_service = provider_validation_service
+
+    @staticmethod
+    def _resolve_state_machine(container: ContainerPort):
+        """Resolve the shared FulfilmentStateMachine from DI (None-safe)."""
+        from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
+
+        try:
+            return container.get(FulfilmentStateMachine)
+        except Exception:
+            return None
 
     async def validate_command(self, command: CreateRequestCommand) -> None:
         """Validate create request command."""

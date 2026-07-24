@@ -290,11 +290,92 @@ class TestRequestSerializerFromDict:
         restored = self._s().from_dict(row)
         assert restored.provider_type is not None
 
+    def test_unknown_diagnostic_category_degrades_request_still_loads(self):
+        """A persisted diagnostic with an unknown category (version skew) must
+        NOT make the whole request unloadable — the advisory diagnostic degrades
+        to None and the request still loads."""
+        row = dict(
+            _minimal_row(),
+            fulfilment_diagnostic={
+                "category": "some_future_category",  # not a valid DiagnosticCategory
+                "summary": "from a newer version",
+                "occurred_at": _NOW.isoformat(),
+            },
+        )
+        restored = self._s().from_dict(row)
+        assert restored.fulfilment_diagnostic is None
+        assert restored.status == RequestStatus.PENDING
+
+    def test_diagnostic_missing_required_field_degrades_to_none(self):
+        """A valid-JSON dict missing the required occurred_at field degrades to
+        None rather than raising on load."""
+        row = dict(
+            _minimal_row(),
+            fulfilment_diagnostic={"category": "capacity", "summary": "no timestamp"},
+        )
+        restored = self._s().from_dict(row)
+        assert restored.fulfilment_diagnostic is None
+
+    def test_valid_diagnostic_survives_load(self):
+        """Guard: a well-formed diagnostic still round-trips through the load."""
+        from orb.domain.base.diagnostic import DiagnosticCategory
+
+        row = dict(
+            _minimal_row(),
+            fulfilment_diagnostic={
+                "category": "capacity",
+                "summary": "Partially fulfilled 2/3",
+                "occurred_at": _NOW.isoformat(),
+            },
+        )
+        restored = self._s().from_dict(row)
+        assert restored.fulfilment_diagnostic is not None
+        assert restored.fulfilment_diagnostic.category == DiagnosticCategory.CAPACITY
+
     def test_caller_dict_not_mutated(self):
         row = _minimal_row()
         original_keys = set(row.keys())
         self._s().from_dict(row)
         assert set(row.keys()) == original_keys
+
+
+@pytest.mark.unit
+class TestParseFulfilmentDiagnostic:
+    """RequestSerializer._parse_fulfilment_diagnostic honours the advisory,
+    never-load-critical contract for malformed / version-skewed payloads."""
+
+    def _p(self, raw):
+        return RequestSerializer._parse_fulfilment_diagnostic(raw)
+
+    def test_none_returns_none(self):
+        assert self._p(None) is None
+
+    def test_non_json_string_returns_none(self):
+        assert self._p("{not json") is None
+
+    def test_json_non_dict_returns_none(self):
+        assert self._p("[1, 2, 3]") is None
+
+    def test_unknown_category_dict_returns_none(self):
+        raw = {
+            "category": "not_a_real_category",
+            "summary": "x",
+            "occurred_at": _NOW.isoformat(),
+        }
+        assert self._p(raw) is None
+
+    def test_missing_occurred_at_returns_none(self):
+        assert self._p({"category": "capacity", "summary": "x"}) is None
+
+    def test_valid_dict_passes_through(self):
+        raw = {"category": "capacity", "summary": "x", "occurred_at": _NOW.isoformat()}
+        assert self._p(raw) == raw
+
+    def test_valid_json_string_parses_to_dict(self):
+        import json
+
+        raw = {"category": "auth", "summary": "denied", "occurred_at": _NOW.isoformat()}
+        assert self._p(json.dumps(raw)) == raw
 
 
 # ---------------------------------------------------------------------------

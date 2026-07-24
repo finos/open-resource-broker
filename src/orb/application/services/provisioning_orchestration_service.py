@@ -20,9 +20,16 @@ from orb.domain.base.operation_outcome import (
 from orb.domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, ProviderConfigPort
 from orb.domain.base.results import ProviderSelectionResult
 from orb.domain.request.aggregate import Request
+from orb.domain.request.fulfilment_state_machine import (
+    FulfilmentEvent,
+    FulfilmentStateMachine,
+)
 from orb.domain.request.request_types import RequestStatus
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.resilience.exceptions import CircuitBreakerOpenError
+
+# Default grace period used only when no FulfilmentStateMachine is injected.
+_DEFAULT_GRACE_PERIOD_SECONDS = 3600
 
 
 @dataclass
@@ -123,6 +130,7 @@ class ProvisioningOrchestrationService:
         provider_config_port: ProviderConfigPort,
         config_port: ConfigurationPort,
         circuit_breaker_factory: Callable[[str], "CircuitBreakerStrategy"],
+        state_machine: "FulfilmentStateMachine | None" = None,
     ):
         self._container = container
         self._logger = logger
@@ -130,6 +138,9 @@ class ProvisioningOrchestrationService:
         self._provider_config_port = provider_config_port
         self._config_port = config_port
         self._circuit_breaker_factory = circuit_breaker_factory
+        self._state_machine = state_machine or FulfilmentStateMachine(
+            grace_period_seconds=_DEFAULT_GRACE_PERIOD_SECONDS
+        )
 
     async def execute_provisioning(
         self, template: Template, request: Request, selection_result: ProviderSelectionResult
@@ -335,10 +346,14 @@ class ProvisioningOrchestrationService:
             for rid in new_resource_ids:
                 updated = updated.add_resource_id(rid)
             # Advance PENDING → ACQUIRING so the request is visibly in-flight;
-            # any other active status is left unchanged.
+            # any other active status is left unchanged. Routed through the
+            # state machine so deadline_at is stamped on first departure from
+            # PENDING.
             if updated.status == RequestStatus.PENDING:
-                updated = updated.update_status(
-                    RequestStatus.ACQUIRING, "Provider resources created, waiting for completion"
+                updated = self._state_machine.apply(
+                    updated,
+                    FulfilmentEvent.RESOURCES_CREATED,
+                    now=datetime.now(timezone.utc),
                 )
             uow_factory = self._container.get(UnitOfWorkFactory)
             with uow_factory.create_unit_of_work() as uow:
@@ -363,9 +378,17 @@ class ProvisioningOrchestrationService:
         from orb.domain.base import UnitOfWorkFactory
 
         try:
-            updated = request.update_status(
-                RequestStatus.ACQUIRING, "Partial fulfillment, retrying"
-            )
+            if request.status == RequestStatus.PENDING:
+                updated = self._state_machine.apply(
+                    request,
+                    FulfilmentEvent.RESOURCES_CREATED,
+                    now=datetime.now(timezone.utc),
+                    message="Partial fulfillment, retrying",
+                )
+            else:
+                # Already past PENDING (e.g. ACQUIRING) — re-persist as-is;
+                # the deadline sweep on the next state-machine touch governs it.
+                updated = request
             uow_factory = self._container.get(UnitOfWorkFactory)
             with uow_factory.create_unit_of_work() as uow:
                 uow.requests.save(updated)
@@ -387,88 +410,134 @@ class ProvisioningOrchestrationService:
             )
 
     def recover_stuck_acquiring_requests(self, timeout_seconds: int = 3600) -> int:
-        """Transition ACQUIRING requests that have exceeded their timeout to FAILED.
+        """Sweep active requests that have blown their deadline to a terminal state.
 
-        Called at startup to clean up rows that were left in ACQUIRING state by
-        a previous ORB process that crashed or was killed mid-provisioning.  Any
-        request whose ``created_at`` timestamp is older than ``timeout_seconds``
-        is failed with an explanatory message.  Resource IDs already recorded on
-        the request row are preserved so operators can investigate orphaned
-        provider resources.
+        Covers every non-terminal status that the deadline sweep governs —
+        ACQUIRING, IN_PROGRESS and PARTIAL_PENDING — not just ACQUIRING.  Without
+        this, a client that stops polling would leave an IN_PROGRESS or
+        PARTIAL_PENDING request active forever because the lazy per-poll sweep
+        never fires.
+
+        Called at startup (and any scheduled recovery path) to clean up rows
+        left active by a previous ORB process that crashed or by a client that
+        stopped polling.  A row is considered expired when EITHER its
+        ``deadline_at`` has passed OR — for legacy rows without a deadline_at —
+        its ``created_at`` is older than ``timeout_seconds``.  Resource IDs
+        already recorded on the row are preserved so operators can investigate
+        orphaned provider resources.
+
+        Each expired row is routed through the state machine's DEADLINE_SWEEP so
+        the authoritative classification applies (COMPLETED / PARTIAL / TIMEOUT);
+        legacy rows with neither deadline_at nor a terminal sweep result fall
+        back to a forced FAILED.
+
+        Note: this is startup/scheduled recovery, not a continuous background
+        scheduler. A request created between startup sweeps whose owner stops
+        polling still relies on the next sweep (or a poll) to terminate; a full
+        periodic scheduler remains out of scope here.
 
         Args:
-            timeout_seconds: Age threshold in seconds.  Requests in ACQUIRING
-                state with ``created_at`` older than this are failed.  Defaults
-                to 3600 s (one hour) which matches the
-                ``request.default_timeout`` config default.
+            timeout_seconds: Age threshold in seconds for legacy rows that carry
+                no ``deadline_at``.  Defaults to 3600 s (one hour) which matches
+                the ``request.default_timeout`` config default.
 
         Returns:
-            The number of requests that were transitioned to FAILED.
+            The number of requests that were transitioned to a terminal state.
         """
         from orb.domain.base import UnitOfWorkFactory
         from orb.domain.request.repository import RequestRepository
 
-        cutoff: datetime = datetime.now(timezone.utc) - timedelta(seconds=timeout_seconds)
+        now: datetime = datetime.now(timezone.utc)
+        cutoff: datetime = now - timedelta(seconds=timeout_seconds)
         failed_count = 0
+
+        # Statuses the deadline sweep can resolve. IN_PROGRESS/PARTIAL_PENDING are
+        # included so a client that stops polling cannot leave them active forever.
+        _SWEEPABLE_STATUSES = (
+            RequestStatus.ACQUIRING,
+            RequestStatus.IN_PROGRESS,
+            RequestStatus.PARTIAL_PENDING,
+        )
+
+        def _is_expired(r: Request) -> bool:
+            # Prefer the authoritative deadline_at when present; otherwise fall
+            # back to the created_at age heuristic for legacy rows.
+            if r.deadline_at is not None:
+                return now >= r.deadline_at
+            return r.created_at is not None and r.created_at < cutoff
 
         try:
             uow_factory = self._container.get(UnitOfWorkFactory)
             with uow_factory.create_unit_of_work() as uow:
                 repo: RequestRepository = uow.requests  # type: ignore[assignment]
-                acquiring = repo.find_by_status(RequestStatus.ACQUIRING)
+                active: list[Request] = []
+                for status in _SWEEPABLE_STATUSES:
+                    active.extend(repo.find_by_status(status))
 
-            expired = [r for r in acquiring if r.created_at is not None and r.created_at < cutoff]
+            expired = [r for r in active if _is_expired(r)]
 
-            if not acquiring:
+            if not active:
                 self._logger.debug(
-                    "startup scan: no ACQUIRING requests found — nothing to recover."
+                    "startup scan: no active (acquiring/in_progress/partial_pending) "
+                    "requests found — nothing to recover."
                 )
                 return 0
 
             if not expired:
                 self._logger.debug(
-                    "startup scan: %d ACQUIRING request(s) found, none older than %ds — "
+                    "startup scan: %d active request(s) found, none past deadline — "
                     "leaving untouched.",
-                    len(acquiring),
-                    timeout_seconds,
+                    len(active),
                 )
                 return 0
 
             self._logger.info(
-                "startup scan: %d ACQUIRING request(s) found; %d exceed timeout of %ds "
-                "and will be transitioned to FAILED.",
-                len(acquiring),
+                "startup scan: %d active request(s) found; %d past deadline "
+                "and will be swept to a terminal state.",
+                len(active),
                 len(expired),
-                timeout_seconds,
             )
 
             for request in expired:
                 try:
-                    failed_request = request.update_status(
-                        RequestStatus.FAILED,
-                        "Request abandoned in ACQUIRING state (timeout exceeded)",
-                        force=True,
+                    # Prefer the state machine's lazy deadline sweep when the
+                    # request carries a deadline_at (post-cutover rows). It
+                    # resolves to PARTIAL (if any capacity was met) or TIMEOUT.
+                    # Legacy rows without a deadline_at fall back to a forced
+                    # FAILED so a crashed-mid-provision request is not left
+                    # stuck forever.
+                    swept = self._state_machine.apply(
+                        request, FulfilmentEvent.DEADLINE_SWEEP, now=now
                     )
+                    if swept.status.is_terminal() and swept is not request:
+                        failed_request = swept
+                    else:
+                        failed_request = request.update_status(
+                            RequestStatus.FAILED,
+                            "Request abandoned in active state (timeout exceeded)",
+                            force=True,
+                        )
                     uow_factory2 = self._container.get(UnitOfWorkFactory)
                     with uow_factory2.create_unit_of_work() as uow2:
                         uow2.requests.save(failed_request)
                     failed_count += 1
                     self._logger.info(
-                        "startup scan: failed ACQUIRING request %s "
+                        "startup scan: swept active request %s to %s "
                         "(created_at=%s, resource_ids=%s)",
                         request.request_id,
+                        failed_request.status.value,
                         request.created_at.isoformat() if request.created_at else "unknown",
                         request.resource_ids,
                     )
                 except Exception as exc:
                     self._logger.warning(
-                        "startup scan: could not recover ACQUIRING request %s: %s",
+                        "startup scan: could not recover active request %s: %s",
                         request.request_id,
                         exc,
                     )
 
         except Exception as exc:
-            self._logger.warning("startup scan: ACQUIRING recovery scan failed: %s", exc)
+            self._logger.warning("startup scan: active-request recovery scan failed: %s", exc)
 
         return failed_count
 

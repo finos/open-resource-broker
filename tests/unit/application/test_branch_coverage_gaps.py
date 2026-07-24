@@ -36,7 +36,6 @@ Covers:
 from __future__ import annotations
 
 import asyncio
-import dataclasses
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -162,15 +161,25 @@ class TestRequestStatusServiceBranchCoverage:
         result = _sync(svc.update_request_status(request, "totally_invalid_status", "msg"))
         assert result is request  # unchanged; rejected
 
+    def _real_request(self, status, **overrides):
+        """Build a real Request aggregate in the given status."""
+        from orb.domain.request.aggregate import Request
+        from orb.domain.request.value_objects import RequestType
+
+        base = Request.create_new_request(RequestType.ACQUIRE, "tmpl", 3, "aws")
+        updates = {"status": status}
+        updates.update(overrides)
+        return base.model_copy(update=updates)
+
     def test_terminal_completed_not_upgraded_to_partial(self):
-        """COMPLETED → PARTIAL is a downgrade, must be blocked."""
+        """COMPLETED → PARTIAL is a downgrade blocked by the state machine (no-op)."""
         from orb.domain.request.request_types import RequestStatus
 
         svc = self._make_svc()
-        request = self._make_real_request(RequestStatus.COMPLETED)
+        request = self._real_request(RequestStatus.COMPLETED)
 
         result = _sync(svc.update_request_status(request, RequestStatus.PARTIAL.value, "msg"))
-        assert result is request  # blocked
+        assert result is request  # blocked — returned unchanged
 
     def test_partial_to_completed_upgrade_is_allowed(self):
         """PARTIAL → COMPLETED upgrade is the one allowed terminal transition."""
@@ -186,20 +195,13 @@ class TestRequestStatusServiceBranchCoverage:
 
         svc.uow_factory.create_unit_of_work.side_effect = _cm
 
-        # Use a real PARTIAL enum so is_terminal() works
-        request = self._make_real_request(RequestStatus.PARTIAL)
-        updated = MagicMock()
-        updated.machine_ids = ["m-1", "m-2"]
-        updated.successful_count = 2
-        updated.with_last_fulfilment = MagicMock(return_value=updated)
-        request.update_status = MagicMock(return_value=updated)
-
-        _sync(svc.update_request_status(request, RequestStatus.COMPLETED.value, "done"))
-        # Must not short-circuit — update_status must be called
-        request.update_status.assert_called_once()
+        request = self._real_request(RequestStatus.PARTIAL, machine_ids=["m-1", "m-2"])
+        result = _sync(svc.update_request_status(request, RequestStatus.COMPLETED.value, "done"))
+        assert result.status == RequestStatus.COMPLETED
+        uow.requests.save.assert_called_once()
 
     def test_successful_count_reconciled_when_machine_ids_differ(self):
-        """When machine_ids count != successful_count, model_copy must be called."""
+        """When machine_ids count != successful_count, successful_count is reconciled."""
         from orb.domain.request.request_types import RequestStatus
 
         svc = self._make_svc()
@@ -212,24 +214,18 @@ class TestRequestStatusServiceBranchCoverage:
 
         svc.uow_factory.create_unit_of_work.side_effect = _cm
 
-        request = self._make_real_request(RequestStatus.IN_PROGRESS)
-
-        updated = MagicMock()
-        updated.machine_ids = ["m-1", "m-2", "m-3"]
-        updated.successful_count = 1  # differs → must reconcile
-        reconciled = MagicMock()
-        reconciled.machine_ids = ["m-1", "m-2", "m-3"]
-        reconciled.successful_count = 3
-        reconciled.with_last_fulfilment = MagicMock(return_value=reconciled)
-        updated.model_copy = MagicMock(return_value=reconciled)
-        updated.with_last_fulfilment = MagicMock(return_value=updated)
-        request.update_status = MagicMock(return_value=updated)
-
-        _sync(svc.update_request_status(request, RequestStatus.IN_PROGRESS.value, "ok"))
-        updated.model_copy.assert_called_once()
+        request = self._real_request(
+            RequestStatus.IN_PROGRESS,
+            machine_ids=["m-1", "m-2", "m-3"],
+            successful_count=1,
+            deadline_at=None,
+        )
+        result = _sync(svc.update_request_status(request, RequestStatus.IN_PROGRESS.value, "ok"))
+        # Idempotent status but successful_count reconciled to machine_ids length.
+        assert result.successful_count == 3
 
     def test_provider_fulfilment_cached_in_metadata(self):
-        """When provider_metadata has provider_fulfilment, with_last_fulfilment is called."""
+        """When provider_metadata has provider_fulfilment, it is cached in metadata."""
         from orb.domain.base.provider_fulfilment import ProviderFulfilment
         from orb.domain.request.request_types import RequestStatus
 
@@ -244,17 +240,9 @@ class TestRequestStatusServiceBranchCoverage:
         svc.uow_factory.create_unit_of_work.side_effect = _cm
 
         fulfilment = ProviderFulfilment(state="fulfilled", message="ok")
-        request = self._make_real_request(RequestStatus.IN_PROGRESS)
+        request = self._real_request(RequestStatus.IN_PROGRESS)
 
-        updated = MagicMock()
-        updated.machine_ids = []
-        updated.successful_count = 0
-        final = MagicMock()
-        updated.with_last_fulfilment = MagicMock(return_value=final)
-        final.with_last_fulfilment = MagicMock(return_value=final)
-        request.update_status = MagicMock(return_value=updated)
-
-        _sync(
+        result = _sync(
             svc.update_request_status(
                 request,
                 RequestStatus.COMPLETED.value,
@@ -262,7 +250,8 @@ class TestRequestStatusServiceBranchCoverage:
                 provider_metadata={"provider_fulfilment": fulfilment},
             )
         )
-        updated.with_last_fulfilment.assert_called_once_with(dataclasses.asdict(fulfilment))
+        assert result.status == RequestStatus.COMPLETED
+        assert "last_fulfilment" in result.metadata
 
     def test_update_request_status_re_raises_exception_from_save(self):
         """Exception from uow.requests.save propagates out."""
@@ -278,15 +267,9 @@ class TestRequestStatusServiceBranchCoverage:
 
         svc.uow_factory.create_unit_of_work.side_effect = _cm
 
-        request = self._make_real_request(RequestStatus.IN_PROGRESS)
-        updated = MagicMock()
-        updated.machine_ids = []
-        updated.successful_count = 0
-        updated.with_last_fulfilment = MagicMock(return_value=updated)
-        request.update_status = MagicMock(return_value=updated)
-
+        request = self._real_request(RequestStatus.IN_PROGRESS)
         with pytest.raises(RuntimeError, match="db failure"):
-            _sync(svc.update_request_status(request, RequestStatus.IN_PROGRESS.value, "msg"))
+            _sync(svc.update_request_status(request, RequestStatus.COMPLETED.value, "msg"))
 
     # ------------------------------------------------------------------
     # map_machine_status_to_result — full coverage
@@ -1198,10 +1181,14 @@ class TestListRequestsHandlerFilters:
 def _build_sync_get_handler():
     """Build SyncAndGetRequestHandler with all collaborators mocked, no real DI."""
     from orb.application.queries.request_query_handlers import SyncAndGetRequestHandler
+    from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
 
     handler = object.__new__(SyncAndGetRequestHandler)
     handler.logger = MagicMock()
     handler.error_handler = MagicMock()
+    # Deadline sweep on the read path needs a state machine; a real one whose
+    # evaluate_deadline is a no-op for these MagicMock requests (no deadline_at).
+    handler._state_machine = FulfilmentStateMachine(grace_period_seconds=3600)
 
     handler._cache_service = MagicMock()
     handler._cache_service.is_caching_enabled.return_value = True

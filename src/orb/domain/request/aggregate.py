@@ -5,6 +5,7 @@ from typing import Any, ClassVar, Optional
 
 from pydantic import ConfigDict, Field
 
+from orb.domain.base.diagnostic import FulfilmentDiagnostic
 from orb.domain.base.entity import AggregateRoot
 from orb.domain.base.events import (
     RequestCompletedEvent,
@@ -80,6 +81,17 @@ class Request(AggregateRoot):
     first_status_check: Optional[datetime] = None
     last_status_check: Optional[datetime] = None
 
+    # Fulfilment state-machine tracking
+    # deadline_at: wall-clock instant past which a still-active request is
+    #   swept to a terminal outcome. Set once when the request leaves PENDING.
+    # partial_since: first time the request entered PARTIAL_PENDING.
+    # last_transition_at: timestamp of the most recent status transition.
+    # fulfilment_diagnostic: structured *why* for the current outcome.
+    deadline_at: Optional[datetime] = None
+    partial_since: Optional[datetime] = None
+    last_transition_at: Optional[datetime] = None
+    fulfilment_diagnostic: Optional[FulfilmentDiagnostic] = None
+
     # Request metadata
     metadata: dict[str, Any] = Field(default_factory=dict)
     error_details: dict[str, Any] = Field(default_factory=dict)
@@ -105,6 +117,22 @@ class Request(AggregateRoot):
     def get_id(self) -> str:
         """Get the request ID."""
         return str(self.request_id)
+
+    def _rebuild_preserving_events(self, fields: dict[str, Any]) -> "Request":
+        """Rebuild the aggregate from a fields dict, carrying domain events forward.
+
+        ``model_validate`` constructs a brand-new instance whose ``_domain_events``
+        list is empty, so any events already queued on ``self`` (e.g. a
+        RequestStatusChangedEvent emitted by a prior ``_transition`` in the same
+        unit of work) would be silently dropped by a subsequent metadata/provider
+        mutation. This helper re-attaches those pending events to the rebuilt
+        aggregate so subscribers still observe the transition after a mutate-then-
+        save sequence.
+        """
+        rebuilt = Request.model_validate(fields)
+        for event in self.get_domain_events():
+            rebuilt.add_domain_event(event)
+        return rebuilt
 
     @property
     def resource_id(self) -> Optional[str]:
@@ -234,14 +262,14 @@ class Request(AggregateRoot):
         fields = self.model_dump()
         fields["provider_data"] = provider_data
         fields["version"] = self.version + 1
-        return Request.model_validate(fields)
+        return self._rebuild_preserving_events(fields)
 
     def update_metadata(self, updates: dict) -> "Request":
         new_metadata = {**self.metadata, **updates}
         fields = self.model_dump()
         fields["metadata"] = new_metadata
         fields["version"] = self.version + 1
-        return Request.model_validate(fields)
+        return self._rebuild_preserving_events(fields)
 
     def with_last_fulfilment(self, fulfilment_dict: dict) -> "Request":
         """Store a serialized ProviderFulfilment snapshot in metadata.
@@ -262,7 +290,7 @@ class Request(AggregateRoot):
         fields = self.model_dump()
         fields["metadata"] = new_metadata
         fields["version"] = self.version + 1
-        return Request.model_validate(fields)
+        return self._rebuild_preserving_events(fields)
 
     def with_launch_template_info(self, template_id: str, version: str) -> "Request":
         new_provider_data = {
@@ -273,7 +301,7 @@ class Request(AggregateRoot):
         fields = self.model_dump()
         fields["provider_data"] = new_provider_data
         fields["version"] = self.version + 1
-        return Request.model_validate(fields)
+        return self._rebuild_preserving_events(fields)
 
     def get_provider_data(self, key: str, default: Any = None) -> Any:
         """Get provider-specific data value."""
@@ -285,7 +313,7 @@ class Request(AggregateRoot):
             fields = self.model_dump()
             fields["resource_ids"] = [*self.resource_ids, resource_id]
             fields["version"] = self.version + 1
-            return Request.model_validate(fields)
+            return self._rebuild_preserving_events(fields)
         return self
 
     def remove_resource_id(self, resource_id: str) -> "Request":
@@ -294,7 +322,7 @@ class Request(AggregateRoot):
             fields = self.model_dump()
             fields["resource_ids"] = [rid for rid in self.resource_ids if rid != resource_id]
             fields["version"] = self.version + 1
-            return Request.model_validate(fields)
+            return self._rebuild_preserving_events(fields)
         return self
 
     def add_machine_ids(self, machine_ids: list[str]) -> "Request":
@@ -638,3 +666,112 @@ class Request(AggregateRoot):
             fields["completed_at"] = now
 
         return Request.model_validate(fields)
+
+    def set_fulfilment_diagnostic(self, diagnostic: FulfilmentDiagnostic) -> "Request":
+        """Attach (merge-on-write) a fulfilment diagnostic.
+
+        Idempotent-merge semantics: the first diagnostic is stored verbatim;
+        subsequent diagnostics are merged with the stored one via
+        ``FulfilmentDiagnostic.merge`` (most-severe category wins, provider
+        errors deduplicated).  Returns a new Request; does not change status.
+        """
+        merged = (
+            diagnostic
+            if self.fulfilment_diagnostic is None
+            else FulfilmentDiagnostic.merge(self.fulfilment_diagnostic, diagnostic)
+        )
+        fields = self.model_dump()
+        fields["fulfilment_diagnostic"] = merged.model_dump()
+        fields["version"] = self.version + 1
+        return self._rebuild_preserving_events(fields)
+
+    def _transition(
+        self,
+        new_status: RequestStatus,
+        *,
+        now: datetime,
+        message: Optional[str] = None,
+        diagnostic: Optional[FulfilmentDiagnostic] = None,
+        deadline_at: Optional[datetime] = None,
+        clear_diagnostic: bool = False,
+    ) -> "Request":
+        """Apply a single validated status transition.
+
+        This is the low-level mutation the ``FulfilmentStateMachine`` drives.
+        It performs NO transition-table validation itself — the state machine
+        owns that policy — but it centralises every field side-effect that a
+        status change implies so no caller has to remember them:
+
+        - ``status`` / ``status_message`` / ``last_transition_at`` / ``version``
+        - ``started_at`` stamped on the first non-PENDING transition
+        - ``completed_at`` stamped when entering a terminal state
+        - ``partial_since`` stamped on first entry to PARTIAL_PENDING
+        - ``deadline_at`` set once (when supplied and not already set)
+        - ``fulfilment_diagnostic`` merged when a diagnostic is supplied, or
+          cleared when ``clear_diagnostic`` is set (a clean success has nothing
+          to explain, so a prior shortfall diagnostic must not carry forward)
+        - emits ``RequestStatusChangedEvent`` (+ ``RequestCompletedEvent`` on
+          COMPLETED)
+
+        ``clear_diagnostic`` and a non-None ``diagnostic`` are mutually
+        exclusive by intent: the state machine only requests a clear when
+        transitioning to a clean success terminal with no diagnostic supplied.
+        A supplied diagnostic always wins (it is explicit new detail).
+        """
+        old_status = self.status
+        fields = self.model_dump()
+        fields["status"] = new_status
+        if message is not None:
+            fields["status_message"] = message
+        fields["last_transition_at"] = now
+        fields["version"] = self.version + 1
+
+        if new_status != RequestStatus.PENDING and self.started_at is None:
+            fields["started_at"] = now
+
+        if new_status.is_terminal():
+            fields["completed_at"] = now
+
+        if new_status == RequestStatus.PARTIAL_PENDING and self.partial_since is None:
+            fields["partial_since"] = now
+
+        if deadline_at is not None and self.deadline_at is None:
+            fields["deadline_at"] = deadline_at
+
+        if diagnostic is not None:
+            existing = self.fulfilment_diagnostic
+            merged = (
+                diagnostic if existing is None else FulfilmentDiagnostic.merge(existing, diagnostic)
+            )
+            fields["fulfilment_diagnostic"] = merged.model_dump()
+        elif clear_diagnostic:
+            # Clean success: drop any stale shortfall diagnostic (e.g. a
+            # CAPACITY "Partially fulfilled 2/3" carried on the row from an
+            # earlier PARTIAL_PENDING poll) so a fully-completed request never
+            # surfaces a self-contradicting shortfall explanation.
+            fields["fulfilment_diagnostic"] = None
+
+        updated_request = Request.model_validate(fields)
+
+        status_event = RequestStatusChangedEvent(
+            aggregate_id=str(self.request_id),
+            aggregate_type="Request",
+            request_id=str(self.request_id),
+            request_type=self.request_type.value,
+            old_status=old_status.value,
+            new_status=new_status.value,
+        )
+        updated_request.add_domain_event(status_event)
+
+        if new_status == RequestStatus.COMPLETED:
+            completion_event = RequestCompletedEvent(
+                aggregate_id=str(self.request_id),
+                aggregate_type="Request",
+                request_id=str(self.request_id),
+                request_type=self.request_type.value,
+                completion_status=RequestStatus.COMPLETED.value,
+                machine_ids=self.machine_ids,
+            )
+            updated_request.add_domain_event(completion_event)
+
+        return updated_request

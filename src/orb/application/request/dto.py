@@ -7,6 +7,7 @@ from pydantic import Field
 
 from orb.application.dto.base import BaseDTO
 from orb.application.machine.result_mapping import map_machine_status_to_result
+from orb.domain.base.diagnostic import FulfilmentDiagnostic
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.machine.aggregate import Machine
 from orb.domain.request.aggregate import Request
@@ -127,6 +128,9 @@ class RequestDTO(BaseDTO):
     fulfilled_units: Optional[int] = None
     running_count: Optional[int] = None
     pending_count: Optional[int] = None
+    # Structured *why* for a partial/failed/timeout outcome. Serialised dict of
+    # the FulfilmentDiagnostic value object; surfaced only when present.
+    fulfilment_diagnostic: Optional[dict[str, Any]] = None
 
     @classmethod
     def from_domain(
@@ -203,6 +207,14 @@ class RequestDTO(BaseDTO):
                         )
                         resolved_fulfilment = None
 
+        # Serialise the fulfilment diagnostic only when it is a real value
+        # object (guards against MagicMock test doubles whose attribute access
+        # returns a truthy Mock).
+        diagnostic_dict: Optional[dict[str, Any]] = None
+        raw_diagnostic = getattr(request, "fulfilment_diagnostic", None)
+        if isinstance(raw_diagnostic, FulfilmentDiagnostic):
+            diagnostic_dict = raw_diagnostic.model_dump(mode="json")
+
         # Build structured error block from error_details when available.
         # Accept both "provider_error" (new) and legacy "aws_error" so that
         # records persisted before this deploy continue to surface the error block.
@@ -250,6 +262,7 @@ class RequestDTO(BaseDTO):
             fulfilled_units=resolved_fulfilment.fulfilled_units if resolved_fulfilment else None,
             running_count=resolved_fulfilment.running_count if resolved_fulfilment else None,
             pending_count=resolved_fulfilment.pending_count if resolved_fulfilment else None,
+            fulfilment_diagnostic=diagnostic_dict,
         )
 
     def to_dict(self, verbose: bool = False, include_timing: bool = False) -> dict[str, Any]:
@@ -292,6 +305,10 @@ class RequestDTO(BaseDTO):
         for cap_field in ("target_units", "fulfilled_units", "running_count", "pending_count"):
             if result.get(cap_field) is None:
                 result.pop(cap_field, None)
+
+        # Include the structured diagnostic only when present.
+        if result.get("fulfilment_diagnostic") is None:
+            result.pop("fulfilment_diagnostic", None)
 
         if not include_details:
             result.pop("metadata", None)

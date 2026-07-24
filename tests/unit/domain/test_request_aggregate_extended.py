@@ -478,3 +478,79 @@ class TestRequestMetadataHelpers:
         updated = req.update_metadata({"new_key": "new_value"})
         assert updated.metadata["existing"] == "value"
         assert updated.metadata["new_key"] == "new_value"
+
+
+# ---------------------------------------------------------------------------
+# Domain events survive post-transition mutators
+# ---------------------------------------------------------------------------
+
+
+class TestDomainEventsPreservedByMutators:
+    """A status transition emits domain events into _domain_events; later
+    metadata/provider mutators (model_dump + model_validate based) previously
+    DROPPED those events. These guard the mutate-then-save path so subscribers
+    still observe the transition."""
+
+    def _transitioned(self):
+        """Return a Request that has just transitioned to COMPLETED (carrying a
+        RequestStatusChangedEvent + RequestCompletedEvent) with the creation
+        event cleared so only transition events remain."""
+        req = _make_request()
+        req.clear_domain_events()  # drop the RequestCreatedEvent
+        completed = req.complete("done")
+        # sanity: complete() emits two events
+        names = {type(e).__name__ for e in completed.get_domain_events()}
+        assert "RequestStatusChangedEvent" in names
+        return completed
+
+    def test_update_metadata_preserves_events(self):
+        completed = self._transitioned()
+        before = {type(e).__name__ for e in completed.get_domain_events()}
+        mutated = completed.update_metadata({"k": "v"})
+        after = {type(e).__name__ for e in mutated.get_domain_events()}
+        assert before == after
+        assert "RequestStatusChangedEvent" in after
+
+    def test_with_last_fulfilment_preserves_events(self):
+        completed = self._transitioned()
+        before = {type(e).__name__ for e in completed.get_domain_events()}
+        mutated = completed.with_last_fulfilment({"count": 1})
+        after = {type(e).__name__ for e in mutated.get_domain_events()}
+        assert before == after
+
+    def test_set_provider_data_preserves_events(self):
+        completed = self._transitioned()
+        mutated = completed.set_provider_data({"x": 1})
+        after = {type(e).__name__ for e in mutated.get_domain_events()}
+        assert "RequestStatusChangedEvent" in after
+
+    def test_add_resource_id_preserves_events(self):
+        completed = self._transitioned()
+        mutated = completed.add_resource_id("fleet-123")
+        after = {type(e).__name__ for e in mutated.get_domain_events()}
+        assert "RequestStatusChangedEvent" in after
+
+    def test_set_fulfilment_diagnostic_preserves_events(self):
+        from datetime import datetime, timezone
+
+        from orb.domain.base.diagnostic import DiagnosticCategory, FulfilmentDiagnostic
+
+        completed = self._transitioned()
+        diag = FulfilmentDiagnostic(
+            category=DiagnosticCategory.CAPACITY,
+            summary="s",
+            occurred_at=datetime.now(timezone.utc),
+        )
+        mutated = completed.set_fulfilment_diagnostic(diag)
+        after = {type(e).__name__ for e in mutated.get_domain_events()}
+        assert "RequestStatusChangedEvent" in after
+
+    def test_chained_mutators_preserve_events_through_save_shape(self):
+        """Full mutate-then-save chain: transition → update_metadata →
+        set_provider_data still yields the transition event for the repository's
+        get_domain_events() extraction."""
+        completed = self._transitioned()
+        chained = completed.update_metadata({"a": 1}).set_provider_data({"b": 2})
+        names = [type(e).__name__ for e in chained.get_domain_events()]
+        assert "RequestStatusChangedEvent" in names
+        assert "RequestCompletedEvent" in names

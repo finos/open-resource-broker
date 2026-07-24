@@ -13,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from orb.domain.base.diagnostic import FulfilmentDiagnostic
+
 # The four possible states a provider can report for a request.
 #
 # fulfilled  — target capacity met, all instances running, no failures.
@@ -41,6 +43,19 @@ class ProviderFulfilment:
         running_count: Number of instances in the running state.  None if unknown.
         pending_count: Number of instances still starting/pending.  None if unknown.
         failed_count: Number of instances in a failure state.  None if unknown.
+        final: Whether this verdict is the provider's *last word* on capacity —
+            ``True`` only for synchronous providers (AWS RunInstances / instant
+            fleet / MicroVM) whose launch API has already settled, so a
+            ``partial`` state means no further capacity is coming and the
+            request should terminalise immediately.  ``False`` (the default) for
+            asynchronous providers such as Kubernetes, where a ``partial`` with
+            ``pending_count == 0`` is a *transient* view (the pod list lags the
+            controller's reconciliation intent) and must be allowed to heal via
+            the PARTIAL_PENDING holding state.  Never infer finality from
+            ``pending_count`` — that signal is provider-specific.
+        diagnostic: Optional structured explanation of *why* the verdict is
+            partial/failed (capacity, auth, validation, ...).  None when the
+            provider has nothing to explain (e.g. a clean ``fulfilled``).
     """
 
     state: FulfilmentState
@@ -50,6 +65,8 @@ class ProviderFulfilment:
     running_count: int | None = None
     pending_count: int | None = None
     failed_count: int | None = None
+    final: bool = False
+    diagnostic: FulfilmentDiagnostic | None = None
 
 
 @dataclass(frozen=True)

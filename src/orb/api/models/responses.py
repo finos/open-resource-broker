@@ -58,6 +58,9 @@ class RequestItem(BaseModel):
     error_details: Optional[dict[str, Any]] = None
     success_rate: Optional[float] = None
     duration: Optional[int] = None
+    # Structured explanation of a partial/failed/timeout outcome (serialised
+    # FulfilmentDiagnostic). Present only when the request carries one.
+    fulfilment_diagnostic: Optional[dict[str, Any]] = None
 
     # --- Machine references ---
     machines: list[MachineRefItem] = []

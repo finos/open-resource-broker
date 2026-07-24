@@ -27,6 +27,22 @@ from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.services.generic_filter_service import GenericFilterService
 
 
+def _resolve_state_machine(container: ContainerPort, logger: LoggingPort):
+    """Resolve the shared FulfilmentStateMachine from DI.
+
+    Falls back to a default-grace-period machine when DI does not provide one
+    (lightweight test wiring) so the read-path deadline sweep always has a
+    usable machine.
+    """
+    from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
+
+    try:
+        return container.get(FulfilmentStateMachine)
+    except Exception as exc:
+        logger.debug("FulfilmentStateMachine unavailable in DI: %s", exc)
+        return FulfilmentStateMachine(grace_period_seconds=3600)
+
+
 @query_handler(SyncAndGetRequestQuery)
 class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestDTO]):
     """Handler for getting request details with live provider sync.
@@ -54,7 +70,10 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
         self.event_publisher = self._get_event_publisher()
 
         self._query_service = RequestQueryService(uow_factory, logger)
-        self._status_service = RequestStatusService(uow_factory, logger)
+        self._state_machine = _resolve_state_machine(container, logger)
+        self._status_service = RequestStatusService(
+            uow_factory, logger, state_machine=self._state_machine
+        )
         self._dto_factory = RequestDTOFactory()
 
     async def execute_query(self, query: SyncAndGetRequestQuery) -> RequestDTO:
@@ -75,6 +94,11 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
             request = await self._query_service.get_request(query.request_id)
 
             if query.lightweight:
+                # No provider round-trip on the lightweight path, so the only
+                # signal that can move an expired request is the deadline sweep.
+                # It is safe to run here because there is no later provider
+                # verdict that it could stale-short-circuit.
+                request = await self._evaluate_deadline_and_persist(request)
                 request_dto = self._dto_factory.create_from_domain(request, [])
                 self.logger.info("Retrieved lightweight request: %s", query.request_id)
                 return request_dto
@@ -121,6 +145,15 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
                         request, new_status, status_message or "", provider_metadata
                     )
                 request = await self._query_service.get_request(query.request_id)
+
+                # Deadline sweep runs AFTER the provider sync so the latest
+                # provider verdict is applied first. A pre-sync sweep on stale DB
+                # counts could flip the request to a terminal outcome and then
+                # permanently short-circuit further reconciliation — the exact
+                # bug the PARTIAL_PENDING holding state exists to prevent. Only a
+                # request that is genuinely still non-terminal AND past its
+                # deadline after the fresh sync is swept here.
+                request = await self._evaluate_deadline_and_persist(request)
             except ProviderContractError:
                 raise
             except Exception as sync_err:
@@ -158,6 +191,59 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
         except Exception as e:
             self.logger.error("Failed to get request: %s", e)
             raise
+
+    async def _evaluate_deadline_and_persist(self, request):
+        """Lazily sweep an expired request to terminal and persist the flip.
+
+        Only writes when the status actually changes and the request is not
+        already terminal. Uses a short OCC retry loop so a concurrent poll does
+        not surface a raw ConcurrencyError on a read path. A persist failure is
+        logged and the in-memory swept request is still returned.
+        """
+        from datetime import datetime, timezone
+
+        from orb.domain.base.exceptions import ConcurrencyError
+
+        if request.status.is_terminal():
+            return request
+
+        state_machine = self._state_machine
+        try:
+            swept = state_machine.evaluate_deadline(request, now=datetime.now(timezone.utc))
+        except Exception as exc:
+            # A malformed / test-double request whose deadline_at is not a real
+            # datetime must never break the read path — skip the sweep.
+            self.logger.debug("Deadline evaluation skipped: %s", exc)
+            return request
+        if swept is request or swept.status == request.status:
+            return request
+
+        _MAX_RETRIES = 3
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                with self.uow_factory.create_unit_of_work() as uow:
+                    events = uow.requests.save(swept)
+                    for event in events or []:
+                        self.event_publisher.publish(event)
+                return swept
+            except ConcurrencyError:
+                if attempt >= _MAX_RETRIES:
+                    self.logger.warning(
+                        "Deadline sweep persist lost the race for %s; returning in-memory state",
+                        request.request_id.value,
+                    )
+                    return swept
+                # Reload, re-evaluate, retry.
+                reloaded = await self._query_service.get_request(str(request.request_id.value))
+                if reloaded is None or reloaded.status.is_terminal():
+                    return reloaded or swept
+                swept = state_machine.evaluate_deadline(reloaded, now=datetime.now(timezone.utc))
+                if swept is reloaded or swept.status == reloaded.status:
+                    return reloaded
+            except Exception as exc:
+                self.logger.warning("Deadline sweep persist failed: %s", exc)
+                return swept
+        return swept
 
     def _get_cache_service(self):
         try:

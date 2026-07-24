@@ -46,6 +46,17 @@ def pytest_addoption(parser):
         default=False,
         help="Run tests marked ``slow`` (e.g. GC tests with long grace-period waits)",
     )
+    parser.addoption(
+        "--capture-wire-format",
+        action="store_true",
+        default=False,
+        help=(
+            "Re-capture the HostFactory wire-format baseline "
+            "(tests/fixtures/wire_format_baseline.json) from the current formatter "
+            "output instead of diffing against it. Use only to intentionally "
+            "re-baseline a documented wire-contract change."
+        ),
+    )
 
 
 def _is_live_test(item) -> bool:

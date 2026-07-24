@@ -16,6 +16,7 @@ from orb.infrastructure.scheduler.hostfactory.formatters.status_mapper import (
     generate_status_message,
     map_domain_status_to_hostfactory,
     map_machine_status_to_result,
+    summarise_diagnostic,
 )
 from orb.infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
 from orb.infrastructure.template.dtos import TemplateDTO
@@ -344,6 +345,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 )
                 status = self._map_domain_status_to_hostfactory(data.status)
                 message = self._generate_status_message(data.status, len(machines))
+                message = self._enrich_message_with_diagnostic(message, dto_dict, len(machines))
 
                 return {
                     "requests": [
@@ -989,6 +991,29 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def _map_domain_status_to_hostfactory(self, domain_status: str) -> str:
         """Map domain status to HostFactory status per hf_docs/input-output.md."""
         return map_domain_status_to_hostfactory(domain_status)
+
+    def _enrich_message_with_diagnostic(
+        self, base_message: str, dto_dict: dict, machine_count: int
+    ) -> str:
+        """Fold a fulfilment diagnostic into the HF message string when present.
+
+        The HF schema has no field for a structured diagnostic, so the *why* is
+        expressed through the category-templated ``message`` (see
+        ``summarise_diagnostic``). Returns the base message unchanged when no
+        diagnostic is attached.
+        """
+        diagnostic = dto_dict.get("fulfilment_diagnostic")
+        if not diagnostic:
+            return base_message
+        fulfilled = dto_dict.get("fulfilled_units")
+        if fulfilled is None:
+            fulfilled = dto_dict.get("successful_count")
+        target = dto_dict.get("target_units")
+        if target is None:
+            target = dto_dict.get("requested_count")
+        return summarise_diagnostic(
+            diagnostic, fulfilled=fulfilled, target=target, fallback=base_message
+        )
 
     def _generate_status_message(self, status: str, machine_count: int) -> str:
         """Generate appropriate status message."""

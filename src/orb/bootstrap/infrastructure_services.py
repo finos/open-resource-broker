@@ -19,11 +19,29 @@ def register_infrastructure_services(container: DIContainer) -> None:
     # Register repository services
     _register_repository_services(container)
 
+    # Register the fulfilment state machine (single status-write authority)
+    _register_fulfilment_state_machine(container)
+
     # Register provisioning orchestration service
     _register_provisioning_orchestration_service(container)
 
     # Register caching services
     _register_caching_services(container)
+
+
+def _register_fulfilment_state_machine(container: DIContainer) -> None:
+    """Register the FulfilmentStateMachine with the configured grace period."""
+    from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
+
+    def create_fulfilment_state_machine(c: DIContainer) -> FulfilmentStateMachine:
+        config_port = c.get(ConfigurationPort)
+        request_config = config_port.get_request_config()
+        grace_period = int(request_config.get("default_timeout", 3600))
+        logger = c.get(LoggingPort)
+        logger.info("FulfilmentStateMachine grace period resolved to %ds", grace_period)
+        return FulfilmentStateMachine(grace_period_seconds=grace_period)
+
+    container.register_singleton(FulfilmentStateMachine, create_fulfilment_state_machine)
 
 
 def _register_template_services(container: DIContainer):
@@ -35,13 +53,25 @@ def _register_template_services(container: DIContainer):
         from orb.application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
+        from orb.domain.template.factory import TemplateFactoryPort
         from orb.infrastructure.registry.template_extension_registry import (
             TemplateExtensionRegistryAdapter,
         )
 
+        # The factory exposes registered provider template subclasses so the
+        # defaults merge can derive alias groups for their top-level
+        # AliasChoices fields (not just the base Template).  Resolved
+        # opportunistically — the service works without it.
+        template_factory = None
+        try:
+            template_factory = c.get(TemplateFactoryPort)
+        except Exception as exc:  # pragma: no cover — defensive
+            c.get(LoggingPort).debug("Template factory unavailable for defaults service: %s", exc)
+
         return TemplateDefaultsService(
             config_manager=c.get(ConfigurationPort),
             logger=c.get(LoggingPort),
+            template_factory=template_factory,  # type: ignore[arg-type]
             extension_registry=TemplateExtensionRegistryAdapter(),
         )
 
@@ -197,6 +227,7 @@ def _register_provisioning_orchestration_service(container: DIContainer) -> None
         ProviderConfigPort,
         ProviderSelectionPort,
     )
+    from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
     from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
 
     def create_provisioning_orchestration_service(
@@ -209,6 +240,7 @@ def _register_provisioning_orchestration_service(container: DIContainer) -> None
             provider_config_port=c.get(ProviderConfigPort),
             config_port=c.get(ConfigurationPort),
             circuit_breaker_factory=CircuitBreakerStrategy,
+            state_machine=c.get(FulfilmentStateMachine),
         )
 
     container.register_singleton(

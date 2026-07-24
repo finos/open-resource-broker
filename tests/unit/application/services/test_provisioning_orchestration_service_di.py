@@ -111,11 +111,16 @@ class TestDIWiringCircuitBreakerFactory:
         container = DIContainer()
 
         # Register the minimal stubs the factory needs
+        from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
+
         container.register_instance(ContainerPort, MagicMock(spec=ContainerPort))
         container.register_instance(LoggingPort, MagicMock(spec=LoggingPort))
         container.register_instance(ProviderSelectionPort, MagicMock(spec=ProviderSelectionPort))
         container.register_instance(ProviderConfigPort, MagicMock(spec=ProviderConfigPort))
         container.register_instance(ConfigurationPort, MagicMock(spec=ConfigurationPort))
+        container.register_instance(
+            FulfilmentStateMachine, FulfilmentStateMachine(grace_period_seconds=3600)
+        )
 
         _infra_svc_mod._register_provisioning_orchestration_service(container)
 
