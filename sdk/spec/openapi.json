@@ -3,7 +3,7 @@
   "info": {
     "title": "Open Resource Broker API",
     "description": "## Open Resource Broker REST API\n\nThis API provides dynamic cloud resource provisioning capabilities for IBM Spectrum Symphony Host Factory.\n\n### Features\n\n- **Multi-Cloud Support**: Currently supports AWS with extensible architecture for other providers\n- **Template Management**: Define and manage VM templates with provider-specific configurations\n- **Machine Provisioning**: Request and manage cloud instances with various deployment strategies\n- **Request Tracking**: Monitor provisioning requests with detailed status information\n- **Authentication**: Multiple authentication strategies including JWT, AWS IAM, and AWS Cognito\n- **Real-time Status**: Get real-time status of provisioning operations\n\n### Authentication\n\nThis API supports multiple authentication methods:\n\n- **None**: No authentication (development/testing only)\n- **Bearer Token**: JWT-based authentication with configurable secrets\n- **AWS IAM**: AWS credential-based authentication using IAM roles/users\n- **AWS Cognito**: Integration with AWS Cognito User Pools\n\n### Rate Limiting\n\nAPI requests are subject to rate limiting to ensure fair usage and system stability.\n\n### Error Handling\n\nAll endpoints return consistent error responses with appropriate HTTP status codes and detailed error messages.\n\n### Versioning\n\nThis API uses URL path versioning (e.g., `/api/v1/`). Breaking changes will result in a new version.",
-    "version": "1.8.4",
+    "version": "1.8.5",
     "contact": {
       "name": "",
       "url": "https://github.com/finos/open-resource-broker",
