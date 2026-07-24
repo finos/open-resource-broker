@@ -1,5 +1,9 @@
 """Retry-specific exceptions."""
 
+from orb.application.ports.resilience_port import (
+    CircuitBreakerOpenError as CircuitBreakerOpenPortError,
+)
+
 
 class RetryError(Exception):
     """Base exception for retry-related errors."""
@@ -41,8 +45,13 @@ class RetryConfigurationError(RetryError):
     """Exception raised when retry configuration is invalid."""
 
 
-class CircuitBreakerOpenError(RetryError):
-    """Exception raised when circuit breaker is in OPEN state."""
+class CircuitBreakerOpenError(RetryError, CircuitBreakerOpenPortError):
+    """Exception raised when circuit breaker is in OPEN state.
+
+    Subclasses the application-layer ``CircuitBreakerOpenError`` port base so
+    the orchestration service can catch open-circuit failures without importing
+    this infrastructure module.
+    """
 
     def __init__(self, service_name: str, failure_count: int, last_failure_time: float) -> None:
         """

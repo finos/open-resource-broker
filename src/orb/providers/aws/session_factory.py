@@ -3,14 +3,11 @@
 from typing import Optional
 
 import boto3
-from botocore.config import Config
+
+from orb.providers.aws.utilities.boto_config import get_boto3_config
 
 # Default timeout config for one-off clients created outside of AWSClient
-_DEFAULT_CONFIG = Config(
-    connect_timeout=10,
-    read_timeout=30,
-    retries={"max_attempts": 3},
-)
+_DEFAULT_CONFIG = get_boto3_config()
 
 
 class AWSSessionFactory:

@@ -273,3 +273,115 @@ class TestRegisteredProviderTypes:
             assert result == []
         finally:
             CLISpecRegistry._store = original
+
+
+# ---------------------------------------------------------------------------
+# Regression guard: --provider-type is defined ONCE and survives a second
+# provider registering
+# ---------------------------------------------------------------------------
+
+
+def _leaf_subparser(
+    parser: argparse.ArgumentParser, resource: str, action: str
+) -> argparse.ArgumentParser:
+    """Return the leaf sub-parser for ``<resource> <action>`` from a built parser.
+
+    Walks the two levels of ``_SubParsersAction`` (resource → action) so a test
+    can introspect the exact parser that composes the shared parent parsers.
+    """
+    resource_action = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    resource_parser = resource_action.choices[resource]
+    action_action = next(
+        a for a in resource_parser._actions if isinstance(a, argparse._SubParsersAction)
+    )
+    return action_action.choices[action]
+
+
+def _provider_type_actions(parser: argparse.ArgumentParser) -> list[argparse.Action]:
+    """Return every action on *parser* whose option strings include --provider-type."""
+    return [a for a in parser._actions if "--provider-type" in getattr(a, "option_strings", [])]
+
+
+class TestMultiProviderNoConflict:
+    """--provider-type is inherited once and never collides when providers grow.
+
+    The global arguments (including --provider-type) live on a single shared
+    parent parser that every leaf sub-parser composes via parents=[...].  This
+    is the property that keeps the CLI stable as new provider types
+    (Azure/GCP/OCI) come online: because the flag is declared once and merely
+    inherited, registering additional providers only widens its ``choices`` —
+    it never adds a second --provider-type action that argparse would reject
+    with a "conflicting option string" error.
+    """
+
+    def test_provider_type_declared_once_per_leaf_subparser(self):
+        """Every leaf sub-parser inherits exactly one --provider-type action."""
+        from orb.cli.args import build_parser
+
+        parser, _ = build_parser()
+
+        for resource, action in [
+            ("machines", "list"),
+            ("templates", "list"),
+            ("requests", "list"),
+            ("providers", "list"),
+        ]:
+            leaf = _leaf_subparser(parser, resource, action)
+            actions = _provider_type_actions(leaf)
+            assert len(actions) == 1, (
+                f"{resource} {action} has {len(actions)} --provider-type actions; "
+                "the flag must be inherited exactly once from the shared parent parser."
+            )
+
+    def test_second_provider_registering_causes_no_conflict(self):
+        """Simulate a second/extra provider type; build_parser must not conflict.
+
+        Injects a synthetic spec into the CLI spec registry (as a real provider
+        plugin would) and drives the full build_parser() pipeline.  A duplicate
+        --provider-type registration would surface here as ValueError/SystemExit
+        at build time; a single inherited flag simply gains a new valid choice.
+        """
+        from orb.cli.args import build_parser
+        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
+
+        class _FakeProviderCLISpec:
+            def add_arguments(self, parser: argparse.ArgumentParser) -> None:
+                parser.add_argument("--fake-region", dest="fake_region", help="fake")
+
+            def extract_config(self, args):
+                return {}
+
+            def extract_partial_config(self, args):
+                return {}
+
+            def validate_add(self, args):
+                return []
+
+            def generate_name(self, args):
+                return "fake-instance"
+
+            def format_display(self, config):
+                return []
+
+        original_specs = dict(CLISpecRegistry._store)
+        try:
+            CLISpecRegistry._store["fake-cloud"] = _FakeProviderCLISpec()  # type: ignore[assignment]
+
+            try:
+                parser, _ = build_parser()
+            except (ValueError, SystemExit) as exc:
+                pytest.fail(
+                    f"build_parser() raised {type(exc).__name__} with a second provider "
+                    f"registered: {exc}. --provider-type must be inherited once, not re-added."
+                )
+
+            # Still exactly one --provider-type action per leaf.
+            leaf = _leaf_subparser(parser, "machines", "list")
+            assert len(_provider_type_actions(leaf)) == 1
+
+            # The new provider type is a valid choice on every command that
+            # inherits the provider-scope parent.
+            ns = parser.parse_args(["machines", "list", "--provider-type", "fake-cloud"])
+            assert ns.provider_type == "fake-cloud"
+        finally:
+            CLISpecRegistry._store = original_specs
