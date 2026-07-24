@@ -59,6 +59,7 @@ from orb.providers.aws.infrastructure.handlers.ec2_fleet.release_manager import 
 )
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from orb.providers.aws.infrastructure.handlers.shared.fleet_fulfilment import (
+    aggregate_fleet_fulfilment,
     compute_ec2fleet_fulfilment,
 )
 from orb.providers.aws.infrastructure.handlers.shared.fleet_grouping_mixin import FleetGroupingMixin
@@ -186,6 +187,20 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 if aws_template.fleet_type is not None
                 else aws_template.fleet_type
             )
+            # When the fleet reported errors, classify them into a structured
+            # diagnostic so the *why* (capacity / auth / validation / ...) is
+            # carried through to the request DTO alongside the raw errors.
+            fulfilment_diagnostic = None
+            if fleet_errors:
+                from datetime import datetime, timezone
+
+                from orb.providers.aws.infrastructure.handlers.shared.error_classifier import (
+                    classify_aws_errors,
+                )
+
+                fulfilment_diagnostic = classify_aws_errors(
+                    fleet_errors, now=datetime.now(timezone.utc)
+                ).model_dump(mode="json")
             return {
                 "success": True,
                 "resource_ids": [fleet_id],
@@ -194,6 +209,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "resource_type": "ec2_fleet",
                     "fleet_type": fleet_type_value,
                     "fleet_errors": fleet_errors,
+                    "fulfilment_diagnostic": fulfilment_diagnostic,
                     # ``requires_async_polling`` — True means the caller must
                     # continue polling the provider to observe further
                     # fulfillment before considering this request settled.
@@ -443,6 +459,12 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         # booting; that classification can only be made once every fleet
         # has reached a terminal verdict.
         states = [r.fulfilment.state for r in fleet_results]
+        # An aggregated partial verdict is only *final* (terminalise now) when
+        # every partial contributor is itself final — i.e. all partial fleets
+        # are settled synchronous (instant) verdicts.  If any partial fleet is
+        # still-reconciling/async (final=False), the aggregate must stay
+        # non-final so the FSM keeps healing via PARTIAL_PENDING.
+        combined_final = False
         if all(s == "fulfilled" for s in states):
             combined_state = "fulfilled"
             combined_msg = f"All {len(fleet_results)} fleets fulfilled"
@@ -455,13 +477,22 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         elif any(s == "partial" for s in states):
             combined_state = "partial"
             combined_msg = "One or more fleets partially fulfilled"
+            combined_final = all(
+                r.fulfilment.final for r in fleet_results if r.fulfilment.state == "partial"
+            )
         else:
             combined_state = "in_progress"
             combined_msg = "Waiting for fleet(s) to fulfil"
 
         return CheckHostsStatusResult(
             instances=all_instances,
-            fulfilment=ProviderFulfilment(state=combined_state, message=combined_msg),
+            fulfilment=aggregate_fleet_fulfilment(
+                state=combined_state,
+                message=combined_msg,
+                final=combined_final,
+                contributors=[r.fulfilment for r in fleet_results],
+                requested_count=request.requested_count,
+            ),
         )
 
     def _check_single_fleet_status(self, fleet_id: str, request: Request) -> CheckHostsStatusResult:

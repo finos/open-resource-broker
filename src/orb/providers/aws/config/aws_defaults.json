@@ -60,9 +60,9 @@
           }
         },
         "template_defaults": {
-          "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-          "instance_type": "t2.micro",
-          "key_name": "",
+          "machine_image": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+          "machine_type": "t2.micro",
+          "machine_ssh_key": "",
           "provider_api": "EC2Fleet",
           "price_type": "ondemand",
           "tags": {

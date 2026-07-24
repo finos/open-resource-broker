@@ -64,6 +64,8 @@ def _fleet_status_result(
     state: FulfilmentState = "fulfilled",
     target_units: int | None = None,
     fulfilled_units: int | None = None,
+    final: bool = False,
+    diagnostic=None,
 ):
     """Build a CheckHostsStatusResult for mocking _get_spot_fleet_status."""
     instances = _formatted_instances(instance_ids, resource_id)
@@ -78,6 +80,8 @@ def _fleet_status_result(
             running_count=n,
             pending_count=0,
             failed_count=0,
+            final=final,
+            diagnostic=diagnostic,
         ),
     )
 
@@ -140,6 +144,108 @@ class TestSpotFleetHandlerCheckHostsStatus:
         assert result.instances == []
         assert isinstance(result.fulfilment, ProviderFulfilment)
         assert result.fulfilment.state == "in_progress"
+
+    def test_check_hosts_status_multi_partial_all_final_is_terminal(self):
+        """All partial contributors final → aggregate partial is final (terminalise)."""
+        handler = _make_handler()
+        request = _make_request(["sfr-A", "sfr-B"], requested_count=4)
+
+        def side_effect(*args, **kwargs):
+            fleet_id = kwargs.get("fleet_id") or args[0]
+            if fleet_id == "sfr-A":
+                return _fleet_status_result(["i-a1"], "sfr-A", state="partial", final=True)
+            return _fleet_status_result(["i-b1"], "sfr-B", state="partial", final=True)
+
+        with patch.object(handler, "_get_spot_fleet_status", side_effect=side_effect):
+            result = handler.check_hosts_status(request)
+
+        assert result.fulfilment.state == "partial"
+        assert result.fulfilment.final is True
+
+    def test_check_hosts_status_multi_partial_one_non_final_stays_pending(self):
+        """A non-final partial contributor → aggregate partial stays non-final (keep healing)."""
+        handler = _make_handler()
+        request = _make_request(["sfr-A", "sfr-B"], requested_count=4)
+
+        def side_effect(*args, **kwargs):
+            fleet_id = kwargs.get("fleet_id") or args[0]
+            if fleet_id == "sfr-A":
+                return _fleet_status_result(["i-a1"], "sfr-A", state="partial", final=True)
+            return _fleet_status_result(["i-b1"], "sfr-B", state="partial", final=False)
+
+        with patch.object(handler, "_get_spot_fleet_status", side_effect=side_effect):
+            result = handler.check_hosts_status(request)
+
+        assert result.fulfilment.state == "partial"
+        assert result.fulfilment.final is False
+
+    def test_check_hosts_status_multi_partial_propagates_diagnostic_and_capacity(self):
+        """Multi spot-fleet partial carries merged diagnostic + summed capacity counts.
+
+        Regression: the aggregate must carry the SAME contract as the
+        single-fleet path — a bare ProviderFulfilment(state, message, final)
+        dropped the diagnostic and every capacity count, so the status API
+        surfaced fulfilment_diagnostic=null and omitted capacity units for
+        multi-fleet partials.
+        """
+        from datetime import datetime, timezone
+
+        from orb.domain.base.diagnostic import DiagnosticCategory, FulfilmentDiagnostic
+
+        handler = _make_handler()
+        request = _make_request(["sfr-A", "sfr-B"], requested_count=7)
+
+        diag_a = FulfilmentDiagnostic(
+            category=DiagnosticCategory.CAPACITY,
+            summary="Partially fulfilled: 1/3 capacity",
+            occurred_at=datetime.now(timezone.utc),
+        )
+        diag_b = FulfilmentDiagnostic(
+            category=DiagnosticCategory.CAPACITY,
+            summary="Partially fulfilled: 2/4 capacity",
+            occurred_at=datetime.now(timezone.utc),
+        )
+
+        def side_effect(*args, **kwargs):
+            fleet_id = kwargs.get("fleet_id") or args[0]
+            if fleet_id == "sfr-A":
+                return _fleet_status_result(
+                    ["i-a1"],
+                    "sfr-A",
+                    state="partial",
+                    final=True,
+                    target_units=3,
+                    fulfilled_units=1,
+                    diagnostic=diag_a,
+                )
+            return _fleet_status_result(
+                ["i-b1", "i-b2"],
+                "sfr-B",
+                state="partial",
+                final=True,
+                target_units=4,
+                fulfilled_units=2,
+                diagnostic=diag_b,
+            )
+
+        with patch.object(handler, "_get_spot_fleet_status", side_effect=side_effect):
+            result = handler.check_hosts_status(request)
+
+        f = result.fulfilment
+        assert f.state == "partial"
+        assert f.final is True
+        # Diagnostic merged (not dropped) so the request DTO gets stamped.
+        assert f.diagnostic is not None
+        assert f.diagnostic.category == DiagnosticCategory.CAPACITY
+        # target_units is the whole-request target (requested_count=7), NOT the
+        # sum of per-fleet targets (3 + 4 = 7 here coincidentally, but the
+        # value comes from requested_count directly).
+        assert f.target_units == 7
+        # Observed counts ARE summed across both fleets (whole-request view).
+        assert f.fulfilled_units == 3
+        assert f.running_count == 3  # 1 + 2 running instances
+        assert f.pending_count == 0
+        assert f.failed_count == 0
 
     def test_check_hosts_status_aws_error(self):
         """Exception inside per-fleet loop → logged and skipped; result has empty instances."""
