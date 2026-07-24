@@ -1,6 +1,7 @@
 """AWS provider configuration - single source of truth."""
 
 import json
+import logging
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
@@ -11,6 +12,8 @@ from orb.providers.aws.configuration.batch_sizes_config import AWSBatchSizesConf
 from orb.providers.aws.configuration.naming_config import AWSNamingConfig
 from orb.providers.aws.domain.template.value_objects import ProviderApi
 from orb.providers.aws.storage.config import AWSStorageConfig
+
+logger = logging.getLogger(__name__)
 
 
 class HandlerCapabilityConfig(BaseModel):
@@ -254,13 +257,26 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
             return data
 
         raw_timeout = None
+        legacy_key = None
         if "aws_connection_timeout" in data:
             raw_timeout = data.get("aws_connection_timeout")
+            legacy_key = "aws_connection_timeout"
         elif "connection_timeout_ms" in data:
             raw_timeout = data.get("connection_timeout_ms")
+            legacy_key = "connection_timeout_ms"
 
         if raw_timeout is None:
             return data
+
+        # Operator-facing config-key deprecation (see docs deprecation.md Pattern 2):
+        # this runs on a deserialised config dict, so the signal must reach
+        # operators via logger.warning — a DeprecationWarning is filtered in
+        # production and never surfaces.
+        logger.warning(
+            "AWS provider config key '%s' is deprecated; use 'aws_connect_timeout' "
+            "(seconds) instead.",
+            legacy_key,
+        )
 
         updated = dict(data)
         try:

@@ -679,6 +679,15 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         updated = dict(data)
         for legacy, canonical in _LEGACY_FIELD_MAP.items():
             if legacy in updated:
+                # Operator-facing config-key deprecation (see docs deprecation.md
+                # Pattern 2): this runs on a deserialised config dict, so the
+                # signal must reach operators via logger.warning — a
+                # DeprecationWarning is filtered in production and never surfaces.
+                _get_logger().warning(
+                    "K8s provider config key '%s' is deprecated; use '%s' instead.",
+                    legacy,
+                    canonical,
+                )
                 if canonical not in updated:
                     updated[canonical] = updated.pop(legacy)
                 else:

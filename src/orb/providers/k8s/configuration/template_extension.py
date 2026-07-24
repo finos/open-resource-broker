@@ -18,11 +18,14 @@ Shadow fields removed — generic concepts read from the parent ``Template``:
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from orb.providers.base.template_extension import ProviderTemplateExtensionBase
+
+logger = logging.getLogger(__name__)
 
 
 class K8sTemplateExtensionConfig(ProviderTemplateExtensionBase):
@@ -85,7 +88,9 @@ class K8sTemplateExtensionConfig(ProviderTemplateExtensionBase):
     # Container environment / mounts
     # Field name is ``env`` (matching K8sTemplate.env).  The legacy name
     # ``environment_variables`` is accepted as a back-compat alias so
-    # existing operator YAML using the old spelling still parses.
+    # existing operator YAML using the old spelling still parses.  The
+    # ``_warn_deprecated_field_names`` validator below surfaces the deprecation
+    # to operators; ``AliasChoices`` alone accepts the old key silently.
     env: Optional[dict[str, str]] = Field(
         None,
         validation_alias=AliasChoices("env", "environment_variables"),
@@ -146,6 +151,23 @@ class K8sTemplateExtensionConfig(ProviderTemplateExtensionBase):
     active_deadline_seconds: Optional[int] = Field(
         None, description="Default ``activeDeadlineSeconds`` for the Job handler."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _warn_deprecated_field_names(cls, data: Any) -> Any:
+        """Emit an operator-facing warning for the deprecated ``environment_variables`` key.
+
+        This is operator config surface (deserialised from provider YAML/JSON),
+        so the signal must reach operators via ``logger.warning`` — a
+        ``DeprecationWarning`` is filtered in production and never surfaces.
+        Runs on the raw input before ``AliasChoices`` maps the old key.
+        """
+        if isinstance(data, dict) and "environment_variables" in data and "env" not in data:
+            logger.warning(
+                "K8s template config field 'environment_variables' is deprecated; "
+                "use 'env' instead."
+            )
+        return data
 
     @field_validator("namespace")
     @classmethod
