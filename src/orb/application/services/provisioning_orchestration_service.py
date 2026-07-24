@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, Callable, assert_never
 
 if TYPE_CHECKING:
     from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
-    from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
 
+from orb.application.ports.resilience_port import CircuitBreakerOpenError, CircuitBreakerPort
 from orb.domain.base.exceptions import QuotaError
 from orb.domain.base.operation_outcome import (
     Accepted,
@@ -26,7 +26,6 @@ from orb.domain.request.fulfilment_state_machine import (
 )
 from orb.domain.request.request_types import RequestStatus
 from orb.domain.template.template_aggregate import Template
-from orb.infrastructure.resilience.exceptions import CircuitBreakerOpenError
 
 # Default grace period used only when no FulfilmentStateMachine is injected.
 _DEFAULT_GRACE_PERIOD_SECONDS = 3600
@@ -129,7 +128,7 @@ class ProvisioningOrchestrationService:
         provider_selection_port: "ProviderSelectionPort",
         provider_config_port: ProviderConfigPort,
         config_port: ConfigurationPort,
-        circuit_breaker_factory: Callable[[str], "CircuitBreakerStrategy"],
+        circuit_breaker_factory: Callable[[str], CircuitBreakerPort],
         state_machine: "FulfilmentStateMachine | None" = None,
     ):
         self._container = container
