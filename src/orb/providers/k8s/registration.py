@@ -64,6 +64,19 @@ def _k8s_config_is_empty(provider_config: Any) -> bool:
     return False
 
 
+def _strip_discriminator(config_data: Any) -> Any:
+    """Drop the provider-type discriminator keys from a raw config dict.
+
+    The ``type`` / ``provider_type`` keys select *which* provider to build;
+    they are not fields of :class:`K8sProviderConfig` (which uses
+    ``extra="forbid"``).  Passing them through would raise
+    ``Extra inputs are not permitted``.  Leaves non-dict inputs untouched.
+    """
+    if isinstance(config_data, dict):
+        return {k: v for k, v in config_data.items() if k not in ("type", "provider_type")}
+    return config_data
+
+
 def create_k8s_strategy(provider_config: Any) -> Any:
     """Create a :class:`K8sProviderStrategy` from configuration.
 
@@ -98,7 +111,7 @@ def create_k8s_strategy(provider_config: Any) -> Any:
             provider_instance_config = None
             provider_name = None
         elif hasattr(provider_config, "config"):
-            config_data = provider_config.config
+            config_data = _strip_discriminator(provider_config.config)
             provider_instance_config = provider_config
             provider_name = provider_config.name
             # Apply the empty-config guard on the extracted dict regardless of
@@ -116,7 +129,7 @@ def create_k8s_strategy(provider_config: Any) -> Any:
                 )
             k8s_config = K8sProviderConfig(**config_data)
         else:
-            config_data = provider_config
+            config_data = _strip_discriminator(provider_config)
             # Reject empty / None configs before constructing a strategy that
             # would silently connect to the wrong cluster.
             if _k8s_config_is_empty(config_data):
@@ -205,7 +218,7 @@ def create_k8s_config(data: dict[str, Any]) -> Any:
     try:
         from orb.providers.k8s.configuration.config import K8sProviderConfig
 
-        return K8sProviderConfig(**data)
+        return K8sProviderConfig(**_strip_discriminator(data))
     except ImportError as exc:
         raise ImportError(f"Kubernetes configuration not available: {exc!s}")
     except Exception as exc:

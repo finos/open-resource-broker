@@ -31,14 +31,18 @@ so operators can confirm their environment is wired correctly.
 
 from __future__ import annotations
 
+import contextlib
 import os
+import sys
 import urllib.parse
-from typing import TYPE_CHECKING, Optional
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any, Optional
 
 from orb.providers.k8s.exceptions.k8s_exceptions import K8sAuthError
 
 if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.domain.base.ports import LoggingPort
+
 
 # Exec plugin commands that are unconditionally permitted.  Operators who
 # run a different binary must set ORB_K8S_ALLOW_UNKNOWN_EXEC_PLUGIN=1.
@@ -53,6 +57,158 @@ _ALLOWED_EXEC_COMMANDS: frozenset[str] = frozenset(
 )
 
 _ENV_ALLOW_UNKNOWN = "ORB_K8S_ALLOW_UNKNOWN_EXEC_PLUGIN"
+
+
+# ---------------------------------------------------------------------------
+# Non-interactive exec-plugin guard
+# ---------------------------------------------------------------------------
+#
+# WHY: the kubernetes SDK's exec-credential path (kubernetes/config/exec_provider.py)
+# decides whether to run the credential plugin (e.g. ``aws eks get-token``)
+# interactively *solely* by inspecting ``sys.stdout.isatty()`` — it does NOT
+# consult the kubeconfig ``interactiveMode`` field.  When ORB is attached to a
+# real terminal that check returns True, so the SDK runs the plugin with the
+# terminal's stdin/stderr inherited.  For an EKS kubeconfig whose exec uses an
+# AWS profile backed by an interactive ``credential_process``, that interactive
+# invocation causes the minted bearer token to not be attached to the API
+# request — the SDK sends an empty Authorization header and the apiserver
+# returns 401.  The same plugin run non-interactively (stdout redirected)
+# attaches the token and succeeds.
+#
+# ORB is a broker/CLI/server that must authenticate to Kubernetes identically
+# whether or not it happens to be attached to a terminal, so it always drives
+# the exec plugin non-interactively.  This guard temporarily makes
+# ``sys.stdout.isatty()`` report False for the duration of the SDK entry points
+# ORB calls (config load + the lazy on-request token-refresh hook), forcing the
+# exec provider onto its non-interactive branch.  The guard is a no-op for the
+# in-cluster service-account path and for non-exec auth (bearer/cert), which
+# never consult ``isatty()``.
+
+
+class _NonTtyStdoutProxy:
+    """Delegates every attribute to the wrapped stdout except ``isatty``.
+
+    Only ``isatty()`` is overridden (to always return ``False``); reads,
+    writes, ``fileno``, ``flush`` and everything else pass straight through to
+    the real stream so nothing else about stdout's behaviour changes.
+    """
+
+    __slots__ = ("_wrapped",)
+
+    def __init__(self, wrapped: Any) -> None:
+        object.__setattr__(self, "_wrapped", wrapped)
+
+    def isatty(self) -> bool:
+        return False
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(object.__getattribute__(self, "_wrapped"), name)
+
+
+@contextlib.contextmanager
+def _force_non_interactive_exec() -> Iterator[None]:
+    """Temporarily force the k8s SDK exec plugin onto its non-interactive branch.
+
+    Replaces ``sys.stdout`` with a thin proxy whose ``isatty()`` returns
+    ``False`` for the duration of the block, then restores the original stream.
+    The kubernetes ``ExecProvider`` keys interactivity off ``sys.stdout.isatty()``
+    alone, so this deterministically selects the non-interactive branch that
+    correctly attaches the exec-minted bearer token.
+
+    When ``sys.stdout`` is already non-interactive (redirected output, no TTY)
+    the proxy changes nothing observable, so wrapping is always safe.
+
+    Concurrency note: ``sys.stdout`` is process-global, so this swap is visible
+    to every thread for its (deliberately tiny) duration.  It is only ever
+    entered around the single SDK call that may spawn the exec plugin — the
+    initial ``load_kube_config`` and the lazy ``refresh_api_key_hook`` re-mint —
+    never around surrounding work and never across a blocking ``watch.stream()``
+    read (the auth header, and therefore the hook, is built when the stream is
+    opened, before the read blocks).  Keeping the region this short bounds the
+    window in which a concurrent thread could observe the non-tty proxy to the
+    duration of one credential mint.
+    """
+    original = sys.stdout
+    if isinstance(original, _NonTtyStdoutProxy):
+        # Already guarded (re-entrant call) — do not double-wrap.
+        yield
+        return
+    sys.stdout = _NonTtyStdoutProxy(original)  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        # Restore the stream we actually replaced.  A nested guard short-circuits
+        # above without swapping, so only the outermost guard restores, and it
+        # restores the exact object it captured (not a stale global read).
+        sys.stdout = original
+
+
+# Sentinel attribute marking a ``refresh_api_key_hook`` already wrapped by
+# :func:`_install_non_interactive_refresh_hook`, so repeated installs (every
+# ``load_kubeconfig`` / ``force_token_refresh``) never double-wrap.
+_ORB_HOOK_WRAPPED_ATTR = "_orb_non_interactive_wrapped"
+
+
+def _install_non_interactive_refresh_hook(client_configuration: Any) -> None:
+    """Wrap a Configuration's ``refresh_api_key_hook`` in the non-interactive guard.
+
+    The kubernetes SDK attaches a ``refresh_api_key_hook`` to the
+    ``Configuration`` whenever a kubeconfig user carries an exec-minted (or
+    otherwise expiring) bearer token.  That hook is invoked *lazily* by the SDK
+    inside ``get_api_key_with_prefix`` — i.e. while building the Authorization
+    header of **every** authenticated request the client makes (resource verbs,
+    watch-stream opens, status polls).  When the embedded token expiry lapses
+    the hook re-runs the exec credential plugin, and that plugin's interactivity
+    is decided solely by ``sys.stdout.isatty()``.
+
+    Wrapping the hook means every one of those request-path re-mints takes the
+    non-interactive branch, with the ``sys.stdout`` swap scoped to just the hook
+    body (the credential mint) rather than the whole request or the client's
+    lifetime.  This is the single seam that covers the steady-state request path
+    without holding a global stdout swap open across concurrent work or blocking
+    watch reads.
+
+    The wrap is a no-op when:
+
+    * no hook is set (non-exec auth: static bearer token, client certificate) —
+      those paths never consult ``isatty()``; or
+    * the hook is already wrapped (idempotent across repeated loads).
+    """
+    hook = getattr(client_configuration, "refresh_api_key_hook", None)
+    if hook is None or getattr(hook, _ORB_HOOK_WRAPPED_ATTR, False):
+        return
+
+    def _wrapped(cfg: Any) -> Any:
+        with _force_non_interactive_exec():
+            return hook(cfg)
+
+    setattr(_wrapped, _ORB_HOOK_WRAPPED_ATTR, True)
+    client_configuration.refresh_api_key_hook = _wrapped
+
+
+def _install_non_interactive_refresh_hook_on(client_configuration: Optional[object]) -> None:
+    """Install the non-interactive refresh-hook wrap on the configuration just loaded.
+
+    When *client_configuration* is supplied (the ``force_token_refresh`` path
+    reloading into a live ``ApiClient``'s config), the hook is wrapped directly
+    on that object.  When ``None`` (the initial global-default load), the SDK
+    wrote the fresh config into ``Configuration._default``; wrap the hook there
+    so ``ApiClient`` instances built afterwards — which deep-copy the default —
+    inherit the wrapped hook (a plain function survives ``deepcopy`` by
+    identity, so the copies share the same guarded callable).
+    """
+    if client_configuration is not None:
+        _install_non_interactive_refresh_hook(client_configuration)
+        return
+
+    try:
+        from kubernetes.client import Configuration  # type: ignore[reportAttributeAccessIssue]
+    except ImportError:  # pragma: no cover — kubernetes extra not installed
+        return
+
+    default = getattr(Configuration, "_default", None)
+    if default is not None:
+        _install_non_interactive_refresh_hook(default)
 
 
 def _redact_proxy_url(url: str) -> str:
@@ -332,8 +488,9 @@ def load_kubeconfig(
     logger: Optional[LoggingPort] = None,
     proxy_url: Optional[str] = None,
     no_proxy: Optional[str] = None,
+    client_configuration: Optional[object] = None,
 ) -> None:
-    """Bootstrap the global ``kubernetes`` client config from a kubeconfig file.
+    """Bootstrap ``kubernetes`` client config from a kubeconfig file.
 
     Before delegating to the kubernetes SDK, this function:
 
@@ -366,6 +523,24 @@ def load_kubeconfig(
             :class:`K8sProviderConfig`.  Takes precedence over the ``NO_PROXY``
             / ``no_proxy`` environment variables.  ``None`` falls back to the
             environment.
+        client_configuration: Optional ``kubernetes.client.Configuration`` to
+            load the credentials *into*.  When supplied, the SDK re-runs the
+            exec credential plugin (re-minting an EKS/GKE/AKS token) and writes
+            the fresh Bearer token plus the expiry-based
+            ``refresh_api_key_hook`` directly into this object rather than the
+            global default.  This is the 401-recovery path used by
+            :meth:`K8sClient.force_token_refresh`: the pinned kubernetes SDK's
+            ``ExecProvider`` performs no token caching — it spawns the plugin
+            (e.g. ``aws eks get-token``) on *every* ``load_kube_config`` call —
+            so re-running the load here re-mints a fresh token and writes it
+            into this *live* ``ApiClient``'s configuration, and its
+            already-built typed API clients pick up the new token without
+            rebuilding the connection pool.  When ``None`` (the default) the
+            global default Configuration is populated, preserving the original
+            behaviour.  Proxy re-wiring is skipped in the targeted case because
+            ``load_kube_config`` does not clear an existing
+            ``Configuration.proxy`` — the value carried on the live config is
+            retained.
 
     Raises:
         K8sAuthError: If the kubernetes SDK is not installed, an unknown
@@ -382,14 +557,38 @@ def load_kubeconfig(
             "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"
         ) from exc
 
-    # Step 2 — load with sanitised error surface.
+    # Step 2 — load with sanitised error surface.  The load is wrapped in the
+    # non-interactive guard because ``load_kube_config`` runs the exec
+    # credential plugin synchronously to mint the initial bearer token; on a
+    # TTY the SDK would otherwise run it interactively and fail to attach the
+    # token (see ``_force_non_interactive_exec`` above).
     try:
-        _k8s_config.load_kube_config(config_file=config_file, context=context)
+        with _force_non_interactive_exec():
+            if client_configuration is not None:
+                _k8s_config.load_kube_config(
+                    config_file=config_file,
+                    context=context,
+                    client_configuration=client_configuration,  # type: ignore[arg-type]
+                )
+            else:
+                _k8s_config.load_kube_config(config_file=config_file, context=context)
     except K8sAuthError:
         raise
     except Exception as exc:
         raise K8sAuthError(_sanitise_load_error(exc, config_file)) from exc
 
+    # Step 2b — wrap the lazy on-request token-refresh hook that the SDK just
+    # installed so its exec re-mint also takes the non-interactive branch.  The
+    # hook fires from inside ``get_api_key_with_prefix`` on every authenticated
+    # request the client subsequently makes (resource verbs, watch-stream opens,
+    # status polls); guarding it here covers the whole steady-state request path
+    # with one seam.  When a specific live configuration was loaded into, wrap
+    # that object; otherwise wrap the global default the SDK set.
+    _install_non_interactive_refresh_hook_on(client_configuration)
+
     # Step 3 — wire HTTP proxy (config value or environment) into the loaded
-    # configuration.
-    _apply_proxy_to_default_configuration(logger, proxy_url, no_proxy)
+    # configuration.  Only the global-default path re-applies proxy; a targeted
+    # client_configuration keeps the proxy it was built with (load_kube_config
+    # does not clear it).
+    if client_configuration is None:
+        _apply_proxy_to_default_configuration(logger, proxy_url, no_proxy)

@@ -16,22 +16,45 @@ provider — a single chokepoint through which all SDK calls flow so that:
 
 Token refresh
 -------------
-When the provider is running in-cluster the service-account token on disk
-rotates periodically (Kubernetes projects tokens with a finite TTL).
-:class:`InClusterAuthAdapter` is wired into ``load_config`` so that:
+Two credential-expiry exposures are handled:
 
-1. A proactive :meth:`InClusterAuthAdapter.refresh_if_stale` call is made
-   before every batch of API calls exposed via :meth:`call_with_auth_retry`.
-2. An ``ApiException(status=401)`` response causes an immediate token
-   reload followed by one retry of the failed call.
+* **In-cluster** — the projected service-account token on disk rotates
+  periodically (finite TTL).  :class:`InClusterAuthAdapter` tracks the load
+  time and :meth:`refresh_if_stale` proactively reloads before the TTL
+  lapses.
+* **kubeconfig / exec plugin** (e.g. EKS ``aws eks get-token``) — the exec
+  plugin mints a short-lived (~15 min) Bearer token.  The kubernetes SDK's
+  ``refresh_api_key_hook`` only re-execs when the token's *embedded* expiry
+  passes; a token that is rejected for another reason (identity/session
+  change, clock skew, revocation) keeps being resent, yielding a 401.
 
-Both paths keep the ``ApiClient`` alive — only the underlying credential
-material is refreshed.
+:meth:`force_token_refresh` recovers from a 401 for *both* modes by
+re-minting the credential and loading it into the *live* ``ApiClient``'s
+``Configuration`` so the already-built typed API clients pick up the new
+token without rebuilding the connection pool.  For the kubeconfig / exec
+case the re-mint happens simply because the pinned kubernetes SDK's
+``ExecProvider`` does no token caching — it spawns the plugin on every
+``load_kube_config`` call — so re-running the load always yields a fresh
+token.  Because a mass-401 can enter this method from many concurrent retry
+workers at once, the re-mint is guarded by a lock + short debounce window so
+the stampede coalesces into a single re-exec (the token lives on the one
+shared live ``Configuration``, so one refresh serves every waiter).
+
+Steady-state exec re-mints (the SDK's lazy ``refresh_api_key_hook`` firing on
+an ordinary request when the embedded token expiry lapses) are handled
+separately in :mod:`orb.providers.k8s.auth.kubeconfig`, which wraps that hook
+so its exec plugin runs non-interactively regardless of whether ORB is
+attached to a terminal.  Because the wrap lives on the ``Configuration`` the
+``ApiClient`` reads per request, it covers every request path — resource
+verbs, watch-stream opens, status polls — without this facade needing a
+per-call wrapper.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
+import threading
+import time
+from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.k8s.auth.in_cluster import (
@@ -47,16 +70,12 @@ if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from kubernetes.client import AppsV1Api, BatchV1Api, CoreV1Api
     from kubernetes.client.api_client import ApiClient
 
-_T = TypeVar("_T")
-
-
-def _is_401(exc: BaseException) -> bool:
-    """Return ``True`` when *exc* is an ``ApiException`` with status 401."""
-    try:
-        from kubernetes.client.exceptions import ApiException
-    except ImportError:  # pragma: no cover
-        return False
-    return isinstance(exc, ApiException) and getattr(exc, "status", None) == 401
+# When a mass-401 fans out across many concurrent retry workers, only the
+# first re-mint is useful — the fresh token lands on the single shared live
+# Configuration and immediately serves every other waiter.  A re-mint newer
+# than this many seconds is treated as still-fresh and skipped, coalescing the
+# stampede into one ``aws eks get-token`` (or SA-file re-read) invocation.
+_TOKEN_REFRESH_DEBOUNCE_SECONDS = 5.0
 
 
 class K8sClient:
@@ -85,6 +104,13 @@ class K8sClient:
         self._core_v1: Optional[CoreV1Api] = None
         self._apps_v1: Optional[AppsV1Api] = None
         self._batch_v1: Optional[BatchV1Api] = None
+
+        # Coalesce concurrent 401-driven refreshes: the lock serialises the
+        # re-mint and ``_last_refresh_at`` records when it last completed so
+        # waiters that arrive within the debounce window skip a redundant
+        # re-exec (the shared live Configuration already carries a fresh token).
+        self._refresh_lock = threading.Lock()
+        self._last_refresh_at: Optional[float] = None
 
         # Auth adapter — only populated for in-cluster auth; None for kubeconfig
         # auth (kubeconfig credentials are typically long-lived certificates).
@@ -196,55 +222,118 @@ class K8sClient:
             self._logger.info("K8sClient: in-cluster service-account token refreshed proactively.")
         return refreshed
 
-    def call_with_auth_retry(self, fn: Callable[..., _T], *args: Any, **kwargs: Any) -> _T:
-        """Execute *fn* with a proactive stale-token check and one 401-triggered retry.
+    def force_token_refresh(self) -> bool:
+        """Force a fresh credential to be minted and loaded into the live client.
 
-        Before calling *fn*, :meth:`refresh_if_stale` is consulted so that
-        expired tokens are reloaded before the request is sent.  If the call
-        raises an ``ApiException(status=401)``, the credentials are refreshed
-        and the call is retried exactly once.  A second 401 is re-raised so
-        higher-level retry logic or the operator can investigate.
+        This is the 401-recovery path.  It handles *both* auth modes and,
+        crucially, loads the refreshed credential into the **live**
+        ``ApiClient``'s ``Configuration`` (via ``client_configuration=``) so
+        the already-built ``core_v1`` / ``apps_v1`` / ``batch_v1`` clients — all
+        of which share that same ``ApiClient`` — pick up the new Bearer token
+        without rebuilding the connection pool.
 
-        Args:
-            fn: Callable that performs a kubernetes SDK API call.
-            *args: Positional arguments forwarded to *fn*.
-            **kwargs: Keyword arguments forwarded to *fn*.
+        * **In-cluster** — re-reads the projected service-account token from
+          disk.
+        * **kubeconfig / exec plugin** — re-runs ``load_kube_config`` into the
+          live configuration.  The pinned kubernetes SDK's ``ExecProvider``
+          does no token caching, so each load spawns the plugin (e.g.
+          ``aws eks get-token``) afresh and mints a new token — no disk-cache
+          manipulation is needed or attempted (clearing ``~/.kube/cache/token``
+          would only perturb a co-located ``kubectl`` and does nothing for this
+          SDK).
+
+        Concurrency: on a mass-401 many retry workers may call this at once.
+        A lock plus a short debounce window (:data:`_TOKEN_REFRESH_DEBOUNCE_SECONDS`)
+        coalesces the stampede — the first caller re-mints, and callers that
+        acquire the lock and find a just-completed refresh skip the redundant
+        re-exec because the shared live ``Configuration`` already holds a fresh
+        token.
+
+        A pre-supplied (test-injected) ``ApiClient`` has no config to reload,
+        so this is a no-op returning ``False`` in that case.
 
         Returns:
-            The return value of *fn*.
+            ``True`` when a refresh was attempted and succeeded, ``False`` when
+            there was nothing to refresh (injected client, no live config).
 
         Raises:
-            ``ApiException``: When the call fails with a non-401 status code,
-                or with 401 on the retry.
+            K8sAuthError: When the refresh itself fails (propagated so the
+                caller can decide whether to re-raise the original 401).
         """
-        self.refresh_if_stale()
+        live_config = self._live_client_configuration()
+        if live_config is None:
+            # Injected ApiClient (unit tests) — no owned config to reload.
+            return False
 
-        try:
-            return fn(*args, **kwargs)
-        except Exception as exc:
-            if not _is_401(exc):
-                raise
-            self._logger.warning(
-                "K8sClient: received 401 Unauthorised; refreshing in-cluster token and retrying."
-            )
-            # Force a token reload regardless of the TTL.
-            adapter = self._in_cluster_adapter
-            if adapter is not None:
-                try:
-                    import time
+        with self._refresh_lock:
+            # Double-checked: a concurrent worker may have just re-minted while
+            # we were blocked on the lock.  The token lives on the shared live
+            # Configuration, so a refresh within the debounce window already
+            # serves us — skip the redundant re-exec and go straight to retry.
+            now = time.monotonic()
+            last = self._last_refresh_at
+            if last is not None and (now - last) < _TOKEN_REFRESH_DEBOUNCE_SECONDS:
+                self._logger.debug(
+                    "K8sClient: credential refreshed %.2fs ago (< %.1fs window); "
+                    "reusing the fresh token instead of re-minting.",
+                    now - last,
+                    _TOKEN_REFRESH_DEBOUNCE_SECONDS,
+                )
+                return True
 
-                    load_in_cluster_config(
-                        logger=self._logger,
-                        proxy_url=self._config.proxy_url,
-                        no_proxy=self._config.no_proxy,
-                    )
-                    # Update the adapter's timestamp so the TTL window resets.
+            if self._is_in_cluster_auth():
+                load_in_cluster_config(
+                    logger=self._logger,
+                    proxy_url=self._config.proxy_url,
+                    no_proxy=self._config.no_proxy,
+                    client_configuration=live_config,
+                )
+                adapter = self._in_cluster_adapter
+                if adapter is not None:
                     adapter._last_loaded_at = time.monotonic()
-                except K8sAuthError as auth_exc:
-                    self._logger.error("K8sClient: token refresh on 401 failed: %s", auth_exc)
-                    raise exc from None
-            # Single retry.
-            return fn(*args, **kwargs)
+            else:
+                # kubeconfig / exec-plugin auth: re-run load_kube_config so the
+                # (cache-less) exec plugin re-mints straight into the live config.
+                load_kubeconfig(
+                    config_file=self._config.kubeconfig_path,
+                    context=self._config.context,
+                    logger=self._logger,
+                    proxy_url=self._config.proxy_url,
+                    no_proxy=self._config.no_proxy,
+                    client_configuration=live_config,
+                )
+            self._last_refresh_at = time.monotonic()
+            return True
+
+    def _is_in_cluster_auth(self) -> bool:
+        """Return ``True`` when this client authenticates via in-cluster secrets.
+
+        Mirrors the resolution order in :meth:`load_config`: an explicit
+        ``config.in_cluster`` flag wins, otherwise the in-cluster
+        service-account sentinel is auto-detected.  Used by
+        :meth:`force_token_refresh` to pick the correct re-mint path
+        independently of whether :meth:`load_config` has already nulled the
+        in-cluster adapter.
+        """
+        if self._config.in_cluster is True:
+            return True
+        if self._config.in_cluster is False:
+            return False
+        return is_in_cluster()
+
+    def _live_client_configuration(self) -> Optional[Any]:
+        """Return the ``Configuration`` owned by the live ``ApiClient``, or ``None``.
+
+        The ``ApiClient`` holds its own copy of the ``Configuration`` (it does
+        not consult the global default per request), so reloading credentials
+        into the global default alone would never reach an in-flight client.
+        This returns the live client's own configuration object so refreshed
+        credentials land where the requests actually read them.
+        """
+        client = self._api_client
+        if client is None:
+            return None
+        return getattr(client, "configuration", None)
 
     # ------------------------------------------------------------------
     # API client accessors

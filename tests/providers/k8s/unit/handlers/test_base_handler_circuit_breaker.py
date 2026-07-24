@@ -140,6 +140,76 @@ def test_5xx_exhausts_budget_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Tests: 401 credential-recovery path (stale exec/SA token)
+# ---------------------------------------------------------------------------
+
+
+def test_401_forces_credential_refresh_and_retries_once() -> None:
+    """A 401 must trigger force_token_refresh then a single retry that succeeds.
+
+    Regression for the stale-exec-token exposure: the SDK's expiry-based
+    refresh hook does not recover a token rejected for identity change / clock
+    skew / revocation, so ``with_retry`` must proactively re-mint the credential
+    on a 401 and retry the operation exactly once.
+    """
+    handler = _unique_handler()
+    calls: list[int] = []
+
+    def _op() -> str:
+        calls.append(1)
+        if len(calls) == 1:
+            raise ApiException(status=401, reason="Unauthorized")
+        return "recovered"
+
+    result = handler.with_retry(_op, operation_name="test_op")
+
+    assert result == "recovered"
+    assert len(calls) == 2, "401 must be retried exactly once after credential refresh"
+    handler._kubernetes_client.force_token_refresh.assert_called_once()
+
+
+def test_repeated_401_refreshes_only_once_then_surfaces() -> None:
+    """A persistent 401 must refresh at most once, then surface as a terminal auth failure.
+
+    The recovery is bounded: a second 401 (after the forced re-mint) must not
+    loop — it falls through to the non-retryable path and propagates.
+    """
+    handler = _unique_handler()
+    calls: list[int] = []
+
+    def _always_401() -> None:
+        calls.append(1)
+        raise ApiException(status=401, reason="Unauthorized")
+
+    with pytest.raises(ApiException) as exc_info:
+        handler.with_retry(_always_401, operation_name="test_op")
+
+    assert exc_info.value.status == 401
+    # Exactly two attempts: original + one post-refresh retry.
+    assert len(calls) == 2
+    # Refresh attempted exactly once — bounded recovery, no loop.
+    handler._kubernetes_client.force_token_refresh.assert_called_once()
+
+
+def test_401_refresh_failure_reraises_original() -> None:
+    """When force_token_refresh raises, the original 401 must surface (no retry)."""
+    handler = _unique_handler()
+    handler._kubernetes_client.force_token_refresh.side_effect = RuntimeError("re-mint failed")
+    calls: list[int] = []
+
+    def _op() -> None:
+        calls.append(1)
+        raise ApiException(status=401, reason="Unauthorized")
+
+    with pytest.raises(ApiException) as exc_info:
+        handler.with_retry(_op, operation_name="test_op")
+
+    assert exc_info.value.status == 401
+    # Only the initial attempt — refresh failed so no retry.
+    assert len(calls) == 1
+
+
 @pytest.mark.parametrize("status_code", [400, 409, 403, 422])
 def test_non_retryable_status_raises_immediately(status_code: int) -> None:
     """ApiException with non-retryable status must propagate immediately (attempt=1 only)."""

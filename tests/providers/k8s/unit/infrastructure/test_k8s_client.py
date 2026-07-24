@@ -9,7 +9,6 @@ Backfill coverage added in Group T1:
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
@@ -250,75 +249,6 @@ def test_cleanup_tolerates_missing_close() -> None:
 
 
 # ---------------------------------------------------------------------------
-# call_with_auth_retry — 401 triggers one retry
-# ---------------------------------------------------------------------------
-
-
-def test_call_with_auth_retry_succeeds_first_time() -> None:
-    """call_with_auth_retry passes through when fn succeeds on the first call."""
-    mock_api_client = MagicMock()
-    client = _make_client(api_client=mock_api_client)
-
-    fn = MagicMock(return_value="ok")
-    result = client.call_with_auth_retry(fn, "arg1", key="val")
-
-    fn.assert_called_once_with("arg1", key="val")
-    assert result == "ok"
-
-
-def test_call_with_auth_retry_retries_on_401(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A 401 ApiException must cause one retry after credential refresh."""
-    import sys
-
-    class _FakeApiException(Exception):
-        def __init__(self, status: int) -> None:
-            self.status = status
-            super().__init__(f"HTTP {status}")
-
-    fake_exceptions = SimpleNamespace(ApiException=_FakeApiException)
-    monkeypatch.setitem(sys.modules, "kubernetes.client.exceptions", fake_exceptions)
-
-    mock_api_client = MagicMock()
-    client = _make_client(api_client=mock_api_client)
-    # Wire a fake in-cluster adapter so the refresh path is exercised.
-    mock_adapter = MagicMock()
-    mock_adapter.refresh_if_stale.return_value = False
-    client._in_cluster_adapter = mock_adapter
-
-    # fn fails first with 401, then succeeds.
-    fn = MagicMock(side_effect=[_FakeApiException(401), "recovered"])
-
-    with patch("orb.providers.k8s.infrastructure.k8s_client.load_in_cluster_config") as mock_reload:
-        result = client.call_with_auth_retry(fn)
-
-    assert result == "recovered"
-    assert fn.call_count == 2
-    mock_reload.assert_called_once()
-
-
-def test_call_with_auth_retry_does_not_retry_non_401(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Non-401 exceptions are not retried."""
-    import sys
-
-    class _FakeApiException(Exception):
-        def __init__(self, status: int) -> None:
-            self.status = status
-
-    fake_exceptions = SimpleNamespace(ApiException=_FakeApiException)
-    monkeypatch.setitem(sys.modules, "kubernetes.client.exceptions", fake_exceptions)
-
-    mock_api_client = MagicMock()
-    client = _make_client(api_client=mock_api_client)
-
-    fn = MagicMock(side_effect=_FakeApiException(403))
-
-    with pytest.raises(_FakeApiException):
-        client.call_with_auth_retry(fn)
-
-    fn.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
 # refresh_if_stale proxies to InClusterAuthAdapter
 # ---------------------------------------------------------------------------
 
@@ -335,3 +265,148 @@ def test_refresh_if_stale_noop_with_api_client_override() -> None:
     # adapter must be None when api_client was pre-supplied
     assert client._in_cluster_adapter is None
     assert client.refresh_if_stale() is False
+
+
+# ---------------------------------------------------------------------------
+# force_token_refresh — 401-recovery credential re-mint
+# ---------------------------------------------------------------------------
+
+
+def test_force_token_refresh_noop_with_injected_client() -> None:
+    """force_token_refresh() is a no-op when an ApiClient was injected.
+
+    An injected client (unit-test path) owns no config ORB loaded, so there is
+    nothing to reload — the method must return False without touching the SDK.
+    """
+    client = _make_client(api_client=MagicMock())
+    with patch("orb.providers.k8s.infrastructure.k8s_client.load_kubeconfig") as mock_lkc:
+        with patch(
+            "orb.providers.k8s.infrastructure.k8s_client.load_in_cluster_config"
+        ) as mock_lic:
+            # _live_client_configuration returns None because the injected mock's
+            # ``configuration`` attribute is not what ORB built; force that path.
+            with patch.object(client, "_live_client_configuration", return_value=None):
+                assert client.force_token_refresh() is False
+    mock_lkc.assert_not_called()
+    mock_lic.assert_not_called()
+
+
+def test_force_token_refresh_kubeconfig_reloads_live_config() -> None:
+    """kubeconfig auth: 401 recovery re-runs load_kubeconfig into the LIVE config.
+
+    The pinned kubernetes SDK's ``ExecProvider`` does no token caching — it
+    re-execs the plugin (``aws eks get-token``) on every ``load_kube_config``
+    call — so simply re-running the load re-mints a fresh token.  No disk-cache
+    manipulation is performed (clearing ``~/.kube/cache/token`` would only
+    perturb a co-located kubectl and does nothing for this SDK).  The refreshed
+    credential must land on the live ApiClient's own Configuration
+    (``client_configuration=``) rather than only the global default — otherwise
+    the in-flight client would never see it.
+    """
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+
+    cfg = K8sProviderConfig(in_cluster=False)  # type: ignore[call-arg]
+    client = K8sClient(config=cfg, logger=MagicMock())
+
+    live_config = object()
+    with patch.object(client, "_live_client_configuration", return_value=live_config):
+        with patch("orb.providers.k8s.infrastructure.k8s_client.load_kubeconfig") as mock_lkc:
+            result = client.force_token_refresh()
+
+    assert result is True
+    mock_lkc.assert_called_once()
+    # The refreshed credential must target the LIVE client configuration.
+    assert mock_lkc.call_args.kwargs["client_configuration"] is live_config
+
+
+def test_force_token_refresh_coalesces_concurrent_401s() -> None:
+    """Concurrent 401-driven refreshes collapse into a SINGLE re-mint.
+
+    On a mass-401 (e.g. ~50 pod-create / orphan-GC workers) every worker calls
+    ``force_token_refresh`` at once.  A lock + debounce window must coalesce the
+    stampede: the first caller re-execs the plugin, and the others — which
+    acquire the lock and find a just-completed refresh — reuse the fresh token
+    already sitting on the shared live Configuration.  We assert the underlying
+    ``load_kubeconfig`` (the re-exec seam) ran exactly once across N threads.
+    """
+    import threading
+
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+
+    cfg = K8sProviderConfig(in_cluster=False)  # type: ignore[call-arg]
+    client = K8sClient(config=cfg, logger=MagicMock())
+
+    live_config = object()
+    start = threading.Barrier(24)
+    results: list[bool] = []
+    results_lock = threading.Lock()
+
+    def _worker() -> None:
+        start.wait()
+        outcome = client.force_token_refresh()
+        with results_lock:
+            results.append(outcome)
+
+    with patch.object(client, "_live_client_configuration", return_value=live_config):
+        with patch("orb.providers.k8s.infrastructure.k8s_client.load_kubeconfig") as mock_lkc:
+            threads = [threading.Thread(target=_worker) for _ in range(24)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+    # Every worker reports success (either it re-minted or reused the fresh token)...
+    assert results == [True] * 24
+    # ...but the expensive re-exec happened exactly once within the window.
+    mock_lkc.assert_called_once()
+    assert mock_lkc.call_args.kwargs["client_configuration"] is live_config
+
+
+def test_force_token_refresh_re_mints_again_after_debounce_window() -> None:
+    """A refresh outside the debounce window re-mints again (not permanently skipped).
+
+    The debounce only coalesces a near-simultaneous burst; a genuinely later
+    401 (past the window) must still trigger a fresh re-exec.
+    """
+    from orb.providers.k8s.infrastructure import k8s_client as k8s_client_mod
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+
+    cfg = K8sProviderConfig(in_cluster=False)  # type: ignore[call-arg]
+    client = K8sClient(config=cfg, logger=MagicMock())
+
+    live_config = object()
+    fake_clock = {"now": 1000.0}
+
+    def _fake_monotonic() -> float:
+        return fake_clock["now"]
+
+    with patch.object(client, "_live_client_configuration", return_value=live_config):
+        with patch("orb.providers.k8s.infrastructure.k8s_client.load_kubeconfig") as mock_lkc:
+            with patch.object(k8s_client_mod.time, "monotonic", _fake_monotonic):
+                assert client.force_token_refresh() is True
+                # Advance well past the debounce window.
+                fake_clock["now"] += k8s_client_mod._TOKEN_REFRESH_DEBOUNCE_SECONDS + 1.0
+                assert client.force_token_refresh() is True
+
+    assert mock_lkc.call_count == 2
+
+
+def test_force_token_refresh_in_cluster_reloads_live_config() -> None:
+    """in-cluster auth: 401 recovery reloads the SA token into the live config."""
+    from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+
+    cfg = K8sProviderConfig(in_cluster=True)  # type: ignore[call-arg]
+    client = K8sClient(config=cfg, logger=MagicMock())
+    # in_cluster=True builds an adapter; keep it (do not inject api_client).
+    assert client._in_cluster_adapter is not None
+
+    live_config = object()
+    with patch.object(client, "_live_client_configuration", return_value=live_config):
+        with patch(
+            "orb.providers.k8s.infrastructure.k8s_client.load_in_cluster_config"
+        ) as mock_lic:
+            result = client.force_token_refresh()
+
+    assert result is True
+    mock_lic.assert_called_once()
+    assert mock_lic.call_args.kwargs["client_configuration"] is live_config

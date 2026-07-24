@@ -267,7 +267,18 @@ class K8sCapabilityService:
                 ),
             }
 
+        from orb.providers.k8s.auth.kubeconfig import (
+            _force_non_interactive_exec,
+            _install_non_interactive_refresh_hook_on,
+        )
+
         try:
+            # ``load_kube_config`` / ``load_config`` run the exec credential
+            # plugin to mint the token, and its interactivity is decided by
+            # ``sys.stdout.isatty()``; force the non-interactive branch so a
+            # TTY-attached ``orb`` diagnostic attaches the token.  The lazy
+            # re-mint hook is wrapped afterwards so the ``get_api_resources``
+            # call below stays non-interactive if the token has expired.
             if (
                 credential_source is not None
                 and _normalise_sentinel(credential_source) == _IN_CLUSTER_SENTINEL
@@ -275,10 +286,14 @@ class K8sCapabilityService:
                 _k8s_config.load_incluster_config()
                 context_label = "in-cluster"
             elif credential_source and credential_source not in ("default", ""):
-                _k8s_config.load_kube_config(context=credential_source)
+                with _force_non_interactive_exec():
+                    _k8s_config.load_kube_config(context=credential_source)
+                _install_non_interactive_refresh_hook_on(None)
                 context_label = credential_source
             else:
-                _k8s_config.load_config()
+                with _force_non_interactive_exec():
+                    _k8s_config.load_config()
+                _install_non_interactive_refresh_hook_on(None)
                 context_label = "auto-detected"
 
             from kubernetes.client.api_client import ApiClient
