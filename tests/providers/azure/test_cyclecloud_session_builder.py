@@ -20,7 +20,28 @@ from orb.providers.azure.infrastructure.cyclecloud_session_builder import (
 )
 
 
-def _make_builder(*, provider_cfg=None, template=None, request_context=None, credential=None):
+def _provider_config(
+    *,
+    url: str | None = "https://cc.example.com",
+    credential_path: str | None = None,
+    verify_ssl: bool | None = False,
+    auth_mode: str | None = None,
+    aad_scope: str | None = None,
+) -> AzureProviderConfig:
+    return AzureProviderConfig(
+        region="eastus2",
+        resource_group="orb-test-rg",
+        cyclecloud={
+            "url": url,
+            "credential_path": credential_path,
+            "verify_ssl": verify_ssl,
+            "auth_mode": auth_mode,
+            "aad_scope": aad_scope,
+        },
+    )
+
+
+def _make_builder(*, provider_cfg=None, credential=None):
     async_token_provider = None
     if credential is not None:
         async_token_provider = MagicMock()
@@ -32,11 +53,7 @@ def _make_builder(*, provider_cfg=None, template=None, request_context=None, cre
             ClientAuthenticationError,
         )
     return CycleCloudSessionBuilder(
-        cc_url="https://cc.example.com",
-        verify_ssl=None,
-        template=template,
-        request_context=request_context or CycleCloudRequestContext(),
-        provider_cfg=provider_cfg,
+        provider_cfg=provider_cfg or _provider_config(),
         async_token_provider=async_token_provider,
     )
 
@@ -50,11 +67,6 @@ def test_cyclecloud_request_context_round_trips_metadata():
             "operation_id": "op-123",
             "operation_location": "https://cc.example.com/operations/op-123",
             "added_count": "2",
-            "cyclecloud_url": "https://cc.example.com",
-            "cyclecloud_credential_path": "config/cc.json",
-            "cyclecloud_verify_ssl": False,
-            "cyclecloud_auth_mode": "bearer",
-            "cyclecloud_aad_scope": "https://cc.example.com/.default",
         }
     )
 
@@ -67,22 +79,11 @@ def test_cyclecloud_request_context_round_trips_metadata():
         "operation_id": "op-123",
         "operation_location": "https://cc.example.com/operations/op-123",
         "added_count": 2,
-        "cyclecloud_url": "https://cc.example.com",
-        "cyclecloud_credential_path": "config/cc.json",
-        "cyclecloud_verify_ssl": False,
-        "cyclecloud_auth_mode": "bearer",
-        "cyclecloud_aad_scope": "https://cc.example.com/.default",
     }
 
 
 def test_build_settings_returns_bearer_mode_when_no_token_provider_is_available():
-    builder = CycleCloudSessionBuilder(
-        cc_url="https://cc.example.com",
-        verify_ssl=False,
-        template=None,
-        request_context=CycleCloudRequestContext.from_mapping({"cyclecloud_auth_mode": "bearer"}),
-        provider_cfg=None,
-    )
+    builder = _make_builder(provider_cfg=_provider_config(auth_mode="bearer"))
 
     settings = builder.build_settings()
 
@@ -98,16 +99,10 @@ async def test_resolve_async_auth_skips_expected_auth_failures_before_returning_
         MagicMock(token="tok-123"),
     ]
     builder = CycleCloudSessionBuilder(
-        cc_url="https://cc.example.com",
-        verify_ssl=False,
-        template=None,
-        request_context=CycleCloudRequestContext.from_mapping(
-            {
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://scope-1/.default",
-            }
+        provider_cfg=_provider_config(
+            auth_mode="bearer",
+            aad_scope="https://scope-1/.default",
         ),
-        provider_cfg=None,
         async_token_provider=MagicMock(
             get_access_token=AsyncMock(side_effect=lambda scope: credential.get_token(scope).token),
             get_auth_error_types=MagicMock(
@@ -129,11 +124,7 @@ async def test_resolve_async_auth_propagates_unexpected_token_errors():
     credential = MagicMock()
     credential.get_token.side_effect = RuntimeError("boom")
     builder = CycleCloudSessionBuilder(
-        cc_url="https://cc.example.com",
-        verify_ssl=False,
-        template=None,
-        request_context=CycleCloudRequestContext.from_mapping({"cyclecloud_auth_mode": "bearer"}),
-        provider_cfg=None,
+        provider_cfg=_provider_config(auth_mode="bearer"),
         async_token_provider=MagicMock(
             get_access_token=AsyncMock(side_effect=lambda scope: credential.get_token(scope).token),
             get_auth_error_types=MagicMock(
@@ -161,16 +152,10 @@ async def test_resolve_async_auth_uses_async_token_provider():
         ClientAuthenticationError,
     )
     builder = CycleCloudSessionBuilder(
-        cc_url="https://cc.example.com",
-        verify_ssl=False,
-        template=None,
-        request_context=CycleCloudRequestContext.from_mapping(
-            {
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://scope-1/.default",
-            }
+        provider_cfg=_provider_config(
+            auth_mode="bearer",
+            aad_scope="https://scope-1/.default",
         ),
-        provider_cfg=None,
         async_token_provider=async_token_provider,
     )
 
@@ -185,13 +170,7 @@ async def test_resolve_async_auth_uses_async_token_provider():
 
 @pytest.mark.asyncio
 async def test_resolve_async_auth_rejects_ssh_mode():
-    builder = CycleCloudSessionBuilder(
-        cc_url="https://cc.example.com",
-        verify_ssl=False,
-        template=None,
-        request_context=CycleCloudRequestContext.from_mapping({"cyclecloud_auth_mode": "ssh"}),
-        provider_cfg=None,
-    )
+    builder = _make_builder(provider_cfg=_provider_config(auth_mode="ssh"))
 
     with pytest.raises(CycleCloudConnectionError, match="not supported"):
         settings = builder.build_settings()
@@ -209,11 +188,7 @@ async def test_resolve_async_auth_errors_when_bearer_requested_but_unavailable()
         ClientAuthenticationError,
     )
     builder = CycleCloudSessionBuilder(
-        cc_url="https://cc.example.com",
-        verify_ssl=False,
-        template=None,
-        request_context=CycleCloudRequestContext.from_mapping({"cyclecloud_auth_mode": "bearer"}),
-        provider_cfg=None,
+        provider_cfg=_provider_config(auth_mode="bearer"),
         async_token_provider=async_token_provider,
     )
 
@@ -224,13 +199,7 @@ async def test_resolve_async_auth_errors_when_bearer_requested_but_unavailable()
 
 @pytest.mark.asyncio
 async def test_resolve_async_auth_errors_when_no_auth_method_resolves():
-    builder = CycleCloudSessionBuilder(
-        cc_url="https://cc.example.com",
-        verify_ssl=False,
-        template=None,
-        request_context=CycleCloudRequestContext(),
-        provider_cfg=None,
-    )
+    builder = _make_builder()
 
     with pytest.raises(CycleCloudConnectionError, match="No CycleCloud auth method resolved"):
         settings = builder.build_settings()
@@ -260,7 +229,7 @@ def test_build_settings_loads_cyclecloud_config_from_provider():
     assert settings.base_url == "https://cc.example.com"
     assert settings.verify_ssl is False
     assert settings.auth_mode is None
-    assert settings.credential_path == "config/cyclecloud-credentials.json"
+    assert settings.credential_data.username == "cc_admin"
 
 
 def test_cyclecloud_credential_data_repr_masks_secret_fields():
@@ -296,20 +265,14 @@ async def test_resolve_async_auth_loads_credentials_from_file(tmp_path: Path):
         encoding="utf-8",
     )
     builder = CycleCloudSessionBuilder(
-        cc_url="https://cc.example.com",
-        verify_ssl=False,
-        template=None,
-        request_context=CycleCloudRequestContext.from_mapping(
-            {"cyclecloud_credential_path": str(credential_file)}
-        ),
-        provider_cfg=None,
+        provider_cfg=_provider_config(credential_path=str(credential_file)),
     )
 
     settings = builder.build_settings()
 
     assert settings.base_url == "https://cc.example.com"
     assert settings.verify_ssl is False
-    assert settings.credential_path == str(credential_file)
+    assert settings.credential_data.username == "file-admin"
 
     headers, auth, resolved_auth_mode = await builder.resolve_async_auth(settings=settings)
     assert headers == {}
@@ -317,20 +280,8 @@ async def test_resolve_async_auth_loads_credentials_from_file(tmp_path: Path):
     assert isinstance(auth, httpx.BasicAuth)
 
 
-def test_build_settings_parses_verify_ssl_string_from_request_context():
-    builder = CycleCloudSessionBuilder(
-        cc_url="https://cc.example.com",
-        verify_ssl=None,
-        template=None,
-        request_context=CycleCloudRequestContext.from_mapping(
-            {
-                "cyclecloud_verify_ssl": "false",
-                "cyclecloud_auth_mode": "bearer",
-                "cyclecloud_aad_scope": "https://cc.example.com/.default",
-            }
-        ),
-        provider_cfg=None,
-    )
+def test_build_settings_takes_verify_ssl_from_provider_config():
+    builder = _make_builder(provider_cfg=_provider_config(verify_ssl=False))
     settings = builder.build_settings()
 
     assert settings.verify_ssl is False
@@ -350,37 +301,51 @@ def test_build_settings_takes_verify_ssl_from_credential_file(tmp_path: Path):
         encoding="utf-8",
     )
     builder = CycleCloudSessionBuilder(
-        cc_url=None,
-        verify_ssl=None,
-        template=None,
-        request_context=CycleCloudRequestContext.from_mapping(
-            {"cyclecloud_credential_path": str(credential_file)}
+        provider_cfg=_provider_config(
+            url=None,
+            credential_path=str(credential_file),
+            verify_ssl=None,
         ),
-        provider_cfg=None,
     )
 
     settings = builder.build_settings()
 
     assert settings.base_url == "https://cc.example.com"
     assert settings.verify_ssl is False
-    assert settings.credential_path == str(credential_file)
+    assert settings.credential_data.username == "file-admin"
+
+
+def test_missing_credential_file_error_does_not_expose_configured_path(tmp_path: Path):
+    credential_path = tmp_path / "private" / "cyclecloud-credentials.json"
+    builder = _make_builder(provider_cfg=_provider_config(credential_path=str(credential_path)))
+
+    with pytest.raises(CycleCloudConnectionError) as exc_info:
+        builder.build_settings()
+
+    assert str(credential_path) not in str(exc_info.value)
+
+
+def test_credential_file_rejects_unsupported_fields(tmp_path: Path):
+    credential_file = tmp_path / "cyclecloud-credentials.json"
+    credential_file.write_text(
+        json.dumps({"username": "admin", "password": "secret", "unexpected": True}),
+        encoding="utf-8",
+    )
+    builder = _make_builder(provider_cfg=_provider_config(credential_path=str(credential_file)))
+
+    with pytest.raises(CycleCloudConnectionError, match="unsupported fields: unexpected"):
+        builder.build_settings()
 
 
 def test_resolve_cascaded_value_skips_blank_values_and_uses_default():
-    builder = CycleCloudSessionBuilder(
-        cc_url=None,
-        verify_ssl=None,
-        template=None,
-        request_context=CycleCloudRequestContext(),
-        provider_cfg=None,
-    )
+    builder = _make_builder()
 
     resolved = builder._resolve_cascaded_value(None, "", False, default=True)
 
     assert resolved is False
 
 
-def test_build_settings_resolves_url_from_request_context_before_provider_config():
+def test_build_settings_uses_provider_url():
     provider_cfg = AzureProviderConfig(
         region="eastus2",
         resource_group="orb-test-rg",
@@ -389,16 +354,8 @@ def test_build_settings_resolves_url_from_request_context_before_provider_config
             "verify_ssl": True,
         },
     )
-    builder = CycleCloudSessionBuilder(
-        cc_url=None,
-        verify_ssl=None,
-        template=None,
-        request_context=CycleCloudRequestContext.from_mapping(
-            {"cyclecloud_url": "https://request.example.com"}
-        ),
-        provider_cfg=provider_cfg,
-    )
+    builder = CycleCloudSessionBuilder(provider_cfg=provider_cfg)
 
     settings = builder.build_settings()
 
-    assert settings.base_url == "https://request.example.com"
+    assert settings.base_url == "https://provider.example.com"

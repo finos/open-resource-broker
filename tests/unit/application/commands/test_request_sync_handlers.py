@@ -83,8 +83,8 @@ def _make_handler(
 
 class TestPopulateMachineIdsDispatch:
     @pytest.mark.asyncio
-    async def test_dispatch_includes_provider_api_and_template_id(self):
-        """Handler must pass provider_api and template_id so the correct handler is dispatched."""
+    async def test_dispatch_includes_provider_api_template_id_and_request(self):
+        """Handler must pass the provider routing and durable request context."""
         request = _make_request(provider_api="SpotFleet", template_id="tpl-1")
 
         captured_operations: list[Operation] = []
@@ -105,6 +105,7 @@ class TestPopulateMachineIdsDispatch:
         params = captured_operations[0].parameters
         assert params["provider_api"] == "SpotFleet"
         assert params["template_id"] == "tpl-1"
+        assert params["request"] is request
 
     @pytest.mark.asyncio
     async def test_dispatch_operation_type_is_describe_resource_instances(self):

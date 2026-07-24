@@ -10,15 +10,25 @@ from urllib.parse import urlparse
 import httpx
 
 from orb.providers.azure.configuration.config import AzureProviderConfig
-from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.exceptions.azure_exceptions import CycleCloudConnectionError
 from orb.providers.azure.infrastructure.credential_factory import (
     AsyncAzureAccessTokenProviderProtocol,
 )
 from orb.providers.azure.infrastructure.cyclecloud_session import (
     CycleCloudCredentialData,
-    CycleCloudRequestContext,
     CycleCloudSessionSettings,
+)
+
+_CYCLECLOUD_CREDENTIAL_FIELDS = frozenset(
+    {
+        "url",
+        "verify_ssl",
+        "auth_mode",
+        "username",
+        "password",
+        "bearer_token",
+        "aad_scope",
+    }
 )
 
 
@@ -28,17 +38,9 @@ class CycleCloudSessionBuilder:
     def __init__(
         self,
         *,
-        cc_url: Optional[str],
-        verify_ssl: Optional[bool],
-        template: Optional[AzureTemplate],
-        request_context: Optional[CycleCloudRequestContext],
         provider_cfg: Optional[AzureProviderConfig],
         async_token_provider: Optional[AsyncAzureAccessTokenProviderProtocol] = None,
     ):
-        self._cc_url = cc_url
-        self._verify_ssl = verify_ssl
-        self._template = template
-        self._request_context = request_context or CycleCloudRequestContext()
         self._provider_cfg = provider_cfg
         self._async_token_provider = async_token_provider
 
@@ -50,23 +52,31 @@ class CycleCloudSessionBuilder:
                 data = json.load(handle)
         except FileNotFoundError as exc:
             raise CycleCloudConnectionError(
-                f"CycleCloud credential file not found: {path}",
+                "Configured CycleCloud credential file was not found.",
                 url=None,
             ) from exc
         except json.JSONDecodeError as exc:
             raise CycleCloudConnectionError(
-                f"CycleCloud credential file is not valid JSON: {path}",
+                "Configured CycleCloud credential file is not valid JSON.",
                 url=None,
             ) from exc
         except OSError as exc:
             raise CycleCloudConnectionError(
-                f"Failed to read CycleCloud credential file {path}: {exc}",
+                "Failed to read the configured CycleCloud credential file.",
                 url=None,
             ) from exc
 
         if not isinstance(data, dict):
             raise CycleCloudConnectionError(
-                f"CycleCloud credential file must contain a JSON object: {path}",
+                "Configured CycleCloud credential file must contain a JSON object.",
+                url=None,
+            )
+
+        unsupported_fields = set(data).difference(_CYCLECLOUD_CREDENTIAL_FIELDS)
+        if unsupported_fields:
+            field_list = ", ".join(sorted(unsupported_fields))
+            raise CycleCloudConnectionError(
+                f"Configured CycleCloud credential file contains unsupported fields: {field_list}.",
                 url=None,
             )
 
@@ -102,16 +112,14 @@ class CycleCloudSessionBuilder:
                 continue
         return None
 
-    def _resolve_credential_path(self) -> Optional[str]:
+    def _load_provider_credential_data(self) -> CycleCloudCredentialData:
         provider_cyclecloud = self._provider_cyclecloud()
-        credential_path = self._resolve_cascaded_value(
-            None if self._template is None else self._template.cyclecloud_credential_path,
-            self._request_context.cyclecloud_credential_path,
-            None if provider_cyclecloud is None else provider_cyclecloud.credential_path,
+        credential_path = (
+            None if provider_cyclecloud is None else provider_cyclecloud.credential_path
         )
         if credential_path in (None, ""):
-            return None
-        return str(credential_path)
+            return CycleCloudCredentialData()
+        return self._load_credential_file(str(credential_path))
 
     def _resolve_transport_settings(
         self,
@@ -119,17 +127,11 @@ class CycleCloudSessionBuilder:
     ) -> tuple[str, bool]:
         provider_cyclecloud = self._provider_cyclecloud()
         resolved_url = self._resolve_cascaded_value(
-            self._cc_url,
-            None if self._template is None else self._template.cyclecloud_url,
-            self._request_context.cyclecloud_url,
             None if provider_cyclecloud is None else provider_cyclecloud.url,
             credential_data.url,
         )
 
         verify_resolved = self._resolve_cascaded_value(
-            self._verify_ssl,
-            None if self._template is None else self._template.cyclecloud_verify_ssl,
-            self._request_context.cyclecloud_verify_ssl,
             None if provider_cyclecloud is None else provider_cyclecloud.verify_ssl,
             credential_data.verify_ssl,
             default=True,
@@ -137,7 +139,7 @@ class CycleCloudSessionBuilder:
 
         if not resolved_url:
             raise CycleCloudConnectionError(
-                "cyclecloud_url is required in the template, request context, or provider configuration.",
+                "cyclecloud.url is required in provider configuration or its credential file.",
                 url=None,
             )
 
@@ -149,8 +151,6 @@ class CycleCloudSessionBuilder:
     ) -> Optional[str]:
         provider_cyclecloud = self._provider_cyclecloud()
         auth_mode = self._resolve_cascaded_value(
-            None if self._template is None else self._template.cyclecloud_auth_mode,
-            self._request_context.cyclecloud_auth_mode,
             None if provider_cyclecloud is None else provider_cyclecloud.auth_mode,
             credential_data.auth_mode,
         )
@@ -167,8 +167,6 @@ class CycleCloudSessionBuilder:
 
         provider_cyclecloud = self._provider_cyclecloud()
         aad_scope = self._resolve_cascaded_value(
-            None if self._template is None else self._template.cyclecloud_aad_scope,
-            self._request_context.cyclecloud_aad_scope,
             None if provider_cyclecloud is None else provider_cyclecloud.aad_scope,
             credential_data.aad_scope,
         )
@@ -183,19 +181,14 @@ class CycleCloudSessionBuilder:
 
     def build_settings(self) -> CycleCloudSessionSettings:
         """Resolve credential, transport, and auth settings into a session config."""
-        credential_path = self._resolve_credential_path()
-        credential_data = (
-            self._load_credential_file(credential_path)
-            if credential_path
-            else CycleCloudCredentialData()
-        )
+        credential_data = self._load_provider_credential_data()
         base_url, verify_ssl = self._resolve_transport_settings(credential_data)
         auth_mode = self._resolve_auth_mode(credential_data)
         return CycleCloudSessionSettings(
             base_url=base_url,
             verify_ssl=verify_ssl,
             auth_mode=auth_mode,
-            credential_path=credential_path,
+            credential_data=credential_data,
         )
 
     async def resolve_async_auth(
@@ -206,15 +199,12 @@ class CycleCloudSessionBuilder:
         """Resolve auth settings for an ``httpx.AsyncClient`` transport."""
         if settings.auth_mode == "ssh":
             raise CycleCloudConnectionError(
-                "cyclecloud_auth_mode=ssh is not supported. Configure CycleCloud API credentials instead.",
+                "cyclecloud.auth_mode=ssh is not supported. "
+                "Configure CycleCloud API credentials instead.",
                 url=settings.base_url,
             )
 
-        credential_data = (
-            self._load_credential_file(settings.credential_path)
-            if settings.credential_path
-            else CycleCloudCredentialData()
-        )
+        credential_data = settings.credential_data
         if credential_data.username and credential_data.password and settings.auth_mode != "bearer":
             return {}, httpx.BasicAuth(credential_data.username, credential_data.password), "basic"
 
@@ -226,7 +216,7 @@ class CycleCloudSessionBuilder:
             return {"Authorization": f"Bearer {bearer_token}"}, None, "bearer"
         if settings.auth_mode == "bearer":
             raise CycleCloudConnectionError(
-                "cyclecloud_auth_mode=bearer requested but no bearer token could be resolved.",
+                "cyclecloud.auth_mode=bearer requested but no bearer token could be resolved.",
                 url=settings.base_url,
             )
         raise CycleCloudConnectionError(

@@ -403,32 +403,6 @@ class AzureTemplate(Template):
         description="CycleCloud node array (partition) to target, e.g. 'execute', 'hpc', 'htc'.",
         validation_alias=AliasChoices("node_array", "nodeArray"),
     )
-    cyclecloud_url: Optional[str] = Field(
-        default=None,
-        description="CycleCloud REST API base URL, e.g. 'https://cyclecloud.example.com'.",
-        validation_alias=AliasChoices("cyclecloud_url", "cyclecloudUrl"),
-    )
-    cyclecloud_credential_path: Optional[str] = Field(
-        default=None,
-        description="Path to a JSON file containing CycleCloud credentials and optional auth overrides.",
-        validation_alias=AliasChoices("cyclecloud_credential_path", "cyclecloudCredentialPath"),
-    )
-    cyclecloud_verify_ssl: Optional[bool] = Field(
-        default=None,
-        description="Whether to verify SSL certificates for CycleCloud API calls.",
-        validation_alias=AliasChoices("cyclecloud_verify_ssl", "cyclecloudVerifySsl"),
-    )
-    # TODO: Bearer functionality not tested in live environment
-    cyclecloud_auth_mode: Optional[str] = Field(
-        default=None,
-        description="CycleCloud auth mode override, e.g. 'basic' or 'bearer'.",
-        validation_alias=AliasChoices("cyclecloud_auth_mode", "cyclecloudAuthMode"),
-    )
-    cyclecloud_aad_scope: Optional[str] = Field(
-        default=None,
-        description="AAD scope used to resolve a bearer token for CycleCloud.",
-        validation_alias=AliasChoices("cyclecloud_aad_scope", "cyclecloudAadScope"),
-    )
     version: Optional[str] = Field(
         default=None,
         description="Template catalog or DTO version metadata.",

@@ -24,14 +24,6 @@ def _coerce_optional_bool(value: Any) -> Optional[bool]:
     return bool(value)
 
 
-def _mapping_value(data: dict[str, Any], *keys: str) -> Any:
-    for key in keys:
-        value = data.get(key)
-        if value not in (None, ""):
-            return value
-    return None
-
-
 @dataclass(frozen=True)
 class CycleCloudCredentialData:
     """CycleCloud credential material resolved from a credential file."""
@@ -48,15 +40,13 @@ class CycleCloudCredentialData:
     def from_mapping(cls, data: dict[str, Any]) -> CycleCloudCredentialData:
         """Construct credential data from a flat config mapping."""
         return cls(
-            url=_mapping_value(data, "cyclecloud_url", "url"),
-            verify_ssl=_coerce_optional_bool(
-                _mapping_value(data, "cyclecloud_verify_ssl", "verify_ssl")
-            ),
-            auth_mode=_mapping_value(data, "cyclecloud_auth_mode", "auth_mode"),
-            username=_mapping_value(data, "cyclecloud_username", "username"),
-            password=_mapping_value(data, "cyclecloud_password", "password"),
-            bearer_token=_mapping_value(data, "cyclecloud_bearer_token", "bearer_token"),
-            aad_scope=_mapping_value(data, "cyclecloud_aad_scope", "aad_scope"),
+            url=data.get("url"),
+            verify_ssl=_coerce_optional_bool(data.get("verify_ssl")),
+            auth_mode=data.get("auth_mode"),
+            username=data.get("username"),
+            password=data.get("password"),
+            bearer_token=data.get("bearer_token"),
+            aad_scope=data.get("aad_scope"),
         )
 
 
@@ -67,7 +57,7 @@ class CycleCloudSessionSettings:
     base_url: str
     verify_ssl: bool
     auth_mode: Optional[str]
-    credential_path: Optional[str]
+    credential_data: CycleCloudCredentialData = field(repr=False)
 
 
 @dataclass(frozen=True)
@@ -80,11 +70,6 @@ class CycleCloudRequestContext:
     operation_id: Optional[str] = None
     operation_location: Optional[str] = None
     added_count: Optional[int] = None
-    cyclecloud_url: Optional[str] = None
-    cyclecloud_credential_path: Optional[str] = None
-    cyclecloud_verify_ssl: Optional[bool] = None
-    cyclecloud_auth_mode: Optional[str] = None
-    cyclecloud_aad_scope: Optional[str] = None
 
     @classmethod
     def from_mapping(cls, data: Optional[dict[str, Any]]) -> CycleCloudRequestContext:
@@ -108,11 +93,6 @@ class CycleCloudRequestContext:
             operation_id=data.get("operation_id"),
             operation_location=data.get("operation_location"),
             added_count=added_count,
-            cyclecloud_url=data.get("cyclecloud_url"),
-            cyclecloud_credential_path=data.get("cyclecloud_credential_path"),
-            cyclecloud_verify_ssl=_coerce_optional_bool(data.get("cyclecloud_verify_ssl")),
-            cyclecloud_auth_mode=data.get("cyclecloud_auth_mode"),
-            cyclecloud_aad_scope=data.get("cyclecloud_aad_scope"),
         )
 
     def to_metadata(self) -> dict[str, Any]:
@@ -130,16 +110,6 @@ class CycleCloudRequestContext:
             metadata["operation_location"] = self.operation_location
         if self.added_count is not None:
             metadata["added_count"] = self.added_count
-        if self.cyclecloud_url not in (None, ""):
-            metadata["cyclecloud_url"] = self.cyclecloud_url
-        if self.cyclecloud_credential_path not in (None, ""):
-            metadata["cyclecloud_credential_path"] = self.cyclecloud_credential_path
-        if self.cyclecloud_verify_ssl not in (None, ""):
-            metadata["cyclecloud_verify_ssl"] = self.cyclecloud_verify_ssl
-        if self.cyclecloud_auth_mode not in (None, ""):
-            metadata["cyclecloud_auth_mode"] = self.cyclecloud_auth_mode
-        if self.cyclecloud_aad_scope not in (None, ""):
-            metadata["cyclecloud_aad_scope"] = self.cyclecloud_aad_scope
         return metadata
 
 
@@ -150,7 +120,6 @@ class AsyncCycleCloudSessionContext:
     client: httpx.AsyncClient = field(repr=False)
     base_url: str
     auth_mode: Optional[str]
-    credential_path: Optional[str]
     verify_ssl: bool
 
     def __repr__(self) -> str:
@@ -159,6 +128,5 @@ class AsyncCycleCloudSessionContext:
             "AsyncCycleCloudSessionContext("
             f"base_url={self.base_url!r}, "
             f"auth_mode={self.auth_mode!r}, "
-            f"credential_path={self.credential_path!r}, "
             f"verify_ssl={self.verify_ssl!r})"
         )

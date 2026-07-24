@@ -15,6 +15,7 @@ from threading import Condition, RLock
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from orb.domain.base.ports import LoggingPort
+from orb.domain.request.aggregate import Request
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.azure.capabilities import (
     get_supported_api_capabilities,
@@ -25,12 +26,12 @@ from orb.providers.azure.configuration.validator import validate_azure_template
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzurePriority, AzureProviderApi
 from orb.providers.azure.exceptions import AzureError, AzureValidationError
+from orb.providers.azure.infrastructure.cyclecloud_session import (
+    CycleCloudRequestContext,
+)
 from orb.providers.azure.infrastructure.error_utils import (
     canonical_azure_error_code,
     extract_azure_error_details,
-)
-from orb.providers.azure.services.cyclecloud_request_context_service import (
-    resolve_cyclecloud_request_metadata,
 )
 from orb.providers.azure.services.health_check_service import AzureHealthCheckService
 from orb.providers.azure.services.inventory_service import (
@@ -731,7 +732,6 @@ class AzureProviderStrategy(ProviderStrategy):
     async def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
         self._logger.debug("_handle_terminate_instances")
         try:
-            operation = self._resolve_cyclecloud_operation(operation)
             is_dry_run = bool(operation.context and operation.context.get("dry_run", False))
             return await self._termination_service.terminate_instances_async(
                 operation, is_dry_run=is_dry_run
@@ -752,20 +752,20 @@ class AzureProviderStrategy(ProviderStrategy):
                 exc,
             )
 
-    def _resolve_cyclecloud_operation(self, operation: ProviderOperation) -> ProviderOperation:
-        """Merge durable CycleCloud follow-up context into an operation on demand."""
+    def _cyclecloud_read_context(self, operation: ProviderOperation) -> CycleCloudRequestContext:
+        """Return persisted CycleCloud context for a read operation."""
         provider_api = resolve_operation_provider_api(operation)
         if provider_api != AzureProviderApi.CYCLECLOUD:
-            return operation
+            return CycleCloudRequestContext()
 
-        resolved_request_metadata = resolve_cyclecloud_request_metadata(
-            operation=operation,
-        )
-        return ProviderOperation(
-            operation_type=operation.operation_type,
-            parameters={**operation.parameters, "request_metadata": resolved_request_metadata},
-            context=operation.context,
-        )
+        request = operation.parameters.get("request")
+        if not isinstance(request, Request):
+            raise AzureValidationError(
+                "CycleCloud status operations require a typed request.",
+                error_code="MISSING_CYCLECLOUD_REQUEST",
+            )
+
+        return CycleCloudRequestContext.from_mapping(request.provider_data)
 
     # ------------------------------------------------------------------
     # GET_INSTANCE_STATUS
@@ -773,11 +773,11 @@ class AzureProviderStrategy(ProviderStrategy):
 
     async def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
         try:
-            operation = self._resolve_cyclecloud_operation(operation)
             read_context = build_read_operation_context(
                 operation=operation,
                 operation_name="get_instance_status",
                 default_resource_group=self._azure_config.resource_group,
+                cyclecloud_request_context=self._cyclecloud_read_context(operation),
             )
 
             if read_context.resource_group is None:
@@ -808,11 +808,11 @@ class AzureProviderStrategy(ProviderStrategy):
         self, operation: ProviderOperation
     ) -> ProviderResult:
         try:
-            operation = self._resolve_cyclecloud_operation(operation)
             read_context = build_read_operation_context(
                 operation=operation,
                 operation_name="describe_resource_instances",
                 default_resource_group=self._azure_config.resource_group,
+                cyclecloud_request_context=self._cyclecloud_read_context(operation),
             )
             if bool(operation.context and operation.context.get("dry_run", False)):
                 return self._dry_run_describe_instances_result(read_context)

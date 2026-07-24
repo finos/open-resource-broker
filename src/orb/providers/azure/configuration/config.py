@@ -23,8 +23,7 @@ class CycleCloudConfig(BaseModel):
         None,
         description=(
             "Whether to verify TLS certificates for CycleCloud API calls. "
-            "None means 'unset here' so request/template/credential-file/default "
-            "precedence can resolve the effective value later."
+            "None means the credential-file value or secure default applies."
         ),
     )
     auth_mode: Optional[str] = Field(
@@ -47,9 +46,6 @@ class CycleCloudConfig(BaseModel):
             "username",
             "password",
             "bearer_token",
-            "cyclecloud_username",
-            "cyclecloud_password",
-            "cyclecloud_bearer_token",
         }
         present = [field for field in forbidden_fields if data.get(field) not in (None, "")]
         if present:

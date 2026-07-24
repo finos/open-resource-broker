@@ -83,20 +83,6 @@ class AzureStatusResult(TypedDict, total=False):
     provider_data: AzureStatusProviderData
 
 
-CYCLECLOUD_METADATA_KEYS = (
-    "cluster_name",
-    "node_array",
-    "node_ids",
-    "operation_id",
-    "operation_location",
-    "cyclecloud_url",
-    "cyclecloud_credential_path",
-    "cyclecloud_verify_ssl",
-    "cyclecloud_auth_mode",
-    "cyclecloud_aad_scope",
-)
-
-
 def normalize_status_result(result: AzureHandlerStatusResult) -> AzureStatusResult:
     """Build an AzureStatusResult from a generic handler status dict."""
     normalized: AzureStatusResult = {}
@@ -183,30 +169,15 @@ def status_resource_ids(
     )
 
 
-def build_cyclecloud_request_metadata(
-    *,
-    operation: ProviderOperation,
-    resource_group: Optional[str],
-) -> dict[str, Any]:
-    """Build the metadata dict required for CycleCloud handler calls."""
-    metadata: dict[str, Any] = {"resource_group": resource_group}
-    metadata_from_request = operation.parameters.get("request_metadata") or {}
-    for key in CYCLECLOUD_METADATA_KEYS:
-        value = metadata_from_request.get(key)
-        if value not in (None, ""):
-            metadata[key] = value
-    return metadata
-
-
 def build_read_operation_context(
     *,
     operation: ProviderOperation,
     operation_name: str,
     default_resource_group: Optional[str],
+    cyclecloud_request_context: CycleCloudRequestContext,
 ) -> AzureReadOperationContext:
     """Build the provider-owned runtime context for Azure read operations."""
     metadata: dict[str, Any] = dict(operation.parameters.get("request_metadata") or {})
-    cyclecloud_request_context = CycleCloudRequestContext.from_mapping(metadata)
     provider_api = resolve_operation_provider_api(operation)
     provider_api_key = provider_api.value if provider_api is not None else None
 
