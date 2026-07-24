@@ -22,6 +22,7 @@ performance environments.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 import time
@@ -142,6 +143,76 @@ def _create_burst_pod(core_v1, namespace: str, pod_index: int) -> str:
     return pod_name
 
 
+def _create_managed_burst_pod(core_v1, namespace: str, request_id: str, pod_index: int) -> str:
+    """Create a burst pod carrying the ORB managed + request-id labels.
+
+    Unlike :func:`_create_burst_pod`, these pods match the watcher's
+    ``orb.io/managed=true`` label selector and carry ``orb.io/request-id``
+    so the real :class:`K8sWatcher` ingests them into its cache.  The
+    request-id scopes them to a single test so the cache-dedup assertion is
+    unaffected by any pods a concurrently-running test creates.
+    """
+    from kubernetes.client.models import V1Container, V1ObjectMeta, V1Pod, V1PodSpec
+
+    pod_name = f"orb-overflow-managed-{pod_index:05d}"
+    pod = V1Pod(
+        metadata=V1ObjectMeta(
+            name=pod_name,
+            namespace=namespace,
+            labels={
+                _BURST_NAMESPACE_LABEL: "true",
+                "orb.io/managed": "true",
+                "orb.io/request-id": request_id,
+                "orb.io/provider-api": "Pod",
+            },
+        ),
+        spec=V1PodSpec(
+            restart_policy="Never",
+            containers=[
+                V1Container(
+                    name="burst",
+                    image="busybox:latest",
+                    command=["sh", "-c", "exit 0"],
+                )
+            ],
+        ),
+    )
+    try:
+        core_v1.create_namespaced_pod(namespace=namespace, body=pod)
+    except Exception as exc:
+        if getattr(exc, "status", None) == 409:
+            pass  # Already exists — idempotent.
+        else:
+            raise
+    return pod_name
+
+
+def _delete_managed_burst_pods(core_v1, namespace: str, request_id: str) -> int:
+    """Delete the managed burst pods for ``request_id``; return count deleted."""
+    from kubernetes.client.models import V1DeleteOptions
+
+    deleted = 0
+    try:
+        pod_list = core_v1.list_namespaced_pod(
+            namespace=namespace,
+            label_selector=f"orb.io/request-id={request_id}",
+        )
+        for pod in pod_list.items:
+            try:
+                core_v1.delete_namespaced_pod(
+                    name=pod.metadata.name,
+                    namespace=namespace,
+                    body=V1DeleteOptions(grace_period_seconds=0),
+                )
+                deleted += 1
+            except Exception as exc:
+                if getattr(exc, "status", None) != 404:
+                    log.warning("Failed to delete managed burst pod %s: %s", pod.metadata.name, exc)
+    except Exception as exc:
+        log.warning("delete_managed_burst_pods failed: %s", exc)
+    return deleted
+
+
 def _delete_burst_pods(core_v1, namespace: str) -> int:
     """Delete all burst pods and return count deleted."""
     try:
@@ -184,28 +255,50 @@ def _wait_burst_pods_gone(core_v1, namespace: str, timeout: float = _BURST_TIMEO
     return remaining
 
 
-def _start_watch_loop(k8s_provider_config: dict):
-    """Start the ORB k8s watch loop in a background thread if the handler exposes one.
+def _build_watcher(k8s_provider_config: dict, namespace: str):
+    """Construct the real ORB pod watcher against the live cluster.
 
-    Returns (watch_obj, stop_event, thread) or (None, None, None) if the
-    handler has no watch-loop API.
+    Returns ``(K8sWatcher, PodStateCache)``.  The watcher consumes the
+    namespace's pod event stream (ADDED/MODIFIED/DELETED) and upserts each
+    event into the cache keyed by ``(request_id, pod_name)`` — the key that
+    guarantees a pod is represented by exactly one cache entry regardless of
+    how many events it generates.  That key-based upsert is the ORB watch
+    loop's de-duplication contract: a burst of events for a pod collapses to
+    a single live cache entry, so the cache size is bounded by the number of
+    distinct pods, never by the number of events observed.
     """
-    try:
-        from orb.providers.k8s.infrastructure.watch_loop import K8sWatchLoop  # type: ignore[import]
+    from orb.providers.k8s.watch.pod_state_cache import PodStateCache
+    from orb.providers.k8s.watch.watcher import K8sWatcher
 
-        client, config = _build_k8s_client(k8s_provider_config)
-        logger = MagicMock()
-        watch_loop = K8sWatchLoop(kubernetes_client=client, config=config, logger=logger)
-        stop_event = threading.Event()
+    client, _config = _build_k8s_client(k8s_provider_config)
+    cache = PodStateCache()
+    watcher = K8sWatcher(
+        kubernetes_client=client,
+        cache=cache,
+        logger=MagicMock(),
+        namespace=namespace,
+        # Short apiserver watch timeout so a session that starts before the
+        # burst still recycles and picks the events up promptly.
+        watch_timeout_seconds=60,
+        base_backoff_seconds=0.5,
+        max_backoff_seconds=2.0,
+    )
+    return watcher, cache
 
-        def _run() -> None:
-            watch_loop.run(stop_event=stop_event)
 
-        thread = threading.Thread(target=_run, daemon=True)
-        thread.start()
-        return watch_loop, stop_event, thread
-    except ImportError:
-        return None, None, None
+async def _wait_for(check, *, timeout: float, poll_interval: float = 1.0) -> bool:
+    """Poll ``check`` until it returns True or ``timeout`` seconds elapse.
+
+    Returns whether the condition became true within the deadline.  Used
+    instead of a fixed sleep so the test exits as soon as the watcher has
+    converged rather than always waiting the worst-case duration.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if check():
+            return True
+        await asyncio.sleep(poll_interval)
+    return check()
 
 
 # ---------------------------------------------------------------------------
@@ -289,49 +382,74 @@ async def test_watch_loop_no_duplicate_events_after_overflow(
     k8s_core_v1,
     live_request_id: str,
 ) -> None:
-    """T26b: watch loop does not double-count events when the buffer overflows.
+    """T26b: the watch loop does not double-count events during an event burst.
 
-    Starts the ORB watch loop (if accessible via K8sWatchLoop), triggers a
-    burst, then asserts that the event counter did not exceed expected bounds.
-    Skipped when the watch loop is not importable as a standalone class.
+    Runs the real ORB :class:`K8sWatcher` against the live cluster, then
+    creates and deletes a burst of ORB-labelled pods to drive a dense
+    ADDED→MODIFIED→DELETED event stream through the watcher's ingest path.
+
+    The de-duplication contract: the watcher upserts every event into a
+    :class:`PodStateCache` keyed by ``(request_id, pod_name)``.  However
+    many events a pod produces, the cache holds at most one live entry for
+    it — so the number of distinct live cache entries can never exceed the
+    number of pods actually created, and after the pods are deleted the
+    watcher must converge to zero live entries for the request.  A double-
+    counting watch loop would leave the cache over-populated (more entries
+    than pods) or fail to converge after the DELETE wave.
     """
-    watch_loop, stop_event, watch_thread = _start_watch_loop(k8s_provider_config)
-    if watch_loop is None:
-        pytest.skip(
-            "K8sWatchLoop is not importable as a standalone class. "
-            "This test requires orb.providers.k8s.infrastructure.watch_loop.K8sWatchLoop."
+    watcher, cache = _build_watcher(k8s_provider_config, k8s_namespace)
+    burst_count = 20
+
+    watcher.start()
+    try:
+        # Give the watch session a moment to open before the burst so the
+        # ADDED events are delivered over the stream rather than only via a
+        # later re-LIST.
+        await asyncio.sleep(2)
+
+        for i in range(burst_count):
+            _create_managed_burst_pod(k8s_core_v1, k8s_namespace, live_request_id, i + 1000)
+
+        # Wait until the watcher has ingested every created pod.  The cache
+        # entry count for this request must equal the pod count exactly —
+        # not a multiple of it — which is the no-double-count assertion.
+        added_ok = await _wait_for(
+            lambda: (
+                len([s for s in (cache.get(live_request_id) or []) if not s.deleted]) == burst_count
+            ),
+            timeout=90,
+        )
+        live_entries = [s for s in (cache.get(live_request_id) or []) if not s.deleted]
+        assert added_ok, (
+            f"Watcher did not converge to {burst_count} distinct live cache entries; "
+            f"saw {len(live_entries)} (double-counting would exceed {burst_count})"
+        )
+        assert len(live_entries) == burst_count, (
+            f"Cache holds {len(live_entries)} live entries for {burst_count} pods — "
+            "watch loop double-counted events into duplicate cache entries."
         )
 
-    assert stop_event is not None
-    assert watch_thread is not None
+        # Delete the whole burst to drive the DELETE wave through the stream.
+        _delete_managed_burst_pods(k8s_core_v1, k8s_namespace, live_request_id)
 
-    try:
-        burst_count = 20
-        for i in range(burst_count):
-            _create_burst_pod(k8s_core_v1, k8s_namespace, i + 1000)
+        # After the DELETE events the watcher must converge to zero live
+        # entries for the request — proving DELETE events are not dropped or
+        # double-processed into stuck entries.
+        drained_ok = await _wait_for(
+            lambda: len([s for s in (cache.get(live_request_id) or []) if not s.deleted]) == 0,
+            timeout=90,
+        )
+        remaining = [s for s in (cache.get(live_request_id) or []) if not s.deleted]
+        assert drained_ok, (
+            f"Watcher did not drain live cache entries after burst delete; "
+            f"{len(remaining)} still present"
+        )
 
-        time.sleep(5)
-        _delete_burst_pods(k8s_core_v1, k8s_namespace)
-        _wait_burst_pods_gone(k8s_core_v1, k8s_namespace, timeout=60)
-        time.sleep(_WATCH_SETTLE_WAIT)
-
-        # The watch loop must still be alive.
-        assert watch_thread.is_alive(), "Watch loop thread died after burst"
-
-        # If the watch loop exposes an event_count attribute, validate it.
-        if hasattr(watch_loop, "event_count"):
-            event_count = watch_loop.event_count
-            # Each pod generates at least 2 events (ADDED + DELETED).
-            # Upper bound: no event processed more than twice.
-            max_expected = burst_count * 4
-            assert event_count <= max_expected, (
-                f"Watch loop event_count={event_count} exceeds plausible max {max_expected}; "
-                "possible double-counting."
-            )
+        # The watch task must still be alive and healthy after the burst.
+        assert watcher.is_running(), "Watch loop task died after event burst"
     finally:
-        stop_event.set()
-        watch_thread.join(timeout=15)
-        _delete_burst_pods(k8s_core_v1, k8s_namespace)
+        await watcher.stop()
+        _delete_managed_burst_pods(k8s_core_v1, k8s_namespace, live_request_id)
 
 
 async def test_normal_operation_after_10k_event_simulation(

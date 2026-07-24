@@ -9,10 +9,12 @@ exhausted, wrong instance type, cloud-provider error), the pods stay
 Pending indefinitely and ORB must surface a clear timeout error rather than
 hanging forever.
 
-Infrastructure requirement: a Karpenter NodePool/Provisioner named
-``orb-test-karpenter-cold`` that intentionally cannot schedule
-(e.g. targeting a non-existent instance type or a tainted/empty node pool).
-Tests are skipped when Karpenter CRDs are absent from the cluster.
+Infrastructure requirement: a Karpenter NodePool named
+``orb-test-karpenter-cold`` that intentionally cannot schedule (it targets a
+non-existent instance family, so every node claim is rejected).  The
+``cold_karpenter_nodepool`` fixture provisions this pool automatically for the
+duration of the test and deletes it on teardown; no node is ever launched, so
+it is free.  Tests are skipped when Karpenter CRDs are absent from the cluster.
 """
 
 from __future__ import annotations
@@ -51,26 +53,6 @@ def _karpenter_available(k8s_provider_config: dict) -> bool:
         return len(crds.items) > 0
     except Exception as exc:
         log.debug("Karpenter CRD check failed: %s", exc)
-        return False
-
-
-def _cold_nodepool_exists(k8s_provider_config: dict) -> bool:
-    """Return True when the cold-test NodePool is configured."""
-    try:
-        from kubernetes import client as k8s_client_mod, config as k8s_config_mod
-
-        kubeconfig_path = k8s_provider_config.get("kubeconfig_path")
-        context = k8s_provider_config.get("context")
-        k8s_config_mod.load_kube_config(config_file=kubeconfig_path, context=context)
-        custom = k8s_client_mod.CustomObjectsApi()
-        custom.get_cluster_custom_object(
-            group="karpenter.sh",
-            version="v1",
-            plural="nodepools",
-            name=_COLD_NODEPOOL_NAME,
-        )
-        return True
-    except Exception:
         return False
 
 
@@ -122,32 +104,25 @@ def _make_request(request_id: str, count: int = 1, template_id: str = "live-cold
 
 
 def _make_template_cold_node(namespace: str):
-    """Build a Template that targets the cold (unschedulable) Karpenter NodePool."""
-    from orb.domain.template.template_aggregate import Template
+    """Build a K8sTemplate that pins pods to the cold (unschedulable) NodePool.
 
-    return Template(
+    Node-pool pinning is expressed via ``node_selector``
+    (``karpenter.sh/nodepool=<pool>``) — a typed ``K8sTemplate`` field the
+    pod-spec builder honours.  The generic ``Template`` aggregate has no
+    ``provider_data`` surface, so a nested ``provider_data['k8s']`` block would
+    be silently dropped and the pod would schedule onto a normal node instead
+    of staying Pending on the cold pool.
+    """
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
+
+    return K8sTemplate(
         template_id="live-cold-tpl",
-        provider_type="k8s",
         provider_api="Pod",
-        image_id="busybox:latest",
-        max_instances=5,
-        provider_data={
-            "k8s": {
-                "namespace": namespace,
-                "command": ["sh", "-c", "sleep 3600"],
-                "node_selector": {
-                    "karpenter.sh/nodepool": _COLD_NODEPOOL_NAME,
-                },
-                "tolerations": [
-                    {
-                        "key": "karpenter.sh/nodepool",
-                        "operator": "Equal",
-                        "value": _COLD_NODEPOOL_NAME,
-                        "effect": "NoSchedule",
-                    }
-                ],
-            }
-        },
+        machine_image="busybox:latest",
+        max_machines=5,
+        namespace=namespace,
+        command=["sh", "-c", "sleep 3600"],
+        node_selector={"karpenter.sh/nodepool": _COLD_NODEPOOL_NAME},
     )
 
 
@@ -158,6 +133,30 @@ def _pod_phase(core_v1, namespace: str, pod_name: str) -> str:
         return (pod.status.phase or "Unknown") if pod.status else "Unknown"
     except Exception:
         return "Unknown"
+
+
+def _wait_pod_pending(core_v1, namespace: str, pod_name: str, timeout: float = 60.0) -> str:
+    """Poll until the pod reports ``Pending``, returning the last phase seen.
+
+    A pod pinned to the cold (unschedulable) NodePool never leaves ``Pending``,
+    but under a busy cluster the apiserver may briefly return a transient read
+    error (surfaced by ``_pod_phase`` as ``'Unknown'``) or the pod record may
+    take a moment to appear.  Polling rather than reading once after a fixed
+    sleep makes the assertion robust to that timing without masking a genuine
+    "scheduled onto a node" regression — a cold pod can never reach ``Running``.
+    """
+    deadline = time.monotonic() + timeout
+    phase = "Unknown"
+    while time.monotonic() < deadline:
+        phase = _pod_phase(core_v1, namespace, pod_name)
+        if phase == "Pending":
+            return phase
+        if phase in {"Running", "Succeeded", "Failed"}:
+            # A cold-pool pod reaching a scheduled phase is a real failure —
+            # return immediately so the caller's assertion reports it.
+            return phase
+        time.sleep(2)
+    return phase
 
 
 def _force_delete_pod(core_v1, namespace: str, pod_name: str) -> None:
@@ -182,76 +181,78 @@ def _force_delete_pod(core_v1, namespace: str, pod_name: str) -> None:
 
 async def test_karpenter_cold_node_pod_stays_pending(
     k8s_provider_config: dict,
-    k8s_namespace: str,
+    k8s_isolated_namespace: str,
     k8s_core_v1,
     live_request_id: str,
+    cold_karpenter_nodepool: str,
 ) -> None:
     """T22a: pod targeting cold Karpenter pool stays Pending; requires Karpenter CRDs.
 
     Validates that when Karpenter cannot provision a node the pod remains
     in Pending state.  The test confirms the Pending state after a brief
     window rather than waiting for ORB's timeout to fire, keeping CI fast.
+
+    The unschedulable ``orb-test-karpenter-cold`` NodePool is provisioned by
+    the ``cold_karpenter_nodepool`` fixture.  Runs in a per-test isolated
+    namespace so the shared namespace's session-end nuclear sweep cannot
+    delete the pod out from under the Pending assertion.
     """
+    namespace = k8s_isolated_namespace
     if not _karpenter_available(k8s_provider_config):
         pytest.skip(
             f"Karpenter not installed (CRD {_KARPENTER_NODEPOOL_CRD!r} absent). "
             "Install Karpenter to run T22 cold-node tests."
         )
-    if not _cold_nodepool_exists(k8s_provider_config):
-        pytest.skip(
-            f"Cold-node NodePool {_COLD_NODEPOOL_NAME!r} not configured. "
-            "Create a Karpenter NodePool named 'orb-test-karpenter-cold' that "
-            "cannot schedule pods (e.g. targeting non-existent instance type)."
-        )
 
     handler, _ = _make_pod_handler(k8s_provider_config)
     request = _make_request(live_request_id, count=1)
-    template = _make_template_cold_node(k8s_namespace)
+    template = _make_template_cold_node(namespace)
 
     # Submit the acquire — this should create the pod but not wait for Ready.
     result = await handler.acquire_hosts(request, template)
     pod_names = result.get("machine_ids", [])
     assert pod_names, "acquire_hosts returned no pod names for cold-node acquire"
 
-    # Give the scheduler a moment to process the pod.
-    time.sleep(10)
-
+    # Poll for Pending — a cold-pool pod can never schedule, so it must settle
+    # on Pending and stay there.  Polling tolerates transient apiserver read
+    # errors under concurrent cluster load without waiting a fixed duration.
     pod_name = pod_names[0]
-    phase = _pod_phase(k8s_core_v1, k8s_namespace, pod_name)
+    phase = _wait_pod_pending(k8s_core_v1, namespace, pod_name)
     assert phase == "Pending", (
         f"Expected pod {pod_name} to be Pending on cold Karpenter pool, got {phase!r}"
     )
 
     # Cleanup: force-delete the stuck pod.
-    _force_delete_pod(k8s_core_v1, k8s_namespace, pod_name)
+    _force_delete_pod(k8s_core_v1, namespace, pod_name)
 
 
 async def test_karpenter_cold_node_acquire_times_out(
     k8s_provider_config: dict,
-    k8s_namespace: str,
+    k8s_isolated_namespace: str,
     k8s_core_v1,
     live_request_id: str,
+    cold_karpenter_nodepool: str,
 ) -> None:
     """T22b: ORB surfaces a timeout error when Karpenter nodes never come up.
 
     When the handler's acquire waits for nodes to become Ready and they
     never do, ORB must raise a TimeoutError (or provider-specific timeout
     exception) rather than blocking indefinitely.
+
+    The unschedulable ``orb-test-karpenter-cold`` NodePool is provisioned by
+    the ``cold_karpenter_nodepool`` fixture.  Runs in a per-test isolated
+    namespace to stay independent of the shared namespace's session-end sweep.
     """
+    namespace = k8s_isolated_namespace
     if not _karpenter_available(k8s_provider_config):
         pytest.skip(
             f"Karpenter not installed (CRD {_KARPENTER_NODEPOOL_CRD!r} absent). "
             "Install Karpenter to run T22 cold-node tests."
         )
-    if not _cold_nodepool_exists(k8s_provider_config):
-        pytest.skip(
-            f"Cold-node NodePool {_COLD_NODEPOOL_NAME!r} not configured. "
-            "Create a Karpenter NodePool named 'orb-test-karpenter-cold'."
-        )
 
     handler, _ = _make_pod_handler(k8s_provider_config)
     request = _make_request(live_request_id, count=1)
-    template = _make_template_cold_node(k8s_namespace)
+    template = _make_template_cold_node(namespace)
 
     start = time.monotonic()
     caught_exc: Exception | None = None
@@ -263,11 +264,11 @@ async def test_karpenter_cold_node_acquire_times_out(
 
     # Cleanup any stuck pods.
     pods = k8s_core_v1.list_namespaced_pod(
-        namespace=k8s_namespace,
+        namespace=namespace,
         label_selector=f"orb.io/request-id={live_request_id}",
     )
     for pod in pods.items:
-        _force_delete_pod(k8s_core_v1, k8s_namespace, pod.metadata.name)
+        _force_delete_pod(k8s_core_v1, namespace, pod.metadata.name)
 
     if caught_exc is None:
         # If no exception was raised, the acquire must have returned quickly

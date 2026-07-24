@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import uuid
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -122,7 +123,11 @@ async def test_two_concurrent_requests_are_isolated(
     * ORB ``check_hosts_status`` for A never returns pods from B, and vice versa.
     """
     id_a = live_request_id
-    id_b = f"{request_id_prefix}iso-b-{live_request_id[-8:]}"
+    # Request B needs its own id in the domain-valid ``{prefix}{uuid}`` form.
+    # The RequestId value object rejects anything but ``req-<uuid>`` /
+    # ``ret-<uuid>``, so a descriptive slug cannot be embedded in the id
+    # itself — the request-id label alone distinguishes the two pod sets.
+    id_b = f"{request_id_prefix}{uuid.uuid4()}"
 
     handler = _make_pod_handler(k8s_provider_config, k8s_namespace)
     req_a = _make_request(id_a, count=2)
@@ -172,12 +177,24 @@ async def test_two_concurrent_requests_are_isolated(
         status_a = handler.check_hosts_status(req_a)
         status_b = handler.check_hosts_status(req_b)
 
-        ids_a_from_orb = {inst.get("machine_id") for inst in (status_a.instances or [])}
-        ids_b_from_orb = {inst.get("machine_id") for inst in (status_b.instances or [])}
+        # The Pod handler surfaces the pod name (its machine identifier) as
+        # ``instance_id`` in the per-instance dict; there is no ``machine_id``
+        # key on the status instance shape.
+        ids_a_from_orb = {inst.get("instance_id") for inst in (status_a.instances or [])}
+        ids_b_from_orb = {inst.get("instance_id") for inst in (status_b.instances or [])}
+
+        assert ids_a_from_orb == set(pods_a), (
+            f"ORB status for request A returned unexpected instances. "
+            f"Expected {set(pods_a)}, got {ids_a_from_orb}"
+        )
+        assert ids_b_from_orb == set(pods_b), (
+            f"ORB status for request B returned unexpected instances. "
+            f"Expected {set(pods_b)}, got {ids_b_from_orb}"
+        )
 
         orb_cross = ids_a_from_orb & ids_b_from_orb
         assert not orb_cross, (
-            f"ORB status cross-contamination: machine_ids in both A and B: {orb_cross}"
+            f"ORB status cross-contamination: instance_ids in both A and B: {orb_cross}"
         )
         log.info("ORB status isolation verified")
 

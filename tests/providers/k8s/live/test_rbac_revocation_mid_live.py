@@ -110,7 +110,10 @@ def _create_test_crb(rbac_v1: Any, namespace: str, crb_name: str) -> None:
     V1ClusterRoleBinding = _k8s.V1ClusterRoleBinding  # type: ignore[attr-defined]
     V1ObjectMeta = _k8s.V1ObjectMeta  # type: ignore[attr-defined]
     V1RoleRef = _k8s.V1RoleRef  # type: ignore[attr-defined]
-    V1Subject = _k8s.V1Subject  # type: ignore[attr-defined]
+    # The rbac subject model is ``RbacV1Subject`` in current client releases;
+    # older releases exposed it as ``V1Subject``.  Prefer the current name and
+    # fall back so the test builds against either SDK generation.
+    V1Subject = getattr(_k8s, "RbacV1Subject", None) or _k8s.V1Subject  # type: ignore[attr-defined]
 
     crb = V1ClusterRoleBinding(
         metadata=V1ObjectMeta(name=crb_name),
@@ -132,11 +135,19 @@ def _create_test_crb(rbac_v1: Any, namespace: str, crb_name: str) -> None:
 
 
 def _delete_crb(rbac_v1: Any, crb_name: str) -> None:
-    """Delete the test ClusterRoleBinding (best-effort)."""
+    """Delete the test ClusterRoleBinding (best-effort, idempotent).
+
+    A ``NotFound`` (404) means the binding is already gone — expected on
+    the belt-and-suspenders second delete in the ``finally`` block — so it
+    is swallowed silently rather than logged as a warning.
+    """
     try:
         rbac_v1.delete_cluster_role_binding(name=crb_name)
         log.info("Deleted ClusterRoleBinding %s", crb_name)
     except Exception as exc:
+        if getattr(exc, "status", None) == 404:
+            log.debug("ClusterRoleBinding %s already gone (404) — delete is a no-op", crb_name)
+            return
         log.warning("Could not delete ClusterRoleBinding %s: %s", crb_name, exc)
 
 
@@ -205,7 +216,9 @@ async def test_rbac_revocation_mid_test(
         # permissions), this acquire should still succeed.  The scenario
         # demonstrates the test scaffold; in a real revocation test the handler
         # would be constructed with the SA that lost permissions.
-        rid2 = f"{live_request_id[:-4]}rev2"
+        # Phase 3 needs its own valid ``req-<uuid>`` id — the RequestId value
+        # object rejects any mangling of the UUID body.
+        rid2 = f"req-{uuid.uuid4()}"
         request2 = _make_request(rid2)
         result2 = await handler.acquire_hosts(request2, template)
         pod_names2: list[str] = result2.get("machine_ids", [])

@@ -127,7 +127,7 @@ def _delete_quota(core_v1: Any, namespace: str, quota_name: str) -> None:
 
 async def test_acquire_fails_when_quota_exceeded(
     k8s_provider_config: dict,
-    k8s_namespace: str,
+    k8s_isolated_namespace: str,
     k8s_core_v1: Any,
     live_request_id: str,
 ) -> None:
@@ -136,19 +136,23 @@ async def test_acquire_fails_when_quota_exceeded(
     The quota is set to 0 pods.  The acquire must raise a provider-level
     exception (not hang, not return empty results silently).  The specific
     exception type depends on how ORB maps the apiserver's 403/409 response.
+
+    A ``ResourceQuota`` with ``pods: 0`` blocks every pod creation in its
+    namespace, so this test runs in a per-test isolated namespace to keep
+    it safe to run alongside other live tests.
     """
+    namespace = k8s_isolated_namespace
     quota_name = f"{_QUOTA_NAME_PREFIX}-{uuid.uuid4().hex[:8]}"
-    handler = _make_pod_handler(k8s_provider_config, k8s_namespace)
+    handler = _make_pod_handler(k8s_provider_config, namespace)
     request = _make_request(live_request_id, count=2)
-    template = _make_template(k8s_namespace)
+    template = _make_template(namespace)
 
     # Attempt to create the quota; skip if the test runner lacks quota permissions.
     try:
-        _create_pod_count_quota(k8s_core_v1, k8s_namespace, quota_name, max_pods=0)
+        _create_pod_count_quota(k8s_core_v1, namespace, quota_name, max_pods=0)
     except Exception as exc:
         pytest.skip(
-            f"Could not create ResourceQuota in {k8s_namespace} "
-            f"(permissions or cluster policy): {exc}"
+            f"Could not create ResourceQuota in {namespace} (permissions or cluster policy): {exc}"
         )
 
     try:
@@ -168,12 +172,12 @@ async def test_acquire_fails_when_quota_exceeded(
         log.info("Quota rejection correctly surfaced as: %r", exc)
 
     finally:
-        _delete_quota(k8s_core_v1, k8s_namespace, quota_name)
+        _delete_quota(k8s_core_v1, namespace, quota_name)
 
 
 async def test_acquire_succeeds_after_quota_removed(
     k8s_provider_config: dict,
-    k8s_namespace: str,
+    k8s_isolated_namespace: str,
     k8s_core_v1: Any,
     live_request_id: str,
 ) -> None:
@@ -184,15 +188,22 @@ async def test_acquire_succeeds_after_quota_removed(
     3. Delete quota.
     4. Verify acquire now succeeds.
     5. Release acquired pods.
+
+    Runs in a per-test isolated namespace: the ``pods: 0`` quota would
+    otherwise block pod creation for any concurrently-running live test.
     """
+    namespace = k8s_isolated_namespace
     quota_name = f"{_QUOTA_NAME_PREFIX}-rmv-{uuid.uuid4().hex[:8]}"
-    handler = _make_pod_handler(k8s_provider_config, k8s_namespace)
-    request_blocked = _make_request(f"{live_request_id}-blk", count=1)
-    request_ok = _make_request(f"{live_request_id}-ok", count=1)
-    template = _make_template(k8s_namespace)
+    handler = _make_pod_handler(k8s_provider_config, namespace)
+    # Each request needs its own valid ``req-<uuid>`` id — the RequestId value
+    # object rejects any suffix beyond the bare UUID, so the blocked and
+    # post-removal acquires use distinct freshly-generated ids.
+    request_blocked = _make_request(f"req-{uuid.uuid4()}", count=1)
+    request_ok = _make_request(f"req-{uuid.uuid4()}", count=1)
+    template = _make_template(namespace)
 
     try:
-        _create_pod_count_quota(k8s_core_v1, k8s_namespace, quota_name, max_pods=0)
+        _create_pod_count_quota(k8s_core_v1, namespace, quota_name, max_pods=0)
     except Exception as exc:
         pytest.skip(f"Could not create ResourceQuota: {exc}")
 
@@ -206,7 +217,7 @@ async def test_acquire_succeeds_after_quota_removed(
             log.info("Acquire correctly blocked by quota")
 
         # Step 3: remove quota.
-        _delete_quota(k8s_core_v1, k8s_namespace, quota_name)
+        _delete_quota(k8s_core_v1, namespace, quota_name)
         quota_name = ""  # mark as deleted so finally block skips
 
         # Step 4: acquire should now succeed.
@@ -217,7 +228,7 @@ async def test_acquire_succeeds_after_quota_removed(
 
     finally:
         if quota_name:
-            _delete_quota(k8s_core_v1, k8s_namespace, quota_name)
+            _delete_quota(k8s_core_v1, namespace, quota_name)
         if acquired_pods:
             try:
                 await handler.release_hosts(acquired_pods, request_ok.provider_data)

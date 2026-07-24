@@ -74,21 +74,22 @@ def _make_request(request_id: str, count: int = 1, template_id: str = "live-tpl"
 
 
 def _make_template(namespace: str, image: str = "busybox:latest", command: list | None = None):
-    """Construct a minimal :class:`Template` for pod tests."""
-    from orb.domain.template.template_aggregate import Template
+    """Construct a minimal :class:`K8sTemplate` for pod tests.
 
-    return Template(
+    Kubernetes-specific fields (namespace, command) are set as typed
+    ``K8sTemplate`` attributes so they reach the pod spec — the generic
+    ``Template`` aggregate has no ``provider_data`` surface, so those
+    fields would be silently dropped if set there.
+    """
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
+
+    return K8sTemplate(
         template_id="live-tpl",
-        provider_type="k8s",
         provider_api="Pod",
-        image_id=image,
-        max_instances=10,
-        provider_data={
-            "k8s": {
-                "namespace": namespace,
-                "command": command or ["sh", "-c", "sleep 3600"],
-            }
-        },
+        machine_image=image,
+        max_machines=10,
+        namespace=namespace,
+        command=command or ["sh", "-c", "sleep 3600"],
     )
 
 

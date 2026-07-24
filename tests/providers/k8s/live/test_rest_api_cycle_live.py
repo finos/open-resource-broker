@@ -3,28 +3,33 @@
 Scenario
 --------
 Submit an acquire request via the ORB REST API, poll until the request
-reaches ``fulfilled`` state, verify pods exist in the cluster, then submit
-a release request and verify the pods are removed.
+reaches a terminal ``complete`` state, verify pods exist in the cluster, then
+submit a return request and verify the pods are removed.
 
 Prerequisites
 -------------
 * Real Kubernetes cluster accessible via ORB config.
-* ORB REST server running (``ORB_REST_BASE_URL`` env var, default
-  ``http://localhost:8080``).
 * Pass ``--run-k8s`` to enable.
+
+The ORB REST server is provided by the session-scoped ``orb_rest_server``
+fixture (see ``conftest.py``): it launches ``orb server start --foreground
+--api-only`` on an isolated work dir and free loopback port, so no external
+server needs to be started.  Set ``ORB_REST_BASE_URL`` to point the tests at
+an already-running server instead.
 
 Cleanup guarantee
 -----------------
-The test calls the release endpoint in its ``finally`` block.  Any
-surviving pods are caught by the session-scoped nuclear cleanup fixture
-in ``conftest.py`` via ``orb.io/managed=true`` label sweep.
+The test calls the return endpoint in its ``finally`` block.  Any surviving
+pods are caught by the session-scoped nuclear cleanup fixture in
+``conftest.py`` via the ``orb.io/managed=true`` label sweep.
 """
 
 from __future__ import annotations
 
+import json
 import logging
-import os
 import time
+import urllib.request
 from typing import Any
 
 import pytest
@@ -33,10 +38,12 @@ log = logging.getLogger("k8s.live.rest_api")
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.k8s_live]
 
-_ORB_REST_BASE_URL = os.environ.get("ORB_REST_BASE_URL", "http://localhost:8080")
+_TEMPLATE_ID = "k8s-pod-example"
 _POLL_INTERVAL = 5  # seconds
 _ACQUIRE_TIMEOUT = 180  # seconds
 _RELEASE_TIMEOUT = 60  # seconds
+# Terminal states the default scheduler reports for a fully-provisioned acquire.
+_FULFILLED_STATES = {"complete", "running"}
 
 
 # ---------------------------------------------------------------------------
@@ -44,61 +51,83 @@ _RELEASE_TIMEOUT = 60  # seconds
 # ---------------------------------------------------------------------------
 
 
-def _rest_available() -> bool:
-    """Return True when the ORB REST server is reachable."""
-    try:
-        import urllib.request
+def _headers(server: Any) -> dict[str, str]:
+    """Build request headers, attaching the loopback-admin bearer token.
 
-        with urllib.request.urlopen(f"{_ORB_REST_BASE_URL}/health", timeout=5) as resp:
-            return resp.status < 500
-    except Exception:
-        return False
+    POST routes require the operator role; without the token the anonymous
+    caller resolves to ``viewer`` and the server returns 403.
+    """
+    headers = {"Content-Type": "application/json"}
+    if getattr(server, "token", None):
+        headers["Authorization"] = f"Bearer {server.token}"
+    return headers
 
 
-def _post_json(path: str, payload: dict) -> dict:
+def _post_json(server: Any, path: str, payload: dict) -> dict:
     """POST JSON to the ORB REST server and return the response dict."""
-    import json
-    import urllib.request
-
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
-        f"{_ORB_REST_BASE_URL}{path}",
+        f"{server.base_url}{path}",
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers=_headers(server),
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 — loopback test server
         return json.loads(resp.read())  # type: ignore[return-value]
 
 
-def _get_json(path: str) -> dict:
+def _get_json(server: Any, path: str) -> dict:
     """GET from the ORB REST server and return the response dict."""
-    import json
-    import urllib.request
-
-    with urllib.request.urlopen(f"{_ORB_REST_BASE_URL}{path}", timeout=30) as resp:
+    req = urllib.request.Request(f"{server.base_url}{path}", headers=_headers(server))
+    with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 — loopback test server
         return json.loads(resp.read())  # type: ignore[return-value]
 
 
-def _poll_request_status(
+def _extract_request(status_body: dict) -> dict:
+    """Pull the single request record out of a status envelope."""
+    requests = status_body.get("requests") if isinstance(status_body, dict) else None
+    if requests:
+        return requests[0]
+    return status_body if isinstance(status_body, dict) else {}
+
+
+def _machine_ids(record: dict) -> list[str]:
+    """Collect machine ids from a request record (snake_case default scheduler)."""
+    ids: list[str] = []
+    if record.get("machine_ids"):
+        return list(record["machine_ids"])
+    for machine in record.get("machines", []) or []:
+        mid = machine.get("machine_id") or machine.get("machineId")
+        if mid:
+            ids.append(mid)
+    return ids
+
+
+def _poll_request(
+    server: Any,
     request_id: str,
-    target_status: str,
-    timeout: float = _ACQUIRE_TIMEOUT,
+    target_states: set[str],
+    *,
+    require_machines: bool,
+    timeout: float,
 ) -> dict:
-    """Poll ``/requests/{id}`` until ``status`` matches ``target_status``."""
+    """Poll ``/requests/{id}/status`` until the request reaches a target state."""
     deadline = time.monotonic() + timeout
+    last: dict = {}
     while time.monotonic() < deadline:
         try:
-            resp = _get_json(f"/requests/{request_id}")
-            status = resp.get("status", "")
+            body = _get_json(server, f"/api/v1/requests/{request_id}/status")
+            last = _extract_request(body)
+            status = last.get("status", "")
             log.debug("Request %s status: %s", request_id, status)
-            if status == target_status:
-                return resp
-        except Exception as exc:
-            log.debug("poll_request_status error: %s", exc)
+            if status in target_states and (not require_machines or _machine_ids(last)):
+                return last
+        except Exception as exc:  # noqa: BLE001 — transient poll errors are retried
+            log.debug("poll error: %s", exc)
         time.sleep(_POLL_INTERVAL)
     raise TimeoutError(
-        f"Request {request_id} did not reach status={target_status!r} within {timeout}s"
+        f"Request {request_id} did not reach {target_states} within {timeout}s "
+        f"(last status={last.get('status')!r})"
     )
 
 
@@ -107,81 +136,71 @@ def _poll_request_status(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(
-    not _rest_available(),
-    reason=(
-        f"ORB REST server not reachable at {_ORB_REST_BASE_URL}. "
-        "Set ORB_REST_BASE_URL or start the server before running this test."
-    ),
-)
 async def test_rest_api_acquire_release_cycle(
+    orb_rest_server: Any,
     k8s_namespace: str,
     k8s_core_v1: Any,
-    live_request_id: str,
 ) -> None:
-    """Full REST acquire → poll-until-fulfilled → release → verify-clean cycle.
+    """Full REST acquire → poll-until-complete → return → verify-clean cycle.
 
-    1. POST /machines/acquire with provider_type=k8s, count=1.
-    2. Poll /requests/{id} until status == "fulfilled".
+    1. POST /api/v1/machines/request with the k8s pod template, count=1.
+    2. Poll /api/v1/requests/{id}/status until the request is complete.
     3. Verify at least one pod labelled with the request-id exists.
-    4. POST /machines/release with the returned machine ids.
-    5. Poll /requests/{id} until status == "released".
-    6. Verify no pods labelled with the request-id remain.
+    4. POST /api/v1/machines/return with the returned machine ids.
+    5. Verify no pods labelled with the request-id remain.
     """
-    acquire_payload = {
-        "request_id": live_request_id,
-        "provider_type": "k8s",
-        "provider_api": "Pod",
-        "template_id": "live-rest-tpl",
-        "count": 1,
-    }
+    acquire_resp = _post_json(
+        orb_rest_server,
+        "/api/v1/machines/request",
+        {"template_id": _TEMPLATE_ID, "count": 1},
+    )
+    request_id = acquire_resp.get("request_id") or acquire_resp.get("requestId")
+    assert request_id, f"No request_id in acquire response: {acquire_resp!r}"
+    log.info("REST acquire submitted: %s", request_id)
 
     acquired_machine_ids: list[str] = []
-
     try:
-        log.info("Submitting acquire via REST for %s", live_request_id)
-        acquire_resp = _post_json("/machines/acquire", acquire_payload)
-        assert acquire_resp.get("request_id") == live_request_id, (
-            f"Unexpected request_id in response: {acquire_resp!r}"
+        record = _poll_request(
+            orb_rest_server,
+            request_id,
+            _FULFILLED_STATES,
+            require_machines=True,
+            timeout=_ACQUIRE_TIMEOUT,
         )
+        acquired_machine_ids = _machine_ids(record)
+        assert acquired_machine_ids, f"No machine ids after fulfil: {record!r}"
+        log.info("Request %s fulfilled with %r", request_id, acquired_machine_ids)
 
-        fulfilled = _poll_request_status(live_request_id, "fulfilled")
-        acquired_machine_ids = fulfilled.get("machine_ids") or []
-        assert len(acquired_machine_ids) >= 1, (
-            f"Expected at least 1 machine_id after fulfil, got: {acquired_machine_ids!r}"
-        )
-        log.info("Request %s fulfilled with machines: %r", live_request_id, acquired_machine_ids)
-
-        # Verify pods exist in the cluster.
-        label_selector = f"orb.io/request-id={live_request_id}"
+        label_selector = f"orb.io/request-id={request_id}"
         pod_list = k8s_core_v1.list_namespaced_pod(
             namespace=k8s_namespace, label_selector=label_selector
         )
         assert len(pod_list.items) >= 1, (
-            f"Expected pods for request {live_request_id} in namespace {k8s_namespace}, found none"
+            f"Expected pods for request {request_id} in {k8s_namespace}, found none"
         )
-        log.info("Found %d pod(s) for request %s", len(pod_list.items), live_request_id)
+        log.info("Found %d pod(s) for request %s", len(pod_list.items), request_id)
 
     finally:
         if acquired_machine_ids:
             try:
-                release_payload = {
-                    "request_id": live_request_id,
-                    "machine_ids": acquired_machine_ids,
-                }
-                _post_json("/machines/release", release_payload)
-                log.info("Release submitted for %s", live_request_id)
-                _poll_request_status(live_request_id, "released", timeout=_RELEASE_TIMEOUT)
-                log.info("Request %s released", live_request_id)
+                _post_json(
+                    orb_rest_server,
+                    "/api/v1/machines/return",
+                    {"machine_ids": acquired_machine_ids},
+                )
+                log.info("Return submitted for %s", request_id)
 
-                # Verify pods are gone.
-                label_selector = f"orb.io/request-id={live_request_id}"
-                pod_list = k8s_core_v1.list_namespaced_pod(
-                    namespace=k8s_namespace, label_selector=label_selector
-                )
-                assert len(pod_list.items) == 0, (
-                    f"Expected no pods after release, found: "
-                    f"{[p.metadata.name for p in pod_list.items]!r}"
-                )
-            except Exception as exc:
-                log.warning("REST release cleanup failed for %s: %s", live_request_id, exc)
+                label_selector = f"orb.io/request-id={request_id}"
+                deadline = time.monotonic() + _RELEASE_TIMEOUT
+                remaining = None
+                while time.monotonic() < deadline:
+                    pod_list = k8s_core_v1.list_namespaced_pod(
+                        namespace=k8s_namespace, label_selector=label_selector
+                    )
+                    remaining = [p.metadata.name for p in pod_list.items]
+                    if not remaining:
+                        break
+                    time.sleep(_POLL_INTERVAL)
+                assert not remaining, f"Pods still present after return: {remaining!r}"
+            except Exception as exc:  # noqa: BLE001 — cleanup failures must not mask result
+                log.warning("REST return cleanup failed for %s: %s", request_id, exc)
