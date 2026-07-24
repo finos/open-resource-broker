@@ -31,6 +31,7 @@ def test_create_default_azure_credential_passes_managed_identity_client_id_when_
     fake_identity = types.ModuleType("azure.identity")
     fake_ctor = MagicMock(return_value=MagicMock())
     fake_identity.DefaultAzureCredential = fake_ctor
+    logger = MagicMock()
 
     with patch.dict(
         sys.modules,
@@ -41,11 +42,13 @@ def test_create_default_azure_credential_passes_managed_identity_client_id_when_
     ):
         credential = create_default_azure_credential(
             client_id="managed-identity-client-id",
-            logger=MagicMock(),
+            logger=logger,
         )
 
     assert credential is fake_ctor.return_value
     fake_ctor.assert_called_once_with(managed_identity_client_id="managed-identity-client-id")
+    logger.debug.assert_called_once_with("Azure DefaultAzureCredential initialised")
+    logger.info.assert_not_called()
 
 
 def test_create_default_azure_credential_omits_managed_identity_client_id_when_unset():
@@ -108,6 +111,7 @@ def test_create_default_azure_credential_async_passes_managed_identity_client_id
     fake_identity_aio = types.ModuleType("azure.identity.aio")
     fake_ctor = MagicMock(return_value=MagicMock())
     fake_identity_aio.DefaultAzureCredential = fake_ctor
+    logger = MagicMock()
 
     with patch.dict(
         sys.modules,
@@ -119,11 +123,13 @@ def test_create_default_azure_credential_async_passes_managed_identity_client_id
     ):
         credential = create_default_azure_credential_async(
             client_id="managed-identity-client-id",
-            logger=MagicMock(),
+            logger=logger,
         )
 
     assert credential is fake_ctor.return_value
     fake_ctor.assert_called_once_with(managed_identity_client_id="managed-identity-client-id")
+    logger.debug.assert_called_once_with("Async Azure DefaultAzureCredential initialised")
+    logger.info.assert_not_called()
 
 
 def test_default_azure_access_token_provider_closes_short_lived_credential():

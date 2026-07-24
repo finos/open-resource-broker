@@ -133,7 +133,7 @@ def create_default_azure_credential(
     except ImportError as exc:
         logger.error(format_import_error("azure-identity", exc))
         raise
-    logger.info("Azure DefaultAzureCredential initialised")
+    logger.debug("Azure DefaultAzureCredential initialised")
     return credential
 
 
@@ -156,7 +156,7 @@ def create_default_azure_credential_async(
     except ImportError as exc:
         logger.error(format_import_error("azure-identity", exc))
         raise
-    logger.info("Async Azure DefaultAzureCredential initialised")
+    logger.debug("Async Azure DefaultAzureCredential initialised")
     return credential
 
 
