@@ -308,8 +308,10 @@ class TestRunInstancesProviderFulfilment:
     def test_some_running_below_target_is_in_progress(self):
         instances = [self._inst("running")]
         f = self._run(instances, 2)
-        # 1 running, no pending → partial
+        # 1 running, no pending → partial. RunInstances is synchronous, so the
+        # shortfall is settled: the verdict is final and must terminalise.
         assert f.state == "partial"
+        assert f.final is True
 
     def test_all_failed_is_failed(self):
         instances = [self._inst("failed"), self._inst("failed")]

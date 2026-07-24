@@ -442,6 +442,7 @@ class TestEC2FleetFulfilment:
             requested_count=4,
         )
         assert f.state == "partial"
+        assert f.final is True
 
     def test_instant_fleet_in_progress_when_no_instances_yet(self):
         """Instant: no instances yet → in_progress."""

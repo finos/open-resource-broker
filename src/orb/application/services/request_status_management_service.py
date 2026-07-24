@@ -46,6 +46,7 @@ class RequestStatusManagementService:
         *,
         event: FulfilmentEvent = FulfilmentEvent.PROVIDER_VERDICT,
         fulfilment: Optional[ProviderFulfilment] = None,
+        final: bool = False,
         diagnostic: Any = None,
     ) -> Any:
         """Route a status transition through the fulfilment state machine.
@@ -54,6 +55,15 @@ class RequestStatusManagementService:
         machine (single write authority). For non-pydantic stand-ins used in
         tests, fall back to the aggregate-style ``update_status`` so those
         callers keep working.
+
+        ``final`` carries the caller's finality signal onto the synthesised
+        verdict when no explicit ``fulfilment`` is supplied. A synchronous
+        provider whose launch API has already settled (e.g. AWS RunInstances)
+        reports a settled shortfall: marking the synthesised ``partial`` verdict
+        ``final=True`` lets the state machine terminalise it immediately rather
+        than parking it in the PARTIAL_PENDING holding state to await capacity
+        that can never arrive. Asynchronous providers leave it ``False`` so a
+        transient partial can still heal.
         """
         from orb.domain.request.exceptions import InvalidRequestStateError
         from orb.domain.request.request_types import RequestStatus
@@ -62,7 +72,11 @@ class RequestStatusManagementService:
         if isinstance(request, Request):
             try:
                 if event == FulfilmentEvent.PROVIDER_VERDICT:
-                    verdict = fulfilment or ProviderFulfilment(state=state, message=message)  # type: ignore[arg-type]
+                    verdict = fulfilment or ProviderFulfilment(
+                        state=state,  # type: ignore[arg-type]
+                        message=message,
+                        final=final,
+                    )
                     return self._state_machine.apply(
                         request,
                         FulfilmentEvent.PROVIDER_VERDICT,
@@ -453,12 +467,14 @@ class RequestStatusManagementService:
                     request,
                     "partial",
                     f"Partial success: {instance_count}/{requested_count} instances created with API errors: {error_summary}",
+                    final=fulfillment_final,
                 )
             else:
                 request = self._apply_verdict(
                     request,
                     "partial",
                     f"Partially fulfilled: {instance_count}/{requested_count} instances",
+                    final=fulfillment_final,
                 )
         elif request.resource_ids:
             request = self._apply_verdict(

@@ -191,6 +191,111 @@ class TestUpdateRequestStatus:
         assert captured["fleet_errors"][0]["error_code"] == "InsufficientCapacity"
 
 
+class TestAcquireTimeShortfallFinality:
+    """Acquire-time settled-shortfall must terminalise for synchronous providers.
+
+    A synchronous launch API (AWS RunInstances / instant fleet / MicroVM) that
+    returns fewer instances than requested has *settled* — the missing capacity
+    will never arrive. That shortfall must land on terminal PARTIAL immediately,
+    not sit in the non-terminal PARTIAL_PENDING holding state (which exists only
+    to let an asynchronous provider's transient partial heal within the
+    deadline). The finality signal flows from the provider's synchronous outcome
+    through ``fulfillment_final`` to the synthesised verdict.
+    """
+
+    def setup_method(self):
+        self.svc = _make_service()
+
+    def _acquire_in_progress(self, requested_count=5):
+        from datetime import datetime, timedelta, timezone
+
+        from orb.domain.request.aggregate import Request
+        from orb.domain.request.request_types import RequestStatus
+        from orb.domain.request.value_objects import RequestType
+
+        now = datetime.now(timezone.utc)
+        return Request.create_new_request(
+            RequestType.ACQUIRE, "tmpl-001", requested_count, "aws"
+        ).model_copy(
+            update={
+                "status": RequestStatus.IN_PROGRESS,
+                "started_at": now,
+                # Comfortably within the grace period so a non-final partial
+                # would park in PARTIAL_PENDING — isolating the finality signal
+                # as the only thing that can force terminal PARTIAL.
+                "deadline_at": now + timedelta(seconds=3600),
+            }
+        )
+
+    def test_synchronous_shortfall_is_terminal_partial(self):
+        from orb.domain.request.request_types import RequestStatus
+
+        request = self._acquire_in_progress(requested_count=5)
+        updated = self.svc._update_request_status(
+            request=request,
+            instance_count=3,
+            requested_count=5,
+            has_api_errors=False,
+            provider_errors=[],
+            fulfillment_final=True,
+        )
+        assert updated.status == RequestStatus.PARTIAL
+        assert updated.status.is_terminal()
+
+    def test_synchronous_shortfall_with_api_errors_is_terminal_partial(self):
+        from orb.domain.request.request_types import RequestStatus
+
+        request = self._acquire_in_progress(requested_count=5)
+        updated = self.svc._update_request_status(
+            request=request,
+            instance_count=2,
+            requested_count=5,
+            has_api_errors=True,
+            provider_errors=[{"error_code": "Throttling", "error_message": "Rate exceeded"}],
+            fulfillment_final=True,
+        )
+        assert updated.status == RequestStatus.PARTIAL
+        assert updated.status.is_terminal()
+
+    def test_asynchronous_shortfall_stays_non_terminal(self):
+        """An asynchronous provider shortfall (finality not signalled) must NOT
+        terminalise at acquire time — it stays in progress so a later poll can
+        promote it (to COMPLETED) or park it in PARTIAL_PENDING."""
+        from orb.domain.request.request_types import RequestStatus
+
+        request = self._acquire_in_progress(requested_count=5)
+        updated = self.svc._update_request_status(
+            request=request,
+            instance_count=3,
+            requested_count=5,
+            has_api_errors=False,
+            provider_errors=[],
+            fulfillment_final=False,
+        )
+        assert updated.status == RequestStatus.IN_PROGRESS
+        assert not updated.status.is_terminal()
+
+    def test_apply_verdict_final_partial_is_terminal(self):
+        """The finality signal threaded onto a synthesised partial verdict drives
+        the state machine to terminal PARTIAL."""
+        from orb.domain.request.request_types import RequestStatus
+
+        request = self._acquire_in_progress(requested_count=5)
+        updated = self.svc._apply_verdict(request, "partial", "3/5 instances", final=True)
+        assert updated.status == RequestStatus.PARTIAL
+        assert updated.status.is_terminal()
+
+    def test_apply_verdict_nonfinal_partial_holds_in_partial_pending(self):
+        """A synthesised partial verdict without the finality signal parks in the
+        non-terminal PARTIAL_PENDING holding state while within the deadline."""
+        from orb.domain.request.request_types import RequestStatus
+
+        request = self._acquire_in_progress(requested_count=5)
+        updated = self.svc._apply_verdict(request, "partial", "3/5 instances", final=False)
+        assert updated.status == RequestStatus.PARTIAL_PENDING
+        assert not updated.status.is_terminal()
+
+
 class TestHandleProvisioningFailure:
     def setup_method(self):
         self.svc = _make_service()
