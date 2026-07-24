@@ -75,7 +75,6 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
                     "resource_ids": request.resource_ids,
                     "provider_api": request.provider_api,
                     "template_id": request.template_id,
-                    "request": request,
                 },
             )
 

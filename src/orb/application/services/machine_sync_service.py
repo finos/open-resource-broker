@@ -72,7 +72,6 @@ class MachineSyncService:
                 operation_type = ProviderOperationType.GET_INSTANCE_STATUS
                 parameters = {
                     "instance_ids": request.machine_ids,
-                    "provider_api": request.provider_api,
                     "template_id": request.template_id,
                 }
             # Use resource-level discovery for acquire requests (handles scaling/replacement)
@@ -90,7 +89,6 @@ class MachineSyncService:
                 instance_ids = [m.machine_id.value for m in db_machines]
                 parameters = {
                     "instance_ids": instance_ids,
-                    "provider_api": request.provider_api,
                     "template_id": request.template_id,
                 }
             else:
