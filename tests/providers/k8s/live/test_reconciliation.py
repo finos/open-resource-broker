@@ -160,7 +160,7 @@ async def test_startup_reconciler_rebuilds_cache_from_cluster(
 
 async def test_orphan_gc_deletes_orphan_after_grace_period(
     k8s_provider_config: dict,
-    k8s_namespace: str,
+    k8s_isolated_namespace: str,
     k8s_core_v1,
     live_request_id: str,
 ) -> None:
@@ -170,17 +170,23 @@ async def test_orphan_gc_deletes_orphan_after_grace_period(
     The GC is configured with a short interval (``_GC_FAST_INTERVAL`` seconds)
     and ``orphan_min_age_seconds=0`` so the pod is eligible for deletion
     immediately without waiting on any cluster-level config value.
+
+    Runs in a per-test isolated namespace.  With an empty known-request-id
+    set the GC classifies *every* ``orb.io/managed=true`` pod in its
+    namespace as an orphan and deletes it, so it must not share a namespace
+    with any concurrently-running live test.
     """
     from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector
 
-    client, config = _build_k8s_client_and_config(k8s_provider_config, k8s_namespace)
+    namespace = k8s_isolated_namespace
+    client, config = _build_k8s_client_and_config(k8s_provider_config, namespace)
 
     orphan_request_id = str(uuid.uuid4())  # NOT in known_ids
     pod_name = f"orb-live-orphan-{orphan_request_id[:8]}-0000"
-    _create_raw_pod(k8s_core_v1, k8s_namespace, pod_name, orphan_request_id)
-    log.info("Created orphan pod %s/%s", k8s_namespace, pod_name)
+    _create_raw_pod(k8s_core_v1, namespace, pod_name, orphan_request_id)
+    log.info("Created orphan pod %s/%s", namespace, pod_name)
 
-    assert _pod_exists(k8s_core_v1, k8s_namespace, pod_name), (
+    assert _pod_exists(k8s_core_v1, namespace, pod_name), (
         f"Orphan pod {pod_name} should exist before GC run"
     )
 
@@ -203,13 +209,13 @@ async def test_orphan_gc_deletes_orphan_after_grace_period(
     # With auto_cleanup_orphans=True the GC deletes the pod.  Poll until gone.
     deadline = time.monotonic() + _GC_WAIT_TIMEOUT
     while time.monotonic() < deadline:
-        if not _pod_exists(k8s_core_v1, k8s_namespace, pod_name):
+        if not _pod_exists(k8s_core_v1, namespace, pod_name):
             break
         await asyncio.sleep(_POLL_INTERVAL)
     else:
         pytest.fail(f"Orphan pod {pod_name} not deleted within {_GC_WAIT_TIMEOUT}s after GC run")
 
-    log.info("Orphan pod %s/%s deleted by GC", k8s_namespace, pod_name)
+    log.info("Orphan pod %s/%s deleted by GC", namespace, pod_name)
 
 
 async def test_timeout_gc_deletes_pending_pod_past_threshold(

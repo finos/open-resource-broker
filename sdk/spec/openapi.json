@@ -3384,6 +3384,18 @@
             ],
             "title": "Duration"
           },
+          "fulfilment_diagnostic": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fulfilment Diagnostic"
+          },
           "machines": {
             "items": {
               "$ref": "#/components/schemas/MachineReferenceDTO"

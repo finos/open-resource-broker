@@ -31,4 +31,17 @@ class TemplateExtensionRegistryPort(Protocol):
             Mapping of template field names to default values.  Returns an
             empty dict when no extension is registered for *provider_type*.
         """
-        ...
+        pass
+
+    def get_extension_class(self, provider_type: str) -> Optional[type]:  # type: ignore[return]
+        """Return the extension config *class* for *provider_type*, if registered.
+
+        Used by the defaults merge to derive alias groups from the extension
+        model (which declares extension-only ``AliasChoices`` fields such as
+        ``env`` / ``environment_variables`` that the base ``Template`` and
+        provider template subclasses do not).  The concrete return type is a
+        Pydantic ``BaseModel`` subclass; typed as ``type`` here to keep the
+        domain port free of framework imports.  Returns ``None`` when no
+        extension class is registered for *provider_type*.
+        """
+        pass

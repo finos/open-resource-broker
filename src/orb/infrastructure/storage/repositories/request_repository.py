@@ -23,6 +23,9 @@ from orb.infrastructure.storage.components.entity_serializer import BaseEntitySe
 from orb.infrastructure.storage.components.generic_serializer import GenericEntitySerializer
 from orb.infrastructure.storage.constants import LEGACY_DEFAULT_PROVIDER_TYPE
 
+# Module-level logger for static helpers that have no instance ``self.logger``.
+_module_logger = get_logger(__name__)
+
 
 def _id_str(value_obj: Any) -> str:
     """Extract string from a value object or plain string."""
@@ -111,6 +114,60 @@ class RequestSerializer(BaseEntitySerializer):
 
         return data
 
+    @staticmethod
+    def _parse_fulfilment_diagnostic(raw: Any) -> Any:
+        """Parse a persisted fulfilment_diagnostic into a dict for the aggregate.
+
+        Accepts a JSON string, an already-parsed dict, or None. Returns a plain
+        dict (which ``Request.model_validate`` coerces into the value object) or
+        None. Malformed payloads degrade to None rather than failing the load —
+        a diagnostic is advisory, never load-critical.
+
+        "Malformed" covers BOTH shape failures (non-JSON string, non-dict JSON)
+        AND semantic failures: a valid-JSON dict that does not satisfy the
+        ``FulfilmentDiagnostic`` schema (e.g. an unknown ``category`` written by
+        a newer version, or a missing ``occurred_at``) is degraded to None too.
+        Returning such a dict verbatim would make ``Request.model_validate``
+        raise and blow up the entire request load — violating the advisory,
+        never-load-critical contract this method promises.
+        """
+        if raw is None:
+            return None
+
+        parsed: Any
+        if isinstance(raw, dict):
+            parsed = raw
+        elif isinstance(raw, str):
+            import json
+
+            try:
+                loaded = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                return None
+            if not isinstance(loaded, dict):
+                return None
+            parsed = loaded
+        else:
+            return None
+
+        # Semantic validation: confirm the dict actually satisfies the value
+        # object schema. Degrade to None (with a warning) on a validation error
+        # so version-skewed / partial diagnostics never make the whole request
+        # unloadable.
+        from pydantic import ValidationError
+
+        from orb.domain.base.diagnostic import FulfilmentDiagnostic
+
+        try:
+            FulfilmentDiagnostic.model_validate(parsed)
+        except ValidationError as exc:
+            _module_logger.warning(
+                "Discarding malformed fulfilment_diagnostic (advisory-only) on load: %s",
+                exc,
+            )
+            return None
+        return parsed
+
     def _parse_request_id(self, request_id_data: Any) -> RequestId:
         """Parse RequestId from various formats."""
         if isinstance(request_id_data, str):
@@ -171,6 +228,15 @@ class RequestSerializer(BaseEntitySerializer):
                 "completed_at": self._dt.serialize_datetime(request.completed_at),
                 "first_status_check": self._dt.serialize_datetime(request.first_status_check),
                 "last_status_check": self._dt.serialize_datetime(request.last_status_check),
+                # Fulfilment state machine
+                "deadline_at": self._dt.serialize_datetime(request.deadline_at),
+                "partial_since": self._dt.serialize_datetime(request.partial_since),
+                "last_transition_at": self._dt.serialize_datetime(request.last_transition_at),
+                "fulfilment_diagnostic": (
+                    request.fulfilment_diagnostic.model_dump_json()
+                    if request.fulfilment_diagnostic is not None
+                    else None
+                ),
                 # Versioning
                 "version": request.version,
                 # Legacy fields for backward compatibility
@@ -193,6 +259,12 @@ class RequestSerializer(BaseEntitySerializer):
             created_at = datetime.fromisoformat(data["created_at"])
             started_at = self._dt.deserialize_datetime(data.get("started_at"))
             completed_at = self._dt.deserialize_datetime(data.get("completed_at"))
+
+            # Fulfilment diagnostic may arrive as a JSON string (file backends)
+            # or an already-parsed dict (SQL serializer auto-parses JSON TEXT).
+            fulfilment_diagnostic = self._parse_fulfilment_diagnostic(
+                data.get("fulfilment_diagnostic")
+            )
 
             # Build request data with additional fields
             request_data = {
@@ -235,6 +307,11 @@ class RequestSerializer(BaseEntitySerializer):
                 "completed_at": completed_at,
                 "first_status_check": self._dt.deserialize_datetime(data.get("first_status_check")),
                 "last_status_check": self._dt.deserialize_datetime(data.get("last_status_check")),
+                # Fulfilment state machine
+                "deadline_at": self._dt.deserialize_datetime(data.get("deadline_at")),
+                "partial_since": self._dt.deserialize_datetime(data.get("partial_since")),
+                "last_transition_at": self._dt.deserialize_datetime(data.get("last_transition_at")),
+                "fulfilment_diagnostic": fulfilment_diagnostic,
                 # Versioning
                 "version": data.get("version", 0),
             }

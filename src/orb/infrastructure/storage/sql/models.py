@@ -43,6 +43,12 @@ class RequestModel(Base):
     error_details: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
     success_rate: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Fulfilment state machine (ISO-8601 TEXT timestamps; diagnostic JSON TEXT)
+    deadline_at: Mapped[str | None] = mapped_column(Text, nullable=True)
+    partial_since: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_transition_at: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fulfilment_diagnostic: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON-encoded
+
     # Provider
     provider_api: Mapped[str | None] = mapped_column(String(255), nullable=True)
     provider_name: Mapped[str | None] = mapped_column(String(255), nullable=True)

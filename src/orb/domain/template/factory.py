@@ -12,13 +12,17 @@ class TemplateFactoryPort(Protocol):
 
     def create_template(
         self, template_data: dict[str, Any], provider_type: Optional[str] = None
-    ) -> Template:
+    ) -> Template:  # type: ignore[return]
         """Create appropriate template type based on provider."""
-        ...
+        pass
 
-    def supports_provider(self, provider_type: str) -> bool:
+    def supports_provider(self, provider_type: str) -> bool:  # type: ignore[return]
         """Check if factory supports a provider type."""
-        ...
+        pass
+
+    def get_registered_template_classes(self) -> dict[str, type]:  # type: ignore[return]
+        """Return the provider-type -> template class map known to the factory."""
+        pass
 
 
 class BaseTemplateFactory(ABC):
@@ -146,6 +150,15 @@ class TemplateFactory(BaseTemplateFactory):
             List of provider types that have registered template classes
         """
         return list(self._provider_template_classes.keys())
+
+    def get_registered_template_classes(self) -> dict[str, type]:
+        """Return the provider-type -> template class map known to the factory.
+
+        Consumed by the template-defaults merge so it can derive alias groups
+        from concrete provider template subclasses (which declare top-level
+        ``AliasChoices`` fields the base ``Template`` does not).
+        """
+        return dict(self._provider_template_classes)
 
     def _determine_provider_type(self, template_data: dict[str, Any]) -> Optional[str]:
         """Determine provider type from template data.

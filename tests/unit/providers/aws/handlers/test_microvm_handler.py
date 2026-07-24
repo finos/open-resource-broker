@@ -355,6 +355,7 @@ class TestMicroVMHandlerCheckStatusEdgeCases:
 
         assert len(result.instances) == 1
         assert result.fulfilment.state == "partial"
+        assert result.fulfilment.final is True
 
     def test_check_status_partial_fulfilment(self, handler):
         """When some MicroVMs are running and some terminated, report partial."""
@@ -380,6 +381,7 @@ class TestMicroVMHandlerCheckStatusEdgeCases:
         result = handler.check_hosts_status(request)
 
         assert result.fulfilment.state == "partial"
+        assert result.fulfilment.final is True
         assert result.fulfilment.running_count == 1
         assert result.fulfilment.failed_count == 1
 

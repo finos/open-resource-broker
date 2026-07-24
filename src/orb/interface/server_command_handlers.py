@@ -10,6 +10,7 @@ logs     → tail the daemon's log file
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -98,6 +99,11 @@ def _resolve_configs(args) -> tuple[Any, Any | None]:
     return server_config, ui_config
 
 
+# Strong references to fire-and-forget background tasks so they are not
+# garbage-collected mid-flight (asyncio only holds a weak reference to a Task).
+_background_tasks: set[asyncio.Task[Any]] = set()
+
+
 async def _initialize_application(container: Any) -> None:
     """Initialise the DI container's providers — same as serve handler.
 
@@ -105,6 +111,12 @@ async def _initialize_application(container: Any) -> None:
     orphan GC, etc). Only the REST/daemon path calls this — CLI commands
     explicitly skip it so they stay synchronous and don't issue per-command
     cluster sweeps.
+
+    This runs on the awaited pre-serve path, so it is intentionally limited to
+    genuine readiness dependencies (provider init + daemon services). The
+    best-effort startup recovery sweep is NOT run here — it is scheduled as a
+    post-serve background task by ``_build_runtime`` so it cannot gate API
+    readiness. See ``_run_startup_recovery``.
 
     Args:
         container: The already-resolved DI container from the CLI dispatch boundary.
@@ -130,6 +142,56 @@ async def _initialize_application(container: Any) -> None:
         )
 
 
+async def _run_startup_recovery(container: Any) -> None:
+    """Sweep active requests left stuck by a previous process, best-effort.
+
+    Startup recovery: sweep active requests (acquiring / in_progress /
+    partial_pending) that blew their deadline while a previous process was
+    down or while their owning client stopped polling. Without this, such
+    rows would stay active forever because the lazy per-poll deadline sweep
+    never fires for an unpolled request.
+
+    This is deliberately NOT awaited on the pre-serve init path: it is launched
+    as a fire-and-forget background task *after* uvicorn is serving so the
+    storage scan (which queries active requests and routes each through the
+    state machine) cannot delay ``/health`` becoming ready. It is best-effort —
+    any failure is logged, never fatal — and the actual sweep is offloaded to a
+    worker thread so it never blocks the event loop.
+
+    Args:
+        container: The already-resolved DI container.
+    """
+    from orb.infrastructure.logging.logger import get_logger
+
+    logger = get_logger(__name__)
+    try:
+        from orb.application.services.provisioning_orchestration_service import (
+            ProvisioningOrchestrationService,
+        )
+
+        recovery_service = container.get(ProvisioningOrchestrationService)
+        swept = await asyncio.to_thread(recovery_service.recover_stuck_acquiring_requests)
+        if swept:
+            logger.info("Startup recovery swept %d stuck active request(s) to terminal", swept)
+    except Exception as recovery_exc:
+        logger.warning("Startup active-request recovery scan failed: %s", recovery_exc)
+
+
+def _schedule_startup_recovery(container: Any) -> asyncio.Task[Any]:
+    """Schedule the best-effort startup recovery sweep as a background task.
+
+    The task is created on the running loop but only executes once the serve
+    coroutine below yields control (i.e. once uvicorn is actually serving), so
+    the sweep runs *after* the server can answer ``/health`` rather than gating
+    readiness on it. A strong reference is retained in ``_background_tasks`` so
+    the task is not garbage-collected before it completes.
+    """
+    task = asyncio.create_task(_run_startup_recovery(container))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
+
 def _build_runtime(args):
     """Return a zero-arg coroutine factory that runs the server."""
     server_config, ui_config = _resolve_configs(args)
@@ -147,6 +209,14 @@ def _build_runtime(args):
         )
 
         await _initialize_application(_container)
+
+        # Schedule the best-effort startup recovery sweep as a fire-and-forget
+        # background task. It is intentionally NOT awaited: creating the task
+        # here means it only runs once the serve coroutine below yields control
+        # (i.e. once uvicorn is actually serving), so the storage-scanning sweep
+        # cannot delay ``/health`` becoming ready. A failure inside it is logged,
+        # never fatal — see ``_run_startup_recovery``.
+        _schedule_startup_recovery(_container)
 
         # --api-only forces split (API-only) mode regardless of config.
         if api_only:

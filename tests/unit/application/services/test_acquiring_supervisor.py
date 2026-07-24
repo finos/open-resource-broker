@@ -106,7 +106,9 @@ class TestAcquiringSupervisor:
         uow = MagicMock()
         uow.__enter__ = MagicMock(return_value=uow)
         uow.__exit__ = MagicMock(return_value=False)
-        uow.requests.find_by_status = MagicMock(return_value=[expired_request])
+        uow.requests.find_by_status = MagicMock(
+            side_effect=lambda status: [r for r in [expired_request] if r.status == status]
+        )
         uow.requests.save = MagicMock(side_effect=lambda r: saved_requests.append(r))
 
         uow_factory = MagicMock()
@@ -179,7 +181,9 @@ class TestAcquiringSupervisor:
         uow = MagicMock()
         uow.__enter__ = MagicMock(return_value=uow)
         uow.__exit__ = MagicMock(return_value=False)
-        uow.requests.find_by_status = MagicMock(return_value=[expired_request])
+        uow.requests.find_by_status = MagicMock(
+            side_effect=lambda status: [r for r in [expired_request] if r.status == status]
+        )
         uow.requests.save = MagicMock(side_effect=lambda r: saved_requests.append(r))
 
         uow_factory = MagicMock()

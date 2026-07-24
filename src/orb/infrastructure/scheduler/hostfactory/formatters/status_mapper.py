@@ -27,7 +27,11 @@ def map_domain_status_to_hostfactory(domain_status: str) -> str:
     status_mapping: dict[str, str] = {
         "pending": "running",
         "in_progress": "running",
+        "acquiring": "running",
         "provisioning": "running",
+        # PARTIAL_PENDING is a non-terminal holding state — still active, so it
+        # maps to "running" for the HF wire contract.
+        "partial_pending": "running",
         "complete": "complete",
         "completed": "complete",
         "partial": "complete_with_error",
@@ -72,6 +76,68 @@ def map_machine_status_to_result(status: str | None, request_type: str | None = 
         return "fail"
     else:
         return "executing"  # Default for unknown states
+
+
+def summarise_diagnostic(
+    diagnostic: dict | None,
+    *,
+    fulfilled: int | None = None,
+    target: int | None = None,
+    fallback: str = "",
+) -> str:
+    """Build a category-templated HF ``message`` string from a diagnostic dict.
+
+    The HostFactory response schema is strict (no room for a structured
+    diagnostic field), so the *why* is folded into the existing ``message``
+    string.  Category-appropriate, safe-to-surface templates are used — raw
+    provider error messages are never emitted (only error *codes* for the
+    UNKNOWN fallback), avoiding ARN / identifier leakage.
+
+    Args:
+        diagnostic: Serialised FulfilmentDiagnostic dict (or None).
+        fulfilled: Fulfilled count, for capacity/deadline templates.
+        target: Target count, for capacity/deadline templates.
+        fallback: Message to use when there is no diagnostic.
+
+    Returns:
+        A short human-readable message string.
+    """
+    if not diagnostic:
+        return fallback
+
+    category = str(diagnostic.get("category", "unknown"))
+    detail = diagnostic.get("detail")
+    counts = ""
+    if fulfilled is not None and target is not None:
+        counts = f" {fulfilled}/{target}"
+
+    if category == "capacity":
+        return f"Partially fulfilled:{counts} (insufficient provider capacity)".strip()
+    if category == "auth":
+        return "Failed: provider authentication denied"
+    if category == "rate_limit":
+        return "Throttled by provider; retry recommended"
+    if category == "validation":
+        return f"Configuration error: {detail}" if detail else "Configuration error"
+    if category == "cancelled":
+        return diagnostic.get("summary") or fallback or "Request cancelled"
+    if category == "deadline":
+        return f"Deadline exceeded:{counts} fulfilled".strip()
+    if category == "internal":
+        return diagnostic.get("summary") or fallback or "Provisioning failed"
+
+    # UNKNOWN — append provider error codes (not full messages) to the fallback.
+    codes = sorted(
+        {
+            str(err.get("code"))
+            for err in diagnostic.get("provider_errors", [])
+            if isinstance(err, dict) and err.get("code")
+        }
+    )
+    if codes:
+        base = fallback or diagnostic.get("summary") or "Request incomplete"
+        return f"{base} ({', '.join(codes)})"
+    return fallback or diagnostic.get("summary") or "Request incomplete"
 
 
 def generate_status_message(status: str, machine_count: int) -> str:

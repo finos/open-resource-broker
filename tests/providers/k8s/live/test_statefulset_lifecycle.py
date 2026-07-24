@@ -65,20 +65,24 @@ def _make_request(request_id: str, count: int = 3):
 
 
 def _make_template(namespace: str, image: str = "busybox:latest"):
-    from orb.domain.template.template_aggregate import Template
+    """Construct a minimal :class:`K8sTemplate` for StatefulSet tests.
 
-    return Template(
+    Kubernetes-specific fields (namespace, command) are set as typed
+    ``K8sTemplate`` attributes so they reach the pod spec — the generic
+    ``Template`` aggregate has no ``provider_data`` surface, so those
+    fields would be silently dropped if set there.  A long-running command
+    keeps pods Running and Ready, which the StatefulSet controller requires
+    (default ``OrderedReady`` policy) before it will honour a scale-down.
+    """
+    from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
+
+    return K8sTemplate(
         template_id="live-sts-tpl",
-        provider_type="k8s",
         provider_api="StatefulSet",
-        image_id=image,
-        max_instances=10,
-        provider_data={
-            "k8s": {
-                "namespace": namespace,
-                "command": ["sh", "-c", "sleep 3600"],
-            }
-        },
+        machine_image=image,
+        max_machines=10,
+        namespace=namespace,
+        command=["sh", "-c", "sleep 3600"],
     )
 
 
@@ -226,11 +230,12 @@ async def test_statefulset_release_terminates_highest_ordinal_first(
 
     label_selector = f"orb.io/request-id={live_request_id}"
     _wait_for_pods_by_label(k8s_core_v1, k8s_namespace, label_selector, expected_count=3)
-    # Release 1 — the handler will scale down by 1; the controller will evict
-    # the highest-ordinal pod (``<sts_name>-2``) regardless of what we pass.
-    # We pass the lowest-ordinal pod to exercise the non-highest-ordinal warning.
-    lowest_pod = f"{sts_name}-0"
-    await handler.release_hosts([lowest_pod], request.provider_data)
+    # Release 1 — the handler scales down by 1 and the controller evicts the
+    # highest-ordinal pod (``<sts_name>-2``).  The handler honours a release
+    # only when the caller supplies the top-of-stack victim, so we pass the
+    # highest-ordinal pod name explicitly.
+    highest_pod = f"{sts_name}-2"
+    await handler.release_hosts([highest_pod], request.provider_data)
 
     remaining = _wait_for_active_pod_count(
         k8s_core_v1, k8s_namespace, label_selector, expected_count=2
@@ -252,21 +257,24 @@ async def test_statefulset_release_terminates_highest_ordinal_first(
     _wait_until_statefulset_gone(apps_v1, k8s_namespace, sts_name)
 
 
-async def test_statefulset_release_of_non_highest_falls_back(
+async def test_statefulset_release_of_non_highest_is_refused(
     k8s_provider_config: dict,
     k8s_namespace: str,
     k8s_core_v1,
     live_request_id: str,
 ) -> None:
-    """Requesting release of ``<name>-1`` should evict ``<name>-2`` instead.
+    """Requesting release of a non-highest ordinal is refused.
 
-    The StatefulSet handler logs a WARNING when the requested victims are
-    not the top-of-stack ordinals and proceeds with a scale-down of N;
-    the controller always evicts the highest ordinals.  This test
-    confirms that the scale-down still happens (``<name>-2`` is gone)
-    even when the caller passed a non-highest ordinal victim.
+    The StatefulSet controller only supports scale-down from the top of the
+    ordinal stack, so the handler refuses a selective release whose victims
+    are not exactly the top-of-stack pod names — silently evicting a
+    different pod would cause data loss.  This test confirms the handler
+    raises rather than evicting the wrong pod, and that all three pods
+    remain after the refusal.
     """
     from kubernetes import client as k8s_client_mod, config as k8s_config_mod
+
+    from orb.providers.k8s.exceptions.k8s_exceptions import K8sError
 
     kubeconfig_path = k8s_provider_config.get("kubeconfig_path")
     context = k8s_provider_config.get("context")
@@ -287,20 +295,21 @@ async def test_statefulset_release_of_non_highest_falls_back(
     label_selector = f"orb.io/request-id={live_request_id}"
     _wait_for_pods_by_label(k8s_core_v1, k8s_namespace, label_selector, expected_count=3)
 
-    # Request to release ordinal -1 specifically (a non-highest victim).
+    # Request to release ordinal -1 specifically (a non-highest victim).  The
+    # top-of-stack victim for a scale-down-by-1 would be ``<sts_name>-2``, so a
+    # ``-1`` victim must be refused.
     middle_pod = f"{sts_name}-1"
-    await handler.release_hosts([middle_pod], request.provider_data)
+    with pytest.raises(K8sError) as exc_info:
+        await handler.release_hosts([middle_pod], request.provider_data)
+    assert "top of the ordinal stack" in str(exc_info.value)
 
+    # No pod should have been evicted — all three ordinals remain active.
     remaining = _wait_for_active_pod_count(
-        k8s_core_v1, k8s_namespace, label_selector, expected_count=2
+        k8s_core_v1, k8s_namespace, label_selector, expected_count=3
     )
     remaining_names = {p.metadata.name for p in remaining}
-
-    # The controller always evicts the highest ordinal regardless of what the
-    # caller passed — ``<sts_name>-2`` must be gone.
-    assert f"{sts_name}-2" not in remaining_names, (
-        f"Controller should have evicted {sts_name}-2 (highest ordinal); "
-        f"remaining={remaining_names!r}"
+    assert remaining_names == {f"{sts_name}-0", f"{sts_name}-1", f"{sts_name}-2"}, (
+        f"Refused release must not evict any pod; remaining={remaining_names!r}"
     )
 
     # Full cleanup

@@ -542,6 +542,13 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
         )
 
         attempt = 0
+        # One-shot guard for the 401 credential-recovery path.  A 401 is
+        # non-retryable via the backoff classifier (an expired/rejected token
+        # needs a *refresh*, not a retry), so it is handled out-of-band: on the
+        # first 401 we force the client to re-mint its credential and retry the
+        # operation exactly once.  A second 401 falls through to the normal
+        # non-retryable path and surfaces to the caller.
+        auth_recovery_used = False
         while True:
             # Every invocation after the first is a retry issued by the
             # backoff loop — record it against the operation so
@@ -557,6 +564,29 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
             try:
                 result = operation(*args, **kwargs)
             except Exception as exc:
+                # 401 recovery (bounded to once): an exec/SA token may be
+                # rejected for a reason the SDK's expiry-based refresh hook does
+                # not catch (identity change, clock skew, revoked session).
+                # Force a credential re-mint and retry once before treating the
+                # 401 as a terminal auth failure.
+                if not auth_recovery_used and self._is_auth_401(exc):
+                    auth_recovery_used = True
+                    self._record_api_retry(operation=operation_name)
+                    self._logger.warning(
+                        "Kubernetes operation %s returned 401; forcing credential "
+                        "refresh and retrying once.",
+                        operation_name,
+                    )
+                    try:
+                        self._kubernetes_client.force_token_refresh()
+                    except Exception as refresh_exc:  # pragma: no cover — defensive
+                        self._logger.error(
+                            "Credential refresh after 401 failed for %s: %s",
+                            operation_name,
+                            refresh_exc,
+                        )
+                        raise exc from None
+                    continue
                 # ``should_retry`` updates the circuit state (and may raise
                 # ``CircuitBreakerOpenError`` when the circuit is open),
                 # emitting the state gauge on any transition.
@@ -573,6 +603,26 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
 
             breaker.record_success()
             return result
+
+    @staticmethod
+    def _is_auth_401(exc: BaseException) -> bool:
+        """Return ``True`` when *exc* is (or wraps) a 401 ``ApiException``.
+
+        Unwraps one level of retry wrapping so a 401 surfaced through a
+        ``MaxRetriesExceededError`` is still detected.  Returns ``False`` when
+        the kubernetes SDK is not installed.
+        """
+        try:
+            from kubernetes.client.exceptions import ApiException as _ApiException
+        except ImportError:  # pragma: no cover — extra not installed
+            return False
+
+        candidate: BaseException = exc
+        last_exception = getattr(exc, "last_exception", None)
+        if isinstance(last_exception, BaseException):
+            candidate = last_exception
+
+        return isinstance(candidate, _ApiException) and getattr(candidate, "status", None) == 401
 
     # ------------------------------------------------------------------
     # Pod-state translation — shared between handlers and watcher

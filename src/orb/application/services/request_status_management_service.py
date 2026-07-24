@@ -1,20 +1,113 @@
 """Service for managing request status updates and persistence."""
 
-from typing import Any, Dict, List, cast
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports import LoggingPort
+
+if TYPE_CHECKING:
+    from orb.domain.base.diagnostic import FulfilmentDiagnostic
+from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.machine.aggregate import Machine
+from orb.domain.request.aggregate import Request
+from orb.domain.request.fulfilment_state_machine import (
+    FulfilmentEvent,
+    FulfilmentStateMachine,
+)
 
 from .provisioning_orchestration_service import ProvisioningResult
+
+# Default grace period used only when no FulfilmentStateMachine is injected
+# (lightweight test construction). Production injects the config-driven machine.
+_DEFAULT_GRACE_PERIOD_SECONDS = 3600
 
 
 class RequestStatusManagementService:
     """Service for managing request status updates and persistence."""
 
-    def __init__(self, uow_factory: UnitOfWorkFactory, logger: LoggingPort):
+    def __init__(
+        self,
+        uow_factory: UnitOfWorkFactory,
+        logger: LoggingPort,
+        state_machine: Optional[FulfilmentStateMachine] = None,
+    ):
         self._uow_factory = uow_factory
         self._logger = logger
+        self._state_machine = state_machine or FulfilmentStateMachine(
+            grace_period_seconds=_DEFAULT_GRACE_PERIOD_SECONDS
+        )
+
+    def _apply_verdict(
+        self,
+        request: Any,
+        state: str,
+        message: str,
+        *,
+        event: FulfilmentEvent = FulfilmentEvent.PROVIDER_VERDICT,
+        fulfilment: Optional[ProviderFulfilment] = None,
+        final: bool = False,
+        diagnostic: Any = None,
+    ) -> Any:
+        """Route a status transition through the fulfilment state machine.
+
+        For real ``Request`` aggregates the transition is driven by the state
+        machine (single write authority). For non-pydantic stand-ins used in
+        tests, fall back to the aggregate-style ``update_status`` so those
+        callers keep working.
+
+        ``final`` carries the caller's finality signal onto the synthesised
+        verdict when no explicit ``fulfilment`` is supplied. A synchronous
+        provider whose launch API has already settled (e.g. AWS RunInstances)
+        reports a settled shortfall: marking the synthesised ``partial`` verdict
+        ``final=True`` lets the state machine terminalise it immediately rather
+        than parking it in the PARTIAL_PENDING holding state to await capacity
+        that can never arrive. Asynchronous providers leave it ``False`` so a
+        transient partial can still heal.
+        """
+        from orb.domain.request.exceptions import InvalidRequestStateError
+        from orb.domain.request.request_types import RequestStatus
+
+        now = datetime.now(timezone.utc)
+        if isinstance(request, Request):
+            try:
+                if event == FulfilmentEvent.PROVIDER_VERDICT:
+                    verdict = fulfilment or ProviderFulfilment(
+                        state=state,  # type: ignore[arg-type]
+                        message=message,
+                        final=final,
+                    )
+                    return self._state_machine.apply(
+                        request,
+                        FulfilmentEvent.PROVIDER_VERDICT,
+                        now=now,
+                        fulfilment=verdict,
+                        message=message,
+                        diagnostic=diagnostic,
+                    )
+                return self._state_machine.apply(
+                    request,
+                    event,
+                    now=now,
+                    message=message,
+                    diagnostic=diagnostic,
+                )
+            except InvalidRequestStateError:
+                self._logger.debug(
+                    "State machine rejected transition to %s for request %s",
+                    state,
+                    getattr(request, "request_id", "<unknown>"),
+                )
+                return request
+
+        # Non-pydantic fallback (test mocks) — map verdict state to a status.
+        fallback_status = {
+            "fulfilled": RequestStatus.COMPLETED,
+            "in_progress": RequestStatus.IN_PROGRESS,
+            "partial": RequestStatus.PARTIAL,
+            "failed": RequestStatus.FAILED,
+        }.get(state, RequestStatus.IN_PROGRESS)
+        return request.update_status(fallback_status, message)
 
     async def update_request_from_provisioning(
         self, request: Any, provisioning_result: ProvisioningResult
@@ -62,6 +155,14 @@ class RequestStatusManagementService:
         if has_api_errors and not request.metadata.get("fleet_errors"):
             request = request.update_metadata({"fleet_errors": provider_errors})
 
+        # Surface the provider's *classified* diagnostic (auth / validation /
+        # throttle / capacity) onto the aggregate. The handler stores it under
+        # provider_data["fulfilment_diagnostic"] as a JSON-mode dict; without
+        # merging it here the headline "WHY did it fall short" signal never
+        # reaches request.fulfilment_diagnostic and only a generic capacity
+        # shortfall would be shown.
+        request = self._merge_provider_diagnostic(request, provider_data)
+
         # Create and save machine aggregates
         if instances:
             machines_to_save = []
@@ -96,15 +197,64 @@ class RequestStatusManagementService:
             fulfillment_final=provisioning_result.is_final,
         )
 
-    def _handle_provisioning_failure(self, request: Any, provisioning_result: Any) -> Any:
-        """Handle provisioning failure, capturing provider error details when available."""
-        from orb.domain.request.value_objects import RequestStatus
+    def _merge_provider_diagnostic(self, request: Any, provider_data: Any) -> Any:
+        """Merge a provider-classified diagnostic onto the request aggregate.
 
+        The AWS handlers classify their fleet/spot/ASG errors into a
+        ``FulfilmentDiagnostic`` and stash it (JSON-mode dict) under
+        ``provider_data["fulfilment_diagnostic"]``. This lifts that classified
+        category (auth / validation / throttle / capacity) onto
+        ``request.fulfilment_diagnostic`` via the aggregate's merge-on-write
+        ``set_fulfilment_diagnostic`` so the *why* survives to the DTO.
+
+        Best-effort: a malformed / missing diagnostic is skipped without
+        disturbing the status flow. Only applies to real ``Request`` aggregates.
+        """
+        if not isinstance(request, Request):
+            return request
+        if not isinstance(provider_data, dict):
+            return request
+        raw = provider_data.get("fulfilment_diagnostic")
+        if not raw:
+            return request
+        try:
+            from orb.domain.base.diagnostic import FulfilmentDiagnostic
+
+            if isinstance(raw, FulfilmentDiagnostic):
+                diagnostic = raw
+            elif isinstance(raw, dict):
+                diagnostic = FulfilmentDiagnostic.model_validate(raw)
+            else:
+                return request
+            return request.set_fulfilment_diagnostic(diagnostic)
+        except Exception as e:
+            self._logger.warning(
+                "Failed to merge provider fulfilment diagnostic for request %s: %s",
+                getattr(request, "request_id", "<unknown>"),
+                e,
+            )
+            return request
+
+    def _handle_provisioning_failure(self, request: Any, provisioning_result: Any) -> Any:
+        """Handle provisioning failure, capturing provider error details when available.
+
+        The provider error is run through the shared classifier so a hard
+        failure (``InsufficientInstanceCapacity`` -> CAPACITY,
+        ``UnauthorizedOperation`` -> AUTH, ...) is categorised correctly instead
+        of being flattened to INTERNAL. The user-facing ``summary`` is the safe
+        category template; the raw provider message is kept only in ``detail``
+        (and in ``error_details``/metadata below), never in the summary.
+        """
         error_message = (
             provisioning_result.error_message or "Provisioning failed (no error details)"
         )
-        request = request.update_status(
-            RequestStatus.FAILED, f"Provisioning failed: {error_message}"
+        failure_diagnostic = self._classify_failure_diagnostic(provisioning_result, error_message)
+        request = self._apply_verdict(
+            request,
+            "failed",
+            f"Provisioning failed: {error_message}",
+            event=FulfilmentEvent.FAIL,
+            diagnostic=failure_diagnostic,
         )
 
         request = request.update_metadata(
@@ -141,12 +291,73 @@ class RequestStatusManagementService:
                 fields = request.model_dump()
                 fields["error_details"] = current
                 fields["version"] = request.version + 1
-                request = RequestAggregate.model_validate(fields)
+                # Preserve the FAILED status-change event emitted by the FAIL
+                # verdict above — a plain model_validate would drop _domain_events
+                # and subscribers would never observe the failure.
+                request = request._rebuild_preserving_events(fields)
             else:
                 # Fallback for mock objects in tests
                 request.error_details = current  # type: ignore[attr-defined]
 
         return request
+
+    def _classify_failure_diagnostic(
+        self, provisioning_result: Any, error_message: str
+    ) -> "FulfilmentDiagnostic":
+        """Classify a provisioning failure into a categorised diagnostic.
+
+        Assembles the provider error signals available on the failed result
+        (``fleet_errors`` in ``provider_data``, plus the top-level
+        ``provider_error_code`` / ``error_message``) and runs them through the
+        shared classifier so a hard failure gets the right category
+        (CAPACITY / AUTH / VALIDATION / RATE_LIMIT) rather than a blanket
+        INTERNAL. The summary is the safe category template; the raw provider
+        message is preserved only in ``detail``.
+        """
+        from orb.domain.base.diagnostic import DiagnosticCategory, FulfilmentDiagnostic
+        from orb.domain.base.error_classification import classify_provider_errors
+
+        now = datetime.now(timezone.utc)
+        provider_error_code = getattr(provisioning_result, "provider_error_code", None)
+        provider_error_message = getattr(provisioning_result, "provider_error_message", None)
+        detail = provider_error_code if isinstance(provider_error_code, str) else None
+
+        # Collect classifiable error records. Prefer the structured fleet_errors
+        # the provider already normalised; otherwise synthesise a single record
+        # from the top-level provider_error_code so a hard API failure that did
+        # not populate fleet_errors is still categorised.
+        errors: list[dict[str, Any]] = []
+        provider_data = getattr(provisioning_result, "provider_data", None)
+        if isinstance(provider_data, dict):
+            fleet_errors = provider_data.get("fleet_errors")
+            if isinstance(fleet_errors, list):
+                errors.extend(e for e in fleet_errors if isinstance(e, dict))
+        if not errors and isinstance(provider_error_code, str) and provider_error_code:
+            errors.append(
+                {
+                    "error_code": provider_error_code,
+                    "error_message": (
+                        provider_error_message
+                        if isinstance(provider_error_message, str)
+                        else error_message
+                    ),
+                }
+            )
+
+        if not errors:
+            # No provider error signal at all (e.g. dispatch timeout, generic
+            # exception) — keep the INTERNAL categorisation, raw detail in detail.
+            return FulfilmentDiagnostic(
+                category=DiagnosticCategory.INTERNAL,
+                summary="Provisioning failed",
+                detail=detail or error_message,
+                occurred_at=now,
+            )
+
+        classified = classify_provider_errors(errors, now=now)
+        # Keep the safe category-templated summary; attach the raw provider code
+        # as detail so operators still have the actionable specifics.
+        return classified.model_copy(update={"detail": detail or classified.detail})
 
     def _update_request_status(
         self,
@@ -174,8 +385,6 @@ class RequestStatusManagementService:
         wire payload consistent across both batched-instance and
         instant-fulfilment providers.
         """
-        from orb.domain.request.value_objects import RequestStatus
-
         error_summary = None
         if has_api_errors:
             error_summary = (
@@ -216,60 +425,67 @@ class RequestStatusManagementService:
             # specific spot capacity warnings that were already routed around
             # by the fleet's instance-type ladder) are advisory in this
             # case — they did not prevent any capacity unit being met.
-            # Marking the request PARTIAL would be misleading and locks it
-            # in a terminal non-success state. The errors are still
-            # persisted under request.metadata["fleet_errors"] and visible
-            # in the drawer.
+            # Marking the request partial would be misleading. The errors are
+            # still persisted under request.metadata["fleet_errors"].
             if not fulfillment_final:
                 # Provider returned all instance IDs synchronously but instances
-                # are still 'pending' (booting). Keep request IN_PROGRESS so
-                # check_hosts_status / ProviderFulfilment can promote it to
-                # COMPLETED once running_count >= target.
-                request = request.update_status(
-                    RequestStatus.IN_PROGRESS,
+                # are still 'pending' (booting). Keep request in progress so a
+                # later provider verdict can promote it to COMPLETED once
+                # running_count >= target.
+                request = self._apply_verdict(
+                    request,
+                    "in_progress",
                     f"{instance_count}/{requested_count} instances created — awaiting running state",
                 )
             elif has_api_errors:
-                request = request.update_status(
-                    RequestStatus.COMPLETED,
+                request = self._apply_verdict(
+                    request,
+                    "fulfilled",
                     f"All {instance_count} instances provisioned (with non-blocking provider warnings)",
                 )
             else:
-                request = request.update_status(
-                    RequestStatus.COMPLETED,
+                request = self._apply_verdict(
+                    request,
+                    "fulfilled",
                     "All instances provisioned successfully",
                 )
         elif instance_count > 0:
             # When the provider has NOT signalled this is the final answer
-            # (fulfillment_final=False — true for async cloud providers that
-            # set requires_async_polling=True) we MUST NOT stamp PARTIAL here.
-            # PARTIAL is terminal; once stamped, future sync cycles cannot
-            # reconcile against the actual provider state. Stay IN_PROGRESS
-            # instead and let the polling loop / ProviderFulfilment promote the
-            # request to COMPLETED once running_count >= target.
+            # (fulfillment_final=False) stay in progress. When it IS final and
+            # the count fell short, emit a partial verdict: the state machine
+            # resolves it to the non-terminal PARTIAL_PENDING holding state
+            # while within the deadline (so a later sync can still complete it)
+            # or to terminal PARTIAL once the deadline passes.
             if not fulfillment_final:
-                request = request.update_status(
-                    RequestStatus.IN_PROGRESS,
+                request = self._apply_verdict(
+                    request,
+                    "in_progress",
                     f"{instance_count}/{requested_count} instances created — awaiting provider confirmation",
                 )
             elif has_api_errors:
-                request = request.update_status(
-                    RequestStatus.PARTIAL,
+                request = self._apply_verdict(
+                    request,
+                    "partial",
                     f"Partial success: {instance_count}/{requested_count} instances created with API errors: {error_summary}",
+                    final=fulfillment_final,
                 )
             else:
-                request = request.update_status(
-                    RequestStatus.PARTIAL,
+                request = self._apply_verdict(
+                    request,
+                    "partial",
                     f"Partially fulfilled: {instance_count}/{requested_count} instances",
+                    final=fulfillment_final,
                 )
         elif request.resource_ids:
-            request = request.update_status(
-                RequestStatus.IN_PROGRESS,
+            request = self._apply_verdict(
+                request,
+                "in_progress",
                 "Resources created, instances pending",
             )
         else:
-            request = request.update_status(
-                RequestStatus.FAILED,
+            request = self._apply_verdict(
+                request,
+                "failed",
                 "No instances provisioned and no cloud resources created",
             )
 

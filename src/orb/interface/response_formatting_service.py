@@ -1,14 +1,52 @@
 """Response formatting service — wraps SchedulerPort with explicit per-operation methods."""
 
-from typing import Any
+from typing import Any, Final
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.ports.scheduler_port import SchedulerPort
 
 
+class _Unset:
+    """Sentinel type marking a pagination argument the caller did not supply.
+
+    Distinguishes a *LIST* response (caller passes ``total_count``/``next_cursor``
+    — even when their value is ``None`` on the last page) from a *single-item* or
+    HostFactory ``getRequestStatus`` response (caller omits them entirely). Only
+    LIST callers get the pagination fields stamped into the payload; single/HF
+    responses must stay free of ``next_cursor``/``total_count`` because the IBM
+    Symphony HostFactory wire spec has no pagination cursor there.
+    """
+
+
+_UNSET: Final = _Unset()
+
+
 class ResponseFormattingService:
     def __init__(self, scheduler: SchedulerPort) -> None:
         self._scheduler = scheduler
+
+    @staticmethod
+    def _stamp_pagination(
+        data: Any,
+        total_count: int | None | _Unset,
+        next_cursor: str | None | _Unset,
+    ) -> None:
+        """Stamp pagination fields onto a LIST payload, in place.
+
+        A field is written only when the caller *supplied* it (i.e. the argument
+        is not the ``_UNSET`` sentinel). This gates pagination to LIST responses:
+        single-item and HostFactory ``getRequestStatus`` callers omit both
+        arguments, so their payload never gains ``next_cursor``/``total_count``.
+        Supplying an explicit ``None`` (a last page with no more rows) still
+        writes the key — LIST consumers such as the UI ``load-more`` control read
+        ``res["next_cursor"]`` and rely on the key being present.
+        """
+        if not isinstance(data, dict):
+            return
+        if not isinstance(total_count, _Unset):
+            data["total_count"] = total_count
+        if not isinstance(next_cursor, _Unset):
+            data["next_cursor"] = next_cursor
 
     def format_request_operation(self, raw: dict[str, Any], status: str) -> InterfaceResponse:
         """Format a request creation/mutation result."""
@@ -20,21 +58,29 @@ class ResponseFormattingService:
         self,
         requests: list[Any],
         *,
-        total_count: int | None = None,
-        next_cursor: str | None = None,
+        total_count: int | None | _Unset = _UNSET,
+        next_cursor: str | None | _Unset = _UNSET,
     ) -> InterfaceResponse:
-        """Format a list of request status DTOs.
+        """Format request status DTOs for LIST *and* single/HF status responses.
 
-        The optional ``total_count`` and ``next_cursor`` keyword arguments
-        are appended to the payload when supplied so the CLI response shape
-        matches ``GET /api/v1/requests/``.
+        This method backs two distinct wire contracts sharing one formatter:
+
+        * **LIST responses** (``list_requests`` CLI, ``GET /api/v1/requests/``)
+          pass ``total_count`` and ``next_cursor`` so the paginated shape carries
+          the load-more cursor.
+        * **Single-request / HostFactory ``getRequestStatus`` responses**
+          (``get_request_status`` CLI, ``GET /{id}``, ``GET /{id}/status``,
+          ``POST /status``, SSE stream) omit both arguments. The IBM Symphony HF
+          wire spec has no pagination cursor there, so ``next_cursor``/
+          ``total_count`` must NOT be injected into that payload.
+
+        Injection is therefore gated on whether the caller supplied the
+        arguments, not on their value — a LIST last page still stamps
+        ``next_cursor=None`` (key present for the UI), while a single/HF call
+        leaves the payload clean.
         """
         data = self._scheduler.format_request_status_response(requests)
-        if isinstance(data, dict):
-            if total_count is not None:
-                data["total_count"] = total_count
-            if next_cursor is not None or "next_cursor" not in data:
-                data["next_cursor"] = next_cursor
+        self._stamp_pagination(data, total_count, next_cursor)
         return InterfaceResponse(data=data)
 
     def format_return_requests(self, requests: list[Any]) -> InterfaceResponse:
@@ -47,21 +93,18 @@ class ResponseFormattingService:
         self,
         machines: list[Any],
         *,
-        total_count: int | None = None,
-        next_cursor: str | None = None,
+        total_count: int | None | _Unset = _UNSET,
+        next_cursor: str | None | _Unset = _UNSET,
     ) -> InterfaceResponse:
-        """Format a list of machine DTOs.
+        """Format a LIST of machine DTOs.
 
-        The optional ``total_count`` and ``next_cursor`` keyword arguments
-        are appended to the payload when supplied so the CLI response shape
-        matches ``GET /api/v1/machines/``.
+        The ``total_count`` and ``next_cursor`` keyword arguments are stamped
+        into the payload only when supplied, so the paginated CLI shape matches
+        ``GET /api/v1/machines/``. A single-machine listing (no kwargs) stays
+        free of pagination fields.
         """
         data = self._scheduler.format_machine_status_response(machines)
-        if isinstance(data, dict):
-            if total_count is not None:
-                data["total_count"] = total_count
-            if next_cursor is not None or "next_cursor" not in data:
-                data["next_cursor"] = next_cursor
+        self._stamp_pagination(data, total_count, next_cursor)
         return InterfaceResponse(data=data)
 
     def format_machine_detail(self, machine: dict[str, Any]) -> InterfaceResponse:
@@ -73,21 +116,18 @@ class ResponseFormattingService:
         self,
         templates: list[Any],
         *,
-        total_count: int | None = None,
-        next_cursor: str | None = None,
+        total_count: int | None | _Unset = _UNSET,
+        next_cursor: str | None | _Unset = _UNSET,
     ) -> InterfaceResponse:
-        """Format a list of template DTOs.
+        """Format a LIST of template DTOs.
 
-        The optional ``total_count`` and ``next_cursor`` keyword arguments
-        are appended to the payload when supplied so the CLI response shape
-        matches ``GET /api/v1/templates/``.
+        The ``total_count`` and ``next_cursor`` keyword arguments are stamped
+        into the payload only when supplied, so the paginated CLI shape matches
+        ``GET /api/v1/templates/``. A refresh/list call without pagination
+        kwargs stays free of pagination fields.
         """
         data = self._scheduler.format_templates_response(templates)
-        if isinstance(data, dict):
-            if total_count is not None:
-                data["total_count"] = total_count
-            if next_cursor is not None or "next_cursor" not in data:
-                data["next_cursor"] = next_cursor
+        self._stamp_pagination(data, total_count, next_cursor)
         return InterfaceResponse(data=data)
 
     def format_template_mutation(self, raw: dict[str, Any]) -> InterfaceResponse:

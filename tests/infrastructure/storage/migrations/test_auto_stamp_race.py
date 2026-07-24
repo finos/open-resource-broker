@@ -154,7 +154,7 @@ class TestAutoStampSingleWorker:
         strategy._auto_stamp_head(pre_existing_db)
 
         value = _stamp_value(pre_existing_db)
-        assert value == "f6d2ba73f23c", f"Expected head revision 931fd7c7aca5 but got {value!r}"
+        assert value == "55e3b5553d98", f"Expected head revision 55e3b5553d98 but got {value!r}"
 
     def test_second_call_is_no_op(self, pre_existing_db):
         """Calling _auto_stamp_head twice must not create a second row."""
@@ -229,7 +229,7 @@ class TestAutoStampConcurrentWorkers:
         """The stamped revision must equal the Alembic head after concurrent writes."""
         self._run_n_workers(pre_existing_db, n=5)
         value = _stamp_value(pre_existing_db)
-        assert value == "f6d2ba73f23c"
+        assert value == "55e3b5553d98"
 
     def test_workers_do_not_raise_on_contention(self, pre_existing_db):
         """Workers that lose the race must log INFO and return cleanly (no exception)."""

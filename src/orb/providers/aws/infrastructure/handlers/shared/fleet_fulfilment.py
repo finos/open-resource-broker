@@ -12,12 +12,122 @@ types and using count-based logic for Instant fleets.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
+    from orb.domain.base.provider_fulfilment import FulfilmentState
     from orb.providers.aws.domain.template.value_objects import AWSFleetType
 
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
+
+
+def _sum_optional_counts(values: list[Optional[int]]) -> Optional[int]:
+    """Sum a list of optional capacity counts, preserving 'unknown' vs 'zero'.
+
+    A ``None`` contributor is treated as 0 for summation, but if *every*
+    contributor is ``None`` the result is ``None`` — collapsing an all-unknown
+    field to 0 would fabricate a definite 'zero' the providers never reported.
+    """
+    present = [v for v in values if v is not None]
+    if not present:
+        return None
+    return sum(present)
+
+
+# The combined states for which a merged diagnostic is meaningful.  A
+# diagnostic exists to explain a *shortfall* or *failure*; an ``in_progress``
+# aggregate (a fleet is still booting — nothing has gone wrong yet) and a
+# ``fulfilled`` aggregate (nothing to explain) must carry ``diagnostic=None``,
+# exactly like the single-fleet path never attaches a diagnostic to those two
+# states.  Gating here keeps the multi-fleet contract symmetric with the
+# single-fleet one and stops a transient IN_PROGRESS poll from being stamped
+# with (and re-persisting every poll) a contributor's CAPACITY shortfall.
+_DIAGNOSTIC_STATES: frozenset[str] = frozenset({"partial", "failed"})
+
+
+def aggregate_fleet_fulfilment(
+    state: "FulfilmentState",
+    message: str,
+    final: bool,
+    contributors: list[ProviderFulfilment],
+    requested_count: int,
+) -> ProviderFulfilment:
+    """Build the combined verdict for a multi-fleet request.
+
+    A multi-fleet request's overall verdict must carry the SAME contract as the
+    single-fleet path — not just ``state``/``message``/``final``. This helper
+    propagates every meaningful field so a multi-fleet partial stamps the
+    request DTO with a diagnostic and capacity numbers exactly like a
+    single-fleet partial would.
+
+    ``target_units`` is the whole-request target — ``requested_count`` — a
+    single known value, NOT the sum of the contributors' ``target_units``.  The
+    per-fleet handlers fall back to the full ``request.requested_count`` when
+    AWS omits a fleet's capacity (a not-yet-visible fleet, or one missing
+    ``TargetCapacity``), so each such fleet already stamps ``target_units`` with
+    the whole-request total; summing those fallbacks over-counts the target
+    (a 10-instance request split across two fleets could report 15).  Because
+    ORB always submits ``TotalTargetCapacity == requested_count`` (see the fleet
+    config builders), ``requested_count`` is exactly the whole-request target
+    on the same capacity-unit scale as the summed ``fulfilled_units``.
+
+    The observed counts (``fulfilled_units``/``running_count``/``pending_count``/
+    ``failed_count``) ARE summed across all contributing fleets — those are real
+    per-fleet observations, not request-total fallbacks — so the aggregate
+    represents the whole request's observed capacity; each stays ``None`` only
+    when every contributor reported ``None`` (see :func:`_sum_optional_counts`).
+
+    ``diagnostic`` is the most-severe merge (:meth:`FulfilmentDiagnostic.merge`)
+    of every contributor's diagnostic — but ONLY when ``state`` is a genuine
+    shortfall/failure (``partial``/``failed``; see ``_DIAGNOSTIC_STATES``).  An
+    ``in_progress`` or ``fulfilled`` aggregate carries ``diagnostic=None``,
+    matching the single-fleet path, since neither has anything to explain.
+    ``None`` too when no contributor has a diagnostic to merge.
+    """
+    from orb.domain.base.diagnostic import FulfilmentDiagnostic
+
+    merged_diagnostic: Optional[FulfilmentDiagnostic] = None
+    if state in _DIAGNOSTIC_STATES:
+        for contributor in contributors:
+            diag = contributor.diagnostic
+            if diag is None:
+                continue
+            merged_diagnostic = (
+                diag
+                if merged_diagnostic is None
+                else FulfilmentDiagnostic.merge(merged_diagnostic, diag)
+            )
+
+    return ProviderFulfilment(
+        state=state,
+        message=message,
+        target_units=requested_count,
+        fulfilled_units=_sum_optional_counts([c.fulfilled_units for c in contributors]),
+        running_count=_sum_optional_counts([c.running_count for c in contributors]),
+        pending_count=_sum_optional_counts([c.pending_count for c in contributors]),
+        failed_count=_sum_optional_counts([c.failed_count for c in contributors]),
+        final=final,
+        diagnostic=merged_diagnostic,
+    )
+
+
+def build_diagnostic_for_errors(
+    fleet_errors: Optional[list[dict[str, Any]]],
+) -> Any:
+    """Classify fleet errors into a FulfilmentDiagnostic (or None when empty).
+
+    Thin wrapper over :func:`classify_aws_errors` so handlers can attach a
+    diagnostic to a partial/failed ``ProviderFulfilment`` without importing the
+    classifier at every call site.
+    """
+    if not fleet_errors:
+        return None
+    from orb.providers.aws.infrastructure.handlers.shared.error_classifier import (
+        classify_aws_errors,
+    )
+
+    return classify_aws_errors(fleet_errors, now=datetime.now(timezone.utc))
 
 
 def compute_capacity_based_fulfilment(
@@ -79,6 +189,22 @@ def compute_capacity_based_fulfilment(
             pending_count=pending_count,
             failed_count=failed_count,
         )
+
+
+def _capacity_diagnostic(fulfilled: int, target: int) -> Any:
+    """Build a CAPACITY diagnostic for a partial fleet with no explicit errors.
+
+    A partial poll verdict with no AWS error payload still needs a *why* — the
+    capacity simply did not arrive. This yields a CAPACITY-category diagnostic
+    so the request DTO can explain the shortfall.
+    """
+    from orb.domain.base.diagnostic import DiagnosticCategory, FulfilmentDiagnostic
+
+    return FulfilmentDiagnostic(
+        category=DiagnosticCategory.CAPACITY,
+        summary=f"Partially fulfilled: {fulfilled}/{target} capacity",
+        occurred_at=datetime.now(timezone.utc),
+    )
 
 
 def compute_ec2fleet_fulfilment(
@@ -146,6 +272,10 @@ def compute_ec2fleet_fulfilment(
                 running_count=running_count,
                 pending_count=pending_count,
                 failed_count=failed_count,
+                # Instant fleet is synchronous: this partial is settled, the
+                # remaining capacity will never arrive — terminalise immediately.
+                final=True,
+                diagnostic=_capacity_diagnostic(running_count, requested_count),
             )
         elif not instances:
             return ProviderFulfilment(

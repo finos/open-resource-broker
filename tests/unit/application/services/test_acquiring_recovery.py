@@ -82,7 +82,14 @@ def _make_uow_factory(requests: list[Request]) -> tuple[MagicMock, MagicMock]:
     saved: list[Request] = []
 
     repo_mock = MagicMock()
-    repo_mock.find_by_status.return_value = requests
+
+    # The recovery scan queries ACQUIRING, IN_PROGRESS and PARTIAL_PENDING
+    # separately. Return each supplied request only for the status it actually
+    # holds so a single ACQUIRING row is not counted once per queried status.
+    def _find_by_status(status: RequestStatus) -> list[Request]:
+        return [r for r in requests if r.status == status]
+
+    repo_mock.find_by_status.side_effect = _find_by_status
 
     def _save(req: Request) -> None:
         saved.append(req)
@@ -133,7 +140,7 @@ class TestRecoverStuckAcquiringRequests:
         assert len(saved) == 1
         failed_req: Request = saved[0]
         assert failed_req.status == RequestStatus.FAILED
-        assert "ACQUIRING" in (failed_req.status_message or "")
+        assert "timeout exceeded" in (failed_req.status_message or "")
         # Resource IDs are preserved for operator visibility.
         assert "pod-abc" in failed_req.resource_ids
 
@@ -168,3 +175,74 @@ class TestRecoverStuckAcquiringRequests:
         assert len(saved) == 1
         assert saved[0].status == RequestStatus.FAILED
         assert "pod-old" in saved[0].resource_ids
+
+
+class TestRecoverSweepsAllActiveStatuses:
+    """The recovery sweep must cover IN_PROGRESS and PARTIAL_PENDING (not just
+    ACQUIRING) so a client that stops polling cannot leave a request active
+    forever. Rows are judged expired by deadline_at when present."""
+
+    def _make_active_request(
+        self,
+        status: RequestStatus,
+        deadline_at: datetime,
+        machine_ids: list[str] | None = None,
+    ) -> Request:
+        req = Request.create_new_request(
+            request_type=RequestType.ACQUIRE,
+            template_id="tpl-active",
+            machine_count=3,
+            provider_type="aws",
+            provider_name="aws-1",
+        )
+        updates = {
+            "status": status,
+            "deadline_at": deadline_at,
+            "started_at": deadline_at - timedelta(seconds=3600),
+        }
+        if machine_ids:
+            updates["machine_ids"] = machine_ids
+        return req.model_copy(update=updates)
+
+    def test_expired_in_progress_swept_to_timeout(self):
+        now = datetime.now(timezone.utc)
+        req = self._make_active_request(
+            RequestStatus.IN_PROGRESS, deadline_at=now - timedelta(seconds=10)
+        )
+        uow_factory, saved = _make_uow_factory([req])
+        svc = _make_service(uow_factory)
+
+        result = svc.recover_stuck_acquiring_requests(timeout_seconds=3600)
+
+        assert result == 1
+        assert len(saved) == 1
+        # No capacity → TIMEOUT via the deadline sweep.
+        assert saved[0].status == RequestStatus.TIMEOUT
+
+    def test_expired_partial_pending_swept_to_partial(self):
+        now = datetime.now(timezone.utc)
+        req = self._make_active_request(
+            RequestStatus.PARTIAL_PENDING,
+            deadline_at=now - timedelta(seconds=10),
+            machine_ids=["i-1"],  # 1/3 capacity → terminal PARTIAL
+        )
+        uow_factory, saved = _make_uow_factory([req])
+        svc = _make_service(uow_factory)
+
+        result = svc.recover_stuck_acquiring_requests(timeout_seconds=3600)
+
+        assert result == 1
+        assert saved[0].status == RequestStatus.PARTIAL
+
+    def test_in_progress_within_deadline_left_alone(self):
+        now = datetime.now(timezone.utc)
+        req = self._make_active_request(
+            RequestStatus.IN_PROGRESS, deadline_at=now + timedelta(seconds=600)
+        )
+        uow_factory, saved = _make_uow_factory([req])
+        svc = _make_service(uow_factory)
+
+        result = svc.recover_stuck_acquiring_requests(timeout_seconds=3600)
+
+        assert result == 0
+        assert saved == []

@@ -14,6 +14,14 @@ paths-ignore:
   - ".venv/**"
   - "build/**"
   - "dist/**"
+  # Generated Alembic migration boilerplate. Each migration module MUST define
+  # the revision/down_revision/branch_labels/depends_on globals — Alembic reads
+  # them by name to build the revision graph, so they are never referenced from
+  # within the module and trip py/unused-global-variable as a universal false
+  # positive. These modules contain only static schema DDL via the Alembic/
+  # SQLAlchemy API (no request handling, no user input, no injection surface),
+  # so excluding them from code-quality scanning loses no security coverage.
+  - "src/orb/infrastructure/storage/sql/migrations/versions/**"
 
 paths:
   - "src/**"

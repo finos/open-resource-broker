@@ -540,6 +540,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 running_count=running_count,
                 pending_count=pending_count,
                 failed_count=failed_count,
+                # Synchronous RunInstances settled: nothing pending, remaining
+                # capacity will never appear — terminalise immediately.
+                final=True,
             )
         else:
             return ProviderFulfilment(
@@ -778,7 +781,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 description="On-demand instances using RunInstances API",
                 provider_api="RunInstances",
                 machine_types={"t3.medium": 2},
-                max_instances=100,
+                max_machines=100,
                 price_type="ondemand",
                 subnet_ids=[],
                 security_group_ids=[],
@@ -790,7 +793,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 description="Spot instances using RunInstances API",
                 provider_api="RunInstances",
                 machine_types={"t3.medium": 2},
-                max_instances=100,
+                max_machines=100,
                 price_type="spot",
                 max_price=0.10,
                 subnet_ids=[],

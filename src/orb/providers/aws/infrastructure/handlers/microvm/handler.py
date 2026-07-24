@@ -330,6 +330,9 @@ class MicroVMHandler(AWSHandler):
                 running_count=running_count,
                 pending_count=pending_count,
                 failed_count=failed_count,
+                # Synchronous launch settled: nothing pending, remaining
+                # capacity will never appear — terminalise immediately.
+                final=True,
             )
         else:
             return ProviderFulfilment(

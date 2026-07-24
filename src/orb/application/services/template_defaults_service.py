@@ -2,6 +2,8 @@
 
 from typing import Any, Optional
 
+from pydantic import BaseModel
+
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
@@ -12,6 +14,85 @@ from orb.domain.template.ports.template_extension_registry_port import (
     TemplateExtensionRegistryPort,
 )
 from orb.domain.template.template_aggregate import Template
+
+
+def _alias_groups_for_model(model: type[BaseModel]) -> dict[str, tuple[str, ...]]:
+    """Map every ``AliasChoices`` field name on *model* to its full alias set.
+
+    A field may be declared under a canonical name plus one or more deprecated
+    aliases via Pydantic ``AliasChoices`` (e.g. ``machine_image`` accepts the
+    legacy ``image_id``).  Derived from the model's own ``model_fields`` so it
+    can never drift from the model definition.  This walks *only* the given
+    model class, so calling it on a provider template subclass (e.g.
+    ``AWSTemplate``) picks up top-level alias fields the base ``Template`` does
+    not declare (e.g. ``abis_instance_requirements`` /
+    ``abisInstanceRequirements``), and calling it on a provider *extension*
+    config (e.g. ``K8sTemplateExtensionConfig``) picks up extension-only aliases
+    such as ``env`` / ``environment_variables``.
+    """
+    from pydantic import AliasChoices
+
+    groups: dict[str, tuple[str, ...]] = {}
+    for field in model.model_fields.values():
+        va = field.validation_alias
+        if isinstance(va, AliasChoices):
+            names = tuple(c for c in va.choices if isinstance(c, str))
+            for name in names:
+                groups[name] = names
+    return groups
+
+
+def _union_alias_groups(
+    group_maps: list[dict[str, tuple[str, ...]]],
+) -> dict[str, tuple[str, ...]]:
+    """Union alias-group maps from several template models into one.
+
+    Field aliases describe the *same logical slot* across the base model and
+    any provider subclass, so overlapping groups are merged via their
+    transitive closure: if any name is shared between two groups, every name in
+    both belongs to the combined slot.  The result maps each alias name to the
+    complete set of names for its slot, so a value under any one alias can drop
+    every sibling regardless of which model contributed the alias.
+    """
+    # Union-find over alias names to compute connected components.
+    parent: dict[str, str] = {}
+
+    def find(x: str) -> str:
+        parent.setdefault(x, x)
+        root = x
+        while parent[root] != root:
+            root = parent[root]
+        # Path compression.
+        while parent[x] != root:
+            parent[x], x = root, parent[x]
+        return root
+
+    def union(a: str, b: str) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for gm in group_maps:
+        for names in gm.values():
+            for name in names:
+                union(names[0], name)
+
+    components: dict[str, list[str]] = {}
+    for name in parent:
+        components.setdefault(find(name), []).append(name)
+
+    result: dict[str, tuple[str, ...]] = {}
+    for members in components.values():
+        group = tuple(members)
+        for name in members:
+            result[name] = group
+    return result
+
+
+# Base-model alias groups — used as a static fallback when no provider template
+# factory is injected.  The service unions these with provider-subclass alias
+# groups at merge time via :meth:`TemplateDefaultsService._effective_alias_groups`.
+_FIELD_ALIAS_GROUPS: dict[str, tuple[str, ...]] = _alias_groups_for_model(Template)
 
 
 class TemplateDefaultsService(TemplateDefaultsPort):
@@ -51,6 +132,125 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         self.template_factory = template_factory
         self.extension_registry = extension_registry
         self.provider_registry = provider_registry
+        # Lazily-computed union of base + provider-subclass alias groups.
+        self._alias_groups_cache: Optional[dict[str, tuple[str, ...]]] = None
+        # Per-provider-type extension-config alias groups, computed on demand.
+        self._extension_alias_groups_cache: dict[str, dict[str, tuple[str, ...]]] = {}
+
+    def _effective_alias_groups(self) -> dict[str, tuple[str, ...]]:
+        """Alias groups covering base ``Template`` plus every registered provider subclass.
+
+        The base ``Template`` only declares its own ``AliasChoices`` fields;
+        provider subclasses (e.g. ``AWSTemplate``) add top-level alias fields
+        such as ``abis_instance_requirements`` / ``abisInstanceRequirements``.
+        When a template factory is injected, those subclasses are discovered via
+        the factory registry and their alias groups are unioned in, so no
+        aliased field on any registered template model is missed during merges.
+        Falls back to the static base-model groups when no factory is present.
+        """
+        if self._alias_groups_cache is not None:
+            return self._alias_groups_cache
+
+        group_maps: list[dict[str, tuple[str, ...]]] = [_FIELD_ALIAS_GROUPS]
+
+        factory = self.template_factory
+        getter = getattr(factory, "get_registered_template_classes", None)
+        if callable(getter):
+            try:
+                registered = getter()
+                classes = registered.values() if isinstance(registered, dict) else ()
+                for tpl_cls in classes:
+                    if isinstance(tpl_cls, type) and issubclass(tpl_cls, Template):
+                        group_maps.append(_alias_groups_for_model(tpl_cls))
+            except Exception as e:  # pragma: no cover — defensive
+                self.logger.debug("Could not derive provider alias groups: %s", e)
+
+        self._alias_groups_cache = (
+            _union_alias_groups(group_maps) if len(group_maps) > 1 else _FIELD_ALIAS_GROUPS
+        )
+        return self._alias_groups_cache
+
+    def _extension_alias_groups(self, provider_type: str) -> dict[str, tuple[str, ...]]:
+        """Alias groups for a provider's *extension* config model.
+
+        Extension configs (``ProviderTemplateExtensionBase`` subclasses such as
+        ``K8sTemplateExtensionConfig``) declare their own ``AliasChoices`` fields
+        — e.g. ``env`` / ``environment_variables`` — that neither the base
+        ``Template`` nor the provider template subclasses carry.  The
+        extension-layer merge must key by those groups so a higher-priority
+        (instance) extension default under any alias drops the lower-priority
+        (type) sibling.  Derived from the concrete extension class the registry
+        holds for *provider_type*; empty when none is registered.
+        """
+        cached = self._extension_alias_groups_cache.get(provider_type)
+        if cached is not None:
+            return cached
+
+        groups: dict[str, tuple[str, ...]] = {}
+        registry = self.extension_registry
+        getter = getattr(registry, "get_extension_class", None)
+        if callable(getter):
+            try:
+                ext_cls = getter(provider_type)
+                if isinstance(ext_cls, type) and issubclass(ext_cls, BaseModel):
+                    groups = _alias_groups_for_model(ext_cls)
+            except Exception as e:  # pragma: no cover — defensive
+                self.logger.debug(
+                    "Could not derive extension alias groups for %s: %s", provider_type, e
+                )
+
+        self._extension_alias_groups_cache[provider_type] = groups
+        return groups
+
+    def _template_and_extension_alias_groups(
+        self, provider_type: Optional[str]
+    ) -> dict[str, tuple[str, ...]]:
+        """Union template-field and extension-config alias groups for a provider.
+
+        Used when merging the extension-defaults layer against the resolved
+        template dict, which mixes template-model aliases (e.g. ``machine_image``
+        / ``image_id``) with extension-model aliases (e.g. ``env`` /
+        ``environment_variables``).  Keying by the union ensures a template
+        value under any alias drops the lower-priority extension sibling.
+        """
+        template_groups = self._effective_alias_groups()
+        if not provider_type:
+            return template_groups
+        ext_groups = self._extension_alias_groups(provider_type)
+        if not ext_groups:
+            return template_groups
+        return _union_alias_groups([template_groups, ext_groups])
+
+    def _merge_layer(
+        self,
+        base: dict[str, Any],
+        overlay: dict[str, Any],
+        alias_groups: Optional[dict[str, tuple[str, ...]]] = None,
+    ) -> dict[str, Any]:
+        """Merge one default layer *overlay* onto *base* (overlay wins).
+
+        Alias-aware: a field expressed under any alias in *overlay* supersedes
+        the same field carried by *base* under a *different* alias, so at most
+        one key per logical field survives — always the higher-priority
+        (overlay) layer's value keyed under the overlay's alias.  Without this,
+        both the canonical name and a legacy alias would survive a plain
+        ``dict.update`` and the model's ``AliasChoices`` canonical-first
+        precedence would silently pick the lower-priority layer's value.
+
+        *alias_groups* selects the alias map to key by — the template-field
+        groups by default, or the extension-config groups when merging
+        extension layers.  Unlike :meth:`_coalesce_merge` this does not treat
+        empty collections as unset — inter-layer defaults are authored
+        configuration and an empty value there is intentional.
+        """
+        groups = alias_groups if alias_groups is not None else self._effective_alias_groups()
+        result = dict(base)
+        for key, value in overlay.items():
+            result[key] = value
+            for alias in groups.get(key, ()):
+                if alias != key and alias in result:
+                    del result[alias]
+        return result
 
     def resolve_template_defaults(
         self,
@@ -73,11 +273,11 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         )
 
         # Start with empty defaults
-        resolved_defaults = {}
+        resolved_defaults: dict[str, Any] = {}
 
         # 1. Apply global template defaults (lowest priority)
         global_defaults = self._get_global_template_defaults()
-        resolved_defaults.update(global_defaults)
+        resolved_defaults = self._merge_layer(resolved_defaults, global_defaults)
         self.logger.debug("Applied %s global defaults", len(global_defaults))
 
         # 2. Apply provider type defaults
@@ -85,7 +285,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             provider_type = self._get_provider_type(provider_instance_name)
             if provider_type:
                 provider_type_defaults = self._get_provider_type_defaults(provider_type)
-                resolved_defaults.update(provider_type_defaults)
+                resolved_defaults = self._merge_layer(resolved_defaults, provider_type_defaults)
                 self.logger.debug(
                     "Applied %s provider type defaults for %s",
                     len(provider_type_defaults),
@@ -96,7 +296,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                 provider_instance_defaults = self._get_provider_instance_defaults(
                     provider_instance_name
                 )
-                resolved_defaults.update(provider_instance_defaults)
+                resolved_defaults = self._merge_layer(resolved_defaults, provider_instance_defaults)
                 self.logger.debug(
                     "Applied %s provider instance defaults for %s",
                     len(provider_instance_defaults),
@@ -152,15 +352,29 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         Empty list values in overrides are treated as "unset" so provider
         defaults can fill them in. An empty list is never a meaningful value
         for any template field, so this is safe to apply generically.
+
+        Alias-aware: a template field may be expressed under either its
+        canonical name (e.g. ``machine_image``) or a deprecated alias
+        (e.g. ``image_id``).  When an override supplies a field under one
+        alias while the defaults carry the *same* field under a different
+        alias, the override must supersede the default — otherwise BOTH keys
+        survive into the final dict and the domain model's ``AliasChoices``
+        precedence silently picks the default over the caller's value.
         """
         result = defaults.copy()
 
         for key, value in overrides.items():
-            if value is not None:
-                # Treat empty lists as "unset" — let the default win
-                if self._is_empty_collection(value):
-                    continue
-                result[key] = value
+            if value is None:
+                continue
+            # Treat empty lists as "unset" — let the default win
+            if self._is_empty_collection(value):
+                continue
+            result[key] = value
+            # If this override targets an aliased field, drop any sibling
+            # aliases carried by the defaults so the override actually wins.
+            for alias in self._effective_alias_groups().get(key, ()):
+                if alias != key and alias in result:
+                    del result[alias]
 
         return result
 
@@ -236,19 +450,23 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         Returns:
             Merged template defaults
         """
-        defaults = {}
+        defaults: dict[str, Any] = {}
 
         # Global defaults
-        defaults.update(self._get_global_template_defaults())
+        defaults = self._merge_layer(defaults, self._get_global_template_defaults())
 
         # Provider type defaults
         if provider_instance_name:
             provider_type = self._get_provider_type(provider_instance_name)
             if provider_type:
-                defaults.update(self._get_provider_type_defaults(provider_type))
+                defaults = self._merge_layer(
+                    defaults, self._get_provider_type_defaults(provider_type)
+                )
 
                 # Provider instance defaults
-                defaults.update(self._get_provider_instance_defaults(provider_instance_name))
+                defaults = self._merge_layer(
+                    defaults, self._get_provider_instance_defaults(provider_instance_name)
+                )
 
         return defaults
 
@@ -427,8 +645,15 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         # 3. Apply provider extension defaults
         if provider_type:
             extension_defaults = self._get_extension_defaults(provider_type, provider_instance_name)
-            # Extension defaults have lower priority than hierarchical defaults
-            resolved_dict = {**extension_defaults, **resolved_dict}
+            # Extension defaults have lower priority than hierarchical defaults.
+            # Alias-aware across BOTH template-field and extension-field aliases
+            # so a resolved template value under any alias drops the sibling
+            # alias contributed by the lower-priority extension layer.
+            resolved_dict = self._merge_layer(
+                extension_defaults,
+                resolved_dict,
+                self._template_and_extension_alias_groups(provider_type),
+            )
             self.logger.debug(
                 "Applied %s extension defaults for %s",
                 len(extension_defaults),
@@ -467,15 +692,21 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         Returns:
             Dictionary of extension defaults
         """
-        extension_defaults = {}
+        extension_defaults: dict[str, Any] = {}
 
         if self.extension_registry is None:
             return extension_defaults
 
+        # Alias groups for this provider's extension model so the type->instance
+        # extension layering is alias-aware (e.g. env / environment_variables).
+        ext_alias_groups = self._extension_alias_groups(provider_type)
+
         try:
             # 1. Get provider type extension defaults — safe for unknown providers (returns {})
             type_extension_defaults = self.extension_registry.get_extension_defaults(provider_type)
-            extension_defaults.update(type_extension_defaults)
+            extension_defaults = self._merge_layer(
+                extension_defaults, type_extension_defaults, ext_alias_groups
+            )
             self.logger.debug("Applied %s type extension defaults", len(type_extension_defaults))
 
             # 2. Get provider instance extension overrides
@@ -483,7 +714,9 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                 instance_extension_defaults = self._get_provider_instance_extension_defaults(
                     provider_instance_name, provider_type
                 )
-                extension_defaults.update(instance_extension_defaults)
+                extension_defaults = self._merge_layer(
+                    extension_defaults, instance_extension_defaults, ext_alias_groups
+                )
                 self.logger.debug(
                     "Applied %s instance extension defaults",
                     len(instance_extension_defaults),
@@ -564,7 +797,12 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         )
         if provider_type:
             extension_defaults = self._get_extension_defaults(provider_type, provider_instance_name)
-            resolved_dict = {**extension_defaults, **resolved_dict}
+            # Alias-aware extension->template merge (see resolve_template_with_extensions).
+            resolved_dict = self._merge_layer(
+                extension_defaults,
+                resolved_dict,
+                self._template_and_extension_alias_groups(provider_type),
+            )
 
         return resolved_dict
 

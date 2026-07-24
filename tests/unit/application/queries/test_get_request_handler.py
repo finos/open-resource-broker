@@ -214,3 +214,45 @@ async def test_get_request_raises_entity_not_found_when_missing():
     query = SyncAndGetRequestQuery(request_id=_ID_MISSING)
     with pytest.raises(EntityNotFoundError):
         await handler.execute_query(query)
+
+
+@pytest.mark.asyncio
+async def test_read_path_syncs_provider_before_deadline_sweep():
+    """ROOT CAUSE 2 regression: for a non-terminal request that is past its
+    deadline with stale DB counts, the read-through provider sync must run
+    BEFORE the terminal deadline sweep.
+
+    Previously the deadline sweep ran first on stale counts, flipped the request
+    to terminal, and the terminal short-circuit permanently blocked further
+    provider reconciliation — the exact stuck-terminal bug PARTIAL_PENDING was
+    meant to kill. This asserts populate_missing_machine_ids and the provider
+    sync are still invoked for an expired request.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    # ACQUIRING + past-deadline + stale successful_count but capacity actually
+    # present via machine_ids — exactly the situation a pre-sync sweep would
+    # misjudge terminal on stale data.
+    now = datetime.now(timezone.utc)
+    request = _make_request(_ID_SUCCESS).model_copy(
+        update={
+            "status": RequestStatus.ACQUIRING,
+            "deadline_at": now - timedelta(seconds=5),
+            "started_at": now - timedelta(seconds=3600),
+            "successful_count": 0,
+            "machine_ids": ["i-1", "i-2", "i-3"],
+            "requested_count": 3,
+        }
+    )
+
+    handler, mock_query_service, _ = _make_handler(request, sync_side_effect=None)
+    mock_query_service.get_request = AsyncMock(return_value=request)
+
+    query = SyncAndGetRequestQuery(request_id=_ID_SUCCESS)
+    result = await handler.execute_query(query)
+
+    assert isinstance(result, RequestDTO)
+    # The provider read-through sync MUST have been attempted — it was not
+    # short-circuited by a pre-sync terminal deadline sweep.
+    handler._machine_sync_service.populate_missing_machine_ids.assert_awaited()
+    handler._machine_sync_service.sync_machines_with_provider.assert_awaited()

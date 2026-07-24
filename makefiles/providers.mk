@@ -2,8 +2,15 @@
 # Auto-discovers provider directories under tests/providers/*/
 # Per-provider overrides live in optional tests/providers/<name>/testconf.mk
 
-# Auto-discover providers with tests
-PROVIDERS := $(patsubst tests/providers/%/,%,$(sort $(wildcard tests/providers/*/)))
+# @SECTION Provider Tests
+
+# Auto-discover real providers: only directories under tests/providers/ that own
+# a testconf.mk fragment. Shared helper dirs (base/, contract/, logs/) and
+# __pycache__ have no testconf.mk and are excluded — matching print-providers
+# below and the CI discovery in .github/workflows/shared-config.yml, so the
+# generated per-provider targets and the aggregate roll-ups cover exactly the
+# real providers (aws, k8s, …) and nothing else.
+PROVIDERS := $(sort $(patsubst tests/providers/%/testconf.mk,%,$(wildcard tests/providers/*/testconf.mk)))
 
 # Emit PROVIDERS as a JSON array for consumption by CI scripts.
 # Only directories that have a testconf.mk fragment are considered real
@@ -68,3 +75,13 @@ test-providers-$(1): dev-install  ## Run all non-live $(1) provider tests
 endef
 
 $(foreach p,$(PROVIDERS),$(eval $(call _provider_targets,$(p))))
+
+# Aggregate roll-ups over every discovered provider in $(PROVIDERS).
+# Prereq-list form: each depends on the matching generated per-provider target,
+# so `make test-providers-live` fans out to aws + k8s live suites (and any
+# future provider) with no further edits.
+test-providers-live: $(foreach p,$(PROVIDERS),test-providers-$(p)-live)  ## Run live tests for every provider (real cloud / cluster)
+
+test-providers-all: $(foreach p,$(PROVIDERS),test-providers-$(p))  ## Run all non-live tests for every provider
+
+.PHONY: test-providers-live test-providers-all

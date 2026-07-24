@@ -75,7 +75,11 @@ class RequestStatus(str, Enum):
         COMPLETED: Request has been successfully completed
         FAILED: Request has failed and cannot be completed
         CANCELLED: Request has been cancelled by user or system
-        PARTIAL: Request completed with partial success
+        PARTIAL: Request completed with partial success (terminal)
+        PARTIAL_PENDING: Request is partially fulfilled but still within its
+            deadline — a non-terminal holding state. It resolves to COMPLETED
+            (if the rest of the capacity arrives) or to terminal PARTIAL/TIMEOUT
+            when the deadline is reached.
         TIMEOUT: Request has timed out
     """
 
@@ -85,6 +89,7 @@ class RequestStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     PARTIAL = "partial"
+    PARTIAL_PENDING = "partial_pending"
     TIMEOUT = "timeout"
     ACQUIRING = "acquiring"
 
@@ -121,7 +126,12 @@ class RequestStatus(str, Enum):
 
     def is_active(self) -> bool:
         """Check if this status represents an active state."""
-        return self in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.ACQUIRING]
+        return self in [
+            RequestStatus.PENDING,
+            RequestStatus.IN_PROGRESS,
+            RequestStatus.ACQUIRING,
+            RequestStatus.PARTIAL_PENDING,
+        ]
 
     def can_transition_to(self, new_status: RequestStatus) -> bool:
         """
@@ -145,10 +155,12 @@ class RequestStatus(str, Enum):
                 RequestStatus.FAILED,
                 RequestStatus.COMPLETED,  # instant provisioning (e.g. RunInstances)
                 RequestStatus.PARTIAL,  # instant provisioning with partial fulfillment
+                RequestStatus.PARTIAL_PENDING,  # partial within deadline — holding state
             ],
             RequestStatus.IN_PROGRESS: [
                 RequestStatus.COMPLETED,
                 RequestStatus.PARTIAL,
+                RequestStatus.PARTIAL_PENDING,
                 RequestStatus.FAILED,
                 RequestStatus.CANCELLED,
                 RequestStatus.TIMEOUT,
@@ -158,20 +170,33 @@ class RequestStatus(str, Enum):
                 RequestStatus.ACQUIRING,
                 RequestStatus.COMPLETED,
                 RequestStatus.PARTIAL,
+                RequestStatus.PARTIAL_PENDING,
                 RequestStatus.FAILED,
                 RequestStatus.TIMEOUT,
                 RequestStatus.CANCELLED,
+            ],
+            # Holding state — resolves out to any terminal outcome. This is
+            # the state that replaces the old PARTIAL→COMPLETED upgrade hack:
+            # a still-live partial request lives here until its capacity is
+            # fully met (→ COMPLETED) or its deadline passes (→ PARTIAL/TIMEOUT).
+            RequestStatus.PARTIAL_PENDING: [
+                RequestStatus.COMPLETED,
+                RequestStatus.PARTIAL,
+                RequestStatus.FAILED,
+                RequestStatus.CANCELLED,
+                RequestStatus.TIMEOUT,
             ],
             RequestStatus.COMPLETED: [],  # Terminal state
             RequestStatus.FAILED: [],  # Terminal state
             RequestStatus.CANCELLED: [],  # Terminal state
             RequestStatus.TIMEOUT: [],  # Terminal state
-            # PARTIAL is terminal in the failure direction but can be
-            # UPGRADED to COMPLETED when a later sync proves the original
-            # partial verdict was a misclassification (e.g. multi-fleet
-            # request stamped partial before all fleets reported in, then
-            # later confirmed fully fulfilled). Downgrade in the other
-            # direction stays blocked.
+            # PARTIAL is terminal. The PARTIAL→COMPLETED edge is retained for
+            # backward compatibility: in-flight PARTIAL rows written before the
+            # PARTIAL_PENDING holding state existed still need to be able to
+            # upgrade when a later sync confirms full fulfilment. New code never
+            # enters terminal PARTIAL from a still-live poll — it uses
+            # PARTIAL_PENDING. This edge is deprecated and slated for removal
+            # once no pre-cutover PARTIAL rows remain.
             RequestStatus.PARTIAL: [RequestStatus.COMPLETED],
         }
 

@@ -55,8 +55,8 @@ def test_hf_all_domain_statuses_map_to_allowed_output(hf_strategy):
 
 
 def test_hf_status_mapping_covers_active_states(hf_strategy):
-    """Active domain states (pending, in_progress, acquiring) map to 'running'."""
-    active_states = ["pending", "in_progress", "acquiring"]
+    """Active domain states (pending, in_progress, acquiring, partial_pending) map to 'running'."""
+    active_states = ["pending", "in_progress", "acquiring", "partial_pending"]
     for state in active_states:
         mapped = hf_strategy._map_domain_status_to_hostfactory(state)
         assert mapped == "running", (

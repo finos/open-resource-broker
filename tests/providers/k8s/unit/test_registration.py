@@ -66,6 +66,31 @@ def test_create_k8s_config_from_dict() -> None:
     assert cfg.namespace == "orb"
 
 
+def test_create_k8s_config_strips_type_discriminator() -> None:
+    """The provider-type discriminator must not reach K8sProviderConfig.
+
+    Regression: ``K8sProviderConfig`` uses ``extra="forbid"``, so passing the
+    selector key ``type='k8s'`` (present in config.json entries) raised
+    ``Extra inputs are not permitted``.  The registration path must strip the
+    discriminator before construction.
+    """
+    cfg = create_k8s_config({"type": "k8s", "context": "some-ctx"})
+    assert isinstance(cfg, K8sProviderConfig)
+    assert cfg.context == "some-ctx"
+
+
+def test_create_k8s_strategy_with_type_discriminator_succeeds() -> None:
+    """Discover-infrastructure path: a config dict carrying the ``type`` selector
+    plus real cluster targeting must build a strategy without an extras error."""
+    with patch(
+        "orb.infrastructure.di.container.get_container",
+        side_effect=Exception("DI not ready"),
+    ):
+        strategy = create_k8s_strategy({"type": "k8s", "context": "some-ctx"})
+    assert isinstance(strategy, K8sProviderStrategy)
+    assert strategy._k8s_config.context == "some-ctx"  # type: ignore[attr-defined]
+
+
 def test_create_k8s_resolver_returns_none() -> None:
     """No provider-side resolver is shipped — generic fallback applies."""
     assert create_k8s_resolver() is None

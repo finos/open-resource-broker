@@ -84,6 +84,201 @@ def test_load_kubeconfig_wraps_sdk_errors(monkeypatch: pytest.MonkeyPatch) -> No
     assert "/nope" in str(exc_info.value)
 
 
+def test_load_kubeconfig_forwards_client_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A supplied client_configuration is threaded to the SDK so a LIVE config is reloaded.
+
+    This is the 401-recovery seam: refreshed exec-token credentials must land on
+    the in-flight ApiClient's own Configuration, not only the global default.
+    """
+    fake_config = SimpleNamespace(load_kube_config=MagicMock())
+    fake_kubernetes = SimpleNamespace(config=fake_config)
+    monkeypatch.setitem(sys.modules, "kubernetes", fake_kubernetes)
+    monkeypatch.setitem(sys.modules, "kubernetes.config", fake_config)
+
+    sentinel_config = object()
+    load_kubeconfig(
+        config_file="/etc/kube.cfg", context="prod", client_configuration=sentinel_config
+    )
+
+    fake_config.load_kube_config.assert_called_once_with(
+        config_file="/etc/kube.cfg", context="prod", client_configuration=sentinel_config
+    )
+
+
+def test_load_kubeconfig_forces_exec_plugin_non_interactive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A TTY-attached load must drive the exec plugin non-interactively.
+
+    The kubernetes SDK's ``ExecProvider`` decides interactivity solely from
+    ``sys.stdout.isatty()``; on a real terminal it runs the credential plugin
+    interactively, which fails to attach the minted bearer token for
+    ``credential_process``-backed AWS profiles (empty Authorization header ->
+    401).  ORB's loader must neutralise that: even with ``isatty()`` forced
+    ``True``, the SDK's ``load_kube_config`` must observe ``isatty()`` ==
+    ``False`` at call time.
+    """
+    observed_isatty: list[bool] = []
+
+    def _fake_load_kube_config(**_kwargs: object) -> None:
+        # Capture what the SDK's ExecProvider would read at the exact moment
+        # ORB delegates to it.
+        observed_isatty.append(sys.stdout.isatty())
+
+    fake_config = SimpleNamespace(load_kube_config=MagicMock(side_effect=_fake_load_kube_config))
+    fake_kubernetes = SimpleNamespace(config=fake_config)
+    monkeypatch.setitem(sys.modules, "kubernetes", fake_kubernetes)
+    monkeypatch.setitem(sys.modules, "kubernetes.config", fake_config)
+
+    # Force the failing precondition: pretend stdout is a real terminal.
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
+    assert sys.stdout.isatty() is True
+
+    load_kubeconfig(config_file="/etc/kube.cfg", context="prod")
+
+    assert observed_isatty == [False], (
+        "load_kube_config must run inside the non-interactive guard so the exec "
+        "plugin takes its non-interactive branch"
+    )
+    # The guard must be scoped: stdout is restored to a TTY afterwards.
+    assert sys.stdout.isatty() is True
+
+
+def test_force_non_interactive_exec_restores_stdout_on_error() -> None:
+    """The guard restores ``sys.stdout`` even when the wrapped block raises."""
+    original = sys.stdout
+    raised = False
+    try:
+        with kubeconfig_module._force_non_interactive_exec():
+            assert sys.stdout.isatty() is False
+            raise RuntimeError("boom")
+    except RuntimeError:
+        raised = True
+    assert raised
+    assert sys.stdout is original
+
+
+def test_request_path_token_refresh_hook_forces_non_interactive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The wrapped refresh hook re-mints non-interactively on the live request path.
+
+    This is the steady-state 401 exposure: the SDK fires
+    ``Configuration.refresh_api_key_hook`` lazily while building the
+    Authorization header of an ordinary request (resource verb / watch open /
+    status poll).  When the embedded token expiry lapses that hook re-runs the
+    exec credential plugin, whose interactivity is keyed off
+    ``sys.stdout.isatty()``.  On a TTY the unwrapped hook would re-mint
+    interactively and drop the token; the wrap installed by ORB must force the
+    non-interactive branch and then restore stdout.
+    """
+    observed_isatty: list[bool] = []
+
+    def _sdk_refresh(_cfg: object) -> None:
+        # Mirrors ExecProvider.run's isatty() decision at re-mint time.
+        observed_isatty.append(sys.stdout.isatty())
+
+    config = SimpleNamespace(refresh_api_key_hook=_sdk_refresh)
+
+    kubeconfig_module._install_non_interactive_refresh_hook(config)
+
+    # Force a real terminal, then fire the wrapped hook as the SDK would.
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
+    assert sys.stdout.isatty() is True
+
+    config.refresh_api_key_hook(config)
+
+    assert observed_isatty == [False], (
+        "the request-path refresh hook must re-mint the exec token "
+        "non-interactively even when ORB is attached to a TTY"
+    )
+    # Scoped: stdout is restored to the TTY once the mint completes.
+    assert sys.stdout.isatty() is True
+
+
+def test_install_non_interactive_refresh_hook_is_idempotent() -> None:
+    """Re-installing the wrap on an already-wrapped hook is a no-op.
+
+    ``load_kubeconfig`` / ``force_token_refresh`` may re-run repeatedly; the
+    wrap must not stack (which would nest guards without benefit).
+    """
+    calls: list[int] = []
+
+    def _hook(_cfg: object) -> None:
+        calls.append(1)
+
+    config = SimpleNamespace(refresh_api_key_hook=_hook)
+
+    kubeconfig_module._install_non_interactive_refresh_hook(config)
+    wrapped_once = config.refresh_api_key_hook
+    assert wrapped_once is not _hook
+
+    kubeconfig_module._install_non_interactive_refresh_hook(config)
+    assert config.refresh_api_key_hook is wrapped_once
+
+
+def test_install_non_interactive_refresh_hook_noop_without_hook() -> None:
+    """Non-exec auth (no refresh hook) leaves the configuration untouched.
+
+    Static bearer-token / client-certificate configs never set a
+    ``refresh_api_key_hook`` and never consult ``isatty()``; the installer must
+    be inert for them.
+    """
+    config = SimpleNamespace(refresh_api_key_hook=None)
+    kubeconfig_module._install_non_interactive_refresh_hook(config)
+    assert config.refresh_api_key_hook is None
+
+
+def test_load_kubeconfig_wraps_refresh_hook_on_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """After a global-default load, the SDK's refresh hook is wrapped in place.
+
+    The initial ``load_kube_config`` writes the fresh config (with its exec
+    refresh hook) into ``Configuration._default``.  ORB must wrap that hook so
+    ``ApiClient`` instances built afterwards — which deep-copy the default —
+    inherit the guarded callable and re-mint non-interactively on every request.
+    """
+    observed_isatty: list[bool] = []
+
+    def _sdk_refresh(_cfg: object) -> None:
+        observed_isatty.append(sys.stdout.isatty())
+
+    default_config = SimpleNamespace(refresh_api_key_hook=_sdk_refresh)
+    fake_configuration_cls = SimpleNamespace(_default=default_config)
+    fake_client_mod = SimpleNamespace(Configuration=fake_configuration_cls)
+    fake_config = SimpleNamespace(load_kube_config=MagicMock())
+    fake_kubernetes = SimpleNamespace(config=fake_config)
+    monkeypatch.setitem(sys.modules, "kubernetes", fake_kubernetes)
+    monkeypatch.setitem(sys.modules, "kubernetes.config", fake_config)
+    monkeypatch.setitem(sys.modules, "kubernetes.client", fake_client_mod)
+
+    load_kubeconfig(config_file="/etc/kube.cfg", context="prod")
+
+    # The default's hook was replaced by the wrapped version.
+    assert default_config.refresh_api_key_hook is not _sdk_refresh
+
+    # Firing the wrapped hook on a TTY re-mints non-interactively.
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
+    default_config.refresh_api_key_hook(default_config)
+    assert observed_isatty == [False]
+
+
+def test_load_in_cluster_config_forwards_client_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A supplied client_configuration is threaded to load_incluster_config."""
+    fake_config = SimpleNamespace(load_incluster_config=MagicMock())
+    fake_kubernetes = SimpleNamespace(config=fake_config)
+    monkeypatch.setitem(sys.modules, "kubernetes", fake_kubernetes)
+    monkeypatch.setitem(sys.modules, "kubernetes.config", fake_config)
+
+    sentinel_config = object()
+    load_in_cluster_config(client_configuration=sentinel_config)
+
+    fake_config.load_incluster_config.assert_called_once_with(client_configuration=sentinel_config)
+
+
 def test_modules_expose_documented_symbols() -> None:
     """Defensive: ensure the public auth API stays stable."""
     assert hasattr(in_cluster_module, "is_in_cluster")

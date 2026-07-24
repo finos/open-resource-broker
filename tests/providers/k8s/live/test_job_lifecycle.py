@@ -168,9 +168,12 @@ async def test_job_acquire_creates_parallelism_completions(
         f"Job pod template missing orb.io/request-id label: {pod_labels!r}"
     )
 
-    # Cleanup
-    dummy_machine_ids = ["placeholder"]
-    await handler.release_hosts(dummy_machine_ids, request.provider_data)
+    # Cleanup: release the whole Job.  The Job controller does not support
+    # subset release, so the handler requires the machine_ids to cover every
+    # pod of the Job (``len(machine_ids) >= parallelism``).  This is a
+    # whole-Job delete; the ids themselves are informational.
+    full_release_ids = [f"{job_name}-{i}" for i in range(parallelism)]
+    await handler.release_hosts(full_release_ids, request.provider_data)
     _wait_until_job_gone(k8s_batch_v1, k8s_namespace, job_name)
 
 

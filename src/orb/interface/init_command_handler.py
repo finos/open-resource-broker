@@ -216,7 +216,7 @@ def _interactive_setup(container: Any) -> Dict[str, Any]:
         console.separator(char="-", color="cyan")
 
         # Step 1: pre-auth params (e.g. Azure tenant_id)
-        auth_requirements = _get_credential_requirements(provider_type)
+        auth_requirements = _get_credential_requirements(provider_type, container=container)
         provider_config: Dict[str, Any] = {"type": provider_type}
         for param, info in auth_requirements.items():
             if info.get("required"):
@@ -225,7 +225,7 @@ def _interactive_setup(container: Any) -> Dict[str, Any]:
 
         # Step 2: select credentials
         console.info("  Discovering credential sources...")
-        credential_sources = _get_available_credential_sources(provider_type)
+        credential_sources = _get_available_credential_sources(provider_type, container=container)
 
         console.info("")
         console.info("Available credentials:")
@@ -242,7 +242,7 @@ def _interactive_setup(container: Any) -> Dict[str, Any]:
         console.info("")
         console.info("Testing credentials...")
         success, error_msg = _test_provider_credentials(
-            provider_type, selected_source, **provider_config
+            provider_type, selected_source, container=container, **provider_config
         )
         if success:
             console.success("Credentials verified successfully")
@@ -376,7 +376,7 @@ def _configure_additional_provider(container: Any) -> Optional[Dict[str, Any]]:
         console.separator(char="-", color="cyan")
 
         # Step 1: pre-auth params (e.g. Azure tenant_id)
-        auth_requirements = _get_credential_requirements(provider_type)
+        auth_requirements = _get_credential_requirements(provider_type, container=container)
         provider_config: Dict[str, Any] = {"type": provider_type}
         for param, info in auth_requirements.items():
             if info.get("required"):
@@ -385,7 +385,7 @@ def _configure_additional_provider(container: Any) -> Optional[Dict[str, Any]]:
 
         # Step 2: select credentials
         console.info("  Discovering credential sources...")
-        credential_sources = _get_available_credential_sources(provider_type)
+        credential_sources = _get_available_credential_sources(provider_type, container=container)
 
         console.info("")
         console.info("Available credentials:")
@@ -402,7 +402,7 @@ def _configure_additional_provider(container: Any) -> Optional[Dict[str, Any]]:
         console.info("")
         console.info("Testing credentials...")
         success, error_msg = _test_provider_credentials(
-            provider_type, selected_source, **provider_config
+            provider_type, selected_source, container=container, **provider_config
         )
         if success:
             console.success("Credentials verified successfully")
@@ -557,9 +557,14 @@ def _prompt_operational_params(
     return result
 
 
-def _get_available_credential_sources(provider_type: str) -> list[dict]:
-    """Get available credential sources for provider via strategy."""
-    strategy = _get_provider_strategy(provider_type)
+def _get_available_credential_sources(provider_type: str, container: Any = None) -> list[dict]:
+    """Get available credential sources for provider via strategy.
+
+    ``container`` must be threaded from the init flow so the provider registry
+    can resolve the strategy class.  Without it ``_get_provider_strategy``
+    returns ``None`` and every provider degrades to the generic default.
+    """
+    strategy = _get_provider_strategy(provider_type, container=container)
     if strategy is not None:
         try:
             sources = strategy.get_available_credential_sources()
@@ -571,10 +576,15 @@ def _get_available_credential_sources(provider_type: str) -> list[dict]:
 
 
 def _test_provider_credentials(
-    provider_type: str, credential_source: Optional[str], **kwargs
+    provider_type: str, credential_source: Optional[str], container: Any = None, **kwargs
 ) -> tuple[bool, str]:
-    """Test provider credentials via strategy."""
-    strategy = _get_provider_strategy(provider_type)
+    """Test provider credentials via strategy.
+
+    ``container`` must be threaded from the init flow so the provider registry
+    can resolve the strategy class; otherwise the strategy cannot be resolved
+    and credential testing incorrectly reports "Provider type not supported".
+    """
+    strategy = _get_provider_strategy(provider_type, container=container)
     if strategy is None:
         return False, "Provider type not supported"
     try:
@@ -586,9 +596,13 @@ def _test_provider_credentials(
         return False, str(e)
 
 
-def _get_credential_requirements(provider_type: str) -> dict:
-    """Get credential requirements for provider via strategy."""
-    strategy = _get_provider_strategy(provider_type)
+def _get_credential_requirements(provider_type: str, container: Any = None) -> dict:
+    """Get credential requirements for provider via strategy.
+
+    ``container`` must be threaded from the init flow so the provider registry
+    can resolve the strategy class.
+    """
+    strategy = _get_provider_strategy(provider_type, container=container)
     if strategy is not None:
         try:
             return strategy.get_credential_requirements()
@@ -597,9 +611,13 @@ def _get_credential_requirements(provider_type: str) -> dict:
     return {}
 
 
-def _get_operational_requirements(provider_type: str) -> dict:
-    """Get operational requirements for provider via strategy."""
-    strategy = _get_provider_strategy(provider_type)
+def _get_operational_requirements(provider_type: str, container: Any = None) -> dict:
+    """Get operational requirements for provider via strategy.
+
+    ``container`` must be threaded from the init flow so the provider registry
+    can resolve the strategy class.
+    """
+    strategy = _get_provider_strategy(provider_type, container=container)
     if strategy is not None:
         try:
             return strategy.get_operational_requirements()

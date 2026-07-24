@@ -224,8 +224,9 @@ def load_in_cluster_config(
     logger: Optional[LoggingPort] = None,
     proxy_url: Optional[str] = None,
     no_proxy: Optional[str] = None,
+    client_configuration: Optional[object] = None,
 ) -> None:
-    """Bootstrap the global ``kubernetes`` client config from in-cluster secrets.
+    """Bootstrap ``kubernetes`` client config from in-cluster secrets.
 
     After loading the service-account credentials, the function wires an HTTP
     proxy into ``kubernetes.client.Configuration.proxy``.  When *proxy_url* is
@@ -247,6 +248,13 @@ def load_in_cluster_config(
             :class:`K8sProviderConfig`.  Takes precedence over the ``NO_PROXY``
             / ``no_proxy`` environment variables.  ``None`` falls back to the
             environment.
+        client_configuration: Optional ``kubernetes.client.Configuration`` to
+            load the credentials *into* instead of the global default.  When
+            supplied the freshly-read service-account token is written directly
+            into this object so a *live* ``ApiClient`` picks up the rotated
+            token.  Used by the 401-recovery path.  When ``None`` (the default)
+            the global default Configuration is populated, preserving the
+            original behaviour.
 
     Raises:
         K8sAuthError: If the kubernetes SDK is not installed, or the
@@ -261,12 +269,18 @@ def load_in_cluster_config(
         ) from exc
 
     try:
-        _k8s_config.load_incluster_config()
+        if client_configuration is not None:
+            _k8s_config.load_incluster_config(client_configuration=client_configuration)  # type: ignore[arg-type]
+        else:
+            _k8s_config.load_incluster_config()
     except Exception as exc:
         raise K8sAuthError(f"Failed to load in-cluster config: {exc}") from exc
 
-    # Wire HTTP proxy (config value or environment) into the loaded configuration.
-    _apply_proxy_to_default_configuration(logger, proxy_url, no_proxy)
+    # Wire HTTP proxy (config value or environment) into the loaded
+    # configuration.  Only the global-default path re-applies proxy; a targeted
+    # client_configuration keeps the proxy it already carries.
+    if client_configuration is None:
+        _apply_proxy_to_default_configuration(logger, proxy_url, no_proxy)
 
 
 class InClusterAuthAdapter:

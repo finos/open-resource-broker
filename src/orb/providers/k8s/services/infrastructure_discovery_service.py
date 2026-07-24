@@ -135,14 +135,29 @@ class K8sInfrastructureDiscoveryService:
             raise K8sError(
                 "kubernetes SDK is not installed; install with `pip install orb-py[k8s]`"
             ) from exc
+        from orb.providers.k8s.auth.kubeconfig import (
+            _force_non_interactive_exec,
+            _install_non_interactive_refresh_hook_on,
+        )
+
         if is_in_cluster():
             _k8s_config.load_incluster_config()
+            client = ApiClient()
         else:
-            _k8s_config.load_kube_config(
-                config_file=self._config.kubeconfig_path,
-                context=self._config.context,
-            )
-        return ApiClient()
+            # ``load_kube_config`` runs the exec credential plugin to mint the
+            # initial bearer token; the guard forces its non-interactive branch
+            # so a TTY-attached ``orb init`` still attaches the token.  The
+            # subsequent lazy re-mint hook is wrapped on the loaded configuration
+            # so any expiry-driven re-exec during discovery calls stays
+            # non-interactive too.
+            with _force_non_interactive_exec():
+                _k8s_config.load_kube_config(
+                    config_file=self._config.kubeconfig_path,
+                    context=self._config.context,
+                )
+            _install_non_interactive_refresh_hook_on(None)
+            client = ApiClient()
+        return client
 
     def _core_v1(self) -> Any:
         """Return a ``CoreV1Api`` instance backed by this service's client."""
@@ -270,8 +285,14 @@ class K8sInfrastructureDiscoveryService:
             self._logger.warning("discover_cluster_endpoint: kubernetes SDK not installed.")
             return "unknown"
 
+        from orb.providers.k8s.auth.kubeconfig import _force_non_interactive_exec
+
         try:
-            client = _k8s_config.new_client_from_config(context=context)
+            # ``new_client_from_config`` runs the exec credential plugin to mint
+            # the token; force its non-interactive branch so a TTY-attached
+            # ``orb init`` resolves the endpoint instead of hanging/failing.
+            with _force_non_interactive_exec():
+                client = _k8s_config.new_client_from_config(context=context)
             # kubernetes-stubs-elephant-fork omits the `configuration`
             # attribute from ApiClient; it exists at runtime.
             host: str = client.configuration.host or "unknown"  # type: ignore[attr-defined]

@@ -57,11 +57,33 @@ def _formatted_instances(instance_ids, resource_id="fleet-test"):
     return [_inst(iid, resource_id) for iid in instance_ids]
 
 
-def _fleet_result(instance_ids, resource_id="fleet-test", state: FulfilmentState = "fulfilled"):
+def _fleet_result(
+    instance_ids,
+    resource_id="fleet-test",
+    state: FulfilmentState = "fulfilled",
+    final: bool = False,
+    *,
+    target_units=None,
+    fulfilled_units=None,
+    running_count=None,
+    pending_count=None,
+    failed_count=None,
+    diagnostic=None,
+):
     """Build a CheckHostsStatusResult for mocking _check_single_fleet_status."""
     return CheckHostsStatusResult(
         instances=_formatted_instances(instance_ids, resource_id),
-        fulfilment=ProviderFulfilment(state=state, message="test"),
+        fulfilment=ProviderFulfilment(
+            state=state,
+            message="test",
+            final=final,
+            target_units=target_units,
+            fulfilled_units=fulfilled_units,
+            running_count=running_count,
+            pending_count=pending_count,
+            failed_count=failed_count,
+            diagnostic=diagnostic,
+        ),
     )
 
 
@@ -140,6 +162,153 @@ class TestEC2FleetHandlerCheckHostsStatus:
         assert len(result.instances) == 3
         returned_ids = {r["instance_id"] for r in result.instances}
         assert returned_ids == {"i-a1", "i-a2", "i-b1"}
+
+    def test_check_hosts_status_multi_partial_all_final_is_terminal(self):
+        """All partial contributors final → aggregate partial is final (terminalise)."""
+        handler = _make_handler()
+        request = _make_request(["fleet-A", "fleet-B"], metadata={"fleet_type": "instant"})
+
+        def single_fleet_side_effect(fleet_id, req):
+            if fleet_id == "fleet-A":
+                return _fleet_result(["i-a1"], "fleet-A", state="partial", final=True)
+            return _fleet_result(["i-b1"], "fleet-B", state="partial", final=True)
+
+        with patch.object(
+            handler, "_check_single_fleet_status", side_effect=single_fleet_side_effect
+        ):
+            result = handler.check_hosts_status(request)
+
+        assert result.fulfilment.state == "partial"
+        assert result.fulfilment.final is True
+
+    def test_check_hosts_status_multi_partial_one_non_final_stays_pending(self):
+        """A non-final partial contributor → aggregate partial stays non-final (keep healing)."""
+        handler = _make_handler()
+        request = _make_request(["fleet-A", "fleet-B"], metadata={"fleet_type": "maintain"})
+
+        def single_fleet_side_effect(fleet_id, req):
+            if fleet_id == "fleet-A":
+                return _fleet_result(["i-a1"], "fleet-A", state="partial", final=True)
+            # async/still-reconciling fleet: partial but not settled
+            return _fleet_result(["i-b1"], "fleet-B", state="partial", final=False)
+
+        with patch.object(
+            handler, "_check_single_fleet_status", side_effect=single_fleet_side_effect
+        ):
+            result = handler.check_hosts_status(request)
+
+        assert result.fulfilment.state == "partial"
+        assert result.fulfilment.final is False
+
+    def test_check_hosts_status_multi_partial_propagates_diagnostic_and_capacity(self):
+        """Multi-fleet partial carries merged diagnostic + summed capacity counts.
+
+        Regression: the aggregate must carry the SAME contract as the
+        single-fleet path — a bare ProviderFulfilment(state, message, final)
+        dropped the diagnostic and every capacity count, so the status API
+        surfaced fulfilment_diagnostic=null and omitted capacity units for
+        multi-instant-fleet partials.
+        """
+        from datetime import datetime, timezone
+
+        from orb.domain.base.diagnostic import DiagnosticCategory, FulfilmentDiagnostic
+
+        handler = _make_handler()
+        request = _make_request(
+            ["fleet-A", "fleet-B"], metadata={"fleet_type": "instant"}, requested_count=7
+        )
+
+        diag_a = FulfilmentDiagnostic(
+            category=DiagnosticCategory.CAPACITY,
+            summary="Partially fulfilled: 1/3 capacity",
+            occurred_at=datetime.now(timezone.utc),
+        )
+        diag_b = FulfilmentDiagnostic(
+            category=DiagnosticCategory.CAPACITY,
+            summary="Partially fulfilled: 2/4 capacity",
+            occurred_at=datetime.now(timezone.utc),
+        )
+
+        def single_fleet_side_effect(fleet_id, req):
+            if fleet_id == "fleet-A":
+                return _fleet_result(
+                    ["i-a1"],
+                    "fleet-A",
+                    state="partial",
+                    final=True,
+                    target_units=3,
+                    fulfilled_units=1,
+                    running_count=1,
+                    pending_count=0,
+                    failed_count=0,
+                    diagnostic=diag_a,
+                )
+            return _fleet_result(
+                ["i-b1", "i-b2"],
+                "fleet-B",
+                state="partial",
+                final=True,
+                target_units=4,
+                fulfilled_units=2,
+                running_count=2,
+                pending_count=0,
+                failed_count=0,
+                diagnostic=diag_b,
+            )
+
+        with patch.object(
+            handler, "_check_single_fleet_status", side_effect=single_fleet_side_effect
+        ):
+            result = handler.check_hosts_status(request)
+
+        f = result.fulfilment
+        assert f.state == "partial"
+        assert f.final is True
+        # Diagnostic is merged (not dropped) so the request DTO gets stamped.
+        assert f.diagnostic is not None
+        assert f.diagnostic.category == DiagnosticCategory.CAPACITY
+        # target_units is the whole-request target (requested_count), NOT the
+        # sum of per-fleet targets (which double-counts fallback values).
+        assert f.target_units == 7
+        # Observed counts ARE summed across both fleets (whole-request view).
+        assert f.fulfilled_units == 3
+        assert f.running_count == 3
+        assert f.pending_count == 0
+        assert f.failed_count == 0
+
+    def test_check_hosts_status_multi_partial_all_none_capacity_stays_none(self):
+        """When every contributor reports None for an OBSERVED field the aggregate stays None.
+
+        Preserves 'unknown' vs 'zero' for the summed observed counts — an
+        all-None field must not collapse to 0.  ``target_units`` is the
+        exception: it is always the known whole-request target
+        (``requested_count``), never a sum, so it is never None here.
+        """
+        handler = _make_handler()
+        request = _make_request(
+            ["fleet-A", "fleet-B"], metadata={"fleet_type": "instant"}, requested_count=5
+        )
+
+        def single_fleet_side_effect(fleet_id, req):
+            resource = "fleet-A" if fleet_id == "fleet-A" else "fleet-B"
+            return _fleet_result([f"i-{resource}"], resource, state="partial", final=True)
+
+        with patch.object(
+            handler, "_check_single_fleet_status", side_effect=single_fleet_side_effect
+        ):
+            result = handler.check_hosts_status(request)
+
+        f = result.fulfilment
+        assert f.state == "partial"
+        assert f.final is True
+        # target_units is the whole-request target, not a sum of None contributors.
+        assert f.target_units == 5
+        assert f.fulfilled_units is None
+        assert f.running_count is None
+        assert f.pending_count is None
+        assert f.failed_count is None
+        # No contributor carried a diagnostic → merged diagnostic is None.
+        assert f.diagnostic is None
 
     def test_check_hosts_status_aws_error(self):
         """ClientError inside per-fleet loop → logged and skipped; empty instances."""
@@ -273,6 +442,7 @@ class TestEC2FleetFulfilment:
             requested_count=4,
         )
         assert f.state == "partial"
+        assert f.final is True
 
     def test_instant_fleet_in_progress_when_no_instances_yet(self):
         """Instant: no instances yet → in_progress."""

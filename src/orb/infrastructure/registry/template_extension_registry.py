@@ -169,6 +169,10 @@ class TemplateExtensionRegistryAdapter:
         """Delegate to ``TemplateExtensionRegistry.get_extension_defaults``."""
         return TemplateExtensionRegistry.get_extension_defaults(provider_type, config_data)
 
+    def get_extension_class(self, provider_type: str) -> Optional[type[BaseModel]]:
+        """Delegate to ``TemplateExtensionRegistry.get_extension_class``."""
+        return TemplateExtensionRegistry.get_extension_class(provider_type)
+
 
 # Convenience functions for common operations
 def register_provider_extension(provider_type: str, extension_class: type[BaseModel]) -> None:

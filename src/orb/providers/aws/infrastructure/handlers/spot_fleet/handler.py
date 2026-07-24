@@ -47,6 +47,7 @@ from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from orb.providers.aws.infrastructure.handlers.shared.fleet_fulfilment import (
+    aggregate_fleet_fulfilment,
     compute_capacity_based_fulfilment,
 )
 from orb.providers.aws.infrastructure.handlers.shared.fleet_grouping_mixin import FleetGroupingMixin
@@ -323,6 +324,12 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 )
 
             states = [r.fulfilment.state for r in fleet_results]
+            # An aggregated partial verdict is only *final* (terminalise now)
+            # when every partial contributor is itself final — i.e. all partial
+            # fleets are settled synchronous (instant) verdicts.  If any partial
+            # fleet is still-reconciling/async (final=False), the aggregate must
+            # stay non-final so the FSM keeps healing via PARTIAL_PENDING.
+            combined_final = False
             if all(s == "fulfilled" for s in states):
                 combined_state = "fulfilled"
                 combined_msg = f"All {len(fleet_results)} spot fleets fulfilled"
@@ -332,13 +339,22 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             elif any(s == "partial" for s in states):
                 combined_state = "partial"
                 combined_msg = "One or more spot fleets partially fulfilled"
+                combined_final = all(
+                    r.fulfilment.final for r in fleet_results if r.fulfilment.state == "partial"
+                )
             else:
                 combined_state = "in_progress"
                 combined_msg = "Waiting for spot fleet(s) to fulfil"
 
             return CheckHostsStatusResult(
                 instances=all_instances,
-                fulfilment=ProviderFulfilment(state=combined_state, message=combined_msg),
+                fulfilment=aggregate_fleet_fulfilment(
+                    state=combined_state,
+                    message=combined_msg,
+                    final=combined_final,
+                    contributors=[r.fulfilment for r in fleet_results],
+                    requested_count=request.requested_count,
+                ),
             )
 
         except Exception as e:
@@ -721,7 +737,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet request with lowest price allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 2, "t3.large": 2, "t3.xlarge": 4},
-                max_instances=100,
+                max_machines=100,
                 price_type="spot",
                 allocation_strategy="lowestPrice",
                 fleet_type="request",
@@ -736,7 +752,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet request with diversified allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 2, "t3.large": 2, "t3.xlarge": 4},
-                max_instances=100,
+                max_machines=100,
                 price_type="spot",
                 allocation_strategy="diversified",
                 fleet_type="request",
@@ -751,7 +767,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet request with capacity optimized allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 2, "t3.large": 2, "t3.xlarge": 4},
-                max_instances=100,
+                max_machines=100,
                 price_type="spot",
                 allocation_strategy="capacityOptimized",
                 fleet_type="request",
@@ -767,7 +783,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet maintain with lowest price allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 2, "t3.large": 2, "t3.xlarge": 4},
-                max_instances=100,
+                max_machines=100,
                 price_type="spot",
                 allocation_strategy="lowestPrice",
                 fleet_type="maintain",
@@ -782,7 +798,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet maintain with diversified allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 2, "t3.large": 2, "t3.xlarge": 4},
-                max_instances=100,
+                max_machines=100,
                 price_type="spot",
                 allocation_strategy="diversified",
                 fleet_type="maintain",
@@ -797,7 +813,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet maintain with capacity optimized allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 2, "t3.large": 2, "t3.xlarge": 4},
-                max_instances=100,
+                max_machines=100,
                 price_type="spot",
                 allocation_strategy="capacityOptimized",
                 fleet_type="maintain",

@@ -18,6 +18,7 @@ The return path is unchanged.
 """
 
 import dataclasses
+from datetime import datetime, timezone
 from typing import Optional, Tuple
 
 from orb.domain.base import UnitOfWorkFactory
@@ -26,7 +27,16 @@ from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.machine.aggregate import Machine
 from orb.domain.request.aggregate import Request
+from orb.domain.request.fulfilment_state_machine import (
+    FulfilmentEvent,
+    FulfilmentStateMachine,
+)
 from orb.domain.request.request_types import RequestStatus, RequestType
+
+# Default grace period used only when no FulfilmentStateMachine is injected
+# (e.g. lightweight unit-test construction). Production always injects the
+# config-driven machine via DI.
+_DEFAULT_GRACE_PERIOD_SECONDS = 3600
 
 
 class RequestStatusService:
@@ -36,9 +46,13 @@ class RequestStatusService:
         self,
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
+        state_machine: Optional[FulfilmentStateMachine] = None,
     ) -> None:
         self.uow_factory = uow_factory
         self.logger = logger
+        self._state_machine = state_machine or FulfilmentStateMachine(
+            grace_period_seconds=_DEFAULT_GRACE_PERIOD_SECONDS
+        )
 
     def determine_status_from_machines(
         self,
@@ -187,86 +201,143 @@ class RequestStatusService:
         message: str,
         provider_metadata: Optional[dict] = None,
     ) -> Request:
-        """Update request status and optionally cache the latest ProviderFulfilment.
+        """Route a status update through the fulfilment state machine and persist.
 
-        When ``provider_metadata`` is supplied and contains a ``provider_fulfilment``
-        key, the fulfilment is serialised and stored as ``request.metadata["last_fulfilment"]``.
-        That snapshot is later read by ``RequestDTO.from_domain`` so capacity fields
-        (target_units, fulfilled_units, running_count, pending_count) appear in every
-        response without requiring the caller to re-pass the fulfilment explicitly.
+        The state machine is the single write authority for ``Request.status``.
+        The ``PARTIAL_PENDING`` holding state and the deadline sweep replace the
+        old terminal-``PARTIAL`` upgrade hack: an illegal transition (e.g. any
+        write to an already-terminal request other than an allowed upgrade) is
+        rejected by the state machine and surfaces here as a no-op — the request
+        is returned unchanged and nothing is persisted.
 
-        Terminal requests are mostly immutable, but PARTIAL is allowed to
-        upgrade to COMPLETED. Multi-fleet requests can be stamped PARTIAL on
-        a first sync when one fleet is still reporting transient state; once
-        every fleet's instances are running, the next sync correctly produces
-        a 'fulfilled' verdict and the request should reflect that — not stay
-        stuck PARTIAL forever.
-
-        Downgrades (COMPLETED -> PARTIAL/FAILED, CANCELLED -> anything, etc.)
-        remain blocked.
+        When ``provider_metadata`` carries a ``provider_fulfilment`` the verdict
+        is fed to the machine as a ``PROVIDER_VERDICT`` event (the machine owns
+        the state mapping, including the deadline-dependent partial resolution)
+        and the fulfilment snapshot is cached in ``metadata["last_fulfilment"]``
+        so ``RequestDTO.from_domain`` can surface capacity fields.
         """
-        if request.status.is_terminal():
-            # Allow PARTIAL -> COMPLETED upgrade; everything else stays put.
-            new_status_enum: Optional[RequestStatus] = None
-            try:
-                new_status_enum = RequestStatus(status)
-            except ValueError as exc:
-                self.logger.debug(
-                    "Unknown status %r on terminal-state upgrade check: %s; rejecting upgrade",
-                    status,
-                    exc,
-                )
-                new_status_enum = None
-            is_upgrade_to_complete = (
-                request.status == RequestStatus.PARTIAL
-                and new_status_enum == RequestStatus.COMPLETED
-            )
-            if not is_upgrade_to_complete:
-                return request
+        from orb.domain.request.exceptions import InvalidRequestStateError
+
+        now = datetime.now(timezone.utc)
+        fulfilment: Optional[ProviderFulfilment] = (
+            provider_metadata.get("provider_fulfilment") if provider_metadata else None
+        )
+
         try:
-            status_enum = RequestStatus(status)
-            updated_request = request.update_status(status_enum, message)
-
-            # Reconcile the persisted counters with reality. The acquire
-            # fulfilment path transitions directly via ``update_status``,
-            # which does not touch ``successful_count`` — it is only
-            # bumped by ``update_with_provisioning_result``. That works
-            # for batched-instance providers but not for instant fulfilment
-            # (e.g. EC2Fleet instant) where the provider reports
-            # "fulfilled" without emitting instance_ids. Use the request's
-            # own machine_ids list — which is the authoritative count of
-            # machines associated with this request — as the source of
-            # truth for ``successful_count`` whenever it disagrees with
-            # the persisted value.
-            if status_enum in (
-                RequestStatus.COMPLETED,
-                RequestStatus.PARTIAL,
-                RequestStatus.IN_PROGRESS,
-            ):
-                actual_count = len(updated_request.machine_ids)
-                if actual_count and actual_count != updated_request.successful_count:
-                    updated_request = updated_request.model_copy(
-                        update={"successful_count": actual_count}
+            if fulfilment is not None:
+                updated_request = self._state_machine.apply(
+                    request,
+                    FulfilmentEvent.PROVIDER_VERDICT,
+                    now=now,
+                    fulfilment=fulfilment,
+                    message=message,
+                )
+            else:
+                # No provider fulfilment (return path, or explicit status set):
+                # synthesise a verdict from the requested status string so the
+                # same state-machine policy applies uniformly.
+                synthetic = self._synthesise_fulfilment(status, message)
+                if synthetic is None:
+                    self.logger.debug(
+                        "Unknown status %r for request %s; leaving unchanged",
+                        status,
+                        request.request_id.value,
                     )
+                    return request
+                updated_request = self._state_machine.apply(
+                    request,
+                    FulfilmentEvent.PROVIDER_VERDICT,
+                    now=now,
+                    fulfilment=synthetic,
+                    message=message,
+                )
+        except InvalidRequestStateError as exc:
+            # Illegal transition (e.g. terminal request, backward step). This is
+            # not an error — it is the state machine refusing an out-of-order
+            # write. Leave the request untouched, matching the previous
+            # "terminal requests stay put" behaviour.
+            self.logger.debug(
+                "State machine rejected transition for request %s: %s",
+                request.request_id.value,
+                exc,
+            )
+            return request
 
-            # Cache the latest ProviderFulfilment snapshot so DTO callers can surface it.
-            if provider_metadata:
-                fulfilment = provider_metadata.get("provider_fulfilment")
-                if fulfilment is not None:
-                    updated_request = updated_request.with_last_fulfilment(
-                        dataclasses.asdict(fulfilment)
-                    )
+        # Reconcile the persisted ``successful_count`` against the authoritative
+        # machine_ids count for still-progressing/terminal-success states. The
+        # state machine does not touch successful_count; instant-fulfilment
+        # providers (EC2Fleet instant) report "fulfilled" without emitting
+        # instance_ids, so machine_ids is the source of truth. This runs even on
+        # an idempotent status re-application so a lagging counter still heals.
+        changed = updated_request is not request
+        if updated_request.status in (
+            RequestStatus.COMPLETED,
+            RequestStatus.PARTIAL,
+            RequestStatus.PARTIAL_PENDING,
+            RequestStatus.IN_PROGRESS,
+        ):
+            actual_count = len(updated_request.machine_ids)
+            if actual_count and actual_count != updated_request.successful_count:
+                updated_request = updated_request.model_copy(
+                    update={"successful_count": actual_count}
+                )
+                changed = True
 
-            # Save updated request
+        # Cache the latest ProviderFulfilment snapshot so DTO callers can surface it.
+        if fulfilment is not None:
+            snapshot = dataclasses.asdict(fulfilment)
+            # ``diagnostic`` is a pydantic value object inside a frozen dataclass;
+            # dataclasses.asdict leaves it as a nested value — drop it from the
+            # metadata snapshot (the structured diagnostic lives on the request
+            # aggregate itself, not in the capacity snapshot).
+            snapshot.pop("diagnostic", None)
+            updated_request = updated_request.with_last_fulfilment(snapshot)
+            changed = True
+
+        # Nothing actually changed (idempotent re-application with no counter or
+        # snapshot delta) — skip the write.
+        if not changed:
+            return request
+
+        try:
             with self.uow_factory.create_unit_of_work() as uow:
                 uow.requests.save(updated_request)
-
-            self.logger.info(f"Updated request {request.request_id.value} status to {status}")
-            return updated_request
-
         except Exception as e:
-            self.logger.error(f"Failed to update request status: {e}")
+            self.logger.error(f"Failed to persist request status update: {e}")
             raise
+
+        self.logger.info(
+            "Updated request %s status to %s",
+            request.request_id.value,
+            updated_request.status.value,
+        )
+        return updated_request
+
+    @staticmethod
+    def _synthesise_fulfilment(status: str, message: str) -> Optional[ProviderFulfilment]:
+        """Build a ProviderFulfilment verdict from a plain status string.
+
+        Used for the return path (machine-count based) and any caller that
+        supplies a status without a provider verdict, so all writes flow through
+        the same state-machine policy. Returns None for unknown statuses.
+        """
+        try:
+            target = RequestStatus(status)
+        except ValueError:
+            return None
+
+        state_map: dict[RequestStatus, str] = {
+            RequestStatus.COMPLETED: "fulfilled",
+            RequestStatus.IN_PROGRESS: "in_progress",
+            RequestStatus.ACQUIRING: "in_progress",
+            RequestStatus.PARTIAL: "partial",
+            RequestStatus.PARTIAL_PENDING: "partial",
+            RequestStatus.FAILED: "failed",
+        }
+        mapped = state_map.get(target)
+        if mapped is None:
+            return None
+        return ProviderFulfilment(state=mapped, message=message)  # type: ignore[arg-type]
 
     def map_machine_status_to_result(self, status: str, request_type: RequestType) -> str:
         """Map machine status to result code."""
