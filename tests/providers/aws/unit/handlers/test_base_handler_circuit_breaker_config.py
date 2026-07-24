@@ -16,7 +16,7 @@ class _ConcreteHandler(AWSHandler):
     def check_hosts_status(self, request):  # type: ignore[override]
         return []
 
-    def release_hosts(self, machine_ids, resource_mapping=None, request_id=""):  # type: ignore[override]
+    def release_hosts(self, machine_ids, context=None):  # type: ignore[override]
         pass
 
     def cancel_resource(self, resource_id, request_id):  # type: ignore[override]

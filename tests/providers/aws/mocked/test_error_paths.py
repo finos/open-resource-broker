@@ -379,7 +379,7 @@ class TestEC2FleetHandlerEdgeCases:
         resource_mapping = {iid: (fleet_id, 1) for iid in fake_instance_ids}
 
         try:
-            handler.release_hosts(fake_instance_ids, resource_mapping=resource_mapping)
+            handler.release_hosts(fake_instance_ids, {"resource_mapping": resource_mapping})
         except Exception as exc:
             assert "InvalidInstanceID" in str(exc) or "does not exist" in str(exc).lower()
 
@@ -468,7 +468,7 @@ class TestSpotFleetHandlerEdgeCases:
         }
 
         try:
-            h.release_hosts(fake_instance_ids, resource_mapping=resource_mapping)
+            h.release_hosts(fake_instance_ids, {"resource_mapping": resource_mapping})
         except Exception:
             pass
 

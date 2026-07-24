@@ -212,7 +212,7 @@ class K8sJobHandler(K8sHandlerBase):
     async def release_hosts(
         self,
         machine_ids: list[str],
-        provider_data: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Delete the whole Job (cascade-deletes pods).
 
@@ -239,8 +239,8 @@ class K8sJobHandler(K8sHandlerBase):
                 If the live Job cannot be read and parallelism is still
                 unknown, the release is refused — we cannot confirm the
                 caller is releasing the whole Job.
-            provider_data: The ``provider_data`` dict stamped onto the
-                Request aggregate at acquire time.  Carries ``namespace``,
+            context: The ``provider_data`` dict stamped onto the Request
+                aggregate at acquire time.  Carries ``namespace``,
                 ``job_name`` and optionally ``parallelism``.
 
         Raises:
@@ -249,6 +249,7 @@ class K8sJobHandler(K8sHandlerBase):
                 determined (absent in ``provider_data`` and live Job
                 read fails).
         """
+        provider_data = context or {}
         request_id = provider_data.get("request_id", "unknown")
         if not machine_ids:
             self._logger.debug(

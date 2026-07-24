@@ -678,17 +678,19 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
     def release_hosts(
         self,
         machine_ids: list[str],
-        resource_mapping: Optional[dict[str, tuple[Optional[str], int]]] = None,
-        request_id: str = "",
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """
         Release hosts created by RunInstances.
 
         Args:
             machine_ids: List of instance IDs to terminate
-            resource_mapping: Dict mapping instance_id to (resource_id or None, desired_capacity)
-            request_id: Original provisioning request ID, used for launch template cleanup
+            context: Neutral release context; ``resource_mapping`` maps
+                instance_id to (resource_id or None, desired_capacity) and
+                ``request_id`` is the original provisioning request ID used
+                for launch template cleanup.
         """
+        _resource_mapping, request_id = self._unpack_release_context(context)
         try:
             if not machine_ids:
                 self._logger.warning("No instance IDs provided for RunInstances termination")

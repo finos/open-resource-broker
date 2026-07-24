@@ -235,7 +235,7 @@ class K8sStatefulSetHandler(K8sHandlerBase):
     async def release_hosts(
         self,
         machine_ids: list[str],
-        provider_data: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Selective or full release using ordinal-aware scale-down.
 
@@ -268,11 +268,12 @@ class K8sStatefulSetHandler(K8sHandlerBase):
 
         Args:
             machine_ids: Pod names the caller wants to release.
-            provider_data: The ``provider_data`` dict stamped onto the
-                Request aggregate at acquire time.  Carries ``namespace``
-                and ``statefulset_name`` (falls back to deterministic
-                defaults when absent).
+            context: The ``provider_data`` dict stamped onto the Request
+                aggregate at acquire time.  Carries ``namespace`` and
+                ``statefulset_name`` (falls back to deterministic defaults
+                when absent).
         """
+        provider_data = context or {}
         request_id = provider_data.get("request_id", "unknown")
         if not machine_ids:
             self._logger.debug(

@@ -352,10 +352,15 @@ class MicroVMHandler(AWSHandler):
     def release_hosts(
         self,
         machine_ids: list[str],
-        resource_mapping: Optional[dict[str, tuple[Optional[str], int]]] = None,
-        request_id: str = "",
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
-        """Terminate MicroVMs in parallel."""
+        """Terminate MicroVMs in parallel.
+
+        Args:
+            machine_ids: MicroVM identifiers to terminate.
+            context: Neutral release context; unused by the MicroVM handler,
+                accepted for signature parity with the provider contract.
+        """
         if not machine_ids:
             self._logger.warning("No MicroVM IDs provided for termination")
             return

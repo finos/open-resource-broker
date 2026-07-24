@@ -461,7 +461,7 @@ class TestPartialReturnCapacityReduction:
         resource_mapping = {
             instance_ids[0]: (asg_name, 2),
         }
-        handler.release_hosts([instance_ids[0]], resource_mapping=resource_mapping)
+        handler.release_hosts([instance_ids[0]], {"resource_mapping": resource_mapping})
 
         resp = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
         assert resp["AutoScalingGroups"], "ASG should still exist after partial release"

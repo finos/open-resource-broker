@@ -666,7 +666,7 @@ class TestEC2FleetHandler:
         }
 
         # Test release_hosts with resource mapping
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that terminate_instances_with_fallback was called
         assert aws_ops.terminate_instances_with_fallback.called
@@ -709,7 +709,7 @@ class TestEC2FleetHandler:
         }
 
         # Test release_hosts with mixed instances
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that terminate_instances_with_fallback was called
         assert aws_ops.terminate_instances_with_fallback.called
@@ -796,7 +796,7 @@ class TestEC2FleetHandler:
 
         # Test release_hosts with incomplete resource mapping
         # The handler should process all instances, even with incomplete mapping
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that the handler processes the instances correctly
         assert aws_ops.terminate_instances_with_fallback.called, "Expected termination to be called"
@@ -903,7 +903,7 @@ class TestEC2FleetHandler:
         )
 
         # Test release_hosts with maintain fleet instances
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that terminate_instances_with_fallback was called
         assert aws_ops.terminate_instances_with_fallback.called
@@ -1106,7 +1106,7 @@ class TestASGHandler:
         }
 
         # Test release_hosts with resource mapping
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that terminate_instances_with_fallback was called
         # (The exact number of calls depends on how instances are grouped)
@@ -1152,7 +1152,7 @@ class TestASGHandler:
         }
 
         # Test release_hosts with mixed instances
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that terminate_instances_with_fallback was called
         # Should be called multiple times for different groups
@@ -1243,7 +1243,7 @@ class TestASGHandler:
 
         # Test release_hosts with incomplete resource mapping
         # The handler should process all instances, even with incomplete mapping
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that the handler processes the instances correctly
         assert aws_ops.terminate_instances_with_fallback.called, "Expected termination to be called"
@@ -1591,7 +1591,7 @@ class TestSpotFleetHandler:
         }
 
         # Test release_hosts with resource mapping
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that terminate_instances_with_fallback was called
         assert aws_ops.terminate_instances_with_fallback.called
@@ -1667,7 +1667,7 @@ class TestSpotFleetHandler:
         )
 
         # Test release_hosts with mixed instances
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that terminate_instances_with_fallback was called
         assert aws_ops.terminate_instances_with_fallback.called
@@ -1777,7 +1777,7 @@ class TestSpotFleetHandler:
 
         # Test release_hosts with incomplete resource mapping
         # The handler should process all instances, even with incomplete mapping
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that the handler processes the instances correctly
         assert aws_ops.terminate_instances_with_fallback.called, "Expected termination to be called"
@@ -1942,7 +1942,7 @@ class TestSpotFleetHandler:
         resource_mapping = {}
 
         # Test release_hosts with empty instance list (should trigger fleet cancellation logic)
-        handler.release_hosts([], resource_mapping)
+        handler.release_hosts([], {"resource_mapping": resource_mapping})
 
         # This should trigger early return due to empty machine_ids
         # Verify that no termination calls were made
@@ -2172,7 +2172,7 @@ class TestRunInstancesHandler:
         }
 
         # Test release_hosts with resource mapping
-        handler.release_hosts(instance_ids, resource_mapping)
+        handler.release_hosts(instance_ids, {"resource_mapping": resource_mapping})
 
         # Verify that terminate_instances_with_fallback was called
         # RunInstances handler should ignore resource_mapping and just terminate all instances

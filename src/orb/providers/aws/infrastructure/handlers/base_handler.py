@@ -270,22 +270,38 @@ class AWSHandler(ProviderHandlerBase, ABC):
     def release_hosts(
         self,
         machine_ids: list[str],
-        resource_mapping: Optional[dict[str, tuple[Optional[str], int]]] = None,
-        request_id: str = "",
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """
         Release hosts by instance ID.
 
         Args:
             machine_ids: List of instance IDs to terminate
-            resource_mapping: Optional mapping of instance_id to (resource_id, desired_capacity)
-                              for intelligent resource management (e.g. ASG/fleet capacity reduction)
-            request_id: Original provisioning request ID, used for launch template cleanup
+            context: Neutral per-release context dict carrying provider-specific
+                release inputs.  AWS handlers read two optional keys:
+                ``resource_mapping`` — mapping of instance_id to
+                (resource_id, desired_capacity) for intelligent resource
+                management (e.g. ASG/fleet capacity reduction); and
+                ``request_id`` — original provisioning request ID, used for
+                launch template cleanup.
 
         Raises:
             AWSEntityNotFoundError: If the AWS resource is not found
             InfrastructureError: For other AWS API errors
         """
+
+    @staticmethod
+    def _unpack_release_context(
+        context: Optional[dict[str, Any]],
+    ) -> tuple[Optional[dict[str, tuple[Optional[str], int]]], str]:
+        """Extract the AWS release inputs from the neutral ``context`` dict.
+
+        Returns the ``(resource_mapping, request_id)`` pair every AWS handler
+        needs, applying the historical defaults (``None`` mapping, empty
+        request ID) when the keys are absent or ``context`` is ``None``.
+        """
+        context = context or {}
+        return context.get("resource_mapping"), context.get("request_id", "")
 
     @abstractmethod
     def cancel_resource(self, resource_id: str, request_id: str) -> dict[str, Any]:

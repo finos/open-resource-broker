@@ -296,8 +296,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         # Call handler's release_hosts method for all provider APIs
         try:
             handler.release_hosts(
-                machine_ids, resource_mapping=resource_mapping, request_id=request_id
-            )  # type: ignore[call-arg]
+                machine_ids,
+                {"resource_mapping": resource_mapping, "request_id": request_id},
+            )
 
         except Exception as e:
             self._logger.error(

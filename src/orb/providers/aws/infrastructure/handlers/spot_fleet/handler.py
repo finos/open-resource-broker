@@ -520,16 +520,18 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
     def release_hosts(
         self,
         machine_ids: list[str],
-        resource_mapping: Optional[dict[str, tuple[Optional[str], int]]] = None,
-        request_id: str = "",
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Release hosts across multiple Spot Fleets by detecting fleet membership.
 
         Args:
             machine_ids: List of instance IDs to terminate
-            resource_mapping: Dict mapping instance_id to (resource_id or None, desired_capacity)
-            request_id: Original provisioning request ID (unused by SpotFleet handler — recovered from fleet tag)
+            context: Neutral release context; ``resource_mapping`` maps
+                instance_id to (resource_id or None, desired_capacity).
+                ``request_id`` is unused by the SpotFleet handler — it is
+                recovered from the fleet tag.
         """
+        resource_mapping, _request_id = self._unpack_release_context(context)
         try:
             if not machine_ids:
                 self._logger.warning("No instance IDs provided for Spot Fleet termination")

@@ -363,7 +363,7 @@ class K8sPodHandler(K8sHandlerBase):
     async def release_hosts(
         self,
         machine_ids: list[str],
-        provider_data: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         """Delete the named pods concurrently; 404s are best-effort.
 
@@ -381,11 +381,11 @@ class K8sPodHandler(K8sHandlerBase):
         Args:
             machine_ids: Pod names to delete.  For the Pod handler the
                 machine_id IS the pod name (1 ORB unit = 1 pod).
-            provider_data: The ``provider_data`` dict stamped onto the
-                Request aggregate at acquire time.  Carries
-                ``namespace`` (falls back to the provider default when
-                absent).
+            context: The ``provider_data`` dict stamped onto the Request
+                aggregate at acquire time.  Carries ``namespace`` (falls
+                back to the provider default when absent).
         """
+        provider_data = context or {}
         request_id = provider_data.get("request_id", "unknown")
         if not machine_ids:
             self._logger.debug(

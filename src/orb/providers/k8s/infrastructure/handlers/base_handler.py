@@ -775,16 +775,17 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
     async def release_hosts(
         self,
         machine_ids: list[str],
-        provider_data: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Delete the pods/workloads identified by ``machine_ids``.
 
-        ``provider_data`` is the dict stored on the Request aggregate at
-        acquire time.  It carries ``namespace`` (and for controller-based
-        handlers ``deployment_name`` / ``job_name`` / ``statefulset_name``)
-        so the handler can resolve context without needing the full Request
-        aggregate.  The dict is the same object that was stamped under
-        ``Request.provider_data`` by ``acquire_hosts``.
+        ``context`` is the neutral per-release context dict.  For Kubernetes
+        handlers it is the ``provider_data`` dict stored on the Request
+        aggregate at acquire time: it carries ``namespace`` (and for
+        controller-based handlers ``deployment_name`` / ``job_name`` /
+        ``statefulset_name``) so the handler can resolve context without
+        needing the full Request aggregate.  The dict is the same object that
+        was stamped under ``Request.provider_data`` by ``acquire_hosts``.
         """
 
     @classmethod

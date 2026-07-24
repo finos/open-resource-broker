@@ -49,7 +49,7 @@ async def test_release_rejected_when_subset_of_parallelism() -> None:
     with pytest.raises(K8sError, match="Job selective release refused"):
         await handler.release_hosts(
             machine_ids=["pod-1", "pod-2"],
-            provider_data={
+            context={
                 "request_id": "req-test",
                 "namespace": "ns",
                 "job_name": "orb-job",
@@ -64,7 +64,7 @@ async def test_release_accepted_when_full_parallelism() -> None:
     handler = _make_handler()
     await handler.release_hosts(
         machine_ids=["pod-1", "pod-2", "pod-3"],
-        provider_data={
+        context={
             "request_id": "req-test",
             "namespace": "ns",
             "job_name": "orb-job",
@@ -79,7 +79,7 @@ async def test_release_noop_when_empty_machine_ids() -> None:
     handler = _make_handler()
     await handler.release_hosts(
         machine_ids=[],
-        provider_data={
+        context={
             "request_id": "req-test",
             "namespace": "ns",
             "job_name": "orb-job",
@@ -102,7 +102,7 @@ async def test_release_resolves_parallelism_from_live_job_when_absent() -> None:
     handler = _make_handler(live_parallelism=2)
     await handler.release_hosts(
         machine_ids=["pod-1", "pod-2"],
-        provider_data={
+        context={
             "request_id": "req-test",
             "namespace": "ns",
             "job_name": "orb-job",
@@ -125,7 +125,7 @@ async def test_release_refuses_subset_when_parallelism_resolved_from_live_job() 
     with pytest.raises(K8sError, match="selective release refused"):
         await handler.release_hosts(
             machine_ids=["pod-1", "pod-2"],
-            provider_data={
+            context={
                 "request_id": "req-test",
                 "namespace": "ns",
                 "job_name": "orb-job",
@@ -149,7 +149,7 @@ async def test_release_refused_when_live_read_unavailable_unknown_parallelism() 
     with pytest.raises(K8sError, match="missing 'parallelism'"):
         await handler.release_hosts(
             machine_ids=["pod-1", "pod-2"],
-            provider_data={
+            context={
                 "request_id": "req-test",
                 "namespace": "ns",
                 "job_name": "orb-job",
@@ -174,7 +174,7 @@ async def test_release_refused_when_parallelism_absent_and_live_read_fails() -> 
     with pytest.raises(K8sError, match="missing 'parallelism'"):
         await handler.release_hosts(
             machine_ids=["pod-1"],
-            provider_data={
+            context={
                 "request_id": "req-test",
                 "namespace": "ns",
                 "job_name": "orb-job",

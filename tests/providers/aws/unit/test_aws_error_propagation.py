@@ -55,7 +55,7 @@ def _make_handler():
         def check_hosts_status(self, request):
             pass  # type: ignore[return]
 
-        def release_hosts(self, machine_ids, resource_mapping=None, request_id=""):
+        def release_hosts(self, machine_ids, context=None):
             pass
 
         def cancel_resource(self, resource_id, request_id):
