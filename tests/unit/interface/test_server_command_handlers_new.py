@@ -236,6 +236,7 @@ class TestBuildRuntime:
             patch("orb.interface.server_runtime.run_api_foreground", mock_run_api),
             patch("orb.interface.server_runtime.run_embedded_foreground", mock_run_embedded),
             patch("orb.interface.server_command_handlers._initialize_application", AsyncMock()),
+            patch("orb.interface.server_command_handlers._schedule_startup_recovery"),
         ):
             asyncio_run = __import__("asyncio")
             asyncio_run.run(runtime())
@@ -266,6 +267,7 @@ class TestBuildRuntime:
             patch("orb.interface.server_runtime.run_api_foreground", mock_run_api),
             patch("orb.interface.server_runtime.run_embedded_foreground", mock_run_embedded),
             patch("orb.interface.server_command_handlers._initialize_application", AsyncMock()),
+            patch("orb.interface.server_command_handlers._schedule_startup_recovery"),
         ):
             _asyncio.run(runtime())
 
@@ -292,6 +294,7 @@ class TestBuildRuntime:
         with (
             patch("orb.interface.server_runtime.run_api_foreground", mock_run_api),
             patch("orb.interface.server_command_handlers._initialize_application", AsyncMock()),
+            patch("orb.interface.server_command_handlers._schedule_startup_recovery"),
         ):
             _asyncio.run(runtime())
 
@@ -821,3 +824,167 @@ class TestInitializeApplication:
 
         mock_logger.warning.assert_called_once()
         mock_logger.error.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_initialize_does_not_run_recovery_sweep(self):
+        """Structural guard: the best-effort recovery sweep must NOT run on the
+        awaited pre-serve init path.
+
+        The sweep queries active requests and routes each through the state
+        machine, which can push init past the server-start window and keep
+        /health returning 503. It is scheduled post-serve instead. Here we prove
+        _initialize_application never resolves the recovery service and never
+        invokes recover_stuck_acquiring_requests.
+        """
+        from orb.application.services.provisioning_orchestration_service import (
+            ProvisioningOrchestrationService,
+        )
+        from orb.interface.server_command_handlers import _initialize_application
+
+        recovery_service = MagicMock()
+
+        def _container_get(cls):
+            if cls is ProvisioningOrchestrationService:
+                return recovery_service
+            mock_config_port = MagicMock()
+            mock_config_port._config_file = None
+            return mock_config_port
+
+        mock_container = MagicMock()
+        mock_container.get.side_effect = _container_get
+
+        mock_app = MagicMock()
+        mock_app.initialize = AsyncMock(return_value=True)
+        mock_app.start_daemon_services = AsyncMock(return_value=True)
+
+        with patch("orb.bootstrap.Application", return_value=mock_app):
+            await _initialize_application(mock_container)
+
+        # The recovery service is never resolved and never invoked on the
+        # awaited init path.
+        recovery_service.recover_stuck_acquiring_requests.assert_not_called()
+        assert ProvisioningOrchestrationService not in [
+            c.args[0] for c in mock_container.get.call_args_list if c.args
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Startup recovery sweep — post-serve, best-effort, non-blocking to readiness
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestStartupRecovery:
+    @pytest.mark.asyncio
+    async def test_run_startup_recovery_offloads_and_logs_sweep_count(self):
+        """_run_startup_recovery resolves the service, runs the sweep off-thread,
+        and logs when rows were swept."""
+        from orb.application.services.provisioning_orchestration_service import (
+            ProvisioningOrchestrationService,
+        )
+        from orb.interface.server_command_handlers import _run_startup_recovery
+
+        recovery_service = MagicMock()
+        recovery_service.recover_stuck_acquiring_requests.return_value = 3
+
+        def _container_get(cls):
+            if cls is ProvisioningOrchestrationService:
+                return recovery_service
+            return MagicMock()
+
+        mock_container = MagicMock()
+        mock_container.get.side_effect = _container_get
+
+        await _run_startup_recovery(mock_container)
+
+        recovery_service.recover_stuck_acquiring_requests.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_run_startup_recovery_swallows_exceptions(self):
+        """A failure in the sweep is best-effort: logged, never raised."""
+        from orb.application.services.provisioning_orchestration_service import (
+            ProvisioningOrchestrationService,
+        )
+        from orb.interface.server_command_handlers import _run_startup_recovery
+
+        recovery_service = MagicMock()
+        recovery_service.recover_stuck_acquiring_requests.side_effect = RuntimeError("boom")
+
+        def _container_get(cls):
+            if cls is ProvisioningOrchestrationService:
+                return recovery_service
+            return MagicMock()
+
+        mock_container = MagicMock()
+        mock_container.get.side_effect = _container_get
+
+        # Must not raise.
+        await _run_startup_recovery(mock_container)
+
+    @pytest.mark.asyncio
+    async def test_schedule_startup_recovery_is_fire_and_forget(self):
+        """_schedule_startup_recovery returns immediately without awaiting the
+        sweep, and the sweep only executes once the loop yields (after serve)."""
+        import asyncio as _asyncio
+
+        from orb.interface import server_command_handlers as sch
+
+        started = _asyncio.Event()
+        release = _asyncio.Event()
+
+        async def _fake_recovery(container):
+            started.set()
+            await release.wait()
+
+        with patch.object(sch, "_run_startup_recovery", _fake_recovery):
+            task = sch._schedule_startup_recovery(MagicMock())
+            # Scheduling did not block on / await the sweep: at the point
+            # _schedule_startup_recovery returned the coroutine had not yet run.
+            assert not started.is_set()
+            assert not task.done()
+            # Yield so the scheduled task gets a chance to start.
+            await _asyncio.sleep(0)
+            assert started.is_set()
+            # Let it finish and clean up the strong reference. Draining the
+            # task fires the done-callback that drops it from the set.
+            release.set()
+            result = await task
+            assert result is None
+            assert task not in sch._background_tasks
+
+    def test_runtime_schedules_recovery_after_init_not_awaited(self):
+        """Structural guard on the serve path: runtime() schedules the recovery
+        sweep (fire-and-forget) and starts serving without awaiting it, so
+        readiness never depends on the sweep completing."""
+        from orb.interface.server_command_handlers import _build_runtime
+
+        server_cfg = _make_server_config()
+        with patch(_RESOLVE_CONFIGS, return_value=(server_cfg, None)):
+            args = _args(api_only=True)
+            args._container = MagicMock()
+            runtime, _sc, _ui = _build_runtime(args)
+
+        call_order: list[str] = []
+
+        init_mock = AsyncMock(side_effect=lambda *_a, **_k: call_order.append("init"))
+        schedule_mock = MagicMock(side_effect=lambda *_a, **_k: call_order.append("schedule"))
+
+        async def _fake_serve(*_a, **_k):
+            call_order.append("serve")
+            return {"exit_code": 0}
+
+        import asyncio as _asyncio
+
+        with (
+            patch("orb.interface.server_command_handlers._initialize_application", init_mock),
+            patch(
+                "orb.interface.server_command_handlers._schedule_startup_recovery",
+                schedule_mock,
+            ),
+            patch("orb.interface.server_runtime.run_api_foreground", _fake_serve),
+        ):
+            _asyncio.run(runtime())
+
+        # Recovery is scheduled (not awaited) after init and before serve blocks.
+        schedule_mock.assert_called_once()
+        assert call_order == ["init", "schedule", "serve"]

@@ -20,7 +20,7 @@ help:  ## Show this help message
 	@echo ''
 	@awk 'BEGIN {FS = ":.*## "; section=""} \
 		/^# @SECTION / {if(section && length(buffer)>0) {print buffer | "sort"; close("sort"); buffer=""} section=substr($$0,12); print "\n" section ":"} \
-		/^[[:alnum:]_-]+:.*## / {if(section) buffer = buffer sprintf("  %-20s %s\n", $$1, $$2)} \
+		/^[[:alnum:]_-][[:alnum:]_$$()-]*:.*## / {if(section) {t=$$1; d=$$2; gsub(/\$$\(1\)/, "<name>", t); gsub(/\$$\(1\)/, "<name>", d); buffer = buffer sprintf("  %-28s %s\n", t, d)}} \
 		END {if(section && length(buffer)>0) {print buffer | "sort"; close("sort")}}' $(MAKEFILE_LIST)
 
 # @SECTION Convenience Targets

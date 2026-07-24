@@ -138,6 +138,7 @@ class TestGetRequestConfig:
         req_cfg.fulfillment_timeout_seconds = 120
         req_cfg.fulfillment_batch_size = 500
         req_cfg.fulfillment_fallback_template_id = "tpl-fallback"
+        req_cfg.concurrency_max_retries = 7
         cm.get_typed.return_value = req_cfg
 
         result = adapter.get_request_config()
@@ -145,6 +146,7 @@ class TestGetRequestConfig:
         assert result["max_machines_per_request"] == 50
         assert result["fulfillment_max_retries"] == 5
         assert result["fulfillment_fallback_template_id"] == "tpl-fallback"
+        assert result["concurrency_max_retries"] == 7
 
     def test_falls_back_to_defaults_on_exception(self):
         adapter, cm = _make_adapter()
@@ -154,6 +156,7 @@ class TestGetRequestConfig:
 
         assert result["max_machines_per_request"] == 100
         assert result["fulfillment_fallback_template_id"] is None
+        assert result["concurrency_max_retries"] == 3
 
 
 # ---------------------------------------------------------------------------

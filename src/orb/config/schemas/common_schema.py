@@ -162,6 +162,10 @@ class RequestConfig(BaseModel):
     fulfillment_max_retries: int = Field(
         3, description="Maximum number of provisioning retry attempts"
     )
+    concurrency_max_retries: int = Field(
+        3,
+        description="Maximum optimistic-concurrency (version-conflict) retry attempts for request status writes",
+    )
     fulfillment_timeout_seconds: int = Field(300, description="Provisioning timeout in seconds")
     fulfillment_batch_size: int = Field(
         1000, description="Maximum instances per provisioning attempt"

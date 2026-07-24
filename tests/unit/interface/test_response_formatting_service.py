@@ -71,14 +71,28 @@ class TestFormatRequestStatus:
         result = svc.format_request_status([], next_cursor="cursor123")
         assert result.data["next_cursor"] == "cursor123"
 
-    def test_next_cursor_none_sets_key_when_missing_from_data(self):
+    def test_no_pagination_kwargs_leaves_payload_clean(self):
+        """Single-request / HostFactory getRequestStatus path: caller passes no
+        pagination kwargs, so next_cursor/total_count must NOT be injected.
+
+        The IBM Symphony HF wire spec has no pagination cursor on a single
+        request-status response — stamping ``next_cursor: null`` there leaks a
+        field into external HF integrations.
+        """
         svc, scheduler = _make_service()
-        # data does NOT contain next_cursor key
         scheduler.format_request_status_response.return_value = {"requests": []}
         result = svc.format_request_status([])
-        # next_cursor should be set to None since it was not in data
-        assert "next_cursor" in result.data
+        assert "next_cursor" not in result.data
+        assert "total_count" not in result.data
+
+    def test_explicit_none_cursor_is_stamped_for_list_last_page(self):
+        """LIST caller that explicitly passes next_cursor=None (a last page)
+        still gets the key stamped so UI load-more can read it."""
+        svc, scheduler = _make_service()
+        scheduler.format_request_status_response.return_value = {"requests": []}
+        result = svc.format_request_status([], total_count=3, next_cursor=None)
         assert result.data["next_cursor"] is None
+        assert result.data["total_count"] == 3
 
     def test_next_cursor_not_overwritten_when_data_already_has_it(self):
         svc, scheduler = _make_service()
@@ -86,7 +100,7 @@ class TestFormatRequestStatus:
             "requests": [],
             "next_cursor": "existing",
         }
-        # Don't pass next_cursor kwarg — should preserve existing value
+        # Don't pass next_cursor kwarg — should preserve existing value untouched
         result = svc.format_request_status([])
         assert result.data["next_cursor"] == "existing"
 
@@ -132,11 +146,13 @@ class TestFormatMachineList:
         result = svc.format_machine_list([], next_cursor="pg2")
         assert result.data["next_cursor"] == "pg2"
 
-    def test_next_cursor_none_injected_when_missing(self):
+    def test_no_pagination_kwargs_leaves_payload_clean(self):
+        """Single-machine listing (no kwargs) must not gain pagination fields."""
         svc, scheduler = _make_service()
         scheduler.format_machine_status_response.return_value = {"machines": []}
         result = svc.format_machine_list([])
-        assert "next_cursor" in result.data
+        assert "next_cursor" not in result.data
+        assert "total_count" not in result.data
 
 
 @pytest.mark.unit
@@ -164,11 +180,13 @@ class TestFormatTemplateList:
         assert result.data["total_count"] == 5
         assert result.data["next_cursor"] == "c1"
 
-    def test_next_cursor_none_injected_when_key_absent(self):
+    def test_no_pagination_kwargs_leaves_payload_clean(self):
+        """Refresh/list without kwargs must not gain pagination fields."""
         svc, scheduler = _make_service()
         scheduler.format_templates_response.return_value = {"templates": []}
         result = svc.format_template_list([])
-        assert "next_cursor" in result.data
+        assert "next_cursor" not in result.data
+        assert "total_count" not in result.data
 
 
 @pytest.mark.unit
