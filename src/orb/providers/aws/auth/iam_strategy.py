@@ -6,7 +6,6 @@ import asyncio
 import os
 from typing import TYPE_CHECKING, Any, Optional
 
-from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from orb.domain.base.ports import LoggingPort
@@ -18,15 +17,12 @@ from orb.infrastructure.adapters.ports.auth import (
 )
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.aws.session_factory import AWSSessionFactory
+from orb.providers.aws.utilities.boto_config import get_boto3_config
 
 if TYPE_CHECKING:
     pass
 
-_DEFAULT_CONFIG = Config(
-    connect_timeout=10,
-    read_timeout=30,
-    retries={"max_attempts": 3},
-)
+_DEFAULT_CONFIG = get_boto3_config()
 
 
 @injectable
