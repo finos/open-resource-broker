@@ -5,7 +5,7 @@ create, status, and release operations used by Azure services.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional, TypeAlias, TypedDict
 
 from orb.domain.base.ports import LoggingPort
@@ -17,7 +17,6 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     TerminationError,
 )
 from orb.providers.azure.infrastructure.azure_client import AzureClient
-from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
 
 
 class _AzureAcquireHostsRequiredResult(TypedDict):
@@ -25,8 +24,8 @@ class _AzureAcquireHostsRequiredResult(TypedDict):
 
     ``resource_ids`` are opaque lifecycle tracking identifiers interpreted
     using the request's ``provider_api``. VMSS uses scale-set names, SingleVM
-    uses VM names, and CycleCloud uses request IDs. They are intentionally not
-    constrained to ARM resource-ID syntax.
+    uses VM names, and CycleCloud uses composite cluster/request identifiers.
+    They are intentionally not constrained to ARM resource-ID syntax.
     """
 
     success: bool
@@ -112,9 +111,6 @@ class AzureReleaseContext:
 
     resource_group: str | None = None
     resource_id: str | None = None
-    cyclecloud_request_context: CycleCloudRequestContext = field(
-        default_factory=CycleCloudRequestContext
-    )
 
 
 class AzureSubmittedDeletion(TypedDict, total=False):

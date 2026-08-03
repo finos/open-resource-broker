@@ -6,6 +6,7 @@ from orb.application.request.dto import RequestDTO
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestType
 from orb.infrastructure.storage.repositories.request_repository import RequestSerializer
+from orb.providers.azure.infrastructure.cyclecloud_resource_id import CycleCloudResourceId
 from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 
 
@@ -18,7 +19,15 @@ def test_azure_does_not_advertise_one_resource_id_pattern():
     [
         ("VMSS", "vmss-orb-eastus2"),
         ("SingleVM", "vm-orb-0001"),
-        ("CycleCloud", "req-12345678-1234-1234-1234-123456789012"),
+        (
+            "CycleCloud",
+            str(
+                CycleCloudResourceId(
+                    cluster_name="cluster-east",
+                    request_id="req-12345678-1234-1234-1234-123456789012",
+                )
+            ),
+        ),
     ],
 )
 def test_azure_opaque_resource_ids_round_trip_through_storage_and_api(

@@ -40,9 +40,12 @@ from orb.providers.azure.exceptions.azure_exceptions import (
 from orb.providers.azure.infrastructure.credential_factory import (
     AsyncAzureCredentialAccessTokenProvider,
 )
+from orb.providers.azure.infrastructure.cyclecloud_resource_id import (
+    CycleCloudMachineId,
+    CycleCloudResourceId,
+)
 from orb.providers.azure.infrastructure.cyclecloud_session import (
     AsyncCycleCloudSessionContext,
-    CycleCloudRequestContext,
 )
 from orb.providers.azure.infrastructure.cyclecloud_session_builder import (
     CycleCloudSessionBuilder,
@@ -115,11 +118,8 @@ class _CycleCloudAcquireRequest:
 class _CycleCloudStatusRequest:
     """Durable request-scoped context needed for CycleCloud status checks."""
 
-    request_context: CycleCloudRequestContext
-    cluster_name: str
-    node_array: Optional[str]
+    resource_id: CycleCloudResourceId
     node_ids: list[str]
-    cyclecloud_request_id: str
 
 
 def _optional_text(value: Any) -> Optional[str]:
@@ -150,9 +150,8 @@ def _first_optional_text(node: dict[str, Any], *keys: str) -> Optional[str]:
 def _collect_cyclecloud_status_results(
     *,
     logger: LoggingPort,
-    cluster_name: str,
+    resource_id: CycleCloudResourceId,
     nodes: list[dict[str, Any]],
-    node_array: Optional[str],
     node_ids: list[str],
 ) -> list[AzureHandlerStatusResult]:
     """Filter and normalize CycleCloud node payloads for status responses."""
@@ -162,8 +161,6 @@ def _collect_cyclecloud_status_results(
         node_name = parsed_node.name
         node_id = parsed_node.node_id or node_name
 
-        if node_array and parsed_node.node_array != node_array:
-            continue
         if node_ids and node_name not in node_ids and node_id not in node_ids:
             continue
 
@@ -174,13 +171,13 @@ def _collect_cyclecloud_status_results(
 
         fleet_errors = _extract_cyclecloud_node_errors(
             node,
-            cluster_name=cluster_name,
+            resource_id=str(resource_id),
             node_array=parsed_node.node_array,
         )
 
         results.append(
             _build_cyclecloud_status_result(
-                cluster_name=cluster_name,
+                resource_id=resource_id,
                 parsed_node=parsed_node,
                 cc_state=cc_state,
                 status=status,
@@ -192,7 +189,7 @@ def _collect_cyclecloud_status_results(
 
 def _build_cyclecloud_status_result(
     *,
-    cluster_name: str,
+    resource_id: CycleCloudResourceId,
     parsed_node: CycleCloudNode,
     cc_state: str,
     status: str,
@@ -201,10 +198,12 @@ def _build_cyclecloud_status_result(
     """Build a typed Azure status result for one CycleCloud node."""
     node_name = parsed_node.name or parsed_node.hostname or parsed_node.node_id
     node_id = parsed_node.node_id or node_name
+    resource_id_text = str(resource_id)
+    machine_id = str(CycleCloudMachineId(resource_id=resource_id, node_id=node_id))
     provider_data: AzureStatusProviderData = {
-        "resource_id": cluster_name,
+        "resource_id": resource_id_text,
         "cloud_host_id": node_id,
-        "cluster_name": cluster_name,
+        "cluster_name": resource_id.cluster_name,
         "node_array": parsed_node.node_array,
         "node_id": node_id,
         "cc_state": cc_state,
@@ -215,9 +214,9 @@ def _build_cyclecloud_status_result(
     if parsed_node.hostname:
         provider_data["hostname"] = parsed_node.hostname
     return {
-        "instance_id": node_name,
+        "instance_id": machine_id,
         "name": node_name,
-        "resource_id": cluster_name,
+        "resource_id": resource_id_text,
         "status": status,
         "private_ip": parsed_node.private_ip,
         "public_ip": parsed_node.public_ip,
@@ -268,7 +267,7 @@ def _parse_cyclecloud_node(node: dict[str, Any]) -> CycleCloudNode:
 def _extract_cyclecloud_node_errors(
     node: dict[str, Any],
     *,
-    cluster_name: str,
+    resource_id: str,
     node_array: str,
 ) -> list[ProviderErrorEntry]:
     """Extract structured node errors from CycleCloud node payloads."""
@@ -289,7 +288,7 @@ def _extract_cyclecloud_node_errors(
     node_error: ProviderErrorEntry = {
         "error_code": str(error_code or "CycleCloudNodeError"),
         "error_message": str(message or f"CycleCloud node entered state {parsed_node.state}"),
-        "resource_id": cluster_name,
+        "resource_id": resource_id,
         "node_array": node_array,
         "cc_state": parsed_node.state,
     }
@@ -494,81 +493,6 @@ class CycleCloudHandler(AzureHandler):
                 url=url,
             ) from exc
 
-    async def _resolve_release_node_targets_via_fetch_async(
-        self,
-        *,
-        fetch_nodes: Callable[[], Awaitable[dict[str, Any]]],
-        machine_ids: list[str],
-    ) -> dict[str, list[str]]:
-        """Async variant of release-target resolution using fetched cluster nodes."""
-        try:
-            nodes_response = await fetch_nodes()
-        except CycleCloudConnectionError:
-            return {"names": machine_ids}
-        return self._resolve_release_node_targets_from_nodes(
-            nodes=nodes_response.get("nodes", []),
-            machine_ids=machine_ids,
-        )
-
-    async def _resolve_release_node_targets_async(
-        self,
-        *,
-        client: httpx.AsyncClient,
-        base_url: str,
-        cluster_name: str,
-        machine_ids: list[str],
-    ) -> dict[str, list[str]]:
-        """Resolve stored machine IDs to the strongest CycleCloud identifier set available."""
-        return await self._resolve_release_node_targets_via_fetch_async(
-            fetch_nodes=lambda: self._cc_request_async(
-                client,
-                "GET",
-                f"{base_url}/clusters/{cluster_name}/nodes",
-            ),
-            machine_ids=machine_ids,
-        )
-
-    def _resolve_release_node_targets_from_nodes(
-        self,
-        *,
-        nodes: list[dict[str, Any]],
-        machine_ids: list[str],
-    ) -> dict[str, list[str]]:
-        """Resolve stored machine IDs using fetched CycleCloud node payloads."""
-        resolved_ids: list[str] = []
-        resolved_names: list[str] = []
-        seen_ids: set[str] = set()
-        seen_names: set[str] = set()
-
-        for machine_id in machine_ids:
-            matched = False
-            for node in nodes:
-                parsed_node = _parse_cyclecloud_node(node)
-                if machine_id in {parsed_node.name, parsed_node.node_id}:
-                    if parsed_node.node_id and parsed_node.node_id not in seen_ids:
-                        resolved_ids.append(parsed_node.node_id)
-                        seen_ids.add(parsed_node.node_id)
-                    if parsed_node.name and parsed_node.name not in seen_names:
-                        resolved_names.append(parsed_node.name)
-                        seen_names.add(parsed_node.name)
-                    matched = True
-                    break
-            if not matched and machine_id and machine_id not in seen_names:
-                resolved_names.append(machine_id)
-                seen_names.add(machine_id)
-
-        if resolved_ids or resolved_names != machine_ids:
-            self._logger.info(
-                "Resolved CycleCloud release ids %s -> node_ids=%s node_names=%s",
-                machine_ids,
-                resolved_ids,
-                resolved_names,
-            )
-
-        if resolved_ids:
-            return {"ids": resolved_ids}
-        return {"names": resolved_names}
-
     @staticmethod
     def _build_release_result(
         *,
@@ -680,6 +604,12 @@ class CycleCloudHandler(AzureHandler):
         created_sets = result.get("sets", [])
         fleet_errors: list[ProviderErrorEntry] = []
         added_count = 0
+        resource_id = str(
+            CycleCloudResourceId(
+                cluster_name=request_data.cluster_name,
+                request_id=request_data.cyclecloud_request_id,
+            )
+        )
 
         for node_set in created_sets:
             added = node_set.get("added", 0)
@@ -687,7 +617,7 @@ class CycleCloudHandler(AzureHandler):
             for node in node_set.get("nodes", []):
                 node_errors = _extract_cyclecloud_node_errors(
                     node,
-                    cluster_name=request_data.cluster_name,
+                    resource_id=resource_id,
                     node_array=request_data.node_array,
                 )
                 for error in node_errors:
@@ -703,7 +633,7 @@ class CycleCloudHandler(AzureHandler):
 
         return {
             "success": True,
-            "resource_ids": [request_data.cyclecloud_request_id],
+            "resource_ids": [resource_id],
             "instances": [],
             "error_message": None,
             "provider_data": {
@@ -729,34 +659,20 @@ class CycleCloudHandler(AzureHandler):
             self._logger.warning("check_hosts_status called with no resource_ids")
             return None
 
-        request_context = CycleCloudRequestContext.from_mapping(request.metadata or {})
-        cluster_name = request_context.cluster_name
-        cyclecloud_request_id = resource_ids[0]
-
-        if not cluster_name:
-            message = "cluster_name is required for CycleCloud status check"
-            self._logger.error(message)
-            raise CycleCloudConnectionError(
-                message,
-                url=None,
-                details={"request_id": request.request_id},
-            )
-
-        if not cyclecloud_request_id:
-            message = f"CycleCloud request identity is required for status check in cluster '{cluster_name}'"
+        try:
+            resource_id = CycleCloudResourceId.parse(resource_ids[0])
+        except ValueError as exc:
+            message = str(exc)
             self._logger.error(message)
             raise CycleCloudConnectionError(
                 message,
                 url=None,
                 details={"resource_ids": resource_ids},
-            )
+            ) from exc
 
         return _CycleCloudStatusRequest(
-            request_context=request_context,
-            cluster_name=cluster_name,
-            node_array=request_context.node_array,
-            node_ids=list(request_context.node_ids),
-            cyclecloud_request_id=cyclecloud_request_id,
+            resource_id=resource_id,
+            node_ids=list((request.metadata or {}).get("node_ids", []) or []),
         )
 
     def _log_status_check_failure(
@@ -790,15 +706,14 @@ class CycleCloudHandler(AzureHandler):
         """Build normalized status results from a CycleCloud nodes response."""
         results = _collect_cyclecloud_status_results(
             logger=self._logger,
-            cluster_name=status_request.cluster_name,
+            resource_id=status_request.resource_id,
             nodes=nodes_response.get("nodes", []),
-            node_array=status_request.node_array,
             node_ids=status_request.node_ids,
         )
 
         self._logger.debug(
             "CycleCloud status check for cluster '%s': %d node(s) found",
-            status_request.cluster_name,
+            status_request.resource_id.cluster_name,
             len(results),
         )
         return results
@@ -807,40 +722,23 @@ class CycleCloudHandler(AzureHandler):
         self,
         *,
         cluster_name: str,
-        machine_ids: list[str],
-        resolve_node_targets: Callable[[], Awaitable[dict[str, list[str]]]],
+        node_ids: list[str],
         submit_terminate: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
     ) -> AzureReleaseHostsResult:
-        """Async variant of CycleCloud node termination submission."""
+        """Submit CycleCloud node termination by canonical node ID."""
         self._logger.info(
             "Terminating %d node(s) from CycleCloud cluster '%s': %s",
-            len(machine_ids),
+            len(node_ids),
             cluster_name,
-            machine_ids,
+            node_ids,
         )
-        return await self._submit_release_request_result_async(
-            cluster_name=cluster_name,
-            machine_ids=machine_ids,
-            node_targets=await resolve_node_targets(),
-            submit_terminate=submit_terminate,
-        )
-
-    async def _submit_release_request_result_async(
-        self,
-        *,
-        cluster_name: str,
-        machine_ids: list[str],
-        node_targets: dict[str, list[str]],
-        submit_terminate: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
-    ) -> AzureReleaseHostsResult:
-        """Submit a prepared CycleCloud termination payload through the async client."""
         try:
-            terminate_payload: dict[str, Any] = dict(node_targets)
+            terminate_payload = {"ids": node_ids}
             terminate_response = await submit_terminate(terminate_payload)
             self._logger.debug("Terminate request sent for CycleCloud nodes: %s", terminate_payload)
             self._logger.info(
                 "Successfully submitted termination for %d node(s) from cluster '%s'",
-                len(machine_ids),
+                len(node_ids),
                 cluster_name,
             )
             return self._build_release_result(
@@ -850,7 +748,7 @@ class CycleCloudHandler(AzureHandler):
         except CycleCloudConnectionError as exc:
             raise TerminationError(
                 f"Failed to terminate nodes from CycleCloud cluster '{cluster_name}': {exc}",
-                resource_ids=machine_ids,
+                resource_ids=node_ids,
             ) from exc
 
     async def acquire_hosts_async(
@@ -912,13 +810,14 @@ class CycleCloudHandler(AzureHandler):
                 nodes_response = await self._cc_request_async(
                     session_context.client,
                     "GET",
-                    f"{session_context.base_url}/clusters/{status_request.cluster_name}/nodes",
-                    params={"request_id": status_request.cyclecloud_request_id},
+                    f"{session_context.base_url}/clusters/"
+                    f"{status_request.resource_id.cluster_name}/nodes",
+                    params={"request_id": status_request.resource_id.request_id},
                 )
         except CycleCloudConnectionError as exc:
             self._log_status_check_failure(
-                cluster_name=status_request.cluster_name,
-                cyclecloud_request_id=status_request.cyclecloud_request_id,
+                cluster_name=status_request.resource_id.cluster_name,
+                cyclecloud_request_id=status_request.resource_id.request_id,
                 exc=exc,
             )
             raise
@@ -935,21 +834,29 @@ class CycleCloudHandler(AzureHandler):
         context: Optional[AzureReleaseContext] = None,
     ) -> Optional[AzureReleaseHostsResult]:
         """Async variant of ``release_hosts`` using ``httpx.AsyncClient``."""
-        release_context = context or AzureReleaseContext()
-        request_context = release_context.cyclecloud_request_context
-        cluster_name = str(request_context.cluster_name or resource_id)
+        try:
+            parsed_resource_id = CycleCloudResourceId.parse(resource_id)
+            node_ids: list[str] = []
+            for machine_id in machine_ids:
+                parsed_machine_id = CycleCloudMachineId.parse(machine_id)
+                if parsed_machine_id.resource_id != parsed_resource_id:
+                    raise ValueError(
+                        f"CycleCloud machine ID {machine_id!r} does not belong to "
+                        f"resource {resource_id!r}"
+                    )
+                node_ids.append(parsed_machine_id.node_id)
+        except ValueError as exc:
+            raise TerminationError(
+                str(exc),
+                resource_ids=[resource_id, *machine_ids],
+            ) from exc
+        cluster_name = parsed_resource_id.cluster_name
 
         try:
             async with self._async_cc_session_scope() as session_context:
                 return await self._submit_release_request_async(
                     cluster_name=cluster_name,
-                    machine_ids=machine_ids,
-                    resolve_node_targets=lambda: self._resolve_release_node_targets_async(
-                        client=session_context.client,
-                        base_url=session_context.base_url,
-                        cluster_name=cluster_name,
-                        machine_ids=machine_ids,
-                    ),
+                    node_ids=node_ids,
                     submit_terminate=lambda terminate_payload: self._cc_request_async(
                         session_context.client,
                         "POST",

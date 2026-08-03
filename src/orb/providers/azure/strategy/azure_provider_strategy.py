@@ -15,7 +15,6 @@ from threading import Condition, RLock
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from orb.domain.base.ports import LoggingPort
-from orb.domain.request.aggregate import Request
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.azure.capabilities import (
     get_supported_api_capabilities,
@@ -26,9 +25,6 @@ from orb.providers.azure.configuration.validator import validate_azure_template
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzurePriority, AzureProviderApi
 from orb.providers.azure.exceptions import AzureError, AzureValidationError
-from orb.providers.azure.infrastructure.cyclecloud_session import (
-    CycleCloudRequestContext,
-)
 from orb.providers.azure.infrastructure.error_utils import (
     canonical_azure_error_code,
     extract_azure_error_details,
@@ -39,7 +35,6 @@ from orb.providers.azure.services.inventory_service import (
     AzureReadOperationContext,
     build_read_operation_context,
 )
-from orb.providers.azure.services.operation_parsing import resolve_operation_provider_api
 from orb.providers.azure.services.provisioning_service import (
     AzureProvisioningService,
     create_instances_dry_run_result,
@@ -752,21 +747,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 exc,
             )
 
-    def _cyclecloud_read_context(self, operation: ProviderOperation) -> CycleCloudRequestContext:
-        """Return persisted CycleCloud context for a read operation."""
-        provider_api = resolve_operation_provider_api(operation)
-        if provider_api != AzureProviderApi.CYCLECLOUD:
-            return CycleCloudRequestContext()
-
-        request = operation.parameters.get("request")
-        if not isinstance(request, Request):
-            raise AzureValidationError(
-                "CycleCloud status operations require a typed request.",
-                error_code="MISSING_CYCLECLOUD_REQUEST",
-            )
-
-        return CycleCloudRequestContext.from_mapping(request.provider_data)
-
     # ------------------------------------------------------------------
     # GET_INSTANCE_STATUS
     # ------------------------------------------------------------------
@@ -777,7 +757,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 operation=operation,
                 operation_name="get_instance_status",
                 default_resource_group=self._azure_config.resource_group,
-                cyclecloud_request_context=self._cyclecloud_read_context(operation),
             )
 
             if read_context.resource_group is None:
@@ -812,7 +791,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 operation=operation,
                 operation_name="describe_resource_instances",
                 default_resource_group=self._azure_config.resource_group,
-                cyclecloud_request_context=self._cyclecloud_read_context(operation),
             )
             if bool(operation.context and operation.context.get("dry_run", False)):
                 return self._dry_run_describe_instances_result(read_context)
@@ -876,7 +854,7 @@ class AzureProviderStrategy(ProviderStrategy):
         status_result = self._resource_metadata_service.attach_provider_fulfilment(
             metadata,
             instances=[],
-            target_units=None,
+            target_units=read_context.target_units,
         )
         return ProviderResult.success_result(
             {"instances": status_result.instances},

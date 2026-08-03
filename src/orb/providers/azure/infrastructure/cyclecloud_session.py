@@ -61,59 +61,6 @@ class CycleCloudSessionSettings:
 
 
 @dataclass(frozen=True)
-class CycleCloudRequestContext:
-    """Typed CycleCloud request/follow-up context carried through handler flows."""
-
-    cluster_name: Optional[str] = None
-    node_array: Optional[str] = None
-    node_ids: tuple[str, ...] = ()
-    operation_id: Optional[str] = None
-    operation_location: Optional[str] = None
-    added_count: Optional[int] = None
-
-    @classmethod
-    def from_mapping(cls, data: Optional[dict[str, Any]]) -> CycleCloudRequestContext:
-        """Construct a request context from an optional metadata mapping."""
-        if not data:
-            return cls()
-
-        raw_node_ids = data.get("node_ids") or ()
-        if isinstance(raw_node_ids, (list, tuple)):
-            node_ids = tuple(str(node_id) for node_id in raw_node_ids if node_id not in (None, ""))
-        else:
-            node_ids = ()
-
-        raw_added_count = data.get("added_count")
-        added_count = int(raw_added_count) if raw_added_count not in (None, "") else None
-
-        return cls(
-            cluster_name=data.get("cluster_name"),
-            node_array=data.get("node_array"),
-            node_ids=node_ids,
-            operation_id=data.get("operation_id"),
-            operation_location=data.get("operation_location"),
-            added_count=added_count,
-        )
-
-    def to_metadata(self) -> dict[str, Any]:
-        """Serialize non-empty fields to a metadata dict for transport."""
-        metadata: dict[str, Any] = {}
-        if self.cluster_name not in (None, ""):
-            metadata["cluster_name"] = self.cluster_name
-        if self.node_array not in (None, ""):
-            metadata["node_array"] = self.node_array
-        if self.node_ids:
-            metadata["node_ids"] = list(self.node_ids)
-        if self.operation_id not in (None, ""):
-            metadata["operation_id"] = self.operation_id
-        if self.operation_location not in (None, ""):
-            metadata["operation_location"] = self.operation_location
-        if self.added_count is not None:
-            metadata["added_count"] = self.added_count
-        return metadata
-
-
-@dataclass(frozen=True)
 class AsyncCycleCloudSessionContext:
     """Resolved async CycleCloud HTTP session plus ORB-specific connection metadata."""
 

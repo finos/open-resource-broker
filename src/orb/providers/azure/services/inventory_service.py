@@ -17,7 +17,10 @@ from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestType
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
-from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
+from orb.providers.azure.infrastructure.cyclecloud_resource_id import (
+    CycleCloudMachineId,
+    CycleCloudResourceId,
+)
 from orb.providers.azure.infrastructure.error_codes import ProviderErrorEntry
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     RAISE_ON_STATUS_ERROR_METADATA_KEY,
@@ -54,7 +57,6 @@ class AzureReadOperationContext:
     request_id: str | None
     template_id: str
     request_metadata: dict[str, Any]
-    cyclecloud_request_context: CycleCloudRequestContext
     provider_api: Optional[AzureProviderApi]
     provider_api_key: str | None
     resource_group: str | None
@@ -62,6 +64,7 @@ class AzureReadOperationContext:
     resource_ids: list[str] = field(default_factory=list)
     grouped_resource_mapping: dict[str, list[str]] = field(default_factory=dict)
     direct_resource_id: str | None = None
+    target_units: int | None = None
     raise_on_status_error: bool = False
 
 
@@ -174,7 +177,6 @@ def build_read_operation_context(
     operation: ProviderOperation,
     operation_name: str,
     default_resource_group: Optional[str],
-    cyclecloud_request_context: CycleCloudRequestContext,
 ) -> AzureReadOperationContext:
     """Build the provider-owned runtime context for Azure read operations."""
     metadata: dict[str, Any] = dict(operation.parameters.get("request_metadata") or {})
@@ -202,20 +204,30 @@ def build_read_operation_context(
             instance_ids,
             operation.parameters.get("resource_mapping", {}) or {},
         )
-        direct_resource_id = operation.parameters.get("resource_id")
-        if (
-            direct_resource_id in (None, "")
-            and provider_api == AzureProviderApi.CYCLECLOUD
-            and cyclecloud_request_context.cluster_name not in (None, "")
-        ):
-            direct_resource_id = cyclecloud_request_context.cluster_name
+        if provider_api == AzureProviderApi.CYCLECLOUD:
+            grouped_resource_mapping = {}
+            for instance_id in instance_ids:
+                try:
+                    machine_id = CycleCloudMachineId.parse(instance_id)
+                except ValueError as exc:
+                    raise AzureValidationError(
+                        str(exc),
+                        error_code="INVALID_CYCLECLOUD_MACHINE_ID",
+                    ) from exc
+                grouped_resource_mapping.setdefault(str(machine_id.resource_id), []).append(
+                    instance_id
+                )
+        direct_resource_id = (
+            None
+            if provider_api == AzureProviderApi.CYCLECLOUD
+            else operation.parameters.get("resource_id")
+        )
 
         return AzureReadOperationContext(
             operation_name=operation_name,
             request_id=str(request_id) if request_id not in (None, "") else None,
             template_id=template_id,
             request_metadata=metadata,
-            cyclecloud_request_context=cyclecloud_request_context,
             provider_api=provider_api,
             provider_api_key=provider_api_key,
             resource_group=resource_group,
@@ -238,18 +250,40 @@ def build_read_operation_context(
             "provider_api is required for Azure resource discovery",
             error_code="MISSING_PROVIDER_API",
         )
+    if provider_api == AzureProviderApi.CYCLECLOUD:
+        if len(resource_ids) != 1:
+            raise AzureValidationError(
+                "CycleCloud resource discovery requires exactly one resource ID.",
+                error_code="INVALID_RESOURCE_IDS",
+            )
+        try:
+            CycleCloudResourceId.parse(resource_ids[0])
+        except ValueError as exc:
+            raise AzureValidationError(
+                str(exc),
+                error_code="INVALID_CYCLECLOUD_RESOURCE_ID",
+            ) from exc
+
+    raw_target_units = operation.parameters.get("requested_count")
+    if raw_target_units is not None and (
+        type(raw_target_units) is not int or raw_target_units <= 0
+    ):
+        raise AzureValidationError(
+            "requested_count must be a positive integer when supplied",
+            error_code="INVALID_REQUESTED_COUNT",
+        )
 
     return AzureReadOperationContext(
         operation_name=operation_name,
         request_id=str(request_id) if request_id not in (None, "") else None,
         template_id=template_id,
         request_metadata=metadata,
-        cyclecloud_request_context=cyclecloud_request_context,
         provider_api=provider_api,
         provider_api_key=provider_api_key,
         resource_group=resource_group,
         resource_ids=resource_ids,
         direct_resource_id=resource_ids[0] if len(resource_ids) == 1 else None,
+        target_units=raw_target_units,
     )
 
 
@@ -262,7 +296,6 @@ def build_read_handler_request(
 ) -> Request:
     """Build the Request object used for Azure read/query handler calls."""
     metadata: dict[str, Any] = {"resource_group": read_context.resource_group}
-    metadata.update(read_context.cyclecloud_request_context.to_metadata())
     if additional_metadata:
         metadata.update(additional_metadata)
 
@@ -394,8 +427,7 @@ class AzureInventoryService:
                     machines=filter_status_results(machines, mapped_ids),
                 )
 
-            if all_results:
-                return all_results
+            return all_results
 
         resource_id = read_context.direct_resource_id
         if not handler or not resource_id:
@@ -528,7 +560,11 @@ class AzureInventoryService:
     ) -> dict[str, Any] | None:
         """Return provider-specific handler metadata for status requests."""
         if provider_api == AzureProviderApi.CYCLECLOUD:
-            return {"node_ids": instance_ids}
+            return {
+                "node_ids": [
+                    CycleCloudMachineId.parse(instance_id).node_id for instance_id in instance_ids
+                ]
+            }
         return None
 
     def _resolve_status_handler(
@@ -625,6 +661,11 @@ class AzureInventoryService:
             "handler_used": provider_api_key,
             "instance_count": len(instance_details),
         }
+        target_units: int | None = None
+        if provider_api == AzureProviderApi.CYCLECLOUD:
+            target_units = read_context.target_units
+        elif provider_api == AzureProviderApi.SINGLE_VM:
+            target_units = len(resource_ids)
 
         if not instance_details:
             if provider_api in (AzureProviderApi.VMSS, AzureProviderApi.VMSS_UNIFORM):
@@ -652,9 +693,7 @@ class AzureInventoryService:
             status_result = self._resource_metadata_service.attach_provider_fulfilment(
                 metadata,
                 instances=[],
-                target_units=(
-                    len(resource_ids) if provider_api == AzureProviderApi.SINGLE_VM else None
-                ),
+                target_units=target_units,
             )
             return ProviderResult.success_result(
                 {"instances": status_result.instances},
@@ -676,9 +715,7 @@ class AzureInventoryService:
         status_result = self._resource_metadata_service.attach_provider_fulfilment(
             metadata,
             instances=instance_details,
-            target_units=(
-                len(resource_ids) if provider_api == AzureProviderApi.SINGLE_VM else None
-            ),
+            target_units=target_units,
         )
         return ProviderResult.success_result(
             data={"instances": status_result.instances},

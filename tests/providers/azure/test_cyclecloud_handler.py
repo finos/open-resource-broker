@@ -12,9 +12,12 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     CycleCloudNodeError,
     TerminationError,
 )
+from orb.providers.azure.infrastructure.cyclecloud_resource_id import (
+    CycleCloudMachineId,
+    CycleCloudResourceId,
+)
 from orb.providers.azure.infrastructure.cyclecloud_session import (
     CycleCloudCredentialData,
-    CycleCloudRequestContext,
 )
 from orb.providers.azure.infrastructure.cyclecloud_session_builder import (
     CycleCloudSessionBuilder,
@@ -39,6 +42,17 @@ _CC_TEMPLATE_FIELDS = {
     "cluster_name": "my-cluster",
     "node_array": "execute",
 }
+_CC_REQUEST_ID = "req-12345678-1234-1234-1234-123456789012"
+_CC_RESOURCE_ID = str(CycleCloudResourceId(cluster_name="my-cluster", request_id=_CC_REQUEST_ID))
+
+
+def _cc_machine_id(node_id: str) -> str:
+    return str(
+        CycleCloudMachineId(
+            resource_id=CycleCloudResourceId.parse(_CC_RESOURCE_ID),
+            node_id=node_id,
+        )
+    )
 
 
 def _make_template(**overrides):
@@ -64,15 +78,11 @@ def _make_handler():
 
 def _make_request(count=2, resource_ids=None, metadata=None):
     req = MagicMock()
-    req.request_id = "req-12345678-1234-1234-1234-123456789012"
+    req.request_id = _CC_REQUEST_ID
     req.requested_count = count
     req.resource_ids = resource_ids or []
     req.metadata = metadata or {}
     return req
-
-
-def _make_cc_request_context(**values):
-    return CycleCloudRequestContext.from_mapping(values)
 
 
 class _AsyncContextManager:
@@ -222,7 +232,7 @@ class TestCycleCloudHandlerAcquire:
         result = run_operation(handler.acquire_hosts_async(request, template))
 
         assert result["success"] is True
-        assert result["resource_ids"] == ["req-12345678-1234-1234-1234-123456789012"]
+        assert result["resource_ids"] == [_CC_RESOURCE_ID]
         assert result["provider_data"]["cluster_name"] == "my-cluster"
         assert result["provider_data"]["operation_id"] == "op-123"
         assert (
@@ -233,7 +243,7 @@ class TestCycleCloudHandlerAcquire:
         assert result["provider_data"]["submitted_count"] == 2
         assert result["provider_data"]["operation_status"] == "submitted"
         request_json = handler._cc_request_async.await_args_list[1].kwargs["json"]
-        assert request_json["requestId"] == "req-12345678-1234-1234-1234-123456789012"
+        assert request_json["requestId"] == _CC_REQUEST_ID
 
     @pytest.mark.asyncio
     async def test_acquire_hosts_async_returns_submitted_operation_metadata(self):
@@ -330,19 +340,16 @@ class TestCycleCloudHandlerStatus:
         )
 
         request = _make_request(
-            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
-            metadata={
-                "cluster_name": "my-cluster",
-                "node_array": "execute",
-            },
+            resource_ids=[_CC_RESOURCE_ID],
         )
 
         results = run_operation(handler.check_hosts_status_async(request))
 
         assert len(results) == 2
-        assert results[0]["instance_id"] == "node-1"
+        assert results[0]["instance_id"] == _cc_machine_id("id-1")
         assert results[0]["name"] == "node-1"
-        assert results[0]["resource_id"] == "my-cluster"
+        assert results[0]["resource_id"] == _CC_RESOURCE_ID
+        assert results[0]["provider_data"]["resource_id"] == _CC_RESOURCE_ID
         assert results[0]["status"] == "running"
         assert results[0]["private_ip"] == "10.0.0.1"
         assert results[1]["status"] == "pending"
@@ -354,30 +361,31 @@ class TestCycleCloudHandlerStatus:
             resource_group="test-rg",
         )
         request = _make_request(
-            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
-            metadata={"cluster_name": "my-cluster"},
+            resource_ids=[_CC_RESOURCE_ID],
         )
         with pytest.raises(CycleCloudConnectionError, match=r"cyclecloud\.url is required"):
             run_operation(handler.check_hosts_status_async(request))
 
-    def test_check_hosts_status_requires_cyclecloud_request_identity(self):
+    def test_check_hosts_status_rejects_invalid_cyclecloud_resource_id(self):
         handler = _make_handler()
         request = _make_request(
             resource_ids=[""],
-            metadata={"cluster_name": "my-cluster"},
         )
-        with pytest.raises(CycleCloudConnectionError, match="request identity is required"):
+        with pytest.raises(CycleCloudConnectionError, match="Invalid CycleCloud resource ID"):
             run_operation(handler.check_hosts_status_async(request))
 
-    def test_check_hosts_status_requires_cluster_name(self):
+    def test_check_hosts_status_does_not_require_cluster_name_metadata(self):
         handler = _make_handler()
+        _wire_async_cyclecloud_calls(handler, responses=[{"nodes": []}])
         request = _make_request(
-            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
+            resource_ids=[_CC_RESOURCE_ID],
             metadata={},
         )
 
-        with pytest.raises(CycleCloudConnectionError, match="cluster_name is required"):
-            run_operation(handler.check_hosts_status_async(request))
+        assert run_operation(handler.check_hosts_status_async(request)) == []
+        assert handler._cc_request_async.await_args.kwargs["params"] == {
+            "request_id": _CC_REQUEST_ID
+        }
 
     def test_check_hosts_status_request_failure_raises(self):
         handler = _make_handler()
@@ -393,8 +401,7 @@ class TestCycleCloudHandlerStatus:
         )
 
         request = _make_request(
-            resource_ids=["req-12345678-1234-1234-1234-123456789012"],
-            metadata={"cluster_name": "my-cluster"},
+            resource_ids=[_CC_RESOURCE_ID],
         )
 
         with pytest.raises(CycleCloudConnectionError, match="Cannot connect to CycleCloud"):
@@ -429,19 +436,25 @@ class TestCycleCloudHandlerStatus:
             }
         )
         request = _make_request(
-            resource_ids=["req-123"],
-            metadata={
-                "cluster_name": "my-cluster",
-                "node_array": "execute",
-                "node_ids": ["node-1"],
-            },
+            resource_ids=[
+                str(CycleCloudResourceId(cluster_name="my-cluster", request_id="req-123"))
+            ],
+            metadata={"node_ids": ["node-1"]},
         )
 
         result = await handler.check_hosts_status_async(request)
 
         assert len(result) == 1
         assert result[0]["status"] == "running"
-        assert result[0]["instance_id"] == "node-1"
+        assert result[0]["instance_id"] == str(
+            CycleCloudMachineId(
+                resource_id=CycleCloudResourceId(
+                    cluster_name="my-cluster",
+                    request_id="req-123",
+                ),
+                node_id="id-1",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -455,7 +468,6 @@ class TestCycleCloudHandlerRelease:
         _wire_async_cyclecloud_calls(
             handler,
             responses=[
-                {"nodes": [{"name": "node-1", "nodeId": "node-1"}]},
                 {
                     "body": {"operationId": "op-release"},
                     "headers": {"Location": "https://cc.example.com/operations/op-release"},
@@ -465,19 +477,16 @@ class TestCycleCloudHandlerRelease:
 
         result = run_operation(
             handler.release_hosts_async(
-                machine_ids=["node-1", "node-2"],
-                resource_id="my-cluster",
-                context=AzureReleaseContext(
-                    cyclecloud_request_context=CycleCloudRequestContext(
-                        cluster_name="my-cluster",
-                    )
-                ),
+                machine_ids=[_cc_machine_id("node-1"), _cc_machine_id("node-2")],
+                resource_id=_CC_RESOURCE_ID,
+                context=AzureReleaseContext(),
             )
         )
         assert result["provider_data"]["operation_status"] == "submitted"
         assert result["provider_data"]["terminate_operation_location"] == (
             "https://cc.example.com/operations/op-release"
         )
+        assert handler._cc_request_async.await_args.kwargs["json"] == {"ids": ["node-1", "node-2"]}
 
     def test_release_hosts_missing_url(self):
         handler = _make_handler()
@@ -488,8 +497,29 @@ class TestCycleCloudHandlerRelease:
         with pytest.raises(TerminationError, match=r"cyclecloud\.url is required"):
             run_operation(
                 handler.release_hosts_async(
-                    machine_ids=["node-1"],
-                    resource_id="my-cluster",
+                    machine_ids=[_cc_machine_id("node-1")],
+                    resource_id=_CC_RESOURCE_ID,
+                    context=AzureReleaseContext(),
+                )
+            )
+
+    def test_release_hosts_rejects_machine_from_another_resource(self):
+        handler = _make_handler()
+        other_machine_id = str(
+            CycleCloudMachineId(
+                resource_id=CycleCloudResourceId(
+                    cluster_name="other-cluster",
+                    request_id=_CC_REQUEST_ID,
+                ),
+                node_id="node-1",
+            )
+        )
+
+        with pytest.raises(TerminationError, match="does not belong to resource"):
+            run_operation(
+                handler.release_hosts_async(
+                    machine_ids=[other_machine_id],
+                    resource_id=_CC_RESOURCE_ID,
                     context=AzureReleaseContext(),
                 )
             )
@@ -503,7 +533,6 @@ class TestCycleCloudHandlerRelease:
         handler._async_cc_session_scope = MagicMock(
             return_value=_AsyncContextManager(session_context)
         )
-        handler._resolve_release_node_targets_async = AsyncMock(return_value={"names": ["node-1"]})
         handler._cc_request_async = AsyncMock(
             return_value={
                 "body": {"operationId": "op-release"},
@@ -512,13 +541,9 @@ class TestCycleCloudHandlerRelease:
         )
 
         result = await handler.release_hosts_async(
-            machine_ids=["node-1"],
-            resource_id="my-cluster",
-            context=AzureReleaseContext(
-                cyclecloud_request_context=_make_cc_request_context(
-                    cluster_name="my-cluster",
-                )
-            ),
+            machine_ids=[_cc_machine_id("node-1")],
+            resource_id=_CC_RESOURCE_ID,
+            context=AzureReleaseContext(),
         )
 
         assert result is not None
@@ -527,6 +552,7 @@ class TestCycleCloudHandlerRelease:
             result["provider_data"]["terminate_operation_location"]
             == "https://cc.example.com/operations/op-release"
         )
+        assert handler._cc_request_async.await_args.kwargs["json"] == {"ids": ["node-1"]}
 
 
 # ---------------------------------------------------------------------------

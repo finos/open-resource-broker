@@ -13,7 +13,6 @@ from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.exceptions.azure_exceptions import CycleCloudConnectionError
 from orb.providers.azure.infrastructure.cyclecloud_session import (
     CycleCloudCredentialData,
-    CycleCloudRequestContext,
 )
 from orb.providers.azure.infrastructure.cyclecloud_session_builder import (
     CycleCloudSessionBuilder,
@@ -56,30 +55,6 @@ def _make_builder(*, provider_cfg=None, credential=None):
         provider_cfg=provider_cfg or _provider_config(),
         async_token_provider=async_token_provider,
     )
-
-
-def test_cyclecloud_request_context_round_trips_metadata():
-    context = CycleCloudRequestContext.from_mapping(
-        {
-            "cluster_name": "my-cluster",
-            "node_array": "execute",
-            "node_ids": ["node-1", "node-2"],
-            "operation_id": "op-123",
-            "operation_location": "https://cc.example.com/operations/op-123",
-            "added_count": "2",
-        }
-    )
-
-    assert context.added_count == 2
-    assert context.node_ids == ("node-1", "node-2")
-    assert context.to_metadata() == {
-        "cluster_name": "my-cluster",
-        "node_array": "execute",
-        "node_ids": ["node-1", "node-2"],
-        "operation_id": "op-123",
-        "operation_location": "https://cc.example.com/operations/op-123",
-        "added_count": 2,
-    }
 
 
 def test_build_settings_returns_bearer_mode_when_no_token_provider_is_available():

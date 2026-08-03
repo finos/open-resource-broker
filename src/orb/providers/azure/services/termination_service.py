@@ -8,8 +8,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 from orb.domain.base.ports import LoggingPort
+from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions import AzureValidationError
-from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
+from orb.providers.azure.infrastructure.cyclecloud_resource_id import (
+    CycleCloudResourceId,
+)
 from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureHandler,
     AzureReleaseContext,
@@ -212,6 +215,14 @@ class AzureTerminationService:
                 "resource_id or resource_mapping is required for Azure termination",
                 error_code="MISSING_RESOURCE_ID",
             )
+        if provider_api == AzureProviderApi.CYCLECLOUD and default_resource_id:
+            try:
+                CycleCloudResourceId.parse(default_resource_id)
+            except ValueError as exc:
+                raise AzureValidationError(
+                    str(exc),
+                    error_code="INVALID_CYCLECLOUD_RESOURCE_ID",
+                ) from exc
 
         resolved_resource_group = resolve_operation_resource_group(
             operation, self._default_resource_group
@@ -219,7 +230,6 @@ class AzureTerminationService:
         release_context = AzureReleaseContext(
             resource_group=resolved_resource_group,
             resource_id=(default_resource_id or None),
-            cyclecloud_request_context=CycleCloudRequestContext(),
         )
 
         return _TerminationOperationContext(

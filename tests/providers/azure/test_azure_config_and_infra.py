@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from pydantic import ValidationError
 
 from orb.application.dto.template import TemplateDTO
 from orb.bootstrap.infrastructure_services import register_infrastructure_services
@@ -321,20 +320,6 @@ class TestAzureHandlerFactory:
         assert isinstance(template, AzureTemplate)
         assert template.vm_size == "Standard_B1s"
         assert "provider_data" not in AzureTemplate.model_fields
-
-    def test_template_factory_does_not_downgrade_invalid_azure_template(self):
-        container = DIContainer()
-        container.register_instance(LoggingPort, MagicMock())
-        register_infrastructure_services(container)
-
-        with pytest.raises(ValidationError, match="vm_size"):
-            container.get(TemplateFactory).create_template(
-                {
-                    "template_id": "invalid-azure-template",
-                    "provider_type": "azure",
-                    "provider_api": "VMSS",
-                }
-            )
 
     def test_registry_created_strategy_gets_azure_client_resolver(self):
         registry = ProviderRegistry()

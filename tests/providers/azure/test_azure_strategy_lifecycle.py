@@ -10,7 +10,10 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     AzureValidationError,
     TerminationError,
 )
-from orb.providers.azure.infrastructure.cyclecloud_session import CycleCloudRequestContext
+from orb.providers.azure.infrastructure.cyclecloud_resource_id import (
+    CycleCloudMachineId,
+    CycleCloudResourceId,
+)
 from orb.providers.azure.infrastructure.handlers.azure_handler import AzureReleaseContext
 from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
@@ -566,13 +569,25 @@ class TestTerminateInstances:
         handler = MagicMock()
         handler.release_hosts_async = AsyncMock(return_value=None)
         strategy_harness.handlers["CycleCloud"] = handler
+        resource_id = str(
+            CycleCloudResourceId(
+                cluster_name="my-cluster",
+                request_id="req-12345678-1234-1234-1234-123456789012",
+            )
+        )
+        machine_id = str(
+            CycleCloudMachineId(
+                resource_id=CycleCloudResourceId.parse(resource_id),
+                node_id="node-1",
+            )
+        )
 
         op = ProviderOperation(
             operation_type=ProviderOperationType.TERMINATE_INSTANCES,
             parameters={
-                "instance_ids": ["node-1"],
+                "instance_ids": [machine_id],
                 "provider_api": "CycleCloud",
-                "resource_id": "my-cluster",
+                "resource_id": resource_id,
             },
         )
 
@@ -581,12 +596,11 @@ class TestTerminateInstances:
         assert result.success
         handler.release_hosts_async.assert_awaited_once()
         _, kwargs = handler.release_hosts_async.await_args
-        assert kwargs["machine_ids"] == ["node-1"]
-        assert kwargs["resource_id"] == "my-cluster"
+        assert kwargs["machine_ids"] == [machine_id]
+        assert kwargs["resource_id"] == resource_id
         assert kwargs["context"] == AzureReleaseContext(
             resource_group="test-rg",
-            resource_id="my-cluster",
-            cyclecloud_request_context=CycleCloudRequestContext(),
+            resource_id=resource_id,
         )
 
     def test_terminate_instances_accepts_enum_provider_api(self, azure_config, logger):
