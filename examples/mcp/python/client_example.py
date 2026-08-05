@@ -16,8 +16,9 @@ import json
 import logging
 from typing import Any, Optional
 
-from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+from mcp import ClientSession, StdioServerParameters
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

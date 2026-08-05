@@ -25,18 +25,14 @@ def _raw_config_with_azure() -> dict:
     }
 
 
-def test_load_strategy_defaults_includes_azure_defaults_without_provider_bootstrap():
-    """Static defaults loading must include Azure without bootstrapping providers."""
+def test_load_strategy_defaults_discovers_azure_without_explicit_provider_bootstrap():
+    """Static defaults loading must discover Azure without the legacy bootstrap alias."""
     from orb.config.loader import ConfigurationLoader
 
-    with (
-        patch("orb.providers.registration.register_all_provider_types") as register_all,
-        patch("orb.providers.registry.get_provider_registry") as get_provider_registry,
-    ):
+    with patch("orb.providers.registration.register_all_provider_types") as register_all:
         defaults = ConfigurationLoader._load_strategy_defaults()
 
     register_all.assert_not_called()
-    get_provider_registry.assert_not_called()
     assert "azure" in defaults["provider"]["provider_defaults"]
 
 
@@ -45,14 +41,10 @@ def test_load_strategy_defaults_includes_azure_handler_capabilities_without_prov
     from orb.config.loader import ConfigurationLoader
     from orb.config.schemas.provider_strategy_schema import ProviderConfig, ProviderInstanceConfig
 
-    with (
-        patch("orb.providers.registration.register_all_provider_types") as register_all,
-        patch("orb.providers.registry.get_provider_registry") as get_provider_registry,
-    ):
+    with patch("orb.providers.registration.register_all_provider_types") as register_all:
         defaults = ConfigurationLoader._load_strategy_defaults()
 
     register_all.assert_not_called()
-    get_provider_registry.assert_not_called()
     provider_config = ProviderConfig.model_validate(defaults["provider"])
     provider_instance = ProviderInstanceConfig(
         name="azure-default",

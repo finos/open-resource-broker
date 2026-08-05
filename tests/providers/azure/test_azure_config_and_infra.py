@@ -27,6 +27,7 @@ from orb.providers.azure.registration import (
     register_azure_provider,
     register_azure_services_with_di,
 )
+from orb.providers.registration import register_all_provider_types
 from orb.providers.registry import ProviderRegistry
 
 # ---------------------------------------------------------------------------
@@ -258,6 +259,7 @@ class TestConfigValidation:
 
 class TestAzureHandlerFactory:
     def test_bootstrap_template_factory_preserves_azure_image_templates(self):
+        register_all_provider_types()
         container = DIContainer()
         container.register_instance(LoggingPort, MagicMock())
         register_infrastructure_services(container)
@@ -292,6 +294,7 @@ class TestAzureHandlerFactory:
         assert template.image.publisher == "Canonical"
 
     def test_template_factory_accepts_azure_template_dto_shape(self):
+        register_all_provider_types()
         container = DIContainer()
         container.register_instance(LoggingPort, MagicMock())
         register_infrastructure_services(container)
