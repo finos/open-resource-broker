@@ -1,6 +1,10 @@
 name: 'Setup UV with Cache'
 description: 'Install UV and restore cached environment, syncing only the requested dependency group'
 inputs:
+  python-version:
+    description: 'Python version used to create the cached environment'
+    required: false
+    default: '3.12'
   cache-key:
     description: 'Cache key for UV environment (caller-supplied; keyed per group)'
     required: true
@@ -14,6 +18,12 @@ inputs:
       have not yet been updated to pass a group).
     required: false
     default: ''
+  extra:
+    description: >-
+      Optional project extra to install alongside the dependency group (for
+      example, test-azure for the Azure provider test leg).
+    required: false
+    default: ''
   fail-on-cache-miss:
     description: 'Whether to fail if cache is not found'
     required: false
@@ -25,10 +35,10 @@ runs:
     - name: Install UV
       uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
 
-    - name: Setup Python 3.12
+    - name: Setup Python
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
       with:
-        python-version: '3.12'
+        python-version: ${{ inputs.python-version }}
 
     - name: Restore UV environment
       id: restore-cache
@@ -52,10 +62,15 @@ runs:
       env:
         ORB_SKIP_UI_BUILD: "1"
         UV_GROUP: ${{ inputs.group }}
+        UV_EXTRA: ${{ inputs.extra }}
       run: |
-        if [ -n "$UV_GROUP" ]; then
+        if [ -n "$UV_GROUP" ] && [ -n "$UV_EXTRA" ]; then
+          uv sync --frozen --no-default-groups --group "$UV_GROUP" --extra "$UV_EXTRA"
+        elif [ -n "$UV_GROUP" ]; then
           # Scoped install: only the packages this job needs (~2-15 pkgs, fast even cold)
           uv sync --frozen --no-default-groups --group "$UV_GROUP"
+        elif [ -n "$UV_EXTRA" ]; then
+          uv sync --frozen --no-default-groups --extra "$UV_EXTRA"
         else
           # Legacy fallback: full install (used by callers that predate group scoping)
           uv sync --frozen --all-groups
