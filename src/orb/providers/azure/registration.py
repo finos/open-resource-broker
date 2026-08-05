@@ -513,25 +513,61 @@ def initialize_azure_provider(
     template_factory: Optional[TemplateFactory] = None,
     logger: Optional["LoggingPort"] = None,
 ) -> None:
-    """Initialize Azure provider components at application startup."""
+    """Initialize every Azure provider satellite at application startup."""
+    from orb.providers.azure.configuration.config import AzureProviderConfig
+    from orb.providers.base.registration import (
+        ProviderRegistrationSpec,
+        register_provider_complete,
+    )
+
+    cli_spec_instance: Optional[Any] = None
     try:
-        register_azure_extensions(logger)
-        register_azure_provider_settings()
-        register_azure_cli_spec()
-        register_azure_hostfactory_field_mapping()
-        # Azure SDK credentials authenticate ORB to Azure Resource Manager; they
-        # do not authenticate callers to ORB. AuthRegistry is consumed by the
-        # inbound API middleware, and Azure has no caller-token validation
-        # contract or auth configuration. Keep DefaultAzureCredential acquisition
-        # in Azure infrastructure rather than exposing it as request auth.
-        if template_factory:
-            register_azure_template_factory(template_factory, logger)
-        if logger:
-            logger.info("Azure provider initialization completed successfully")
-    except Exception as exc:
-        if logger:
-            logger.error("Azure provider initialization failed: %s", exc, exc_info=True)
-        raise
+        from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
+
+        cli_spec_instance = AzureCLISpec()
+    except ImportError:
+        pass
+
+    field_mapping_instance: Optional[Any] = None
+    try:
+        from orb.providers.azure.scheduler.hostfactory_field_mapping import (
+            AzureFieldMapping,
+        )
+
+        field_mapping_instance = AzureFieldMapping()
+    except ImportError:
+        pass
+
+    defaults_loader_instance: Optional[Any] = None
+    try:
+        from orb.providers.azure.defaults_loader import AzureDefaultsLoader
+
+        defaults_loader_instance = AzureDefaultsLoader()
+    except ImportError:
+        pass
+
+    template_class: Optional[type] = None
+    try:
+        from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
+
+        template_class = AzureTemplate
+    except ImportError:
+        pass
+
+    # Azure SDK credentials authenticate ORB to Azure Resource Manager; they do
+    # not authenticate callers to ORB, so Azure intentionally has no inbound
+    # authentication registration hook.
+    spec = ProviderRegistrationSpec(
+        provider_name="azure",
+        settings_class=AzureProviderConfig,
+        dto_config_class=AzureTemplateExtensionConfig,
+        template_class=template_class,
+        template_factory=template_factory,
+        cli_spec_instance=cli_spec_instance,
+        field_mapping_instance=field_mapping_instance,
+        defaults_loader_instance=defaults_loader_instance,
+    )
+    register_provider_complete(spec, logger)
 
 
 def is_azure_provider_registered() -> bool:

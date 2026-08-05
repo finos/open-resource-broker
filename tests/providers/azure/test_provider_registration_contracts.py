@@ -92,6 +92,30 @@ def test_register_all_provider_types_does_not_register_azure_request_auth():
     assert registry.is_registered("azure") is False
 
 
+def test_initialize_azure_provider_restores_cleared_defaults_loader():
+    """Full bootstrap must rebuild Azure's required defaults-loader satellite."""
+    from orb.providers.azure.defaults_loader import AzureDefaultsLoader
+    from orb.providers.azure.registration import initialize_azure_provider
+    from orb.providers.base.provider_plugin import _initialized_providers
+    from orb.providers.registry.defaults_loader_registry import DefaultsLoaderRegistry
+
+    defaults_snapshot = DefaultsLoaderRegistry.all()
+    initialized_snapshot = set(_initialized_providers)
+    try:
+        DefaultsLoaderRegistry.clear()
+        _initialized_providers.discard("azure")
+
+        initialize_azure_provider()
+
+        assert isinstance(DefaultsLoaderRegistry.get("azure"), AzureDefaultsLoader)
+    finally:
+        DefaultsLoaderRegistry.clear()
+        for provider_name, defaults_loader in defaults_snapshot.items():
+            DefaultsLoaderRegistry.register(provider_name, defaults_loader)
+        _initialized_providers.clear()
+        _initialized_providers.update(initialized_snapshot)
+
+
 def test_provider_config_builder_accepts_azure_provider_instance_config():
     """Azure config creation must accept the canonical ProviderInstanceConfig input."""
     from orb.providers.config_builder import ProviderConfigBuilder
