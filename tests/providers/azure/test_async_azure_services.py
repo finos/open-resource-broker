@@ -2,7 +2,7 @@
 
 import asyncio
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -12,6 +12,7 @@ from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.services.azure_deployment_service import (
     AzureDeploymentService,
 )
+from orb.providers.azure.services.handler_resolver import AzureHandlerResolver
 from orb.providers.azure.services.health_check_service import AzureHealthCheckService
 from orb.providers.azure.services.inventory_service import (
     AzureInventoryService,
@@ -27,9 +28,6 @@ from orb.providers.azure.services.termination_service import (
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from tests.providers.azure.strategy_test_support import make_azure_template
 
-if TYPE_CHECKING:
-    from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
-
 
 def _make_template(**overrides):
     return make_azure_template(
@@ -40,15 +38,10 @@ def _make_template(**overrides):
     )
 
 
-def _handler_provider(handler) -> "AzureProviderStrategy":
-    """Build a strategy stand-in that returns ``handler`` from any ``resolve_handler`` call.
-
-    Cast to ``AzureProviderStrategy`` so the test fixture satisfies the inventory
-    service's annotated dependency without spinning up a real strategy. Duck-typed
-    at runtime via ``SimpleNamespace.resolve_handler``.
-    """
+def _handler_provider(handler) -> AzureHandlerResolver:
+    """Build a handler resolver stand-in that returns the supplied handler."""
     return cast(
-        "AzureProviderStrategy",
+        AzureHandlerResolver,
         SimpleNamespace(resolve_handler=lambda *_args, **_kwargs: handler),
     )
 

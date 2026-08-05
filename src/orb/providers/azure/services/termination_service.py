@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import builtins
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
@@ -18,15 +18,13 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureReleaseContext,
     AzureReleaseProviderData,
 )
+from orb.providers.azure.services.handler_resolver import AzureHandlerResolver
 from orb.providers.azure.services.operation_parsing import (
     group_instance_ids_by_resource,
     resolve_operation_provider_api,
     resolve_operation_resource_group,
 )
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
-
-if TYPE_CHECKING:
-    from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 
 
 @dataclass
@@ -146,7 +144,7 @@ class AzureTerminationService:
         self,
         *,
         logger: LoggingPort,
-        handler_provider: AzureProviderStrategy,
+        handler_provider: AzureHandlerResolver,
         default_resource_group: Optional[str],
     ) -> None:
         self._logger = logger

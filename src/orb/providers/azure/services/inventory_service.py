@@ -10,7 +10,7 @@ write paths (``termination_service``, ``provisioning_service``).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional, Protocol, TypedDict, runtime_checkable
+from typing import Any, Optional, Protocol, TypedDict, runtime_checkable
 
 from orb.domain.base.ports import LoggingPort
 from orb.domain.request.aggregate import Request
@@ -28,6 +28,7 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureHandlerStatusResult,
 )
 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
+from orb.providers.azure.services.handler_resolver import AzureHandlerResolver
 from orb.providers.azure.services.operation_parsing import (
     group_instance_ids_by_resource,
     operation_request_id,
@@ -39,10 +40,6 @@ from orb.providers.azure.services.resource_metadata_service import (
     AzureResourceMetadataService,
 )
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
-
-if TYPE_CHECKING:
-    from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
-
 
 # ---------------------------------------------------------------------------
 # Read-side vocabulary
@@ -341,7 +338,7 @@ class AzureInventoryService:
         logger: LoggingPort,
         provider_instance_name: str,
         resource_metadata_service: AzureResourceMetadataService,
-        handler_provider: AzureProviderStrategy,
+        handler_provider: AzureHandlerResolver,
     ) -> None:
         self._logger = logger
         self._provider_instance_name = provider_instance_name
