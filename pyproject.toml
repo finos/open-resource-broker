@@ -277,7 +277,7 @@ dev = [
     "requests-mock>=1.11.0,<2.0.0",
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
-    "nltk>=3.9.3",
+    "nltk>=3.10.2",
     "gitpython>=3.1.52",
     "watchdog",
     "tenacity",
@@ -398,8 +398,9 @@ test = [
     # Security overrides for vulnerable transitive deps pulled in by test tooling
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
-    # Security override for safety's vulnerable nltk dependency (GHSA-7p94-766c-hgjp)
-    "nltk>=3.9.3",
+    # Security override for safety's vulnerable and broken nltk versions
+    # (GHSA-7p94-766c-hgjp; 3.10.1 rejects packages in project-local virtualenvs)
+    "nltk>=3.10.2",
     # Security override for python-semantic-release's vulnerable gitpython
     # (GHSA-956x-8gvw-wg5v, GHSA-2f96-g7mh-g2hx, GHSA-v396-v7q4-x2qj argument
     # injection; GHSA-rwj8-pgh3-r573 os.path.expandvars in polish_url)
