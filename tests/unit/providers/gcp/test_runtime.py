@@ -564,7 +564,7 @@ def test_mig_handler_rolls_back_instance_template_when_mig_operation_fails() -> 
     assert compute_client.deleted_templates == [compute_client.created_templates[0][0]]
 
 
-def test_mig_handler_does_not_roll_back_template_when_mig_operation_times_out() -> None:
+def test_mig_handler_rolls_back_template_when_mig_operation_times_out() -> None:
     compute_client = _ComputeClientStub()
     compute_client.timeout_regional_mig_operation = True
     handler = GCPManagedInstanceGroupHandler(
@@ -601,7 +601,7 @@ def test_mig_handler_does_not_roll_back_template_when_mig_operation_times_out() 
         handler.acquire_hosts(request, template)
 
     assert compute_client.mig_operation_result_called is True
-    assert compute_client.deleted_templates == []
+    assert compute_client.deleted_templates == [compute_client.created_templates[0][0]]
     assert exc_info.value.details["operation"] == "create_mig"
     assert exc_info.value.details["timeout_seconds"] == 36
 
