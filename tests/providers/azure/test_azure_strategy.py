@@ -14,6 +14,7 @@ from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
     AzureSpotPlacementScoreAdapter,
+    SpotPlacementScoreLookup,
 )
 from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from orb.providers.base.strategy import (
@@ -514,7 +515,7 @@ class TestSpotPlacementScoreAdapter:
             },
         )
 
-        adapter._fetch_scores_async = AsyncMock(return_value={})
+        adapter._fetch_scores_async = AsyncMock(return_value=SpotPlacementScoreLookup(entries={}))
 
         scores = adapter.score_candidates(
             requested_count=2,
@@ -522,12 +523,63 @@ class TestSpotPlacementScoreAdapter:
         )
 
         assert [score.candidate.region for score in scores] == ["eastus2"]
+        assert scores[0].raw_score == "DataNotFoundOrStale"
+        assert scores[0].normalized_score == 0.0
+        assert scores[0].approximate is True
+        assert scores[0].metadata["score_source"] == "candidate_missing_from_response"
         adapter._fetch_scores_async.assert_awaited_once_with(
             requested_count=2,
             regions=["eastus2"],
             vm_sizes=template.candidate_vm_sizes,
             zones=[],
         )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("api_score", "normalized_score"),
+        [("Low", 0.2), ("DataNotFoundOrStale", 0.0)],
+    )
+    async def test_score_candidates_async_preserves_explicit_api_score(
+        self,
+        logger,
+        api_score,
+        normalized_score,
+    ):
+        adapter = AzureSpotPlacementScoreAdapter(
+            azure_client=MagicMock(),
+            logger=logger,
+            subscription_id="sub-1",
+            base_location="westeurope",
+        )
+        template = SimpleNamespace(
+            candidate_vm_sizes=["Standard_D4s_v5"],
+            placement_regions=[],
+            location=SimpleNamespace(value="eastus2"),
+            placement_zones=[],
+            zones=[],
+        )
+        adapter._fetch_scores_async = AsyncMock(
+            return_value=SpotPlacementScoreLookup(
+                entries={
+                    ("eastus2", None, "Standard_D4s_v5"): {
+                        "region": "eastus2",
+                        "availabilityZone": None,
+                        "sku": "Standard_D4s_v5",
+                        "score": api_score,
+                    }
+                }
+            )
+        )
+
+        scores = await adapter.score_candidates_async(
+            requested_count=1,
+            template=cast(Any, template),
+        )
+
+        assert scores[0].raw_score == api_score
+        assert scores[0].normalized_score == normalized_score
+        assert scores[0].approximate is False
+        assert scores[0].metadata["score_source"] == "azure_api"
 
     @pytest.mark.asyncio
     async def test_score_candidates_async_uses_async_credential_and_http_payload(
@@ -640,7 +692,7 @@ class TestSpotPlacementScoreAdapter:
         ]
 
     @pytest.mark.asyncio
-    async def test_score_candidates_async_returns_low_scores_on_http_failure(
+    async def test_score_candidates_async_returns_approximate_stale_scores_on_http_failure(
         self, logger, monkeypatch
     ):
         class FakeResponse:
@@ -696,9 +748,81 @@ class TestSpotPlacementScoreAdapter:
         )
 
         assert len(scores) == 1
-        assert scores[0].raw_score == "Low"
-        assert scores[0].normalized_score == 0.2
+        assert scores[0].raw_score == "DataNotFoundOrStale"
+        assert scores[0].normalized_score == 0.0
+        assert scores[0].approximate is True
         assert scores[0].metadata["raw_entry"] == {}
+        assert scores[0].metadata["score_source"] == "lookup_failed"
+        assert scores[0].metadata["score_lookup_failure"] == "score_lookup_failed"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "response_payload",
+        [
+            None,
+            [],
+            {"placementScores": None},
+            {"placementScores": [None]},
+        ],
+    )
+    async def test_score_candidates_async_treats_malformed_response_as_lookup_failure(
+        self,
+        logger,
+        monkeypatch,
+        response_payload,
+    ):
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return response_payload
+
+        class FakeAsyncClient:
+            def __init__(self, *, timeout):
+                self.timeout = timeout
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, *, json, headers):
+                return FakeResponse()
+
+        monkeypatch.setattr(
+            "orb.providers.azure.infrastructure.services."
+            "spot_placement_score_adapter.httpx.AsyncClient",
+            FakeAsyncClient,
+        )
+        credential = MagicMock()
+        credential.get_token = AsyncMock(return_value=SimpleNamespace(token="token-1"))
+        azure_client = MagicMock()
+        azure_client.get_async_credential = AsyncMock(return_value=credential)
+        adapter = AzureSpotPlacementScoreAdapter(
+            azure_client=azure_client,
+            logger=logger,
+            subscription_id="sub-1",
+            base_location="westeurope",
+        )
+        template = SimpleNamespace(
+            candidate_vm_sizes=["Standard_D4s_v5"],
+            placement_regions=[],
+            location=SimpleNamespace(value="eastus2"),
+            placement_zones=[],
+            zones=[],
+        )
+
+        scores = await adapter.score_candidates_async(
+            requested_count=1,
+            template=cast(Any, template),
+        )
+
+        assert scores[0].raw_score == "DataNotFoundOrStale"
+        assert scores[0].normalized_score == 0.0
+        assert scores[0].approximate is True
+        assert scores[0].metadata["score_source"] == "lookup_failed"
 
 
 # ---------------------------------------------------------------------------

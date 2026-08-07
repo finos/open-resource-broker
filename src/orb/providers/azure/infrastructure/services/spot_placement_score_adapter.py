@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 import httpx
@@ -26,6 +28,14 @@ class AzureSpotPlacementTemplate(Protocol):
     placement_zones: list[str]
     zones: list[str]
     candidate_vm_sizes: list[str]
+
+
+@dataclass(frozen=True)
+class SpotPlacementScoreLookup:
+    """Validated Azure score entries and any lookup-level failure reason."""
+
+    entries: dict[tuple[str | None, str | None, str], dict[str, Any]]
+    failure_reason: str | None = None
 
 
 class AzureSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
@@ -78,14 +88,14 @@ class AzureSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
         if not candidates:
             return []
 
-        raw_scores = await self._fetch_scores_async(
+        lookup = await self._fetch_scores_async(
             requested_count=requested_count,
             regions=regions,
             vm_sizes=vm_sizes,
             zones=zones,
         )
 
-        return self._build_scores(candidates=candidates, raw_scores=raw_scores)
+        return self._build_scores(candidates=candidates, lookup=lookup)
 
     def _candidate_inputs(
         self,
@@ -114,12 +124,15 @@ class AzureSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
         regions: list[str],
         vm_sizes: list[str],
         zones: list[str],
-    ) -> dict[tuple[str | None, str | None, str], dict[str, Any]]:
+    ) -> SpotPlacementScoreLookup:
         if not self._subscription_id:
             self._logger.warning(
                 "Azure subscription_id not available; skipping spot placement scoring"
             )
-            return {}
+            return SpotPlacementScoreLookup(
+                entries={},
+                failure_reason="subscription_id_unavailable",
+            )
 
         payload = {
             "desiredLocations": regions,
@@ -149,40 +162,82 @@ class AzureSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
                 )
                 response.raise_for_status()
                 response_payload = response.json()
+            return SpotPlacementScoreLookup(entries=self._parse_score_entries(response_payload))
         except Exception as exc:
             self._logger.warning("Azure spot placement score lookup failed: %s", exc, exc_info=True)
-            return {}
+            return SpotPlacementScoreLookup(
+                entries={},
+                failure_reason="score_lookup_failed",
+            )
 
-        placement_scores = response_payload.get("placementScores", [])
-        return {
-            (
-                entry.get("region"),
-                entry.get("availabilityZone"),
-                entry.get("sku"),
-            ): entry
-            for entry in placement_scores
-        }
+    @staticmethod
+    def _parse_score_entries(
+        response_payload: Any,
+    ) -> dict[tuple[str | None, str | None, str], dict[str, Any]]:
+        """Validate the external response shape before indexing score entries."""
+        if not isinstance(response_payload, Mapping):
+            raise ValueError("Azure spot placement score response must be an object")
+
+        placement_scores = response_payload.get("placementScores")
+        if not isinstance(placement_scores, list):
+            raise ValueError(
+                "Azure spot placement score response field 'placementScores' must be a list"
+            )
+
+        entries: dict[tuple[str | None, str | None, str], dict[str, Any]] = {}
+        for entry in placement_scores:
+            if not isinstance(entry, Mapping):
+                raise ValueError("Azure spot placement score entries must be objects")
+            region = entry.get("region")
+            zone = entry.get("availabilityZone")
+            sku = entry.get("sku")
+            score = entry.get("score")
+            if region is not None and not isinstance(region, str):
+                raise ValueError("Azure spot placement score entry 'region' must be a string")
+            if zone is not None and not isinstance(zone, str):
+                raise ValueError(
+                    "Azure spot placement score entry 'availabilityZone' must be a string"
+                )
+            if not isinstance(sku, str) or not sku:
+                raise ValueError("Azure spot placement score entry 'sku' must be a string")
+            if not isinstance(score, str) or not score:
+                raise ValueError("Azure spot placement score entry 'score' must be a string")
+            entries[(region, zone, sku)] = dict(entry)
+        return entries
 
     def _build_scores(
         self,
         *,
         candidates: list[PlacementCandidate],
-        raw_scores: dict[tuple[str | None, str | None, str], dict[str, Any]],
+        lookup: SpotPlacementScoreLookup,
     ) -> list[PlacementScore]:
         scores: list[PlacementScore] = []
         for candidate in candidates:
             lookup_key = (candidate.region, candidate.zone, candidate.instance_type)
-            entry = raw_scores.get(lookup_key, {})
-            raw_score = entry.get("score", "Low")
+            entry = lookup.entries.get(lookup_key)
+            if entry is None:
+                raw_score = "DataNotFoundOrStale"
+                approximate = True
+                score_source = (
+                    "lookup_failed" if lookup.failure_reason else "candidate_missing_from_response"
+                )
+                raw_entry: dict[str, Any] = {}
+            else:
+                raw_score = entry["score"]
+                approximate = False
+                score_source = "azure_api"
+                raw_entry = entry
             scores.append(
                 PlacementScore(
                     candidate=candidate,
                     raw_score=raw_score,
                     normalized_score=self._normalize_score(raw_score),
-                    approximate=False,
+                    approximate=approximate,
                     metadata={
-                        "is_quota_available": entry.get("isQuotaAvailable"),
-                        "raw_entry": entry,
+                        "is_quota_available": raw_entry.get("isQuotaAvailable"),
+                        "raw_entry": raw_entry,
+                        "score_source": score_source,
+                        "score_lookup_failure": lookup.failure_reason,
                     },
                 )
             )
