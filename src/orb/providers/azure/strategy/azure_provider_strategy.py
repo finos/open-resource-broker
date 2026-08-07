@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import inspect
 import time
 from collections.abc import Mapping
 from threading import Condition, RLock
@@ -47,10 +46,7 @@ from orb.providers.azure.services.spot_launch_service import AzureSpotLaunchServ
 from orb.providers.azure.services.spot_placement_execution import (
     SpotPlacementExecutionService,
 )
-from orb.providers.azure.services.spot_placement_planner import (
-    PlacementPlanEntry,
-    SpotPlacementPlanner,
-)
+from orb.providers.azure.services.spot_placement_planner import SpotPlacementPlanner
 from orb.providers.azure.services.template_catalog_service import AzureTemplateCatalogService
 from orb.providers.azure.services.termination_service import AzureTerminationService
 from orb.providers.base.strategy import (
@@ -272,37 +268,6 @@ class AzureProviderStrategy(ProviderStrategy):
         enhanced_config.setdefault("provider_name", self.provider_instance_name)
         return enhanced_config
 
-    def _build_spot_placement_plan(
-        self,
-        azure_template: AzureTemplate,
-        count: int,
-    ) -> list[PlacementPlanEntry]:
-        """Compatibility wrapper for tests and callers that patch this seam."""
-        return self._spot_launch_service.build_spot_placement_plan(
-            azure_template=azure_template,
-            count=count,
-            azure_client=self.azure_client,
-        )
-
-    async def _build_spot_placement_plan_async(
-        self,
-        azure_template: AzureTemplate,
-        count: int,
-    ) -> list[PlacementPlanEntry]:
-        """Build the spot placement plan without blocking the async create flow."""
-        patched_sync_builder = self.__dict__.get("_build_spot_placement_plan")
-        if patched_sync_builder is not None:
-            return patched_sync_builder(azure_template, count)
-        return await self._spot_launch_service.build_spot_placement_plan_async(
-            azure_template=azure_template,
-            count=count,
-            azure_client=self.azure_client,
-        )
-
-    def _is_capacity_like_failure(self, child_result: dict[str, Any]) -> bool:
-        """Compatibility wrapper for tests and callers that patch this seam."""
-        return self._spot_launch_service.is_capacity_like_failure(child_result)
-
     # ------------------------------------------------------------------
     # ProviderStrategy contract
     # ------------------------------------------------------------------
@@ -334,10 +299,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 self._lifecycle_condition.notify_all()
 
     async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
-        """Compatibility entrypoint that delegates to the native async override."""
-        return await self.execute_operation_async(operation)
-
-    async def execute_operation_async(self, operation: ProviderOperation) -> ProviderResult:
         """Execute an Azure provider operation via the native async strategy path."""
         self._logger.debug(
             "azure_provider_strategy execute_operation [%s, %s, %s]",
@@ -640,13 +601,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 return create_instances_dry_run_result(create_context)
 
             if self._spot_launch_service.should_use_spot_placement(create_context.azure_template):
-                plan_result = self._build_spot_placement_plan_async(
-                    create_context.azure_template,
-                    create_context.count,
-                )
-                plan_override = (
-                    await plan_result if inspect.isawaitable(plan_result) else plan_result
-                )
                 return await self._spot_launch_service.execute_planned_spot_launches_async(
                     azure_template=create_context.azure_template,
                     provider_api=create_context.provider_api,
@@ -657,8 +611,6 @@ class AzureProviderStrategy(ProviderStrategy):
                     provider_instance_name=self.provider_instance_name,
                     handler=self.resolve_handler(create_context.provider_api),
                     azure_client=self.azure_client,
-                    plan_override=plan_override,
-                    capacity_like_failure_checker=self._is_capacity_like_failure,
                 )
 
             request = self._provisioning_service.build_create_request(

@@ -97,23 +97,6 @@ class TestInitialization:
         with pytest.raises(asyncio.CancelledError):
             run_operation(strategy.execute_operation(op))
 
-    def test_execute_operation_delegates_to_execute_operation_async(self, strategy, monkeypatch):
-        expected = ProviderResult.success_result({"ok": True})
-
-        async def delegated(_operation):
-            return expected
-
-        monkeypatch.setattr(strategy, "execute_operation_async", delegated)
-
-        op = ProviderOperation(
-            operation_type=ProviderOperationType.HEALTH_CHECK,
-            parameters={},
-        )
-
-        result = run_operation(strategy.execute_operation(op))
-
-        assert result == expected
-
 
 class TestCapacityMetadata:
     def test_describe_resource_instances_surfaces_vmss_errors_without_instances(

@@ -760,23 +760,25 @@ class TestSpotPlacementPlanning:
         strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
-            strategy,
-            "_build_spot_placement_plan",
-            lambda template, count: [
-                PlacementPlanEntry(
-                    score=PlacementScore(
-                        candidate=PlacementCandidate(
-                            candidate_id="azure:eastus2:1:Standard_D4s_v5",
-                            instance_type="Standard_D4s_v5",
-                            region="eastus2",
-                            zone="1",
+            strategy._spot_launch_service,
+            "build_spot_placement_plan_async",
+            AsyncMock(
+                return_value=[
+                    PlacementPlanEntry(
+                        score=PlacementScore(
+                            candidate=PlacementCandidate(
+                                candidate_id="azure:eastus2:1:Standard_D4s_v5",
+                                instance_type="Standard_D4s_v5",
+                                region="eastus2",
+                                zone="1",
+                            ),
+                            raw_score="High",
+                            normalized_score=1.0,
                         ),
-                        raw_score="High",
-                        normalized_score=1.0,
+                        planned_count=2,
                     ),
-                    planned_count=2,
-                ),
-            ],
+                ]
+            ),
         )
 
         op = ProviderOperation(
@@ -819,23 +821,25 @@ class TestSpotPlacementPlanning:
         strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
-            strategy,
-            "_build_spot_placement_plan",
-            lambda template, count: [
-                PlacementPlanEntry(
-                    score=PlacementScore(
-                        candidate=PlacementCandidate(
-                            candidate_id="azure:eastus2:1:Standard_D4s_v5",
-                            instance_type="Standard_D4s_v5",
-                            region="eastus2",
-                            zone="1",
+            strategy._spot_launch_service,
+            "build_spot_placement_plan_async",
+            AsyncMock(
+                return_value=[
+                    PlacementPlanEntry(
+                        score=PlacementScore(
+                            candidate=PlacementCandidate(
+                                candidate_id="azure:eastus2:1:Standard_D4s_v5",
+                                instance_type="Standard_D4s_v5",
+                                region="eastus2",
+                                zone="1",
+                            ),
+                            raw_score="High",
+                            normalized_score=1.0,
                         ),
-                        raw_score="High",
-                        normalized_score=1.0,
+                        planned_count=1,
                     ),
-                    planned_count=1,
-                ),
-            ],
+                ]
+            ),
         )
 
         op = ProviderOperation(
@@ -881,28 +885,30 @@ class TestSpotPlacementPlanning:
         strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
-            strategy,
-            "_build_spot_placement_plan",
-            lambda template, count: [
-                PlacementPlanEntry(
-                    score=PlacementScore(
-                        candidate=PlacementCandidate(
-                            candidate_id="azure:eastus2:1:Standard_D4s_v5",
-                            instance_type="Standard_D4s_v5",
-                            region="eastus2",
-                            zone="1",
+            strategy._spot_launch_service,
+            "build_spot_placement_plan_async",
+            AsyncMock(
+                return_value=[
+                    PlacementPlanEntry(
+                        score=PlacementScore(
+                            candidate=PlacementCandidate(
+                                candidate_id="azure:eastus2:1:Standard_D4s_v5",
+                                instance_type="Standard_D4s_v5",
+                                region="eastus2",
+                                zone="1",
+                            ),
+                            raw_score="High",
+                            normalized_score=1.0,
                         ),
-                        raw_score="High",
-                        normalized_score=1.0,
+                        planned_count=2,
                     ),
-                    planned_count=2,
-                ),
-            ],
+                ]
+            ),
         )
 
         monkeypatch.setattr(
-            strategy,
-            "_is_capacity_like_failure",
+            strategy._spot_launch_service,
+            "is_capacity_like_failure",
             lambda result: False,
         )
 
@@ -951,36 +957,38 @@ class TestSpotPlacementPlanning:
         strategy_harness.handlers["VMSS"] = handler
 
         monkeypatch.setattr(
-            strategy,
-            "_build_spot_placement_plan",
-            lambda template, count: [
-                PlacementPlanEntry(
-                    score=PlacementScore(
-                        candidate=PlacementCandidate(
-                            candidate_id="azure:eastus2:1:Standard_D4s_v5",
-                            instance_type="Standard_D4s_v5",
-                            region="eastus2",
-                            zone="1",
+            strategy._spot_launch_service,
+            "build_spot_placement_plan_async",
+            AsyncMock(
+                return_value=[
+                    PlacementPlanEntry(
+                        score=PlacementScore(
+                            candidate=PlacementCandidate(
+                                candidate_id="azure:eastus2:1:Standard_D4s_v5",
+                                instance_type="Standard_D4s_v5",
+                                region="eastus2",
+                                zone="1",
+                            ),
+                            raw_score="High",
+                            normalized_score=1.0,
                         ),
-                        raw_score="High",
-                        normalized_score=1.0,
+                        planned_count=2,
                     ),
-                    planned_count=2,
-                ),
-                PlacementPlanEntry(
-                    score=PlacementScore(
-                        candidate=PlacementCandidate(
-                            candidate_id="azure:eastus2:2:Standard_D8s_v5",
-                            instance_type="Standard_D8s_v5",
-                            region="eastus2",
-                            zone="2",
+                    PlacementPlanEntry(
+                        score=PlacementScore(
+                            candidate=PlacementCandidate(
+                                candidate_id="azure:eastus2:2:Standard_D8s_v5",
+                                instance_type="Standard_D8s_v5",
+                                region="eastus2",
+                                zone="2",
+                            ),
+                            raw_score="Medium",
+                            normalized_score=0.6,
                         ),
-                        raw_score="Medium",
-                        normalized_score=0.6,
+                        planned_count=1,
                     ),
-                    planned_count=1,
-                ),
-            ],
+                ]
+            ),
         )
 
         op = ProviderOperation(
