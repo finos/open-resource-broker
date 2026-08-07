@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
@@ -19,8 +19,10 @@ from orb.providers.gcp.types import (
     GCPMutationOutcome,
     GCPProviderData,
 )
-from google.api_core.extended_operation import ExtendedOperation
-from google.cloud.compute_v1.types import Instance
+
+if TYPE_CHECKING:
+    from google.api_core.extended_operation import ExtendedOperation
+    from google.cloud.compute_v1.types import Instance
 
 try:
     from google.api_core import exceptions as google_exceptions
