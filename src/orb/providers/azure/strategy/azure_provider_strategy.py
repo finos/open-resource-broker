@@ -899,9 +899,10 @@ class AzureProviderStrategy(ProviderStrategy):
                 {"operation": "get_available_templates"},
             )
         except Exception as exc:
-            return ProviderResult.error_result(
+            return self._error_result(
                 f"Failed to get available templates: {exc!s}",
                 "GET_TEMPLATES_ERROR",
+                exc,
             )
 
     # ------------------------------------------------------------------

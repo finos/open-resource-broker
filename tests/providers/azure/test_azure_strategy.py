@@ -11,6 +11,7 @@ import pytest
 
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
+from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
     AzureSpotPlacementScoreAdapter,
 )
@@ -453,6 +454,25 @@ class TestGetAvailableTemplates:
     def test_fallback_templates_validate_as_azure_templates(self, strategy):
         for template in strategy._template_catalog_service.get_fallback_templates():
             AzureTemplate.model_validate(template)
+
+    def test_failure_preserves_azure_exception_context(self, strategy):
+        strategy._template_catalog_service.get_available_templates = MagicMock(
+            side_effect=AzureValidationError(
+                "Template catalog is invalid",
+                error_code="InvalidTemplateCatalog",
+            )
+        )
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.GET_AVAILABLE_TEMPLATES,
+            parameters={},
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "InvalidTemplateCatalog"
+        assert result.metadata["error_class"] == "AzureValidationError"
+        assert result.metadata["provider_error"]["error_code"] == "InvalidTemplateCatalog"
 
 
 # ---------------------------------------------------------------------------
