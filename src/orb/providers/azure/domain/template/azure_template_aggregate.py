@@ -461,6 +461,7 @@ class AzureTemplate(Template):
 
         raw_provider_config = data.pop("provider_config", None)
         if raw_provider_config is not None:
+            # getattr: external callers may supply a Pydantic model or a plain mapping.
             if hasattr(raw_provider_config, "model_dump"):
                 provider_config = raw_provider_config.model_dump(mode="json")
             elif isinstance(raw_provider_config, dict):
