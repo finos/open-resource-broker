@@ -497,6 +497,7 @@ async def test_mig_handler_acquire_hosts_times_out_waiting_for_template_operatio
     }
     assert compute_client.template_operation_result_called is True
     assert compute_client.created_migs == []
+    assert compute_client.deleted_templates == [compute_client.created_templates[0][0]]
 
 
 @pytest.mark.asyncio
