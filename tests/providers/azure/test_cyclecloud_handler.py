@@ -167,6 +167,10 @@ class TestCycleCloudTemplate:
         with pytest.raises(ValueError, match="Extra inputs are not permitted"):
             _make_template(made_up_setting=True)
 
+    def test_template_rejects_aws_fleet_type(self):
+        with pytest.raises(ValueError, match="fleet_type"):
+            _make_template(fleet_type="request")
+
 
 # ---------------------------------------------------------------------------
 # State mapping

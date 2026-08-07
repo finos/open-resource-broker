@@ -9,25 +9,21 @@ from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 
 _AZURE_API_CAPABILITIES: dict[str, dict[str, Any]] = {
     AzureProviderApi.VMSS.value: {
-        "supported_fleet_types": [],
         "supports_spot": True,
         "supports_on_demand": True,
         "max_instances": 1000,
     },
     AzureProviderApi.VMSS_UNIFORM.value: {
-        "supported_fleet_types": [],
         "supports_spot": True,
         "supports_on_demand": True,
         "max_instances": 1000,
     },
     AzureProviderApi.SINGLE_VM.value: {
-        "supported_fleet_types": [],
         "supports_spot": True,
         "supports_on_demand": True,
         "max_instances": 1000,
     },
     AzureProviderApi.CYCLECLOUD.value: {
-        "supported_fleet_types": [],
         "supports_spot": False,
         "supports_on_demand": True,
     },

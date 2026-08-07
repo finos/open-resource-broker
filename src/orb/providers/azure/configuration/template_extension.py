@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from orb.providers.azure.domain.template.value_objects import (
     AzureAllocationStrategy,
@@ -176,6 +176,14 @@ class AzureTemplateExtensionConfig(ProviderTemplateExtensionBase):
         default_factory=dict,
         description="Freeform attributes merged into the template",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_aws_fleet_type(cls, data: Any) -> Any:
+        """Reject the AWS-only fleet type instead of silently ignoring it."""
+        if isinstance(data, dict) and ({"fleet_type", "fleetType"} & data.keys()):
+            raise ValueError("fleet_type is AWS-specific and is not supported by Azure templates")
+        return data
 
     def to_template_defaults(self) -> dict[str, Any]:
         """Project every configured field, normalising legacy OS disk settings."""

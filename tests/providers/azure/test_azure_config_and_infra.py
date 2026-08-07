@@ -450,6 +450,11 @@ class TestAzureHandlerFactory:
 
 
 class TestTemplateExtension:
+    @pytest.mark.parametrize("field_name", ["fleet_type", "fleetType"])
+    def test_rejects_aws_fleet_type(self, field_name):
+        with pytest.raises(ValueError, match="fleet_type is AWS-specific"):
+            AzureTemplateExtensionConfig(**{field_name: "request"})
+
     def test_defaults_do_not_include_vm_size_without_explicit_config(self):
         ext = AzureTemplateExtensionConfig()
         defaults = ext.to_template_defaults()
