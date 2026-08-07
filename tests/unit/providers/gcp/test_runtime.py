@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 from concurrent.futures import TimeoutError as FutureTimeoutError
 import uuid
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from google.api_core import exceptions as google_exceptions
@@ -79,6 +80,9 @@ class _ComputeClientStub:
             if self._result_failure is not None:
                 raise self._result_failure
             return self
+
+        def done(self) -> bool:
+            return True
 
     def create_instance(self, *, zone: str, body: object) -> object:
         if body.name in self.fail_create_instance_for:
@@ -195,7 +199,8 @@ def test_handler_factory_rejects_invalid_handler_type_with_gcp_validation_error(
         factory.create_handler("Bogus")
 
 
-def test_single_vm_handler_acquire_hosts_submits_instance_creation() -> None:
+@pytest.mark.asyncio
+async def test_single_vm_handler_acquire_hosts_submits_instance_creation() -> None:
     compute_client = _ComputeClientStub()
     handler = GCPSingleVMHandler(
         compute_client=compute_client,
@@ -223,7 +228,7 @@ def test_single_vm_handler_acquire_hosts_submits_instance_creation() -> None:
         }
     )
 
-    result = handler.acquire_hosts(request, template)
+    result = await handler.acquire_hosts(request, template)
 
     assert len(result.resource_ids) == 1
     assert result.provider_data["zone"] == "us-central1-a"
@@ -299,7 +304,8 @@ def test_single_vm_handler_status_omits_missing_instances() -> None:
     assert result == []
 
 
-def test_single_vm_handler_acquire_hosts_tracks_partial_failures() -> None:
+@pytest.mark.asyncio
+async def test_single_vm_handler_acquire_hosts_tracks_partial_failures() -> None:
     compute_client = _ComputeClientStub()
     logger = MagicMock()
     handler = GCPSingleVMHandler(
@@ -340,7 +346,7 @@ def test_single_vm_handler_acquire_hosts_tracks_partial_failures() -> None:
             "uuid4",
             lambda: generated.pop(0) if generated else SimpleNamespace(hex="feedfacecafebeef"),
         )
-        result = handler.acquire_hosts(request, template)
+        result = await handler.acquire_hosts(request, template)
 
     assert result.provider_data["partial_failure"] is True
     assert result.provider_data["submitted_count"] == 1
@@ -389,7 +395,8 @@ def test_mig_handler_start_instances_returns_failed_results_for_unsupported_targ
     assert result.warning.startswith("MIG-managed instances follow group policy")
 
 
-def test_mig_handler_acquire_hosts_submits_template_and_group() -> None:
+@pytest.mark.asyncio
+async def test_mig_handler_acquire_hosts_submits_template_and_group() -> None:
     compute_client = _ComputeClientStub()
     handler = GCPManagedInstanceGroupHandler(
         compute_client=compute_client,
@@ -418,7 +425,7 @@ def test_mig_handler_acquire_hosts_submits_template_and_group() -> None:
         }
     )
 
-    result = handler.acquire_hosts(request, template)
+    result = await handler.acquire_hosts(request, template)
 
     assert len(result.resource_ids) == 1
     assert result.provider_data["target_size"] == 3
@@ -429,7 +436,8 @@ def test_mig_handler_acquire_hosts_submits_template_and_group() -> None:
     assert len(compute_client.created_migs) == 1
 
 
-def test_mig_handler_acquire_hosts_times_out_waiting_for_template_operation() -> None:
+@pytest.mark.asyncio
+async def test_mig_handler_acquire_hosts_times_out_waiting_for_template_operation() -> None:
     compute_client = _ComputeClientStub()
 
     class _TimeoutOperationStub(compute_client._OperationStub):
@@ -479,7 +487,7 @@ def test_mig_handler_acquire_hosts_times_out_waiting_for_template_operation() ->
         GCPNetworkError,
         match="Timed out waiting for GCP instance template creation to finish",
     ) as exc_info:
-        handler.acquire_hosts(request, template)
+        await handler.acquire_hosts(request, template)
 
     assert exc_info.value.details == {
         "operation": "create_instance_template",
@@ -491,7 +499,8 @@ def test_mig_handler_acquire_hosts_times_out_waiting_for_template_operation() ->
     assert compute_client.created_migs == []
 
 
-def test_mig_handler_rolls_back_instance_template_when_mig_create_fails() -> None:
+@pytest.mark.asyncio
+async def test_mig_handler_rolls_back_instance_template_when_mig_create_fails() -> None:
     compute_client = _ComputeClientStub()
     compute_client.fail_create_regional_mig = True
     handler = GCPManagedInstanceGroupHandler(
@@ -522,12 +531,13 @@ def test_mig_handler_rolls_back_instance_template_when_mig_create_fails() -> Non
     )
 
     with pytest.raises(RuntimeError, match="regional mig create failed"):
-        handler.acquire_hosts(request, template)
+        await handler.acquire_hosts(request, template)
 
     assert compute_client.deleted_templates == [compute_client.created_templates[0][0]]
 
 
-def test_mig_handler_rolls_back_instance_template_when_mig_operation_fails() -> None:
+@pytest.mark.asyncio
+async def test_mig_handler_rolls_back_instance_template_when_mig_operation_fails() -> None:
     compute_client = _ComputeClientStub()
     compute_client.fail_regional_mig_operation = True
     handler = GCPManagedInstanceGroupHandler(
@@ -558,13 +568,14 @@ def test_mig_handler_rolls_back_instance_template_when_mig_operation_fails() -> 
     )
 
     with pytest.raises(RuntimeError, match="regional mig operation failed"):
-        handler.acquire_hosts(request, template)
+        await handler.acquire_hosts(request, template)
 
     assert compute_client.mig_operation_result_called is True
     assert compute_client.deleted_templates == [compute_client.created_templates[0][0]]
 
 
-def test_mig_handler_rolls_back_template_when_mig_operation_times_out() -> None:
+@pytest.mark.asyncio
+async def test_mig_handler_rolls_back_template_when_mig_operation_times_out() -> None:
     compute_client = _ComputeClientStub()
     compute_client.timeout_regional_mig_operation = True
     handler = GCPManagedInstanceGroupHandler(
@@ -598,12 +609,47 @@ def test_mig_handler_rolls_back_template_when_mig_operation_times_out() -> None:
         GCPNetworkError,
         match="Timed out waiting for GCP managed instance group creation to finish",
     ) as exc_info:
-        handler.acquire_hosts(request, template)
+        await handler.acquire_hosts(request, template)
 
     assert compute_client.mig_operation_result_called is True
     assert compute_client.deleted_templates == [compute_client.created_templates[0][0]]
     assert exc_info.value.details["operation"] == "create_mig"
     assert exc_info.value.details["timeout_seconds"] == 36
+
+
+@pytest.mark.asyncio
+async def test_mig_operation_polling_stops_when_cancelled() -> None:
+    poll_started = asyncio.Event()
+    event_loop = asyncio.get_running_loop()
+
+    class _PendingOperation:
+        name = "pending-operation"
+        poll_count = 0
+
+        def done(self) -> bool:
+            self.poll_count += 1
+            event_loop.call_soon_threadsafe(poll_started.set)
+            return False
+
+        def result(self, timeout: float | None = None) -> object:
+            raise AssertionError(f"result should not be called with timeout={timeout}")
+
+    operation = _PendingOperation()
+    wait_task = asyncio.create_task(
+        GCPManagedInstanceGroupHandler._wait_for_operation(
+            operation,
+            timeout_seconds=270,
+        )
+    )
+    await asyncio.wait_for(poll_started.wait(), timeout=1)
+
+    wait_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await wait_task
+
+    poll_count_after_cancellation = operation.poll_count
+    await asyncio.sleep(0.01)
+    assert operation.poll_count == poll_count_after_cancellation
 
 
 def test_provisioning_service_projects_failed_operations_into_fleet_errors() -> None:
@@ -1013,10 +1059,12 @@ async def test_strategy_create_instances_delegates_to_handler() -> None:
     assert strategy.initialize() is True
 
     handler = MagicMock()
-    handler.acquire_hosts.return_value = GCPCreateOutcome(
-        resource_ids=["mig-demo"],
-        instances=[],
-        provider_data={"scope": "regional"},
+    handler.acquire_hosts = AsyncMock(
+        return_value=GCPCreateOutcome(
+            resource_ids=["mig-demo"],
+            instances=[],
+            provider_data={"scope": "regional"},
+        )
     )
     strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
 
@@ -1056,10 +1104,12 @@ async def test_strategy_create_instances_normalizes_legacy_template_aliases() ->
     assert strategy.initialize() is True
 
     handler = MagicMock()
-    handler.acquire_hosts.return_value = GCPCreateOutcome(
-        resource_ids=["vm-a"],
-        instances=[],
-        provider_data={"zone": "us-central1-a"},
+    handler.acquire_hosts = AsyncMock(
+        return_value=GCPCreateOutcome(
+            resource_ids=["vm-a"],
+            instances=[],
+            provider_data={"zone": "us-central1-a"},
+        )
     )
     strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
 
@@ -1321,7 +1371,9 @@ async def test_strategy_preserves_direct_gcp_errors() -> None:
     assert strategy.initialize() is True
 
     handler = MagicMock()
-    handler.acquire_hosts.side_effect = GCPRateLimitError("rate limit exceeded", details={"quota": "api"})
+    handler.acquire_hosts = AsyncMock(
+        side_effect=GCPRateLimitError("rate limit exceeded", details={"quota": "api"})
+    )
     strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
 
     result = await strategy.execute_operation(

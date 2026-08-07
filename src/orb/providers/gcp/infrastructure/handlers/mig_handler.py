@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Protocol
 import uuid
@@ -37,6 +38,14 @@ class _GCPOperationWithName(Protocol):
         """Return the provider operation name."""
         ...
 
+    def done(self) -> bool:
+        """Refresh the operation once and report whether it completed."""
+        ...
+
+    def result(self, timeout: float | None = None) -> object:
+        """Return the completed operation result or raise its failure."""
+        ...
+
 
 class GCPManagedInstanceGroupHandler(GCPHandler):
     """Create and manage zonal or regional Managed Instance Groups."""
@@ -45,13 +54,14 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         "Delete operation submitted to GCP; completion must be confirmed by later polling."
     )
 
-    def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
+    async def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
         """Create the MIG and backing instance template for a request."""
         mig_name = template.mig_name or f"orb-mig-{template.template_id}-{uuid.uuid4().hex[:8]}"
         template_name = (
             f"{template.instance_template_name_prefix or 'orb'}-{template.template_id}-{uuid.uuid4().hex[:8]}"
         )
-        template_operation = self._compute_client.create_instance_template(
+        template_operation = await asyncio.to_thread(
+            self._compute_client.create_instance_template,
             template_name=template_name,
             body=self._build_instance_template_payload(template, template_name),
         )
@@ -59,7 +69,10 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         # the subsequent MIG create can race eventual consistency on template lookup.
         wait_timeout_seconds = self._operation_wait_timeout_seconds()
         try:
-            template_operation.result(timeout=wait_timeout_seconds)
+            await self._wait_for_operation(
+                template_operation,
+                timeout_seconds=wait_timeout_seconds,
+            )
         except FutureTimeoutError as exc:
             raise GCPNetworkError(
                 "Timed out waiting for GCP instance template creation to finish",
@@ -75,7 +88,8 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
             if template.mig_scope == GCPMIGScope.REGIONAL:
                 region = str(template.region)
                 location_context = {"region": region, "scope": template.mig_scope.value}
-                response = self._compute_client.create_regional_mig(
+                response = await asyncio.to_thread(
+                    self._compute_client.create_regional_mig,
                     region=region,
                     mig_name=mig_name,
                     body=self._build_regional_mig_payload(
@@ -87,7 +101,8 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
             else:
                 zone = str(template.zones[0])
                 location_context = {"zone": zone, "scope": template.mig_scope.value}
-                response = self._compute_client.create_zonal_mig(
+                response = await asyncio.to_thread(
+                    self._compute_client.create_zonal_mig,
                     zone=zone,
                     mig_name=mig_name,
                     body=self._build_zonal_mig_payload(
@@ -97,13 +112,16 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                     ),
                 )
         except Exception:
-            self._rollback_instance_template(template_name)
+            await self._rollback_instance_template(template_name)
             raise
 
         try:
-            response.result(timeout=wait_timeout_seconds)
+            await self._wait_for_operation(
+                response,
+                timeout_seconds=wait_timeout_seconds,
+            )
         except FutureTimeoutError as exc:
-            self._rollback_instance_template(template_name)
+            await self._rollback_instance_template(template_name)
             raise GCPNetworkError(
                 "Timed out waiting for GCP managed instance group creation to finish",
                 details={
@@ -116,7 +134,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                 },
             ) from exc
         except Exception:
-            self._rollback_instance_template(template_name)
+            await self._rollback_instance_template(template_name)
             raise
 
         provider_data: GCPProviderData = {
@@ -134,15 +152,33 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
             provider_data=provider_data,
         )
 
-    def _rollback_instance_template(self, template_name: str) -> None:
+    async def _rollback_instance_template(self, template_name: str) -> None:
         try:
-            self._compute_client.delete_instance_template(template_name=template_name)
+            await asyncio.to_thread(
+                self._compute_client.delete_instance_template,
+                template_name=template_name,
+            )
         except Exception as cleanup_exc:
             self._logger.warning(
                 "Failed to roll back orphaned instance template %s after MIG create failure: %s",
                 template_name,
                 cleanup_exc,
             )
+
+    @staticmethod
+    async def _wait_for_operation(
+        operation: _GCPOperationWithName,
+        *,
+        timeout_seconds: float,
+    ) -> None:
+        """Poll one SDK refresh at a time so cancellation stops further work."""
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                while not await asyncio.to_thread(operation.done):
+                    await asyncio.sleep(1.0)
+                await asyncio.to_thread(operation.result, timeout=0)
+        except TimeoutError as exc:
+            raise FutureTimeoutError from exc
 
     def terminate_hosts(
         self,
