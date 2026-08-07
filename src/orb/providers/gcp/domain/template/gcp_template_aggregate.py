@@ -102,6 +102,10 @@ class GCPTemplate(Template):
     @model_validator(mode="after")
     def validate_gcp_template(self) -> GCPTemplate:
         """Validate GCP-specific template semantics."""
+        if self.key_name:
+            raise ValueError(
+                "GCP does not support named SSH key pairs; key_name is unsupported"
+            )
         if self.provider_api == GCPProviderApi.MIG:
             if self.max_instances <= 0:
                 raise ValueError("MIG templates require max_instances > 0")

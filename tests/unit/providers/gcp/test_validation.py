@@ -71,6 +71,27 @@ def test_validate_gcp_template_rejects_singlevm_without_explicit_zone() -> None:
     )
 
 
+def test_validate_gcp_template_rejects_named_ssh_key_pair() -> None:
+    result = validate_gcp_template(
+        {
+            "template_id": "gcp-singlevm",
+            "provider_type": "gcp",
+            "provider_api": "SingleVM",
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "zones": ["us-central1-a"],
+            "instance_type": "e2-standard-4",
+            "max_instances": 1,
+            "key_name": "operator-key",
+            "source_image_family": "debian-12",
+            "source_image_project": "debian-cloud",
+        }
+    )
+
+    assert result["valid"] is False
+    assert any("key_name is unsupported" in error for error in result["errors"])
+
+
 def test_validate_gcp_template_rejects_boot_disk_type_reference() -> None:
     result = validate_gcp_template(
         {

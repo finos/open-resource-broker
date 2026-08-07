@@ -223,6 +223,8 @@ async def test_single_vm_handler_acquire_hosts_submits_instance_creation() -> No
             "zones": ["us-central1-a"],
             "instance_type": "e2-standard-4",
             "max_instances": 1,
+            "public_ip_assignment": True,
+            "user_data": "#!/bin/sh\necho ready",
             "source_image_family": "debian-12",
             "source_image_project": "debian-cloud",
         }
@@ -233,6 +235,12 @@ async def test_single_vm_handler_acquire_hosts_submits_instance_creation() -> No
     assert len(result.resource_ids) == 1
     assert result.provider_data["zone"] == "us-central1-a"
     assert compute_client.created_instances[0][0] == "us-central1-a"
+    instance = compute_client.created_instances[0][1]
+    assert instance.network_interfaces[0].access_configs[0].name == "External NAT"
+    assert instance.network_interfaces[0].access_configs[0].type_ == "ONE_TO_ONE_NAT"
+    assert [(item.key, item.value) for item in instance.metadata.items] == [
+        ("startup-script", "#!/bin/sh\necho ready")
+    ]
 
 
 def test_single_vm_handler_status_normalizes_compute_instance_record() -> None:
@@ -420,6 +428,8 @@ async def test_mig_handler_acquire_hosts_submits_template_and_group() -> None:
             "mig_scope": "regional",
             "instance_type": "e2-standard-4",
             "max_instances": 3,
+            "public_ip_assignment": True,
+            "user_data": "#!/bin/sh\necho ready",
             "source_image_family": "debian-12",
             "source_image_project": "debian-cloud",
         }
@@ -434,6 +444,11 @@ async def test_mig_handler_acquire_hosts_submits_template_and_group() -> None:
     assert compute_client.template_operation_result_called is True
     assert compute_client.mig_operation_result_called is True
     assert len(compute_client.created_migs) == 1
+    instance_properties = compute_client.created_templates[0][1].properties
+    assert instance_properties.network_interfaces[0].access_configs[0].name == "External NAT"
+    assert [(item.key, item.value) for item in instance_properties.metadata.items] == [
+        ("startup-script", "#!/bin/sh\necho ready")
+    ]
 
 
 @pytest.mark.asyncio

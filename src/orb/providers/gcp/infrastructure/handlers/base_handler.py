@@ -135,7 +135,24 @@ class GCPHandler(ABC):
                 subnetwork,
                 region=template.region.value,
             )
+        if template.public_ip_assignment:
+            network_interface.access_configs = [
+                compute_v1.AccessConfig(
+                    name="External NAT",
+                    type_="ONE_TO_ONE_NAT",
+                )
+            ]
         payload["network_interfaces"] = [network_interface]
+
+        if template.user_data:
+            payload["metadata"] = compute_v1.Metadata(
+                items=[
+                    compute_v1.Items(
+                        key="startup-script",
+                        value=template.user_data,
+                    )
+                ]
+            )
 
         if template.service_account_email:
             payload["service_accounts"] = [
