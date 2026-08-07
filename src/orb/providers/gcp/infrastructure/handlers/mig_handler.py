@@ -103,6 +103,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         try:
             response.result(timeout=wait_timeout_seconds)
         except FutureTimeoutError as exc:
+            self._rollback_instance_template(template_name)
             raise GCPNetworkError(
                 "Timed out waiting for GCP managed instance group creation to finish",
                 details={
