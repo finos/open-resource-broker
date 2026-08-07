@@ -1,6 +1,7 @@
 """Tests for the CycleCloud handler and related template/exception additions."""
 
 import json
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -10,6 +11,7 @@ from orb.providers.azure.domain.template.azure_template_aggregate import AzureTe
 from orb.providers.azure.exceptions.azure_exceptions import (
     CycleCloudConnectionError,
     CycleCloudNodeError,
+    QuotaExceededError,
     TerminationError,
 )
 from orb.providers.azure.infrastructure.cyclecloud_resource_id import (
@@ -113,7 +115,7 @@ def _make_async_session_context(
 def _wire_async_cyclecloud_calls(
     handler: CycleCloudHandler,
     *,
-    responses: list[dict[str, object]],
+    responses: list[Any],
     session_context=None,
 ):
     session_context = session_context or _make_async_session_context()
@@ -210,7 +212,7 @@ class TestCycleCloudHandlerAcquire:
             handler,
             session_context=session_context,
             responses=[
-                {"state": "Started"},
+                {"state": "Started", "maxCount": 100},
                 {
                     "body": {
                         "operationId": "op-123",
@@ -260,7 +262,7 @@ class TestCycleCloudHandlerAcquire:
         )
         handler._cc_request_async = AsyncMock(
             side_effect=[
-                {"state": "Started"},
+                {"state": "Started", "maxCount": 100},
                 {
                     "body": {
                         "operationId": "op-123",
@@ -290,6 +292,45 @@ class TestCycleCloudHandlerAcquire:
 
         with pytest.raises(CycleCloudNodeError, match="cluster_name is required"):
             run_operation(handler.acquire_hosts_async(request, template))
+
+    def test_acquire_hosts_rejects_count_above_live_cluster_limit(self):
+        handler = _make_handler()
+        _wire_async_cyclecloud_calls(
+            handler,
+            responses=[{"state": "Started", "maxCount": 3}],
+        )
+
+        with pytest.raises(QuotaExceededError, match=r"5 nodes.*maxCount limit of 3") as exc_info:
+            run_operation(handler.acquire_hosts_async(_make_request(count=5), _make_template()))
+
+        assert exc_info.value.details["requested_count"] == 5
+        assert exc_info.value.details["max_count"] == 3
+        assert handler._cc_request_async.await_count == 1
+
+    @pytest.mark.parametrize("max_count", [None, "10", -1, True])
+    def test_acquire_hosts_rejects_invalid_cluster_capacity_status(self, max_count):
+        handler = _make_handler()
+        _wire_async_cyclecloud_calls(
+            handler,
+            responses=[{"state": "Started", "maxCount": max_count}],
+        )
+
+        with pytest.raises(
+            CycleCloudConnectionError,
+            match=r"non-negative integer 'maxCount'",
+        ):
+            run_operation(handler.acquire_hosts_async(_make_request(), _make_template()))
+
+        assert handler._cc_request_async.await_count == 1
+
+    def test_acquire_hosts_rejects_non_object_cluster_status(self):
+        handler = _make_handler()
+        _wire_async_cyclecloud_calls(handler, responses=[["invalid"]])
+
+        with pytest.raises(CycleCloudConnectionError, match=r"must be a JSON object; got list"):
+            run_operation(handler.acquire_hosts_async(_make_request(), _make_template()))
+
+        assert handler._cc_request_async.await_count == 1
 
     def test_acquire_hosts_missing_url(self):
         """Should raise CycleCloudConnectionError if the provider URL is missing."""

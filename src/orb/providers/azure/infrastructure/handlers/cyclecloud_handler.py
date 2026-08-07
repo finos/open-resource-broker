@@ -35,6 +35,7 @@ from orb.providers.azure.exceptions.azure_exceptions import (
     CycleCloudClusterNotFoundError,
     CycleCloudConnectionError,
     CycleCloudNodeError,
+    QuotaExceededError,
     TerminationError,
 )
 from orb.providers.azure.infrastructure.credential_factory import (
@@ -115,6 +116,14 @@ class _CycleCloudAcquireRequest:
 
 
 @dataclass(frozen=True)
+class _CycleCloudClusterStatus:
+    """Validated capacity fields from the CycleCloud cluster-status response."""
+
+    state: str
+    max_count: int
+
+
+@dataclass(frozen=True)
 class _CycleCloudStatusRequest:
     """Durable request-scoped context needed for CycleCloud status checks."""
 
@@ -127,6 +136,36 @@ def _optional_text(value: Any) -> Optional[str]:
     if value in (None, ""):
         return None
     return str(value)
+
+
+def _parse_cyclecloud_cluster_status(
+    cluster_status: Any,
+    *,
+    cluster_name: str,
+) -> _CycleCloudClusterStatus:
+    """Validate the cluster-status fields used to gate node creation."""
+    if not isinstance(cluster_status, dict):
+        raise CycleCloudConnectionError(
+            "CycleCloud cluster status for "
+            f"'{cluster_name}' must be a JSON object; got "
+            f"{type(cluster_status).__name__}.",
+            details={"cluster_name": cluster_name},
+        )
+
+    max_count = cluster_status.get("maxCount")
+    if isinstance(max_count, bool) or not isinstance(max_count, int) or max_count < 0:
+        actual_type = "missing" if max_count is None else type(max_count).__name__
+        raise CycleCloudConnectionError(
+            "CycleCloud cluster status for "
+            f"'{cluster_name}' must contain a non-negative integer 'maxCount'; "
+            f"got {actual_type}.",
+            details={"cluster_name": cluster_name, "field_name": "maxCount"},
+        )
+
+    return _CycleCloudClusterStatus(
+        state=str(cluster_status.get("state") or "Unknown"),
+        max_count=max_count,
+    )
 
 
 def _first_text(node: dict[str, Any], *keys: str, default: str = "") -> str:
@@ -565,18 +604,23 @@ class CycleCloudHandler(AzureHandler):
             node_params=node_params,
         )
 
-    async def _validate_cluster_exists_async(
+    async def _get_cluster_status_async(
         self,
         *,
         cluster_name: str,
         fetch_cluster_status: Callable[[], Awaitable[dict[str, Any]]],
-    ) -> None:
-        """Async variant of CycleCloud cluster existence validation."""
+    ) -> _CycleCloudClusterStatus:
+        """Fetch and validate the live CycleCloud cluster status."""
         try:
+            cluster_status = _parse_cyclecloud_cluster_status(
+                await fetch_cluster_status(),
+                cluster_name=cluster_name,
+            )
             self._log_cluster_state(
                 cluster_name=cluster_name,
-                cluster_status=await fetch_cluster_status(),
+                cluster_status=cluster_status,
             )
+            return cluster_status
         except CycleCloudConnectionError as exc:
             if exc.details and exc.details.get("status_code") == 404:
                 raise CycleCloudClusterNotFoundError(
@@ -585,10 +629,36 @@ class CycleCloudHandler(AzureHandler):
                 ) from exc
             raise
 
-    def _log_cluster_state(self, *, cluster_name: str, cluster_status: dict[str, Any]) -> None:
+    def _log_cluster_state(
+        self,
+        *,
+        cluster_name: str,
+        cluster_status: _CycleCloudClusterStatus,
+    ) -> None:
         """Log the current CycleCloud cluster state after a successful status fetch."""
-        cluster_state = cluster_status.get("state", "Unknown")
-        self._logger.debug("CycleCloud cluster '%s' state: %s", cluster_name, cluster_state)
+        self._logger.debug("CycleCloud cluster '%s' state: %s", cluster_name, cluster_status.state)
+
+    @staticmethod
+    def _validate_cluster_capacity(
+        *,
+        request_data: _CycleCloudAcquireRequest,
+        cluster_status: _CycleCloudClusterStatus,
+    ) -> None:
+        """Reject node requests above the live cluster capacity ceiling."""
+        if request_data.count <= cluster_status.max_count:
+            return
+
+        raise QuotaExceededError(
+            f"Requested {request_data.count} nodes for CycleCloud cluster "
+            f"'{request_data.cluster_name}' exceeds its maxCount limit of "
+            f"{cluster_status.max_count}.",
+            details={
+                "cluster_name": request_data.cluster_name,
+                "node_array": request_data.node_array,
+                "requested_count": request_data.count,
+                "max_count": cluster_status.max_count,
+            },
+        )
 
     def _build_acquire_result(
         self,
@@ -769,13 +839,17 @@ class CycleCloudHandler(AzureHandler):
             client = session_context.client
             base_url = session_context.base_url
 
-            await self._validate_cluster_exists_async(
+            cluster_status = await self._get_cluster_status_async(
                 cluster_name=acquire_request.cluster_name,
                 fetch_cluster_status=lambda: self._cc_request_async(
                     client,
                     "GET",
                     f"{base_url}/clusters/{acquire_request.cluster_name}/status",
                 ),
+            )
+            self._validate_cluster_capacity(
+                request_data=acquire_request,
+                cluster_status=cluster_status,
             )
 
             try:

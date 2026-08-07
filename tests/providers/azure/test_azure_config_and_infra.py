@@ -10,6 +10,7 @@ from orb.config import PerformanceConfig
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.di.container import DIContainer
+from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
 from orb.providers.azure.configuration.validator import (
@@ -500,6 +501,79 @@ class TestTemplateExtension:
         assert defaults["placement_primary_share_percent"] == 80
         assert defaults["placement_regions"] == ["eastus2"]
         assert defaults["placement_zones"] == ["1", "2", "3"]
+
+    def test_defaults_project_all_configured_azure_fields(self):
+        ext = AzureTemplateExtensionConfig(
+            resource_group="orb-test-rg",
+            location="eastus2",
+            subscription_id="subscription-id",
+            orchestration_mode="Flexible",
+            image={
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+            },
+            eviction_policy="Delete",
+            spot_percentage=25,
+            zones=["1", "2"],
+            zone_balance=False,
+            network_config={"subnet_id": "/subscriptions/sub/resourceGroups/rg/subnets/default"},
+            security_type="TrustedLaunch",
+            custom_data="Y2xvdWQtaW5pdA==",
+            ssh_public_keys=["ssh-rsa AAAA test@host"],
+            extension_profile=[{"name": "bootstrap"}],
+            disk_encryption_set_id=(
+                "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/"
+                "diskEncryptionSets/default"
+            ),
+        )
+
+        defaults = ext.to_template_defaults()
+        expected = {
+            field_name: field_value
+            for field_name, field_value in ext.model_dump().items()
+            if field_value is not None
+        }
+
+        assert defaults == expected
+
+    def test_defaults_preserve_explicit_empty_collections(self):
+        ext = AzureTemplateExtensionConfig(
+            ssh_public_keys=[],
+            zones=[],
+            extension_profile=[],
+        )
+
+        defaults = ext.to_template_defaults()
+
+        assert defaults["ssh_public_keys"] == []
+        assert defaults["zones"] == []
+        assert defaults["extension_profile"] == []
+
+    def test_registry_defaults_apply_validated_azure_fields(self):
+        config_data = {
+            "resource_group": "orb-test-rg",
+            "location": "eastus2",
+            "image": {
+                "publisher": "Canonical",
+                "offer": "0001-com-ubuntu-server-jammy",
+                "sku": "22_04-lts-gen2",
+            },
+        }
+
+        with (
+            patch.dict(
+                TemplateExtensionRegistry._extensions,
+                {"azure": AzureTemplateExtensionConfig},
+                clear=True,
+            ),
+            patch.dict(TemplateExtensionRegistry._extension_instances, {}, clear=True),
+        ):
+            defaults = TemplateExtensionRegistry.get_extension_defaults("azure", config_data)
+
+        assert defaults["resource_group"] == "orb-test-rg"
+        assert defaults["location"] == "eastus2"
+        assert defaults["image"]["publisher"] == "Canonical"
 
 
 class TestAzureRegistration:

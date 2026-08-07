@@ -30,10 +30,6 @@ _AZURE_API_CAPABILITIES: dict[str, dict[str, Any]] = {
         "supported_fleet_types": [],
         "supports_spot": False,
         "supports_on_demand": True,
-        "requires_existing_cluster": True,
-        "required_create_fields": ["cluster_name", "node_array"],
-        "capacity_limit_source": "cluster_status.maxCount",
-        "supports_async_operations": True,
     },
 }
 

@@ -214,7 +214,9 @@ class TemplateValidationDomainService:
 
         api_capabilities = capabilities.get_feature("api_capabilities", {})
         api_caps = api_capabilities.get(template.provider_api, {})
-        max_instances = api_caps.get("max_instances", float("inf"))
+        max_instances = api_caps.get("max_instances")
+        if max_instances is None:
+            return
 
         # Accept both the renamed domain attribute (``max_machines``) and the
         # original name still used by the application ``TemplateDTO`` seam.
