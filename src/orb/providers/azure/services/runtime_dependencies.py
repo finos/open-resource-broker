@@ -57,15 +57,7 @@ class AzureRuntimeDependencies:
             if self._client is None:
                 self._logger.debug("Creating Azure client on first access")
                 if self._azure_client_resolver:
-                    try:
-                        self._client = self._azure_client_resolver()
-                    except Exception as exc:
-                        self._logger.warning(
-                            "Failed to resolve AzureClient lazily: %s",
-                            exc,
-                            exc_info=True,
-                        )
-                        self._client = None
+                    self._client = self._azure_client_resolver()
                 else:
                     self._logger.warning("AzureClient resolver not provided")
             return self._client
@@ -76,15 +68,7 @@ class AzureRuntimeDependencies:
         with self._lock:
             azure_client = self.azure_client
             if self._resource_manager is None and self._azure_resource_manager_resolver is not None:
-                try:
-                    self._resource_manager = self._azure_resource_manager_resolver()
-                except Exception as exc:
-                    self._logger.warning(
-                        "Failed to resolve AzureResourceManager lazily: %s",
-                        exc,
-                        exc_info=True,
-                    )
-                    self._resource_manager = None
+                self._resource_manager = self._azure_resource_manager_resolver()
             if self._resource_manager is None and azure_client:
                 self._logger.debug("Creating Azure resource manager on first access")
                 from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
@@ -105,15 +89,7 @@ class AzureRuntimeDependencies:
                 self._deployment_service is None
                 and self._azure_deployment_service_resolver is not None
             ):
-                try:
-                    self._deployment_service = self._azure_deployment_service_resolver()
-                except Exception as exc:
-                    self._logger.warning(
-                        "Failed to resolve AzureDeploymentService lazily: %s",
-                        exc,
-                        exc_info=True,
-                    )
-                    self._deployment_service = None
+                self._deployment_service = self._azure_deployment_service_resolver()
             if self._deployment_service is None and azure_client:
                 from orb.providers.azure.infrastructure.services.azure_deployment_service import (
                     AzureDeploymentService,
@@ -133,17 +109,8 @@ class AzureRuntimeDependencies:
                 return self._handler_factory
 
             if self._azure_handler_factory_resolver is not None:
-                try:
-                    self._handler_factory = self._azure_handler_factory_resolver()
-                    return self._handler_factory
-                except Exception as exc:
-                    self._logger.warning(
-                        "Failed to resolve AzureHandlerFactory lazily: %s",
-                        exc,
-                        exc_info=True,
-                    )
-                    self._handler_factory = None
-                    return None
+                self._handler_factory = self._azure_handler_factory_resolver()
+                return self._handler_factory
 
             azure_client = self.azure_client
             if azure_client is None:

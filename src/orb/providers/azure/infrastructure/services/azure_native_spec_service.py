@@ -67,12 +67,16 @@ class AzureNativeSpecService:
 
         native_config = self.config_port.get_native_spec_config() or {}
         merge_mode = native_config.get("merge_mode", "merge")
+        if merge_mode not in {"merge", "replace"}:
+            raise AzureValidationError(
+                "Azure native spec merge_mode must be 'merge' or 'replace'",
+                details={"merge_mode": merge_mode},
+                error_code="InvalidNativeSpecMergeMode",
+            )
 
         if merge_mode == "replace":
             return rendered_native_spec
-        if merge_mode == "merge":
-            return deep_merge(default_payload, rendered_native_spec)
-        return rendered_native_spec
+        return deep_merge(default_payload, rendered_native_spec)
 
     def _resolve_provider_api_spec(self, template: AzureTemplate) -> Optional[dict[str, Any]]:
         """Resolve provider API spec from inline data or file path."""
@@ -102,7 +106,24 @@ class AzureNativeSpecService:
                 "Azure native spec file paths must be relative and must not contain '..'"
             )
 
-        resolved_base_path = Path(base_path).resolve()
+        configured_base_path = Path(base_path).expanduser()
+        if not configured_base_path.is_absolute():
+            root_dir = self.config_port.get_root_dir()
+            if not root_dir:
+                raise AzureValidationError(
+                    "Azure native spec relative base paths require a configured ORB root directory",
+                    error_code="InvalidNativeSpecBasePath",
+                )
+            configured_root = Path(root_dir).expanduser()
+            if not configured_root.is_absolute():
+                raise AzureValidationError(
+                    "Azure native spec ORB root directory must be an absolute path",
+                    details={"root_dir": root_dir},
+                    error_code="InvalidNativeSpecBasePath",
+                )
+            configured_base_path = configured_root / configured_base_path
+
+        resolved_base_path = configured_base_path.resolve()
         resolved_spec_path = (resolved_base_path / requested_path).resolve()
         if not resolved_spec_path.is_relative_to(resolved_base_path):
             raise AzureValidationError(

@@ -11,11 +11,15 @@ import pytest
 
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
-from orb.providers.azure.exceptions.azure_exceptions import AzureValidationError
+from orb.providers.azure.exceptions.azure_exceptions import (
+    AuthenticationError,
+    AzureValidationError,
+)
 from orb.providers.azure.infrastructure.services.spot_placement_score_adapter import (
     AzureSpotPlacementScoreAdapter,
     SpotPlacementScoreLookup,
 )
+from orb.providers.azure.services.runtime_dependencies import AzureRuntimeDependencies
 from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from orb.providers.base.strategy import (
     ProviderOperation,
@@ -33,6 +37,38 @@ class TestInitialization:
                 logger=logger,
                 provider_instance_name="azure-default",
             )
+
+    @pytest.mark.parametrize(
+        ("resolver_name", "read_dependency"),
+        [
+            ("azure_client_resolver", lambda runtime: runtime.azure_client),
+            ("azure_resource_manager_resolver", lambda runtime: runtime.resource_manager),
+            ("azure_deployment_service_resolver", lambda runtime: runtime.deployment_service),
+            ("azure_handler_factory_resolver", lambda runtime: runtime.handler_factory),
+        ],
+    )
+    def test_runtime_dependency_resolver_errors_propagate(
+        self,
+        azure_config,
+        logger,
+        resolver_name,
+        read_dependency,
+    ):
+        def fail_resolution():
+            raise AuthenticationError("credential rejected")
+
+        resolver_kwargs: dict[str, Any] = {
+            "azure_client_resolver": lambda: MagicMock(),
+            resolver_name: fail_resolution,
+        }
+        runtime = AzureRuntimeDependencies(
+            config=azure_config,
+            logger=logger,
+            **resolver_kwargs,
+        )
+
+        with pytest.raises(AuthenticationError, match="credential rejected"):
+            read_dependency(runtime)
 
     def test_not_initialized_returns_error(self, azure_config, logger):
         s = AzureProviderStrategy(

@@ -7,6 +7,7 @@ import pytest
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions.azure_exceptions import (
+    AuthenticationError,
     AzureValidationError,
     TerminationError,
 )
@@ -24,6 +25,7 @@ from orb.providers.azure.services.spot_placement_planner import (
     PlacementPlanEntry,
     PlacementScore,
 )
+from orb.providers.azure.strategy.azure_provider_strategy import AzureProviderStrategy
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from tests.providers.azure.strategy_test_support import build_strategy_harness, run_operation
 
@@ -64,6 +66,40 @@ class TestCreateInstances:
 
         assert not result.success
         assert result.error_code == "HANDLER_NOT_FOUND"
+
+    def test_handler_factory_auth_failure_is_not_relabelled_as_missing_handler(
+        self,
+        azure_config,
+        logger,
+    ):
+        def fail_handler_factory():
+            raise AuthenticationError("credential rejected")
+
+        strategy = AzureProviderStrategy(
+            config=azure_config,
+            logger=logger,
+            provider_instance_name="azure-default",
+            azure_handler_factory_resolver=fail_handler_factory,
+        )
+        strategy.initialize()
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "template_config": {
+                    "template_id": "azure-auth-failure",
+                    "provider_api": "VMSS",
+                },
+                "count": 1,
+            },
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "AuthenticationError"
+        assert "credential rejected" in result.error_message
+        assert result.metadata["error_class"] == "AuthenticationError"
+        assert result.metadata["provider_error"]["provider_type"] == "azure"
 
     def test_dry_run_short_circuits_before_handler(self, azure_config, logger):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)

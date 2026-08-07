@@ -108,8 +108,36 @@ def test_process_provider_api_spec_with_merge_replace_mode_replaces_default():
     assert result == {"location": "westus2"}
 
 
+def test_process_provider_api_spec_rejects_unknown_merge_mode():
+    config_port = Mock()
+    config_port.get_native_spec_config.return_value = {
+        "enabled": True,
+        "merge_mode": "overwrite",
+    }
+    config_port.get_package_info.return_value = {"name": "orb", "version": "1.0.0"}
+    spec_renderer = Mock()
+    spec_renderer.render_spec.return_value = {"location": "westus2"}
+    service = AzureNativeSpecService(
+        NativeSpecService(config_port, spec_renderer, Mock()),
+        config_port,
+    )
+
+    with pytest.raises(
+        AzureValidationError,
+        match="merge_mode must be 'merge' or 'replace'",
+    ) as error:
+        service.process_provider_api_spec_with_merge(
+            _make_template(provider_api_spec={"location": "{{ location }}"}),
+            _make_request(),
+            {"location": "eastus2"},
+        )
+
+    assert error.value.error_code == "InvalidNativeSpecMergeMode"
+
+
 def test_load_spec_file_uses_typed_provider_config_extensions_path():
     config_port = Mock()
+    config_port.get_root_dir.return_value = str(Path.cwd())
     config_port.get_provider_config.return_value = _make_provider_config(
         azure_extensions={"native_spec": {"spec_file_base_path": "config/specs/azure"}}
     )
@@ -129,6 +157,29 @@ def test_load_spec_file_uses_typed_provider_config_extensions_path():
         assert result == {"location": "eastus2"}
         expected_path = Path("config/specs/azure/vmss.json").resolve()
         mock_read.assert_called_once_with(str(expected_path))
+
+
+def test_load_spec_file_resolves_default_base_from_orb_root_not_process_cwd(
+    tmp_path,
+    monkeypatch,
+):
+    orb_root = tmp_path / "orb-root"
+    spec_file = orb_root / "specs" / "azure" / "vmss.json"
+    spec_file.parent.mkdir(parents=True)
+    spec_file.write_text('{"location": "eastus2"}', encoding="utf-8")
+    launch_directory = tmp_path / "launch-directory"
+    launch_directory.mkdir()
+    monkeypatch.chdir(launch_directory)
+
+    config_port = Mock()
+    config_port.get_provider_config.return_value = _make_provider_config()
+    config_port.get_root_dir.return_value = str(orb_root)
+    service = AzureNativeSpecService(
+        NativeSpecService(config_port, Mock(), Mock()),
+        config_port,
+    )
+
+    assert service._load_spec_file("vmss.json") == {"location": "eastus2"}
 
 
 def test_load_spec_file_accepts_nested_file_inside_configured_base(tmp_path):
