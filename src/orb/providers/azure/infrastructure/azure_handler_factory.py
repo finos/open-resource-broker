@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
         AzureNativeSpecService,
     )
-    from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
 
 
 @injectable
@@ -30,13 +29,11 @@ class AzureHandlerFactory:
         azure_client: AzureClient,
         logger: LoggingPort,
         azure_native_spec_service: "AzureNativeSpecService | None" = None,
-        azure_resource_manager: "AzureResourceManager | None" = None,
     ) -> None:
         """Initialize the factory with an Azure client and register handler classes."""
         self._azure_client = azure_client
         self._logger = logger
         self._azure_native_spec_service = azure_native_spec_service
-        self._azure_resource_manager = azure_resource_manager
         self._lock = RLock()
         self._handlers: dict[AzureProviderApi, AzureHandler] = {}
         self._handler_classes: dict[AzureProviderApi, type[AzureHandler]] = {}
@@ -89,7 +86,6 @@ class AzureHandlerFactory:
                     azure_client=self._azure_client,
                     logger=self._logger,
                     azure_native_spec_service=self._azure_native_spec_service,
-                    azure_resource_manager=self._azure_resource_manager,
                 )
             else:
                 from orb.providers.azure.infrastructure.handlers.cyclecloud_handler import (

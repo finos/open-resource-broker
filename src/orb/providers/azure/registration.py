@@ -377,19 +377,12 @@ def _register_azure_components_with_di(
         from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
             AzureNativeSpecService,
         )
-        from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
 
         azure_client = container_instance.get(f"AzureClient_{instance_name}")
-        logger_port = container_instance.get(LoggingPort)
         return AzureHandlerFactory(
             azure_client=azure_client,
-            logger=logger_port,
+            logger=container_instance.get(LoggingPort),
             azure_native_spec_service=container_instance.get_optional(AzureNativeSpecService),
-            azure_resource_manager=AzureResourceManager(
-                azure_client=azure_client,
-                config=azure_config,
-                logger=logger_port,
-            ),
         )
 
     container.register_factory(

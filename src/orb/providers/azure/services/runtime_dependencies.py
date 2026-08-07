@@ -157,7 +157,6 @@ class AzureRuntimeDependencies:
                 azure_client=azure_client,
                 logger=self._logger,
                 azure_native_spec_service=self._azure_native_spec_service,
-                azure_resource_manager=self.resource_manager,
             )
             return self._handler_factory
 

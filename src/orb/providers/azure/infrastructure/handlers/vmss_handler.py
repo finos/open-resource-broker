@@ -72,7 +72,6 @@ if TYPE_CHECKING:
     from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
         AzureNativeSpecService,
     )
-    from orb.providers.azure.managers.azure_resource_manager import AzureResourceManager
 
 
 def _status_attr(status: Any, attr: str, default: Any = None) -> Any:
@@ -174,12 +173,10 @@ class VMSSHandler(AzureHandler):
         logger: LoggingPort,
         *,
         azure_native_spec_service: AzureNativeSpecService | None = None,
-        azure_resource_manager: AzureResourceManager | None = None,
     ) -> None:
         """Initialize handler with explicit optional infrastructure services."""
         super().__init__(azure_client=azure_client, logger=logger)
         self.azure_native_spec_service = azure_native_spec_service
-        self.azure_resource_manager = azure_resource_manager
 
     async def acquire_hosts_async(
         self, request: Request, template: AzureTemplate
