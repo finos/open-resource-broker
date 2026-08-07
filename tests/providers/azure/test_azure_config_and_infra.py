@@ -504,6 +504,25 @@ class TestTemplateExtension:
         assert defaults["placement_regions"] == ["eastus2"]
         assert defaults["placement_zones"] == ["1", "2", "3"]
 
+    @pytest.mark.parametrize("primary_share_percent", [0, 100])
+    def test_primary_share_percent_accepts_percentage_endpoints(
+        self,
+        primary_share_percent: int,
+    ):
+        extension = AzureTemplateExtensionConfig(
+            placement_primary_share_percent=primary_share_percent
+        )
+
+        assert extension.placement_primary_share_percent == primary_share_percent
+
+    @pytest.mark.parametrize("primary_share_percent", [-1, 101])
+    def test_primary_share_percent_rejects_values_outside_percentage_range(
+        self,
+        primary_share_percent: int,
+    ):
+        with pytest.raises(ValueError):
+            AzureTemplateExtensionConfig(placement_primary_share_percent=primary_share_percent)
+
     def test_defaults_project_all_configured_azure_fields(self):
         ext = AzureTemplateExtensionConfig(
             resource_group="orb-test-rg",

@@ -81,7 +81,10 @@ class AzureTemplateExtensionConfig(ProviderTemplateExtensionBase):
         default=None, description="How Spot Placement Score launches split capacity"
     )
     placement_primary_share_percent: Optional[int] = Field(
-        default=None, description="Capacity percentage assigned to the top placement candidate"
+        default=None,
+        ge=0,
+        le=100,
+        description="Capacity percentage assigned to the top placement candidate",
     )
     placement_regions: Optional[list[str]] = Field(
         default=None, description="Azure regions considered for Spot Placement Score planning"
