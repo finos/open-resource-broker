@@ -26,19 +26,11 @@ class GCPValidationAdapter(BaseProviderValidationAdapter):
 
     def validate_provider_api(self, api: str) -> bool:
         """Report whether the requested GCP provider API is supported."""
-        try:
-            return api in set(get_supported_apis())
-        except Exception as exc:
-            self._logger.error("Error validating GCP provider API %s: %s", api, exc)
-            return api in {"MIG", "SingleVM"}
+        return api in get_supported_apis()
 
     def get_supported_provider_apis(self) -> list[str]:
         """List supported GCP provider APIs."""
-        try:
-            return sorted(get_supported_apis())
-        except Exception as exc:
-            self._logger.error("Error getting supported GCP APIs: %s", exc)
-            return ["MIG", "SingleVM"]
+        return sorted(get_supported_apis())
 
     @staticmethod
     def get_api_capabilities(api: str) -> dict[str, Any]:
