@@ -33,7 +33,7 @@ class GCPHandler(ABC):
         self._logger = logger
 
     @abstractmethod
-    def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
+    async def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
         """Create capacity for the request."""
 
     @abstractmethod

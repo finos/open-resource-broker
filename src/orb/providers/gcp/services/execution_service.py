@@ -15,9 +15,9 @@ class GCPExecutionService:
     """Dispatch typed GCP contexts to the resolved handler methods."""
 
     @staticmethod
-    def execute_create(context: GCPCreateOperationContext) -> GCPCreateOutcome:
+    async def execute_create(context: GCPCreateOperationContext) -> GCPCreateOutcome:
         """Execute a create operation through the resolved handler."""
-        return context.handler.acquire_hosts(context.request, context.template)
+        return await context.handler.acquire_hosts(context.request, context.template)
 
     @staticmethod
     def execute_terminate(context: GCPMutationOperationContext) -> GCPMutationOutcome:

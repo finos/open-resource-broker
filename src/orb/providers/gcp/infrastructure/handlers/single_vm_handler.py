@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from typing import TYPE_CHECKING, Callable
 
@@ -33,7 +34,7 @@ except ImportError:  # pragma: no cover - exercised only when optional sdk deps 
 class GCPSingleVMHandler(GCPHandler):
     """Create and manage standalone Compute Engine instances."""
 
-    def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
+    async def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
         """Create the requested number of standalone VM instances."""
         zone = self._template_zone(template)
         instances: list[GCPInstanceStatus] = []
@@ -44,7 +45,8 @@ class GCPSingleVMHandler(GCPHandler):
             instance_name = f"gcp-{template.template_id}-{uuid.uuid4().hex[:8]}"
             payload = self._build_instance_payload(instance_name, template)
             try:
-                operation = self._compute_client.create_instance(
+                operation = await asyncio.to_thread(
+                    self._compute_client.create_instance,
                     zone=zone,
                     body=payload,
                 )

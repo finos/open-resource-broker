@@ -171,14 +171,15 @@ class GCPProviderStrategy(ProviderStrategy):
         start_time = time.time()
         is_dry_run = bool(operation.context and operation.context.get("dry_run", False))
         try:
-            # google-cloud-compute exposes only synchronous REST clients in the
-            # supported v1 SDK, so the async provider contract is bridged here by
-            # isolating the full sync execution path on a worker thread.
-            result = await asyncio.to_thread(
-                self._execute_operation_internal,
-                operation,
-                is_dry_run,
-            )
+            if operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
+                result = await self._execute_create_operation(operation, is_dry_run)
+            else:
+                # Non-create operations contain one bounded synchronous SDK call.
+                result = await asyncio.to_thread(
+                    self._execute_operation_internal,
+                    operation,
+                    is_dry_run,
+                )
             execution_time_ms = int((time.time() - start_time) * 1000)
             return result.model_copy(
                 update={
@@ -229,6 +230,19 @@ class GCPProviderStrategy(ProviderStrategy):
                 }
             )
 
+    async def _execute_create_operation(
+        self,
+        operation: ProviderOperation,
+        is_dry_run: bool,
+    ) -> ProviderResult:
+        """Execute cancellable create orchestration on the event loop."""
+        if is_dry_run:
+            from orb.providers.gcp.infrastructure.dry_run_adapter import gcp_dry_run_context
+
+            with gcp_dry_run_context():
+                return await self._handle_create_instances(operation)
+        return await self._handle_create_instances(operation)
+
     def _execute_operation_internal(
         self,
         operation: ProviderOperation,
@@ -243,8 +257,6 @@ class GCPProviderStrategy(ProviderStrategy):
 
     def _execute_operation_internal_sync(self, operation: ProviderOperation) -> ProviderResult:
         op = operation.operation_type
-        if op == ProviderOperationType.CREATE_INSTANCES:
-            return self._handle_create_instances(operation)
         if op == ProviderOperationType.TERMINATE_INSTANCES:
             return self._handle_terminate_instances(operation)
         if op == ProviderOperationType.GET_INSTANCE_STATUS:
@@ -286,11 +298,11 @@ class GCPProviderStrategy(ProviderStrategy):
             f"Unsupported operation: {operation.operation_type}", "UNSUPPORTED_OPERATION"
         )
 
-    def _handle_create_instances(self, operation: ProviderOperation) -> ProviderResult:
+    async def _handle_create_instances(self, operation: ProviderOperation) -> ProviderResult:
         create_context = self._get_operation_context_service().build_create_context(operation)
         if bool(operation.context and operation.context.get("dry_run", False)):
             return self._provisioning_service.create_instances_dry_run_result(context=create_context)
-        outcome = self._execution_service.execute_create(create_context)
+        outcome = await self._execution_service.execute_create(create_context)
         return self._provisioning_service.build_provider_result(
             context=create_context,
             outcome=outcome,
