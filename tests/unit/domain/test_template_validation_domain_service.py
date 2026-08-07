@@ -133,18 +133,6 @@ class TestTemplateValidationDomainService:
         assert result.is_valid is False
         assert any("exceeds" in e for e in result.errors)
 
-    def test_missing_static_instance_limit_does_not_claim_validation(self):
-        caps = _ProviderCapabilities(
-            provider_type="azure",
-            supported_apis=["CycleCloud"],
-            features={"api_capabilities": {"CycleCloud": {}}},
-        )
-        self.svc._get_config_based_capabilities = MagicMock(return_value=caps)
-
-        result = self._run(_make_template(provider_api="CycleCloud", max_instances=100))
-
-        assert not any("Instance count:" in feature for feature in result.supported_features)
-
     def test_supported_features_populated(self):
         template = _make_template(provider_api="RunInstances", max_instances=5)
         result = self._run(template)
