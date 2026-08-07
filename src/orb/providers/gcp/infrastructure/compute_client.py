@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 from orb.providers.gcp.configuration.config import GCPProviderConfig
-from orb.providers.gcp.exceptions import GCPDryRunBlockedError
+from orb.providers.gcp.exceptions import GCPConfigurationError, GCPDryRunBlockedError
 from orb.providers.gcp.types import GCPInstanceRecord, GCPManagedInstanceRecord
 
 if TYPE_CHECKING:
@@ -391,7 +391,7 @@ class GCPComputeClient:
             from google.api_core import exceptions as google_exceptions
             from google.api_core.retry import Retry, if_exception_type
         except ImportError as exc:
-            raise RuntimeError(
+            raise GCPConfigurationError(
                 "google-api-core is required for GCP retry configuration"
             ) from exc
 
@@ -445,7 +445,7 @@ class GCPComputeClient:
         try:
             from google.cloud import compute_v1
         except ImportError as exc:
-            raise RuntimeError(
+            raise GCPConfigurationError(
                 "google-cloud-compute is required for the GCP provider runtime"
             ) from exc
         return compute_v1

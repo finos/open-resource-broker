@@ -96,8 +96,6 @@ def translate_gcp_exception(
     mapped_error = _translate_google_api_exception(exc, message, translated_details)
     if mapped_error is not None:
         return mapped_error
-    if isinstance(exc, RuntimeError) and "required for gcp" in message.lower():
-        return GCPConfigurationError(message, details=translated_details)
     return GCPInfrastructureError(message, details=translated_details)
 
 
