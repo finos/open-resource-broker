@@ -268,11 +268,11 @@ class AzureSpotLaunchService:
         raw_result: Mapping[str, Any],
     ) -> dict[str, Any]:
         result = dict(raw_result)
-        if "fulfilled_count" in result:
+        if result.get("success") is not True:
+            result["fulfilled_count"] = 0
             return result
 
-        if not result.get("success", True):
-            result["fulfilled_count"] = 0
+        if "fulfilled_count" in result:
             return result
 
         if provider_api_key == "CycleCloud":

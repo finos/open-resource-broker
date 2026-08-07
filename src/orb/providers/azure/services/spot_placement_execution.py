@@ -212,19 +212,41 @@ class SpotPlacementExecutionService:
         raw_result: Mapping[str, Any],
     ) -> dict[str, Any]:
         result = dict(raw_result)
-        success = result.get("success", True)
         error_message = result.get("error_message")
+        raw_success = result.get("success")
+        if "success" not in result:
+            success = False
+            success_contract_valid = False
+            error_message = (
+                error_message or "Child launch result is missing required 'success' field"
+            )
+        elif not isinstance(raw_success, bool):
+            success = False
+            success_contract_valid = False
+            error_message = error_message or "Child launch result field 'success' must be a boolean"
+        else:
+            success = raw_success
+            success_contract_valid = True
         resource_ids = result.get("resource_ids", [])
         instances = result.get("instances", [])
         provider_data = result.get("provider_data") or {}
         raw_fulfilled_count = result.get("fulfilled_count")
-        if success:
+        if not success_contract_valid:
+            fulfilled_count = 0
+        elif success:
             fulfilled_count = (
                 requested_count if raw_fulfilled_count is None else int(raw_fulfilled_count)
             )
         else:
             fulfilled_count = 0 if raw_fulfilled_count is None else int(raw_fulfilled_count)
         fulfilled_count = min(max(fulfilled_count, 0), requested_count)
+        if success and fulfilled_count < requested_count and not error_message:
+            error_message = (
+                f"Child launch for '{plan_entry.score.candidate.candidate_id}' fulfilled "
+                f"{fulfilled_count} of {requested_count} requested instances"
+            )
+        elif not success and not error_message:
+            error_message = "Child launch reported failure without an error message"
 
         return {
             "candidate_id": plan_entry.score.candidate.candidate_id,
