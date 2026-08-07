@@ -1051,6 +1051,47 @@ async def test_strategy_create_instances_delegates_to_handler() -> None:
 
 
 @pytest.mark.asyncio
+async def test_strategy_create_instances_normalizes_legacy_template_aliases() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock())
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.acquire_hosts.return_value = GCPCreateOutcome(
+        resource_ids=["vm-a"],
+        instances=[],
+        provider_data={"zone": "us-central1-a"},
+    )
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "count": 1,
+                "template_config": {
+                    "template_id": "gcp-single",
+                    "provider_api": "SingleVM",
+                    "project_id": "orb-example-12345",
+                    "region": "us-central1",
+                    "zones": ["us-central1-a"],
+                    "machine_type": "e2-standard-8",
+                    "root_device_volume_size": 50,
+                    "volume_type": "pd-ssd",
+                    "source_image_family": "debian-12",
+                    "source_image_project": "debian-cloud",
+                },
+            },
+        )
+    )
+
+    assert result.success is True
+    template = handler.acquire_hosts.call_args.args[1]
+    assert template.instance_type == "e2-standard-8"
+    assert template.boot_disk_size_gb == 50
+    assert template.boot_disk_type.value == "pd-ssd"
+
+
+@pytest.mark.asyncio
 async def test_strategy_describe_resource_instances_emits_provider_fulfilment() -> None:
     strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
     assert strategy.initialize() is True
