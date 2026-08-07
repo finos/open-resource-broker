@@ -59,6 +59,14 @@ def test_validate_provider_api_does_not_accept_dead_config_only_api_names():
     assert adapter.validate_provider_api("AzureFleet") is False
 
 
+def test_cyclecloud_capabilities_only_advertise_consumed_static_contracts():
+    assert AzureValidationAdapter.get_api_capabilities("CycleCloud") == {
+        "supported_fleet_types": [],
+        "supports_spot": False,
+        "supports_on_demand": True,
+    }
+
+
 def test_validate_template_configuration_rejects_spot_percentage_for_uniform():
     adapter = AzureValidationAdapter(config=AzureProviderConfig(), logger=MagicMock())
 

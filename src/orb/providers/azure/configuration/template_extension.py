@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from orb.providers.azure.domain.template.value_objects import (
     AzureAllocationStrategy,
@@ -23,16 +23,17 @@ from orb.providers.azure.domain.template.value_objects import (
     AzureVMSSOrchestrationMode,
 )
 from orb.providers.azure.services.spot_placement_planner import PlacementSplitStrategy
+from orb.providers.base.template_extension import ProviderTemplateExtensionBase
 
 
-class AzureTemplateExtensionConfig(BaseModel):
+class AzureTemplateExtensionConfig(ProviderTemplateExtensionBase):
     """Azure-specific template extension defaults.
 
     Registered with ``TemplateExtensionRegistry`` so the template factory
     can apply Azure defaults when ``provider_type == "azure"``.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     # Azure DTO-only fields preserved by TemplateDTO.provider_config round-trips.
     resource_group: Optional[AzureResourceGroupName] = Field(
@@ -177,30 +178,11 @@ class AzureTemplateExtensionConfig(BaseModel):
     )
 
     def to_template_defaults(self) -> dict[str, Any]:
-        """Convert extension to a dict of default values for template creation."""
-        defaults: dict[str, Any] = {
-            "priority": self.priority,
-            "admin_username": self.admin_username,
-            "node_attributes": self.node_attributes,
-        }
-        if self.vm_size:
-            defaults["vm_size"] = self.vm_size
-        if self.vm_sizes:
-            defaults["vm_sizes"] = self.vm_sizes
-        if self.vm_size_preferences:
-            defaults["vm_size_preferences"] = self.vm_size_preferences
-        if self.vmss_allocation_strategy:
-            defaults["vmss_allocation_strategy"] = self.vmss_allocation_strategy
-        if self.spot_placement_score_enabled is not None:
-            defaults["spot_placement_score_enabled"] = self.spot_placement_score_enabled
-        if self.placement_split_strategy:
-            defaults["placement_split_strategy"] = self.placement_split_strategy
-        if self.placement_primary_share_percent is not None:
-            defaults["placement_primary_share_percent"] = self.placement_primary_share_percent
-        if self.placement_regions:
-            defaults["placement_regions"] = self.placement_regions
-        if self.placement_zones:
-            defaults["placement_zones"] = self.placement_zones
+        """Project every configured field, normalising legacy OS disk settings."""
+        defaults = super().to_template_defaults()
+        defaults.pop("os_disk_type", None)
+        defaults.pop("os_disk_size_gb", None)
+
         if self.os_disk is not None:
             defaults["os_disk"] = self.os_disk.model_dump(mode="json", exclude_none=True)
         elif self.os_disk_type is not None or self.os_disk_size_gb is not None:
