@@ -11,7 +11,9 @@ from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
 from orb.providers.azure.domain.template.value_objects import (
     AzureAllocationStrategy,
+    AzureCapacityReservationGroupId,
     AzureDataDisk,
+    AzureDiskEncryptionSetId,
     AzureEvictionPolicy,
     AzureImageReference,
     AzureNetworkConfig,
@@ -19,6 +21,7 @@ from orb.providers.azure.domain.template.value_objects import (
     AzureOSDiskType,
     AzurePriority,
     AzureProviderApi,
+    AzureProximityPlacementGroupId,
     AzureVMSSOrchestrationMode,
 )
 from orb.providers.azure.exceptions import AzureValidationError
@@ -601,6 +604,50 @@ class TestArmPayload:
 
 
 class TestValueObjects:
+    @pytest.mark.parametrize(
+        ("resource_id_type", "resource_type"),
+        [
+            (AzureProximityPlacementGroupId, "proximityPlacementGroups"),
+            (AzureCapacityReservationGroupId, "capacityReservationGroups"),
+            (AzureDiskEncryptionSetId, "diskEncryptionSets"),
+        ],
+    )
+    def test_arm_resource_id_accepts_exact_resource_group_scoped_shape(
+        self,
+        resource_id_type,
+        resource_type,
+    ):
+        value = (
+            "/SUBSCRIPTIONS/sub/RESOURCEGROUPS/rg/PROVIDERS/"
+            f"MICROSOFT.COMPUTE/{resource_type}/resource-1"
+        )
+
+        resource_id = resource_id_type.model_validate(value)
+
+        assert str(resource_id) == value
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/diskEncryptionSets/",
+            "/subscriptions/sub/providers/Microsoft.Compute/diskEncryptionSets/des-1",
+            "/subscriptions/sub/resourceGroups/rg/providers/Contoso/widgets/widget-1/"
+            "providers/Microsoft.Compute/diskEncryptionSets/des-1",
+            "/subscriptions/sub/resourceGroups/rg/providers/"
+            "Microsoft.Compute/diskEncryptionSets/des-1/children/child-1",
+            "/subscriptions//resourceGroups/rg/providers/"
+            "Microsoft.Compute/diskEncryptionSets/des-1",
+            "/subscriptions/sub/resourceGroups//providers/"
+            "Microsoft.Compute/diskEncryptionSets/des-1",
+        ],
+    )
+    def test_arm_resource_id_rejects_invalid_structure(self, value):
+        with pytest.raises(
+            ValidationError,
+            match="complete resource-group-scoped ARM resource ID",
+        ):
+            AzureDiskEncryptionSetId.model_validate(value)
+
     def test_image_reference_marketplace(self):
         img = AzureImageReference(
             publisher="Canonical",

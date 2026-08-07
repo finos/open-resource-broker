@@ -227,38 +227,77 @@ class AzureLocationName(AzureStringValue):
 class AzureArmResourceId(AzureStringValue):
     """Base class for Azure ARM resource identifiers."""
 
-    expected_segment: ClassVar[Optional[str]] = None
+    expected_provider_namespace: ClassVar[Optional[str]] = None
+    expected_resource_type: ClassVar[Optional[str]] = None
 
     @classmethod
     def _validate_normalised(cls, value: str) -> None:
-        """Validate Azure ARM resource ID format."""
-        casefolded_value = value.casefold()
-        if not casefolded_value.startswith("/subscriptions/"):
-            raise ValueError(f"{cls.__name__} must be a full ARM resource ID")
-        if "/providers/" not in casefolded_value:
-            raise ValueError(f"{cls.__name__} must include an Azure provider segment")
+        """Validate one resource-group-scoped ARM resource ID."""
+        parts = value.split("/")
+        if len(parts) != 9 or parts[0]:
+            raise ValueError(
+                f"{cls.__name__} must be a complete resource-group-scoped ARM resource ID"
+            )
 
-        expected_segment = cls.expected_segment.casefold() if cls.expected_segment else None
-        if expected_segment and expected_segment not in casefolded_value:
-            raise ValueError(f"{cls.__name__} must reference '{cls.expected_segment}'")
+        (
+            _,
+            subscriptions_segment,
+            subscription_id,
+            resource_groups_segment,
+            resource_group,
+            providers_segment,
+            provider_namespace,
+            resource_type,
+            resource_name,
+        ) = parts
+        if (
+            subscriptions_segment.casefold() != "subscriptions"
+            or resource_groups_segment.casefold() != "resourcegroups"
+            or providers_segment.casefold() != "providers"
+            or not subscription_id
+            or not resource_group
+            or not provider_namespace
+            or not resource_type
+            or not resource_name
+        ):
+            raise ValueError(
+                f"{cls.__name__} must be a complete resource-group-scoped ARM resource ID"
+            )
+
+        if (
+            cls.expected_provider_namespace
+            and provider_namespace.casefold() != cls.expected_provider_namespace.casefold()
+        ):
+            raise ValueError(
+                f"{cls.__name__} must reference provider '{cls.expected_provider_namespace}'"
+            )
+        if cls.expected_resource_type and (
+            resource_type.casefold() != cls.expected_resource_type.casefold()
+        ):
+            raise ValueError(
+                f"{cls.__name__} must reference resource type '{cls.expected_resource_type}'"
+            )
 
 
 class AzureProximityPlacementGroupId(AzureArmResourceId):
     """ARM resource ID for an Azure proximity placement group."""
 
-    expected_segment = "/providers/Microsoft.Compute/proximityPlacementGroups/"
+    expected_provider_namespace = "Microsoft.Compute"
+    expected_resource_type = "proximityPlacementGroups"
 
 
 class AzureCapacityReservationGroupId(AzureArmResourceId):
     """ARM resource ID for an Azure capacity reservation group."""
 
-    expected_segment = "/providers/Microsoft.Compute/capacityReservationGroups/"
+    expected_provider_namespace = "Microsoft.Compute"
+    expected_resource_type = "capacityReservationGroups"
 
 
 class AzureDiskEncryptionSetId(AzureArmResourceId):
     """ARM resource ID for an Azure disk encryption set."""
 
-    expected_segment = "/providers/Microsoft.Compute/diskEncryptionSets/"
+    expected_provider_namespace = "Microsoft.Compute"
+    expected_resource_type = "diskEncryptionSets"
 
 
 # ---------------------------------------------------------------------------
