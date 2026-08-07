@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from types import ModuleType
 from types import SimpleNamespace
@@ -18,6 +19,44 @@ from orb.providers.gcp.infrastructure.compute_client import (
     GCP_READ_RETRYABLE_GOOGLE_API_EXCEPTIONS,
     GCP_RETRYABLE_GOOGLE_API_EXCEPTIONS,
 )
+
+
+def test_gcp_infrastructure_imports_without_optional_google_sdk() -> None:
+    script = """
+import builtins
+
+real_import = builtins.__import__
+
+def import_without_google(name, globals=None, locals=None, fromlist=(), level=0):
+    if name == "google" or name.startswith("google."):
+        raise ImportError("GCP extra not installed (simulated)")
+    return real_import(name, globals, locals, fromlist, level)
+
+builtins.__import__ = import_without_google
+
+from orb.providers.gcp.infrastructure import GCPComputeClient, GCPHandlerFactory
+from orb.providers.gcp.exceptions import google_exceptions
+
+assert GCPComputeClient is not None
+assert GCPHandlerFactory is not None
+assert google_exceptions is None
+
+try:
+    GCPComputeClient._compute_v1(object())
+except RuntimeError as exc:
+    assert str(exc) == "google-cloud-compute is required for the GCP provider runtime"
+else:
+    raise AssertionError("expected the lazy SDK accessor to report the missing GCP extra")
+"""
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 class _FakeInstancesClient:
