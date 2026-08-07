@@ -73,6 +73,59 @@ def test_acquire_hosts_submits_native_vmss_create_and_returns_submitted_status()
     assert create_call["parameters"]["sku"]["capacity"] == 2
 
 
+def test_acquire_hosts_rejects_non_object_sku_from_replacement_native_spec():
+    azure_client = _make_azure_client()
+    native_spec_service = MagicMock()
+    native_spec_service.process_provider_api_spec_with_merge.return_value = {
+        "location": "eastus2",
+        "sku": "Standard_D4s_v5",
+        "properties": {},
+    }
+    handler = VMSSHandler(
+        azure_client=azure_client,
+        logger=MagicMock(),
+        azure_native_spec_service=native_spec_service,
+    )
+
+    request = MagicMock(requested_count=2, request_id="req-invalid-sku", metadata={})
+
+    with pytest.raises(
+        AzureValidationError,
+        match=r"field 'sku' must be an object; got str.*merge_mode 'replace'",
+    ):
+        run_operation(handler.acquire_hosts_async(request, _make_template()))
+
+    azure_client.get_async_compute_client.assert_not_awaited()
+
+
+def test_acquire_hosts_rejects_missing_os_profile_from_replacement_native_spec():
+    azure_client = _make_azure_client()
+    native_spec_service = MagicMock()
+    native_spec_service.process_provider_api_spec_with_merge.return_value = {
+        "location": "eastus2",
+        "sku": {"name": "Standard_D4s_v5"},
+        "properties": {"virtualMachineProfile": {}},
+    }
+    handler = VMSSHandler(
+        azure_client=azure_client,
+        logger=MagicMock(),
+        azure_native_spec_service=native_spec_service,
+    )
+    template = _make_template(ssh_key_name="orb-key", ssh_public_keys=[])
+    request = MagicMock(requested_count=2, request_id="req-missing-os-profile", metadata={})
+
+    with pytest.raises(
+        AzureValidationError,
+        match=(
+            r"field 'properties\.virtualMachineProfile\.osProfile' must be an object; "
+            r"got missing.*merge_mode 'replace'"
+        ),
+    ):
+        run_operation(handler.acquire_hosts_async(request, template))
+
+    azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_acquire_hosts_async_submits_native_vmss_create_and_returns_submitted_status():
     azure_client = _make_azure_client()

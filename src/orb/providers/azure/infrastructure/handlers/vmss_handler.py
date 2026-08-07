@@ -116,6 +116,33 @@ def _build_vmss_delete_instance_ids(instance_ids: list[str]) -> Any:
     return VirtualMachineScaleSetVMInstanceRequiredIDs(instance_ids=instance_ids)
 
 
+def _require_vmss_payload_object(
+    payload: dict[str, Any],
+    path: tuple[str, ...],
+) -> dict[str, Any]:
+    """Return the object at an ARM payload path that the handler must mutate."""
+    value = payload
+    traversed_path: list[str] = []
+    for field in path:
+        traversed_path.append(field)
+        field_path = ".".join(traversed_path)
+        if field not in value:
+            actual_type = "missing"
+        else:
+            nested_value = value[field]
+            if isinstance(nested_value, dict):
+                value = nested_value
+                continue
+            actual_type = "null" if nested_value is None else type(nested_value).__name__
+
+        raise AzureValidationError(
+            f"Invalid VMSS ARM payload: field '{field_path}' must be an object; "
+            f"got {actual_type}. A native spec using merge_mode 'replace' must "
+            "provide the complete object structure required by the VMSS template."
+        )
+    return value
+
+
 def _read_vm_identity(vm: AzureVmWithIdentityProtocol) -> _AzureVmIdentity:
     """Normalize VM identity across VMSS VM and regular VM SDK objects.
 
@@ -213,10 +240,15 @@ class VMSSHandler(AzureHandler):
                     arm_payload = merged_payload
 
             arm_payload.setdefault("sku", {})
-            arm_payload["sku"]["capacity"] = request.requested_count
+            sku = _require_vmss_payload_object(arm_payload, ("sku",))
+            sku["capacity"] = request.requested_count
 
             compute = await self.azure_client.get_async_compute_client()
             if resolved_template.ssh_key_name and not resolved_template.ssh_public_keys:
+                os_profile = _require_vmss_payload_object(
+                    arm_payload,
+                    ("properties", "virtualMachineProfile", "osProfile"),
+                )
                 resolved_keys = await resolve_ssh_keys_async(
                     ssh_key_name=resolved_template.ssh_key_name,
                     ssh_public_keys=resolved_template.ssh_public_keys,
@@ -228,8 +260,7 @@ class VMSSHandler(AzureHandler):
                     # the concrete shapes match.
                     compute_client=cast(AzureComputeSshKeyClientProtocol, compute),
                 )
-                vm_profile = arm_payload["properties"]["virtualMachineProfile"]
-                vm_profile["osProfile"]["linuxConfiguration"] = {
+                os_profile["linuxConfiguration"] = {
                     "disablePasswordAuthentication": True,
                     "ssh": {
                         "publicKeys": [
