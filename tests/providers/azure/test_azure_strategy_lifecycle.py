@@ -277,6 +277,82 @@ class TestCreateInstances:
         assert forwarded_template.location.value == "westus2"
         assert forwarded_template.vm_size == "Standard_B1s"
 
+    def test_create_instances_preserves_subnet_named_default_subnet(self, azure_config, logger):
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        handler = MagicMock()
+        handler.acquire_hosts_async = AsyncMock(
+            return_value={
+                "success": True,
+                "resource_ids": ["azure-resource"],
+                "instances": [],
+            }
+        )
+        strategy_harness.handlers["VMSS"] = handler
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "template_config": {
+                    "template_id": "azure-named-subnet",
+                    "provider_api": "VMSS",
+                    "vm_size": "Standard_B1s",
+                    "resource_group": "test-rg",
+                    "location": "eastus2",
+                    "image_id": ("Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest"),
+                    "ssh_public_keys": ["ssh-rsa test-key"],
+                    "subnet_id": "default-subnet",
+                },
+                "count": 1,
+            },
+        )
+
+        result = run_operation(strategy_harness.strategy.execute_operation(op))
+
+        assert result.success
+        forwarded_template = handler.acquire_hosts_async.await_args.args[1]
+        assert forwarded_template.subnet_ids == ["default-subnet"]
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("priority", None),
+            ("admin_username", None),
+            ("node_attributes", ""),
+        ],
+    )
+    def test_create_instances_does_not_replace_invalid_values_with_model_defaults(
+        self,
+        azure_config,
+        logger,
+        field,
+        value,
+    ):
+        strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
+        handler = MagicMock()
+        handler.acquire_hosts_async = AsyncMock()
+        strategy_harness.handlers["VMSS"] = handler
+        template_config = {
+            "template_id": "azure-invalid-explicit-default",
+            "provider_api": "VMSS",
+            "vm_size": "Standard_B1s",
+            "resource_group": "test-rg",
+            "location": "eastus2",
+            "image_id": "Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest",
+            "ssh_public_keys": ["ssh-rsa test-key"],
+            field: value,
+        }
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"template_config": template_config, "count": 1},
+        )
+
+        result = run_operation(strategy_harness.strategy.execute_operation(op))
+
+        assert not result.success
+        assert field in result.error_message
+        handler.acquire_hosts_async.assert_not_awaited()
+
     def test_create_instances_rejects_non_mapping_provider_config(self, azure_config, logger):
         strategy_harness = build_strategy_harness(config=azure_config, logger=logger)
         strategy = strategy_harness.strategy

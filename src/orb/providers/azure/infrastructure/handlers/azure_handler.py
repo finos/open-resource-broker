@@ -199,11 +199,7 @@ class AzureHandler(ABC):
         if template.network_config and template.network_config.subnet_id:
             return template.network_config.subnet_id
 
-        subnet_ids = [
-            subnet_id
-            for subnet_id in template.subnet_ids
-            if subnet_id and subnet_id != "default-subnet"
-        ]
+        subnet_ids = [subnet_id for subnet_id in template.subnet_ids if subnet_id]
         if len(subnet_ids) > 1:
             raise AzureValidationError(
                 "Azure templates support a single subnet for VM network interfaces; "

@@ -184,6 +184,29 @@ def test_acquire_hosts_does_not_mutate_template_when_network_config_is_derived_f
     assert subnet_id == "/subscriptions/.../subnets/derived"
 
 
+def test_acquire_hosts_preserves_subnet_named_default_subnet():
+    azure_client = _make_azure_client()
+    handler = VMSSHandler(azure_client=azure_client, logger=MagicMock())
+    azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.return_value = (
+        MagicMock()
+    )
+    request = MagicMock(requested_count=1, request_id="req-named-subnet", metadata={})
+    template = _make_template(network_config=None, subnet_ids=["default-subnet"])
+
+    result = run_operation(handler.acquire_hosts_async(request, template))
+
+    assert result["success"] is True
+    create_call = (
+        azure_client.compute_client.virtual_machine_scale_sets.begin_create_or_update.call_args
+    )
+    subnet_id = create_call.kwargs["parameters"]["properties"]["virtualMachineProfile"][
+        "networkProfile"
+    ]["networkInterfaceConfigurations"][0]["properties"]["ipConfigurations"][0]["properties"][
+        "subnet"
+    ]["id"]
+    assert subnet_id == "default-subnet"
+
+
 def test_acquire_hosts_rejects_multiple_subnet_ids_without_network_config():
     azure_client = _make_azure_client()
     logger = MagicMock()

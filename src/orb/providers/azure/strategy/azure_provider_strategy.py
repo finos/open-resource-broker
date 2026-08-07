@@ -23,7 +23,7 @@ from orb.providers.azure.capabilities import (
 from orb.providers.azure.configuration.config import AzureProviderConfig
 from orb.providers.azure.configuration.validator import validate_azure_template
 from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
-from orb.providers.azure.domain.template.value_objects import AzurePriority, AzureProviderApi
+from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 from orb.providers.azure.exceptions import AzureError, AzureValidationError
 from orb.providers.azure.infrastructure.error_utils import (
     canonical_azure_error_code,
@@ -239,31 +239,13 @@ class AzureProviderStrategy(ProviderStrategy):
             return None
 
     def _build_azure_template_config(self, template_config: dict[str, Any]) -> dict[str, Any]:
-        """Coalesce provider-owned and Azure-default fields before AzureTemplate validation."""
+        """Add provider-owned context before AzureTemplate validation."""
         enhanced_config = dict(template_config)
         provider_config = _provider_config_mapping(enhanced_config)
 
-        raw_subnet_id = enhanced_config.get("subnet_id")
-        if raw_subnet_id and raw_subnet_id != "default-subnet":
+        raw_subnet_id = enhanced_config.pop("subnet_id", None)
+        if raw_subnet_id is not None:
             enhanced_config["subnet_ids"] = [raw_subnet_id]
-        elif enhanced_config.get("subnet_ids") == ["default-subnet"]:
-            enhanced_config.pop("subnet_ids", None)
-
-        if enhanced_config.get("priority") in (
-            None,
-            "",
-        ) and not _has_provider_config_value(provider_config, "priority"):
-            enhanced_config["priority"] = AzurePriority.REGULAR
-        if enhanced_config.get("admin_username") in (
-            None,
-            "",
-        ) and not _has_provider_config_value(provider_config, "admin_username"):
-            enhanced_config["admin_username"] = "azureuser"
-        if enhanced_config.get("node_attributes") in (
-            None,
-            "",
-        ) and not _has_provider_config_value(provider_config, "node_attributes"):
-            enhanced_config["node_attributes"] = {}
 
         if (
             enhanced_config.get("resource_group") in (None, "")
