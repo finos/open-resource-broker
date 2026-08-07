@@ -126,6 +126,80 @@ async def test_get_deployment_status_async_tolerates_non_mapping_properties():
     }
 
 
+@pytest.mark.asyncio
+async def test_cleanup_failed_single_vm_deployment_deletes_in_reverse_dependency_order():
+    azure_client = MagicMock()
+    async_resource_client = MagicMock()
+    delete_pollers = [MagicMock(), MagicMock(), MagicMock()]
+    for poller in delete_pollers:
+        poller.result = AsyncMock()
+    async_resource_client.resources.begin_delete = AsyncMock(side_effect=delete_pollers)
+    azure_client.get_async_resource_client = AsyncMock(return_value=async_resource_client)
+    service = AzureDeploymentService(azure_client=azure_client, logger=MagicMock())
+
+    result = await service.cleanup_failed_single_vm_deployment_async(
+        resource_group="test-rg",
+        resources=[
+            {
+                "vm_name": "vm-test",
+                "nic_name": "nic-vm-test",
+                "public_ip_name": "pip-vm-test",
+            }
+        ],
+    )
+
+    assert result == {
+        "status": "succeeded",
+        "completed_resources": [
+            "Microsoft.Compute/virtualMachines/vm-test",
+            "Microsoft.Network/networkInterfaces/nic-vm-test",
+            "Microsoft.Network/publicIPAddresses/pip-vm-test",
+        ],
+        "failed_resources": [],
+    }
+    assert [
+        call.kwargs["resource_type"]
+        for call in async_resource_client.resources.begin_delete.await_args_list
+    ] == ["virtualMachines", "networkInterfaces", "publicIPAddresses"]
+    for poller in delete_pollers:
+        poller.result.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_failed_single_vm_deployment_reports_partial_cleanup():
+    azure_client = MagicMock()
+    async_resource_client = MagicMock()
+    vm_poller = MagicMock()
+    vm_poller.result = AsyncMock(side_effect=RuntimeError("VM delete failed"))
+    nic_poller = MagicMock()
+    nic_poller.result = AsyncMock()
+    async_resource_client.resources.begin_delete = AsyncMock(side_effect=[vm_poller, nic_poller])
+    azure_client.get_async_resource_client = AsyncMock(return_value=async_resource_client)
+    service = AzureDeploymentService(azure_client=azure_client, logger=MagicMock())
+
+    result = await service.cleanup_failed_single_vm_deployment_async(
+        resource_group="test-rg",
+        resources=[
+            {
+                "vm_name": "vm-test",
+                "nic_name": "nic-vm-test",
+                "public_ip_name": None,
+            }
+        ],
+    )
+
+    assert result == {
+        "status": "partial",
+        "completed_resources": ["Microsoft.Network/networkInterfaces/nic-vm-test"],
+        "failed_resources": [
+            {
+                "resource": "Microsoft.Compute/virtualMachines/vm-test",
+                "error": "VM delete failed",
+            }
+        ],
+    }
+
+
 def test_build_single_vm_deployment_template_attaches_public_ip_when_enabled():
     service = AzureDeploymentService(azure_client=MagicMock(), logger=MagicMock())
     deployment_template = service.build_single_vm_deployment_template(

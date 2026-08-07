@@ -103,6 +103,109 @@ async def test_augment_vmss_capacity_metadata_async_skips_failed_snapshot_and_pr
     logger.warning.assert_called_once()
 
 
+@pytest.mark.asyncio
+async def test_failed_single_vm_deployment_cleans_submitted_resources():
+    service = AzureResourceMetadataService(
+        default_resource_group="test-rg",
+        logger=MagicMock(),
+    )
+    deployment_service = MagicMock()
+    deployment_service.get_deployment_status_async = AsyncMock(
+        return_value={
+            "provisioning_state": "Failed",
+            "error_code": "DeploymentFailed",
+            "error_message": "VM provisioning failed",
+        }
+    )
+    cleanup_result = {
+        "status": "succeeded",
+        "completed_resources": [
+            "Microsoft.Compute/virtualMachines/vm-test",
+            "Microsoft.Network/networkInterfaces/nic-vm-test",
+            "Microsoft.Network/publicIPAddresses/pip-vm-test",
+        ],
+        "failed_resources": [],
+    }
+    deployment_service.cleanup_failed_single_vm_deployment_async = AsyncMock(
+        return_value=cleanup_result
+    )
+    metadata: dict[str, object] = {}
+
+    await service.augment_single_vm_deployment_metadata_async(
+        metadata,
+        {
+            "deployment_name": "dep-test",
+            "submitted_vms": [
+                {
+                    "vm_name": "vm-test",
+                    "nic_name": "nic-vm-test",
+                    "public_ip_name": "pip-vm-test",
+                    "selected_vm_size": "Standard_D2s_v5",
+                }
+            ],
+        },
+        resource_group="test-rg",
+        deployment_service=deployment_service,
+    )
+
+    deployment_service.cleanup_failed_single_vm_deployment_async.assert_awaited_once_with(
+        resource_group="test-rg",
+        resources=[
+            {
+                "vm_name": "vm-test",
+                "nic_name": "nic-vm-test",
+                "public_ip_name": "pip-vm-test",
+            }
+        ],
+    )
+    assert metadata["failed_deployment_cleanup"] == cleanup_result
+    assert metadata["fleet_errors"] == [
+        {
+            "error_code": "DeploymentFailed",
+            "error_message": "VM provisioning failed",
+            "resource_group": "test-rg",
+            "instance_id": "dep-test",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_successful_single_vm_deployment_does_not_run_failed_cleanup():
+    service = AzureResourceMetadataService(
+        default_resource_group="test-rg",
+        logger=MagicMock(),
+    )
+    deployment_service = MagicMock()
+    deployment_service.get_deployment_status_async = AsyncMock(
+        return_value={
+            "provisioning_state": "Succeeded",
+            "error_code": None,
+            "error_message": None,
+        }
+    )
+    deployment_service.cleanup_failed_single_vm_deployment_async = AsyncMock()
+    metadata: dict[str, object] = {}
+
+    await service.augment_single_vm_deployment_metadata_async(
+        metadata,
+        {
+            "deployment_name": "dep-test",
+            "submitted_vms": [
+                {
+                    "vm_name": "vm-test",
+                    "nic_name": "nic-vm-test",
+                    "public_ip_name": None,
+                }
+            ],
+        },
+        resource_group="test-rg",
+        deployment_service=deployment_service,
+    )
+
+    deployment_service.cleanup_failed_single_vm_deployment_async.assert_not_awaited()
+    assert "failed_deployment_cleanup" not in metadata
+
+
 def test_attach_provider_fulfilment_uses_vmss_capacity_metadata():
     service = AzureResourceMetadataService(
         default_resource_group="test-rg",

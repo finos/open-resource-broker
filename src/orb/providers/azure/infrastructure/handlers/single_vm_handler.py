@@ -50,6 +50,9 @@ from orb.providers.azure.infrastructure.services.azure_network_identity_resolver
 if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
     from orb.providers.azure.infrastructure.azure_client import AzureClient
+    from orb.providers.azure.infrastructure.services.azure_deployment_service import (
+        SingleVmDeploymentResource,
+    )
     from orb.providers.azure.infrastructure.services.azure_native_spec_service import (
         AzureNativeSpecService,
     )
@@ -354,7 +357,7 @@ class SingleVMHandler(AzureHandler):
             )
 
         created_ids = [vm_definition["vm_name"] for vm_definition in vm_definitions]
-        operation_tracking = [
+        operation_tracking: list[SingleVmDeploymentResource] = [
             {
                 "vm_name": vm_definition["vm_name"],
                 "nic_name": vm_definition["nic_name"],
@@ -622,11 +625,10 @@ class SingleVMHandler(AzureHandler):
             "OverconstrainedAllocationRequest",
         }
 
-    # NIC and Public IP cleanup is handled natively by Azure via
-    # deleteOption: "Delete" on the NIC and Public IP references in the
-    # ARM template.  When a VM is deleted, Azure cascades the deletion
-    # through NIC → Public IP automatically.  For Flexible VMSS this is
-    # the default behaviour.  No ORB-managed rollback methods are needed.
+    # Normal termination relies on Azure's deleteOption cascade from VM to
+    # NIC and Public IP. Failed incremental deployments are different: a VM
+    # may never exist, so deployment-status reconciliation explicitly cleans
+    # up the provider-owned resources created before the failure.
     # See: https://learn.microsoft.com/en-us/azure/virtual-machines/delete
 
     @classmethod

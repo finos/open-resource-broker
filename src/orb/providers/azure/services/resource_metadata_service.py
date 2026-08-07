@@ -13,6 +13,10 @@ from orb.domain.base.provider_fulfilment import (
     FulfilmentState,
     ProviderFulfilment,
 )
+from orb.providers.azure.infrastructure.services.azure_deployment_service import (
+    FailedDeploymentCleanupResult,
+    SingleVmDeploymentResource,
+)
 
 _RUNNING_STATES = frozenset({"running"})
 _PENDING_STATES = frozenset({"pending", "creating", "starting", "updating", "unknown"})
@@ -69,6 +73,15 @@ class AzureDeploymentStatusServiceProtocol(Protocol):
         deployment_name: str,
     ) -> Optional[dict[str, object]]:
         """Return deployment provisioning/error state for one ARM deployment via the async SDK."""
+        ...
+
+    async def cleanup_failed_single_vm_deployment_async(
+        self,
+        *,
+        resource_group: str,
+        resources: list[SingleVmDeploymentResource],
+    ) -> FailedDeploymentCleanupResult:
+        """Remove provider-owned resources left by a failed deployment."""
         ...
 
 
@@ -247,6 +260,67 @@ class AzureResourceMetadataService:
                     "instance_id": str(deployment_name),
                 }
             ]
+
+        if str(provisioning_state).lower() == "failed":
+            resources = self._single_vm_deployment_resources(request_metadata.get("submitted_vms"))
+            if resources:
+                metadata[
+                    "failed_deployment_cleanup"
+                ] = await self._cleanup_failed_single_vm_deployment_async(
+                    resource_group=str(resource_group),
+                    resources=resources,
+                    deployment_service=deployment_service,
+                )
+
+    @staticmethod
+    def _single_vm_deployment_resources(value: object) -> list[SingleVmDeploymentResource]:
+        """Validate persisted launch metadata at the status-operation boundary."""
+        if not isinstance(value, list):
+            return []
+
+        resources: list[SingleVmDeploymentResource] = []
+        for item in value:
+            if not isinstance(item, Mapping):
+                return []
+            vm_name = item.get("vm_name")
+            nic_name = item.get("nic_name")
+            public_ip_name = item.get("public_ip_name")
+            if not isinstance(vm_name, str) or not vm_name:
+                return []
+            if not isinstance(nic_name, str) or not nic_name:
+                return []
+            if public_ip_name is not None and (
+                not isinstance(public_ip_name, str) or not public_ip_name
+            ):
+                return []
+            resources.append(
+                {
+                    "vm_name": vm_name,
+                    "nic_name": nic_name,
+                    "public_ip_name": public_ip_name,
+                }
+            )
+        return resources
+
+    async def _cleanup_failed_single_vm_deployment_async(
+        self,
+        *,
+        resource_group: str,
+        resources: list[SingleVmDeploymentResource],
+        deployment_service: AzureDeploymentStatusServiceProtocol,
+    ) -> FailedDeploymentCleanupResult | dict[str, str]:
+        try:
+            return await deployment_service.cleanup_failed_single_vm_deployment_async(
+                resource_group=resource_group,
+                resources=resources,
+            )
+        except Exception as exc:
+            self._logger.error(
+                "Could not clean up resources after failed SingleVM deployment: %s",
+                exc,
+                exc_info=True,
+            )
+            return {"status": "failed", "error": str(exc)}
 
     @staticmethod
     def augment_shortfall_metadata(metadata: dict[str, Any]) -> None:

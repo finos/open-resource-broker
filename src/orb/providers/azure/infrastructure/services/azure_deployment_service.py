@@ -4,10 +4,57 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Any, Literal, NotRequired, Optional, TypedDict
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.azure.infrastructure.azure_client import AzureClient
+
+
+class SingleVmDeploymentResource(TypedDict):
+    """Provider-owned resources submitted for one standalone VM."""
+
+    vm_name: str
+    nic_name: str
+    public_ip_name: str | None
+    selected_vm_size: NotRequired[str]
+
+
+class FailedDeploymentCleanupFailure(TypedDict):
+    """One resource that could not be removed after a failed deployment."""
+
+    resource: str
+    error: str
+
+
+class FailedDeploymentCleanupResult(TypedDict):
+    """Outcome of best-effort cleanup for a failed SingleVM deployment."""
+
+    status: Literal["succeeded", "partial"]
+    completed_resources: list[str]
+    failed_resources: list[FailedDeploymentCleanupFailure]
+
+
+@dataclass(frozen=True)
+class _CleanupResource:
+    """One ARM resource targeted by failed-deployment cleanup."""
+
+    provider_namespace: str
+    resource_type: str
+    name: str
+    api_version: str
+
+    @property
+    def label(self) -> str:
+        """Return a stable resource label for cleanup reporting."""
+        return f"{self.provider_namespace}/{self.resource_type}/{self.name}"
+
+
+def _azure_resource_not_found_error_type() -> type[Exception]:
+    """Resolve the optional Azure SDK exception only when cleanup runs."""
+    from azure.core.exceptions import ResourceNotFoundError
+
+    return ResourceNotFoundError
 
 
 class AzureDeploymentService:
@@ -116,6 +163,94 @@ class AzureDeploymentService:
             "error_code": error_code,
             "error_message": error_message,
         }
+
+    async def cleanup_failed_single_vm_deployment_async(
+        self,
+        *,
+        resource_group: str,
+        resources: list[SingleVmDeploymentResource],
+    ) -> FailedDeploymentCleanupResult:
+        """Remove provider-owned resources left by a failed ARM deployment.
+
+        Incremental ARM deployments do not undo resources that completed before
+        a later resource failed. Delete in reverse dependency order so this
+        create-time cleanup does not depend on a VM having reached a state where
+        Azure can apply its normal ``deleteOption`` cascade.
+        """
+        cleanup_resources = self._single_vm_cleanup_resources(resources)
+        resource_client = await self.azure_client.get_async_resource_client()
+        resource_operations: Any = resource_client.resources
+        completed_resources: list[str] = []
+        failed_resources: list[FailedDeploymentCleanupFailure] = []
+
+        for resource in cleanup_resources:
+            try:
+                poller = await resource_operations.begin_delete(
+                    resource_group_name=resource_group,
+                    resource_provider_namespace=resource.provider_namespace,
+                    parent_resource_path="",
+                    resource_type=resource.resource_type,
+                    resource_name=resource.name,
+                    api_version=resource.api_version,
+                )
+                await poller.result()
+                completed_resources.append(resource.label)
+            except _azure_resource_not_found_error_type():
+                completed_resources.append(resource.label)
+            except Exception as exc:
+                failed_resources.append(
+                    {
+                        "resource": resource.label,
+                        "error": str(exc),
+                    }
+                )
+                self._logger.warning(
+                    "Could not clean up '%s' after failed ARM deployment: %s",
+                    resource.label,
+                    exc,
+                    exc_info=True,
+                )
+
+        return {
+            "status": "partial" if failed_resources else "succeeded",
+            "completed_resources": completed_resources,
+            "failed_resources": failed_resources,
+        }
+
+    @classmethod
+    def _single_vm_cleanup_resources(
+        cls,
+        resources: list[SingleVmDeploymentResource],
+    ) -> list[_CleanupResource]:
+        virtual_machines = [
+            _CleanupResource(
+                provider_namespace="Microsoft.Compute",
+                resource_type="virtualMachines",
+                name=resource["vm_name"],
+                api_version=cls._VM_API_VERSION,
+            )
+            for resource in resources
+        ]
+        network_interfaces = [
+            _CleanupResource(
+                provider_namespace="Microsoft.Network",
+                resource_type="networkInterfaces",
+                name=resource["nic_name"],
+                api_version=cls._NETWORK_API_VERSION,
+            )
+            for resource in resources
+        ]
+        public_ips = [
+            _CleanupResource(
+                provider_namespace="Microsoft.Network",
+                resource_type="publicIPAddresses",
+                name=public_ip_name,
+                api_version=cls._NETWORK_API_VERSION,
+            )
+            for resource in resources
+            if (public_ip_name := resource["public_ip_name"]) is not None
+        ]
+        return virtual_machines + network_interfaces + public_ips
 
     def build_single_vm_deployment_template(
         self,
