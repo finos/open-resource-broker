@@ -24,6 +24,7 @@ from orb.providers.gcp.infrastructure.compute_client import (
 def test_gcp_infrastructure_imports_without_optional_google_sdk() -> None:
     script = """
 import builtins
+from unittest.mock import MagicMock
 
 real_import = builtins.__import__
 
@@ -35,18 +36,37 @@ def import_without_google(name, globals=None, locals=None, fromlist=(), level=0)
 builtins.__import__ = import_without_google
 
 from orb.providers.gcp.infrastructure import GCPComputeClient, GCPHandlerFactory
-from orb.providers.gcp.exceptions import google_exceptions
+from orb.providers.gcp.configuration.config import GCPProviderConfig
+from orb.providers.gcp.exceptions import GCPConfigurationError, google_exceptions
 
 assert GCPComputeClient is not None
 assert GCPHandlerFactory is not None
 assert google_exceptions is None
 
+client = GCPComputeClient(
+    GCPProviderConfig(
+        project_id="orb-example-12345",
+        region="us-central1",
+        zones=["us-central1-a"],
+    ),
+    MagicMock(),
+)
+
 try:
-    GCPComputeClient._compute_v1(object())
-except RuntimeError as exc:
+    client._compute_v1()
+except GCPConfigurationError as exc:
     assert str(exc) == "google-cloud-compute is required for the GCP provider runtime"
+    assert exc.error_code == "GCPConfigurationError"
 else:
     raise AssertionError("expected the lazy SDK accessor to report the missing GCP extra")
+
+try:
+    client._build_retry_policy("read")
+except GCPConfigurationError as exc:
+    assert str(exc) == "google-api-core is required for GCP retry configuration"
+    assert exc.error_code == "GCPConfigurationError"
+else:
+    raise AssertionError("expected retry configuration to report the missing GCP extra")
 """
 
     result = subprocess.run(
