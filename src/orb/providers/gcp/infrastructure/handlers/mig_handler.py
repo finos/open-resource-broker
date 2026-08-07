@@ -74,6 +74,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                 timeout_seconds=wait_timeout_seconds,
             )
         except FutureTimeoutError as exc:
+            await self._rollback_instance_template(template_name)
             raise GCPNetworkError(
                 "Timed out waiting for GCP instance template creation to finish",
                 details={
