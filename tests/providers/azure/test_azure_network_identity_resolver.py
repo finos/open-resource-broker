@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from orb.providers.azure.exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.services.arm_resource_id_parser import (
     ArmResourceIdParser,
 )
@@ -74,6 +75,7 @@ class TestAzureNetworkIdentityResolver:
         resolver = AzureNetworkIdentityResolver(
             async_network_client_getter=AsyncMock(return_value=network_client),
             logger=MagicMock(),
+            subscription_id="sub",
             arm_resource_id_parser=ArmResourceIdParser(),
             network_lookup_error_types=lambda: (),
         )
@@ -123,6 +125,49 @@ class TestAzureNetworkIdentityResolver:
         assert result["subnet_id"].endswith("/subnets/default")
         assert result["vnet_id"].endswith("/virtualNetworks/test-vnet")
         assert result["nic_name"] == "nic-vm-1"
+
+    @pytest.mark.asyncio
+    async def test_resolve_from_nic_refs_rejects_foreign_subscription(self):
+        resolver, network_client = self._build_resolver()
+        nic_ref = MagicMock()
+        nic_ref.id = (
+            "/subscriptions/foreign-sub/resourceGroups/test-rg/providers/"
+            "Microsoft.Network/networkInterfaces/nic-vm-1"
+        )
+        nic_ref.properties.primary = True
+
+        with pytest.raises(AzureValidationError, match="foreign-sub != sub"):
+            await resolver.resolve_from_nic_refs_async([nic_ref])
+
+        network_client.network_interfaces.get.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_resolve_public_ip_rejects_foreign_subscription(self):
+        resolver, network_client = self._build_resolver()
+        nic_ref = MagicMock()
+        nic_ref.id = (
+            "/subscriptions/sub/resourceGroups/test-rg/providers/"
+            "Microsoft.Network/networkInterfaces/nic-vm-1"
+        )
+        nic_ref.properties.primary = True
+
+        public_ip_ref = MagicMock()
+        public_ip_ref.id = (
+            "/subscriptions/foreign-sub/resourceGroups/test-rg/providers/"
+            "Microsoft.Network/publicIPAddresses/pip-vm-1"
+        )
+        ip_config = MagicMock()
+        ip_config.private_ip_address = "10.0.0.4"
+        ip_config.subnet = None
+        ip_config.public_ip_address = public_ip_ref
+        nic = MagicMock()
+        nic.ip_configurations = [ip_config]
+        network_client.network_interfaces.get.return_value = nic
+
+        with pytest.raises(AzureValidationError, match="foreign-sub != sub"):
+            await resolver.resolve_from_nic_refs_async([nic_ref])
+
+        network_client.public_ip_addresses.get.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_resolve_from_vm_tolerates_missing_nested_property_bags(self):
@@ -181,6 +226,7 @@ class TestAzureNetworkIdentityResolver:
         resolver = AzureNetworkIdentityResolver(
             async_network_client_getter=AsyncMock(return_value=network_client),
             logger=MagicMock(),
+            subscription_id="sub",
             arm_resource_id_parser=ArmResourceIdParser(),
             network_lookup_error_types=lambda: (ResourceNotFoundError,),
         )
@@ -224,6 +270,7 @@ class TestAzureNetworkIdentityResolver:
         resolver = AzureNetworkIdentityResolver(
             async_network_client_getter=AsyncMock(return_value=network_client),
             logger=MagicMock(),
+            subscription_id="sub",
             arm_resource_id_parser=ArmResourceIdParser(),
             network_lookup_error_types=lambda: (),
         )
@@ -281,6 +328,7 @@ class TestAzureNetworkIdentityResolver:
         resolver = AzureNetworkIdentityResolver(
             async_network_client_getter=AsyncMock(return_value=network_client),
             logger=MagicMock(),
+            subscription_id="sub",
             arm_resource_id_parser=ArmResourceIdParser(),
             network_lookup_error_types=lambda: (ResourceNotFoundError,),
         )

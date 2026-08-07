@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Optional, Protocol, TypedDict, cast
 
 from orb.domain.base.ports import LoggingPort
+from orb.providers.azure.exceptions import AzureValidationError
 
 from .arm_resource_id_parser import ArmResourceIdParser
 
@@ -85,6 +86,7 @@ class _AzureResourceLookup:
     """Parsed ARM lookup fields needed for Azure SDK get calls."""
 
     resource_id: str
+    subscription_id: str
     resource_group: str
     name: str
 
@@ -97,11 +99,13 @@ class AzureNetworkIdentityResolver:
         *,
         async_network_client_getter: Callable[[], Awaitable[Any]],
         logger: LoggingPort,
+        subscription_id: str | None,
         arm_resource_id_parser: ArmResourceIdParser,
         network_lookup_error_types: Callable[[], tuple[type[BaseException], ...]],
     ) -> None:
         self._async_network_client_getter = async_network_client_getter
         self._logger = logger
+        self._subscription_id = subscription_id
         self._arm_resource_id_parser = arm_resource_id_parser
         self._network_lookup_error_types = network_lookup_error_types
 
@@ -177,15 +181,27 @@ class AzureNetworkIdentityResolver:
         if not nic_id:
             return None
 
-        nic_lookup = self._arm_resource_id_parser.extract_resource_group_and_name(str(nic_id))
-        if not nic_lookup:
+        return self._lookup_from_resource_id(str(nic_id))
+
+    def _lookup_from_resource_id(self, resource_id: str) -> _AzureResourceLookup | None:
+        """Parse an ARM ID and reject references outside the bound subscription."""
+        parsed_resource_id = self._arm_resource_id_parser.parse(resource_id)
+        if parsed_resource_id is None:
             return None
 
-        nic_rg, nic_name = nic_lookup
+        if self._subscription_id and (
+            parsed_resource_id.subscription_id.casefold() != self._subscription_id.casefold()
+        ):
+            raise AzureValidationError(
+                "Azure network resource subscription does not match the configured subscription: "
+                f"{parsed_resource_id.subscription_id} != {self._subscription_id}"
+            )
+
         return _AzureResourceLookup(
-            resource_id=str(nic_id),
-            resource_group=nic_rg,
-            name=nic_name,
+            resource_id=resource_id,
+            subscription_id=parsed_resource_id.subscription_id,
+            resource_group=parsed_resource_id.resource_group,
+            name=parsed_resource_id.resource_name,
         )
 
     @staticmethod
@@ -226,18 +242,7 @@ class AzureNetworkIdentityResolver:
         if not public_ip_id:
             return None
 
-        public_ip_lookup = self._arm_resource_id_parser.extract_resource_group_and_name(
-            str(public_ip_id)
-        )
-        if not public_ip_lookup:
-            return None
-
-        pip_rg, pip_name = public_ip_lookup
-        return _AzureResourceLookup(
-            resource_id=str(public_ip_id),
-            resource_group=pip_rg,
-            name=pip_name,
-        )
+        return self._lookup_from_resource_id(str(public_ip_id))
 
     async def _resolve_public_ip_with_client_async(
         self,

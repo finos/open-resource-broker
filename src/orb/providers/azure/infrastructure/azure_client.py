@@ -138,6 +138,7 @@ class AzureClient:
         self._network_identity_resolver = AzureNetworkIdentityResolver(
             async_network_client_getter=self.get_async_network_client,
             logger=logger,
+            subscription_id=self.subscription_id,
             arm_resource_id_parser=self._arm_resource_id_parser,
             network_lookup_error_types=self._network_lookup_error_types,
         )
@@ -691,10 +692,3 @@ class AzureClient:
     async def resolve_network_identity_from_vm_async(self, vm: Any) -> AzureNetworkIdentity:
         """Async variant of VM network identity resolution."""
         return await self._get_network_identity_resolver().resolve_from_vm_async(vm)
-
-    async def resolve_network_identity_from_nic_refs_async(
-        self,
-        nic_refs: list[Any],
-    ) -> AzureNetworkIdentity:
-        """Async variant of NIC-ref network identity resolution."""
-        return await self._get_network_identity_resolver().resolve_from_nic_refs_async(nic_refs)

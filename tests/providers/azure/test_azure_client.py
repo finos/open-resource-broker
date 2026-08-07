@@ -66,6 +66,7 @@ class TestAzureClientOperationalBehavior:
         client._network_identity_resolver = AzureNetworkIdentityResolver(
             async_network_client_getter=client.get_async_network_client,
             logger=client._logger,
+            subscription_id="sub",
             arm_resource_id_parser=client._arm_resource_id_parser,
             network_lookup_error_types=client._network_lookup_error_types,
         )
@@ -493,6 +494,7 @@ class TestAzureClientNetworkResolution:
         client._network_identity_resolver = AzureNetworkIdentityResolver(
             async_network_client_getter=client.get_async_network_client,
             logger=client._logger,
+            subscription_id="sub",
             arm_resource_id_parser=client._arm_resource_id_parser,
             network_lookup_error_types=client._network_lookup_error_types,
         )
@@ -508,6 +510,7 @@ class TestAzureClientNetworkResolution:
         azure_client._network_identity_resolver = AzureNetworkIdentityResolver(
             async_network_client_getter=azure_client.get_async_network_client,
             logger=azure_client._logger,
+            subscription_id="sub",
             arm_resource_id_parser=azure_client._arm_resource_id_parser,
             network_lookup_error_types=azure_client._network_lookup_error_types,
         )
