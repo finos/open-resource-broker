@@ -111,7 +111,7 @@ class GCPOperationContextService:
         merged.setdefault("project_id", self._config.project_id)
         merged.setdefault("region", self._config.region)
         zones = merged.get("zones")
-        zones_were_missing = zones is None or zones == "" or zones == []
+        zones_were_missing = zones in (None, "", [])
         if zones_were_missing:
             merged["zones"] = self._config.zones
         if (
@@ -126,12 +126,15 @@ class GCPOperationContextService:
         merged.setdefault("subnetwork", self._config.subnetwork)
 
         # Normalize legacy aliases before applying current compute defaults.
-        if "instance_type" not in merged and "machine_type" in merged:
-            merged["instance_type"] = merged["machine_type"]
-        if "boot_disk_size_gb" not in merged and "root_device_volume_size" in merged:
-            merged["boot_disk_size_gb"] = merged["root_device_volume_size"]
-        if "boot_disk_type" not in merged and "volume_type" in merged:
-            merged["boot_disk_type"] = merged["volume_type"]
+        if "machine_type" in merged:
+            machine_type = merged.pop("machine_type")
+            merged.setdefault("instance_type", machine_type)
+        if "root_device_volume_size" in merged:
+            root_device_volume_size = merged.pop("root_device_volume_size")
+            merged.setdefault("boot_disk_size_gb", root_device_volume_size)
+        if "volume_type" in merged:
+            volume_type = merged.pop("volume_type")
+            merged.setdefault("boot_disk_type", volume_type)
 
         # Compute and image defaults describe the VM shape to provision.
         merged.setdefault("instance_type", defaults.machine_type)
