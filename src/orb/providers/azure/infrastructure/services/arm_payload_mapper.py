@@ -17,6 +17,7 @@ from orb.providers.azure.domain.template.value_objects import (
     AzurePriority,
     AzureVMSSOrchestrationMode,
 )
+from orb.providers.azure.exceptions import AzureValidationError
 
 # Flexible VMSS network profiles require a Microsoft.Network API version
 # in the payload.
@@ -137,6 +138,17 @@ class ArmPayloadMapper:
                 },
             }
         if template.node_attributes:
+            conflicting_keys = sorted(properties.keys() & template.node_attributes.keys())
+            if conflicting_keys:
+                raise AzureValidationError(
+                    "node_attributes cannot override Azure-managed VMSS properties: "
+                    f"{', '.join(conflicting_keys)}",
+                    details={
+                        "template_id": template.template_id,
+                        "conflicting_keys": conflicting_keys,
+                    },
+                    error_code="InvalidParameter",
+                )
             properties.update(template.node_attributes)
 
         return resource

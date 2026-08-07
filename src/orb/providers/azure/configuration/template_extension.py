@@ -174,7 +174,10 @@ class AzureTemplateExtensionConfig(ProviderTemplateExtensionBase):
     # Freeform attributes
     node_attributes: dict[str, Any] = Field(
         default_factory=dict,
-        description="Freeform attributes merged into the template",
+        description=(
+            "Additional provider attributes; VMSS attributes cannot replace properties "
+            "managed by the ARM payload mapper"
+        ),
     )
 
     @model_validator(mode="before")

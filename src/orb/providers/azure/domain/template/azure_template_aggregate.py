@@ -386,7 +386,10 @@ class AzureTemplate(Template):
     )
     node_attributes: dict[str, Any] = Field(
         default_factory=dict,
-        description="Freeform pass-through properties appended to the VMSS ARM payload.",
+        description=(
+            "Additional provider properties. VMSS attributes cannot replace properties "
+            "managed by the ARM payload mapper."
+        ),
         validation_alias=AliasChoices("node_attributes", "nodeAttributes"),
     )
 

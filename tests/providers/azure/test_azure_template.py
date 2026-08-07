@@ -21,6 +21,7 @@ from orb.providers.azure.domain.template.value_objects import (
     AzureProviderApi,
     AzureVMSSOrchestrationMode,
 )
+from orb.providers.azure.exceptions import AzureValidationError
 from orb.providers.azure.infrastructure.services.arm_payload_mapper import ArmPayloadMapper
 
 # ---------------------------------------------------------------------------
@@ -404,6 +405,45 @@ class TestArmPayload:
         assert vm_profile["storageProfile"]["osDisk"]["deleteOption"] == "Delete"
         nic_config = vm_profile["networkProfile"]["networkInterfaceConfigurations"][0]
         assert nic_config["properties"]["deleteOption"] == "Delete"
+
+    def test_node_attributes_add_unmanaged_vmss_properties(self):
+        t = AzureTemplate(
+            **_BASE_FIELDS,
+            node_attributes={"additionalCapabilities": {"ultraSSDEnabled": True}},
+        )
+
+        arm = ArmPayloadMapper.vmss_payload(t)
+
+        assert arm["properties"]["additionalCapabilities"] == {"ultraSSDEnabled": True}
+
+    def test_node_attributes_cannot_override_managed_vmss_properties(self):
+        t = AzureTemplate(
+            **_BASE_FIELDS,
+            priority="Spot",
+            vm_sizes=["Standard_D8s_v5"],
+            spot_percentage=70,
+            node_attributes={
+                "orchestrationMode": "Uniform",
+                "platformFaultDomainCount": 5,
+                "priorityMixPolicy": {},
+            },
+        )
+
+        with pytest.raises(
+            AzureValidationError,
+            match=(
+                "node_attributes cannot override Azure-managed VMSS properties: "
+                "orchestrationMode, platformFaultDomainCount, priorityMixPolicy"
+            ),
+        ) as error:
+            ArmPayloadMapper.vmss_payload(t)
+
+        assert error.value.error_code == "InvalidParameter"
+        assert error.value.details["conflicting_keys"] == [
+            "orchestrationMode",
+            "platformFaultDomainCount",
+            "priorityMixPolicy",
+        ]
 
     def test_spot_arm_payload(self):
         t = AzureTemplate(
