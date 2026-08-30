@@ -123,7 +123,7 @@ jobs:
     # openapi-generator needs a JVM; generated models are gitignored and MUST be
     # produced here or the published package ships with no model types.
     - name: Set up Java (Corretto 17) — openapi-generator
-      uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95  # v5.6.0
+      uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
       with:
         java-version: '17'
         distribution: 'corretto'
@@ -239,7 +239,7 @@ jobs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
     - name: Set up Java (Corretto 17, with GPG signing)
-      uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95  # v5.6.0
+      uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
       with:
         java-version: '17'
         distribution: 'corretto'
@@ -345,7 +345,7 @@ jobs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
     - name: Set up Java (Corretto 17, Kotlin runs on JVM)
-      uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95  # v5.6.0
+      uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
       with:
         java-version: '17'
         distribution: 'corretto'

@@ -96,7 +96,7 @@ jobs:
 
       - name: Upload Semgrep SARIF results
         if: inputs.scan-type == 'semgrep' && always()
-        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38  # v4.37.4
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
         with:
           sarif_file: semgrep.sarif
 
@@ -119,7 +119,7 @@ jobs:
 
       - name: Upload Trivy filesystem scan results
         if: inputs.scan-type == 'trivy-fs' && always()
-        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38  # v4.37.4
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
         with:
           sarif_file: 'trivy-fs-results.sarif'
 
@@ -132,7 +132,7 @@ jobs:
       # reviewed and hadolint is ready to act as a hard gate.
       - name: Run Hadolint Dockerfile scan
         if: inputs.scan-type == 'hadolint'
-        uses: hadolint/hadolint-action@2a66e89f53d0771bb131a7fa31f3136336094aa6  # v3.4.0
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387  # v3.5.0
         with:
           dockerfile: Dockerfile
           format: sarif
@@ -141,7 +141,7 @@ jobs:
 
       - name: Upload Hadolint SARIF results
         if: inputs.scan-type == 'hadolint' && always()
-        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38  # v4.37.4
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
         with:
           sarif_file: hadolint-results.sarif
 
@@ -167,7 +167,7 @@ jobs:
       #   TODO: ensure branch protection prevents direct pushes to main.
       - name: Initialize CodeQL
         if: inputs.scan-type == 'codeql'
-        uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38  # v4.37.4
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
         with:
           languages: python
           queries: security-extended,security-and-quality
@@ -176,13 +176,13 @@ jobs:
 
       - name: Initialize CodeQL (fallback)
         if: inputs.scan-type == 'codeql' && steps.codeql-init-extended.outcome == 'failure'
-        uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38  # v4.37.4
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
         with:
           languages: python
           queries: security-and-quality
 
       - name: Perform CodeQL Analysis
         if: inputs.scan-type == 'codeql'
-        uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38  # v4.37.4
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
         with:
           category: "/language:python"
