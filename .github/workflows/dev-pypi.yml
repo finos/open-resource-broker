@@ -261,7 +261,7 @@ jobs:
         retention-days: 180
 
     - name: Upload SBOM to GitHub dependency graph
-      uses: advanced-security/spdx-dependency-submission-action@169d22427d74f3faf93504e70b03eede8dab272a  # v0.2.0
+      uses: advanced-security/spdx-dependency-submission-action@b009efcf8b9d562a4569d2028c276522232e631f  # v0.4.0
       if: always()
       with:
         filePath: "."
