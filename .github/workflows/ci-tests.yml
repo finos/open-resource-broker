@@ -123,6 +123,7 @@ jobs:
     with:
       test-type: providers
       provider: ${{ matrix.provider }}
+      extra: ${{ format('test-{0}', matrix.provider) }}
       python-version: ${{ needs.config.outputs.default-python-version }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       continue-on-error: false
@@ -158,6 +159,7 @@ jobs:
     with:
       test-type: providers-serial
       provider: ${{ matrix.provider }}
+      extra: ${{ format('test-{0}', matrix.provider) }}
       python-version: ${{ needs.config.outputs.default-python-version }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       continue-on-error: false
@@ -369,4 +371,3 @@ jobs:
       uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe  # v1.2.2
       with:
         jobs: ${{ toJSON(needs) }}
-

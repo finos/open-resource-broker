@@ -89,12 +89,17 @@ k8s = [
     "kubernetes",
 ]
 
-# Placeholder entries for future providers (add when provider is implemented)
-# azure = [
-#     "azure-mgmt-compute>=30.0.0",
-#     "azure-identity>=1.15.0",
-#     "azure-mgmt-network>=25.0.0",
-# ]
+# Azure provider runtime dependencies. Install with:
+#   pip install orb-py[azure]
+azure = [
+    "azure-core>=1.38.2",
+    "azure-identity>=1.25.2",
+    "azure-mgmt-compute>=37.2.0",
+    "azure-mgmt-network>=30.2.0",
+    "azure-mgmt-resource>=25.0.0",
+    "azure-mgmt-resource-subscriptions==1.0.0b1",
+    "httpx>=0.27.0",
+]
 # gcp = [
 #     "google-cloud-compute>=1.14.0",
 #     "google-auth>=2.23.0",
@@ -103,6 +108,7 @@ k8s = [
 # Meta-extra: all currently implemented providers
 all-providers = [
     "orb-py[aws]",
+    "orb-py[azure]",
     "orb-py[k8s]",
 ]
 
@@ -206,6 +212,15 @@ test-aws = [
     "requests-mock>=1.11.0,<2.0.0",
 ]
 
+# Azure SDK packages imported directly by the Azure tests. These overlap with
+# the runtime extra because the tests assert behavior using real SDK exception
+# and model types, but the test group does not install unrelated runtime SDKs.
+test-azure = [
+    "azure-core>=1.38.2",
+    "azure-identity>=1.25.2",
+    "azure-mgmt-compute>=37.2.0",
+]
+
 # Kubernetes test dependencies — kmock is an in-process HTTP-level K8s API mock.
 # Tests point the real kubernetes SDK client at the kmock URL so the full
 # client stack is exercised without a live cluster.
@@ -262,7 +277,7 @@ dev = [
     "requests-mock>=1.11.0,<2.0.0",
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
-    "nltk>=3.9.3",
+    "nltk>=3.10.2",
     "gitpython>=3.1.52",
     "watchdog",
     "tenacity",
@@ -383,8 +398,9 @@ test = [
     # Security overrides for vulnerable transitive deps pulled in by test tooling
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
-    # Security override for safety's vulnerable nltk dependency (GHSA-7p94-766c-hgjp)
-    "nltk>=3.9.3",
+    # Security override for safety's vulnerable and broken nltk versions
+    # (GHSA-7p94-766c-hgjp; 3.10.1 rejects packages in project-local virtualenvs)
+    "nltk>=3.10.2",
     # Security override for python-semantic-release's vulnerable gitpython
     # (GHSA-956x-8gvw-wg5v, GHSA-2f96-g7mh-g2hx, GHSA-v396-v7q4-x2qj argument
     # injection; GHSA-rwj8-pgh3-r573 os.path.expandvars in polish_url)
@@ -479,6 +495,7 @@ orb = "orb.run:cli_main"
 
 [project.entry-points."orb.providers"]
 aws = "orb.providers.aws.provider_plugin:AWSPlugin.register_plugin"
+azure = "orb.providers.azure.provider_plugin:AzurePlugin.register_plugin"
 k8s = "orb.providers.k8s.provider_plugin:K8sPlugin.register_plugin"
 
 [project.urls]
@@ -750,6 +767,7 @@ line-ending = "auto"
 
 [tool.ruff.lint.isort]
 known-first-party = ["orb"]
+known-third-party = ["mcp"]
 combine-as-imports = true
 
 [tool.pyright]

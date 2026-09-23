@@ -97,6 +97,7 @@ jobs:
     with:
       test-type: providers
       provider: ${{ matrix.provider }}
+      extra: ${{ format('test-{0}', matrix.provider) }}
       python-version: ${{ matrix.python-version }}
       os: ${{ matrix.os }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}

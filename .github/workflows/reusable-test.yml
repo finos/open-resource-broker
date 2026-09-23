@@ -82,6 +82,13 @@ on:
         required: false
         type: string
         default: 'test'
+      extra:
+        description: >-
+          Optional project extra required by this test leg (for example,
+          test-azure for Azure SDK-backed tests).
+        required: false
+        type: string
+        default: ''
       artifact-prefix:
         description: >-
           Caller-supplied prefix prepended to artifact names to prevent
@@ -130,11 +137,15 @@ jobs:
             ${{
               inputs.cache-key != ''
               && inputs.cache-key
-              || format('deps-py3.12-{0}-{1}',
+              || format('deps-py{0}-{1}-{2}-{3}',
+                   inputs.python-version != '' && inputs.python-version || inputs.default-python-version,
                    inputs.group,
+                   inputs.extra != '' && inputs.extra || 'base',
                    hashFiles('.project.yml', 'pyproject.toml', 'uv.lock'))
             }}
+          python-version: ${{ inputs.python-version != '' && inputs.python-version || inputs.default-python-version }}
           group: ${{ inputs.group }}
+          extra: ${{ inputs.extra }}
           fail-on-cache-miss: false
 
       - name: Run tests
