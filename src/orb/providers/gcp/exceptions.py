@@ -20,14 +20,6 @@ class GCPError(InfrastructureError):
         error_code: Optional[str] = None,
     ) -> None:
         super().__init__(message, error_code or self.__class__.__name__, details)
-        self.error_code = error_code or self.__class__.__name__
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert the error to a structured dictionary."""
-        result: dict[str, Any] = super().to_dict()
-        if self.error_code and self.error_code != self.__class__.__name__:
-            result["error_code"] = self.error_code
-        return result
 
 
 class GCPValidationError(GCPError):

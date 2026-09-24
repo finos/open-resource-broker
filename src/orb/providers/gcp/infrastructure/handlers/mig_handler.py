@@ -31,7 +31,7 @@ from orb.providers.gcp.types import (
 
 
 class _GCPOperationWithName(Protocol):
-    """Minimal GCP operation shape used by the MIG handler."""
+    """Methods supplied by the SDK operation, not implemented by this protocol."""
 
     @property
     def name(self) -> str | None:
