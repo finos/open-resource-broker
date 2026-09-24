@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from orb.domain.base.ports import LoggingPort
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
-from orb.providers.gcp.infrastructure.compute_client import GCPComputeClient
 from orb.providers.gcp.infrastructure.disk_types import normalize_boot_disk_type
 from orb.providers.gcp.types import (
     GCPCreateOutcome,
@@ -17,6 +16,9 @@ from orb.providers.gcp.types import (
     GCPInstanceStatus,
     GCPMutationOutcome,
 )
+
+if TYPE_CHECKING:
+    from orb.providers.gcp.infrastructure.compute_client import GCPComputeClient
 
 
 class GCPHandler(ABC):

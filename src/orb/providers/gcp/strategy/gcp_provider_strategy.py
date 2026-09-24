@@ -36,11 +36,12 @@ from orb.providers.gcp.services import (
     GCPOperationContextService,
     GCPProvisioningService,
 )
+from orb.providers.gcp.services.operation_context import GCPMutationOperationContext
 from orb.providers.gcp.services.operation_parameters import (
     GCPMachineCoordinates,
     GCPMutationParameters,
 )
-from orb.providers.gcp.types import GCPMutationOperationContext, GCPMutationOutcome
+from orb.providers.gcp.types import GCPMutationOutcome
 
 
 @injectable
