@@ -77,6 +77,36 @@ class TestMapTemplateFieldsCallsApplyTemplateDefaults:
         with pytest.raises(ValueError):
             self.strategy._map_template_fields(cast(dict[str, Any], "not-a-dict"), None)
 
+    def test_declared_provider_selects_its_field_mapping(self):
+        from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
+            FieldMappingRegistry,
+        )
+        from orb.providers.gcp.scheduler.hostfactory_field_mapping import GCPFieldMapping
+
+        self.strategy._template_defaults_service = cast(None, MagicMock())
+        self.strategy._template_defaults_service.resolve_provider_api_default.return_value = "MIG"
+        self.strategy._template_defaults_service.resolve_template_defaults.side_effect = (
+            lambda template, provider: template
+        )
+
+        with (
+            patch.object(self.strategy, "_get_provider_name", return_value="azure-primary"),
+            patch.object(self.strategy, "_get_active_provider_type", return_value="azure"),
+            patch.object(
+                FieldMappingRegistry,
+                "get_or_none",
+                side_effect=lambda provider_type: (
+                    GCPFieldMapping() if provider_type == "gcp" else None
+                ),
+            ),
+        ):
+            mapped = self.strategy._map_template_fields(
+                {"templateId": "gcp-template", "providerType": "gcp", "vmType": "e2-micro"}
+            )
+
+        assert mapped["provider_type"] == "gcp"
+        assert mapped["machine_type"] == "e2-micro"
+
 
 class TestHFFormatRequestResponseUsesCoerceAndUnwrap:
     """format_request_response must use _coerce_to_dict and _unwrap_request_id."""
