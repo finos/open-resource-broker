@@ -6,7 +6,6 @@ from typing import Annotated
 
 from pydantic import AfterValidator
 
-
 GCP_OAUTH_SCOPE_PREFIX = "https://www.googleapis.com/auth/"
 
 

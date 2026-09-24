@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
 from orb.domain.template.template_aggregate import Template
 from orb.providers.gcp.configuration.template_extension import GCPTemplateExtensionConfig
@@ -48,11 +48,13 @@ class GCPTemplate(Template):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     provider_api: GCPProviderApi = GCPProviderApi.MIG
+    machine_type: str = Field(
+        default=..., validation_alias=AliasChoices("machine_type", "instance_type")
+    )
     project_id: GCPProjectId
     region: GCPRegion
     zones: list[GCPZone] = Field(default_factory=list)
     mig_scope: GCPMIGScope = GCPMIGScope.REGIONAL
-    instance_type: str = Field(default=..., description="Compute Engine machine type")
     network: Optional[str] = None
     subnetwork: Optional[str] = None
     service_account_email: Optional[str] = None
@@ -78,8 +80,7 @@ class GCPTemplate(Template):
     @classmethod
     def normalise_input(cls, data: object) -> object:
         """Rewrite external HostFactory/config field names to canonical domain fields."""
-        # `max_number` is the HostFactory/API/storage external name; the
-        # canonical domain field is `max_instances`.
+        # `max_number` is the HostFactory/API/storage external name.
         if not isinstance(data, dict):
             return data
         data = dict(data)
@@ -93,22 +94,31 @@ class GCPTemplate(Template):
                 if _has_template_value(value) and _is_missing_template_value(data.get(key)):
                     data[key] = value
 
-        if "max_number" in data:
-            if "max_instances" not in data:
-                data["max_instances"] = data["max_number"]
-            data.pop("max_number", None)
+        if "max_machines" not in data:
+            if "max_instances" in data:
+                data["max_machines"] = data["max_instances"]
+            elif "max_number" in data:
+                data["max_machines"] = data["max_number"]
+        data.pop("max_instances", None)
+        data.pop("max_number", None)
+        if data.get("boot_disk_size_gb") is not None:
+            data["machine_disk_size_gb"] = data["boot_disk_size_gb"]
+        elif data.get("machine_disk_size_gb") is not None:
+            data["boot_disk_size_gb"] = data["machine_disk_size_gb"]
+        if data.get("boot_disk_type") is not None:
+            data["machine_disk_type"] = str(data["boot_disk_type"])
+        elif data.get("machine_disk_type") is not None:
+            data["boot_disk_type"] = data["machine_disk_type"]
         return data
 
     @model_validator(mode="after")
     def validate_gcp_template(self) -> GCPTemplate:
         """Validate GCP-specific template semantics."""
         if self.key_name:
-            raise ValueError(
-                "GCP does not support named SSH key pairs; key_name is unsupported"
-            )
+            raise ValueError("GCP does not support named SSH key pairs; key_name is unsupported")
         if self.provider_api == GCPProviderApi.MIG:
-            if self.max_instances <= 0:
-                raise ValueError("MIG templates require max_instances > 0")
+            if self.max_machines <= 0:
+                raise ValueError("MIG templates require max_machines > 0")
             # Regional and zonal MIGs have different placement semantics:
             # https://cloud.google.com/compute/docs/instance-groups/distributing-instances-with-regional-instance-groups
             # https://cloud.google.com/compute/docs/instance-groups/creating-groups-of-managed-instances
@@ -119,14 +129,12 @@ class GCPTemplate(Template):
                     "regional MIG templates should use at least two zones when zones are specified"
                 )
         elif self.provider_api == GCPProviderApi.SINGLE_VM:
-            if self.max_instances != 1:
-                raise ValueError("SingleVM templates require max_instances == 1")
+            if self.max_machines != 1:
+                raise ValueError("SingleVM templates require max_machines == 1")
             if len(self.zones) != 1:
                 raise ValueError("SingleVM templates require exactly one explicit zone")
 
-        if not self.source_image and not (
-            self.source_image_family and self.source_image_project
-        ):
+        if not self.source_image and not (self.source_image_family and self.source_image_project):
             raise ValueError(
                 "GCP templates require source_image or source_image_family + source_image_project"
             )

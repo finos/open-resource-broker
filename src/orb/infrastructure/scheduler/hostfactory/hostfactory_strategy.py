@@ -1032,7 +1032,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
     def format_template_for_provider(self, template: TemplateDTO) -> dict[str, Any]:
         """Format template for provider operations using internal format (no field mapping)."""
-        return template.to_dict()
+        return template.to_domain_data()
 
     def format_machine_for_display(self, machine_dict: dict[str, Any]) -> dict[str, Any]:
         """Format machine dict for display using HostFactory field mapper."""

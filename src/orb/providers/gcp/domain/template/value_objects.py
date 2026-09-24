@@ -6,7 +6,7 @@ import re
 from enum import Enum
 from typing import ClassVar
 
-from pydantic import field_validator, model_validator, model_serializer
+from pydantic import field_validator, model_serializer, model_validator
 
 from orb.domain.base.value_objects import ValueObject
 

@@ -19,9 +19,9 @@ if TYPE_CHECKING:
         Instance,
         InstanceGroupManager,
         InstanceGroupManagersClient,
+        InstancesClient,
         InstanceTemplate,
         InstanceTemplatesClient,
-        InstancesClient,
         RegionInstanceGroupManagersClient,
     )
 
@@ -118,12 +118,8 @@ class GCPComputeClient:
         public_ip = None
         if nic and nic.access_configs:
             public_ip = nic.access_configs[0].nat_i_p or None
-        machine_type = (
-            instance.machine_type.rsplit("/", 1)[-1] if instance.machine_type else None
-        )
-        provisioning_model = (
-            instance.scheduling.provisioning_model if instance.scheduling else None
-        )
+        machine_type = instance.machine_type.rsplit("/", 1)[-1] if instance.machine_type else None
+        provisioning_model = instance.scheduling.provisioning_model if instance.scheduling else None
 
         return GCPInstanceRecord(
             name=str(instance.name),

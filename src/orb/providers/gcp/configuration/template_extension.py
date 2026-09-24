@@ -58,9 +58,9 @@ class GCPTemplateExtensionConfig(BaseModel):
         """Convert extension defaults into template defaults."""
         defaults: dict[str, Any] = {
             "provider_api": self.provider_api,
-            "instance_type": self.machine_type,
-            "root_device_volume_size": self.boot_disk_size_gb,
-            "volume_type": self.boot_disk_type,
+            "machine_type": self.machine_type,
+            "machine_disk_size_gb": self.boot_disk_size_gb,
+            "machine_disk_type": self.boot_disk_type,
             "boot_disk_size_gb": self.boot_disk_size_gb,
             "boot_disk_type": self.boot_disk_type,
             "tags": self.labels,
@@ -68,7 +68,7 @@ class GCPTemplateExtensionConfig(BaseModel):
             "price_type": self.price_type,
         }
         if self.service_account_email:
-            defaults["instance_profile"] = self.service_account_email
+            defaults["machine_role"] = self.service_account_email
             defaults["service_account_email"] = self.service_account_email
         if self.service_account_scopes:
             defaults["service_account_scopes"] = self.service_account_scopes

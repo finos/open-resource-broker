@@ -2,10 +2,10 @@
 
 import pytest
 
-from orb.infrastructure.template.dtos import TemplateDTO
+from orb.infrastructure.template.factories import TemplateDTOFactory
 from orb.providers.gcp.configuration.template_extension import GCPTemplateExtensionConfig
-from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 from orb.providers.gcp.configuration.validator import validate_gcp_template
+from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 
 
 def test_validate_gcp_template_accepts_regional_mig() -> None:
@@ -46,7 +46,9 @@ def test_validate_gcp_template_rejects_singlevm_with_multiple_instances() -> Non
     )
 
     assert result["valid"] is False
-    assert any("SingleVM templates require max_instances == 1" in error for error in result["errors"])
+    assert any(
+        "SingleVM templates require max_machines == 1" in error for error in result["errors"]
+    )
 
 
 def test_validate_gcp_template_rejects_singlevm_without_explicit_zone() -> None:
@@ -111,7 +113,9 @@ def test_validate_gcp_template_rejects_boot_disk_type_reference() -> None:
     )
 
     assert result["valid"] is False
-    assert any("boot_disk_type must be a disk type resource name" in error for error in result["errors"])
+    assert any(
+        "boot_disk_type must be a disk type resource name" in error for error in result["errors"]
+    )
 
 
 def test_gcp_template_dto_roundtrip_preserves_provider_fields() -> None:
@@ -136,7 +140,15 @@ def test_gcp_template_dto_roundtrip_preserves_provider_fields() -> None:
         instance_template_name_prefix="orb-worker",
     )
 
-    dto = TemplateDTO.from_domain(original)
+    dto = TemplateDTOFactory().from_domain(original)
+    assert dto.root_device_volume_size == 64
+    assert dto.volume_type == "pd-balanced"
+
+    provider_payload = dto.to_domain_data()
+    assert "root_device_volume_size" not in provider_payload
+    assert "volume_type" not in provider_payload
+    assert "provider_data" not in provider_payload
+    assert GCPTemplate.model_validate(provider_payload).machine_type == "e2-standard-4"
 
     assert isinstance(dto.provider_config, GCPTemplateExtensionConfig)
     provider_config = dto.provider_config.model_dump(exclude_none=True, exclude_unset=True)
@@ -148,7 +160,8 @@ def test_gcp_template_dto_roundtrip_preserves_provider_fields() -> None:
     )
     assert provider_config["labels"] == {"component": "worker"}
 
-    restored_config = dto.model_dump(exclude={"provider_config"}, exclude_none=True)
+    restored_config = dto.to_domain_data()
+    restored_config.pop("provider_config")
     restored_config.update(dto.provider_config.to_template_defaults())
     restored = GCPTemplate.model_validate(restored_config)
     assert restored.project_id.value == "orb-example-12345"
@@ -221,7 +234,7 @@ def test_gcp_template_accepts_provider_config_extension_payload() -> None:
     )
 
     assert template.provider_api == "MIG"
-    assert template.instance_type == "e2-standard-4"
+    assert template.machine_type == "e2-standard-4"
     assert template.price_type == "spot"
     assert template.project_id.value == "orb-example-12345"
     assert [zone.value for zone in template.zones] == ["us-central1-a", "us-central1-b"]

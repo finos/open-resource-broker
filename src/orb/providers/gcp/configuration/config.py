@@ -8,6 +8,7 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
+
 _PROJECT_RE = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
 _REGION_RE = re.compile(r"^[a-z]+-[a-z0-9]+[0-9]$")
 _ZONE_RE = re.compile(r"^[a-z]+-[a-z0-9]+[0-9]-[a-z]$")
@@ -29,9 +30,7 @@ class GCPProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     region: str = Field(default="us-central1", description="Default GCP region")
     zones: list[str] = Field(default_factory=list, description="Optional preferred zones")
     network: str | None = Field(None, description="Default VPC network self-link or name")
-    subnetwork: str | None = Field(
-        None, description="Default subnetwork self-link or name"
-    )
+    subnetwork: str | None = Field(None, description="Default subnetwork self-link or name")
     max_retries: int = Field(3, ge=0, description="Maximum retry attempts for GCP API calls")
     connect_timeout: int = Field(30, ge=1, description="Connection timeout in seconds")
     read_timeout: int = Field(60, ge=1, description="Read timeout in seconds")
@@ -41,9 +40,7 @@ class GCPProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     def validate_project_id(cls, value: str) -> str:
         """Validate a canonical GCP project ID."""
         if not _PROJECT_RE.match(value):
-            raise ValueError(
-                "project_id must match the canonical GCP project ID format"
-            )
+            raise ValueError("project_id must match the canonical GCP project ID format")
         return value
 
     @field_validator("region")

@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Callable
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 from orb.providers.gcp.exceptions import GCPError, GCPValidationError, translate_gcp_exception
-from orb.providers.gcp.infrastructure.instance_status import normalize_gcp_instance_status
 from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
+from orb.providers.gcp.infrastructure.instance_status import normalize_gcp_instance_status
 from orb.providers.gcp.types import (
     GCPCreateOutcome,
     GCPFailedOperation,
@@ -179,9 +179,9 @@ class GCPSingleVMHandler(GCPHandler):
 
         zone = self._template_zone(template)
         machine_type = (
-            template.instance_type
-            if template.instance_type.startswith("zones/")
-            else f"zones/{zone}/machineTypes/{template.instance_type}"
+            template.machine_type
+            if template.machine_type.startswith("zones/")
+            else f"zones/{zone}/machineTypes/{template.machine_type}"
         )
         return compute_v1.Instance(
             name=instance_name,

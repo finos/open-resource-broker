@@ -97,9 +97,7 @@ class GCPHandler(ABC):
         from google.cloud import compute_v1
 
         disk_type = (
-            str(template.boot_disk_type)
-            if template.boot_disk_type is not None
-            else "pd-balanced"
+            str(template.boot_disk_type) if template.boot_disk_type is not None else "pd-balanced"
         )
         disk_size = template.boot_disk_size_gb or 50
         source_image = self._resolve_source_image(template)
