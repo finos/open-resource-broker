@@ -9,6 +9,7 @@ from collections.abc import Callable
 from typing import Any, Mapping, Optional
 
 from orb.domain.base.ports import LoggingPort
+from orb.domain.machine.aggregate import Machine
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.base.strategy import (
     ProviderCapabilities,
@@ -35,7 +36,10 @@ from orb.providers.gcp.services import (
     GCPOperationContextService,
     GCPProvisioningService,
 )
-from orb.providers.gcp.services.operation_parameters import GCPMutationParameters
+from orb.providers.gcp.services.operation_parameters import (
+    GCPMachineCoordinates,
+    GCPMutationParameters,
+)
 from orb.providers.gcp.types import GCPMutationOperationContext, GCPMutationOutcome
 
 
@@ -262,6 +266,8 @@ class GCPProviderStrategy(ProviderStrategy):
         op = operation.operation_type
         if op == ProviderOperationType.TERMINATE_INSTANCES:
             return self._handle_terminate_instances(operation)
+        if op == ProviderOperationType.CLEANUP_MACHINE_RESOURCES:
+            return self._handle_cleanup_machine_resources(operation)
         if op == ProviderOperationType.GET_INSTANCE_STATUS:
             return self._handle_get_instance_status(operation)
         if op == ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES:
@@ -334,6 +340,65 @@ class GCPProviderStrategy(ProviderStrategy):
                 "resource_ids": mutation_context.resource_ids,
             },
         )
+
+    def _handle_cleanup_machine_resources(self, operation: ProviderOperation) -> ProviderResult:
+        """Use native termination for a persisted GCP machine and its auto-delete disk."""
+        machine = operation.parameters.get("machine")
+        if not isinstance(machine, Machine):
+            raise GCPValidationError("A machine is required for GCP resource cleanup")
+        if machine.provider_type != "gcp":
+            raise GCPValidationError("GCP resource cleanup received a non-GCP machine")
+
+        coordinates = GCPMachineCoordinates.model_validate(
+            {
+                "provider_api": machine.provider_api,
+                "resource_id": machine.resource_id,
+                "provider_data": machine.provider_data,
+            }
+        )
+        instance_id = machine.machine_id.value
+        metadata = coordinates.provider_data
+        if coordinates.provider_api.value == "SingleVM":
+            if metadata.zone is None:
+                raise GCPValidationError(f"Missing GCP zone for machine {instance_id}")
+        else:
+            if coordinates.resource_id is None:
+                raise GCPValidationError(f"Missing GCP MIG resource ID for machine {instance_id}")
+            if metadata.scope not in {"regional", "zonal"}:
+                raise GCPValidationError(f"Missing GCP MIG scope for machine {instance_id}")
+            if metadata.scope == "zonal" and metadata.zone is None:
+                raise GCPValidationError(f"Missing GCP zone for machine {instance_id}")
+            if metadata.scope == "regional" and metadata.region is None:
+                raise GCPValidationError(f"Missing GCP region for machine {instance_id}")
+
+        terminate_operation = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "instance_ids": [instance_id],
+                "resource_ids": [coordinates.resource_id] if coordinates.resource_id else [],
+                "provider_api": coordinates.provider_api.value,
+                "request_metadata": metadata.model_dump(exclude_none=True),
+            },
+            context=operation.context,
+        )
+        result = self._handle_terminate_instances(terminate_operation)
+        metadata_result = {**result.metadata, "operation": "cleanup_machine_resources"}
+        if not result.success:
+            return result.model_copy(update={"metadata": metadata_result})
+        # General mutation calls permit partial success, but this command's
+        # caller terminalises the machine on result.success. A failed delete
+        # must therefore be a failed cleanup even if some targets succeeded.
+        if not result.data["success"]:
+            failures = result.data["failed_operations"]
+            failure_reason = "; ".join(failure["error_message"] for failure in failures)
+            return ProviderResult(
+                success=False,
+                data=result.data,
+                error_message=f"GCP cleanup did not delete machine {instance_id}: {failure_reason}",
+                error_code="GCP_MACHINE_CLEANUP_FAILED",
+                metadata=metadata_result,
+            )
+        return result.model_copy(update={"metadata": metadata_result})
 
     def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
         mutation_context = self._get_operation_context_service().build_mutation_context(operation)
@@ -500,6 +565,7 @@ class GCPProviderStrategy(ProviderStrategy):
             supported_operations=[
                 ProviderOperationType.CREATE_INSTANCES,
                 ProviderOperationType.TERMINATE_INSTANCES,
+                ProviderOperationType.CLEANUP_MACHINE_RESOURCES,
                 ProviderOperationType.GET_INSTANCE_STATUS,
                 ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
                 ProviderOperationType.VALIDATE_TEMPLATE,
