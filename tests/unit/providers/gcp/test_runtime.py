@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, call
 import pytest
 from google.api_core import exceptions as google_exceptions
 
+from orb.application.dto.template import TemplateDTO
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestType
 from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
@@ -1329,6 +1330,38 @@ async def test_strategy_create_single_vm_uses_provider_zone_when_template_dto_ha
     assert result.success is True
     assert result.data["provider_api"] == "SingleVM"
     assert result.metadata["zone"] == "us-central1-a"
+
+
+@pytest.mark.asyncio
+async def test_strategy_create_single_vm_from_standard_template_dto() -> None:
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
+    assert strategy.initialize() is True
+
+    handler = MagicMock()
+    handler.acquire_hosts.side_effect = AssertionError("dry-run should not reach acquire_hosts")
+    strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
+    template = TemplateDTO(
+        template_id="gcp-standard",
+        provider_type="gcp",
+        provider_api="SingleVM",
+        image_id="projects/debian-cloud/global/images/debian-12-v1",
+        machine_types={"e2-micro": 1},
+        network_zones=["us-central1-b"],
+    )
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 1, "template_config": template.model_dump(exclude_none=True)},
+            context={"dry_run": True},
+        )
+    )
+
+    assert result.success is True
+    assert result.metadata["zone"] == "us-central1-b"
+    assert result.data["provider_api"] == "SingleVM"
 
 
 @pytest.mark.asyncio

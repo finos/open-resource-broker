@@ -99,6 +99,22 @@ class GCPTemplate(Template):
             value = data.pop(dto_field, None)
             if domain_field not in data and value is not None:
                 data[domain_field] = value
+        # The storage DTO uses the standard template fields. Interpret them at
+        # the GCP boundary; provider-specific fields remain available to direct
+        # GCP templates loaded from configuration files.
+        machine_types = data.get("machine_types") or {}
+        if machine_types:
+            if len(machine_types) != 1 or next(iter(machine_types.values())) != 1:
+                raise ValueError("GCP templates require one machine type with weight 1")
+            data["machine_type"] = next(iter(machine_types))
+        if data.get("machine_types_ondemand") or data.get("machine_types_priority"):
+            raise ValueError("GCP templates do not support separate machine-type pools")
+        if data.get("network_zones"):
+            data["zones"] = data["network_zones"]
+        if data.get("machine_image"):
+            data["source_image"] = data["machine_image"]
+        if data.get("tags") and not data.get("labels"):
+            data["labels"] = data["tags"]
         data.pop("provider_data", None)
         data.pop("version", None)
 
