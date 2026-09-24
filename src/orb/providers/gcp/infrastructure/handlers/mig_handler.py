@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Protocol
-import uuid
 
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
@@ -16,10 +16,10 @@ from orb.providers.gcp.exceptions import (
     GCPValidationError,
     translate_gcp_exception,
 )
+from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
 from orb.providers.gcp.infrastructure.instance_status import (
     normalize_gcp_managed_instance_status,
 )
-from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
 from orb.providers.gcp.types import (
     GCPCreateOutcome,
     GCPHandlerContext,
@@ -57,9 +57,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
     async def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
         """Create the MIG and backing instance template for a request."""
         mig_name = template.mig_name or f"orb-mig-{template.template_id}-{uuid.uuid4().hex[:8]}"
-        template_name = (
-            f"{template.instance_template_name_prefix or 'orb'}-{template.template_id}-{uuid.uuid4().hex[:8]}"
-        )
+        template_name = f"{template.instance_template_name_prefix or 'orb'}-{template.template_id}-{uuid.uuid4().hex[:8]}"
         template_operation = await asyncio.to_thread(
             self._compute_client.create_instance_template,
             template_name=template_name,
@@ -350,7 +348,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         properties = compute_v1.InstanceProperties(
             **self._build_instance_configuration(
                 template=template,
-                machine_type=template.instance_type,
+                machine_type=template.machine_type,
                 zone=str(template.zones[0]) if template.zones else None,
                 payload_context="instance_template",
             )

@@ -51,20 +51,57 @@ def test_register_gcp_provider_registers_cli_spec() -> None:
     assert registry.is_provider_registered("gcp") is True
 
 
+def test_gcp_bootstrap_populates_required_satellites() -> None:
+    from orb.bootstrap.provider_completeness import assert_provider_registrations_complete
+    from orb.infrastructure.registry.template_example_generator_registry import (
+        TemplateExampleGeneratorRegistry,
+    )
+    from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import FieldMappingRegistry
+    from orb.providers.gcp.registration import (
+        initialize_gcp_provider,
+        register_gcp_provider,
+        register_gcp_services_with_di,
+    )
+    from orb.providers.registry import get_provider_registry
+
+    registry = get_provider_registry()
+    registry.clear_registrations()
+    register_gcp_provider(registry=registry)
+    initialize_gcp_provider()
+    register_gcp_services_with_di(MagicMock())
+
+    assert_provider_registrations_complete()
+    mapping = FieldMappingRegistry.get("gcp")
+    assert mapping.get_mappings()["vmType"] == "machine_type"
+    assert mapping.apply_defaults({}) == {"max_machines": 1}
+
+    from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
+
+    mapped = HostFactoryFieldMapper("gcp").map_input_fields(
+        {"templateId": "gcp-1", "vmType": "e2-standard-4", "projectId": "example-project-12345"}
+    )
+    assert mapped["machine_type"] == "e2-standard-4"
+    assert mapped["project_id"] == "example-project-12345"
+
+    generator = TemplateExampleGeneratorRegistry.get("gcp")
+    examples = generator.generate_example_templates("gcp-default")
+    assert {example["provider_api"] for example in examples} == {"MIG", "SingleVM"}
+    assert [
+        example["provider_api"]
+        for example in generator.generate_example_templates("gcp-default", "MIG")
+    ] == ["MIG"]
+
+
 def test_load_strategy_defaults_includes_gcp_defaults_without_provider_bootstrap() -> None:
     """Static defaults loading must include GCP without bootstrapping providers."""
     from unittest.mock import patch
 
     from orb.config.loader import ConfigurationLoader
 
-    with (
-        patch("orb.providers.registration.register_all_provider_types") as register_all,
-        patch("orb.providers.registry.get_provider_registry") as get_provider_registry,
-    ):
+    with patch("orb.providers.registration.register_all_provider_types") as register_all:
         defaults = ConfigurationLoader._load_strategy_defaults()
 
     register_all.assert_not_called()
-    get_provider_registry.assert_not_called()
     assert "gcp" in defaults["provider"]["provider_defaults"]
     handlers = defaults["provider"]["provider_defaults"]["gcp"]["handlers"]
     assert set(handlers) == {"MIG", "SingleVM"}

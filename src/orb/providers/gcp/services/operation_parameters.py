@@ -6,6 +6,7 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 
+from orb.domain.request.aggregate import Request
 from orb.providers.base.strategy import ProviderOperation
 from orb.providers.gcp.domain.template.value_objects import GCPProviderApi
 from orb.providers.gcp.exceptions import GCPValidationError
@@ -27,6 +28,16 @@ class GCPRequestMetadataParameters(BaseModel):
     provider_api: GCPProviderApi | None = None
 
 
+class GCPMachineCoordinates(BaseModel):
+    """Persisted provider coordinates supplied by machine commands."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    provider_api: GCPProviderApi
+    resource_id: NonEmptyString | None = None
+    provider_data: GCPRequestMetadataParameters
+
+
 class GCPMutationParameters(BaseModel):
     """Validated GCP mutation/read operation parameters."""
 
@@ -35,14 +46,13 @@ class GCPMutationParameters(BaseModel):
     instance_ids: list[NonEmptyString] = Field(default_factory=list)
     resource_ids: list[NonEmptyString] = Field(default_factory=list)
     resource_id: NonEmptyString | None = None
-    resource_mapping: dict[NonEmptyString, tuple[NonEmptyString, int]] = Field(
-        default_factory=dict
-    )
+    resource_mapping: dict[NonEmptyString, tuple[NonEmptyString, int]] = Field(default_factory=dict)
     provider_api: GCPProviderApi | None = None
     region: NonEmptyString | None = None
     zone: NonEmptyString | None = None
     zones: list[NonEmptyString] = Field(default_factory=list)
     requested_count: int | None = Field(default=None, ge=0)
+    machine_coordinates: dict[NonEmptyString, GCPMachineCoordinates] = Field(default_factory=dict)
     request_metadata: GCPRequestMetadataParameters = Field(
         default_factory=GCPRequestMetadataParameters
     )
@@ -58,7 +68,13 @@ class GCPMutationParameters(BaseModel):
     @classmethod
     def from_operation(cls, operation: ProviderOperation) -> Self:
         """Validate raw provider operation parameters at the GCP boundary."""
+        data = dict(operation.parameters)
+        request = data.pop("request", None)
+        if isinstance(request, Request):
+            if request.provider_api:
+                data.setdefault("provider_api", request.provider_api)
+            data.setdefault("request_metadata", request.provider_data)
         try:
-            return cls.model_validate(operation.parameters)
+            return cls.model_validate(data)
         except ValidationError as exc:
             raise GCPValidationError("Invalid GCP mutation operation parameters") from exc

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_validation_port import BaseProviderValidationAdapter
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.gcp.capabilities import get_supported_api_capabilities, get_supported_apis
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.configuration.validator import validate_gcp_template
@@ -45,7 +45,9 @@ class GCPValidationAdapter(BaseProviderValidationAdapter):
         base_result = super().validate_template_configuration(template_config)
         gcp_result = validate_gcp_template(template_config)
 
-        errors = list(dict.fromkeys([*base_result.get("errors", []), *gcp_result.get("errors", [])]))
+        errors = list(
+            dict.fromkeys([*base_result.get("errors", []), *gcp_result.get("errors", [])])
+        )
         warnings = list(
             dict.fromkeys([*base_result.get("warnings", []), *gcp_result.get("warnings", [])])
         )

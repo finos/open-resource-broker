@@ -57,9 +57,7 @@ class GCPMutationService:
         failed_operations = list(outcome.failed_operations)
         attempted_ids = list(outcome.attempted_ids)
         if not attempted_ids:
-            attempted_ids = successful_ids + [
-                failure.target_id for failure in failed_operations
-            ]
+            attempted_ids = successful_ids + [failure.target_id for failure in failed_operations]
 
         success_set = set(successful_ids)
         response_data: dict[str, object] = {

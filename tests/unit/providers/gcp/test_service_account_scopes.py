@@ -9,9 +9,9 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import ValidationError
 
+from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.configuration.template_extension import GCPTemplateExtensionConfig
 from orb.providers.gcp.constants import DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES
-from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 from orb.providers.gcp.infrastructure.handlers.mig_handler import GCPManagedInstanceGroupHandler
 from orb.providers.gcp.infrastructure.handlers.single_vm_handler import GCPSingleVMHandler
@@ -321,9 +321,7 @@ def test_short_network_names_expand_to_compute_engine_resource_paths(monkeypatch
     payload = single_vm_handler._build_instance_payload("vm-1", template)
 
     assert payload.network_interfaces[0].network == "global/networks/default"
-    assert payload.network_interfaces[0].subnetwork == (
-        "regions/us-central1/subnetworks/default"
-    )
+    assert payload.network_interfaces[0].subnetwork == ("regions/us-central1/subnetworks/default")
 
 
 def test_instance_payloads_include_default_network_interface(monkeypatch) -> None:
@@ -346,6 +344,4 @@ def test_instance_payloads_include_default_network_interface(monkeypatch) -> Non
     template_payload = mig_handler._build_instance_template_payload(mig_template, "tmpl-1")
 
     assert instance_payload.network_interfaces[0].network == "global/networks/default"
-    assert template_payload.properties.network_interfaces[0].network == (
-        "global/networks/default"
-    )
+    assert template_payload.properties.network_interfaces[0].network == ("global/networks/default")

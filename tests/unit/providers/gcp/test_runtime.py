@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-from concurrent.futures import TimeoutError as FutureTimeoutError
 import uuid
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 from google.api_core import exceptions as google_exceptions
 
-from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 from orb.domain.request.aggregate import Request
 from orb.domain.request.value_objects import RequestType
+from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from orb.providers.base.strategy.provider_strategy import ProviderResult
 from orb.providers.gcp.configuration.config import GCPProviderConfig
@@ -149,7 +149,11 @@ class _ComputeClientStub:
         return SimpleNamespace(name=f"delete-instances-{mig_name}")
 
     def list_regional_managed_instances(
-        self, *, region: str, mig_name: str, instance_filter: str | None = None,
+        self,
+        *,
+        region: str,
+        mig_name: str,
+        instance_filter: str | None = None,
     ) -> list[object]:
         _ = region, instance_filter
         return self.regional_managed_instances.get(mig_name, [])
@@ -187,6 +191,7 @@ def _config(**overrides: object) -> GCPProviderConfig:
     }
     payload.update(overrides)
     return GCPProviderConfig(**payload)
+
 
 def test_handler_factory_rejects_invalid_handler_type_with_gcp_validation_error() -> None:
     factory = GCPHandlerFactory(
@@ -294,6 +299,7 @@ def test_single_vm_handler_status_normalizes_compute_instance_record() -> None:
         }
     ]
 
+
 def test_single_vm_handler_status_omits_missing_instances() -> None:
     compute_client = _ComputeClientStub()
     compute_client.fail_get_instance_for = {"vm-deleted"}
@@ -379,9 +385,9 @@ def test_single_vm_handler_start_instances_tracks_partial_failures() -> None:
 
     assert result.attempted_ids == ["vm-a", "vm-b"]
     assert result.successful_ids == ["vm-a"]
-    assert [(f.target_id, f.error_code, f.error_message, f.operation) for f in result.failed_operations] == [
-        ("vm-b", "GCPNetworkError", "503 service unavailable", "start_instance")
-    ]
+    assert [
+        (f.target_id, f.error_code, f.error_message, f.operation) for f in result.failed_operations
+    ] == [("vm-b", "GCPNetworkError", "503 service unavailable", "start_instance")]
 
 
 def test_mig_handler_start_instances_returns_failed_results_for_unsupported_targets() -> None:
@@ -712,8 +718,9 @@ def test_provisioning_service_projects_failed_operations_into_fleet_errors() -> 
         ),
     )
 
-    assert result.success is True
-    assert result.metadata["provider_data"]["fleet_errors"] == [
+    assert result.success is False
+    assert result.error_code == "GCPQuotaExceededError"
+    assert result.metadata["fleet_errors"] == [
         {
             "instance_id": "vm-a",
             "error_code": "GCPQuotaExceededError",
@@ -774,7 +781,8 @@ def test_provisioning_service_single_vm_create_result_waits_for_status_sync() ->
     assert result.data["instance_ids"] == ["vm-a"]
     assert result.data["instances"] == []
     assert result.data["results"] == {"vm-a": True}
-    assert result.metadata["provider_data"]["operation_status"] == "submitted"
+    assert result.metadata["operation_status"] == "submitted"
+    assert result.metadata["requires_async_polling"] is True
 
 
 def test_provisioning_service_mig_create_result_tracks_resource_not_machine_id() -> None:
@@ -824,8 +832,32 @@ def test_provisioning_service_mig_create_result_tracks_resource_not_machine_id()
     assert result.data["instance_ids"] == []
     assert result.data["instances"] == []
     assert result.data["results"] == {"orb-gcp-mig-12345678": True}
-    assert result.metadata["provider_data"]["provider_api"] == "MIG"
-    assert result.metadata["provider_data"]["fulfillment_final"] is True
+    assert result.metadata["provider_api"] == "MIG"
+    assert result.metadata["requires_async_polling"] is True
+
+
+def test_status_parameters_use_persisted_request_provider_context() -> None:
+    from orb.providers.gcp.services.operation_parameters import GCPMutationParameters
+
+    request = Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
+        template_id="gcp-mig",
+        machine_count=1,
+        provider_type="gcp",
+    )
+    request.provider_api = "MIG"
+    request = request.set_provider_data({"scope": "zonal", "zone": "us-central1-a"})
+
+    params = GCPMutationParameters.from_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={"instance_ids": ["vm-a"], "request": request},
+        )
+    )
+
+    assert params.provider_api_name == "MIG"
+    assert params.request_metadata.scope == "zonal"
+    assert params.request_metadata.zone == "us-central1-a"
 
 
 def test_inventory_service_emits_fulfilment_for_running_instances() -> None:
@@ -1071,7 +1103,9 @@ def test_mig_handler_status_treats_missing_mig_as_empty() -> None:
 
 @pytest.mark.asyncio
 async def test_strategy_create_instances_delegates_to_handler() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1107,10 +1141,12 @@ async def test_strategy_create_instances_delegates_to_handler() -> None:
 
     assert result.success is True
     assert result.data["resource_ids"] == ["mig-demo"]
-    assert result.metadata["provider_data"] == {
+    assert {
+        key: result.metadata[key] for key in ("scope", "provider_api", "requires_async_polling")
+    } == {
         "scope": "regional",
         "provider_api": "MIG",
-        "fulfillment_final": True,
+        "requires_async_polling": True,
     }
 
 
@@ -1152,14 +1188,16 @@ async def test_strategy_create_instances_normalizes_legacy_template_aliases() ->
 
     assert result.success is True
     template = handler.acquire_hosts.call_args.args[1]
-    assert template.instance_type == "e2-standard-8"
+    assert template.machine_type == "e2-standard-8"
     assert template.boot_disk_size_gb == 50
     assert template.boot_disk_type.value == "pd-ssd"
 
 
 @pytest.mark.asyncio
 async def test_strategy_describe_resource_instances_emits_provider_fulfilment() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1210,7 +1248,9 @@ async def test_strategy_describe_resource_instances_emits_provider_fulfilment() 
 
 @pytest.mark.asyncio
 async def test_strategy_create_instances_dry_run_short_circuits_handler_calls() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1244,14 +1284,18 @@ async def test_strategy_create_instances_dry_run_short_circuits_handler_calls() 
     assert result.metadata["method"] == "dry_run"
     assert result.data["provider_api"] == "MIG"
     assert result.data["resource_ids"] == ["dry-run-gcp-mig"]
-    assert result.metadata["provider_data"]["dry_run"] is True
-    assert result.metadata["provider_data"]["fulfillment_final"] is True
+    assert result.metadata["dry_run"] is True
+    assert result.metadata["requires_async_polling"] is False
     assert is_dry_run_active() is False
 
 
 @pytest.mark.asyncio
-async def test_strategy_create_single_vm_uses_provider_zone_when_template_dto_has_empty_zones() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+async def test_strategy_create_single_vm_uses_provider_zone_when_template_dto_has_empty_zones() -> (
+    None
+):
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1284,12 +1328,14 @@ async def test_strategy_create_single_vm_uses_provider_zone_when_template_dto_ha
 
     assert result.success is True
     assert result.data["provider_api"] == "SingleVM"
-    assert result.metadata["provider_data"]["zone"] == "us-central1-a"
+    assert result.metadata["zone"] == "us-central1-a"
 
 
 @pytest.mark.asyncio
 async def test_strategy_create_spot_template_accepts_neutral_price_type() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1326,7 +1372,9 @@ async def test_strategy_create_spot_template_accepts_neutral_price_type() -> Non
 
 @pytest.mark.asyncio
 async def test_strategy_execute_operation_preserves_dry_run_context_inside_to_thread() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     observed: dict[str, bool] = {}
@@ -1354,7 +1402,9 @@ async def test_strategy_execute_operation_preserves_dry_run_context_inside_to_th
 
 @pytest.mark.asyncio
 async def test_strategy_create_singlevm_rejects_missing_zone() -> None:
-    strategy = GCPProviderStrategy(config=_config(zones=[]), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(zones=[]), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     result = await strategy.execute_operation(
@@ -1383,7 +1433,9 @@ async def test_strategy_create_singlevm_rejects_missing_zone() -> None:
 
 @pytest.mark.asyncio
 async def test_strategy_preserves_direct_gcp_errors() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1419,7 +1471,9 @@ async def test_strategy_preserves_direct_gcp_errors() -> None:
 
 @pytest.mark.asyncio
 async def test_strategy_translates_not_found_failures_to_gcp_entity_errors() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1445,7 +1499,9 @@ async def test_strategy_translates_not_found_failures_to_gcp_entity_errors() -> 
 
 @pytest.mark.asyncio
 async def test_strategy_translates_resource_exhausted_to_gcp_quota_error() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1469,11 +1525,15 @@ async def test_strategy_translates_resource_exhausted_to_gcp_quota_error() -> No
 
 @pytest.mark.asyncio
 async def test_strategy_translates_service_unavailable_to_gcp_network_error() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
-    handler.check_hosts_status.side_effect = google_exceptions.ServiceUnavailable("service unavailable")
+    handler.check_hosts_status.side_effect = google_exceptions.ServiceUnavailable(
+        "service unavailable"
+    )
     strategy._handler_factory = SimpleNamespace(create_handler=lambda _api: handler)
 
     result = await strategy.execute_operation(
@@ -1493,7 +1553,9 @@ async def test_strategy_translates_service_unavailable_to_gcp_network_error() ->
 
 @pytest.mark.asyncio
 async def test_strategy_terminate_instances_supports_multiple_mig_resource_ids() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
     strategy._compute_client = _ComputeClientStub()
     strategy._handler_factory = GCPHandlerFactory(
@@ -1558,7 +1620,9 @@ async def test_strategy_terminate_single_vm_derives_zone_from_instance_resource_
 
 @pytest.mark.asyncio
 async def test_strategy_terminate_mig_uses_resource_mapping() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1590,7 +1654,9 @@ async def test_strategy_terminate_mig_uses_resource_mapping() -> None:
 
 @pytest.mark.asyncio
 async def test_strategy_status_mig_uses_scalar_resource_id() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1624,7 +1690,9 @@ async def test_strategy_status_mig_uses_scalar_resource_id() -> None:
 
 @pytest.mark.asyncio
 async def test_strategy_terminate_mig_requires_resource_mapping_for_instance_ids() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     result = await strategy.execute_operation(
@@ -1645,7 +1713,9 @@ async def test_strategy_terminate_mig_requires_resource_mapping_for_instance_ids
 
 @pytest.mark.asyncio
 async def test_strategy_terminate_mig_rejects_incomplete_resource_mapping() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     result = await strategy.execute_operation(
@@ -1667,7 +1737,9 @@ async def test_strategy_terminate_mig_rejects_incomplete_resource_mapping() -> N
 
 @pytest.mark.asyncio
 async def test_strategy_terminate_mig_rejects_empty_resource_mapping_resource_id() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     result = await strategy.execute_operation(
@@ -1689,7 +1761,9 @@ async def test_strategy_terminate_mig_rejects_empty_resource_mapping_resource_id
 
 @pytest.mark.asyncio
 async def test_strategy_terminate_instances_dry_run_short_circuits_handler_calls() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1717,7 +1791,9 @@ async def test_strategy_terminate_instances_dry_run_short_circuits_handler_calls
 
 @pytest.mark.asyncio
 async def test_strategy_start_instances_surfaces_partial_results() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
     strategy._compute_client = _ComputeClientStub()
     strategy._handler_factory = GCPHandlerFactory(
@@ -1744,8 +1820,51 @@ async def test_strategy_start_instances_surfaces_partial_results() -> None:
 
 
 @pytest.mark.asyncio
+async def test_strategy_start_instances_uses_each_machine_zone() -> None:
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
+    assert strategy.initialize() is True
+    compute_client = _ComputeClientStub()
+    compute_client.start_instance = MagicMock(wraps=compute_client.start_instance)
+    strategy._compute_client = compute_client
+    strategy._handler_factory = GCPHandlerFactory(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+
+    result = await strategy.execute_operation(
+        ProviderOperation(
+            operation_type=ProviderOperationType.START_INSTANCES,
+            parameters={
+                "instance_ids": ["vm-a", "vm-b"],
+                "machine_coordinates": {
+                    "vm-a": {
+                        "provider_api": "SingleVM",
+                        "provider_data": {"zone": "us-central1-a"},
+                    },
+                    "vm-b": {
+                        "provider_api": "SingleVM",
+                        "provider_data": {"zone": "us-central1-b"},
+                    },
+                },
+            },
+        )
+    )
+
+    assert result.data["results"] == {"vm-a": True, "vm-b": True}
+    assert compute_client.start_instance.call_args_list == [
+        call(zone="us-central1-a", instance_name="vm-a"),
+        call(zone="us-central1-b", instance_name="vm-b"),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_strategy_get_instance_status_dry_run_short_circuits_handler_calls() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     handler = MagicMock()
@@ -1777,7 +1896,9 @@ async def test_strategy_get_instance_status_dry_run_short_circuits_handler_calls
 
 @pytest.mark.asyncio
 async def test_strategy_resolve_image_uses_compute_client() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
     strategy._compute_client = _ComputeClientStub()
 
@@ -1797,7 +1918,9 @@ async def test_strategy_resolve_image_uses_compute_client() -> None:
 
 @pytest.mark.asyncio
 async def test_strategy_resolve_image_dry_run_short_circuits_compute_client() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     compute_client = MagicMock()
@@ -1825,7 +1948,9 @@ async def test_strategy_resolve_image_dry_run_short_circuits_compute_client() ->
 
 
 def test_health_check_reports_healthy_in_dry_run_mode() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     with pytest.MonkeyPatch.context() as mp:
@@ -1843,7 +1968,9 @@ def test_health_check_reports_healthy_in_dry_run_mode() -> None:
 
 
 def test_strategy_reuses_operation_context_service_until_handler_factory_changes() -> None:
-    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock(), provider_name="gcp-default")
+    strategy = GCPProviderStrategy(
+        config=_config(), logger=MagicMock(), provider_name="gcp-default"
+    )
     assert strategy.initialize() is True
 
     first_service = strategy._get_operation_context_service()
@@ -1876,5 +2003,9 @@ def test_mig_handler_missing_membership_raises_gcp_entity_not_found() -> None:
         handler.terminate_hosts(
             resource_ids=["mig-a"],
             instance_ids=["vm-missing"],
-            context={"project_id": "orb-example-12345", "region": "us-central1", "scope": "regional"},
+            context={
+                "project_id": "orb-example-12345",
+                "region": "us-central1",
+                "scope": "regional",
+            },
         )

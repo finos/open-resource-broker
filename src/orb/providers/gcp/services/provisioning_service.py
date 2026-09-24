@@ -74,8 +74,9 @@ class GCPProvisioningService:
                     "operation": "create_instances",
                     "handler_used": provider_api,
                     "method": "dry_run",
-                    "provider_data": provider_data,
+                    **provider_data,
                     "partial_failure": False,
+                    "requires_async_polling": False,
                 },
             )
 
@@ -91,7 +92,6 @@ class GCPProvisioningService:
                 "target_size": context.count,
                 "operation_status": "dry_run",
                 "scope": scope,
-                "fulfillment_final": True,
             }
         )
         if context.template.region:
@@ -113,8 +113,9 @@ class GCPProvisioningService:
                 "operation": "create_instances",
                 "handler_used": provider_api,
                 "method": "dry_run",
-                "provider_data": provider_data,
+                **provider_data,
                 "partial_failure": False,
+                "requires_async_polling": False,
             },
         )
 
@@ -137,10 +138,22 @@ class GCPProvisioningService:
         }
         provider_data = dict(outcome.provider_data)
         provider_data["provider_api"] = provider_api
-        if provider_api == "MIG" and outcome.resource_ids:
-            provider_data["fulfillment_final"] = True
         if fleet_errors:
             provider_data["fleet_errors"] = fleet_errors
+        metadata = {
+            "operation": "create_instances",
+            "handler_used": provider_api,
+            **provider_data,
+            "partial_failure": bool(failed_operations),
+            "requires_async_polling": bool(successful_ids),
+        }
+        if not successful_ids and failed_operations:
+            first_failure = failed_operations[0]
+            return ProviderResult.error_result(
+                first_failure.error_message,
+                error_code=first_failure.error_code,
+                metadata=metadata,
+            )
         return ProviderResult.success_result(
             {
                 "resource_ids": outcome.resource_ids,
@@ -152,10 +165,5 @@ class GCPProvisioningService:
                 "failed_operations": [failure.__dict__ for failure in failed_operations],
                 "results": results,
             },
-            {
-                "operation": "create_instances",
-                "handler_used": provider_api,
-                "provider_data": provider_data,
-                "partial_failure": bool(failed_operations),
-            },
+            metadata,
         )

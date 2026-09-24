@@ -5,10 +5,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import time
+from collections.abc import Callable
 from typing import Any, Mapping, Optional
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.base.strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
@@ -21,7 +22,7 @@ from orb.providers.gcp.capabilities import get_supported_api_capabilities, get_s
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.configuration.template_extension import GCPTemplateExtensionConfig
 from orb.providers.gcp.configuration.validator import validate_gcp_template
-from orb.providers.gcp.exceptions import GCPError, translate_gcp_exception
+from orb.providers.gcp.exceptions import GCPError, GCPValidationError, translate_gcp_exception
 from orb.providers.gcp.infrastructure import (
     GCPComputeClient,
     GCPHandlerFactory,
@@ -34,6 +35,8 @@ from orb.providers.gcp.services import (
     GCPOperationContextService,
     GCPProvisioningService,
 )
+from orb.providers.gcp.services.operation_parameters import GCPMutationParameters
+from orb.providers.gcp.types import GCPMutationOperationContext, GCPMutationOutcome
 
 
 @injectable
@@ -301,7 +304,9 @@ class GCPProviderStrategy(ProviderStrategy):
     async def _handle_create_instances(self, operation: ProviderOperation) -> ProviderResult:
         create_context = self._get_operation_context_service().build_create_context(operation)
         if bool(operation.context and operation.context.get("dry_run", False)):
-            return self._provisioning_service.create_instances_dry_run_result(context=create_context)
+            return self._provisioning_service.create_instances_dry_run_result(
+                context=create_context
+            )
         outcome = await self._execution_service.execute_create(create_context)
         return self._provisioning_service.build_provider_result(
             context=create_context,
@@ -380,7 +385,9 @@ class GCPProviderStrategy(ProviderStrategy):
                     "provider_data": {"dry_run": True},
                 },
             )
-        image = self._get_compute_client().get_image_from_family(image_project=project, family=family)
+        image = self._get_compute_client().get_image_from_family(
+            image_project=project, family=family
+        )
         return ProviderResult.success_result(
             {
                 "resolved_images": {
@@ -393,28 +400,72 @@ class GCPProviderStrategy(ProviderStrategy):
         )
 
     def _handle_start_instances(self, operation: ProviderOperation) -> ProviderResult:
-        mutation_context = self._get_operation_context_service().build_mutation_context(operation)
-        if bool(operation.context and operation.context.get("dry_run", False)):
-            return self._mutation_service.build_dry_run_result(
-                operation_name="start_instances",
-                attempted_ids=mutation_context.instance_ids,
-            )
-        outcome = self._execution_service.execute_start(mutation_context)
-        return self._mutation_service.build_provider_result(
-            operation_name="start_instances",
-            outcome=outcome,
+        return self._execute_machine_mutation(
+            operation, "start_instances", self._execution_service.execute_start
         )
 
     def _handle_stop_instances(self, operation: ProviderOperation) -> ProviderResult:
-        mutation_context = self._get_operation_context_service().build_mutation_context(operation)
+        return self._execute_machine_mutation(
+            operation, "stop_instances", self._execution_service.execute_stop
+        )
+
+    def _execute_machine_mutation(
+        self,
+        operation: ProviderOperation,
+        operation_name: str,
+        execute: Callable[[GCPMutationOperationContext], GCPMutationOutcome],
+    ) -> ProviderResult:
+        """Dispatch machine mutations using each machine's persisted placement."""
+        params = GCPMutationParameters.from_operation(operation)
+        contexts: list[GCPMutationOperationContext] = []
+        if params.machine_coordinates:
+            for instance_id in params.instance_ids:
+                coordinates = params.machine_coordinates.get(instance_id)
+                if coordinates is None:
+                    raise GCPValidationError(f"Missing GCP coordinates for machine {instance_id}")
+                if (
+                    coordinates.provider_api.value == "SingleVM"
+                    and not coordinates.provider_data.zone
+                ):
+                    raise GCPValidationError(f"Missing GCP zone for machine {instance_id}")
+                if coordinates.provider_api.value == "MIG" and not coordinates.resource_id:
+                    raise GCPValidationError(
+                        f"Missing GCP MIG resource ID for machine {instance_id}"
+                    )
+                target_operation = ProviderOperation(
+                    operation_type=operation.operation_type,
+                    parameters={
+                        "instance_ids": [instance_id],
+                        "resource_ids": [coordinates.resource_id]
+                        if coordinates.resource_id
+                        else [],
+                        "provider_api": coordinates.provider_api.value,
+                        "request_metadata": coordinates.provider_data.model_dump(exclude_none=True),
+                    },
+                    context=operation.context,
+                )
+                contexts.append(
+                    self._get_operation_context_service().build_mutation_context(target_operation)
+                )
+        else:
+            contexts.append(self._get_operation_context_service().build_mutation_context(operation))
+
         if bool(operation.context and operation.context.get("dry_run", False)):
             return self._mutation_service.build_dry_run_result(
-                operation_name="stop_instances",
-                attempted_ids=mutation_context.instance_ids,
+                operation_name=operation_name,
+                attempted_ids=params.instance_ids,
             )
-        outcome = self._execution_service.execute_stop(mutation_context)
+        outcome = GCPMutationOutcome()
+        for context in contexts:
+            result = execute(context)
+            outcome.attempted_ids.extend(result.attempted_ids)
+            outcome.successful_ids.extend(result.successful_ids)
+            outcome.operations.extend(result.operations)
+            outcome.failed_operations.extend(result.failed_operations)
+            if result.warning:
+                outcome.warning = result.warning
         return self._mutation_service.build_provider_result(
-            operation_name="stop_instances",
+            operation_name=operation_name,
             outcome=outcome,
         )
 
@@ -559,7 +610,9 @@ class GCPProviderStrategy(ProviderStrategy):
             "project_id": config_mapping.get("project_id", self._config.project_id),
             "region": config_mapping.get("region", self._config.region),
             "networks": [config_mapping.get("network")] if config_mapping.get("network") else [],
-            "subnetworks": [config_mapping.get("subnetwork")] if config_mapping.get("subnetwork") else [],
+            "subnetworks": [config_mapping.get("subnetwork")]
+            if config_mapping.get("subnetwork")
+            else [],
         }
 
     def discover_infrastructure_interactive(

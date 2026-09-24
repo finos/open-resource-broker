@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from orb.domain.base.dependency_injection import injectable
 from orb.domain.base.ports import LoggingPort
+from orb.infrastructure.di.injectable import injectable
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.domain.template.value_objects import GCPProviderApi
 from orb.providers.gcp.exceptions import GCPValidationError

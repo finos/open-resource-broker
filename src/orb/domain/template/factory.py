@@ -104,20 +104,13 @@ class TemplateFactory(BaseTemplateFactory):
 
         # Create provider-specific template if available
         if provider_type and provider_type in self._provider_template_classes:
-            try:
-                template_class = self._provider_template_classes[provider_type]
-                template = template_class(**template_data)
+            template_class = self._provider_template_classes[provider_type]
+            template = template_class(**template_data)
 
-                if self._logger:
-                    self._logger.debug(
-                        "Created %s template: %s", provider_type, template.template_id
-                    )
+            if self._logger:
+                self._logger.debug("Created %s template: %s", provider_type, template.template_id)
 
-                return template
-            except Exception as e:
-                if self._logger:
-                    self._logger.error("Failed to create %s template: %s", provider_type, e)
-                # Fall back to core template
+            return template
 
         # Fall back to core template
         try:

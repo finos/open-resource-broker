@@ -54,7 +54,9 @@ class GCPOperationContextService:
                 error_code="MISSING_TEMPLATE_CONFIG",
             )
 
-        template = GCPTemplate.model_validate(self._build_gcp_template_config(template_config, count))
+        template = GCPTemplate.model_validate(
+            self._build_gcp_template_config(template_config, count)
+        )
         handler = self._handler_factory.create_handler(template.provider_api)
         request = Request.create_new_request(
             request_type=RequestType.ACQUIRE,
@@ -126,9 +128,9 @@ class GCPOperationContextService:
         merged.setdefault("subnetwork", self._config.subnetwork)
 
         # Normalize legacy aliases before applying current compute defaults.
-        if "machine_type" in merged:
-            machine_type = merged.pop("machine_type")
-            merged.setdefault("instance_type", machine_type)
+        if "instance_type" in merged:
+            instance_type = merged.pop("instance_type")
+            merged.setdefault("machine_type", instance_type)
         if "root_device_volume_size" in merged:
             root_device_volume_size = merged.pop("root_device_volume_size")
             merged.setdefault("boot_disk_size_gb", root_device_volume_size)
@@ -137,7 +139,7 @@ class GCPOperationContextService:
             merged.setdefault("boot_disk_type", volume_type)
 
         # Compute and image defaults describe the VM shape to provision.
-        merged.setdefault("instance_type", defaults.machine_type)
+        merged.setdefault("machine_type", defaults.machine_type)
         merged.setdefault("boot_disk_size_gb", defaults.boot_disk_size_gb)
         merged.setdefault("boot_disk_type", defaults.boot_disk_type)
         merged.setdefault("source_image_family", defaults.source_image_family)
@@ -148,7 +150,7 @@ class GCPOperationContextService:
         merged.setdefault("network_tags", defaults.network_tags)
         merged.setdefault("labels", defaults.labels)
         merged.setdefault("instance_template_name_prefix", defaults.instance_template_name_prefix)
-        merged.setdefault("max_instances", count)
+        merged.setdefault("max_machines", count)
         return merged
 
     def _get_handler_for_operation(self, params: GCPMutationParameters) -> GCPHandler:
@@ -242,9 +244,7 @@ class GCPOperationContextService:
         for instance_id in instance_ids:
             mapping_value = resource_mapping.get(instance_id)
             if mapping_value is None:
-                raise GCPValidationError(
-                    f"resource_mapping is missing instance '{instance_id}'"
-                )
+                raise GCPValidationError(f"resource_mapping is missing instance '{instance_id}'")
             resource_id = mapping_value[0]
             if resource_id not in resource_ids:
                 resource_ids.append(resource_id)

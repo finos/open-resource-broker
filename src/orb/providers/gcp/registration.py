@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
-    from orb.providers.registry import ProviderRegistry
     from orb.providers.gcp.configuration.config import GCPProviderConfig
     from orb.providers.gcp.infrastructure.adapters.gcp_validation_adapter import (
         GCPValidationAdapter,
     )
     from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
+    from orb.providers.registry import ProviderRegistry
 
 from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
@@ -29,7 +29,9 @@ class GCPProviderInstanceProtocol(Protocol):
     config: Mapping[str, Any]
 
 
-def _provider_config_data(data: Mapping[str, Any] | GCPProviderInstanceProtocol) -> Mapping[str, Any]:
+def _provider_config_data(
+    data: Mapping[str, Any] | GCPProviderInstanceProtocol,
+) -> Mapping[str, Any]:
     """Return the raw provider config mapping from registry inputs."""
     if isinstance(data, Mapping):
         return data
@@ -206,11 +208,17 @@ def initialize_gcp_provider(
     template_factory: Optional[TemplateFactory] = None,
     logger: Optional[LoggingPort] = None,
 ) -> None:
-    """Initialize GCP provider components."""
-    register_gcp_extensions(logger)
-    register_gcp_provider_settings()
-    if template_factory:
-        register_gcp_template_factory(template_factory, logger)
+    """Initialize GCP's provider satellites during bootstrap."""
+    from orb.providers.gcp.provider_plugin import GCPPlugin
+
+    GCPPlugin().initialize_provider(template_factory=template_factory, logger=logger)
+
+
+def register_gcp_services_with_di(container: Any) -> None:
+    """Register GCP utility services and its template example generator."""
+    from orb.providers.gcp.provider_plugin import GCPPlugin
+
+    GCPPlugin().register_services_with_di(container)
 
 
 def is_gcp_provider_registered() -> bool:

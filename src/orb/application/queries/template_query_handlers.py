@@ -53,7 +53,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
             if not template_dto:
                 raise EntityNotFoundError("Template", query.template_id)
 
-            template_data = template_dto.model_dump()
+            template_data = template_dto.to_domain_data()
             template_data.setdefault("template_id", template_dto.template_id)
             template_data.setdefault("name", template_dto.name or template_dto.template_id)
             template_data.setdefault("provider_api", template_dto.provider_api)

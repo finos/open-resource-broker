@@ -280,28 +280,30 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         resolved_defaults = self._merge_layer(resolved_defaults, global_defaults)
         self.logger.debug("Applied %s global defaults", len(global_defaults))
 
-        # 2. Apply provider type defaults
-        if provider_instance_name:
-            provider_type = self._get_provider_type(provider_instance_name)
-            if provider_type:
-                provider_type_defaults = self._get_provider_type_defaults(provider_type)
-                resolved_defaults = self._merge_layer(resolved_defaults, provider_type_defaults)
-                self.logger.debug(
-                    "Applied %s provider type defaults for %s",
-                    len(provider_type_defaults),
-                    provider_type,
-                )
+        # A shared template file can contain several providers. Its declared type
+        # owns the defaults; an unrelated active instance must never supply them.
+        declared_type = template_dict.get("provider_type")
+        instance_name = template_dict.get("provider_name") or provider_instance_name
+        instance_type = self._get_provider_type(instance_name) if instance_name else None
+        provider_type = declared_type or instance_type
+        if provider_type:
+            provider_type_defaults = self._get_provider_type_defaults(provider_type)
+            resolved_defaults = self._merge_layer(resolved_defaults, provider_type_defaults)
+            self.logger.debug(
+                "Applied %s provider type defaults for %s",
+                len(provider_type_defaults),
+                provider_type,
+            )
 
-                # 3. Apply provider instance defaults
-                provider_instance_defaults = self._get_provider_instance_defaults(
-                    provider_instance_name
-                )
-                resolved_defaults = self._merge_layer(resolved_defaults, provider_instance_defaults)
-                self.logger.debug(
-                    "Applied %s provider instance defaults for %s",
-                    len(provider_instance_defaults),
-                    provider_instance_name,
-                )
+        # 3. Apply instance defaults only when the instance belongs to this type.
+        if instance_name and instance_type == provider_type:
+            provider_instance_defaults = self._get_provider_instance_defaults(instance_name)
+            resolved_defaults = self._merge_layer(resolved_defaults, provider_instance_defaults)
+            self.logger.debug(
+                "Applied %s provider instance defaults for %s",
+                len(provider_instance_defaults),
+                instance_name,
+            )
 
         # 4. Apply template values (highest priority - only for missing fields)
         # launch_template_id may be at top level (legacy) or inside provider_config (new path).
@@ -638,13 +640,13 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         resolved_dict = self.resolve_template_defaults(template_dict, provider_instance_name)
 
         # 2. Determine provider type
-        provider_type = (
-            self._get_provider_type(provider_instance_name) if provider_instance_name else None
-        )
+        instance_type = self._get_provider_type(provider_instance_name) if provider_instance_name else None
+        provider_type = resolved_dict.get("provider_type") or instance_type
 
         # 3. Apply provider extension defaults
         if provider_type:
-            extension_defaults = self._get_extension_defaults(provider_type, provider_instance_name)
+            matching_instance = provider_instance_name if instance_type == provider_type else None
+            extension_defaults = self._get_extension_defaults(provider_type, matching_instance)
             # Extension defaults have lower priority than hierarchical defaults.
             # Alias-aware across BOTH template-field and extension-field aliases
             # so a resolved template value under any alias drops the sibling
@@ -662,13 +664,9 @@ class TemplateDefaultsService(TemplateDefaultsPort):
 
         # 4. Create appropriate template type via factory
         if self.template_factory:
-            try:
-                template = self.template_factory.create_template(resolved_dict, provider_type)
-                self.logger.debug("Created %s via factory", type(template).__name__)
-                return template
-            except Exception as e:
-                self.logger.error("Failed to create template via factory: %s", e)
-                # Fall back to core template
+            template = self.template_factory.create_template(resolved_dict, provider_type)
+            self.logger.debug("Created %s via factory", type(template).__name__)
+            return template
 
         # Fallback: create core template directly
         try:

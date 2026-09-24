@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from types import ModuleType
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -14,10 +13,10 @@ from orb.infrastructure.mocking.dry_run_context import dry_run_context
 from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.exceptions import GCPDryRunBlockedError
 from orb.providers.gcp.infrastructure.compute_client import (
-    GCPComputeClient,
     GCP_MUTATION_RETRYABLE_GOOGLE_API_EXCEPTIONS,
     GCP_READ_RETRYABLE_GOOGLE_API_EXCEPTIONS,
     GCP_RETRYABLE_GOOGLE_API_EXCEPTIONS,
+    GCPComputeClient,
 )
 
 
@@ -130,7 +129,9 @@ def test_create_instance_passes_configured_retry_and_numeric_timeout(monkeypatch
     client = GCPComputeClient(config=_config(), logger=MagicMock())
 
     monkeypatch.setattr(client, "_compute_v1", lambda: fake_compute_v1)
-    monkeypatch.setattr(client, "_build_retry_policy", lambda operation_name: f"{operation_name}-policy")
+    monkeypatch.setattr(
+        client, "_build_retry_policy", lambda operation_name: f"{operation_name}-policy"
+    )
 
     body = SimpleNamespace(name="vm-1")
     client.create_instance(zone="us-central1-a", body=body)
@@ -152,7 +153,9 @@ def test_get_image_from_family_passes_configured_retry_and_numeric_timeout(monke
     client = GCPComputeClient(config=_config(), logger=MagicMock())
 
     monkeypatch.setattr(client, "_compute_v1", lambda: fake_compute_v1)
-    monkeypatch.setattr(client, "_build_retry_policy", lambda operation_name: f"{operation_name}-policy")
+    monkeypatch.setattr(
+        client, "_build_retry_policy", lambda operation_name: f"{operation_name}-policy"
+    )
 
     client.get_image_from_family(image_project="debian-cloud", family="debian-12")
 

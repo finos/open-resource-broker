@@ -126,6 +126,25 @@ class TestTemplateDefaultsService:
         # Should not have provider-specific defaults
         assert "image_id" not in result or result["image_id"] is None
 
+    def test_declared_provider_does_not_inherit_unrelated_instance_defaults(
+        self,
+        template_defaults_service,
+        mock_config_manager,
+        sample_provider_config,
+        sample_template_config,
+    ):
+        mock_config_manager.get_template_config.return_value = sample_template_config
+        mock_config_manager.get_provider_config.return_value = sample_provider_config
+
+        result = template_defaults_service.resolve_template_defaults(
+            {"template_id": "gcp-template", "provider_type": "gcp"}, "aws-primary"
+        )
+
+        assert result["provider_type"] == "gcp"
+        assert "image_id" not in result
+        assert "machine_types" not in result
+        assert "provider_api" not in result
+
     def test_resolve_provider_api_default_hierarchy(
         self,
         template_defaults_service,
