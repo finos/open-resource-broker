@@ -2,6 +2,7 @@
 
 import pytest
 
+from orb.application.dto.template import TemplateDTO
 from orb.infrastructure.template.factories import TemplateDTOFactory
 from orb.providers.gcp.configuration.template_extension import GCPTemplateExtensionConfig
 from orb.providers.gcp.configuration.validator import validate_gcp_template
@@ -27,6 +28,63 @@ def test_validate_gcp_template_accepts_regional_mig() -> None:
 
     assert result["valid"] is True
     assert result["errors"] == []
+
+
+def test_gcp_template_translates_standard_template_fields() -> None:
+    dto = TemplateDTO(
+        template_id="gcp-standard",
+        provider_type="gcp",
+        provider_api="SingleVM",
+        image_id="projects/debian-cloud/global/images/debian-12-v1",
+        machine_types={"e2-micro": 1},
+        network_zones=["us-central1-a"],
+        root_device_volume_size=20,
+        volume_type="pd-standard",
+        tags={"purpose": "worker"},
+    )
+
+    template = GCPTemplate.model_validate(
+        {**dto.model_dump(), "project_id": "orb-example-12345", "region": "us-central1"}
+    )
+
+    assert template.machine_type == "e2-micro"
+    assert template.source_image == "projects/debian-cloud/global/images/debian-12-v1"
+    assert [str(zone) for zone in template.zones] == ["us-central1-a"]
+    assert template.boot_disk_size_gb == 20
+    assert str(template.boot_disk_type) == "pd-standard"
+    assert template.labels == {"purpose": "worker"}
+
+
+def test_gcp_template_rejects_multiple_standard_machine_types() -> None:
+    result = validate_gcp_template(
+        {
+            "template_id": "gcp-ambiguous",
+            "provider_api": "MIG",
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "machine_types": {"e2-micro": 1, "e2-small": 1},
+            "source_image_family": "debian-12",
+            "source_image_project": "debian-cloud",
+        }
+    )
+    assert not result["valid"]
+    assert any("one machine type with weight 1" in error for error in result["errors"])
+
+
+def test_gcp_template_rejects_weighted_standard_machine_type() -> None:
+    result = validate_gcp_template(
+        {
+            "template_id": "gcp-weighted",
+            "provider_api": "MIG",
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "machine_types": {"e2-micro": 2},
+            "source_image_family": "debian-12",
+            "source_image_project": "debian-cloud",
+        }
+    )
+    assert not result["valid"]
+    assert any("one machine type with weight 1" in error for error in result["errors"])
 
 
 def test_validate_gcp_template_rejects_singlevm_with_multiple_instances() -> None:
