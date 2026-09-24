@@ -98,23 +98,6 @@ class TemplateDTO(BaseDTO):
     # Legacy fields
     version: Optional[str] = None
 
-    def to_domain_data(self) -> dict[str, Any]:
-        """Return the domain template vocabulary, including typed provider config."""
-        data = self.model_dump(exclude_none=True, exclude={"provider_data", "version"})
-        field_names = {
-            "image_id": "machine_image",
-            "max_instances": "max_machines",
-            "root_device_volume_size": "machine_disk_size_gb",
-            "volume_type": "machine_disk_type",
-            "key_name": "machine_ssh_key",
-            "user_data": "machine_bootstrap",
-            "instance_profile": "machine_role",
-        }
-        for dto_name, domain_name in field_names.items():
-            if dto_name in data:
-                data[domain_name] = data.pop(dto_name)
-        return data
-
     @field_serializer("provider_config")
     def _serialize_provider_config(self, value: Optional[BaseModel]) -> Optional[dict[str, Any]]:
         """Serialise the typed provider_config to a plain dict for model_dump() consumers."""
