@@ -29,10 +29,10 @@ from orb.providers.gcp.infrastructure.gcp_handler_factory import GCPHandlerFacto
 from orb.providers.gcp.infrastructure.handlers.mig_handler import GCPManagedInstanceGroupHandler
 from orb.providers.gcp.infrastructure.handlers.single_vm_handler import GCPSingleVMHandler
 from orb.providers.gcp.services.inventory_service import GCPInventoryService
+from orb.providers.gcp.services.operation_context import GCPCreateOperationContext
 from orb.providers.gcp.services.provisioning_service import GCPProvisioningService
 from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
 from orb.providers.gcp.types import (
-    GCPCreateOperationContext,
     GCPCreateOutcome,
     GCPFailedOperation,
     GCPInstanceRecord,

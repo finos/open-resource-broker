@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from orb.providers.gcp.types import (
+from orb.providers.gcp.services.operation_context import (
     GCPCreateOperationContext,
+    GCPMutationOperationContext,
+)
+from orb.providers.gcp.types import (
     GCPCreateOutcome,
     GCPInstanceStatus,
-    GCPMutationOperationContext,
     GCPMutationOutcome,
 )
 

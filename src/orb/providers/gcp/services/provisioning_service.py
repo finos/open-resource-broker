@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from orb.providers.base.strategy import ProviderResult
+from orb.providers.gcp.services.operation_context import GCPCreateOperationContext
 from orb.providers.gcp.types import (
-    GCPCreateOperationContext,
     GCPCreateOutcome,
     GCPFailedOperation,
 )

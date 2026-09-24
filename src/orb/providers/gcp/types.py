@@ -3,13 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, TypedDict
-
-from orb.domain.request.aggregate import Request
-
-if TYPE_CHECKING:
-    from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
-    from orb.providers.gcp.infrastructure.handlers.base_handler import GCPHandler
+from typing import Any, TypedDict
 
 
 @dataclass(frozen=True)
@@ -112,24 +106,3 @@ class GCPMutationOutcome:
     operations: list[dict[str, str | None]] = field(default_factory=list)
     failed_operations: list[GCPFailedOperation] = field(default_factory=list)
     warning: str | None = None
-
-
-@dataclass(frozen=True)
-class GCPCreateOperationContext:
-    """Typed inputs required to execute a GCP create operation."""
-
-    template: GCPTemplate
-    request: Request
-    handler: GCPHandler
-    count: int
-
-
-@dataclass(frozen=True)
-class GCPMutationOperationContext:
-    """Typed inputs required to execute a GCP mutation operation."""
-
-    handler: GCPHandler
-    instance_ids: list[str]
-    resource_ids: list[str]
-    handler_context: GCPHandlerContext
-    requested_count: int | None = None
