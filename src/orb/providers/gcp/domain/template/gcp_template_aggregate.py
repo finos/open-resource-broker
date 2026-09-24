@@ -85,6 +85,23 @@ class GCPTemplate(Template):
             return data
         data = dict(data)
 
+        # TemplateDTO is the storage/query shape. GCP accepts it at its own
+        # boundary so shared template and scheduler contracts stay unchanged.
+        dto_fields = {
+            "image_id": "machine_image",
+            "root_device_volume_size": "machine_disk_size_gb",
+            "volume_type": "machine_disk_type",
+            "key_name": "machine_ssh_key",
+            "user_data": "machine_bootstrap",
+            "instance_profile": "machine_role",
+        }
+        for dto_field, domain_field in dto_fields.items():
+            value = data.pop(dto_field, None)
+            if domain_field not in data and value is not None:
+                data[domain_field] = value
+        data.pop("provider_data", None)
+        data.pop("version", None)
+
         raw_provider_config = data.pop("provider_config", None)
         if raw_provider_config is not None:
             provider_defaults = GCPTemplateExtensionConfig.model_validate(

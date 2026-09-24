@@ -144,10 +144,7 @@ def test_gcp_template_dto_roundtrip_preserves_provider_fields() -> None:
     assert dto.root_device_volume_size == 64
     assert dto.volume_type == "pd-balanced"
 
-    provider_payload = dto.to_domain_data()
-    assert "root_device_volume_size" not in provider_payload
-    assert "volume_type" not in provider_payload
-    assert "provider_data" not in provider_payload
+    provider_payload = dto.to_dict()
     assert GCPTemplate.model_validate(provider_payload).machine_type == "e2-standard-4"
 
     assert isinstance(dto.provider_config, GCPTemplateExtensionConfig)
@@ -160,7 +157,7 @@ def test_gcp_template_dto_roundtrip_preserves_provider_fields() -> None:
     )
     assert provider_config["labels"] == {"component": "worker"}
 
-    restored_config = dto.to_domain_data()
+    restored_config = dto.model_dump(exclude_none=True)
     restored_config.pop("provider_config")
     restored_config.update(dto.provider_config.to_template_defaults())
     restored = GCPTemplate.model_validate(restored_config)

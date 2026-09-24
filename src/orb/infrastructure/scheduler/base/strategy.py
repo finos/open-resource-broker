@@ -398,8 +398,8 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         return template.to_dict()
 
     def format_template_for_provider(self, template: TemplateDTO) -> dict[str, Any]:
-        """Return domain template fields for a provider operation."""
-        return template.to_domain_data()
+        """Default implementation - clean to_dict without scheduler-specific formatting."""
+        return template.to_dict()
 
     @staticmethod
     def _unwrap_request_id(value: Any) -> str | None:

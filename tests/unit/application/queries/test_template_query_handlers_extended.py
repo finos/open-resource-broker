@@ -48,7 +48,6 @@ def _make_template_dto(template_id="tmpl-1", name="Test Template", is_active=Tru
         }
 
     dto.model_dump = _model_dump
-    dto.to_domain_data = _model_dump
     return dto
 
 
