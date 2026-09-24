@@ -3781,6 +3781,10 @@ test-azure = [
     { name = "azure-identity" },
     { name = "azure-mgmt-compute" },
 ]
+test-gcp = [
+    { name = "google-auth" },
+    { name = "google-cloud-compute" },
+]
 test-k8s = [
     { name = "kmock" },
     { name = "kubernetes" },
@@ -4093,6 +4097,7 @@ requires-dist = [
     { name = "orb-py", extras = ["azure"], marker = "extra == 'all-providers'" },
     { name = "orb-py", extras = ["cli", "api", "mcp", "sql", "monitoring", "monitoring-aws", "all-providers", "ui"], marker = "extra == 'all'" },
     { name = "orb-py", extras = ["gcp"], marker = "extra == 'all-providers'" },
+    { name = "orb-py", extras = ["gcp"], marker = "extra == 'test-gcp'" },
     { name = "orb-py", extras = ["k8s"], marker = "extra == 'all-providers'" },
     { name = "orb-py", extras = ["k8s"], marker = "extra == 'test-k8s'" },
     { name = "orb-py", extras = ["otel"], marker = "extra == 'monitoring'" },
@@ -4157,7 +4162,7 @@ requires-dist = [
     { name = "werkzeug", marker = "extra == 'dev'", specifier = ">=3.1.6" },
     { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.41.3,<1.0.0" },
 ]
-provides-extras = ["sql", "aws", "k8s", "azure", "gcp", "all-providers", "k8s-legacy", "ui", "cli", "api", "mcp", "otel", "monitoring", "monitoring-aws", "all", "test-aws", "test-azure", "test-k8s", "dev"]
+provides-extras = ["sql", "aws", "k8s", "azure", "gcp", "all-providers", "k8s-legacy", "ui", "cli", "api", "mcp", "otel", "monitoring", "monitoring-aws", "all", "test-aws", "test-azure", "test-gcp", "test-k8s", "dev"]
 
 [package.metadata.requires-dev]
 arch = [{ name = "import-linter", specifier = ">=2.0,<3.0.0" }]

@@ -224,6 +224,11 @@ test-azure = [
     "azure-mgmt-compute>=37.2.0",
 ]
 
+# GCP provider tests use Compute SDK models and google-api-core exceptions.
+test-gcp = [
+    "orb-py[gcp]",
+]
+
 # Kubernetes test dependencies — kmock is an in-process HTTP-level K8s API mock.
 # Tests point the real kubernetes SDK client at the kmock URL so the full
 # client stack is exercised without a live cluster.
