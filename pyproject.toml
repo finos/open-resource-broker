@@ -100,16 +100,19 @@ azure = [
     "azure-mgmt-resource-subscriptions==1.0.0b1",
     "httpx>=0.27.0",
 ]
-# gcp = [
-#     "google-cloud-compute>=1.14.0",
-#     "google-auth>=2.23.0",
-# ]
+# GCP provider. Install with:
+#   pip install orb-py[gcp]
+gcp = [
+    "google-cloud-compute>=1.14.0",
+    "google-auth>=2.23.0",
+]
 
 # Meta-extra: all currently implemented providers
 all-providers = [
     "orb-py[aws]",
     "orb-py[azure]",
     "orb-py[k8s]",
+    "orb-py[gcp]",
 ]
 
 # Legacy k8s HostFactory plugin — heavy deps gated behind optional extra.
@@ -219,6 +222,11 @@ test-azure = [
     "azure-core>=1.38.2",
     "azure-identity>=1.25.2",
     "azure-mgmt-compute>=37.2.0",
+]
+
+# GCP provider tests use Compute SDK models and google-api-core exceptions.
+test-gcp = [
+    "orb-py[gcp]",
 ]
 
 # Kubernetes test dependencies — kmock is an in-process HTTP-level K8s API mock.
@@ -496,6 +504,7 @@ orb = "orb.run:cli_main"
 [project.entry-points."orb.providers"]
 aws = "orb.providers.aws.provider_plugin:AWSPlugin.register_plugin"
 azure = "orb.providers.azure.provider_plugin:AzurePlugin.register_plugin"
+gcp = "orb.providers.gcp.provider_plugin:GCPPlugin.register_plugin"
 k8s = "orb.providers.k8s.provider_plugin:K8sPlugin.register_plugin"
 
 [project.urls]

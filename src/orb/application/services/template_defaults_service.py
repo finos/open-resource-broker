@@ -280,28 +280,29 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         resolved_defaults = self._merge_layer(resolved_defaults, global_defaults)
         self.logger.debug("Applied %s global defaults", len(global_defaults))
 
-        # 2. Apply provider type defaults
-        if provider_instance_name:
-            provider_type = self._get_provider_type(provider_instance_name)
-            if provider_type:
-                provider_type_defaults = self._get_provider_type_defaults(provider_type)
-                resolved_defaults = self._merge_layer(resolved_defaults, provider_type_defaults)
-                self.logger.debug(
-                    "Applied %s provider type defaults for %s",
-                    len(provider_type_defaults),
-                    provider_type,
-                )
+        # A scheduler may load several provider types from one file. Resolve
+        # each row's declared owner before applying type or instance defaults;
+        # the scheduler's selected instance is only a fallback for untyped rows.
+        provider_type, matching_instance = self._provider_context(
+            template_dict, provider_instance_name
+        )
+        if provider_type:
+            provider_type_defaults = self._get_provider_type_defaults(provider_type)
+            resolved_defaults = self._merge_layer(resolved_defaults, provider_type_defaults)
+            self.logger.debug(
+                "Applied %s provider type defaults for %s",
+                len(provider_type_defaults),
+                provider_type,
+            )
 
-                # 3. Apply provider instance defaults
-                provider_instance_defaults = self._get_provider_instance_defaults(
-                    provider_instance_name
-                )
-                resolved_defaults = self._merge_layer(resolved_defaults, provider_instance_defaults)
-                self.logger.debug(
-                    "Applied %s provider instance defaults for %s",
-                    len(provider_instance_defaults),
-                    provider_instance_name,
-                )
+        if matching_instance:
+            provider_instance_defaults = self._get_provider_instance_defaults(matching_instance)
+            resolved_defaults = self._merge_layer(resolved_defaults, provider_instance_defaults)
+            self.logger.debug(
+                "Applied %s provider instance defaults for %s",
+                len(provider_instance_defaults),
+                matching_instance,
+            )
 
         # 4. Apply template values (highest priority - only for missing fields)
         # launch_template_id may be at top level (legacy) or inside provider_config (new path).
@@ -342,6 +343,25 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             )
 
         return result
+
+    def _provider_context(
+        self, template_dict: dict[str, Any], selected_instance: Optional[str]
+    ) -> tuple[Optional[str], Optional[str]]:
+        """Resolve a template's type and a matching instance for its defaults."""
+        declared_type = template_dict.get("provider_type") or template_dict.get("providerType")
+        explicit_instance = template_dict.get("provider_name") or template_dict.get("providerName")
+        instance = explicit_instance or selected_instance
+        instance_type = self._get_provider_type(instance) if instance else None
+
+        if explicit_instance and declared_type and instance_type != declared_type:
+            raise ValueError(
+                f"Template provider_name {explicit_instance!r} does not match "
+                f"provider_type {declared_type!r}"
+            )
+
+        provider_type = declared_type or instance_type
+        matching_instance = instance if instance_type == provider_type else None
+        return provider_type, matching_instance
 
     def _coalesce_merge(
         self, defaults: dict[str, Any], overrides: dict[str, Any]
@@ -406,22 +426,25 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             self.logger.debug("Using provider_api from template: %s", provider_api)
             return provider_api
 
+        provider_type, matching_instance = self._provider_context(
+            template_dict, provider_instance_name
+        )
+
         # 2. Check provider instance defaults
-        if provider_instance_name:
-            instance_defaults = self._get_provider_instance_defaults(provider_instance_name)
+        if matching_instance:
+            instance_defaults = self._get_provider_instance_defaults(matching_instance)
             if instance_defaults.get("provider_api"):
                 provider_api = instance_defaults["provider_api"]
                 self.logger.debug("Using provider_api from instance defaults: %s", provider_api)
                 return provider_api
 
-            # 3. Check provider type defaults
-            provider_type = self._get_provider_type(provider_instance_name)
-            if provider_type:
-                type_defaults = self._get_provider_type_defaults(provider_type)
-                if type_defaults.get("provider_api"):
-                    provider_api = type_defaults["provider_api"]
-                    self.logger.debug("Using provider_api from type defaults: %s", provider_api)
-                    return provider_api
+        # 3. Check provider type defaults
+        if provider_type:
+            type_defaults = self._get_provider_type_defaults(provider_type)
+            if type_defaults.get("provider_api"):
+                provider_api = type_defaults["provider_api"]
+                self.logger.debug("Using provider_api from type defaults: %s", provider_api)
+                return provider_api
 
         # 4. Check global template defaults
         global_defaults = self._get_global_template_defaults()
@@ -638,13 +661,13 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         resolved_dict = self.resolve_template_defaults(template_dict, provider_instance_name)
 
         # 2. Determine provider type
-        provider_type = (
-            self._get_provider_type(provider_instance_name) if provider_instance_name else None
+        provider_type, matching_instance = self._provider_context(
+            resolved_dict, provider_instance_name
         )
 
         # 3. Apply provider extension defaults
         if provider_type:
-            extension_defaults = self._get_extension_defaults(provider_type, provider_instance_name)
+            extension_defaults = self._get_extension_defaults(provider_type, matching_instance)
             # Extension defaults have lower priority than hierarchical defaults.
             # Alias-aware across BOTH template-field and extension-field aliases
             # so a resolved template value under any alias drops the sibling
@@ -792,11 +815,11 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         resolved_dict = self.resolve_template_defaults(template_dict, provider_instance_name)
 
         # Apply extension defaults
-        provider_type = (
-            self._get_provider_type(provider_instance_name) if provider_instance_name else None
+        provider_type, matching_instance = self._provider_context(
+            resolved_dict, provider_instance_name
         )
         if provider_type:
-            extension_defaults = self._get_extension_defaults(provider_type, provider_instance_name)
+            extension_defaults = self._get_extension_defaults(provider_type, matching_instance)
             # Alias-aware extension->template merge (see resolve_template_with_extensions).
             resolved_dict = self._merge_layer(
                 extension_defaults,

@@ -1,0 +1,1 @@
+"""GCP template domain."""
