@@ -14,19 +14,19 @@ class GCPPlugin(ProviderPlugin):
 
     def strategy_factory(self) -> Any:
         """Return the GCP strategy factory."""
-        from orb.providers.gcp.registration import create_gcp_strategy
+        from orb.providers.gcp.factories import create_gcp_strategy
 
         return create_gcp_strategy
 
     def config_factory(self) -> Any:
         """Return the GCP configuration factory."""
-        from orb.providers.gcp.registration import create_gcp_config
+        from orb.providers.gcp.factories import create_gcp_config
 
         return create_gcp_config
 
     def validator_factory(self) -> Any:
         """Return the GCP template validator factory."""
-        from orb.providers.gcp.registration import create_gcp_validator
+        from orb.providers.gcp.factories import create_gcp_validator
 
         return create_gcp_validator
 
