@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import uuid
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 from google.api_core import exceptions as google_exceptions
@@ -55,6 +56,7 @@ class _ComputeClientStub:
         self.fail_get_instance_for: set[str] = set()
         self.fail_create_regional_mig = False
         self.fail_regional_mig_operation = False
+        self.fail_delete_regional_mig = False
         self.timeout_regional_mig_operation = False
         self.template_operation_result_called = False
         self.mig_operation_result_called = False
@@ -127,7 +129,9 @@ class _ComputeClientStub:
 
     def delete_instance_template(self, *, template_name: str) -> object:
         self.deleted_templates.append(template_name)
-        return SimpleNamespace(name=f"delete-template-{template_name}")
+        return self._OperationStub(
+            self, result_flag="template_delete_completed", name=f"delete-template-{template_name}"
+        )
 
     def get_image_from_family(self, *, image_project: str, family: str) -> object:
         return SimpleNamespace(
@@ -136,8 +140,12 @@ class _ComputeClientStub:
         )
 
     def delete_regional_mig(self, *, region: str, mig_name: str) -> object:
+        if self.fail_delete_regional_mig:
+            raise RuntimeError("regional mig delete failed")
         self.deleted_regional_migs.append((region, mig_name))
-        return SimpleNamespace(name=f"delete-{mig_name}")
+        return self._OperationStub(
+            self, result_flag="mig_delete_completed", name=f"delete-{mig_name}"
+        )
 
     def delete_regional_managed_instances(
         self,
@@ -192,6 +200,33 @@ def _config(**overrides: object) -> GCPProviderConfig:
     }
     payload.update(overrides)
     return GCPProviderConfig(**payload)
+
+
+def _mig_request() -> Request:
+    return Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
+        template_id="gcp-mig",
+        machine_count=3,
+        provider_type="gcp",
+    )
+
+
+def _regional_mig_template() -> GCPTemplate:
+    return GCPTemplate.model_validate(
+        {
+            "template_id": "gcp-mig",
+            "provider_type": "gcp",
+            "provider_api": "MIG",
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "zones": ["us-central1-a", "us-central1-b"],
+            "mig_scope": "regional",
+            "instance_type": "e2-standard-4",
+            "max_instances": 3,
+            "source_image_family": "debian-12",
+            "source_image_project": "debian-cloud",
+        }
+    )
 
 
 def test_handler_factory_rejects_invalid_handler_type_with_gcp_validation_error() -> None:
@@ -556,6 +591,7 @@ async def test_mig_handler_rolls_back_instance_template_when_mig_create_fails() 
     with pytest.raises(RuntimeError, match="regional mig create failed"):
         await handler.acquire_hosts(request, template)
 
+    assert compute_client.deleted_regional_migs == []
     assert compute_client.deleted_templates == [compute_client.created_templates[0][0]]
 
 
@@ -594,6 +630,7 @@ async def test_mig_handler_rolls_back_instance_template_when_mig_operation_fails
         await handler.acquire_hosts(request, template)
 
     assert compute_client.mig_operation_result_called is True
+    assert compute_client.deleted_regional_migs == [compute_client.created_migs[0][:2]]
     assert compute_client.deleted_templates == [compute_client.created_templates[0][0]]
 
 
@@ -635,9 +672,95 @@ async def test_mig_handler_rolls_back_template_when_mig_operation_times_out() ->
         await handler.acquire_hosts(request, template)
 
     assert compute_client.mig_operation_result_called is True
+    assert compute_client.deleted_regional_migs == [compute_client.created_migs[0][:2]]
     assert compute_client.deleted_templates == [compute_client.created_templates[0][0]]
     assert exc_info.value.details["operation"] == "create_mig"
     assert exc_info.value.details["timeout_seconds"] == 36
+
+
+@pytest.mark.asyncio
+async def test_mig_create_cancellation_deletes_accepted_mig_before_template() -> None:
+    compute_client = _ComputeClientStub()
+    handler = GCPManagedInstanceGroupHandler(compute_client, _config(), MagicMock())
+    request = _mig_request()
+    template = _regional_mig_template()
+    mig_wait_started = asyncio.Event()
+    delete_order: list[str] = []
+    original_delete_mig = compute_client.delete_regional_mig
+    original_delete_template = compute_client.delete_instance_template
+
+    def delete_mig(*, region: str, mig_name: str) -> object:
+        delete_order.append("mig")
+        return original_delete_mig(region=region, mig_name=mig_name)
+
+    def delete_template(*, template_name: str) -> object:
+        delete_order.append("template")
+        return original_delete_template(template_name=template_name)
+
+    async def wait_for_operation(operation: object, *, timeout_seconds: float) -> None:
+        _ = timeout_seconds
+        if operation.name.startswith("mig-op-"):
+            mig_wait_started.set()
+            await asyncio.Event().wait()
+
+    with (
+        patch.object(handler, "_wait_for_operation", side_effect=wait_for_operation),
+        patch.object(compute_client, "delete_regional_mig", side_effect=delete_mig),
+        patch.object(compute_client, "delete_instance_template", side_effect=delete_template),
+    ):
+        create_task = asyncio.create_task(handler.acquire_hosts(request, template))
+        await asyncio.wait_for(mig_wait_started.wait(), 1)
+        create_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await create_task
+
+    assert delete_order == ["mig", "template"]
+
+
+@pytest.mark.asyncio
+async def test_mig_rollback_keeps_template_when_mig_delete_fails() -> None:
+    compute_client = _ComputeClientStub()
+    compute_client.fail_regional_mig_operation = True
+    compute_client.fail_delete_regional_mig = True
+    logger = MagicMock()
+    handler = GCPManagedInstanceGroupHandler(compute_client, _config(), logger)
+    request = _mig_request()
+    template = _regional_mig_template()
+
+    with pytest.raises(RuntimeError, match="regional mig operation failed"):
+        await handler.acquire_hosts(request, template)
+
+    assert compute_client.deleted_templates == []
+    logger.error.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_mig_insert_that_finishes_after_cancellation_is_rolled_back() -> None:
+    compute_client = _ComputeClientStub()
+    handler = GCPManagedInstanceGroupHandler(compute_client, _config(), MagicMock())
+    request = _mig_request()
+    template = _regional_mig_template()
+    insert_started = asyncio.Event()
+    release_insert = threading.Event()
+    loop = asyncio.get_running_loop()
+    original_insert = compute_client.create_regional_mig
+
+    def delayed_insert(*, region: str, mig_name: str, body: object) -> object:
+        loop.call_soon_threadsafe(insert_started.set)
+        if not release_insert.wait(2):
+            raise AssertionError("test did not release the MIG insert")
+        return original_insert(region=region, mig_name=mig_name, body=body)
+
+    with patch.object(compute_client, "create_regional_mig", side_effect=delayed_insert):
+        create_task = asyncio.create_task(handler.acquire_hosts(request, template))
+        await asyncio.wait_for(insert_started.wait(), 1)
+        create_task.cancel()
+        release_insert.set()
+        with pytest.raises(asyncio.CancelledError):
+            await create_task
+
+    assert compute_client.deleted_regional_migs == [compute_client.created_migs[0][:2]]
+    assert compute_client.deleted_templates == [compute_client.created_templates[0][0]]
 
 
 @pytest.mark.asyncio

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from concurrent.futures import TimeoutError as FutureTimeoutError
+from dataclasses import dataclass
 from typing import Protocol
 
 from orb.domain.request.aggregate import Request
@@ -47,6 +48,24 @@ class _GCPOperationWithName(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class _MIGPlacement:
+    """Validated location of the group being created or rolled back."""
+
+    scope: GCPMIGScope
+    location: str
+
+    @classmethod
+    def from_template(cls, template: GCPTemplate) -> _MIGPlacement:
+        """Capture the template's regional or zonal placement."""
+        location = (
+            str(template.region)
+            if template.mig_scope == GCPMIGScope.REGIONAL
+            else str(template.zones[0])
+        )
+        return cls(scope=template.mig_scope, location=location)
+
+
 class GCPManagedInstanceGroupHandler(GCPHandler):
     """Create and manage zonal or regional Managed Instance Groups."""
 
@@ -58,82 +77,81 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         """Create the MIG and backing instance template for a request."""
         mig_name = template.mig_name or f"orb-mig-{template.template_id}-{uuid.uuid4().hex[:8]}"
         template_name = f"{template.instance_template_name_prefix or 'orb'}-{template.template_id}-{uuid.uuid4().hex[:8]}"
-        template_operation = await asyncio.to_thread(
-            self._compute_client.create_instance_template,
-            template_name=template_name,
-            body=self._build_instance_template_payload(template, template_name),
-        )
-        # Wait for the template insert to finish before creating the MIG, otherwise
-        # the subsequent MIG create can race eventual consistency on template lookup.
-        wait_timeout_seconds = self._operation_wait_timeout_seconds()
-        try:
-            await self._wait_for_operation(
-                template_operation,
-                timeout_seconds=wait_timeout_seconds,
+        placement = _MIGPlacement.from_template(template)
+        template_insert = asyncio.create_task(
+            asyncio.to_thread(
+                self._compute_client.create_instance_template,
+                template_name=template_name,
+                body=self._build_instance_template_payload(template, template_name),
             )
-        except FutureTimeoutError as exc:
-            await self._rollback_instance_template(template_name)
-            raise GCPNetworkError(
-                "Timed out waiting for GCP instance template creation to finish",
-                details={
-                    "operation": "create_instance_template",
-                    "template_name": template_name,
-                    "operation_name": template_operation.name or "",
-                    "timeout_seconds": wait_timeout_seconds,
-                },
-            ) from exc
-
+        )
+        wait_timeout_seconds = self._operation_wait_timeout_seconds()
+        mig_insert: asyncio.Task[_GCPOperationWithName] | None = None
         try:
-            if template.mig_scope == GCPMIGScope.REGIONAL:
-                region = str(template.region)
-                location_context = {"region": region, "scope": template.mig_scope.value}
-                response = await asyncio.to_thread(
-                    self._compute_client.create_regional_mig,
-                    region=region,
-                    mig_name=mig_name,
-                    body=self._build_regional_mig_payload(
-                        template=template,
-                        template_name=template_name,
-                        target_size=request.requested_count,
-                    ),
+            template_operation = await asyncio.shield(template_insert)
+            try:
+                await self._wait_for_operation(
+                    template_operation,
+                    timeout_seconds=wait_timeout_seconds,
+                )
+            except FutureTimeoutError as exc:
+                raise GCPNetworkError(
+                    "Timed out waiting for GCP instance template creation to finish",
+                    details={
+                        "operation": "create_instance_template",
+                        "template_name": template_name,
+                        "operation_name": template_operation.name or "",
+                        "timeout_seconds": wait_timeout_seconds,
+                    },
+                ) from exc
+            if placement.scope == GCPMIGScope.REGIONAL:
+                mig_insert = asyncio.create_task(
+                    asyncio.to_thread(
+                        self._compute_client.create_regional_mig,
+                        region=placement.location,
+                        mig_name=mig_name,
+                        body=self._build_regional_mig_payload(
+                            template=template,
+                            template_name=template_name,
+                            target_size=request.requested_count,
+                        ),
+                    )
                 )
             else:
-                zone = str(template.zones[0])
-                location_context = {"zone": zone, "scope": template.mig_scope.value}
-                response = await asyncio.to_thread(
-                    self._compute_client.create_zonal_mig,
-                    zone=zone,
-                    mig_name=mig_name,
-                    body=self._build_zonal_mig_payload(
-                        template=template,
-                        template_name=template_name,
-                        target_size=request.requested_count,
-                    ),
+                mig_insert = asyncio.create_task(
+                    asyncio.to_thread(
+                        self._compute_client.create_zonal_mig,
+                        zone=placement.location,
+                        mig_name=mig_name,
+                        body=self._build_zonal_mig_payload(
+                            template=template,
+                            template_name=template_name,
+                            target_size=request.requested_count,
+                        ),
+                    )
                 )
-        except Exception:
-            await self._rollback_instance_template(template_name)
-            raise
-
-        try:
-            await self._wait_for_operation(
-                response,
-                timeout_seconds=wait_timeout_seconds,
+            response = await asyncio.shield(mig_insert)
+            try:
+                await self._wait_for_operation(
+                    response,
+                    timeout_seconds=wait_timeout_seconds,
+                )
+            except FutureTimeoutError as exc:
+                raise GCPNetworkError(
+                    "Timed out waiting for GCP managed instance group creation to finish",
+                    details={
+                        "operation": "create_mig",
+                        "mig_name": mig_name,
+                        "instance_template_name": template_name,
+                        "operation_name": response.name or "",
+                        "timeout_seconds": wait_timeout_seconds,
+                        **self._location_context(placement),
+                    },
+                ) from exc
+        except (Exception, asyncio.CancelledError):
+            await self._run_rollback(
+                template_name, mig_name, placement, template_insert, mig_insert
             )
-        except FutureTimeoutError as exc:
-            await self._rollback_instance_template(template_name)
-            raise GCPNetworkError(
-                "Timed out waiting for GCP managed instance group creation to finish",
-                details={
-                    "operation": "create_mig",
-                    "mig_name": mig_name,
-                    "instance_template_name": template_name,
-                    "operation_name": response.name or "",
-                    "timeout_seconds": wait_timeout_seconds,
-                    **location_context,
-                },
-            ) from exc
-        except Exception:
-            await self._rollback_instance_template(template_name)
             raise
 
         provider_data: GCPProviderData = {
@@ -142,7 +160,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
             "target_size": request.requested_count,
             "operation_name": response.name or "",
             "operation_status": "completed",
-            **location_context,
+            **self._location_context(placement),
         }
 
         return GCPCreateOutcome(
@@ -151,18 +169,97 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
             provider_data=provider_data,
         )
 
-    async def _rollback_instance_template(self, template_name: str) -> None:
+    async def _run_rollback(
+        self,
+        template_name: str,
+        mig_name: str,
+        placement: _MIGPlacement,
+        template_insert: asyncio.Task[_GCPOperationWithName],
+        mig_insert: asyncio.Task[_GCPOperationWithName] | None,
+    ) -> None:
+        rollback = asyncio.create_task(
+            self._rollback_create(template_name, mig_name, placement, template_insert, mig_insert)
+        )
+        cancelled = False
+        while not rollback.done():
+            try:
+                await asyncio.shield(rollback)
+            except asyncio.CancelledError:
+                cancelled = True
+        rollback.result()
+        if cancelled:
+            raise asyncio.CancelledError
+
+    async def _rollback_create(
+        self,
+        template_name: str,
+        mig_name: str,
+        placement: _MIGPlacement,
+        template_insert: asyncio.Task[_GCPOperationWithName],
+        mig_insert: asyncio.Task[_GCPOperationWithName] | None,
+    ) -> None:
+        for insert in (template_insert, mig_insert):
+            if insert is not None:
+                try:
+                    await insert
+                except Exception:
+                    pass
+
+        if mig_insert is not None and not mig_insert.cancelled() and mig_insert.exception() is None:
+            try:
+                if placement.scope == GCPMIGScope.REGIONAL:
+                    delete_operation = await asyncio.to_thread(
+                        self._compute_client.delete_regional_mig,
+                        region=placement.location,
+                        mig_name=mig_name,
+                    )
+                else:
+                    delete_operation = await asyncio.to_thread(
+                        self._compute_client.delete_zonal_mig,
+                        zone=placement.location,
+                        mig_name=mig_name,
+                    )
+                await self._wait_for_operation(
+                    delete_operation,
+                    timeout_seconds=self._operation_wait_timeout_seconds(),
+                )
+            except Exception as cleanup_exc:
+                if isinstance(
+                    translate_gcp_exception(cleanup_exc, operation="delete_mig"),
+                    GCPEntityNotFoundError,
+                ):
+                    pass
+                else:
+                    self._logger.error(
+                        "Failed to roll back MIG %s and template %s: %s",
+                        mig_name,
+                        template_name,
+                        cleanup_exc,
+                    )
+                    return
+
+        if template_insert.cancelled() or template_insert.exception() is not None:
+            return
         try:
-            await asyncio.to_thread(
+            delete_operation = await asyncio.to_thread(
                 self._compute_client.delete_instance_template,
                 template_name=template_name,
             )
+            await self._wait_for_operation(
+                delete_operation,
+                timeout_seconds=self._operation_wait_timeout_seconds(),
+            )
         except Exception as cleanup_exc:
-            self._logger.warning(
-                "Failed to roll back orphaned instance template %s after MIG create failure: %s",
+            self._logger.error(
+                "Failed to roll back instance template %s after MIG create failure: %s",
                 template_name,
                 cleanup_exc,
             )
+
+    @staticmethod
+    def _location_context(placement: _MIGPlacement) -> dict[str, str]:
+        key = "region" if placement.scope == GCPMIGScope.REGIONAL else "zone"
+        return {"scope": placement.scope.value, key: placement.location}
 
     @staticmethod
     async def _wait_for_operation(
