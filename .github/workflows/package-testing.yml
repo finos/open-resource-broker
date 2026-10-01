@@ -38,10 +38,43 @@ jobs:
     name: Get Configuration
     uses: ./.github/workflows/shared-config.yml
 
+  # Build the wheel exactly once and share it with every job below. The wheel
+  # is pure-Python (py3-none-any) so the interpreter used to build it has no
+  # bearing on which Python versions can install it — building it once on the
+  # default version and reusing it everywhere is equivalent to building it
+  # separately in each job.
+  build-wheel:
+    name: Build Wheel
+    runs-on: ubuntu-latest
+    needs: [config]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ needs.config.outputs.default-python-version }}
+
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel
+          python -m build
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: package-testing-wheel-${{ github.run_id }}
+          path: dist/*.whl
+          retention-days: 1
+
   package-variants:
     name: Test Package Variants
     runs-on: ubuntu-latest
-    needs: [config]
+    needs: [config, build-wheel]
     permissions:
       contents: read
     strategy:
@@ -76,11 +109,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Download wheel artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: package-testing-wheel-${{ github.run_id }}
+          path: dist
+
       - name: Install package variant
         run: |
           python -m pip install --upgrade pip
-          pip install build wheel
-          python -m build
           # Install the built wheel (not editable source) for true variant isolation.
           # 'minimal' maps to the base package with no extras; 'all' is the
           # meta-extra that pulls in all feature layers; everything else is
@@ -236,7 +273,7 @@ jobs:
   import-guard-validation:
     name: Import Guard Validation
     runs-on: ubuntu-latest
-    needs: [config]
+    needs: [config, build-wheel]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -246,11 +283,16 @@ jobs:
         with:
           python-version: ${{ needs.config.outputs.default-python-version }}
 
+      - name: Download wheel artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: package-testing-wheel-${{ github.run_id }}
+          path: dist
+
       - name: Install minimal dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build pytest pytest-mock
-          python -m build
+          pip install pytest pytest-mock
           pip install "$(find dist -name '*.whl' | head -1)"
 
       - name: Test import guards
@@ -295,7 +337,7 @@ jobs:
   dependency-isolation:
     name: Dependency Isolation Test
     runs-on: ubuntu-latest
-    needs: [config]
+    needs: [config, build-wheel]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -305,13 +347,17 @@ jobs:
         with:
           python-version: ${{ needs.config.outputs.default-python-version }}
 
+      - name: Download wheel artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: package-testing-wheel-${{ github.run_id }}
+          path: dist
+
       - name: Test clean environment
         run: |
           python -m pip install --upgrade pip
-          pip install build
-          python -m build
           pip install "$(find dist -name '*.whl' | head -1)"
-          
+
           # Verify no optional dependencies are installed
           python -c "
           import sys
@@ -348,7 +394,7 @@ jobs:
   error-message-quality:
     name: Error Message Quality Test
     runs-on: ubuntu-latest
-    needs: [config]
+    needs: [config, build-wheel]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -358,11 +404,15 @@ jobs:
         with:
           python-version: ${{ needs.config.outputs.default-python-version }}
 
+      - name: Download wheel artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: package-testing-wheel-${{ github.run_id }}
+          path: dist
+
       - name: Install minimal package
         run: |
           python -m pip install --upgrade pip
-          pip install build
-          python -m build
           pip install "$(find dist -name '*.whl' | head -1)"
 
       - name: Test error messages are helpful
@@ -394,7 +444,7 @@ jobs:
   integration-test:
     name: Integration Test
     runs-on: ubuntu-latest
-    needs: [config, package-variants, import-guard-validation, dependency-isolation]
+    needs: [config, build-wheel, package-variants, import-guard-validation, dependency-isolation]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -404,11 +454,15 @@ jobs:
         with:
           python-version: ${{ needs.config.outputs.default-python-version }}
 
+      - name: Download wheel artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: package-testing-wheel-${{ github.run_id }}
+          path: dist
+
       - name: Test full installation
         run: |
           python -m pip install --upgrade pip
-          pip install build
-          python -m build
           pip install "$(find dist -name '*.whl' | head -1)[all]"
 
       - name: Run comprehensive test
