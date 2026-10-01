@@ -8,6 +8,14 @@ on:
       - 'requirements*.txt'
       - 'pyproject.toml'
       - 'uv.lock'
+      - 'sdk/**/package.json'
+      - 'sdk/**/package-lock.json'
+      - 'sdk/**/go.mod'
+      - 'sdk/**/go.sum'
+      - 'sdk/**/pom.xml'
+      - 'sdk/**/build.gradle'
+      - 'sdk/**/build.gradle.kts'
+      - 'sdk/**/*.csproj'
       - '.github/workflows/security-code.yml'
   pull_request:
     branches: [ main, develop ]
@@ -16,6 +24,14 @@ on:
       - 'requirements*.txt'
       - 'pyproject.toml'
       - 'uv.lock'
+      - 'sdk/**/package.json'
+      - 'sdk/**/package-lock.json'
+      - 'sdk/**/go.mod'
+      - 'sdk/**/go.sum'
+      - 'sdk/**/pom.xml'
+      - 'sdk/**/build.gradle'
+      - 'sdk/**/build.gradle.kts'
+      - 'sdk/**/*.csproj'
       - '.github/workflows/security-code.yml'
   schedule:
     - cron: '0 3 * * 0'
@@ -128,31 +144,173 @@ jobs:
       uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294  # v4
       with:
         fail-on-severity: moderate
-        allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unlicense, 0BSD
-        # The dependency-review action sometimes reports compound SPDX expressions
-        # (e.g. 'MIT AND HPND-Markus-Kuhn') for packages that are actually plain MIT
-        # in their PyPI METADATA. The compound string is treated as a single
-        # non-allowlisted license. Each exemption below has been verified by reading
-        # the package's METADATA license / License-Expression directly:
-        #   werkzeug                BSD-3-Clause AND LicenseRef-scancode-unknown-license-reference -> BSD-3-Clause
-        #   lark                    MIT AND MPL-2.0                                                -> MIT (METADATA: License: MIT)
-        #   mcp                     MIT AND Python-2.0                                             -> MIT (METADATA: License: MIT)
-        #   rfc3987-syntax          Apache-2.0 AND GPL-1.0-or-later AND MIT                        -> MIT (METADATA: License-Expression: MIT)
-        #   wcwidth                 MIT AND HPND-Markus-Kuhn                                       -> MIT (METADATA: License-Expression: MIT)
-        #   lxml                    BSD-3-Clause AND GPL-1.0-or-later                              -> BSD-3-Clause (METADATA: License: BSD-3-Clause; GPL applies to a single legacy source file)
-        #   protobuf                BSD-3-Clause AND LicenseRef-scancode-protobuf                  -> 3-Clause BSD (METADATA License text)
-        #   pywin32                 PSF-2.0                                                        -> PSF-2.0 (permissive, equivalent to BSD)
-        #   cyclonedx-python-lib    no detected license                                            -> Apache-2.0 (METADATA: License: Apache-2.0)
-        #   fastapi                 no detected license                                            -> MIT (METADATA: License-Expression: MIT)
-        #   aiohappyeyeballs        0BSD AND BSD-3-Clause AND GPL-1.0-or-later AND PSF-2.0 AND Python-2.0  -> PSF-2.0 (METADATA: License-Expression: PSF-2.0; permissive)
-        #   aiohttp                 no detected license                                            -> Apache-2.0 (METADATA: License-Expression: Apache-2.0 AND MIT; dual permissive)
-        #   docutils                BSD-2-Clause AND BSD-3-Clause AND CC-PDDC AND GPL-1.0-or-later AND GPL-3.0-only AND GPL-3.0-or-later AND ...  -> public-domain + BSD-2-Clause (METADATA: License: public domain, Python, 2-Clause BSD; GPL applies to a few isolated source files in the docutils source tree)
-        #   scramp                  no detected license                                            -> MIT-0 (METADATA: License-Expression: MIT No Attribution; permissive)
-        #   bidict                  MPL-2.0                                                        -> MPL-2.0 file-level copyleft; used unmodified as a runtime dependency, permitted under Apache-2.0 combined works (pulled in transitively via reflex[ui] extra)
-        #   semgrep                 LGPL-2.0-only AND LGPL-2.1                                    -> LGPL-2.1 (PyPI classifier: LGPLv2; CLI-only scanner, not imported or linked into orb-py; LGPL permits this use)
-        #   bowser (npm)            MIT AND MITNFA                                                -> MIT-family permissive (TS SDK transitive; MITNFA = MIT No False Attribution)
-        #   0BSD added to allow-licenses for tslib (TypeScript runtime lib; 0BSD is a standard permissive license)
-        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/lark, pkg:pypi/mcp, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/pywin32, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/bidict, pkg:pypi/semgrep, pkg:npm/bowser'
+        # FINOS license categories (mirrors the ASF policy):
+        # https://community.finos.org/docs/governance/software-projects/license-categories/
+        # Category A (always allowed) + Category B (allowed as a package-managed
+        # dependency) + MIT-0 (ASF Category A; needed because cffi, a runtime
+        # dependency via cryptography, is MIT-0).
+        allow-licenses: >-
+          Apache-1.1, Apache-2.0, 0BSD, BSD-2-Clause, BSD-3-Clause, ISC, MIT,
+          MS-PL, PHP-3.01, PostgreSQL, Python-2.0, PSF-2.0, Unlicense, X11,
+          Zlib, zlib-acknowledgement, BSL-1.0, ICU, NCSA, ZPL-2.0, W3C, WTFPL,
+          Unicode-DFS-2017, DOC, APAFML, Bitstream-Vera, OGL-UK-3.0, Xnet,
+          MPL-1.0, MPL-1.1, MPL-2.0, EPL-1.0, CDDL-1.0, CDDL-1.1, CPL-1.0,
+          IPL-1.0, ErlPL-1.1, OFL-1.1, Ruby, SPL-1.0, IPA, Ubuntu-font-1.0,
+          CC0-1.0, MIT-0
+        # The dependency-review action evaluates compound SPDX expressions
+        # (e.g. 'MIT AND HPND-Markus-Kuhn') by requiring every component to be
+        # allowlisted, and reports some packages as having "no detected license"
+        # even though their actual PyPI METADATA license is permissive. Each
+        # exemption below has been verified by reading the package's own
+        # METADATA license / License-Expression directly:
+        #   werkzeug              BSD-3-Clause AND LicenseRef-scancode-unknown-license-reference -> BSD-3-Clause (the LicenseRef is a scancode artifact, not a real second license)
+        #   trufflehog (action)   AGPL-3.0 -> invoked as a GitHub Action step (CLI secret scanner), never imported or linked into orb-py; dev/CI tooling only
+        #   rfc3987-syntax        Apache-2.0 AND GPL-1.0-or-later AND MIT -> MIT (METADATA: License-Expression: MIT)
+        #   wcwidth               MIT AND HPND-Markus-Kuhn -> MIT (METADATA: License-Expression: MIT)
+        #   lxml                  BSD-3-Clause AND GPL-1.0-or-later -> BSD-3-Clause (METADATA: License: BSD-3-Clause; GPL applies to a single legacy source file)
+        #   protobuf              BSD-3-Clause AND LicenseRef-scancode-protobuf -> BSD-3-Clause (METADATA license text)
+        #   cyclonedx-python-lib  no detected license -> Apache-2.0 (METADATA: License: Apache-2.0)
+        #   fastapi               no detected license -> MIT (METADATA: License-Expression: MIT)
+        #   aiohappyeyeballs      0BSD AND BSD-3-Clause AND GPL-1.0-or-later AND PSF-2.0 AND Python-2.0 -> PSF-2.0 (METADATA: License-Expression: PSF-2.0; permissive)
+        #   aiohttp               no detected license -> Apache-2.0 (METADATA: License-Expression: Apache-2.0 AND MIT; dual permissive)
+        #   docutils              BSD-2-Clause AND BSD-3-Clause AND CC-PDDC AND GPL-1.0-or-later AND GPL-3.0-only AND GPL-3.0-or-later AND ... -> public-domain + BSD-2-Clause (METADATA: License: public domain, Python, 2-Clause BSD; GPL applies to a few isolated source files in the docutils source tree)
+        #   scramp                no detected license -> MIT-0 (METADATA: License-Expression: MIT No Attribution; permissive)
+        #   semgrep               LGPL-2.0-only AND LGPL-2.1 -> LGPL-2.1 (PyPI classifier: LGPLv2; CLI-only scanner, not imported or linked into orb-py; LGPL permits this use)
+        #   bowser (npm)          MIT AND MITNFA -> MIT-family permissive (TypeScript SDK transitive; MITNFA = MIT No False Attribution)
+        #
+        # Dev/CI-only tooling with a FINOS Category X license, or a license not
+        # recognised by name above, that would otherwise fail when bumped. None
+        # of these are shipped by the orb-py runtime install (`pip install
+        # orb-py[...]`); the runtime license set is enforced separately by the
+        # Runtime License Gate job below, scoped to `uv sync --extra all`.
+        #   chardet         LGPL-2.1-or-later -> transitive via cyclonedx-bom (SBOM generation tooling)
+        #   python-gitlab   LGPL-3.0-or-later -> transitive via python-semantic-release (release tooling)
+        #   regex           Apache-2.0 AND CNRI-Python -> transitive via nltk / cfn-lint (lint and test tooling)
+        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/semgrep, pkg:npm/bowser, pkg:pypi/chardet, pkg:pypi/python-gitlab, pkg:pypi/regex'
+        # nltk GHSA-8mgp-746c-j5xp (affects <=3.10.3): CI-only, pulled in
+        # transitively via safety; no upstream fix is published yet.
+        allow-ghsas: GHSA-8mgp-746c-j5xp
+
+  license-gate:
+    name: Runtime License Gate
+    needs: [config]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+    - name: Setup UV with cache
+      uses: ./.github/actions/setup-uv-cached
+      with:
+        cache-key: deps-py3.12-license-${{ hashFiles('.project.yml', 'pyproject.toml', 'uv.lock') }}
+        extra: all
+        fail-on-cache-miss: false
+
+    # FINOS license categories: https://community.finos.org/docs/governance/software-projects/license-categories/
+    # Checks only the runtime install (`uv sync --extra all`, no dependency-groups)
+    # against Category A + B + MIT-0, with no per-package exemptions. Dev/CI-only
+    # tooling is covered separately by the dependency-review purl exemptions
+    # above, never by this gate.
+    #
+    # Matching is exact, not substring: a compound expression like
+    # 'MIT AND GPL-3.0-or-later' must never pass just because 'MIT' is an
+    # allowed substring. --with-system is omitted so pip-licenses' own
+    # tooling (itself, prettytable, wcwidth, pip, setuptools, wheel) is
+    # never evaluated — those are the scanner, not an orb-py runtime
+    # dependency. A handful of packages report a single compound
+    # License-Expression string rather than separate classifiers, so each
+    # exact compound string seen for the current runtime set is listed
+    # explicitly, verified to be built only from already-allowed licenses.
+    - name: Check Python runtime dependency licenses
+      env:
+        ALLOW_LICENSES: >-
+          Apache-1.1;Apache-2.0;Apache Software License;Apache License 2.0;
+          0BSD;BSD-2-Clause;BSD-3-Clause;BSD License;ISC;ISC License (ISCL);
+          MIT;MIT License;MS-PL;PHP-3.01;PostgreSQL;Python-2.0;PSF-2.0;
+          Python Software Foundation License;Unlicense;
+          The Unlicense (Unlicense);X11;Zlib;zlib-acknowledgement;BSL-1.0;
+          ICU;NCSA;ZPL-2.0;W3C;WTFPL;Unicode-DFS-2017;DOC;APAFML;
+          Bitstream-Vera;OGL-UK-3.0;Xnet;MPL-1.0;MPL-1.1;MPL-2.0;
+          Mozilla Public License 2.0 (MPL 2.0);EPL-1.0;CDDL-1.0;CDDL-1.1;
+          CPL-1.0;IPL-1.0;ErlPL-1.1;OFL-1.1;Ruby;SPL-1.0;IPA;
+          Ubuntu-font-1.0;CC0-1.0;MIT-0;MIT No Attribution License (MIT-0);
+          MIT No Attribution;
+          Apache-2.0 AND BSD-2-Clause;Apache-2.0 AND MIT;
+          Apache-2.0 OR BSD-2-Clause;Apache-2.0 OR BSD-3-Clause
+      run: |
+        uv pip install pip-licenses==5.5.5
+        uv run --no-sync pip-licenses \
+          --from=mixed \
+          --ignore-packages orb-py \
+          --allow-only="${ALLOW_LICENSES}"
+
+    - name: Set up Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: sdk/typescript/package-lock.json
+
+    - name: Install TypeScript SDK dependencies
+      working-directory: sdk/typescript
+      run: npm ci
+
+    # Production dependency tree only (--production); dev tooling such as
+    # jest/typescript is out of scope for a runtime license gate.
+    #
+    # license-checker-rseidelsohn's own --onlyAllow does substring matching
+    # (it checks whether the allowed license is contained in the reported
+    # license string), which would let a compound license like
+    # '(MIT AND GPL-3.0-only)' pass just because 'MIT' is a substring. The
+    # JSON output is checked for exact matches instead.
+    - name: Check TypeScript SDK runtime dependency licenses
+      working-directory: sdk/typescript
+      run: |
+        npx --yes license-checker-rseidelsohn@5.0.1 \
+          --production \
+          --excludePackages "@finos/open-resource-broker@0.1.0" \
+          --json > /tmp/sdk-typescript-licenses.json
+        python3 - <<'PY'
+        import json
+        import sys
+
+        # FINOS Category A + B + MIT-0, as reported by license-checker-rseidelsohn
+        # (plain SPDX identifiers; it does not use pip-licenses-style classifier
+        # names).
+        ALLOW = {
+            "Apache-1.1", "Apache-2.0", "0BSD", "BSD-2-Clause", "BSD-3-Clause",
+            "ISC", "MIT", "MS-PL", "PHP-3.01", "PostgreSQL", "Python-2.0",
+            "PSF-2.0", "Unlicense", "X11", "Zlib", "zlib-acknowledgement",
+            "BSL-1.0", "ICU", "NCSA", "ZPL-2.0", "W3C", "WTFPL",
+            "Unicode-DFS-2017", "DOC", "APAFML", "Bitstream-Vera",
+            "OGL-UK-3.0", "Xnet", "MPL-1.0", "MPL-1.1", "MPL-2.0", "EPL-1.0",
+            "CDDL-1.0", "CDDL-1.1", "CPL-1.0", "IPL-1.0", "ErlPL-1.1",
+            "OFL-1.1", "Ruby", "SPL-1.0", "IPA", "Ubuntu-font-1.0",
+            "CC0-1.0", "MIT-0",
+        }
+
+        with open("/tmp/sdk-typescript-licenses.json") as f:
+            packages = json.load(f)
+
+        violations = [
+            (name, info.get("licenses"))
+            for name, info in packages.items()
+            if info.get("licenses") not in ALLOW
+        ]
+
+        if violations:
+            for name, license_name in violations:
+                print(
+                    f"license {license_name!r} not in allow-only licenses was found for package {name}",
+                    file=sys.stderr,
+                )
+            sys.exit(1)
+
+        print(f"All {len(packages)} production dependencies have an allowed license.")
+        PY
 
   codeql-analysis:
     name: CodeQL Analysis
