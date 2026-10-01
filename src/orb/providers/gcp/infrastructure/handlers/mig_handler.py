@@ -203,6 +203,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                 try:
                     await insert
                 except Exception:
+                    # A failed insert must not prevent cleanup of the other accepted resource.
                     pass
 
         if mig_insert is not None and not mig_insert.cancelled() and mig_insert.exception() is None:
