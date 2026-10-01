@@ -47,7 +47,12 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "sqlalchemy>=2.0.0",
     "urllib3>=2.6.3", # Security: Fix CVE-2025-66471, CVE-2025-66418, CVE-2026-21441
-    "PyJWT>=2.8.0",
+    # Security: Fix GHSA-ffc3-869f-jxw9 (critical), GHSA-9j54-fg26-wv3r,
+    # GHSA-w2cx-738m-mc7w, GHSA-9v7f-9g4p-ffgj, GHSA-p4g4-x82p-q773,
+    # GHSA-r6x4-923q-g947 (high), GHSA-jwrc-g2q2-pq5p, GHSA-8wjv-2p76-3863,
+    # GHSA-hxm8-2xgr-2p9m, GHSA-2gx3-rcp4-g85q, GHSA-w6j9-cwv2-h6wq,
+    # GHSA-42vr-xj54-vc7v (medium)
+    "PyJWT>=2.15.0",
     "cryptography>=46.0.5", # Security: Fix CVE-2026-26007
     "filelock>=3.20.1", # Security: Fix CVE-2025-68146 race condition
     "requests>=2.31.0",
