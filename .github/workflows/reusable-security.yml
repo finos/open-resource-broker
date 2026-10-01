@@ -115,7 +115,7 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-fs-results.sarif'
-          trivyignores: .trivyignore
+          trivyignores: .trivyignore.yaml
 
       - name: Upload Trivy filesystem scan results
         if: inputs.scan-type == 'trivy-fs' && always()
