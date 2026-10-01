@@ -1,0 +1,29 @@
+name: Security Exception Audit
+
+# Checks every security exception recorded in .trivyignore.yaml and the
+# dependency-review allow-ghsas list against OSV (https://osv.dev) and opens
+# a tracking issue for any exception whose affected package now has a
+# published fix, so the exception can be re-evaluated and removed.
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    name: Audit security exceptions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+    - name: Check for fixed security exceptions
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: python3 dev-tools/ci/check_security_exceptions.py
