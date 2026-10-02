@@ -34,6 +34,21 @@ log() {
     fi
 }
 
+# Phase timing: written to stderr so these lines show up in CI logs even when
+# --quiet suppresses the rest of this script's output. Phases run
+# sequentially, so one pair of variables is enough to track whichever phase
+# is currently open.
+_phase_t0=0
+_phase_name=""
+_phase_start() {
+    _phase_name="$1"
+    _phase_t0=$(date +%s)
+    printf '[timing] %s: start\n' "$_phase_name" >&2
+}
+_phase_end() {
+    printf '[timing] %s: done in %ss\n' "$_phase_name" "$(( $(date +%s) - _phase_t0 ))" >&2
+}
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 cd "$PROJECT_ROOT"
@@ -81,6 +96,8 @@ log "INFO: Building UI static bundle..."
 # (semgrep→click<8.2), so we NEVER sync from the full lockfile — we always
 # install .[ui] directly into whichever venv we end up using.
 # ---------------------------------------------------------------------------
+
+_phase_start "SPA: venv/ui install"
 
 EPHEMERAL_VENV=""
 
@@ -139,6 +156,7 @@ if command -v uv >/dev/null 2>&1; then
 else
     ORB_SKIP_UI_BUILD=1 "$_VENV_BIN/pip" install --quiet "$(pwd)[ui]"
 fi
+_phase_end
 
 # Invoke reflex from the venv we installed .[ui] into.  Call the venv binary
 # directly rather than ``uv run``: ``uv run`` resolves reflex against uv's
@@ -158,6 +176,7 @@ log "INFO: Cleaning stale bundle outputs..."
 rm -rf "$STATIC_DIR" "$WEB_DIR/build"
 
 log "INFO: Running reflex export --frontend-only..."
+_phase_start "reflex export/init"
 (
     cd "$UI_DIR"
     if [ "$QUIET" = true ]; then
@@ -166,16 +185,25 @@ log "INFO: Running reflex export --frontend-only..."
         "${REFLEX[@]}" export --frontend-only --no-zip --no-ssr --loglevel info
     fi
 )
+_phase_end
 
 log "INFO: Running bun install + bun run export..."
 (
     cd "$WEB_DIR"
     if [ "$QUIET" = true ]; then
+        _phase_start "bun install"
         "$BUN" install --frozen-lockfile >/dev/null 2>&1
+        _phase_end
+        _phase_start "bun run export"
         "$BUN" run export >/dev/null 2>&1
+        _phase_end
     else
+        _phase_start "bun install"
         "$BUN" install --frozen-lockfile
+        _phase_end
+        _phase_start "bun run export"
         "$BUN" run export
+        _phase_end
     fi
 )
 
@@ -185,7 +213,9 @@ if [ ! -d "$CLIENT_DIR" ]; then
 fi
 
 log "INFO: Copying bundle to $STATIC_DIR..."
+_phase_start "copy to _static"
 cp -r "$CLIENT_DIR" "$STATIC_DIR"
+_phase_end
 
 if [ ! -f "$STATIC_DIR/index.html" ]; then
     echo "ERROR: $STATIC_DIR/index.html missing after copy" >&2

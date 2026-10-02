@@ -10,13 +10,19 @@ install: venv-setup  ## Install dependencies (auto-detects UV/pip, environment-a
 	@# UI-agnostic so leaving the extra out of the shared env is safe.
 	@if [ -n "$$CI" ]; then \
 		echo "CI detected: using frozen UV sync"; \
+		_t0=$$(date +%s); echo "[timing] uv sync (frozen, all-groups): start" >&2; \
 		uv sync --frozen --all-groups --quiet; \
+		echo "[timing] uv sync (frozen, all-groups): done in $$(($$(date +%s) - _t0))s" >&2; \
 	elif command -v uv >/dev/null 2>&1; then \
 		echo "UV available"; \
 		if echo "$(MAKECMDGOALS)" | grep -q "_dev"; then \
+			_t0=$$(date +%s); echo "[timing] uv sync (all-groups): start" >&2; \
 			uv sync --all-groups --quiet; \
+			echo "[timing] uv sync (all-groups): done in $$(($$(date +%s) - _t0))s" >&2; \
 		else \
+			_t0=$$(date +%s); echo "[timing] uv sync (no-dev): start" >&2; \
 			uv sync --no-dev --quiet; \
+			echo "[timing] uv sync (no-dev): done in $$(($$(date +%s) - _t0))s" >&2; \
 		fi; \
 	else \
 		echo "Fallback to pip"; \
