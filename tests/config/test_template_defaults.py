@@ -126,6 +126,73 @@ class TestTemplateDefaultsService:
         # Should not have provider-specific defaults
         assert "image_id" not in result or result["image_id"] is None
 
+    def test_declared_provider_uses_its_type_defaults_not_selected_instance(
+        self,
+        template_defaults_service,
+        mock_config_manager,
+        sample_provider_config,
+        sample_template_config,
+    ):
+        gcp_defaults = MagicMock()
+        gcp_defaults.template_defaults = {"provider_api": "MIG", "machine_type": "e2-micro"}
+        sample_provider_config.provider_defaults["gcp"] = gcp_defaults
+        mock_config_manager.get_template_config.return_value = sample_template_config
+        mock_config_manager.get_provider_config.return_value = sample_provider_config
+
+        template = {"template_id": "gcp-template", "provider_type": "gcp"}
+        resolved = template_defaults_service.resolve_template_defaults(template, "aws-primary")
+
+        assert resolved["provider_api"] == "MIG"
+        assert resolved["machine_type"] == "e2-micro"
+        assert "image_id" not in resolved
+        assert "machine_types" not in resolved
+        assert (
+            template_defaults_service.resolve_provider_api_default(template, "aws-primary") == "MIG"
+        )
+
+    def test_explicit_matching_provider_instance_supplies_instance_defaults(
+        self,
+        template_defaults_service,
+        mock_config_manager,
+        sample_provider_config,
+        sample_template_config,
+    ):
+        gcp_instance = MagicMock()
+        gcp_instance.name = "gcp-primary"
+        gcp_instance.type = "gcp"
+        gcp_instance.template_defaults = {"project_id": "example-project-12345"}
+        sample_provider_config.providers.append(gcp_instance)
+        mock_config_manager.get_template_config.return_value = sample_template_config
+        mock_config_manager.get_provider_config.return_value = sample_provider_config
+
+        resolved = template_defaults_service.resolve_template_defaults(
+            {"template_id": "gcp-template", "provider_type": "gcp", "provider_name": "gcp-primary"},
+            "aws-primary",
+        )
+
+        assert resolved["project_id"] == "example-project-12345"
+        assert "image_id" not in resolved
+
+    def test_explicit_provider_type_and_name_must_agree(
+        self,
+        template_defaults_service,
+        mock_config_manager,
+        sample_provider_config,
+        sample_template_config,
+    ):
+        mock_config_manager.get_template_config.return_value = sample_template_config
+        mock_config_manager.get_provider_config.return_value = sample_provider_config
+
+        with pytest.raises(ValueError, match="does not match provider_type"):
+            template_defaults_service.resolve_template_defaults(
+                {
+                    "template_id": "gcp-template",
+                    "provider_type": "gcp",
+                    "provider_name": "aws-primary",
+                },
+                "aws-primary",
+            )
+
     def test_resolve_provider_api_default_hierarchy(
         self,
         template_defaults_service,

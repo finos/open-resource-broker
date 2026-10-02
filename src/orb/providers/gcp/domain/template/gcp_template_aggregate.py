@@ -1,0 +1,175 @@
+"""GCP template aggregate."""
+
+from __future__ import annotations
+
+from typing import Optional
+
+from pydantic import AliasChoices, ConfigDict, Field, model_validator
+
+from orb.domain.template.template_aggregate import Template
+from orb.providers.gcp.configuration.template_extension import GCPTemplateExtensionConfig
+from orb.providers.gcp.constants import (
+    DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES,
+)
+from orb.providers.gcp.domain.template.service_account_scopes import (
+    GCPServiceAccountScopes,
+)
+from orb.providers.gcp.domain.template.value_objects import (
+    GCPDiskTypeName,
+    GCPMIGScope,
+    GCPProjectId,
+    GCPProviderApi,
+    GCPRegion,
+    GCPZone,
+)
+
+
+def _has_template_value(value: object) -> bool:
+    """Return whether a provider_config value should override template input."""
+    if value is None or value == "":
+        return False
+    if isinstance(value, (dict, list)) and not value:
+        return False
+    return True
+
+
+def _is_missing_template_value(value: object) -> bool:
+    """Return whether a template field still needs a provider_config value."""
+    if value is None or value == "":
+        return True
+    if isinstance(value, (dict, list)) and not value:
+        return True
+    return False
+
+
+class GCPTemplate(Template):
+    """GCP-specific template contract for MIG and Single VM provisioning."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    provider_api: GCPProviderApi = GCPProviderApi.MIG
+    machine_type: str = Field(
+        default=..., validation_alias=AliasChoices("machine_type", "instance_type")
+    )
+    project_id: GCPProjectId
+    region: GCPRegion
+    zones: list[GCPZone] = Field(default_factory=list)
+    mig_scope: GCPMIGScope = GCPMIGScope.REGIONAL
+    network: Optional[str] = None
+    subnetwork: Optional[str] = None
+    service_account_email: Optional[str] = None
+    service_account_scopes: GCPServiceAccountScopes = Field(
+        default_factory=lambda: list(DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES)
+    )
+    labels: dict[str, str] = Field(default_factory=dict)
+    network_tags: list[str] = Field(default_factory=list)
+    source_image: Optional[str] = None
+    source_image_family: Optional[str] = None
+    source_image_project: Optional[str] = None
+    boot_disk_type: Optional[GCPDiskTypeName] = None
+    boot_disk_size_gb: Optional[int] = Field(default=None, ge=10)
+    mig_name: Optional[str] = None
+    instance_template_name_prefix: Optional[str] = None
+
+    def __init__(self, **data):
+        """Force the aggregate provider type to GCP before validation."""
+        data["provider_type"] = "gcp"
+        super().__init__(**data)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalise_input(cls, data: object) -> object:
+        """Rewrite external HostFactory/config field names to canonical domain fields."""
+        # `max_number` is the HostFactory/API/storage external name.
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+
+        # TemplateDTO is the storage/query shape. GCP accepts it at its own
+        # boundary so shared template and scheduler contracts stay unchanged.
+        dto_fields = {
+            "image_id": "machine_image",
+            "root_device_volume_size": "machine_disk_size_gb",
+            "volume_type": "machine_disk_type",
+            "key_name": "machine_ssh_key",
+            "user_data": "machine_bootstrap",
+            "instance_profile": "machine_role",
+        }
+        for dto_field, domain_field in dto_fields.items():
+            value = data.pop(dto_field, None)
+            if domain_field not in data and value is not None:
+                data[domain_field] = value
+        # The storage DTO uses the standard template fields. Interpret them at
+        # the GCP boundary; provider-specific fields remain available to direct
+        # GCP templates loaded from configuration files.
+        machine_types = data.get("machine_types") or {}
+        if machine_types:
+            if len(machine_types) != 1 or next(iter(machine_types.values())) != 1:
+                raise ValueError("GCP templates require one machine type with weight 1")
+            data["machine_type"] = next(iter(machine_types))
+        if data.get("machine_types_ondemand") or data.get("machine_types_priority"):
+            raise ValueError("GCP templates do not support separate machine-type pools")
+        if data.get("network_zones"):
+            data["zones"] = data["network_zones"]
+        if data.get("machine_image"):
+            data["source_image"] = data["machine_image"]
+        if data.get("tags") and not data.get("labels"):
+            data["labels"] = data["tags"]
+        data.pop("provider_data", None)
+        data.pop("version", None)
+
+        raw_provider_config = data.pop("provider_config", None)
+        if raw_provider_config is not None:
+            provider_defaults = GCPTemplateExtensionConfig.model_validate(
+                raw_provider_config
+            ).to_template_defaults()
+            for key, value in provider_defaults.items():
+                if _has_template_value(value) and _is_missing_template_value(data.get(key)):
+                    data[key] = value
+
+        if "max_machines" not in data:
+            if "max_instances" in data:
+                data["max_machines"] = data["max_instances"]
+            elif "max_number" in data:
+                data["max_machines"] = data["max_number"]
+        data.pop("max_instances", None)
+        data.pop("max_number", None)
+        if data.get("boot_disk_size_gb") is not None:
+            data["machine_disk_size_gb"] = data["boot_disk_size_gb"]
+        elif data.get("machine_disk_size_gb") is not None:
+            data["boot_disk_size_gb"] = data["machine_disk_size_gb"]
+        if data.get("boot_disk_type") is not None:
+            data["machine_disk_type"] = str(data["boot_disk_type"])
+        elif data.get("machine_disk_type") is not None:
+            data["boot_disk_type"] = data["machine_disk_type"]
+        return data
+
+    @model_validator(mode="after")
+    def validate_gcp_template(self) -> GCPTemplate:
+        """Validate GCP-specific template semantics."""
+        if self.key_name:
+            raise ValueError("GCP does not support named SSH key pairs; key_name is unsupported")
+        if self.provider_api == GCPProviderApi.MIG:
+            if self.max_machines <= 0:
+                raise ValueError("MIG templates require max_machines > 0")
+            # Regional and zonal MIGs have different placement semantics:
+            # https://cloud.google.com/compute/docs/instance-groups/distributing-instances-with-regional-instance-groups
+            # https://cloud.google.com/compute/docs/instance-groups/creating-groups-of-managed-instances
+            if self.mig_scope == GCPMIGScope.ZONAL and len(self.zones) != 1:
+                raise ValueError("zonal MIG templates require exactly one zone")
+            if self.mig_scope == GCPMIGScope.REGIONAL and self.zones and len(self.zones) < 2:
+                raise ValueError(
+                    "regional MIG templates should use at least two zones when zones are specified"
+                )
+        elif self.provider_api == GCPProviderApi.SINGLE_VM:
+            if self.max_machines != 1:
+                raise ValueError("SingleVM templates require max_machines == 1")
+            if len(self.zones) != 1:
+                raise ValueError("SingleVM templates require exactly one explicit zone")
+
+        if not self.source_image and not (self.source_image_family and self.source_image_project):
+            raise ValueError(
+                "GCP templates require source_image or source_image_family + source_image_project"
+            )
+
+        return self

@@ -116,8 +116,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         if not isinstance(template, dict):
             raise ValueError(f"Template must be a dictionary, got {type(template)}")
 
-        # Field mapping (bidirectional)
-        mapped = self.field_mapper.map_input_fields(template)
+        # A shared HostFactory file can contain different provider types; the
+        # selected provider for the process must not choose every row's mapping.
+        declared_type = template.get("providerType") or template.get("provider_type")
+        field_mapper = HostFactoryFieldMapper(declared_type) if declared_type else self.field_mapper
+        mapped = field_mapper.map_input_fields(template)
 
         # Apply HostFactory transformations
         mapped = HostFactoryTransformations.apply_transformations(mapped)
@@ -146,7 +149,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             mapped["name"] = template.get("name", mapped["template_id"])
 
         # Apply per-provider field defaults via the registry.
-        provider_type = self._get_active_provider_type()
+        provider_type = mapped.get("provider_type") or self._get_active_provider_type()
         from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import (
             FieldMappingRegistry,
         )
