@@ -1,6 +1,14 @@
 # Development and testing targets
 
 # @SECTION Setup & Installation
+# Env assignment prepended to the `uv sync` command line only (e.g.
+# "ORB_SKIP_UI_BUILD=1"), never exported into this process's own environment.
+# Empty for a plain `make install`/`make dev-install`.  `build` (deploy.mk)
+# sets this as a target-specific variable so only ITS dependency sync skips
+# the SPA build that orb's own editable reinstall would otherwise trigger;
+# dev-install forwards the value across the recursive `$(MAKE) install` call.
+UV_SYNC_ENV ?=
+
 install: venv-setup  ## Install dependencies (auto-detects UV/pip, environment-aware)
 	@# The ``ui`` extra (reflex>=0.9 → click>=8.2) conflicts with the
 	@# ``ci`` and ``dev`` groups (semgrep → click<8.2), which uv rejects
@@ -11,17 +19,17 @@ install: venv-setup  ## Install dependencies (auto-detects UV/pip, environment-a
 	@if [ -n "$$CI" ]; then \
 		echo "CI detected: using frozen UV sync"; \
 		_t0=$$(date +%s); echo "[timing] uv sync (frozen, all-groups): start" >&2; \
-		uv sync --frozen --all-groups --quiet; \
+		$(UV_SYNC_ENV) uv sync --frozen --all-groups --quiet; \
 		echo "[timing] uv sync (frozen, all-groups): done in $$(($$(date +%s) - _t0))s" >&2; \
 	elif command -v uv >/dev/null 2>&1; then \
 		echo "UV available"; \
 		if echo "$(MAKECMDGOALS)" | grep -q "_dev"; then \
 			_t0=$$(date +%s); echo "[timing] uv sync (all-groups): start" >&2; \
-			uv sync --all-groups --quiet; \
+			$(UV_SYNC_ENV) uv sync --all-groups --quiet; \
 			echo "[timing] uv sync (all-groups): done in $$(($$(date +%s) - _t0))s" >&2; \
 		else \
 			_t0=$$(date +%s); echo "[timing] uv sync (no-dev): start" >&2; \
-			uv sync --no-dev --quiet; \
+			$(UV_SYNC_ENV) uv sync --no-dev --quiet; \
 			echo "[timing] uv sync (no-dev): done in $$(($$(date +%s) - _t0))s" >&2; \
 		fi; \
 	else \
@@ -30,7 +38,7 @@ install: venv-setup  ## Install dependencies (auto-detects UV/pip, environment-a
 	fi
 
 dev-install: generate-pyproject venv-setup  ## Install dev dependencies (preserves CI usage)
-	@$(MAKE) install _dev
+	@$(MAKE) install _dev UV_SYNC_ENV="$(UV_SYNC_ENV)"
 
 requirements: ## Generate/clean requirements (usage: make requirements _clean)
 	@if echo "$(MAKECMDGOALS)" | grep -q "_clean"; then \
