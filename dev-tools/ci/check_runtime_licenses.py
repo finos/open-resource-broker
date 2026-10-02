@@ -14,6 +14,11 @@ dependency-review `allow-licenses` input in
 `.github/workflows/security-code.yml` cannot call out to this script, so it
 must be kept in sync with the allowlist below by hand.
 
+Before either stage, known non-SPDX spellings of the same license (e.g. the
+several "...BSD..." classifier strings packaging tools emit instead of
+"BSD-3-Clause"/"BSD-2-Clause") are normalised to their SPDX id; see
+`ALIAS_TO_SPDX`.
+
 Each package's license string is checked in two stages:
 
 1. Flat check: split on "; " and require every piece to be an exact
@@ -114,7 +119,44 @@ CLASSIFIER_ALLOW = {
 
 ALLOW = {name.lower() for name in SPDX_ALLOW | CLASSIFIER_ALLOW}
 
+# Scanners (pip-licenses, license-checker-rseidelsohn) surface a package's
+# license under whatever display name its own packaging metadata uses, and
+# BSD in particular has no single canonical spelling in the wild. These are
+# known non-SPDX spellings that are the *same* license as the SPDX id they
+# map to, normalised (case-insensitively) to the SPDX id before evaluation
+# so they resolve through the one allowlist above instead of needing a
+# second, duplicate allowlist.
+ALIAS_TO_SPDX = {
+    "3-clause bsd license": "BSD-3-Clause",
+    "bsd 3-clause": "BSD-3-Clause",
+    "bsd-3-clause license": "BSD-3-Clause",
+    "bsd 3-clause license": "BSD-3-Clause",
+    "new bsd license": "BSD-3-Clause",
+    "modified bsd license": "BSD-3-Clause",
+    "revised bsd license": "BSD-3-Clause",
+    "2-clause bsd license": "BSD-2-Clause",
+    "bsd 2-clause": "BSD-2-Clause",
+    "simplified bsd license": "BSD-2-Clause",
+    "freebsd license": "BSD-2-Clause",
+}
+
 _TOKEN_RE = re.compile(r"\(|\)|\bAND\b|\bOR\b|\bWITH\b|[^\s()]+")
+
+
+def _normalise_aliases(license_str: str) -> str:
+    """Rewrite known non-SPDX BSD spellings to their SPDX id, case-insensitively.
+
+    Applied once, up front, before either evaluation stage runs. Splits on
+    "; " the same way stage 1 does, so a bare alias (e.g. "3-Clause BSD
+    License") and one embedded in a "; "-joined classifier set (e.g.
+    "Apache Software License; 3-Clause BSD License") are both normalised
+    the same way. Pieces that aren't a known alias (including SPDX
+    expressions, which never match an alias key) are passed through
+    unchanged for stage 2 to parse.
+    """
+    pieces = license_str.split("; ")
+    normalised = [ALIAS_TO_SPDX.get(piece.strip().lower(), piece) for piece in pieces]
+    return "; ".join(normalised)
 
 
 class LicenseExpressionError(ValueError):
@@ -218,6 +260,8 @@ def is_allowed(license_str: str | None) -> bool:
     if not license_str:
         return False
 
+    license_str = _normalise_aliases(license_str)
+
     # Stage 1: flat classifier-set check. Handles bare SPDX ids, classifier
     # strings (even the ones that contain parentheses), and "; "-joined
     # classifier sets, without needing to parse them as an expression.
@@ -276,6 +320,11 @@ _SELF_TEST_CASES = (
     ("GNU Lesser General Public License v2 or later (LGPLv2+)", False),
     ("UNKNOWN", False),
     ("Apache Software License; BSD License", True),
+    ("3-Clause BSD License", True),
+    ("New BSD License", True),
+    ("Simplified BSD License", True),
+    ("Apache Software License; 3-Clause BSD License", True),
+    ("LGPL-2.1-or-later", False),
 )
 
 
