@@ -125,7 +125,12 @@ jobs:
       if: steps.spa-web-cache.outputs.cache-hit != 'true'
       with:
         path: src/orb/ui/.web
-        key: spa-web-${{ runner.os }}-bun1.4.0-${{ hashFiles('src/orb/ui/reflex.lock/bun.lock', 'src/orb/ui/reflex.lock/package.json', 'uv.lock') }}
+        # Reuse the restore step's own resolved key rather than
+        # re-evaluating hashFiles() here -- the build in between rewrites
+        # src/orb/ui/reflex.lock/bun.lock and package.json in place (reflex
+        # syncs its resolved lockfile back to them), so re-hashing now would
+        # save under a key no future restore step would ever request.
+        key: ${{ steps.spa-web-cache.outputs.cache-primary-key }}
 
     - name: Upload wheel artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
