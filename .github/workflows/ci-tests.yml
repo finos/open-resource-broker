@@ -24,17 +24,11 @@ on:
       - 'Makefile'
       - 'setup.py'
       - '.github/workflows/dev-containers.yml'
+  # No paths filter: CI Passed is a required status check, so it must report
+  # on every PR (including docs-only changes) or GitHub blocks the merge
+  # waiting on a check that never gets created. push keeps its paths filter.
   pull_request:
     branches: [ main, develop ]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'requirements*.txt'
-      - 'uv.lock'
-      - 'assets/**'
-      - 'rxconfig.py'
-      - '.github/workflows/ci-tests.yml'
   schedule:
     - cron: '0 2 * * *'
   # workflow_dispatch: allows re-running tests manually from the Actions UI
