@@ -3820,6 +3820,7 @@ arch = [
 ]
 build = [
     { name = "build" },
+    { name = "setuptools" },
     { name = "wheel" },
 ]
 ci = [
@@ -3879,6 +3880,7 @@ ci = [
     { name = "responses" },
     { name = "ruff" },
     { name = "safety" },
+    { name = "setuptools" },
     { name = "tenacity" },
     { name = "tomli" },
     { name = "types-python-dateutil" },
@@ -3957,6 +3959,7 @@ dev = [
     { name = "responses" },
     { name = "ruff" },
     { name = "safety" },
+    { name = "setuptools" },
     { name = "tenacity" },
     { name = "tomli" },
     { name = "twine" },
@@ -4189,6 +4192,7 @@ provides-extras = ["sql", "aws", "k8s", "azure", "gcp", "all-providers", "k8s-le
 arch = [{ name = "import-linter", specifier = ">=2.0,<3.0.0" }]
 build = [
     { name = "build", specifier = ">=1.0.3,<2.0.0" },
+    { name = "setuptools", specifier = ">=80.9.0" },
     { name = "wheel", specifier = ">=0.41.3,<1.0.0" },
 ]
 ci = [
@@ -4248,6 +4252,7 @@ ci = [
     { name = "responses", specifier = ">=0.24.0,<1.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
     { name = "safety", specifier = ">=3.7.0,<4.0.0" },
+    { name = "setuptools", specifier = ">=80.9.0" },
     { name = "tenacity" },
     { name = "tomli", specifier = ">=2.0.0,<3.0.0" },
     { name = "types-python-dateutil", specifier = ">=2.8.19.14,<3.0.0" },
@@ -4326,6 +4331,7 @@ dev = [
     { name = "responses", specifier = ">=0.24.0,<1.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
     { name = "safety", specifier = ">=3.7.0,<4.0.0" },
+    { name = "setuptools", specifier = ">=80.9.0" },
     { name = "tenacity" },
     { name = "tomli", specifier = ">=2.0.0,<3.0.0" },
     { name = "twine", specifier = ">=4.0.0" },

@@ -480,6 +480,10 @@ security = [
 build = [
     "build>=1.0.3,<2.0.0",
     "wheel>=0.41.3,<1.0.0",
+    # Matches [build-system].requires: python -m build --no-isolation (used
+    # by build.sh) reuses this environment's packages for the build backend
+    # instead of provisioning its own, so setuptools must be present here too.
+    "setuptools>=80.9.0",
 ]
 
 # --- umbrella groups (preserve --all-groups / local dev-install behaviour) ---
