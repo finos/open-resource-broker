@@ -16,7 +16,11 @@ on:
       - 'sdk/**/build.gradle'
       - 'sdk/**/build.gradle.kts'
       - 'sdk/**/*.csproj'
+      - 'dev-tools/ci/check_runtime_licenses.py'
+      - 'dev-tools/ci/ci_security_dispatcher.py'
+      - '.trivyignore.yaml'
       - '.github/workflows/security-code.yml'
+      - '.github/workflows/reusable-security.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -32,7 +36,11 @@ on:
       - 'sdk/**/build.gradle'
       - 'sdk/**/build.gradle.kts'
       - 'sdk/**/*.csproj'
+      - 'dev-tools/ci/check_runtime_licenses.py'
+      - 'dev-tools/ci/ci_security_dispatcher.py'
+      - '.trivyignore.yaml'
       - '.github/workflows/security-code.yml'
+      - '.github/workflows/reusable-security.yml'
   schedule:
     - cron: '0 3 * * 0'
 

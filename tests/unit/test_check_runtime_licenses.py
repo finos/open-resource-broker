@@ -35,6 +35,11 @@ class TestIsAllowed:
             ("GNU Lesser General Public License v2 or later (LGPLv2+)", False),
             ("UNKNOWN", False),
             ("Apache Software License; BSD License", True),
+            ("3-Clause BSD License", True),
+            ("New BSD License", True),
+            ("Simplified BSD License", True),
+            ("Apache Software License; 3-Clause BSD License", True),
+            ("LGPL-2.1-or-later", False),
         ],
     )
     def test_required_cases(self, license_str, expected):
@@ -63,6 +68,48 @@ class TestIsAllowed:
         # "ISC License (ISCL)" must match the classifier allowlist directly,
         # not be mistaken for an SPDX expression just because it has parens.
         assert is_allowed("ISC License (ISCL)") is True
+
+
+@pytest.mark.unit
+class TestBsdAliasNormalisation:
+    """Non-SPDX BSD spellings that packaging metadata emits in practice."""
+
+    @pytest.mark.parametrize(
+        "license_str",
+        [
+            "3-Clause BSD License",
+            "3-clause bsd license",
+            "BSD 3-Clause",
+            "BSD-3-Clause License",
+            "BSD 3-Clause License",
+            "New BSD License",
+            "Modified BSD License",
+            "Revised BSD License",
+        ],
+    )
+    def test_bsd_3_clause_aliases_allowed(self, license_str):
+        assert is_allowed(license_str) is True
+
+    @pytest.mark.parametrize(
+        "license_str",
+        [
+            "2-Clause BSD License",
+            "BSD 2-Clause",
+            "Simplified BSD License",
+            "FreeBSD License",
+        ],
+    )
+    def test_bsd_2_clause_aliases_allowed(self, license_str):
+        assert is_allowed(license_str) is True
+
+    def test_alias_inside_classifier_set_is_normalised(self):
+        assert is_allowed("Apache Software License; 3-Clause BSD License") is True
+
+    def test_unknown_license_string_still_fails(self):
+        # A string that merely contains "BSD" but isn't a recognised BSD
+        # alias (or allowlisted outright) must not be allowed just because
+        # it resembles one.
+        assert is_allowed("GNU General Public License v3 (GPLv3)") is False
 
 
 @pytest.mark.unit
