@@ -153,7 +153,7 @@ jobs:
           Apache-1.1, Apache-2.0, 0BSD, BSD-2-Clause, BSD-3-Clause, ISC, MIT,
           MS-PL, PHP-3.01, PostgreSQL, Python-2.0, PSF-2.0, Unlicense, X11,
           Zlib, zlib-acknowledgement, BSL-1.0, ICU, NCSA, ZPL-2.0, W3C, WTFPL,
-          Unicode-DFS-2017, DOC, APAFML, Bitstream-Vera, OGL-UK-3.0, Xnet,
+          Unicode-DFS-2016, DOC, APAFML, Bitstream-Vera, OGL-UK-3.0, Xnet,
           MPL-1.0, MPL-1.1, MPL-2.0, EPL-1.0, CDDL-1.0, CDDL-1.1, CPL-1.0,
           IPL-1.0, ErlPL-1.1, OFL-1.1, Ruby, SPL-1.0, IPA, Ubuntu-font-1.0,
           CC0-1.0, MIT-0
@@ -232,7 +232,7 @@ jobs:
           MIT;MIT License;MS-PL;PHP-3.01;PostgreSQL;Python-2.0;PSF-2.0;
           Python Software Foundation License;Unlicense;
           The Unlicense (Unlicense);X11;Zlib;zlib-acknowledgement;BSL-1.0;
-          ICU;NCSA;ZPL-2.0;W3C;WTFPL;Unicode-DFS-2017;DOC;APAFML;
+          ICU;NCSA;ZPL-2.0;W3C;WTFPL;Unicode-DFS-2016;DOC;APAFML;
           Bitstream-Vera;OGL-UK-3.0;Xnet;MPL-1.0;MPL-1.1;MPL-2.0;
           Mozilla Public License 2.0 (MPL 2.0);EPL-1.0;CDDL-1.0;CDDL-1.1;
           CPL-1.0;IPL-1.0;ErlPL-1.1;OFL-1.1;Ruby;SPL-1.0;IPA;
@@ -285,7 +285,7 @@ jobs:
             "ISC", "MIT", "MS-PL", "PHP-3.01", "PostgreSQL", "Python-2.0",
             "PSF-2.0", "Unlicense", "X11", "Zlib", "zlib-acknowledgement",
             "BSL-1.0", "ICU", "NCSA", "ZPL-2.0", "W3C", "WTFPL",
-            "Unicode-DFS-2017", "DOC", "APAFML", "Bitstream-Vera",
+            "Unicode-DFS-2016", "DOC", "APAFML", "Bitstream-Vera",
             "OGL-UK-3.0", "Xnet", "MPL-1.0", "MPL-1.1", "MPL-2.0", "EPL-1.0",
             "CDDL-1.0", "CDDL-1.1", "CPL-1.0", "IPL-1.0", "ErlPL-1.1",
             "OFL-1.1", "Ruby", "SPL-1.0", "IPA", "Ubuntu-font-1.0",
