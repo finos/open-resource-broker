@@ -1,0 +1,51 @@
+# Trivy ignore file for security scanning exceptions.
+# Loaded explicitly via `trivyignores:` / `--ignorefile` by each workflow that
+# runs a Trivy filesystem or container-image scan.
+#
+# Schema: https://trivy.dev/latest/docs/configuration/filtering/#trivyignoreyaml
+
+vulnerabilities:
+  # ── Debian 13 (trixie) OS-package CVEs with no upstream fix ────────────────
+  #
+  # All findings below are in the python:3.X-slim base image (Debian 13.6 for
+  # 3.14, Debian 13.4 for older variants). The Dockerfile already runs
+  # `apt-get upgrade -y` so every Debian patch available at build time is
+  # applied. Each entry is suppressed only because Debian has not yet
+  # published a fixed package version for Debian 13 specifically (status
+  # "affected", no Fixed Version in the Trivy report). Re-evaluate on every
+  # release and drop the entry as soon as a fixed Debian 13 package is
+  # available.
+
+  - id: CVE-2025-69720
+    statement: >-
+      Buffer overflow in ncurses (libncursesw6 / libtinfo6 / ncurses-base /
+      ncurses-bin) that may lead to arbitrary code execution. No fixed
+      package in Debian 13.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-54369
+    statement: >-
+      Symlink traversal privilege escalation via libacl1 functions. No fixed
+      package in Debian 13.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-9538
+    statement: >-
+      perl-base (perl-IO-Compress): denial of service via a crafted tar
+      header. No fixed package in Debian 13; status "fix_deferred".
+    expired_at: 2027-01-01
+
+secrets:
+  # moto (AWS mocking library) ships fixed self-signed TLS certificates for
+  # its local mock proxy server. They are test fixtures, not production
+  # credentials, so the private-key finding is suppressed for these two
+  # files only.
+  - id: private-key
+    paths:
+      - "**/.venv/lib/python*/site-packages/moto/moto_proxy/ca.key"
+      - "**/.venv/lib/python*/site-packages/moto/moto_proxy/cert.key"
+      - ".venv/lib/python*/site-packages/moto/moto_proxy/ca.key"
+      - ".venv/lib/python*/site-packages/moto/moto_proxy/cert.key"
+    statement: >-
+      Fixed self-signed test certificate shipped with moto for AWS mocking;
+      not a production credential.

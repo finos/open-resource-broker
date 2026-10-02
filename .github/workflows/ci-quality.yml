@@ -49,10 +49,14 @@ jobs:
     name: Auto-Format Code
     # Same-repo PRs only. Fork PRs handled by auto-format-suggest below.
     # Bot-actor guard prevents the job re-triggering on its own push.
+    # Dependabot PRs are skipped too: the push-back step needs the ORB CICD
+    # App token, which is unavailable on Dependabot-triggered runs (they only
+    # receive Dependabot-store secrets, not repo Actions secrets).
     if: |
       github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
       && github.actor != 'open-resource-broker-cicd[bot]'
+      && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [config]
