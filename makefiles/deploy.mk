@@ -70,6 +70,9 @@ build: clean dev-install  ## Build package
 	VERSION=$${VERSION:-$$(make -s get-version)} $(MAKE) generate-pyproject && \
 	VERSION=$${VERSION:-$$(make -s get-version)} BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh
 
+# Same rationale as `build` above: keep the SPA build out of dev-install's
+# `uv sync` and let build.sh's explicit step build it instead.
+build-with-version: UV_SYNC_ENV := ORB_SKIP_UI_BUILD=1
 build-with-version: clean dev-install  ## Build package with explicit version (skips generate-pyproject)
 	@if [ -z "$$VERSION" ]; then \
 		echo "ERROR: VERSION environment variable must be set"; \
