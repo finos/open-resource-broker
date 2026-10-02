@@ -11,6 +11,21 @@ for arg in "$@"; do
     esac
 done
 
+# Phase timing: written to stderr so these lines show up in CI logs even when
+# --quiet suppresses the rest of this script's stdout output. Phases run
+# sequentially (never nested within this script), so one pair of variables
+# is enough to track whichever phase is currently open.
+_phase_t0=0
+_phase_name=""
+_phase_start() {
+    _phase_name="$1"
+    _phase_t0=$(date +%s)
+    printf '[timing] %s: start\n' "$_phase_name" >&2
+}
+_phase_end() {
+    printf '[timing] %s: done in %ss\n' "$_phase_name" "$(( $(date +%s) - _phase_t0 ))" >&2
+}
+
 if [ "$QUIET" = false ]; then
     echo "INFO: Building open-resource-broker package..."
 fi
@@ -30,6 +45,7 @@ fi
 rm -rf dist/ build/ -- *.egg-info/
 
 # Verify build dependencies are present (declared in pyproject.toml dev deps)
+_phase_start "dependency check/install"
 if [ "$QUIET" = false ]; then
     echo "INFO: Checking build dependencies..."
 fi
@@ -43,6 +59,7 @@ if ! $RUN_TOOL python -c "import build" 2>/dev/null; then
         $RUN_TOOL pip install build
     fi
 fi
+_phase_end
 
 # Compile the Reflex SPA bundle before packaging, unless skipped. The wheel
 # is built from the sdist, which does not include dev-tools/, so the bundle
@@ -60,15 +77,18 @@ elif [ -f "src/orb/ui/_static/index.html" ]; then
         echo "INFO: SPA bundle already present; skipping rebuild."
     fi
 else
+    _phase_start "SPA build (build_ui.sh)"
     if [ "$QUIET" = false ]; then
         echo "INFO: Building SPA bundle..."
         ./dev-tools/package/build_ui.sh
     else
         ./dev-tools/package/build_ui.sh --quiet
     fi
+    _phase_end
 fi
 
 # Build package
+_phase_start "python -m build"
 if [ "$QUIET" = false ]; then
     echo "INFO: Building package..."
 fi
@@ -92,6 +112,7 @@ else
         $RUN_TOOL python -m build --no-isolation
     fi
 fi
+_phase_end
 
 if [ "$QUIET" = true ]; then
     # Show essential info even in quiet mode

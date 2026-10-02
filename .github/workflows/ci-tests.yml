@@ -18,18 +18,16 @@ on:
       - 'Dockerfile*'
       - 'deployment/docker/**'
       - 'dev-tools/container/container_build.sh'
+      - 'dev-tools/package/**'
+      - 'makefiles/deploy.mk'
+      - 'makefiles/dev.mk'
+      - 'Makefile'
+      - 'setup.py'
       - '.github/workflows/dev-containers.yml'
+  # No paths filter on pull_request: this check acts as the merge gate, so
+  # it runs on every PR (including docs-only changes). push keeps its paths filter.
   pull_request:
     branches: [ main, develop ]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'requirements*.txt'
-      - 'uv.lock'
-      - 'assets/**'
-      - 'rxconfig.py'
-      - '.github/workflows/ci-tests.yml'
   schedule:
     - cron: '0 2 * * *'
   # workflow_dispatch: allows re-running tests manually from the Actions UI
