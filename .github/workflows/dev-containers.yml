@@ -14,6 +14,11 @@ on:
       - 'pyproject.toml'
       - 'deployment/docker/**'
       - 'dev-tools/container/container_build.sh'
+      - 'dev-tools/package/**'
+      - 'makefiles/deploy.mk'
+      - 'makefiles/dev.mk'
+      - 'Makefile'
+      - 'setup.py'
       - '.github/workflows/dev-containers.yml'
   workflow_run:
     workflows: ["Unit Tests"]
@@ -27,6 +32,11 @@ on:
       - 'pyproject.toml'
       - 'deployment/docker/**'
       - 'dev-tools/container/container_build.sh'
+      - 'dev-tools/package/**'
+      - 'makefiles/deploy.mk'
+      - 'makefiles/dev.mk'
+      - 'Makefile'
+      - 'setup.py'
       - '.github/workflows/dev-containers.yml'
   workflow_dispatch:
     inputs:
