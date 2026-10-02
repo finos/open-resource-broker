@@ -123,6 +123,20 @@ jobs:
         with:
           bun-version: "1.4.0"  # pinned; update intentionally to avoid surprise breakage
 
+      # Restores the SPA's installed frontend packages (and reflex's own
+      # install fingerprint) so reflex's internal `bun install` can skip
+      # straight to its build step instead of redownloading ~280 packages
+      # every run. Keyed on the lockfile/manifest reflex installs from plus
+      # uv.lock (which pins the reflex version); never on build output, which
+      # is excluded before saving below and always regenerated fresh
+      # regardless of cache state.
+      - name: Restore SPA frontend dependencies cache
+        id: spa-web-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
+        with:
+          path: src/orb/ui/.web
+          key: spa-web-${{ runner.os }}-bun1.4.0-${{ hashFiles('src/orb/ui/reflex.lock/bun.lock', 'src/orb/ui/reflex.lock/package.json', 'uv.lock') }}
+
       # Build the SPA bundle HERE, on the host, where Setup Bun put bun on PATH.
       # This must run on the host — NOT via the setup.py build hook — because the
       # next step (Python Semantic Release) runs `make semantic-release-build`
@@ -133,6 +147,18 @@ jobs:
       # host .venv is left to break the container's mounted-workspace interpreter.
       - name: Build UI static bundle (host — bun is unavailable in the release container)
         run: make ui-build
+
+      - name: Save SPA frontend dependencies cache
+        # Drop build output before saving -- it is never meant to be cached
+        # and is always regenerated from scratch next run regardless.
+        if: steps.spa-web-cache.outputs.cache-hit != 'true'
+        run: rm -rf src/orb/ui/.web/build
+
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
+        if: steps.spa-web-cache.outputs.cache-hit != 'true'
+        with:
+          path: src/orb/ui/.web
+          key: spa-web-${{ runner.os }}-bun1.4.0-${{ hashFiles('src/orb/ui/reflex.lock/bun.lock', 'src/orb/ui/reflex.lock/package.json', 'uv.lock') }}
 
       - name: Python Semantic Release
         id: release
