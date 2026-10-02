@@ -324,6 +324,7 @@ dev = [
     # --- inlined from dependency-groups.build ---
     "build>=1.0.3,<2.0.0",
     "wheel>=0.41.3,<1.0.0",
+    "setuptools>=80.9.0",
     # --- dev-only tools (not in any CI group) ---
     # Security: Fix CVE-2024-53899 (command injection), CVE-2026-102925,
     # CVE-2026-102930, CVE-2026-102937, CVE-2026-102938
