@@ -11,10 +11,8 @@ on:
       - 'uv.lock'
       - '.ruff.toml'
       - '.github/workflows/ci-quality.yml'
-  # No paths filter: Ruff/pyright/Architecture Validation are required status
-  # checks, so they must report on every PR (including docs-only changes) or
-  # GitHub blocks the merge waiting on a check that never gets created. push
-  # keeps its paths filter.
+  # No paths filter on pull_request: these checks act as the merge gate, so
+  # they run on every PR (including docs-only changes). push keeps its paths filter.
   pull_request:
     branches: [ main, develop ]
   # workflow_dispatch: allows re-running quality checks manually from the Actions UI

@@ -24,9 +24,8 @@ on:
       - 'Makefile'
       - 'setup.py'
       - '.github/workflows/dev-containers.yml'
-  # No paths filter: CI Passed is a required status check, so it must report
-  # on every PR (including docs-only changes) or GitHub blocks the merge
-  # waiting on a check that never gets created. push keeps its paths filter.
+  # No paths filter on pull_request: this check acts as the merge gate, so
+  # it runs on every PR (including docs-only changes). push keeps its paths filter.
   pull_request:
     branches: [ main, develop ]
   schedule:
