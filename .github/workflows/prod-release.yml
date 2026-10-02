@@ -97,10 +97,35 @@ jobs:
       with:
         bun-version: "1.4.0"  # pinned; update intentionally to avoid surprise breakage
 
-    # The SPA bundle is built automatically by the setuptools build hook during
-    # `make build` (python -m build). No separate step needed.
+    # Restores the SPA's installed frontend packages (and reflex's own install
+    # fingerprint) so reflex's internal `bun install` can skip straight to its
+    # build step instead of redownloading ~280 packages every run. Keyed on
+    # the lockfile/manifest reflex installs from plus uv.lock (which pins the
+    # reflex version); never on build output, which is excluded before saving
+    # below and always regenerated fresh regardless of cache state.
+    - name: Restore SPA frontend dependencies cache
+      id: spa-web-cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
+      with:
+        path: src/orb/ui/.web
+        key: spa-web-${{ runner.os }}-bun1.4.0-${{ hashFiles('src/orb/ui/reflex.lock/bun.lock', 'src/orb/ui/reflex.lock/package.json', 'uv.lock') }}
+
+    # The SPA bundle is built by build.sh's explicit step (python -m build no
+    # longer triggers it via the editable-install hook).
     - name: Build package wheel
       run: make build
+
+    - name: Save SPA frontend dependencies cache
+      # Drop build output before saving -- it is never meant to be cached and
+      # is always regenerated from scratch next run regardless.
+      if: steps.spa-web-cache.outputs.cache-hit != 'true'
+      run: rm -rf src/orb/ui/.web/build
+
+    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
+      if: steps.spa-web-cache.outputs.cache-hit != 'true'
+      with:
+        path: src/orb/ui/.web
+        key: spa-web-${{ runner.os }}-bun1.4.0-${{ hashFiles('src/orb/ui/reflex.lock/bun.lock', 'src/orb/ui/reflex.lock/package.json', 'uv.lock') }}
 
     - name: Upload wheel artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
