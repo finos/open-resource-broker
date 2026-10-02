@@ -74,6 +74,14 @@ and will be removed in the next major release:
 - Third-party provider plugin discovery via the `orb.providers` entry-point group. Plugins are loaded by `discover_provider_plugins()` after the built-in providers register; failures are logged and tolerated so a broken plugin cannot prevent ORB from starting. See `docs/root/providers/kubernetes/plugin-authoring.md` for the plugin contract and a worked Kubeflow MPIJob example.
 - `KubernetesProviderStrategy.register_handler` classmethod: plugin extension point for attaching a new `provider_api` handler to the Kubernetes provider without forking the strategy.
 - Kubernetes provider documentation under `docs/root/providers/kubernetes/`: overview, configuration reference, handlers guide, authentication guide, RBAC example, migration guide from `orb.k8s_legacy`, and plugin-authoring walkthrough.
+- SLURM scheduler integration — ORB can now act as a resource provider for SLURM clusters via ResumeProgram/SuspendProgram power management hooks (dynamic slot model with batch provisioning)
+- SlurmSchedulerStrategy with full SchedulerPort implementation and batch resume/suspend handlers
+- Bidirectional field mapping between SLURM and ORB domain concepts
+- SlurmNodeMapper for node name ↔ machine ID translation with hostlist range expansion
+- slurmrestd REST client for cluster health monitoring
+- CLI fallback adapter for environments without slurmrestd
+- Mock slurmrestd server for local development and testing
+- Comprehensive documentation: integration guide, deployment scenarios, feature mapping, supported APIs
 
 ### Changed
 
@@ -96,17 +104,6 @@ and will be removed in the next major release:
   behavior change at that cutover.
 
 <small>[Compare with latest](https://github.com/awslabs/open-resource-broker/compare/v0.1.0rc0...HEAD)</small>
-
-### Added
-
-- SLURM scheduler integration — ORB can now act as a resource provider for SLURM clusters via ResumeProgram/SuspendProgram power management hooks (dynamic slot model with batch provisioning)
-- SlurmSchedulerStrategy with full SchedulerPort implementation and batch resume/suspend handlers
-- Bidirectional field mapping between SLURM and ORB domain concepts
-- SlurmNodeMapper for node name ↔ machine ID translation with hostlist range expansion
-- slurmrestd REST client for cluster health monitoring
-- CLI fallback adapter for environments without slurmrestd
-- Mock slurmrestd server for local development and testing
-- Comprehensive documentation: integration guide, deployment scenarios, feature mapping, supported APIs
 
 ### Features
 

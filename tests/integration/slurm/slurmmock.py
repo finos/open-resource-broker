@@ -5,7 +5,7 @@ Simulates the SLURM REST API (v0.0.44) without a real cluster.
 Supports node state transitions via /mock/resume and /mock/suspend endpoints.
 
 Usage:
-    python slurmmock.py --port 6820 --nodes 10 --partitions batch,gpu
+    python tests/integration/slurm/slurmmock.py --port 6820 --nodes 10 --partitions batch,gpu
 """
 
 import argparse
