@@ -9,6 +9,16 @@
 # dev-install forwards the value across the recursive `$(MAKE) install` call.
 UV_SYNC_ENV ?=
 
+# Dependency-group flag(s) for `uv sync`, and a matching label for the timing
+# line.  Empty (default) keeps today's --all-groups/--no-dev behavior for a
+# plain `make install`/`make dev-install`.  `build`/`build-with-version`
+# (deploy.mk) override these to sync only the `build` dependency-group --
+# the wheel build needs the build toolchain (and the project's own runtime
+# deps, always installed regardless of group), not the full dev/test
+# surface.  The SPA's [ui] extra is installed separately by build_ui.sh.
+UV_SYNC_GROUPS ?=
+UV_SYNC_LABEL ?= all-groups
+
 install: venv-setup  ## Install dependencies (auto-detects UV/pip, environment-aware)
 	@# The ``ui`` extra (reflex>=0.9 → click>=8.2) conflicts with the
 	@# ``ci`` and ``dev`` groups (semgrep → click<8.2), which uv rejects
@@ -18,15 +28,15 @@ install: venv-setup  ## Install dependencies (auto-detects UV/pip, environment-a
 	@# UI-agnostic so leaving the extra out of the shared env is safe.
 	@if [ -n "$$CI" ]; then \
 		echo "CI detected: using frozen UV sync"; \
-		_t0=$$(date +%s); echo "[timing] uv sync (frozen, all-groups): start" >&2; \
-		$(UV_SYNC_ENV) uv sync --frozen --all-groups --quiet; \
-		echo "[timing] uv sync (frozen, all-groups): done in $$(($$(date +%s) - _t0))s" >&2; \
+		_t0=$$(date +%s); echo "[timing] uv sync (frozen, $(UV_SYNC_LABEL)): start" >&2; \
+		$(UV_SYNC_ENV) uv sync --frozen $(if $(UV_SYNC_GROUPS),$(UV_SYNC_GROUPS),--all-groups) --quiet; \
+		echo "[timing] uv sync (frozen, $(UV_SYNC_LABEL)): done in $$(($$(date +%s) - _t0))s" >&2; \
 	elif command -v uv >/dev/null 2>&1; then \
 		echo "UV available"; \
 		if echo "$(MAKECMDGOALS)" | grep -q "_dev"; then \
-			_t0=$$(date +%s); echo "[timing] uv sync (all-groups): start" >&2; \
-			$(UV_SYNC_ENV) uv sync --all-groups --quiet; \
-			echo "[timing] uv sync (all-groups): done in $$(($$(date +%s) - _t0))s" >&2; \
+			_t0=$$(date +%s); echo "[timing] uv sync ($(UV_SYNC_LABEL)): start" >&2; \
+			$(UV_SYNC_ENV) uv sync $(if $(UV_SYNC_GROUPS),$(UV_SYNC_GROUPS),--all-groups) --quiet; \
+			echo "[timing] uv sync ($(UV_SYNC_LABEL)): done in $$(($$(date +%s) - _t0))s" >&2; \
 		else \
 			_t0=$$(date +%s); echo "[timing] uv sync (no-dev): start" >&2; \
 			$(UV_SYNC_ENV) uv sync --no-dev --quiet; \
@@ -38,7 +48,7 @@ install: venv-setup  ## Install dependencies (auto-detects UV/pip, environment-a
 	fi
 
 dev-install: generate-pyproject venv-setup  ## Install dev dependencies (preserves CI usage)
-	@$(MAKE) install _dev UV_SYNC_ENV="$(UV_SYNC_ENV)"
+	@$(MAKE) install _dev UV_SYNC_ENV="$(UV_SYNC_ENV)" UV_SYNC_GROUPS="$(UV_SYNC_GROUPS)" UV_SYNC_LABEL="$(UV_SYNC_LABEL)"
 
 requirements: ## Generate/clean requirements (usage: make requirements _clean)
 	@if echo "$(MAKECMDGOALS)" | grep -q "_clean"; then \
