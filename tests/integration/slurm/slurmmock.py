@@ -113,7 +113,10 @@ class SlurmMockHandler(BaseHTTPRequestHandler):
     cluster: ClusterState  # set by server
 
     def log_message(self, format, *args):
-        log.info("%s %s", self.command, self.path)
+        # self.command/self.path come straight from the client request line;
+        # use %r so any CR/LF or control characters are escaped instead of
+        # being written verbatim into the log stream.
+        log.info("%r %r", self.command, self.path)
 
     def _send_json(self, data: dict, status: int = 200) -> None:
         body = json.dumps(data).encode()

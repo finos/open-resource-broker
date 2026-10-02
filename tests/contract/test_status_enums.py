@@ -210,7 +210,7 @@ def test_slurm_all_domain_statuses_produce_valid_output(slurm_strategy):
     """Every RequestStatus value passes through unchanged for SLURM."""
     from orb.domain.request.request_types import RequestStatus
 
-    for domain_status in RequestStatus:
+    for domain_status in list(RequestStatus):
         from datetime import datetime, timezone
 
         from orb.application.request.dto import RequestDTO
