@@ -180,6 +180,12 @@ nav:
       - Authentication: providers/k8s/auth.md
       - Migrating from k8s-legacy: providers/k8s/migrating-from-k8s-legacy.md
       - Plugin Authoring: providers/k8s/plugin-authoring.md
+  - SLURM Integration:
+    - Integration Guide: slurm/integration_guide.md
+    - Operations Guide: slurm/operations_guide.md
+    - Deployment Scenarios: slurm/deployment_scenarios.md
+    - Feature Mapping: slurm/feature_mapping.md
+    - Supported APIs: slurm/supported-apis.md
   - CLI Reference:
     - Overview: cli/README.md
     - Full CLI Reference: cli/cli-reference.md

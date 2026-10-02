@@ -14,6 +14,7 @@ class TemplateGenerationRequest:
     provider_specific: bool = False
     provider_type_filter: Optional[str] = None
     force_overwrite: bool = False
+    slurm_conf: Optional[str] = None
 
 
 @dataclass

@@ -766,9 +766,12 @@ class TestFindTemplatesFile:
     def test_falls_back_to_generic_template_when_provider_specific_missing(self, tmp_path):
         mgr = self._make_mgr()
         (tmp_path / "templates.json").write_text("{}")
-        # No awsprov_templates.json exists
+        # No awsprov_templates.json, aws_templates.json, or slurm_aws_templates.json exists
 
-        with patch.object(mgr, "_get_scheduler_directory", return_value=str(tmp_path)):
+        with (
+            patch.object(mgr, "_get_scheduler_directory", return_value=str(tmp_path)),
+            patch.object(mgr, "resolve_path", return_value=str(tmp_path)),
+        ):
             result = mgr.find_templates_file("aws")
 
         assert result == str(tmp_path / "templates.json")
@@ -777,7 +780,10 @@ class TestFindTemplatesFile:
         mgr = self._make_mgr()
         # No template files at all
 
-        with patch.object(mgr, "_get_scheduler_directory", return_value=str(tmp_path)):
+        with (
+            patch.object(mgr, "_get_scheduler_directory", return_value=str(tmp_path)),
+            patch.object(mgr, "resolve_path", return_value=str(tmp_path)),
+        ):
             with pytest.raises(FileNotFoundError, match="Templates file not found"):
                 mgr.find_templates_file("aws")
 

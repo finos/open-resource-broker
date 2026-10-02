@@ -125,7 +125,9 @@ class ParentParsers:
         )
         add_provider_type_arg(provider_scope)
         provider_scope.add_argument(
-            "--scheduler", choices=["default", "hostfactory"], help="Override scheduler strategy"
+            "--scheduler",
+            choices=["default", "hostfactory", "slurm"],
+            help="Override scheduler strategy",
         )
 
         # hf-compat — HostFactory -f/-d with distinct dests (hf_file/hf_data),
@@ -213,6 +215,9 @@ def add_machine_actions(subparsers, pp: "ParentParsers | None" = None):
         "--count", "-c", type=int, dest="flag_machine_count", help="Number of machines to request"
     )
     machines_request.add_argument(
+        "--nodes", type=str, help="SLURM node list to associate with this request"
+    )
+    machines_request.add_argument(
         "--wait", action="store_true", help="Wait for machines to be ready"
     )
     machines_request.add_argument(
@@ -262,6 +267,9 @@ def add_machine_actions(subparsers, pp: "ParentParsers | None" = None):
         action="append",
         dest="machine_ids_flag",
         help="Machine ID to terminate",
+    )
+    machines_terminate.add_argument(
+        "--nodes", type=str, help="SLURM node list to terminate by node name"
     )
     machines_terminate.add_argument(
         "--wait", action="store_true", help="Wait for terminate request to complete"
@@ -637,6 +645,10 @@ def add_template_actions(subparsers, pp: "ParentParsers | None" = None):
         "--provider-specific",
         action="store_true",
         help="Generate templates with hardcoded infrastructure",
+    )
+    templates_generate.add_argument(
+        "--slurm-conf",
+        help="Path to slurm.conf for SLURM-aware template generation",
     )
 
 
@@ -1172,7 +1184,7 @@ For more information, visit: {DOCS_URL}
     add_force_argument(init_parser)
     init_parser.add_argument("--non-interactive", action="store_true", help="Non-interactive mode")
     init_parser.add_argument(
-        "--scheduler", choices=["default", "hostfactory"], help="Scheduler type"
+        "--scheduler", choices=["default", "hostfactory", "slurm"], help="Scheduler type"
     )
     add_provider_type_arg(
         init_parser,
