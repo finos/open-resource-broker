@@ -46,7 +46,8 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "sqlalchemy>=2.0.0",
-    "urllib3>=2.6.3", # Security: Fix CVE-2025-66471, CVE-2025-66418, CVE-2026-21441
+    "urllib3>=2.8.0", # Security: Fix CVE-2025-66471, CVE-2025-66418, CVE-2026-21441,
+    # CVE-2026-97687, CVE-2026-97688, CVE-2026-97689
     # Security: Fix GHSA-ffc3-869f-jxw9 (critical), GHSA-9j54-fg26-wv3r,
     # GHSA-w2cx-738m-mc7w, GHSA-9v7f-9g4p-ffgj, GHSA-p4g4-x82p-q773,
     # GHSA-r6x4-923q-g947 (high), GHSA-jwrc-g2q2-pq5p, GHSA-8wjv-2p76-3863,
@@ -291,7 +292,11 @@ dev = [
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
     "nltk>=3.10.2",
-    "gitpython>=3.1.52",
+    # Security: Fix CVE-2026-76217, CVE-2026-76218, CVE-2026-76219,
+    # CVE-2026-76220, CVE-2026-76222, CVE-2026-78675, CVE-2026-78676,
+    # CVE-2026-78677, CVE-2026-78678, CVE-2026-78679, CVE-2026-87817,
+    # CVE-2026-87819, GHSA-jm78-9fvv-mhgr (high), GHSA-59cr-6r3x-644w (medium)
+    "gitpython>=3.1.62",
     "watchdog",
     "tenacity",
     "pg8000",
@@ -320,7 +325,9 @@ dev = [
     "build>=1.0.3,<2.0.0",
     "wheel>=0.41.3,<1.0.0",
     # --- dev-only tools (not in any CI group) ---
-    "virtualenv>=20.26.6",
+    # Security: Fix CVE-2024-53899 (command injection), CVE-2026-102925,
+    # CVE-2026-102930, CVE-2026-102937, CVE-2026-102938
+    "virtualenv>=21.7.13",
     "pre-commit>=3.5.0,<5.0.0",
     "bump2version>=1.0.1,<2.0.0",
     "python-semantic-release>=10.0.0,<11.0.0",
@@ -417,7 +424,11 @@ test = [
     # Security override for python-semantic-release's vulnerable gitpython
     # (GHSA-956x-8gvw-wg5v, GHSA-2f96-g7mh-g2hx, GHSA-v396-v7q4-x2qj argument
     # injection; GHSA-rwj8-pgh3-r573 os.path.expandvars in polish_url)
-    "gitpython>=3.1.52",
+    # Security: Fix CVE-2026-76217, CVE-2026-76218, CVE-2026-76219,
+    # CVE-2026-76220, CVE-2026-76222, CVE-2026-78675, CVE-2026-78676,
+    # CVE-2026-78677, CVE-2026-78678, CVE-2026-78679, CVE-2026-87817,
+    # CVE-2026-87819, GHSA-jm78-9fvv-mhgr (high), GHSA-59cr-6r3x-644w (medium)
+    "gitpython>=3.1.62",
     # k8s-legacy extra deps — required for tests/integration/k8s_legacy/
     "kubernetes",
     "watchdog",
@@ -488,7 +499,8 @@ ci = [
 # Dev Dependencies: Additional dev tools (includes all CI deps)
 dev = [
     {include-group = "ci"},
-    "virtualenv>=20.26.6",  # Security: Fix CVE-2024-53899 command injection
+    "virtualenv>=21.7.13",  # Security: Fix CVE-2024-53899, CVE-2026-102925,
+    # CVE-2026-102930, CVE-2026-102937, CVE-2026-102938
     "pre-commit>=3.5.0,<5.0.0",
     "bump2version>=1.0.1,<2.0.0",
     "python-semantic-release>=10.0.0,<11.0.0",
