@@ -12,6 +12,13 @@ on:
       - 'assets/**'
       - 'rxconfig.py'
       - '.github/workflows/ci-tests.yml'
+      # Container-only paths: dev-containers.yml builds main via workflow_run
+      # after this workflow passes, not its own push trigger, so these paths
+      # must run here too or a container-only push to main builds nothing.
+      - 'Dockerfile*'
+      - 'deployment/docker/**'
+      - 'dev-tools/container/container_build.sh'
+      - '.github/workflows/dev-containers.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
