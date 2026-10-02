@@ -24,14 +24,24 @@ import re
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TRIVYIGNORE_PATH = REPO_ROOT / ".trivyignore.yaml"
 SECURITY_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "security-code.yml"
-OSV_API = "https://api.osv.dev/v1/vulns/{}"
+OSV_API_BASE = "https://api.osv.dev/v1/vulns/"
 REQUEST_TIMEOUT_SECONDS = 15
+
+# The only vulnerability ID shapes this script ever queries OSV for: CVE,
+# GHSA (GitHub's fixed-width base32-like alphabet, 4-4-4), the
+# DEBIAN-<CVE-ID> records Debian publishes, and PyPI advisories (PYSEC).
+# query_osv() refuses to build a request URL for anything that doesn't
+# match, since the ID ultimately comes from parsing local config files.
+VULN_ID_RE = re.compile(
+    r"^(CVE-\d{4}-\d+|GHSA(-[23456789cfghjmpqrvwx]{4}){3}|DEBIAN-CVE-\d{4}-\d+|PYSEC-\d{4}-\d+)$"
+)
 
 # The Dockerfile builds on python:<version>-slim, which is Debian 13
 # (trixie) for every supported Python version. A fix published for a
@@ -74,10 +84,32 @@ def load_allow_ghsas(path: Path) -> list[str]:
 
 
 def query_osv(vuln_id: str) -> dict | None:
-    """Fetch an OSV vulnerability record by ID, or None if it does not exist."""
-    request = urllib.request.Request(OSV_API.format(vuln_id))
+    """Fetch an OSV vulnerability record by ID, or None if it does not exist.
+
+    The ID is validated against VULN_ID_RE and percent-encoded before being
+    appended to the fixed https:// OSV_API_BASE, so the final URL can never
+    resolve to a file:// path or another unexpected scheme even though it
+    is built from a value that ultimately comes from local config files.
+    """
+    if not VULN_ID_RE.match(vuln_id):
+        print(f"skipping {vuln_id!r}: not a recognised OSV vulnerability ID", file=sys.stderr)
+        return None
+
+    url = OSV_API_BASE + urllib.parse.quote(vuln_id, safe="-")
+    if not url.startswith(OSV_API_BASE):
+        raise ValueError(f"refusing to request unexpected URL {url!r}")
+
+    request = urllib.request.Request(url)
     try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+        # url is built from the fixed https:// OSV_API_BASE plus an ID that
+        # has already been validated against VULN_ID_RE and percent-encoded
+        # above, and is checked to still start with OSV_API_BASE immediately
+        # before this call, so it can never resolve to a file:// path.
+        with (
+            urllib.request.urlopen(  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+                request, timeout=REQUEST_TIMEOUT_SECONDS
+            ) as response
+        ):
             return json.loads(response.read())
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
