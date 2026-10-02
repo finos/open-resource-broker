@@ -59,6 +59,13 @@ ci-docs-deploy:  ## Deploy documentation to GitHub Pages (matches docs.yml main 
 # Dummy targets removed (consolidated in quality.mk)
 
 # @SECTION Build & Deploy
+# Skip the SPA build inside dev-install's `uv sync` -- orb's own editable
+# reinstall would otherwise trigger it via setup.py's build_py hook, nested
+# inside uv's own venv lock. build.sh's explicit, timed SPA-build step below
+# builds it instead. Scoped to this target only (a target-specific variable,
+# forwarded by dev-install to its own `uv sync` command line): plain `make
+# dev-install`/`make install` are unaffected.
+build: UV_SYNC_ENV := ORB_SKIP_UI_BUILD=1
 build: clean dev-install  ## Build package
 	VERSION=$${VERSION:-$$(make -s get-version)} $(MAKE) generate-pyproject && \
 	VERSION=$${VERSION:-$$(make -s get-version)} BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh
