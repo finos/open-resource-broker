@@ -77,11 +77,58 @@ jobs:
       run: |
         make get-container-tags >> "$GITHUB_OUTPUT"
 
+  # Build the wheel once and share it across every Python version in the
+  # container-pipeline matrix below. The wheel is pure-Python, so it is
+  # identical regardless of which interpreter builds it — repeating the
+  # Reflex SPA + package build per matrix leg only burned extra compute.
+  build-wheel:
+    name: Build Container Wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: config
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        # Pin to the exact commit Unit Tests validated, not the default branch's current HEAD.
+        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+    - name: Setup Python and UV
+      uses: ./.github/actions/setup-uv-cached
+      with:
+        cache-key: container-build-wheel-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        fail-on-cache-miss: false
+
+    - name: Setup Bun (for UI static bundle)
+      # Bun is required to compile the Reflex SPA bundle during `make build`.
+      # Without it the wheel ships no _static/ directory and the container starts
+      # in embedded mode with a missing SPA — a non-bootable signed image (H2).
+      # This mirrors the prod-release.yml build-wheel pattern for prod/dev parity.
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
+      with:
+        bun-version: "1.4.0"  # pinned; update intentionally to avoid surprise breakage
+
+    - name: Build package wheel
+      # SPA bundle is compiled by the setuptools build hook during `make build`
+      # now that Bun is on PATH.  ORB_SKIP_UI_BUILD is NOT set so the wheel
+      # ships the _static/ directory — identical to the prod-release.yml wheel.
+      run: make build
+
+    - name: Upload wheel artifact
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+      with:
+        name: container-wheel-${{ github.run_id }}
+        path: dist/*.whl
+        retention-days: 1
+
   container-pipeline:
     name: Build and Scan Container Images
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: [config, calculate-tags]
+    needs: [config, calculate-tags, build-wheel]
 
     strategy:
       matrix:
@@ -119,26 +166,11 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Setup Python and UV
-      uses: ./.github/actions/setup-uv-cached
+    - name: Download wheel artifact
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
       with:
-        cache-key: container-build-py3.12-${{ hashFiles('.project.yml', 'pyproject.toml', 'uv.lock') }}
-        fail-on-cache-miss: false
-
-    - name: Setup Bun (for UI static bundle)
-      # Bun is required to compile the Reflex SPA bundle during `make build`.
-      # Without it the wheel ships no _static/ directory and the container starts
-      # in embedded mode with a missing SPA — a non-bootable signed image (H2).
-      # This mirrors the prod-release.yml build-wheel pattern for prod/dev parity.
-      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
-      with:
-        bun-version: "1.4.0"  # pinned; update intentionally to avoid surprise breakage
-
-    - name: Build package wheel
-      # SPA bundle is compiled by the setuptools build hook during `make build`
-      # now that Bun is on PATH.  ORB_SKIP_UI_BUILD is NOT set so the wheel
-      # ships the _static/ directory — identical to the prod-release.yml wheel.
-      run: make build
+        name: container-wheel-${{ github.run_id }}
+        path: dist/
 
     - name: Build and scan container image
       id: build
