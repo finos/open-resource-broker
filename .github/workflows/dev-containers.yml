@@ -124,7 +124,7 @@ jobs:
       # This mirrors the prod-release.yml build-wheel pattern for prod/dev parity.
       uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
       with:
-        bun-version: "1.2.15"  # pinned; update intentionally to avoid surprise breakage
+        bun-version: "1.4.0"  # pinned; update intentionally to avoid surprise breakage
 
     - name: Build package wheel
       # SPA bundle is compiled by the setuptools build hook during `make build`

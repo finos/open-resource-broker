@@ -44,26 +44,52 @@ if ! $RUN_TOOL python -c "import build" 2>/dev/null; then
     fi
 fi
 
+# Compile the Reflex SPA bundle before packaging, unless skipped. The wheel
+# is built from the sdist, which does not include dev-tools/, so the bundle
+# must already exist on disk before the sdist is created.
+case "$(printf '%s' "${ORB_SKIP_UI_BUILD:-}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes) _skip_ui_build=true ;;
+    *) _skip_ui_build=false ;;
+esac
+if [ "$_skip_ui_build" = true ]; then
+    if [ "$QUIET" = false ]; then
+        echo "INFO: ORB_SKIP_UI_BUILD set — skipping SPA bundle build."
+    fi
+elif [ -f "src/orb/ui/_static/index.html" ]; then
+    if [ "$QUIET" = false ]; then
+        echo "INFO: SPA bundle already present; skipping rebuild."
+    fi
+else
+    if [ "$QUIET" = false ]; then
+        echo "INFO: Building SPA bundle..."
+        ./dev-tools/package/build_ui.sh
+    else
+        ./dev-tools/package/build_ui.sh --quiet
+    fi
+fi
+
 # Build package
 if [ "$QUIET" = false ]; then
     echo "INFO: Building package..."
 fi
 BUILD_ARGS="${BUILD_ARGS:-}"
 if [ "$QUIET" = true ]; then
-    # Suppress all output in quiet mode
+    # Suppress stdout only in quiet mode; stderr always surfaces so a build
+    # failure is diagnosable instead of showing just the generic "Error 1"
+    # from the enclosing make target.
     if [ -n "$BUILD_ARGS" ]; then
         # shellcheck disable=SC2086
-        $RUN_TOOL python -m build --no-isolation $BUILD_ARGS >/dev/null 2>&1
+        $RUN_TOOL python -m build --no-isolation $BUILD_ARGS >/dev/null
     else
-        $RUN_TOOL python -m build --no-isolation >/dev/null 2>&1
+        $RUN_TOOL python -m build --no-isolation >/dev/null
     fi
 else
     # Normal output
     if [ -n "$BUILD_ARGS" ]; then
         # shellcheck disable=SC2086
-        $RUN_TOOL python -m build --no-isolation $BUILD_ARGS 2>/dev/null
+        $RUN_TOOL python -m build --no-isolation $BUILD_ARGS
     else
-        $RUN_TOOL python -m build --no-isolation 2>/dev/null
+        $RUN_TOOL python -m build --no-isolation
     fi
 fi
 

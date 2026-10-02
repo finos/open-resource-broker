@@ -62,6 +62,12 @@ if [ -z "$BUN" ] || [ ! -x "$BUN" ]; then
     exit 1
 fi
 
+# Pin reflex to this resolved bun instead of letting it silently provision
+# its own (newer) copy and write a lockfile this bun can't read back.
+export REFLEX_USE_SYSTEM_BUN=1
+_bun_dir="$(dirname "$BUN")"
+export PATH="$_bun_dir:$PATH"
+
 log "INFO: Building UI static bundle..."
 
 # ---------------------------------------------------------------------------

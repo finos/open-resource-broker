@@ -121,7 +121,7 @@ jobs:
       - name: Setup Bun (for UI static bundle)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
         with:
-          bun-version: "1.2.15"  # pinned; update intentionally to avoid surprise breakage
+          bun-version: "1.4.0"  # pinned; update intentionally to avoid surprise breakage
 
       # Build the SPA bundle HERE, on the host, where Setup Bun put bun on PATH.
       # This must run on the host — NOT via the setup.py build hook — because the
