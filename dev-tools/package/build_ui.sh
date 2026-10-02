@@ -9,11 +9,12 @@
 # Steps:
 #   1. Wipe any prior _static/ and .web/build/ so stale hashed chunks do
 #      not leak into the wheel.
-#   2. ``reflex export --frontend-only`` emits a React Router 7 project
-#      into ``.web/``.
-#   3. ``bun install && bun run export`` inside ``.web/`` compiles the
-#      SPA into ``.web/build/client/``.
-#   4. Copy ``.web/build/client/`` to ``src/orb/ui/_static/`` so
+#   2. ``reflex export --frontend-only`` emits a React Router 7 project into
+#      ``.web/`` and, as part of that one command, runs its own `bun install`
+#      and `bun run export` (the vite production build) to compile the SPA
+#      into ``.web/build/client/`` -- including the gzip sidecars and the
+#      SPA-fallback 404.html it generates on top of the raw vite output.
+#   3. Copy ``.web/build/client/`` to ``src/orb/ui/_static/`` so
 #      ``[tool.setuptools.package-data]`` picks it up.
 #
 # Usage: dev-tools/package/build_ui.sh [--quiet]
@@ -175,8 +176,14 @@ fi
 log "INFO: Cleaning stale bundle outputs..."
 rm -rf "$STATIC_DIR" "$WEB_DIR/build"
 
+# `reflex export --frontend-only` already runs its own `bun install` and
+# `bun run export` (= the vite production build) internally, then adds the
+# gzip sidecars and the SPA-fallback 404.html on top. Re-running bun here
+# ourselves was redundant work that also clobbered that gzip/404.html
+# post-processing (vite's emptyOutDir wipes them on a second build), so the
+# wheel never shipped them. Use reflex's own export output as-is instead.
 log "INFO: Running reflex export --frontend-only..."
-_phase_start "reflex export/init"
+_phase_start "reflex export (bun install + build)"
 (
     cd "$UI_DIR"
     if [ "$QUIET" = true ]; then
@@ -187,28 +194,8 @@ _phase_start "reflex export/init"
 )
 _phase_end
 
-log "INFO: Running bun install + bun run export..."
-(
-    cd "$WEB_DIR"
-    if [ "$QUIET" = true ]; then
-        _phase_start "bun install"
-        "$BUN" install --frozen-lockfile >/dev/null 2>&1
-        _phase_end
-        _phase_start "bun run export"
-        "$BUN" run export >/dev/null 2>&1
-        _phase_end
-    else
-        _phase_start "bun install"
-        "$BUN" install --frozen-lockfile
-        _phase_end
-        _phase_start "bun run export"
-        "$BUN" run export
-        _phase_end
-    fi
-)
-
 if [ ! -d "$CLIENT_DIR" ]; then
-    echo "ERROR: expected $CLIENT_DIR after bun run export" >&2
+    echo "ERROR: expected $CLIENT_DIR after reflex export" >&2
     exit 1
 fi
 
