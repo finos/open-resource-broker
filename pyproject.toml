@@ -311,6 +311,7 @@ dev = [
     # --- inlined from dependency-groups.build ---
     "build>=1.0.3,<2.0.0",
     "wheel>=0.41.3,<1.0.0",
+    "setuptools>=80.9.0",
     # --- dev-only tools (not in any CI group) ---
     "virtualenv>=20.26.6",
     "pre-commit>=3.5.0,<5.0.0",
