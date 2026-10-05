@@ -66,7 +66,7 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING, Any, ClassVar
 
-if TYPE_CHECKING:  # pragma: no cover — type annotations only
+if TYPE_CHECKING:
     from opentelemetry.metrics import Counter, Histogram, Meter, UpDownCounter
 
 # ---------------------------------------------------------------------------

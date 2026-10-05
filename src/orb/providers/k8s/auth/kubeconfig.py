@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from orb.providers.k8s.exceptions.k8s_exceptions import K8sAuthError
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
 
 
@@ -203,7 +203,7 @@ def _install_non_interactive_refresh_hook_on(client_configuration: Optional[obje
 
     try:
         from kubernetes.client import Configuration  # type: ignore[reportAttributeAccessIssue]
-    except ImportError:  # pragma: no cover — kubernetes extra not installed
+    except ImportError:
         return
 
     default = getattr(Configuration, "_default", None)
@@ -332,7 +332,7 @@ def _apply_proxy_to_default_configuration(
     """
     try:
         from kubernetes.client import Configuration  # type: ignore[reportAttributeAccessIssue]
-    except ImportError:  # pragma: no cover — kubernetes extra not installed
+    except ImportError:
         return
 
     proxy_url = _resolve_proxy_url(config_proxy_url)
@@ -424,7 +424,7 @@ def _check_exec_plugins(
 
     try:
         import yaml
-    except ImportError:  # pragma: no cover — yaml not installed
+    except ImportError:
         return
 
     try:

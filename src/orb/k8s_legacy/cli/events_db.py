@@ -135,7 +135,7 @@ def _process_container_statuses(
     output_session.commit()
 
 
-def _transform_data(input_session, events, output_session, run_id) -> None:  # noqa: C901
+def _transform_data(input_session, events, output_session, run_id) -> None:
     """For each category, read the events in the category and transform them
     from key/value pairs into values in the corresponding table.
     """

@@ -48,7 +48,7 @@ class TestRequestMachinesWatcher(unittest.TestCase):
     def test_request_machines_watcher(
         self,
         mock_create_pod,
-        mock_observer,  # noqa: ARG002
+        mock_observer,
     ) -> None:
         """Test request machines watcher"""
         temp_dir = pathlib.Path(tempfile.mkdtemp(dir="/tmp"))
@@ -102,7 +102,7 @@ class TestRequestReturnMachinesWatcher(unittest.TestCase):
     def test_request_return_machines_watcher(
         self,
         mock_delete_pod,
-        mock_observer,  # noqa: ARG002
+        mock_observer,
     ) -> None:
         """Test request return machines watcher"""
         mock_pod = {"metadata": {"name": "machine1"}, "status": {"phase": "Running"}}

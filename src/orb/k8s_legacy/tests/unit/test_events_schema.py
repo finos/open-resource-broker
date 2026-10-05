@@ -82,7 +82,7 @@ class TestSchemaMetadata:
     def test_events_model_is_abstract_and_not_a_table(self):
         assert "__abstract__" not in schema.Base.metadata.tables
         with pytest.raises(AttributeError):
-            schema.EventsModel.__tablename__  # noqa: B018
+            schema.EventsModel.__tablename__
 
 
 @pytest.mark.unit

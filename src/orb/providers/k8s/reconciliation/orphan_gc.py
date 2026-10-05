@@ -38,7 +38,7 @@ from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.reconciliation.startup_reconciler import OrphanPod
 from orb.providers.k8s.utilities.labels import build_label_selector as _build_label_selector
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from kubernetes.client import V1Pod
 
 
@@ -413,7 +413,7 @@ def _is_not_found(exc: BaseException) -> bool:
     """Return ``True`` when ``exc`` is a 404 ``ApiException``."""
     try:
         from kubernetes.client.exceptions import ApiException
-    except ImportError:  # pragma: no cover — extra not installed
+    except ImportError:
         return False
     if not isinstance(exc, ApiException):
         return False

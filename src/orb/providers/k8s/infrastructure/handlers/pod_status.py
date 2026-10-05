@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
 from orb.domain.request.aggregate import Request
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
 
 

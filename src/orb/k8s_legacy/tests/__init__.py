@@ -87,9 +87,9 @@ def get_workdir() -> str:
     if not workdir:
         user = os.getenv("USER")
         if user:
-            workdir = pathlib.Path(f"/tmp/open-resource-broker-test-{user}/")  # noqa: S108
+            workdir = pathlib.Path(f"/tmp/open-resource-broker-test-{user}/")
         else:
-            workdir = pathlib.Path("/tmp/open-resource-broker-test/")  # noqa: S108
+            workdir = pathlib.Path("/tmp/open-resource-broker-test/")
     else:
         workdir = pathlib.Path(workdir)
 

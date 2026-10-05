@@ -53,7 +53,7 @@ class TraceIDFilter(logging.Filter):
 class ISO8601Formatter(logging.Formatter):
     """Custom formatter to include timezone name in ISO 8601 format."""
 
-    def formatTime(self: "ISO8601Formatter", record, datefmt=None) -> str:  # noqa: N802
+    def formatTime(self: "ISO8601Formatter", record, datefmt=None) -> str:
         """Format the time with timezone name in ISO 8601 format."""
         del datefmt  # Unused
         return _get_iso_timestamp(record)

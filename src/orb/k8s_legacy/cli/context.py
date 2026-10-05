@@ -35,7 +35,7 @@ class Context:
     @property
     def default_workdir(self: "Context") -> str:
         """Get the default workdir."""
-        return self.workdir if self.workdir else "/tmp/open-resource-broker"  # noqa: S108
+        return self.workdir if self.workdir else "/tmp/open-resource-broker"
 
     @property
     def default_templates_filename(self: "Context") -> str:

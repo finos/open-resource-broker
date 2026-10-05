@@ -29,7 +29,7 @@ from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
 from orb.providers.k8s.watch.node_state_cache import K8sNodeStateCache
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from orb.domain.request.aggregate import Request
     from orb.domain.template.template_aggregate import Template
 

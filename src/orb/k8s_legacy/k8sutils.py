@@ -102,7 +102,7 @@ def load_k8s_config(proxy_url: str | None = None) -> None:
 
         if proxy_url:
             logger.info("Setting proxy: %s", proxy_url)
-            kubernetes.client.Configuration._default.proxy = proxy_url  # noqa SLF001
+            kubernetes.client.Configuration._default.proxy = proxy_url
 
 
 def get_namespace() -> str:
@@ -252,7 +252,7 @@ def _parse_cpu_quantity(quantity: str) -> float:
     return float(quantity)  # Assume the quantity is already in cores
 
 
-def _parse_memory_quantity(quantity: str) -> int:  # noqa: PLR0911
+def _parse_memory_quantity(quantity: str) -> int:
     """Parse the memory quantity."""
     if not quantity:
         return 0
@@ -364,7 +364,7 @@ class Pod:
 
     def __init__(self: "Pod", obj) -> None:
         """init the pod from either API object or plain dict"""
-        try:  # noqa: SIM105
+        try:
             obj = obj.to_dict()
         except AttributeError:
             # `obj` is already a plain dict (not a kubernetes API model),
@@ -418,7 +418,7 @@ class Node:
 
     def __init__(self: "Node", obj) -> None:
         """init the node from either API object or plain dict"""
-        try:  # noqa: SIM105
+        try:
             obj = obj.to_dict()
         except AttributeError:
             # `obj` is already a plain dict (not a kubernetes API model),

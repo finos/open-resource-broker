@@ -52,7 +52,7 @@ from orb.providers.k8s.utilities.pod_spec import (
     resolve_restart_policy,
 )
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from kubernetes.client import V1Job
 
 

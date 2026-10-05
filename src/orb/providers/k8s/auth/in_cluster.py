@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, Optional
 
 from orb.providers.k8s.exceptions.k8s_exceptions import K8sAuthError
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
 
 _IN_CLUSTER_SENTINEL = Path("/var/run/secrets/kubernetes.io")
@@ -175,7 +175,7 @@ def _apply_proxy_to_default_configuration(
     """
     try:
         from kubernetes.client import Configuration  # type: ignore[reportAttributeAccessIssue]
-    except ImportError:  # pragma: no cover — kubernetes extra not installed
+    except ImportError:
         return
 
     proxy_url = _resolve_proxy_url(config_proxy_url)

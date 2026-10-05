@@ -48,7 +48,7 @@ from orb.providers.k8s.utilities.pod_state import (
 )
 from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from kubernetes.client import V1Pod
     from kubernetes.watch import Watch
 
@@ -702,7 +702,7 @@ class K8sWatcher:
         """
         try:
             from kubernetes.client.exceptions import ApiException
-        except ImportError:  # pragma: no cover — extra not installed
+        except ImportError:
             return False
         if not isinstance(exc, ApiException):
             return False

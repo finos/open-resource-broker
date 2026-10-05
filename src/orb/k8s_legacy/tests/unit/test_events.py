@@ -954,7 +954,7 @@ class _OneShotQueue:
     def put(self, _item) -> None:
         return None
 
-    def get(self, timeout=None):  # noqa: ARG002
+    def get(self, timeout=None):
         self._calls += 1
         if self._calls == 1:
             return "some/event/path"
@@ -1003,7 +1003,7 @@ def test_watch_builds_backend_list_without_prometheus(monkeypatch, tmp_path) -> 
     monkeypatch.setattr(context.GLOBAL, "dbfile", str(tmp_path / "events.db"))
     captured_backends = {}
 
-    def _fake_watch_events(eventdir, backends) -> None:  # noqa: ARG001
+    def _fake_watch_events(eventdir, backends) -> None:
         captured_backends["backends"] = backends
 
     monkeypatch.setattr(events_impl, "_watch_events", _fake_watch_events)
@@ -1021,7 +1021,7 @@ def test_watch_builds_backend_list_with_prometheus(monkeypatch, tmp_path) -> Non
     monkeypatch.setattr(context.GLOBAL, "dbfile", str(tmp_path / "events.db"))
     captured_backends = {}
 
-    def _fake_watch_events(eventdir, backends) -> None:  # noqa: ARG001
+    def _fake_watch_events(eventdir, backends) -> None:
         captured_backends["backends"] = backends
 
     monkeypatch.setattr(events_impl, "_watch_events", _fake_watch_events)

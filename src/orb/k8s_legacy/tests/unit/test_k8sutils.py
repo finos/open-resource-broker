@@ -573,7 +573,7 @@ class TestLoadK8sConfig:
             k8sutils.load_k8s_config(proxy_url="http://proxy:8080")
         kube_config.assert_called_once()
         assert (
-            kubernetes.client.Configuration._default.proxy == "http://proxy:8080"  # noqa: SLF001
+            kubernetes.client.Configuration._default.proxy == "http://proxy:8080"
         )
 
     def test_loads_local_config_without_proxy(self, monkeypatch) -> None:
@@ -673,7 +673,8 @@ class TestWatchEvents:
         """A ProtocolError during streaming triggers a soft restart."""
 
         def _stream(*_args, **_kwargs):
-            if False:  # noqa: SIM108  (force generator semantics)
+            # Unreachable yield forces generator semantics.
+            if False:
                 yield
             raise urllib3.exceptions.ProtocolError("broken pipe")
 

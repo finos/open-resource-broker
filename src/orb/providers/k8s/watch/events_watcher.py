@@ -68,7 +68,7 @@ from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
-if TYPE_CHECKING:  # pragma: no cover -- type-checking only
+if TYPE_CHECKING:
     from kubernetes.watch import Watch
 
 
@@ -527,7 +527,7 @@ class K8sEventsWatcher:
         """Return ``True`` when ``exc`` is a 410 ``ApiException``."""
         try:
             from kubernetes.client.exceptions import ApiException
-        except ImportError:  # pragma: no cover -- extra not installed
+        except ImportError:
             return False
         if not isinstance(exc, ApiException):
             return False

@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
 
 

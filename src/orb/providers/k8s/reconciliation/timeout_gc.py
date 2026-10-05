@@ -36,7 +36,7 @@ import time
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Optional
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
 
 # Default condition reason emitted when scheduling is blocked.  The
@@ -166,7 +166,7 @@ async def delete_timed_out_pod_async(
     def _delete() -> None:
         try:
             from kubernetes.client import V1DeleteOptions as _V1DeleteOptions
-        except ImportError:  # pragma: no cover — extra not installed
+        except ImportError:
             logger.warning(
                 "kubernetes SDK not installed; cannot delete timed-out pod %s/%s",
                 namespace,

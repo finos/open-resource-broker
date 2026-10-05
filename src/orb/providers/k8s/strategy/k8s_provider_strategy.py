@@ -85,7 +85,7 @@ __all__ = [
     "_outcome_to_provider_result",
 ]
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from orb.domain.request.aggregate import Request
     from orb.domain.template.template_aggregate import Template
     from orb.monitoring.health import HealthCheck
