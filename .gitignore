@@ -16,6 +16,10 @@ requirements-dev.txt
 # Keep the lock file (source of truth)
 !uv.lock
 
+# visualise/ is a standalone, unwired tool with its own hand-written
+# dependency list, not generated from uv.lock
+!dev-tools/analysis/visualise/requirements.txt
+
 # Working directories
 work/
 
@@ -281,8 +285,8 @@ metrics.prom
 !tests/unit/providers/base/metrics
 
 # Visualise directories
-visualise/test/
-visualise/res/
+dev-tools/analysis/visualise/test/
+dev-tools/analysis/visualise/res/
 
 # Generated files - always regenerated from templates
 # pyproject.toml is now tracked - selective templating only

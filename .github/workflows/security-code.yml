@@ -185,6 +185,7 @@ jobs:
         #   scramp                no detected license -> MIT-0 (METADATA: License-Expression: MIT No Attribution; permissive)
         #   semgrep               LGPL-2.0-only AND LGPL-2.1 -> LGPL-2.1 (PyPI classifier: LGPLv2; CLI-only scanner, not imported or linked into orb-py; LGPL permits this use)
         #   bowser (npm)          MIT AND MITNFA -> MIT-family permissive (TypeScript SDK transitive; MITNFA = MIT No False Attribution)
+        #   pillow                MIT-CMU -> MIT variant (METADATA: License-Expression: MIT-CMU; permissive. Used only by the standalone dev-tools/analysis/visualise script, not part of the orb-py runtime install)
         #
         # Dev/CI-only tooling with a FINOS Category X license, or a license not
         # recognised by name above, that would otherwise fail when bumped. None
@@ -194,7 +195,7 @@ jobs:
         #   chardet         LGPL-2.1-or-later -> transitive via cyclonedx-bom (SBOM generation tooling)
         #   python-gitlab   LGPL-3.0-or-later -> transitive via python-semantic-release (release tooling)
         #   regex           Apache-2.0 AND CNRI-Python -> transitive via nltk / cfn-lint (lint and test tooling)
-        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/semgrep, pkg:npm/bowser, pkg:pypi/chardet, pkg:pypi/python-gitlab, pkg:pypi/regex'
+        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/semgrep, pkg:npm/bowser, pkg:pypi/chardet, pkg:pypi/python-gitlab, pkg:pypi/regex, pkg:pypi/pillow'
 
   license-gate:
     name: Runtime License Gate
