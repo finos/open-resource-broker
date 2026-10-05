@@ -48,6 +48,7 @@ def register_domain_services(container: DIContainer) -> None:
         return MachineGroupingService(
             uow_factory=c.get(UnitOfWorkFactory),
             logger=c.get(LoggingPort),
+            provider_selection_port=c.get(ProviderSelectionPort),
         )
 
     container.register_singleton(MachineGroupingService, create_machine_grouping_service)

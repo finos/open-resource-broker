@@ -148,13 +148,24 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
                 OperationType as ProviderOperationType,
             )
 
+            # Check the provider's declared capabilities rather than sniffing
+            # the machine_id format (e.g. "i-" is an AWS instance-ID detail
+            # that has no business leaking into the application layer).
+            capabilities = self._provider_selection_port.get_strategy_capabilities(
+                request.provider_name
+            )
+            if not capabilities or not capabilities.supports_operation(
+                ProviderOperationType.TAG_INSTANCES
+            ):
+                return
+
             with self.uow_factory.create_unit_of_work() as uow:
                 machines = uow.machines.find_by_request_id(str(request.request_id))
 
             # Build per-instance tag map: {instance_id: {key: value, ...}}
             instance_tags: dict[str, dict[str, str]] = {}
             for m in machines:
-                if m.tags and m.tags.tags and str(m.machine_id).startswith("i-"):
+                if m.tags and m.tags.tags:
                     instance_tags[str(m.machine_id)] = m.tags.tags
 
             if not instance_tags:

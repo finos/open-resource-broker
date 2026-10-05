@@ -12,20 +12,30 @@ from typing import Any
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import LoggingPort
+from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 
 
 class MachineGroupingService:
     """Service for grouping machines by provider and resource context."""
 
-    def __init__(self, uow_factory: UnitOfWorkFactory, logger: LoggingPort) -> None:
+    def __init__(
+        self,
+        uow_factory: UnitOfWorkFactory,
+        logger: LoggingPort,
+        provider_selection_port: ProviderSelectionPort | None = None,
+    ) -> None:
         """Initialize the service.
 
         Args:
             uow_factory: Factory for creating unit of work instances
             logger: Logging port for structured logging
+            provider_selection_port: Port used to query provider capabilities
+                (e.g. whether a provider supports direct instance-tag
+                operations) without the service sniffing machine_id formats.
         """
         self.uow_factory = uow_factory
         self.logger = logger
+        self._provider_selection_port = provider_selection_port
 
     def group_by_provider(self, machine_ids: list[str]) -> dict[tuple[str, str, str], list[str]]:
         """Group machines by (provider_type, provider_name, provider_api).
@@ -115,8 +125,9 @@ class MachineGroupingService:
                     resource_id = machine.resource_id
                     if not resource_id:
                         mid_val = getattr(machine.machine_id, "value", str(machine.machine_id))
-                        if mid_val.startswith("i-"):
-                            # EC2 instance missing resource context — terminate directly
+                        if self._supports_direct_instance_termination(machine.provider_name):
+                            # Provider manages raw tagged instances missing
+                            # resource context — terminate directly.
                             provider_api = provider_api or ("Run" + "Instances")
                             resource_id = f"direct-{mid_val}"
                         else:
@@ -155,3 +166,29 @@ class MachineGroupingService:
         )
 
         return dict(resource_groups), skipped_ids
+
+    def _supports_direct_instance_termination(self, provider_name: str) -> bool:
+        """Whether this provider manages raw tagged instances directly.
+
+        Checks the provider's declared TAG_INSTANCES capability rather than
+        sniffing the machine_id format (e.g. an "i-" prefix is an AWS
+        instance-ID detail that has no business leaking into this layer).
+        Returns False (safe default — the caller skips the machine instead
+        of guessing) when no provider_selection_port was injected.
+        """
+        if self._provider_selection_port is None:
+            return False
+        try:
+            from orb.domain.base.operations import OperationType
+
+            capabilities = self._provider_selection_port.get_strategy_capabilities(provider_name)
+            return bool(capabilities) and capabilities.supports_operation(
+                OperationType.TAG_INSTANCES
+            )
+        except Exception as e:
+            self.logger.debug(
+                "Could not determine TAG_INSTANCES capability for provider %s: %s",
+                provider_name,
+                e,
+            )
+            return False
