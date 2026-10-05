@@ -94,7 +94,11 @@ updates:
 
   # Docker dependencies
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/"
+      - "/dev-tools/docker"
+      - "/sdk/java"
+      - "/tests/e2e/microvm/worker"
     schedule:
       interval: "weekly"
       day: "sunday"
@@ -109,6 +113,82 @@ updates:
     open-pull-requests-limit: 1
     groups:
       docker-all:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+
+  # Java SDK dependencies (Gradle)
+  - package-ecosystem: "gradle"
+    directory: "/sdk/java"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "06:00"
+      timezone: "America/New_York"
+    labels:
+      - "dependencies"
+      - "java"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 1
+    groups:
+      java-all:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+
+  # Kotlin SDK dependencies (Gradle)
+  - package-ecosystem: "gradle"
+    directory: "/sdk/kotlin"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "06:00"
+      timezone: "America/New_York"
+    labels:
+      - "dependencies"
+      - "kotlin"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 1
+    groups:
+      kotlin-all:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+
+  # C# SDK dependencies (NuGet)
+  - package-ecosystem: "nuget"
+    directories:
+      - "/sdk/csharp/src/FINOS.OpenResourceBroker"
+      - "/sdk/csharp/tests/unit"
+      - "/sdk/csharp/tests/contract"
+      - "/sdk/csharp/tests/parity"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "06:00"
+      timezone: "America/New_York"
+    labels:
+      - "dependencies"
+      - "csharp"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 1
+    groups:
+      csharp-all:
         patterns:
           - "*"
         update-types:
