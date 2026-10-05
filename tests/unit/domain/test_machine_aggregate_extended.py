@@ -119,33 +119,20 @@ class TestMachineUpdateStatus:
 # ---------------------------------------------------------------------------
 # update_network_info
 # ---------------------------------------------------------------------------
-# NOTE: update_network_info wraps strings in IPAddress(...) before passing them
-# to model_validate, but Machine.private_ip / public_ip are typed Optional[str].
-# This causes a Pydantic ValidationError — src bug. Tests for that path are
-# skipped rather than working around the defect here.
 
 
 @pytest.mark.unit
 class TestMachineUpdateNetworkInfo:
-    @pytest.mark.skip(
-        reason="src bug: update_network_info wraps IPs in IPAddress but field is Optional[str]"
-    )
     def test_sets_private_ip(self):
         m = _make_machine()
         updated = m.update_network_info(private_ip="10.0.0.1")
         assert updated.private_ip == "10.0.0.1"
 
-    @pytest.mark.skip(
-        reason="src bug: update_network_info wraps IPs in IPAddress but field is Optional[str]"
-    )
     def test_sets_public_ip(self):
         m = _make_machine()
         updated = m.update_network_info(public_ip="54.1.2.3")
         assert updated.public_ip == "54.1.2.3"
 
-    @pytest.mark.skip(
-        reason="src bug: update_network_info wraps IPs in IPAddress but field is Optional[str]"
-    )
     def test_updates_version(self):
         m = _make_machine()
         updated = m.update_network_info(private_ip="10.0.0.1")
@@ -261,9 +248,6 @@ class TestMachineProviderFormat:
         )
         assert str(m.machine_id) == "i-camel"
 
-    @pytest.mark.skip(
-        reason="src bug: from_provider_format wraps IPs in IPAddress but field is Optional[str]"
-    )
     def test_from_provider_format_parses_optional_ips(self):
         m = Machine.from_provider_format(
             {
