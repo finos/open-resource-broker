@@ -12,6 +12,9 @@ from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.utilities.json_utils import safe_json_dumps, safe_json_loads
 
 if TYPE_CHECKING:
+    # Type-only; combined with 'from __future__ import annotations' this never
+    # executes at runtime, so the cycle with configuration_manager cannot
+    # actually resolve ConfigurationManager out of order.
     from orb.config.managers.configuration_manager import ConfigurationManager
 
 T = TypeVar("T")

@@ -17,6 +17,10 @@ from .provider_manager import ProviderConfigManager
 from .type_converter import ConfigTypeConverter
 
 if TYPE_CHECKING:
+    # Type-only; combined with 'from __future__ import annotations' this never
+    # executes at runtime, so the cycle with loader cannot actually resolve
+    # ConfigurationLoader out of order. Runtime use goes through the deferred
+    # imports inside the loader/_load_configuration methods below.
     from orb.config.loader import ConfigurationLoader
     from orb.config.schemas.provider_strategy_schema import ProviderConfig
 
