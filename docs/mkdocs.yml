@@ -180,6 +180,16 @@ nav:
       - Authentication: providers/k8s/auth.md
       - Migrating from k8s-legacy: providers/k8s/migrating-from-k8s-legacy.md
       - Plugin Authoring: providers/k8s/plugin-authoring.md
+    - Azure:
+      - Overview: providers/azure/index.md
+      - Configuration: providers/azure/configuration.md
+      - Handlers: providers/azure/handlers.md
+      - Authentication: providers/azure/auth.md
+    - Google Cloud:
+      - Overview: providers/gcp/index.md
+      - Configuration: providers/gcp/configuration.md
+      - Handlers: providers/gcp/handlers.md
+      - Authentication: providers/gcp/auth.md
   - Slurm Integration:
     - Integration Guide: slurm/integration_guide.md
     - Operations Guide: slurm/operations_guide.md
