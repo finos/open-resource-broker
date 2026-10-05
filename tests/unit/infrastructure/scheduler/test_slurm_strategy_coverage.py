@@ -89,6 +89,48 @@ def test_get_slurm_client_propagates_injected_logger_to_rest_client(monkeypatch)
 
 
 # ---------------------------------------------------------------------------
+# expand_node_range — exposed via SchedulerPort instead of importing
+# SlurmNodeMapper directly from infrastructure (open-resource-broker-2706.7)
+# ---------------------------------------------------------------------------
+
+
+def test_expand_node_range_bracket_notation(strategy):
+    assert strategy.expand_node_range("compute-[001-003]") == [
+        "compute-001",
+        "compute-002",
+        "compute-003",
+    ]
+
+
+def test_expand_node_range_space_separated_list(strategy):
+    assert strategy.expand_node_range("compute-001 compute-002") == [
+        "compute-001",
+        "compute-002",
+    ]
+
+
+def test_expand_node_range_delegates_to_node_mapper(strategy, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        strategy.node_mapper, "expand_node_range", lambda spec: calls.append(spec) or ["x"]
+    )
+
+    result = strategy.expand_node_range("compute-[001-003]")
+
+    assert calls == ["compute-[001-003]"]
+    assert result == ["x"]
+
+
+def test_scheduler_port_default_expand_node_range_splits_whitespace():
+    """Non-SLURM schedulers get the generic whitespace-split default for free."""
+    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
+    default_strategy = DefaultSchedulerStrategy()
+
+    assert default_strategy.expand_node_range("node-1 node-2") == ["node-1", "node-2"]
+
+
+# ---------------------------------------------------------------------------
 # check_slurm_health
 # ---------------------------------------------------------------------------
 

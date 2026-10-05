@@ -304,6 +304,14 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             self._node_mapper = SlurmNodeMapper()
         return self._node_mapper
 
+    def expand_node_range(self, node_spec: str) -> list[str]:
+        """Expand SLURM hostlist syntax (e.g. "compute-[001-003]") to individual node names.
+
+        Exposed via SchedulerPort so interface-layer callers (CLI/REST handlers)
+        don't need to import SlurmNodeMapper directly from infrastructure.
+        """
+        return self.node_mapper.expand_node_range(node_spec)
+
     def handle_resume_request(self, node_names: list[str]) -> dict[str, Any]:
         """Handle a batch ResumeProgram call for dynamic slot model.
 
