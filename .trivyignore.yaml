@@ -35,6 +35,44 @@ vulnerabilities:
       header. No fixed package in Debian 13; status "fix_deferred".
     expired_at: 2027-01-01
 
+  - id: CVE-2026-76642
+    statement: >-
+      util-linux: a failed external mount helper still runs privileged
+      X-mount post-hooks (bsdutils, libblkid1, liblastlog2-2, libmount1,
+      libsmartcols1, libuuid1, login, mount, util-linux). No fixed package
+      in Debian 13.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-78408
+    statement: >-
+      util-linux: nsenter --join-cgroup leaks root cgroup migration
+      authority (bsdutils, libblkid1, liblastlog2-2, libmount1,
+      libsmartcols1, libuuid1, login, mount, util-linux). No fixed package
+      in Debian 13.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-78409
+    statement: >-
+      util-linux: X-mount.subdir detached-tree resolution can escape via
+      intermediate symlinks (bsdutils, libblkid1, liblastlog2-2, libmount1,
+      libsmartcols1, libuuid1, login, mount, util-linux). No fixed package
+      in Debian 13.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-78410
+    statement: >-
+      util-linux: restricted bind mounts do not pin the source, allowing
+      X-mount.owner/group/mode changes to escape the restriction (bsdutils,
+      libblkid1, liblastlog2-2, libmount1, libsmartcols1, libuuid1, login,
+      mount, util-linux). No fixed package in Debian 13.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-16742
+    statement: >-
+      systemd-homed: local privilege escalation (libsystemd0, libudev1).
+      No fixed package in Debian 13.
+    expired_at: 2027-01-01
+
 secrets:
   # moto (AWS mocking library) ships fixed self-signed TLS certificates for
   # its local mock proxy server. They are test fixtures, not production

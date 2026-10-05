@@ -47,9 +47,25 @@ RUN groupadd -r "${PACKAGE_NAME_SHORT:-orb}" \
 WORKDIR /app
 RUN mkdir -p /app/logs /app/data /app/tmp
 
-# Install UV and create virtual environment in single layer
+# Install UV and create virtual environment in single layer.
+#
+# The application runs from /opt/venv (built and populated via uv below), so
+# the system interpreter's own pip/setuptools/wheel — only needed transiently
+# to install uv itself — are removed in this same layer once uv exists.
+# pip vendors its own private copies of several libraries (setuptools,
+# urllib3, msgpack); those copies are not reachable at runtime but still
+# show up as vulnerable packages in image scans, so dropping pip removes
+# them entirely instead of just patching the top-level entries.
 RUN pip install --no-cache-dir uv==0.8.12 \
-    && uv venv /opt/venv
+    && uv venv /opt/venv \
+    && rm -rf /usr/local/lib/python*/ensurepip \
+        /usr/local/lib/python*/site-packages/pip \
+        /usr/local/lib/python*/site-packages/pip-*.dist-info \
+        /usr/local/lib/python*/site-packages/setuptools \
+        /usr/local/lib/python*/site-packages/setuptools-*.dist-info \
+        /usr/local/lib/python*/site-packages/wheel \
+        /usr/local/lib/python*/site-packages/wheel-*.dist-info \
+    && find /usr/local/bin -name "pip*" -delete
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy pre-built wheel and install with all runtime extras.
