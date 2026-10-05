@@ -1,0 +1,138 @@
+name: Dependabot Auto-merge
+
+# workflow_run always executes the version of this file on the default
+# branch, in the base repository's context — so the ORB CICD App secrets
+# below are available even though the triggering run was for a PR branch.
+on:
+  workflow_run:
+    workflows: ["Unit Tests", "Quality Checks"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  statuses: read
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  automerge:
+    name: Auto-merge grouped minor/patch update
+    runs-on: ubuntu-latest
+    # Dependabot opens PRs from branches on this repository (never a fork),
+    # so head_branch/pull_requests are always populated for them. Only look
+    # at runs that completed successfully for a pull_request (Unit Tests and
+    # Quality Checks also run on push/schedule, which this job ignores).
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Resolve pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER=$(jq -r '.workflow_run.pull_requests[0].number // empty' "$GITHUB_EVENT_PATH")
+          if [[ -z "$PR_NUMBER" ]]; then
+            PR_NUMBER=$(gh pr list --head "$HEAD_BRANCH" --state open --json number --jq '.[0].number // empty')
+          fi
+          if [[ -z "$PR_NUMBER" ]]; then
+            echo "No open pull request found for $HEAD_BRANCH; nothing to merge."
+          fi
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Check author and update group
+        id: eligible
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          AUTHOR=$(gh pr view "$PR_NUMBER" --json author --jq '.author.login')
+          if [[ "$AUTHOR" != "dependabot[bot]" ]]; then
+            echo "Author is $AUTHOR, not dependabot[bot]; skipping."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # dependabot/fetch-metadata needs a pull_request-triggered run to
+          # expose its outputs, but this job runs on workflow_run instead.
+          # Grouped Dependabot branches are named after their group (see
+          # .github/dependabot.yml), e.g. dependabot/uv/python-minor-patch-<hash>.
+          # Only the *-minor-patch groups are eligible for auto-merge; the
+          # *-major groups and the all-update-types groups (github-actions-all,
+          # go-all, docker-all) still require a human review before merging.
+          if [[ "$HEAD_BRANCH" == *-minor-patch-* ]]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch $HEAD_BRANCH is not a minor/patch update group; skipping."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify all checks are green
+        id: checks
+        if: steps.pr.outputs.number != '' && steps.eligible.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          SHA=$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')
+
+          # Legacy commit statuses (separate from the Checks API). This repo
+          # only uses Actions-based checks today, so an empty status list
+          # (total_count 0) is treated as "nothing to block on" rather than
+          # the API's default "pending" state for no statuses.
+          STATUS_JSON=$(gh api "repos/${{ github.repository }}/commits/$SHA/status")
+          STATUS_TOTAL=$(echo "$STATUS_JSON" | jq '.total_count')
+          STATUS_STATE=$(echo "$STATUS_JSON" | jq -r '.state')
+          STATUS_OK=true
+          if [[ "$STATUS_TOTAL" -gt 0 && "$STATUS_STATE" != "success" ]]; then
+            STATUS_OK=false
+          fi
+
+          # GitHub Actions check runs (CI Passed, Ruff, pyright, Architecture
+          # Validation, etc). Exclude this job's own name defensively in case
+          # it is ever reported against the PR head SHA.
+          CHECK_RUNS=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs" --paginate --jq '.check_runs' | jq -s 'add')
+          RELEVANT=$(echo "$CHECK_RUNS" | jq '[.[] | select(.name != "Auto-merge grouped minor/patch update")]')
+          PENDING=$(echo "$RELEVANT" | jq '[.[] | select(.status != "completed")] | length')
+          FAILED=$(echo "$RELEVANT" | jq '[.[] | select(.conclusion != "success" and .conclusion != "neutral" and .conclusion != "skipped")] | length')
+
+          if [[ "$STATUS_OK" == "true" && "$PENDING" -eq 0 && "$FAILED" -eq 0 ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$PENDING" -gt 0 ]]; then
+            echo "$PENDING check run(s) still pending; a later workflow_run completion will retry."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "A check or commit status is not successful; skipping merge."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mint ORB CICD App token
+        if: steps.pr.outputs.number != '' && steps.eligible.outputs.ok == 'true' && steps.checks.outputs.ready == 'true'
+        id: app-token
+        uses: ./.github/actions/orb-cicd-app-token
+        with:
+          client-id: ${{ secrets.GH_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - name: Merge pull request
+        if: steps.pr.outputs.number != '' && steps.eligible.outputs.ok == 'true' && steps.checks.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR_NUMBER" --merge --delete-branch
