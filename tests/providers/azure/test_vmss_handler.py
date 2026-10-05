@@ -1269,3 +1269,102 @@ def test_flexible_vmss_list_kwargs_rejects_unsafe_vmss_name():
             vmss_name="vmss' or '1'='1",
             include_instance_view=False,
         )
+
+
+def test_start_hosts_async_starts_flexible_members_by_vm_name():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "vm-a"}])
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.FLEXIBLE
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+    azure_client.compute_client.virtual_machines.begin_start.return_value = MagicMock()
+
+    results = run_operation(
+        handler.start_hosts_async(
+            machine_ids=["vm-a"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+        )
+    )
+
+    assert results == {"vm-a": True}
+    azure_client.compute_client.virtual_machines.begin_start.assert_called_once_with(
+        resource_group_name="test-rg",
+        vm_name="vm-a",
+    )
+
+
+def test_start_hosts_async_reports_unresolved_flexible_members_as_failed():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "vm-a"}])
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.FLEXIBLE
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+
+    results = run_operation(
+        handler.start_hosts_async(
+            machine_ids=["vm-missing"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+        )
+    )
+
+    assert results == {"vm-missing": False}
+    azure_client.compute_client.virtual_machines.begin_start.assert_not_called()
+
+
+def test_stop_hosts_async_deallocates_uniform_members_by_default():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=(["3", "4"], []))
+    handler._list_vmss_instances_async = AsyncMock(
+        return_value=[{"instance_id": "3"}, {"instance_id": "4"}]
+    )
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.UNIFORM
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+
+    results = run_operation(
+        handler.stop_hosts_async(
+            machine_ids=["3", "4"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+        )
+    )
+
+    assert results == {"3": True, "4": True}
+    azure_client.compute_client.virtual_machine_scale_sets.begin_deallocate.assert_called_once()
+    azure_client.compute_client.virtual_machine_scale_sets.begin_power_off.assert_not_called()
+
+
+def test_stop_hosts_async_powers_off_uniform_members_without_deallocating_when_requested():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=(["3"], []))
+    handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "3"}])
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.UNIFORM
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+
+    results = run_operation(
+        handler.stop_hosts_async(
+            machine_ids=["3"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+            deallocate=False,
+        )
+    )
+
+    assert results == {"3": True}
+    azure_client.compute_client.virtual_machine_scale_sets.begin_power_off.assert_called_once()
+    azure_client.compute_client.virtual_machine_scale_sets.begin_deallocate.assert_not_called()

@@ -162,6 +162,24 @@ def make_vmss_azure_client() -> MagicMock:
     async_compute.virtual_machines.begin_delete = AsyncMock(
         side_effect=azure_client.compute_client.virtual_machines.begin_delete
     )
+    async_compute.virtual_machines.begin_start = AsyncMock(
+        side_effect=azure_client.compute_client.virtual_machines.begin_start
+    )
+    async_compute.virtual_machines.begin_deallocate = AsyncMock(
+        side_effect=azure_client.compute_client.virtual_machines.begin_deallocate
+    )
+    async_compute.virtual_machines.begin_power_off = AsyncMock(
+        side_effect=azure_client.compute_client.virtual_machines.begin_power_off
+    )
+    async_compute.virtual_machine_scale_sets.begin_start = AsyncMock(
+        side_effect=azure_client.compute_client.virtual_machine_scale_sets.begin_start
+    )
+    async_compute.virtual_machine_scale_sets.begin_deallocate = AsyncMock(
+        side_effect=azure_client.compute_client.virtual_machine_scale_sets.begin_deallocate
+    )
+    async_compute.virtual_machine_scale_sets.begin_power_off = AsyncMock(
+        side_effect=azure_client.compute_client.virtual_machine_scale_sets.begin_power_off
+    )
     async_compute.ssh_public_keys.get = AsyncMock(
         side_effect=azure_client.compute_client.ssh_public_keys.get
     )

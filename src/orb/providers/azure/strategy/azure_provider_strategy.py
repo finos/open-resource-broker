@@ -34,6 +34,9 @@ from orb.providers.azure.services.inventory_service import (
     AzureReadOperationContext,
     build_read_operation_context,
 )
+from orb.providers.azure.services.power_operation_service import (
+    AzurePowerOperationService,
+)
 from orb.providers.azure.services.provisioning_service import (
     AzureProvisioningService,
     create_instances_dry_run_result,
@@ -154,6 +157,11 @@ class AzureProviderStrategy(ProviderStrategy):
         self._cleanup_requested = False
         self._cleanup_wait_timeout_seconds = 30.0
         self._termination_service = AzureTerminationService(
+            logger=logger,
+            handler_provider=self,
+            default_resource_group=config.resource_group,
+        )
+        self._power_operation_service = AzurePowerOperationService(
             logger=logger,
             handler_provider=self,
             default_resource_group=config.resource_group,
@@ -382,6 +390,8 @@ class AzureProviderStrategy(ProviderStrategy):
                 ProviderOperationType.VALIDATE_TEMPLATE,
                 ProviderOperationType.GET_AVAILABLE_TEMPLATES,
                 ProviderOperationType.HEALTH_CHECK,
+                ProviderOperationType.START_INSTANCES,
+                ProviderOperationType.STOP_INSTANCES,
             ],
             supported_apis=get_supported_apis(),
             features={
@@ -572,6 +582,22 @@ class AzureProviderStrategy(ProviderStrategy):
             return await self._handle_get_available_templates()
         elif operation.operation_type == ProviderOperationType.HEALTH_CHECK:
             return await self._handle_health_check(operation)
+        elif operation.operation_type == ProviderOperationType.START_INSTANCES:
+            return await self._handle_start_instances(operation)
+        elif operation.operation_type == ProviderOperationType.STOP_INSTANCES:
+            return await self._handle_stop_instances(operation)
+        elif operation.operation_type == ProviderOperationType.CLEANUP_MACHINE_RESOURCES:
+            return self._unsupported_machine_operation_result(
+                "cleanup_machine_resources",
+                "Azure VMSS/VM deletion already tears down the resources it owns "
+                "(disks, NICs); there is no separate per-machine cleanup step to run.",
+            )
+        elif operation.operation_type == ProviderOperationType.GET_MACHINE_HEALTH:
+            return self._unsupported_machine_operation_result(
+                "get_machine_health",
+                "Azure machine health is derived from check_hosts_status "
+                "(GET_INSTANCE_STATUS); there is no separate per-machine health check.",
+            )
         else:
             return ProviderResult.error_result(
                 f"Unsupported operation: {operation.operation_type}",
@@ -680,6 +706,56 @@ class AzureProviderStrategy(ProviderStrategy):
                 "TERMINATE_INSTANCES_ERROR",
                 exc,
             )
+
+    # ------------------------------------------------------------------
+    # START_INSTANCES / STOP_INSTANCES
+    # ------------------------------------------------------------------
+
+    async def _handle_start_instances(self, operation: ProviderOperation) -> ProviderResult:
+        """Power on stopped/deallocated machines."""
+        try:
+            return await self._power_operation_service.start_instances_async(operation)
+        except asyncio.CancelledError:
+            raise
+        except AzureValidationError as exc:
+            return self._error_result(str(exc), "START_INSTANCES_ERROR", exc)
+        except Exception as exc:
+            return self._error_result(
+                f"Failed to start instances: {exc!s}",
+                "START_INSTANCES_ERROR",
+                exc,
+            )
+
+    async def _handle_stop_instances(self, operation: ProviderOperation) -> ProviderResult:
+        """Power off running machines; deallocates (stops billing) by default."""
+        try:
+            return await self._power_operation_service.stop_instances_async(operation)
+        except asyncio.CancelledError:
+            raise
+        except AzureValidationError as exc:
+            return self._error_result(str(exc), "STOP_INSTANCES_ERROR", exc)
+        except Exception as exc:
+            return self._error_result(
+                f"Failed to stop instances: {exc!s}",
+                "STOP_INSTANCES_ERROR",
+                exc,
+            )
+
+    @staticmethod
+    def _unsupported_machine_operation_result(operation_name: str, reason: str) -> ProviderResult:
+        """Build the documented-unsupported response for a per-machine operation.
+
+        Used for operations AWS implements via a dedicated machine adapter
+        (volume/ENI cleanup, live EC2 health checks) that have no Azure
+        equivalent -- rather than silently no-op'ing, this returns a clear,
+        intentional error so callers do not mistake it for a transient
+        failure.
+        """
+        return ProviderResult.error_result(
+            f"{operation_name} is not supported by the Azure provider: {reason}",
+            f"{operation_name.upper()}_NOT_SUPPORTED",
+            {"operation": operation_name},
+        )
 
     # ------------------------------------------------------------------
     # GET_INSTANCE_STATUS

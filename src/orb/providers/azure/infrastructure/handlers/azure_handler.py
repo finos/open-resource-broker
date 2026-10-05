@@ -245,6 +245,46 @@ class AzureHandler(ABC):
     ) -> Optional[AzureReleaseHostsResult]:
         """Delete / deallocate cloud resources without blocking the event loop."""
 
+    async def start_hosts_async(
+        self,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext] = None,
+    ) -> dict[str, bool]:
+        """Power on stopped/deallocated machines; return per-machine success.
+
+        Default implementation documents the operation as unsupported for
+        provider APIs that have no concept of restarting an individual member
+        (e.g. CycleCloud, which manages node lifecycle at the cluster level).
+        Concrete handlers that support it (VMSS, SingleVM) override this.
+        """
+        raise AzureValidationError(
+            f"start_instances is not supported for {type(self).__name__}",
+            error_code="UNSUPPORTED_OPERATION",
+        )
+
+    async def stop_hosts_async(
+        self,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext] = None,
+        *,
+        deallocate: bool = True,
+    ) -> dict[str, bool]:
+        """Power off (deallocate by default) running machines; return per-machine success.
+
+        ``deallocate=True`` (the default) releases the compute allocation so
+        the VM stops being billed for compute, mirroring the AWS StopInstances
+        default. ``deallocate=False`` performs a plain power-off instead,
+        which Azure continues to bill for the reserved compute. Default
+        implementation documents the operation as unsupported; concrete
+        handlers that support it (VMSS, SingleVM) override this.
+        """
+        raise AzureValidationError(
+            f"stop_instances is not supported for {type(self).__name__}",
+            error_code="UNSUPPORTED_OPERATION",
+        )
+
     @classmethod
     def get_example_templates(cls) -> list[dict[str, Any]]:
         """Return example template dicts for documentation / wizard use."""

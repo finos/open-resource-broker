@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import re
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, cast
 
@@ -144,6 +145,22 @@ def _build_vmss_delete_instance_ids(instance_ids: list[str]) -> Any:
     except ImportError:
         return {"instance_ids": instance_ids}
     return VirtualMachineScaleSetVMInstanceRequiredIDs(instance_ids=instance_ids)
+
+
+def _build_vmss_instance_ids(instance_ids: list[str]) -> Any:
+    """Build the VMSS start/power-off/deallocate payload using the SDK model when available.
+
+    Unlike delete (``VirtualMachineScaleSetVMInstanceRequiredIDs``), the
+    start/power-off/deallocate bulk operations use
+    ``VirtualMachineScaleSetVMInstanceIDs``, whose ``instance_ids`` is
+    optional (omitting it targets every instance) -- ORB always passes an
+    explicit list here.
+    """
+    try:
+        from azure.mgmt.compute.models import VirtualMachineScaleSetVMInstanceIDs
+    except ImportError:
+        return {"instance_ids": instance_ids}
+    return VirtualMachineScaleSetVMInstanceIDs(instance_ids=instance_ids)
 
 
 def _require_vmss_payload_object(
@@ -491,6 +508,176 @@ class VMSSHandler(AzureHandler):
                 f"Failed to submit termination for VMSS '{vmss_name}': {exc}",
                 resource_ids=machine_ids,
             ) from exc
+
+    async def start_hosts_async(
+        self,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext] = None,
+    ) -> dict[str, bool]:
+        """Power on stopped/deallocated VMSS members."""
+        return await self._submit_vmss_power_operation_async(
+            machine_ids=machine_ids,
+            resource_id=resource_id,
+            context=context,
+            operation_name="start",
+            flexible_submit=lambda compute, resource_group, vm_name: (
+                compute.virtual_machines.begin_start(
+                    resource_group_name=resource_group,
+                    vm_name=vm_name,
+                )
+            ),
+            uniform_submit=lambda compute, resource_group, vmss_name, instance_ids: (
+                compute.virtual_machine_scale_sets.begin_start(
+                    resource_group_name=resource_group,
+                    vm_scale_set_name=vmss_name,
+                    vm_instance_i_ds=_build_vmss_instance_ids(instance_ids),
+                )
+            ),
+        )
+
+    async def stop_hosts_async(
+        self,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext] = None,
+        *,
+        deallocate: bool = True,
+    ) -> dict[str, bool]:
+        """Power off VMSS members; deallocates (stops billing) by default."""
+        if deallocate:
+
+            def flexible_submit(compute: Any, resource_group: str, vm_name: str) -> Any:
+                """Submit a deallocate request for a Flexible-orchestration VM."""
+                return compute.virtual_machines.begin_deallocate(
+                    resource_group_name=resource_group,
+                    vm_name=vm_name,
+                )
+
+            def uniform_submit(
+                compute: Any, resource_group: str, vmss_name: str, instance_ids: list[str]
+            ) -> Any:
+                """Submit a deallocate request for Uniform-orchestration VMSS instances."""
+                return compute.virtual_machine_scale_sets.begin_deallocate(
+                    resource_group_name=resource_group,
+                    vm_scale_set_name=vmss_name,
+                    vm_instance_i_ds=_build_vmss_instance_ids(instance_ids),
+                )
+        else:
+
+            def flexible_submit(compute: Any, resource_group: str, vm_name: str) -> Any:
+                """Submit a power-off request for a Flexible-orchestration VM."""
+                return compute.virtual_machines.begin_power_off(
+                    resource_group_name=resource_group,
+                    vm_name=vm_name,
+                )
+
+            def uniform_submit(
+                compute: Any, resource_group: str, vmss_name: str, instance_ids: list[str]
+            ) -> Any:
+                """Submit a power-off request for Uniform-orchestration VMSS instances."""
+                return compute.virtual_machine_scale_sets.begin_power_off(
+                    resource_group_name=resource_group,
+                    vm_scale_set_name=vmss_name,
+                    vm_instance_i_ds=_build_vmss_instance_ids(instance_ids),
+                )
+
+        return await self._submit_vmss_power_operation_async(
+            machine_ids=machine_ids,
+            resource_id=resource_id,
+            context=context,
+            operation_name="deallocate" if deallocate else "power_off",
+            flexible_submit=flexible_submit,
+            uniform_submit=uniform_submit,
+        )
+
+    async def _submit_vmss_power_operation_async(
+        self,
+        *,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext],
+        operation_name: str,
+        flexible_submit: Callable[[Any, str, str], Any],
+        uniform_submit: Callable[[Any, str, str, list[str]], Any],
+    ) -> dict[str, bool]:
+        """Resolve VMSS members and submit a start/power-off/deallocate.
+
+        Returns a per-requested-id success map, mirroring the AWS
+        ``start_instances``/``stop_instances`` result shape. An ID that no
+        longer resolves against the live member list is reported as failed
+        (unlike release, this is not a retried terminal operation -- there is
+        nothing to start or stop).
+        """
+        resource_group = self._resolve_release_resource_group(
+            machine_ids=machine_ids,
+            context=context,
+        )
+        vmss_name = resource_id
+        orchestration_mode = await self._get_vmss_orchestration_mode_async(
+            resource_group, vmss_name
+        )
+        current_members = await self._list_vmss_instances_async(
+            resource_group=resource_group,
+            vmss_name=vmss_name,
+            include_instance_view=False,
+            orchestration_mode=orchestration_mode,
+        )
+        compute = await self.azure_client.get_async_compute_client()
+        results: dict[str, bool] = {}
+
+        if orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE:
+            resolved_vm_names, requested_ids, already_missing_ids = (
+                self._resolve_flexible_vm_names_from_members(
+                    machine_ids=machine_ids,
+                    current_members=current_members,
+                    logger=self._logger,
+                    vmss_name=vmss_name,
+                )
+            )
+            for machine_id in already_missing_ids:
+                results[machine_id] = False
+            for requested_id, vm_name in zip(requested_ids, resolved_vm_names, strict=True):
+                try:
+                    await flexible_submit(compute, resource_group, vm_name)
+                    results[requested_id] = True
+                except Exception as exc:
+                    self._logger.error(
+                        "Failed to %s VMSS flexible member '%s' in '%s': %s",
+                        operation_name,
+                        vm_name,
+                        vmss_name,
+                        exc,
+                    )
+                    results[requested_id] = False
+            return results
+
+        resolved_instance_ids, already_missing_ids = await self._resolve_vmss_instance_ids_async(
+            resource_group=resource_group,
+            vmss_name=vmss_name,
+            machine_ids=machine_ids,
+            current_members=current_members,
+        )
+        for machine_id in already_missing_ids:
+            results[machine_id] = False
+        if resolved_instance_ids:
+            try:
+                await uniform_submit(compute, resource_group, vmss_name, resolved_instance_ids)
+                for machine_id in machine_ids:
+                    if machine_id not in already_missing_ids:
+                        results[str(machine_id)] = True
+            except Exception as exc:
+                self._logger.error(
+                    "Failed to %s VMSS '%s' instances %s: %s",
+                    operation_name,
+                    vmss_name,
+                    resolved_instance_ids,
+                    exc,
+                )
+                for machine_id in machine_ids:
+                    if machine_id not in already_missing_ids:
+                        results[str(machine_id)] = False
+        return results
 
     # ------------------------------------------------------------------
     # Internal helpers
