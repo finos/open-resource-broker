@@ -7,12 +7,13 @@ REST client implementation (only mocks at a higher layer).
 import pytest
 import requests
 
-from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.scheduler.slurm.rest_client import (
     SlurmRestClient,
     SlurmRestClientError,
     _is_loopback_host,
 )
+
+from .conftest import FakeLoggingPort
 
 
 class _FakeResponse:
@@ -26,8 +27,10 @@ class _FakeResponse:
 
 
 @pytest.fixture
-def client() -> SlurmRestClient:
-    return SlurmRestClient(base_url="https://slurmrestd.example.com", token="tok-123")
+def client(fake_logger: FakeLoggingPort) -> SlurmRestClient:
+    return SlurmRestClient(
+        base_url="https://slurmrestd.example.com", logger=fake_logger, token="tok-123"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -35,28 +38,30 @@ def client() -> SlurmRestClient:
 # ---------------------------------------------------------------------------
 
 
-def test_rejects_non_http_scheme():
+def test_rejects_non_http_scheme(fake_logger: FakeLoggingPort):
     with pytest.raises(ValueError, match="must start with http"):
-        SlurmRestClient(base_url="ftp://slurmrestd.example.com")
+        SlurmRestClient(base_url="ftp://slurmrestd.example.com", logger=fake_logger)
 
 
-def test_strips_trailing_slash_from_base_url():
-    c = SlurmRestClient(base_url="https://slurmrestd.example.com/")
+def test_strips_trailing_slash_from_base_url(fake_logger: FakeLoggingPort):
+    c = SlurmRestClient(base_url="https://slurmrestd.example.com/", logger=fake_logger)
     assert c._url("nodes") == "https://slurmrestd.example.com/slurm/v0.0.44/nodes"
 
 
-def test_rejects_plain_http_by_default():
+def test_rejects_plain_http_by_default(fake_logger: FakeLoggingPort):
     with pytest.raises(ValueError, match="Refusing plain http"):
-        SlurmRestClient(base_url="http://slurmrestd.example.com")
+        SlurmRestClient(base_url="http://slurmrestd.example.com", logger=fake_logger)
 
 
-def test_allows_plain_http_when_explicitly_opted_in():
-    c = SlurmRestClient(base_url="http://slurmrestd.example.com", allow_insecure_http=True)
+def test_allows_plain_http_when_explicitly_opted_in(fake_logger: FakeLoggingPort):
+    c = SlurmRestClient(
+        base_url="http://slurmrestd.example.com", logger=fake_logger, allow_insecure_http=True
+    )
     assert c._base_url == "http://slurmrestd.example.com"
 
 
-def test_https_never_requires_the_insecure_opt_in():
-    c = SlurmRestClient(base_url="https://slurmrestd.example.com")
+def test_https_never_requires_the_insecure_opt_in(fake_logger: FakeLoggingPort):
+    c = SlurmRestClient(base_url="https://slurmrestd.example.com", logger=fake_logger)
     assert c._base_url == "https://slurmrestd.example.com"
 
 
@@ -76,8 +81,8 @@ def test_https_never_requires_the_insecure_opt_in():
         "http://[::1]:6820",
     ],
 )
-def test_allows_plain_http_to_loopback_without_opt_in(base_url):
-    c = SlurmRestClient(base_url=base_url)
+def test_allows_plain_http_to_loopback_without_opt_in(base_url, fake_logger: FakeLoggingPort):
+    c = SlurmRestClient(base_url=base_url, logger=fake_logger)
     assert c._base_url == base_url
 
 
@@ -90,9 +95,9 @@ def test_allows_plain_http_to_loopback_without_opt_in(base_url):
         "http://slurmctld:6820",
     ],
 )
-def test_rejects_plain_http_to_non_loopback_host_by_default(base_url):
+def test_rejects_plain_http_to_non_loopback_host_by_default(base_url, fake_logger: FakeLoggingPort):
     with pytest.raises(ValueError, match="Refusing plain http"):
-        SlurmRestClient(base_url=base_url)
+        SlurmRestClient(base_url=base_url, logger=fake_logger)
 
 
 @pytest.mark.parametrize(
@@ -104,13 +109,14 @@ def test_rejects_plain_http_to_non_loopback_host_by_default(base_url):
         "http://slurmctld:6820",
     ],
 )
-def test_allows_plain_http_to_non_loopback_host_when_opted_in(base_url):
-    c = SlurmRestClient(base_url=base_url, allow_insecure_http=True)
+def test_allows_plain_http_to_non_loopback_host_when_opted_in(
+    base_url, fake_logger: FakeLoggingPort
+):
+    c = SlurmRestClient(base_url=base_url, logger=fake_logger, allow_insecure_http=True)
     assert c._base_url == base_url
 
 
-def test_opting_in_for_non_loopback_host_logs_a_warning():
-    fake_logger = _FakeLogger()
+def test_opting_in_for_non_loopback_host_logs_a_warning(fake_logger: FakeLoggingPort):
     SlurmRestClient(
         base_url="http://slurmrestd.example.com",
         allow_insecure_http=True,
@@ -119,8 +125,7 @@ def test_opting_in_for_non_loopback_host_logs_a_warning():
     assert any(call[0] == "warning" for call in fake_logger.calls)
 
 
-def test_opting_in_for_loopback_host_does_not_log_a_warning():
-    fake_logger = _FakeLogger()
+def test_opting_in_for_loopback_host_does_not_log_a_warning(fake_logger: FakeLoggingPort):
     SlurmRestClient(
         base_url="http://localhost:6820",
         allow_insecure_http=True,
@@ -129,8 +134,7 @@ def test_opting_in_for_loopback_host_does_not_log_a_warning():
     assert not any(call[0] == "warning" for call in fake_logger.calls)
 
 
-def test_loopback_host_does_not_log_a_warning_without_opt_in():
-    fake_logger = _FakeLogger()
+def test_loopback_host_does_not_log_a_warning_without_opt_in(fake_logger: FakeLoggingPort):
     SlurmRestClient(base_url="http://localhost:6820", logger=fake_logger)
     assert not any(call[0] == "warning" for call in fake_logger.calls)
 
@@ -160,8 +164,8 @@ def test_headers_include_token_when_set(client):
     assert headers["X-SLURM-USER-TOKEN"] == "tok-123"
 
 
-def test_headers_omit_token_when_not_set():
-    c = SlurmRestClient(base_url="https://slurmrestd.example.com")
+def test_headers_omit_token_when_not_set(fake_logger: FakeLoggingPort):
+    c = SlurmRestClient(base_url="https://slurmrestd.example.com", logger=fake_logger)
     headers = c._get_headers()
     assert "X-SLURM-USER-TOKEN" not in headers
 
@@ -309,38 +313,11 @@ def test_is_available_false_on_unexpected_error(client, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Logging — injected LoggingPort instead of module-level logging.getLogger
+# Logging — the LoggingPort is a required constructor argument
 # ---------------------------------------------------------------------------
 
 
-class _FakeLogger(LoggingPort):
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, tuple]] = []
-
-    def debug(self, message, *args, **kwargs):
-        self.calls.append(("debug", (message, *args)))
-
-    def info(self, message, *args, **kwargs):
-        self.calls.append(("info", (message, *args)))
-
-    def warning(self, message, *args, **kwargs):
-        self.calls.append(("warning", (message, *args)))
-
-    def error(self, message, *args, **kwargs):
-        self.calls.append(("error", (message, *args)))
-
-    def critical(self, message, *args, **kwargs):
-        self.calls.append(("critical", (message, *args)))
-
-    def exception(self, message, *args, **kwargs):
-        self.calls.append(("exception", (message, *args)))
-
-    def log(self, level, message, *args, **kwargs):
-        self.calls.append(("log", (message, *args)))
-
-
-def test_uses_injected_logger_when_provided(monkeypatch):
-    fake_logger = _FakeLogger()
+def test_uses_injected_logger(fake_logger: FakeLoggingPort, monkeypatch):
     c = SlurmRestClient(base_url="https://slurmrestd.example.com", logger=fake_logger)
     monkeypatch.setattr(requests, "get", lambda *a, **k: _FakeResponse(500, text="boom"))
 
@@ -348,11 +325,3 @@ def test_uses_injected_logger_when_provided(monkeypatch):
         c.get_nodes()
 
     assert any(call[0] == "error" for call in fake_logger.calls)
-
-
-def test_falls_back_to_module_logger_when_none_injected(monkeypatch):
-    sentinel = _FakeLogger()
-    monkeypatch.setattr("orb.infrastructure.logging.logger.get_logger", lambda name: sentinel)
-    c = SlurmRestClient(base_url="https://slurmrestd.example.com")
-
-    assert c._log is sentinel

@@ -62,13 +62,13 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             self._slurm_client = SlurmRestClient(
                 base_url=slurmrestd_url,
                 token=token,
-                logger=self._logger,
+                logger=self.logger,
                 allow_insecure_http=allow_insecure_http,
             )
         else:
             from orb.infrastructure.scheduler.slurm.cli_adapter import SlurmCliAdapter
 
-            self._slurm_client = SlurmCliAdapter(logger=self._logger)
+            self._slurm_client = SlurmCliAdapter(logger=self.logger)
 
         return self._slurm_client
 
@@ -462,7 +462,7 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         """
         from orb.infrastructure.scheduler.slurm.node_bootstrap import SlurmNodeBootstrap
 
-        bootstrap = SlurmNodeBootstrap(logger=self._logger)
+        bootstrap = SlurmNodeBootstrap(logger=self.logger)
 
         for node in nodes:
             node_name = node.get("node_name", "")

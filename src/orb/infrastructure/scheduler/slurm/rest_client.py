@@ -2,7 +2,7 @@
 
 import ipaddress
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import requests
@@ -65,11 +65,11 @@ class SlurmRestClient:
     def __init__(
         self,
         base_url: str,
+        logger: "LoggingPort",
         api_version: str = "v0.0.44",
         token: str | None = None,
         timeout: int = 30,
         verify_ssl: bool = True,
-        logger: "LoggingPort | None" = None,
         allow_insecure_http: bool = False,
     ) -> None:
         self._logger = logger
@@ -87,7 +87,7 @@ class SlurmRestClient:
                     "SLURM_ORB_RESTD_ALLOW_HTTP=1 to opt in for a network you "
                     "already trust."
                 )
-            self._log.warning(
+            self._logger.warning(
                 "slurmrestd base_url '%s' uses plain http:// to a non-loopback "
                 "host with SLURM_ORB_RESTD_ALLOW_HTTP=1 set; the JWT token and "
                 "all node/partition data will be sent unencrypted.",
@@ -98,15 +98,6 @@ class SlurmRestClient:
         self._token = token
         self._timeout = timeout
         self._verify_ssl = verify_ssl
-
-    @property
-    def _log(self) -> Any:
-        """Injected LoggingPort, falling back to the module logger when not supplied."""
-        if self._logger is None:
-            from orb.infrastructure.logging.logger import get_logger
-
-            return get_logger(__name__)
-        return self._logger
 
     def set_token(self, token: str) -> None:
         """Set or update the JWT authentication token."""
@@ -133,16 +124,16 @@ class SlurmRestClient:
                 url, headers=self._get_headers(), timeout=self._timeout, verify=self._verify_ssl
             )
             if resp.status_code >= 400:
-                self._log.error(
+                self._logger.error(
                     "slurmrestd %s returned HTTP %d: %s", url, resp.status_code, resp.text
                 )
                 raise SlurmRestClientError(f"slurmrestd HTTP {resp.status_code}: {resp.text[:200]}")
             return resp.json()  # type: ignore[no-any-return]
         except requests.ConnectionError as e:
-            self._log.error("slurmrestd connection failed for %s: %s", url, e)
+            self._logger.error("slurmrestd connection failed for %s: %s", url, e)
             return {}
         except requests.Timeout as e:
-            self._log.error("slurmrestd timeout for %s: %s", url, e)
+            self._logger.error("slurmrestd timeout for %s: %s", url, e)
             return {}
 
     # --- Node endpoints ---

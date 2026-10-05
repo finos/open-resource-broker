@@ -7,7 +7,7 @@ provisions fresh instances — no state is preserved between cycles.
 import re
 import shlex
 import subprocess
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 _NAME_RE = re.compile(r"^[a-zA-Z0-9\-_]+$")
 _IP_RE = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
@@ -24,22 +24,13 @@ class SlurmNodeBootstrap:
 
     def __init__(
         self,
+        logger: "LoggingPort",
         scontrol_path: str = "scontrol",
         timeout: int = 30,
-        logger: "LoggingPort | None" = None,
     ) -> None:
         self._scontrol = scontrol_path
         self._timeout = timeout
         self._logger = logger
-
-    @property
-    def _log(self) -> Any:
-        """Injected LoggingPort, falling back to the module logger when not supplied."""
-        if self._logger is None:
-            from orb.infrastructure.logging.logger import get_logger
-
-            return get_logger(__name__)
-        return self._logger
 
     @staticmethod
     def _validate_node_name(value: str) -> None:
@@ -74,9 +65,9 @@ class SlurmNodeBootstrap:
                 cmd, capture_output=True, text=True, timeout=self._timeout, shell=False, check=False
             )
             if result.returncode == 0:
-                self._log.info("Registered node %s with addr %s", node_name, ip_address)
+                self._logger.info("Registered node %s with addr %s", node_name, ip_address)
                 return True
-            self._log.warning(
+            self._logger.warning(
                 "scontrol update failed for %s (rc=%d): %s",
                 node_name,
                 result.returncode,
@@ -84,7 +75,7 @@ class SlurmNodeBootstrap:
             )
             return False
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-            self._log.warning("scontrol update failed for %s: %s", node_name, e)
+            self._logger.warning("scontrol update failed for %s: %s", node_name, e)
             return False
 
     @staticmethod
