@@ -226,7 +226,13 @@ class TestSetFilePermissionsErrors:
         f.write_text("x")
         with patch("os.chmod", side_effect=OSError("chmod error")):
             with pytest.raises(OSError, match="Failed to set permissions"):
-                set_file_permissions(str(f), 0o644)
+                set_file_permissions(str(f), 0o600)
+
+    def test_raises_value_error_for_group_or_other_access(self, tmp_path) -> None:
+        f = tmp_path / "f.txt"
+        f.write_text("x")
+        with pytest.raises(ValueError, match="group/other"):
+            set_file_permissions(str(f), 0o644)
 
 
 # ---------------------------------------------------------------------------
