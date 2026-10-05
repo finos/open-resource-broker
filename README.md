@@ -33,17 +33,20 @@
 
 Open Resource Broker (ORB) is a unified API for orchestrating and provisioning compute capacity programmatically. Define what you need in a template, request it, track it, return it — through a CLI, REST API, MCP server, or native SDKs in six languages (Python, Go, TypeScript, Java, Kotlin, .NET).
 
-Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet, Lambda MicroVMs), with an extensible provider system for adding new cloud backends.
+ORB ships with provider backends for AWS, Azure, Google Cloud, and Kubernetes, plus an extensible provider system for adding new backends.
 
 **Provider support:**
-- **AWS** — EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups, Lambda MicroVMs
+- **AWS** — EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups, Lambda MicroVMs (built in; see [AWS Provider Setup](#setup) below)
+- **Azure** — VM Scale Sets, single VMs, CycleCloud cluster nodes (`pip install "orb-py[azure]"`; see [Azure Provider Setup](#setup) below)
+- **Google Cloud (GCP)** — Managed Instance Groups, single Compute Engine VMs (`pip install "orb-py[gcp]"`; see [GCP Provider Setup](#setup) below)
 - **Kubernetes** — Pod, Deployment, StatefulSet, Job (`pip install "orb-py[k8s]"`; see [Kubernetes provider docs](docs/root/providers/k8s/index.md))
 - **Custom** — extensible via [provider registry](docs/root/developer_guide/architecture.md) and the [`orb.providers` entry-point group](docs/root/providers/k8s/plugin-authoring.md)
 
 **Scheduler support:**
-- **HostFactory** — runs as an [IBM Spectrum Symphony provider plugin](#hostfactory-integration)
-- **SLURM** — integrates with SLURM workload manager via ResumeProgram/SuspendProgram power hooks
-- **Standalone** — direct usage without an external scheduler
+- **Default** — direct usage without an external scheduler, via ORB's native request/machine API
+- **IBM Spectrum Symphony (HostFactory)** — see [HostFactory Integration](#hostfactory-integration)
+- **Slurm** — integrates with the Slurm workload manager via ResumeProgram/SuspendProgram power hooks
+- **HTC-Grid** and **OpenGRIS Scaler** — these grid schedulers consume ORB through the default scheduler's native API rather than a dedicated ORB scheduler strategy; see [HTC-Grid](https://github.com/finos/htc-grid) and [OpenGRIS Scaler](https://github.com/finos/opengris-scaler)
 
 ![ORB](./ORB.gif)
 
@@ -107,6 +110,8 @@ will return a clear "no provider configured" error rather than an ImportError.
 
 ```bash
 pip install "orb-py[aws]"          # AWS provider (boto3 + botocore)
+pip install "orb-py[azure]"        # Azure provider (azure-identity, azure-mgmt-compute, ...)
+pip install "orb-py[gcp]"          # GCP provider (google-cloud-compute)
 pip install "orb-py[k8s]"   # Kubernetes provider (kubernetes SDK)
 pip install "orb-py[aws,cli]"      # AWS provider + colored CLI output
 pip install "orb-py[aws,api]"      # AWS provider + REST API server
@@ -120,6 +125,8 @@ pip install "orb-py[all]"          # All providers + all features
 |----------|----------------|
 | Core only (no provider) | `pip install orb-py` |
 | AWS operator | `pip install "orb-py[aws]"` |
+| Azure operator | `pip install "orb-py[azure]"` |
+| GCP operator | `pip install "orb-py[gcp]"` |
 | Kubernetes operator | `pip install "orb-py[k8s]"` |
 | AWS + Kubernetes | `pip install "orb-py[aws,k8s]"` |
 | AWS + colored CLI | `pip install "orb-py[aws,cli]"` |
@@ -200,6 +207,54 @@ aws sts get-caller-identity
 | `MicroVM` | Isolated Lambda MicroVM sandboxes for untrusted code |
 
 See the [AWS Provider Guide](docs/root/user_guide/configuration.md) for required IAM permissions and SpotFleet service-linked role setup. See the [MicroVM Provider Guide](docs/root/providers/aws/microvm.md) for Lambda MicroVM setup.
+
+</details>
+
+<details>
+<summary>Azure Provider Setup</summary>
+
+ORB uses Azure's `DefaultAzureCredential` chain — any method that works with the Azure CLI works with ORB.
+
+```bash
+# Verify your credentials are active
+az account show
+```
+
+**Supported credential methods:** environment variables, managed identity (including a specific `--azure-client-id`), Azure CLI (`az login`), and the other credential sources covered by `DefaultAzureCredential`.
+
+### Supported resource types
+
+| Type | Description |
+|---|---|
+| `VMSS` | Virtual Machine Scale Set (flexible orchestration) |
+| `VMSSUniform` | Virtual Machine Scale Set (uniform orchestration) |
+| `SingleVM` | Individual VM via the Compute API |
+| `CycleCloud` | Azure CycleCloud cluster node management |
+
+Install with `pip install "orb-py[azure]"`, then run `orb init --provider-type azure`.
+
+</details>
+
+<details>
+<summary>GCP Provider Setup</summary>
+
+ORB uses Google's Application Default Credentials (ADC) — any method that works with `gcloud` works with ORB.
+
+```bash
+# Verify your credentials are active
+gcloud auth application-default print-access-token
+```
+
+**Supported credential methods:** `gcloud auth application-default login`, the `GOOGLE_APPLICATION_CREDENTIALS` service-account key file, and workload identity when running on GCP.
+
+### Supported resource types
+
+| Type | Description |
+|---|---|
+| `MIG` | Managed Instance Group |
+| `SingleVM` | Individual Compute Engine VM |
+
+Install with `pip install "orb-py[gcp]"`, then run `orb init --provider-type gcp`.
 
 </details>
 

@@ -49,6 +49,8 @@ orb init --non-interactive \
   --fleet-role arn:aws:iam::123456789012:role/MySpotFleetRole
 ```
 
+This guide uses AWS, but the same `orb init --provider-type <type>` flow sets up Azure, GCP, and Kubernetes — see the [Azure and GCP Provider Setup](https://github.com/finos/open-resource-broker#setup) sections in the README and the [Kubernetes Provider Guide](../providers/k8s/index.md).
+
 ## Step 2: Generate templates
 
 Generate example templates for your configured provider:

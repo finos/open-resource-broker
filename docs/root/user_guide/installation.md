@@ -85,7 +85,7 @@ orb init --non-interactive \
 | `--provider-type` | Provider type | `aws` |
 | `--region` | AWS region | prompted |
 | `--profile` | AWS profile | prompted |
-| `--scheduler` | Scheduler type (`default`, `hostfactory`) | prompted |
+| `--scheduler` | Scheduler type (`default`, `hostfactory`, `slurm`) | prompted |
 | `--config-dir` | Custom config directory | OS default |
 | `--subnet-ids` | Comma-separated subnet IDs (non-interactive only) | — |
 | `--security-group-ids` | Comma-separated security group IDs (non-interactive only) | — |
@@ -93,6 +93,8 @@ orb init --non-interactive \
 | `--force` | Overwrite existing config | false |
 
 `--subnet-ids`, `--security-group-ids`, and `--fleet-role` are only used with `--non-interactive`. In interactive mode ORB discovers these from your AWS account automatically.
+
+This page uses AWS for its examples, but the same `orb init --provider-type <type>` flow applies to every provider — see the [Azure and GCP Provider Setup](https://github.com/finos/open-resource-broker#setup) sections in the README and the [Kubernetes Provider Guide](../providers/k8s/index.md).
 
 ## Basic Usage
 

@@ -51,6 +51,10 @@ Welcome to the Open Resource Broker documentation. ORB lets you define what comp
 ## Features
 
 - **AWS Provider** — [EC2 Instances](providers/aws/run-instances.md), [Auto Scaling Groups](providers/aws/asg.md), [Spot Fleet](providers/aws/spot-fleet.md), [EC2 Fleet](providers/aws/ec2-fleet.md), [Lambda MicroVMs](providers/aws/microvm.md)
+- **Azure Provider** — Virtual Machine Scale Sets, single VMs, and CycleCloud cluster nodes
+- **GCP Provider** — Managed Instance Groups and single Compute Engine VMs
+- **Kubernetes Provider** — [Pods, Deployments, StatefulSets, and Jobs](providers/k8s/index.md)
+- **Scheduler integrations** — default (standalone), [IBM Spectrum Symphony (HostFactory)](hostfactory/integration_guide.md), and [Slurm](slurm/integration_guide.md); HTC-Grid and OpenGRIS Scaler integrate through the default scheduler
 - **CLI** — primary interface for all operations
 - **REST API** — HTTP endpoints for service integration
 - **Python SDK** — async-first programmatic access

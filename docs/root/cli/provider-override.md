@@ -223,7 +223,7 @@ orb --scheduler hostfactory --provider-name aws-prod machines request template-i
 orb --scheduler default --provider-name aws-dev templates list --format table
 
 # Test configuration with specific scheduler and provider
-orb --scheduler hf --provider-name aws-staging system health --detailed
+orb --scheduler hostfactory --provider-name aws-staging system health --detailed
 ```
 
 ## Best Practices

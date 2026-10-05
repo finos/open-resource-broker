@@ -16,9 +16,13 @@ maintainers = [
 ]
 keywords = [
     "aws",
+    "azure",
+    "gcp",
+    "kubernetes",
     "ec2",
     "hostfactory",
     "symphony",
+    "slurm",
     "hpc",
     "cluster",
     "cloud",
