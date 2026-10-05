@@ -437,6 +437,26 @@
          <lastmod>2026-10-05</lastmod>
     </url>
     <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/slurm/deployment_scenarios/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/slurm/feature_mapping/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/slurm/integration_guide/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/slurm/operations_guide/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/slurm/supported-apis/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
          <loc>https://finos.github.io/open-resource-broker/dev/testing/moto-limits/</loc>
          <lastmod>2026-10-05</lastmod>
     </url>
