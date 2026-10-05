@@ -171,8 +171,18 @@ try {
 
 ## Building
 
+The Gradle wrapper launcher JAR is not committed to this repository, so on a
+fresh checkout generate it once with a local Gradle install (e.g. `brew
+install gradle` or [sdkman](https://sdkman.io)):
+
 ```bash
 cd sdk/kotlin
+gradle wrapper --gradle-version 8.14.3 --distribution-type all
+```
+
+After that, use the wrapper as usual:
+
+```bash
 ./gradlew build
 ```
 
