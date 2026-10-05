@@ -1,5 +1,6 @@
 """FastAPI server factory and application setup."""
 
+import ipaddress
 import os
 import secrets
 from pathlib import Path
@@ -142,13 +143,26 @@ class _LoopbackAdminAuthWrapper:
                 secrets.compare_digest(candidate_bytes, t.encode("ascii"))
                 for t in _LoopbackAdminAuthWrapper._tokens
             ):
-                self._logger.debug("loopback-admin token accepted for %s", context.path)
-                return AuthResult(
-                    status=AuthStatus.SUCCESS,
-                    user_id="loopback-admin",
-                    user_roles=["admin"],
-                    permissions=["*"],
-                    metadata={"strategy": "loopback_admin_token"},
+                # Mirror _LoopbackAdminTokenMiddleware below: the token value
+                # alone is never enough. Only the direct TCP peer counts,
+                # never X-Forwarded-For/other client-supplied headers, and
+                # never context.client_ip (which can be resolved through a
+                # trusted proxy forwarded header) so a remote caller cannot
+                # spoof a loopback origin merely by presenting the token.
+                # A missing peer is treated as non-loopback.
+                if _is_loopback_address(getattr(context, "direct_client_ip", None)):
+                    self._logger.debug("loopback-admin token accepted for %s", context.path)
+                    return AuthResult(
+                        status=AuthStatus.SUCCESS,
+                        user_id="loopback-admin",
+                        user_roles=["admin"],
+                        permissions=["*"],
+                        metadata={"strategy": "loopback_admin_token"},
+                    )
+                self._logger.warning(
+                    "loopback-admin token presented from non-loopback peer for %s; "
+                    "ignoring and falling through to normal auth",
+                    context.path,
                 )
         return await self._inner.authenticate(context)
 
@@ -194,6 +208,43 @@ def _load_loopback_token(server_config: Any) -> None:
         _server_logger.debug("loopback-admin token load skipped: %s", exc)
 
 
+def _is_loopback_address(host: str | None) -> bool:
+    """Return True only when *host* is a loopback IP address literal.
+
+    Shared by every call site that needs to decide whether a request
+    originated on the local host. Callers must pass the *direct* socket
+    peer address — never a value derived from ``X-Forwarded-For`` or any
+    other client-supplied header — or this check can be spoofed by anyone
+    who can reach the server over the network. Accepts IPv4 loopback
+    (127.0.0.0/8), IPv6 loopback (``::1``), and IPv4-mapped IPv6 loopback
+    (``::ffff:127.0.0.1``).
+    """
+    if not host:
+        return False
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    mapped = getattr(addr, "ipv4_mapped", None)
+    if mapped is not None:
+        addr = mapped
+    return addr.is_loopback
+
+
+def _is_loopback_peer(request: Any) -> bool:
+    """Return True only when the request's direct TCP peer is loopback.
+
+    Deliberately reads only ``request.client`` — the actual socket peer
+    address as seen by the ASGI server — and never consults
+    ``X-Forwarded-For`` or any other client-supplied header. Those headers
+    can be set to any value by anyone who can reach the server over the
+    network, so trusting them here would defeat the whole point of this
+    check.
+    """
+    client = request.client
+    return _is_loopback_address(client.host if client else None)
+
+
 class _LoopbackAdminTokenMiddleware:
     """Always-on middleware that stamps admin identity for valid loopback tokens.
 
@@ -235,9 +286,23 @@ class _LoopbackAdminTokenMiddleware:
                 secrets.compare_digest(candidate_bytes, t.encode("ascii"))
                 for t in _LoopbackAdminAuthWrapper._tokens
             ):
-                request.state.user_id = "loopback-admin"
-                request.state.user_roles = ["admin"]
-                request.state.permissions = ["*"]
+                if _is_loopback_peer(request):
+                    request.state.user_id = "loopback-admin"
+                    request.state.user_roles = ["admin"]
+                    request.state.permissions = ["*"]
+                else:
+                    # Token value matched, but the request did not originate
+                    # from the local host. Never honour it from a
+                    # non-loopback peer, and never trust X-Forwarded-For (or
+                    # any other client-supplied header) for this decision —
+                    # fall through to normal auth instead. Never log the
+                    # token value itself.
+                    client = request.client
+                    _server_logger.warning(
+                        "loopback-admin token presented from non-loopback peer "
+                        "%s; ignoring and falling through to normal auth",
+                        client.host if client else "<no client>",
+                    )
         return await call_next(request)
 
 

@@ -4,8 +4,9 @@ Covers the daemon-issued loopback token capability that lets the CLI reload
 command and the live REST tests authenticate as admin over the loopback IPC:
 
 - ``_LoopbackAdminAuthWrapper``: token acceptance (constant-time), non-ASCII
-  rejection, mtime-based auto-reload, ``rotate_token`` force reload, and
-  delegation to the inner strategy for non-matching tokens.
+  rejection, mtime-based auto-reload, ``rotate_token`` force reload,
+  delegation to the inner strategy for non-matching tokens, and the
+  loopback-peer check (direct peer only, forwarded headers ignored).
 - ``_LoopbackAdminTokenMiddleware``: stamps ``request.state`` with the admin
   role for a valid token and leaves it untouched otherwise.
 - ``_load_loopback_token``: reads the daemon-written token file and registers
@@ -49,9 +50,24 @@ def _reset_loopback_tokens():
     _LoopbackAdminAuthWrapper._token_file_mtime = prev_mtime
 
 
-def _ctx(auth_header: str = "", path: str = "/api/v1/machines/request"):
-    """Minimal auth context: only ``.headers`` and ``.path`` are read."""
-    return SimpleNamespace(headers={"authorization": auth_header}, path=path)
+def _ctx(
+    auth_header: str = "",
+    path: str = "/api/v1/machines/request",
+    direct_client_ip: str | None = "127.0.0.1",
+    forwarded_for: str | None = None,
+):
+    """Minimal auth context.
+
+    ``direct_client_ip`` models ``AuthContext.direct_client_ip`` — the raw
+    socket peer address, never resolved through a forwarded header. Defaults
+    to loopback so existing token-matching tests are unaffected by the peer
+    check. ``forwarded_for`` is only included in headers to prove it is never
+    consulted for the loopback decision.
+    """
+    headers = {"authorization": auth_header}
+    if forwarded_for is not None:
+        headers["x-forwarded-for"] = forwarded_for
+    return SimpleNamespace(headers=headers, path=path, direct_client_ip=direct_client_ip)
 
 
 @pytest.mark.unit
@@ -125,6 +141,72 @@ class TestLoopbackAuthWrapperAuthenticate:
 
         await wrapper.authenticate(_ctx("Bearer "))
 
+        inner.authenticate.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_matching_token_from_loopback_peer_grants_admin_identity(self):
+        """Explicit loopback-peer case for the auth-middleware-facing wrapper."""
+        _LoopbackAdminAuthWrapper._tokens = {"secret-token"}
+        inner = MagicMock()
+        inner.authenticate = AsyncMock()
+        wrapper = _LoopbackAdminAuthWrapper(inner)
+
+        result = await wrapper.authenticate(
+            _ctx("Bearer secret-token", direct_client_ip="127.0.0.1")
+        )
+
+        assert result.status == AuthStatus.SUCCESS
+        assert result.user_id == "loopback-admin"
+        inner.authenticate.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_matching_token_from_non_loopback_peer_falls_through_to_inner(self):
+        """A correct token from a non-loopback peer must never grant admin."""
+        _LoopbackAdminAuthWrapper._tokens = {"secret-token"}
+        inner = MagicMock()
+        inner_result = AuthResult(status=AuthStatus.INVALID, user_id=None)
+        inner.authenticate = AsyncMock(return_value=inner_result)
+        wrapper = _LoopbackAdminAuthWrapper(inner)
+
+        result = await wrapper.authenticate(
+            _ctx("Bearer secret-token", direct_client_ip="203.0.113.5")
+        )
+
+        assert result is inner_result
+        inner.authenticate.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_matching_token_with_missing_peer_falls_through_to_inner(self):
+        """A missing direct peer (e.g. unusual transport) must never be treated as loopback."""
+        _LoopbackAdminAuthWrapper._tokens = {"secret-token"}
+        inner = MagicMock()
+        inner_result = AuthResult(status=AuthStatus.INVALID, user_id=None)
+        inner.authenticate = AsyncMock(return_value=inner_result)
+        wrapper = _LoopbackAdminAuthWrapper(inner)
+
+        result = await wrapper.authenticate(_ctx("Bearer secret-token", direct_client_ip=None))
+
+        assert result is inner_result
+        inner.authenticate.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_matching_token_ignores_forwarded_for_from_non_loopback_peer(self):
+        """X-Forwarded-For claiming loopback must not override the real peer."""
+        _LoopbackAdminAuthWrapper._tokens = {"secret-token"}
+        inner = MagicMock()
+        inner_result = AuthResult(status=AuthStatus.INVALID, user_id=None)
+        inner.authenticate = AsyncMock(return_value=inner_result)
+        wrapper = _LoopbackAdminAuthWrapper(inner)
+
+        result = await wrapper.authenticate(
+            _ctx(
+                "Bearer secret-token",
+                direct_client_ip="203.0.113.5",
+                forwarded_for="127.0.0.1",
+            )
+        )
+
+        assert result is inner_result
         inner.authenticate.assert_awaited_once()
 
 
@@ -210,11 +292,27 @@ class TestLoopbackTokenReload:
 @pytest.mark.unit
 @pytest.mark.api
 class TestLoopbackTokenMiddleware:
-    async def _run_dispatch(self, auth_header: str):
-        """Invoke the middleware dispatch and return the (request, called) pair."""
+    async def _run_dispatch(
+        self,
+        auth_header: str,
+        client_host: str | None = "127.0.0.1",
+        forwarded_for: str | None = None,
+    ):
+        """Invoke the middleware dispatch and return the (request, called) pair.
+
+        ``client_host`` models ``request.client.host`` — the direct TCP peer
+        address as seen by the ASGI server. Pass ``None`` to simulate
+        ``request.client`` being unset entirely (e.g. certain test clients or
+        unusual transports). ``forwarded_for`` is included in headers to prove
+        it is never consulted for the loopback decision.
+        """
+        headers = {"authorization": auth_header}
+        if forwarded_for is not None:
+            headers["x-forwarded-for"] = forwarded_for
         request = SimpleNamespace(
-            headers={"authorization": auth_header},
+            headers=headers,
             state=SimpleNamespace(),
+            client=(SimpleNamespace(host=client_host) if client_host is not None else None),
         )
         called = {"next": False}
 
@@ -228,12 +326,60 @@ class TestLoopbackTokenMiddleware:
     @pytest.mark.asyncio
     async def test_valid_token_stamps_admin_state(self):
         _LoopbackAdminAuthWrapper._tokens = {"secret-token"}
-        request, called, result = await self._run_dispatch("Bearer secret-token")
+        request, called, result = await self._run_dispatch(
+            "Bearer secret-token", client_host="127.0.0.1"
+        )
         assert request.state.user_id == "loopback-admin"
         assert request.state.user_roles == ["admin"]
         assert request.state.permissions == ["*"]
         assert called["next"] is True
         assert result == "response"
+
+    @pytest.mark.asyncio
+    async def test_valid_token_from_ipv6_loopback_stamps_admin_state(self):
+        _LoopbackAdminAuthWrapper._tokens = {"secret-token"}
+        request, called, _ = await self._run_dispatch("Bearer secret-token", client_host="::1")
+        assert request.state.user_id == "loopback-admin"
+        assert called["next"] is True
+
+    @pytest.mark.asyncio
+    async def test_valid_token_from_ipv4_mapped_ipv6_loopback_stamps_admin_state(self):
+        _LoopbackAdminAuthWrapper._tokens = {"secret-token"}
+        request, called, _ = await self._run_dispatch(
+            "Bearer secret-token", client_host="::ffff:127.0.0.1"
+        )
+        assert request.state.user_id == "loopback-admin"
+        assert called["next"] is True
+
+    @pytest.mark.asyncio
+    async def test_valid_token_from_non_loopback_peer_is_rejected(self):
+        """A correct token from a non-loopback peer must never grant admin."""
+        _LoopbackAdminAuthWrapper._tokens = {"secret-token"}
+        request, called, _ = await self._run_dispatch(
+            "Bearer secret-token", client_host="203.0.113.5"
+        )
+        assert not hasattr(request.state, "user_id")
+        assert called["next"] is True
+
+    @pytest.mark.asyncio
+    async def test_valid_token_with_no_client_is_rejected(self):
+        """``request.client`` being unset must never be treated as loopback."""
+        _LoopbackAdminAuthWrapper._tokens = {"secret-token"}
+        request, called, _ = await self._run_dispatch("Bearer secret-token", client_host=None)
+        assert not hasattr(request.state, "user_id")
+        assert called["next"] is True
+
+    @pytest.mark.asyncio
+    async def test_valid_token_ignores_forwarded_for_from_non_loopback_peer(self):
+        """X-Forwarded-For claiming loopback must not override the real peer."""
+        _LoopbackAdminAuthWrapper._tokens = {"secret-token"}
+        request, called, _ = await self._run_dispatch(
+            "Bearer secret-token",
+            client_host="203.0.113.5",
+            forwarded_for="127.0.0.1",
+        )
+        assert not hasattr(request.state, "user_id")
+        assert called["next"] is True
 
     @pytest.mark.asyncio
     async def test_non_matching_token_leaves_state_untouched(self):

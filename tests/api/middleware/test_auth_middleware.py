@@ -184,6 +184,61 @@ class TestAuthMiddlewareTrustedProxy:
         assert result == "10.0.0.1"
 
 
+class TestCreateAuthContextDirectClientIp:
+    """AuthContext.direct_client_ip must be the raw socket peer, never a
+    forwarded header, even when client_ip is resolved through a trusted
+    proxy. Strategies that make loopback-only trust decisions (such as the
+    daemon's loopback-admin token) rely on this field staying unspoofable."""
+
+    def _make_middleware(self, trusted_proxies=None) -> AuthMiddleware:
+        app = MagicMock()
+        auth_port = _make_auth_port(authenticated=False)
+        return AuthMiddleware(app, auth_port=auth_port, trusted_proxies=trusted_proxies or [])
+
+    def _make_request(self, direct_host: str, forwarded_for: str | None = None):
+        request = MagicMock()
+        request.method = "GET"
+        request.url.path = "/api/v1/machines"
+        request.url = MagicMock()
+        request.url.path = "/api/v1/machines"
+        headers = {"user-agent": "pytest"}
+        if forwarded_for is not None:
+            headers["x-forwarded-for"] = forwarded_for
+        request.headers = headers
+        request.query_params = {}
+        request.client.host = direct_host
+        request.base_url = "http://testserver/"
+        return request
+
+    def test_direct_client_ip_matches_socket_peer(self):
+        middleware = self._make_middleware()
+        request = self._make_request("203.0.113.5")
+
+        context = middleware._create_auth_context(request)
+
+        assert context.direct_client_ip == "203.0.113.5"
+
+    def test_direct_client_ip_ignores_forwarded_header_even_when_proxy_trusted(self):
+        """client_ip may follow a trusted proxy's X-Forwarded-For, but
+        direct_client_ip never does — it always reflects the raw peer."""
+        middleware = self._make_middleware(trusted_proxies=["203.0.113.5"])
+        request = self._make_request("203.0.113.5", forwarded_for="127.0.0.1")
+
+        context = middleware._create_auth_context(request)
+
+        assert context.client_ip == "127.0.0.1"
+        assert context.direct_client_ip == "203.0.113.5"
+
+    def test_direct_client_ip_none_when_no_client(self):
+        middleware = self._make_middleware()
+        request = self._make_request("203.0.113.5")
+        request.client = None
+
+        context = middleware._create_auth_context(request)
+
+        assert context.direct_client_ip is None
+
+
 class TestDocsAuthGating:
     """When auth is enabled, docs endpoints are gated unless docs.require_auth=False."""
 
@@ -406,10 +461,16 @@ class TestLoopbackTokenNonAscii:
 
         _LoopbackAdminAuthWrapper._tokens.clear()
 
-    def _make_context(self, auth_value: str) -> MagicMock:
+    def _make_context(
+        self, auth_value: str, direct_client_ip: str | None = "127.0.0.1"
+    ) -> MagicMock:
         ctx = MagicMock()
         ctx.headers.get = lambda k, d="": auth_value if k == "authorization" else d
         ctx.path = "/api/v1/admin"
+        # Defaults to loopback so these ASCII/non-ASCII token tests exercise only
+        # the token-matching logic. The peer check itself is covered separately
+        # in tests/unit/api/test_server_loopback_token.py.
+        ctx.direct_client_ip = direct_client_ip
         return ctx
 
     def test_ascii_token_match_grants_admin(self):
