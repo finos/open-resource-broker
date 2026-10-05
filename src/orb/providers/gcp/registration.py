@@ -148,5 +148,16 @@ def is_gcp_provider_registered() -> bool:
     return TemplateExtensionRegistry.has_extension("gcp")
 
 
-register_gcp_extensions()
-register_gcp_provider_settings()
+# ------------------------------------------------------------------
+# Auto-register extensions on import
+# ------------------------------------------------------------------
+
+try:
+    register_gcp_extensions()
+    register_gcp_provider_settings()
+except Exception:
+    import logging as _logging
+
+    _logging.getLogger(__name__).warning(
+        "Failed to auto-register GCP extensions on import", exc_info=True
+    )
