@@ -255,6 +255,31 @@ async def test_resolve_async_auth_loads_credentials_from_file(tmp_path: Path):
     assert isinstance(auth, httpx.BasicAuth)
 
 
+@pytest.mark.asyncio
+async def test_resolve_async_auth_rejects_basic_auth_over_plain_http(tmp_path: Path):
+    credential_file = tmp_path / "cyclecloud-credentials.json"
+    credential_file.write_text(
+        json.dumps(
+            {
+                "username": "file-admin",
+                "password": "file-secret",
+                "auth_mode": "basic",
+            }
+        ),
+        encoding="utf-8",
+    )
+    builder = CycleCloudSessionBuilder(
+        provider_cfg=_provider_config(
+            url="http://cc.example.com", credential_path=str(credential_file)
+        ),
+    )
+    settings = builder.build_settings()
+    assert settings.base_url == "http://cc.example.com"
+
+    with pytest.raises(CycleCloudConnectionError):
+        await builder.resolve_async_auth(settings=settings)
+
+
 def test_build_settings_takes_verify_ssl_from_provider_config():
     builder = _make_builder(provider_cfg=_provider_config(verify_ssl=False))
     settings = builder.build_settings()

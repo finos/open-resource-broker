@@ -206,6 +206,12 @@ class CycleCloudSessionBuilder:
 
         credential_data = settings.credential_data
         if credential_data.username and credential_data.password and settings.auth_mode != "bearer":
+            if urlparse(settings.base_url).scheme.lower() != "https":
+                raise CycleCloudConnectionError(
+                    "cyclecloud basic auth (username/password) requires an https:// url; "
+                    "sending credentials over plaintext http is not allowed.",
+                    url=settings.base_url,
+                )
             return {}, httpx.BasicAuth(credential_data.username, credential_data.password), "basic"
 
         bearer_token = await self._resolve_bearer_token_async(
