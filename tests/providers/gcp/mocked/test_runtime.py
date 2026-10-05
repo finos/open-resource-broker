@@ -22,6 +22,7 @@ from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 from orb.providers.gcp.exceptions import (
     GCPEntityNotFoundError,
+    GCPError,
     GCPNetworkError,
     GCPRateLimitError,
     GCPValidationError,
@@ -57,6 +58,7 @@ class _ComputeClientStub:
         self.fail_create_regional_mig = False
         self.fail_regional_mig_operation = False
         self.fail_delete_regional_mig = False
+        self.fail_delete_instance_template = False
         self.timeout_regional_mig_operation = False
         self.template_operation_result_called = False
         self.mig_operation_result_called = False
@@ -128,6 +130,8 @@ class _ComputeClientStub:
         )
 
     def delete_instance_template(self, *, template_name: str) -> object:
+        if self.fail_delete_instance_template:
+            raise RuntimeError("instance template delete failed")
         self.deleted_templates.append(template_name)
         return self._OperationStub(
             self, result_flag="template_delete_completed", name=f"delete-template-{template_name}"
@@ -727,11 +731,48 @@ async def test_mig_rollback_keeps_template_when_mig_delete_fails() -> None:
     request = _mig_request()
     template = _regional_mig_template()
 
-    with pytest.raises(RuntimeError, match="regional mig operation failed"):
+    # The error surfaced to the request must be the rollback failure, with
+    # enough detail (mig_name/instance_template_name/region) to find and
+    # manually clean up the leaked MIG; the original create failure that
+    # triggered the rollback is preserved as the exception's cause.
+    with pytest.raises(GCPError, match="regional mig delete failed") as exc_info:
         await handler.acquire_hosts(request, template)
+
+    error = exc_info.value
+    assert error.details["mig_name"]
+    assert error.details["instance_template_name"]
+    assert error.details["region"] == "us-central1"
+    assert isinstance(error.__cause__, RuntimeError)
+    assert str(error.__cause__) == "regional mig operation failed"
 
     assert compute_client.deleted_templates == []
     logger.error.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_mig_rollback_surfaces_template_delete_failure() -> None:
+    compute_client = _ComputeClientStub()
+    compute_client.fail_regional_mig_operation = True
+    compute_client.fail_delete_instance_template = True
+    logger = MagicMock()
+    handler = GCPManagedInstanceGroupHandler(compute_client, _config(), logger)
+    request = _mig_request()
+    template = _regional_mig_template()
+
+    # The MIG delete succeeds (so it is not leaked), but the instance
+    # template delete fails; that failure must still be surfaced with its
+    # own identifying details rather than only logged.
+    with pytest.raises(GCPError, match="instance template delete failed") as exc_info:
+        await handler.acquire_hosts(request, template)
+
+    error = exc_info.value
+    assert error.details["mig_name"]
+    assert error.details["instance_template_name"]
+    assert error.details["region"] == "us-central1"
+    assert isinstance(error.__cause__, RuntimeError)
+    assert str(error.__cause__) == "regional mig operation failed"
+
+    assert compute_client.deleted_regional_migs != []
 
 
 @pytest.mark.asyncio
