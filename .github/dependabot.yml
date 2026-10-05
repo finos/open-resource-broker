@@ -130,3 +130,7 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # ts-jest's peer range does not yet include TypeScript 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
