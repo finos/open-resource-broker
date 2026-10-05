@@ -393,8 +393,10 @@ class GCPComputeClient:
 
         retry_profile = self._retry_profile_for(operation_name)
         per_attempt_timeout = float(self._config.connect_timeout + self._config.read_timeout)
-        # getattr use is intentional at this sdk boundary: it keeps the public constant
-        # readable without hiding the actual retry policy inside inline exception references.
+        # getattr: exception_name is a class name string from the retry
+        # profile config and must resolve to the matching exception class on
+        # google.api_core.exceptions; there is no typed accessor for "look up
+        # an SDK exception class by its configured name".
         retryable_exceptions = tuple(
             getattr(google_exceptions, exception_name)
             for exception_name in retry_profile.retryable_exception_names
