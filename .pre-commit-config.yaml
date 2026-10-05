@@ -45,9 +45,9 @@ repos:
         description: "Run bandit security analysis"
         stages: [pre-push]
 
-      - id: safety
-        name: safety (Dependency Security)
-        entry: make ci-security-safety
+      - id: pip-audit
+        name: pip-audit (Dependency Security)
+        entry: make ci-security-pip-audit
         language: system
         files: requirements.*\.txt$|pyproject\.toml$
         pass_filenames: false

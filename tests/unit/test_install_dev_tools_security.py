@@ -17,6 +17,7 @@ import inspect
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -389,12 +390,15 @@ class TestDockerInstallNoLiteralPipe:
         installer._run_command = capture_run_command
         installer._install_docker_ubuntu()
 
+        def _has_docker_host(cmd: list[str]) -> bool:
+            for token in cmd:
+                hostname = urlparse(token).hostname
+                if hostname and hostname.endswith(".docker.com"):
+                    return True
+            return False
+
         # Find the curl command that downloads the GPG key
-        curl_cmds = [
-            c
-            for c in captured
-            if c and c[0] in ("curl", "sudo") and " ".join(c).find("docker.com") >= 0
-        ]
+        curl_cmds = [c for c in captured if c and c[0] in ("curl", "sudo") and _has_docker_host(c)]
         assert curl_cmds, "Expected a curl command fetching the Docker GPG key"
         for cmd in curl_cmds:
             assert "|" not in cmd, f"Pipe element found in GPG key command: {cmd}"

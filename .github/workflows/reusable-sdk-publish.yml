@@ -265,6 +265,24 @@ jobs:
     - name: Install openapi-generator-cli
       run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
 
+    # The Gradle wrapper launcher JAR is not committed to the repository (it
+    # is a prebuilt binary). Provision Gradle directly and use it to
+    # regenerate gradle-wrapper.jar before the publish step below invokes
+    # ./gradlew, then verify the checksum.
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+      with:
+        gradle-version: current
+        # Only used once to regenerate the wrapper launcher; no build to cache.
+        cache-disabled: true
+
+    - name: Regenerate Gradle wrapper launcher
+      # Matches sdk/java/gradle/wrapper/gradle-wrapper.properties.
+      run: cd sdk/java && gradle wrapper --gradle-version 8.7 --distribution-type bin
+
+    - name: Validate Gradle wrapper checksum
+      uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+
     # REQUIRED: generated model classes are gitignored (0 committed files).
     # Without this step the published jar would contain no model types.
     - name: Generate Java SDK models
@@ -370,6 +388,24 @@ jobs:
 
     - name: Install openapi-generator-cli
       run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
+
+    # The Gradle wrapper launcher JAR is not committed to the repository (it
+    # is a prebuilt binary). Provision Gradle directly and use it to
+    # regenerate gradle-wrapper.jar before the publish step below invokes
+    # ./gradlew, then verify the checksum.
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+      with:
+        gradle-version: current
+        # Only used once to regenerate the wrapper launcher; no build to cache.
+        cache-disabled: true
+
+    - name: Regenerate Gradle wrapper launcher
+      # Matches sdk/kotlin/gradle/wrapper/gradle-wrapper.properties.
+      run: cd sdk/kotlin && gradle wrapper --gradle-version 8.14.3 --distribution-type all
+
+    - name: Validate Gradle wrapper checksum
+      uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
 
     # REQUIRED: generated model classes are gitignored (0 committed files).
     # Without this step the published jar would contain no model types.

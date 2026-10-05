@@ -218,6 +218,9 @@ jobs:
             check-drift-target: sdk-java-check-drift
             needs-orb: true
             orb-env-var: ORB_BINARY
+            # Matches sdk/java/gradle/wrapper/gradle-wrapper.properties.
+            gradle-version: '8.7'
+            gradle-distribution-type: bin
 
           - lang: kotlin
             display-name: Kotlin
@@ -225,6 +228,9 @@ jobs:
             check-drift-target: sdk-kotlin-check-drift
             needs-orb: true
             orb-env-var: ORB_BINARY
+            # Matches sdk/kotlin/gradle/wrapper/gradle-wrapper.properties.
+            gradle-version: '8.14.3'
+            gradle-distribution-type: all
 
           - lang: dotnet
             display-name: .NET
@@ -256,6 +262,32 @@ jobs:
         with:
           java-version: '17'
           distribution: 'corretto'
+
+      # -----------------------------------------------------------------------
+      # The Gradle wrapper launcher JAR is not committed to the repository (it
+      # is a prebuilt binary). Provision Gradle directly and use it to
+      # regenerate gradle-wrapper.jar locally before any ./gradlew call, then
+      # verify the regenerated JAR's checksum against Gradle's published list.
+      # -----------------------------------------------------------------------
+      - name: Set up Gradle
+        if: matrix.lang == 'java' || matrix.lang == 'kotlin'
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+        with:
+          gradle-version: current
+          # Only used once to regenerate the wrapper launcher; no build to cache.
+          cache-disabled: true
+
+      - name: Regenerate Gradle wrapper launcher
+        if: matrix.lang == 'java' || matrix.lang == 'kotlin'
+        run: |
+          cd "${{ matrix.sdk-path }}"
+          gradle wrapper \
+            --gradle-version "${{ matrix.gradle-version }}" \
+            --distribution-type "${{ matrix.gradle-distribution-type }}"
+
+      - name: Validate Gradle wrapper checksum
+        if: matrix.lang == 'java' || matrix.lang == 'kotlin'
+        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
 
       - name: Set up Go
         if: matrix.lang == 'go'

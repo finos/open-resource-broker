@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       scan-type:
-        description: 'Type of security scan (bandit, safety, semgrep, trivy-fs, hadolint, codeql)'
+        description: 'Type of security scan (bandit, pip-audit, semgrep, trivy-fs, hadolint, codeql)'
         required: true
         type: string
       python-version:
@@ -45,7 +45,7 @@ jobs:
           fetch-depth: ${{ inputs.scan-type == 'codeql' && 0 || 1 }}
 
       - name: Setup Python and UV
-        if: contains('bandit,safety,codeql', inputs.scan-type)
+        if: contains('bandit,pip-audit,codeql', inputs.scan-type)
         uses: ./.github/actions/setup-uv-cached
         with:
           # Use the caller-supplied cache key when set; otherwise derive the
@@ -66,10 +66,10 @@ jobs:
         if: inputs.scan-type == 'bandit'
         run: make ci-security-bandit
 
-      # Safety Dependency Scan
-      - name: Run Safety dependency scan
-        if: inputs.scan-type == 'safety'
-        run: make ci-security-safety
+      # pip-audit Dependency Scan
+      - name: Run pip-audit dependency scan
+        if: inputs.scan-type == 'pip-audit'
+        run: make ci-security-pip-audit
 
       # Semgrep Static Analysis
       - name: Install Semgrep

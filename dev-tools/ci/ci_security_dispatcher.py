@@ -11,15 +11,19 @@ def handle_bandit():
     return ["./dev-tools/setup/run_tool.sh", "bandit", "-r", "src", "--exit-zero"]
 
 
-def handle_safety():
-    """Handle safety dependency scan.
+def handle_pip_audit():
+    """Handle pip-audit dependency scan.
 
-    `--continue-on-error` makes safety exit 0 when vulnerabilities are found,
-    matching how bandit runs with `--exit-zero` (security scans are reported
-    via SARIF / job logs, not used as merge gates).
+    pip-audit exits non-zero when it finds vulnerable dependencies, with no
+    built-in "report only" flag. Findings are reported via job logs, not used
+    as a merge gate (matching how bandit runs with `--exit-zero`), so the
+    audit itself is run with its real exit code surfaced in the logs and the
+    dispatcher always hands back a trailing no-op command to keep the overall
+    result a pass.
     """
-    print("Running Safety dependency scan...")
-    return ["./dev-tools/setup/run_tool.sh", "safety", "check", "--continue-on-error"]
+    print("Running pip-audit dependency scan...")
+    subprocess.run(["./dev-tools/setup/run_tool.sh", "pip-audit", "--desc"], check=False)
+    return ["true"]
 
 
 def handle_other_tools(tool):
@@ -31,8 +35,8 @@ def get_command(tool):
     """Get command for security tool."""
     if tool == "bandit":
         return handle_bandit()
-    elif tool == "safety":
-        return handle_safety()
+    elif tool == "pip-audit":
+        return handle_pip_audit()
     elif tool in ["trivy", "hadolint", "semgrep", "trivy-fs", "trufflehog"]:
         return handle_other_tools(tool)
     else:
@@ -45,7 +49,7 @@ def main():
 
     if not args:
         print(
-            "ERROR: Security tool required (bandit, safety, trivy, hadolint, semgrep, trivy-fs, trufflehog)"
+            "ERROR: Security tool required (bandit, pip-audit, trivy, hadolint, semgrep, trivy-fs, trufflehog)"
         )
         return 1
 

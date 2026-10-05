@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -380,7 +382,9 @@ class TestCheckHealthEnrichment:
             status = strategy.check_health()
 
         assert status.is_healthy is True
-        assert status.status_message.find("my-cluster.example.com") >= 0
+        endpoint_match = re.search(r"endpoint=(\S+)", status.status_message)
+        assert endpoint_match is not None, f"expected an endpoint in {status.status_message!r}"
+        assert urlparse(endpoint_match.group(1)).hostname == "my-cluster.example.com"
         assert status.error_details is not None
         assert status.error_details.get("cluster_endpoint") == "https://my-cluster.example.com:6443"
 

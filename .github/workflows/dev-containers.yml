@@ -58,6 +58,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Resolves the commit to build without ever placing the workflow_run event's
+  # head_sha directly into a checkout `ref:`. workflow_run runs with this
+  # repository's permissions/secrets regardless of which repository or branch
+  # originally triggered the upstream "Unit Tests" run, so before trusting
+  # that commit we confirm the run that completed was itself a push to this
+  # repository (not a pull_request from a fork, which could otherwise smuggle
+  # a branch named "main" past the branches: [main] trigger filter above).
+  resolve-commit:
+    name: Resolve Trusted Commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+    - name: Resolve commit SHA
+      id: resolve
+      env:
+        WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event }}
+        WORKFLOW_RUN_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+        WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        CURRENT_SHA: ${{ github.sha }}
+      run: |
+        if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
+          if [[ "$WORKFLOW_RUN_EVENT" != "push" || "$WORKFLOW_RUN_REPO" != "$GITHUB_REPOSITORY" ]]; then
+            echo "::error::workflow_run did not originate from a push to this repository; refusing to build its commit" >&2
+            exit 1
+          fi
+          echo "sha=${WORKFLOW_RUN_SHA}" >> "$GITHUB_OUTPUT"
+        else
+          echo "sha=${CURRENT_SHA}" >> "$GITHUB_OUTPUT"
+        fi
+
   config:
     name: Configuration
     uses: ./.github/workflows/shared-config.yml
@@ -67,7 +102,7 @@ jobs:
     name: Calculate Container Tags
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: config
+    needs: [config, resolve-commit]
     permissions:
       contents: read
     outputs:
@@ -77,8 +112,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
-        # Pin to the exact commit Unit Tests validated, not the default branch's current HEAD.
-        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+        # Pin to the exact commit Unit Tests validated, resolved and
+        # trust-checked by the resolve-commit job above.
+        ref: ${{ needs.resolve-commit.outputs.sha }}
 
     - name: Calculate container tags
       id: tags
@@ -95,7 +131,7 @@ jobs:
     name: Build Container Wheel
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: config
+    needs: [config, resolve-commit]
     permissions:
       contents: read
 
@@ -103,8 +139,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
-        # Pin to the exact commit Unit Tests validated, not the default branch's current HEAD.
-        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+        # Pin to the exact commit Unit Tests validated, resolved and
+        # trust-checked by the resolve-commit job above.
+        ref: ${{ needs.resolve-commit.outputs.sha }}
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
@@ -169,7 +206,7 @@ jobs:
     name: Build and Scan Container Images
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: [config, calculate-tags, build-wheel]
+    needs: [config, calculate-tags, build-wheel, resolve-commit]
 
     strategy:
       matrix:
@@ -192,8 +229,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
-        # Pin to the exact commit Unit Tests validated, not the default branch's current HEAD.
-        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+        # Pin to the exact commit Unit Tests validated, resolved and
+        # trust-checked by the resolve-commit job above.
+        ref: ${{ needs.resolve-commit.outputs.sha }}
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4

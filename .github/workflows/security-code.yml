@@ -76,8 +76,8 @@ jobs:
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       python-version: ${{ needs.config.outputs.default-python-version }}
 
-  security-safety:
-    name: Safety (Dependency Scan)
+  security-pip-audit:
+    name: pip-audit (Dependency Scan)
     needs: [config]
     permissions:
       contents: read
@@ -85,7 +85,7 @@ jobs:
       security-events: write
     uses: ./.github/workflows/reusable-security.yml
     with:
-      scan-type: safety
+      scan-type: pip-audit
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       python-version: ${{ needs.config.outputs.default-python-version }}
 
@@ -195,9 +195,6 @@ jobs:
         #   python-gitlab   LGPL-3.0-or-later -> transitive via python-semantic-release (release tooling)
         #   regex           Apache-2.0 AND CNRI-Python -> transitive via nltk / cfn-lint (lint and test tooling)
         allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/semgrep, pkg:npm/bowser, pkg:pypi/chardet, pkg:pypi/python-gitlab, pkg:pypi/regex'
-        # nltk GHSA-8mgp-746c-j5xp (affects <=3.10.3): CI-only, pulled in
-        # transitively via safety; no upstream fix is published yet.
-        allow-ghsas: GHSA-8mgp-746c-j5xp
 
   license-gate:
     name: Runtime License Gate

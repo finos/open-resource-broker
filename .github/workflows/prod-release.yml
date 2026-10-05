@@ -804,6 +804,29 @@ jobs:
     - name: Install openapi-generator-cli
       run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
 
+    # The Gradle wrapper launcher JAR is not committed to the repository (it
+    # is a prebuilt binary). Provision Gradle directly and use it to
+    # regenerate gradle-wrapper.jar for both Java and Kotlin before the build
+    # step below invokes ./gradlew, then verify the checksums.
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+      with:
+        gradle-version: current
+        # Only used once to regenerate the wrapper launcher; no build to cache.
+        cache-disabled: true
+
+    - name: Regenerate Gradle wrapper launchers
+      run: |
+        # Matches sdk/java/gradle/wrapper/gradle-wrapper.properties.
+        (cd sdk/java && gradle wrapper --gradle-version 8.7 --distribution-type bin)
+        # Matches sdk/kotlin/gradle/wrapper/gradle-wrapper.properties.
+        (cd sdk/kotlin && gradle wrapper --gradle-version 8.14.3 --distribution-type all)
+
+    - name: Validate Gradle wrapper checksums
+      uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+      with:
+        min-wrapper-count: '2'
+
     # REQUIRED: generated models are gitignored (0 committed files) for every
     # language — regenerate before building the archival artifacts.
     - name: Generate all SDK models

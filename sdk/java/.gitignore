@@ -1,7 +1,6 @@
 # Gradle
 .gradle/
 build/
-!gradle/wrapper/gradle-wrapper.jar
 
 # Generated code — produce on build, not committed.
 # Run `make sdk-java-generate` (or `make sdk-generate`) to regenerate.
@@ -17,4 +16,3 @@ generated/
 # Misc
 *.class
 *.jar
-!gradle/wrapper/gradle-wrapper.jar
