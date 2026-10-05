@@ -48,9 +48,9 @@ class PlacementPlanEntry:
 class SpotPlacementScoreAdapter(Protocol):
     """Provider-specific scoring adapter contract."""
 
-    def score_candidates(self, requested_count: int, template: Any) -> list[PlacementScore]:
+    def score_candidates(self, requested_count: int, template: Any) -> list[PlacementScore]:  # type: ignore[return]
         """Return normalized placement scores for the provider's candidates."""
-        ...
+        pass
 
 
 class SpotPlacementPlanner:

@@ -14,7 +14,7 @@ class CommandBusPort(ABC):
     """
 
     @abstractmethod
-    async def execute(self, command: Command) -> Any:
+    async def execute(self, command: Command) -> Any:  # type: ignore[return]
         """Execute a command and return the result.
 
         Args:
@@ -26,4 +26,4 @@ class CommandBusPort(ABC):
         Raises:
             CommandExecutionError: If command execution fails
         """
-        ...
+        pass

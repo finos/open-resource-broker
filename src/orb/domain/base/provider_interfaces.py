@@ -72,70 +72,70 @@ class ProviderLaunchTemplate:
 class ProviderStateMapper(Protocol):
     """Protocol for mapping provider-specific states to domain states."""
 
-    def map_to_domain_state(self, provider_state: str) -> ProviderInstanceState:
+    def map_to_domain_state(self, provider_state: str) -> ProviderInstanceState:  # type: ignore[return]
         """Map provider-specific state to domain state."""
-        ...
+        pass
 
-    def map_from_domain_state(self, domain_state: ProviderInstanceState) -> str:
+    def map_from_domain_state(self, domain_state: ProviderInstanceState) -> str:  # type: ignore[return]
         """Map domain state to provider-specific state."""
-        ...
+        pass
 
 
 class ProviderResourceValidator(Protocol):
     """Protocol for provider-specific resource validation."""
 
-    def validate_resource_identifier(self, identifier: str, resource_type: str) -> bool:
+    def validate_resource_identifier(self, identifier: str, resource_type: str) -> bool:  # type: ignore[return]
         """Validate provider-specific resource identifier format."""
-        ...
+        pass
 
-    def validate_tag(self, tag: ProviderResourceTag) -> bool:
+    def validate_tag(self, tag: ProviderResourceTag) -> bool:  # type: ignore[return]
         """Validate provider-specific tag constraints."""
-        ...
+        pass
 
-    def validate_launch_template(self, template: ProviderLaunchTemplate) -> bool:
+    def validate_launch_template(self, template: ProviderLaunchTemplate) -> bool:  # type: ignore[return]
         """Validate provider-specific launch template format."""
-        ...
+        pass
 
 
 class ProviderAdapter(Protocol):
     """Main provider adapter interface."""
 
     @property
-    def provider_type(self) -> str:
+    def provider_type(self) -> str:  # type: ignore[return]
         """Get the provider type (e.g. ``"aws"``)."""
-        ...
+        pass
 
     @property
-    def state_mapper(self) -> ProviderStateMapper:
+    def state_mapper(self) -> ProviderStateMapper:  # type: ignore[return]
         """Get the state mapper for this provider."""
-        ...
+        pass
 
     @property
-    def resource_validator(self) -> ProviderResourceValidator:
+    def resource_validator(self) -> ProviderResourceValidator:  # type: ignore[return]
         """Get the resource validator for this provider."""
-        ...
+        pass
 
     def create_resource_identifier(
         self, resource_type: str, identifier: str, region: Optional[str] = None
-    ) -> ProviderResourceIdentifier:
+    ) -> ProviderResourceIdentifier:  # type: ignore[return]
         """Create a provider-specific resource identifier."""
-        ...
+        pass
 
     def create_launch_template(
         self, template_id: str, version: Optional[str] = None
-    ) -> ProviderLaunchTemplate:
+    ) -> ProviderLaunchTemplate:  # type: ignore[return]
         """Create a provider-specific launch template."""
-        ...
+        pass
 
 
 # Factory for creating provider adapters
 class ProviderAdapterFactory(Protocol):
     """Factory for creating provider adapters."""
 
-    def create_adapter(self, provider_type: str) -> ProviderAdapter:
+    def create_adapter(self, provider_type: str) -> ProviderAdapter:  # type: ignore[return]
         """Create a provider adapter for the specified type (e.g. ``"aws"``)."""
-        ...
+        pass
 
-    def get_supported_providers(self) -> list[str]:
+    def get_supported_providers(self) -> list[str]:  # type: ignore[return]
         """Get list of supported provider type names."""
-        ...
+        pass

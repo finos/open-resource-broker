@@ -303,7 +303,7 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
     @abstractmethod
     def get_scripts_directory(self) -> Path | None:
         """Return the path to the scheduler's scripts directory, or None if not applicable."""
-        ...
+        pass
 
     def get_template_paths(self) -> list[str]:
         """Get template file paths driven by the set of active provider types.

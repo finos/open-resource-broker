@@ -16,7 +16,7 @@ class AzureSshPublicKeyResourceProtocol(Protocol):
     @property
     def public_key(self) -> str | None:
         """Return the public key material stored on the resource."""
-        ...
+        pass
 
 
 class AzureSshPublicKeyOperationsProtocol(Protocol):
@@ -27,18 +27,18 @@ class AzureSshPublicKeyOperationsProtocol(Protocol):
         resource_group_name: str,
         ssh_public_key_name: str,
         **kwargs: Any,
-    ) -> Awaitable[AzureSshPublicKeyResourceProtocol]:
+    ) -> Awaitable[AzureSshPublicKeyResourceProtocol]:  # type: ignore[return]
         """Fetch an Azure SSH public key resource."""
-        ...
+        pass
 
 
 class AzureComputeSshKeyClientProtocol(Protocol):
     """Azure Compute client surface used for SSH key lookup."""
 
     @property
-    def ssh_public_keys(self) -> AzureSshPublicKeyOperationsProtocol:
+    def ssh_public_keys(self) -> AzureSshPublicKeyOperationsProtocol:  # type: ignore[return]
         """Return SSH public key operations."""
-        ...
+        pass
 
 
 def _azure_resource_not_found_error_type() -> type[Exception]:

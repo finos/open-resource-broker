@@ -12,11 +12,11 @@ class AzureCredentialProtocol(Protocol):
 
     def get_token(self, *scopes: str, **kwargs: Any) -> Any:
         """Request an access token for the given scopes."""
-        ...
+        pass
 
     def close(self) -> None:
         """Release any resources held by this credential."""
-        ...
+        pass
 
 
 class AsyncAzureCredentialProtocol(Protocol):
@@ -24,35 +24,35 @@ class AsyncAzureCredentialProtocol(Protocol):
 
     async def get_token(self, *scopes: str, **kwargs: Any) -> Any:
         """Asynchronously request an access token for the given scopes."""
-        ...
+        pass
 
     async def close(self) -> None:
         """Release any resources held by this async credential."""
-        ...
+        pass
 
 
 class AzureAccessTokenProviderProtocol(Protocol):
     """Short-lived Azure token provider used by auth flows."""
 
-    def get_access_token(self, scope: str) -> str:
+    def get_access_token(self, scope: str) -> str:  # type: ignore[return]
         """Return a raw access-token string for the given scope."""
-        ...
+        pass
 
-    def get_auth_error_types(self) -> tuple[type[Exception], ...]:
+    def get_auth_error_types(self) -> tuple[type[Exception], ...]:  # type: ignore[return]
         """Return exception types that signal authentication failures."""
-        ...
+        pass
 
 
 class AsyncAzureAccessTokenProviderProtocol(Protocol):
     """Async short-lived Azure token provider used by native async auth flows."""
 
-    async def get_access_token(self, scope: str) -> str:
+    async def get_access_token(self, scope: str) -> str:  # type: ignore[return]
         """Return a raw access-token string for the given scope."""
-        ...
+        pass
 
-    def get_auth_error_types(self) -> tuple[type[Exception], ...]:
+    def get_auth_error_types(self) -> tuple[type[Exception], ...]:  # type: ignore[return]
         """Return exception types that signal authentication failures."""
-        ...
+        pass
 
 
 class AzureCredentialAccessTokenProvider(AzureAccessTokenProviderProtocol):

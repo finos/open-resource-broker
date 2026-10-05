@@ -12,16 +12,16 @@ class TemplateDTOPort(ABC):
     """
 
     @abstractmethod
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:  # type: ignore[return]
         """Convert template to dictionary.
 
         Returns:
             Dictionary representation of template
         """
-        ...
+        pass
 
     @abstractmethod
-    def from_dict(self, data: dict[str, Any]) -> "TemplateDTOPort":
+    def from_dict(self, data: dict[str, Any]) -> "TemplateDTOPort":  # type: ignore[return]
         """Create template from dictionary.
 
         Args:
@@ -30,16 +30,16 @@ class TemplateDTOPort(ABC):
         Returns:
             Template DTO instance
         """
-        ...
+        pass
 
     @property
     @abstractmethod
-    def template_id(self) -> str:
+    def template_id(self) -> str:  # type: ignore[return]
         """Get template ID."""
-        ...
+        pass
 
     @property
     @abstractmethod
-    def name(self) -> str:
+    def name(self) -> str:  # type: ignore[return]
         """Get template name."""
-        ...
+        pass

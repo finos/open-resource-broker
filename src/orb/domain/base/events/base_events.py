@@ -75,8 +75,8 @@ class EventPublisher(Protocol):
 
     def publish(self, event: DomainEvent) -> None:
         """Publish a single domain event."""
-        ...
+        pass
 
     def register_handler(self, event_type: str, handler: Callable[[DomainEvent], None]) -> None:
         """Register an event handler."""
-        ...
+        pass

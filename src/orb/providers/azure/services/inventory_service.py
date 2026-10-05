@@ -324,9 +324,9 @@ class VmssResourceErrorReader(Protocol):
         self,
         resource_group: str,
         resource_id: str,
-    ) -> list[ProviderErrorEntry]:
+    ) -> list[ProviderErrorEntry]:  # type: ignore[return]
         """Return VMSS resource-level errors for one scale set."""
-        ...
+        pass
 
 
 class AzureInventoryService:

@@ -12,28 +12,28 @@ class ErrorResponsePort(ABC):
     """
 
     @abstractmethod
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:  # type: ignore[return]
         """Convert error response to dictionary.
 
         Returns:
             Dictionary representation of error response
         """
-        ...
+        pass
 
     @property
     @abstractmethod
-    def error_code(self) -> str:
+    def error_code(self) -> str:  # type: ignore[return]
         """Get error code."""
-        ...
+        pass
 
     @property
     @abstractmethod
-    def error_message(self) -> str:
+    def error_message(self) -> str:  # type: ignore[return]
         """Get error message."""
-        ...
+        pass
 
     @property
     @abstractmethod
-    def status_code(self) -> int:
+    def status_code(self) -> int:  # type: ignore[return]
         """Get HTTP status code."""
-        ...
+        pass

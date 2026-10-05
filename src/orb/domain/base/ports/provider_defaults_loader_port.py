@@ -23,4 +23,4 @@ class ProviderDefaultsLoaderPort(Protocol):
             Raw configuration dictionary (same shape as ``default_config.json``).
             Return an empty dict if the provider has no defaults to contribute.
         """
-        ...
+        pass

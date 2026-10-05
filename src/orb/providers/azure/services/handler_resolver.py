@@ -16,4 +16,4 @@ class AzureHandlerResolver(Protocol):
         allow_vmss_uniform_fallback: bool = False,
     ) -> Optional[AzureHandler]:
         """Return the configured handler, or ``None`` when none is available."""
-        ...
+        pass

@@ -58,9 +58,9 @@ class AzureResourceManagerProtocol(Protocol):
 
     async def get_vmss_capacity_async(
         self, resource_group: str, vmss_name: str
-    ) -> VmssCapacityInfo:
+    ) -> VmssCapacityInfo:  # type: ignore[return]
         """Return VMSS capacity details for one scale set via the async SDK."""
-        ...
+        pass
 
 
 class AzureDeploymentStatusServiceProtocol(Protocol):
@@ -73,16 +73,16 @@ class AzureDeploymentStatusServiceProtocol(Protocol):
         deployment_name: str,
     ) -> Optional[dict[str, object]]:
         """Return deployment provisioning/error state for one ARM deployment via the async SDK."""
-        ...
+        pass
 
     async def cleanup_failed_single_vm_deployment_async(
         self,
         *,
         resource_group: str,
         resources: list[SingleVmDeploymentResource],
-    ) -> FailedDeploymentCleanupResult:
+    ) -> FailedDeploymentCleanupResult:  # type: ignore[return]
         """Remove provider-owned resources left by a failed deployment."""
-        ...
+        pass
 
 
 class AzureResourceMetadataService:

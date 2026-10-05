@@ -11,16 +11,16 @@ class FieldMappingPort(Protocol):
     registered via ``FieldMappingRegistry`` during provider bootstrap.
     """
 
-    def get_mappings(self) -> dict[str, str]:
+    def get_mappings(self) -> dict[str, str]:  # type: ignore[return]
         """Return the provider-specific HF-field → internal-field name dict.
 
         The shared ``HostFactoryFieldMappings.MAPPINGS["generic"]`` table is
         always applied first; this method returns only the *additional*
         provider-specific entries that should be merged on top.
         """
-        ...  # type: ignore[return]
+        pass
 
-    def apply_defaults(self, mapped: dict) -> dict:
+    def apply_defaults(self, mapped: dict) -> dict:  # type: ignore[return]
         """Apply provider-specific ``setdefault`` logic after field mapping.
 
         Args:
@@ -30,7 +30,7 @@ class FieldMappingPort(Protocol):
         Returns:
             The same dict with provider defaults applied.
         """
-        ...  # type: ignore[return]
+        pass
 
     def derive_attributes(self, machine_type: str | None) -> dict[str, list[str]] | None:
         """Build the HF ``attributes`` object for a given machine / instance type.
@@ -43,4 +43,4 @@ class FieldMappingPort(Protocol):
             A dict suitable for the HF ``attributes`` field, or ``None`` when
             the provider does not support cpu/ram attribute derivation.
         """
-        ...  # type: ignore[return]
+        pass

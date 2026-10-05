@@ -23,19 +23,19 @@ class RepositoryProtocol(Protocol[T]):
 
     def save(self, obj: T) -> None:
         """Save an entity."""
-        ...
+        pass
 
-    def find_by_id(self, id_value: Any) -> Optional[T]:
+    def find_by_id(self, id_value: Any) -> Optional[T]:  # type: ignore[return]
         """Find entity by ID."""
-        ...
+        pass
 
     def delete(self, id_value: Any) -> None:
         """Delete entity by ID."""
-        ...
+        pass
 
-    def find_all(self) -> list[T]:
+    def find_all(self) -> list[T]:  # type: ignore[return]
         """Find all entities."""
-        ...
+        pass
 
 
 class Repository(Generic[T], ABC):
@@ -86,13 +86,13 @@ class AggregateRepository(Generic[A], ABC):
 class UnitOfWork(Protocol):
     """Unit of work pattern for transaction management."""
 
-    def __enter__(self) -> UnitOfWork:
+    def __enter__(self) -> UnitOfWork:  # type: ignore[return]
         """Enter the unit of work context."""
-        ...
+        pass
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit the unit of work context."""
-        ...
+        pass
 
     @abstractmethod
     def begin(self) -> None:
