@@ -1,0 +1,72 @@
+name: integration-request
+description: Request a new provider or scheduler integration, or report a gap in an existing one
+title: "[Integration]: "
+labels: ["enhancement", "integration", "triage"]
+assignees:
+  - hostfactory-maintainers
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to request support for a new provider or scheduler, or to report a gap in an existing integration.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      description: What are you requesting?
+      options:
+        - New provider
+        - New scheduler
+        - Gap in an existing integration
+    validations:
+      required: true
+
+  - type: input
+    id: target-system
+    attributes:
+      label: Target system
+      description: Name of the provider or scheduler.
+      placeholder: e.g., Oracle Cloud Infrastructure
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: Describe what you are trying to achieve and why this integration matters to you.
+    validations:
+      required: true
+
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Required capabilities
+      description: List the capabilities ORB would need to support (resource types, operations, scaling behavior, etc.).
+    validations:
+      required: true
+
+  - type: textarea
+    id: api-docs
+    attributes:
+      label: API documentation links
+      description: Link to the target system's API or SDK documentation.
+      placeholder: |
+        https://...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to contribute this integration?
+      options:
+        - label: I would like to help implement this integration
+          required: false
+        - label: I have read the contributing guidelines
+          required: true
+        - label: I have searched existing issues and confirmed this is not a duplicate
+          required: true

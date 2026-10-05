@@ -48,6 +48,79 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      description: Which provider backend is involved?
+      options:
+        - Amazon Web Services (AWS)
+        - Microsoft Azure
+        - Google Cloud
+        - Kubernetes
+        - Not provider-specific
+        - Other (specify in environment details)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scheduler
+    attributes:
+      label: Scheduler
+      description: Which scheduler integration is involved?
+      options:
+        - Default
+        - IBM Spectrum Symphony (host factory)
+        - Slurm Workload Manager
+        - HTC-Grid (via default scheduler)
+        - OpenGRIS Scaler (via default scheduler)
+        - Not scheduler-specific
+        - Other (specify in environment details)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      description: Which interface did you use?
+      options:
+        - CLI
+        - REST API
+        - MCP server
+        - Python SDK
+        - Go SDK
+        - TypeScript SDK
+        - Java SDK
+        - Kotlin SDK
+        - C# SDK
+        - Web UI
+        - Other (specify in environment details)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: storage
+    attributes:
+      label: Storage backend
+      description: Which storage backend is involved, if relevant?
+      options:
+        - JSON
+        - SQL
+        - DynamoDB
+        - Aurora
+        - Not storage-specific
+        - Other (specify in environment details)
+    validations:
+      required: false
+
+  - type: input
+    id: installed-extras
+    attributes:
+      label: Installed extras
+      description: Which install extras (if any) are enabled?
+      placeholder: e.g., orb-py[azure]
+
   - type: textarea
     id: what-happened
     attributes:
@@ -121,4 +194,6 @@ body:
         - label: I agree to follow this project's Code of Conduct
           required: true
         - label: I have searched the existing issues and confirmed this is not a duplicate
+          required: true
+        - label: I removed credentials, tokens and other secrets from logs and configuration
           required: true
