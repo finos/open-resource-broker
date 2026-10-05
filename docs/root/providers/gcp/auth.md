@@ -28,13 +28,21 @@ before reporting the provider healthy.
 
 ### Single identity, by design
 
-Google Cloud's ADC model resolves to exactly one credential per process. Unlike
-the AWS provider (multiple named profiles) or the Azure provider
-(`client_id` to select a specific managed identity), the Google Cloud provider has
-no mechanism to use a different identity per provider instance or per
-template. If you need to operate against more than one Google Cloud project or
-service account, run separate ORB deployments (or processes) each with
-their own ADC source.
+Google Cloud's ADC model resolves to exactly one credential per process, and
+every Google Cloud provider instance in that process shares it: none of the
+Compute Engine clients are constructed with an explicit credentials or
+project argument, so they all resolve ADC the same way. `project_id` is set
+per provider instance, but the identity is not — unlike the AWS provider
+(multiple named profiles) or the Azure provider (`client_id` to select a
+specific managed identity), the Google Cloud provider has no mechanism to use
+a different identity per provider instance or per template.
+
+In practice, this means if you configure multiple Google Cloud provider
+instances in one ORB process targeting different projects, the single ADC
+identity for that process must itself have the required IAM roles in every
+one of those projects — per-instance credentials are not supported. If the
+projects need separate identities, run separate ORB deployments (or
+processes), each with its own ADC source.
 
 ## Required IAM roles
 
