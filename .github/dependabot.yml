@@ -14,40 +14,24 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
 
-    # Group related dependencies together
+    # Bundle all minor/patch bumps into one weekly PR, and all major bumps
+    # into a second weekly PR, instead of one PR per package. Security
+    # updates are left ungrouped so they are never delayed behind a
+    # resolver conflict in either batch.
     groups:
-      aws-dependencies:
+      python-minor-patch:
         patterns:
-          - "boto*"
-          - "aws-*"
-          - "moto*"
+          - "*"
         update-types:
           - "minor"
           - "patch"
-
-      dev-tools:
+      python-major:
         patterns:
-          - "black"
-          - "isort"
-          - "mypy"
-          - "pylint"
-          - "flake8"
-          - "autopep8"
-          - "ruff"
+          - "*"
         update-types:
-          - "minor"
-          - "patch"
-
-      testing-tools:
-        patterns:
-          - "pytest*"
-          - "coverage"
-          - "tox"
-        update-types:
-          - "minor"
-          - "patch"
+          - "major"
 
     # Ignore problematic updates
     ignore:
@@ -55,6 +39,9 @@ updates:
       - dependency-name: "black"
         update-types: ["version-update:semver-major"]
       - dependency-name: "pytest"
+        update-types: ["version-update:semver-major"]
+      # The MCP SDK's major versions change the protocol/API and need a planned migration.
+      - dependency-name: "mcp"
         update-types: ["version-update:semver-major"]
 
   # GitHub Actions
@@ -71,11 +58,15 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 1
     groups:
-      github-actions:
+      github-actions-all:
         patterns:
           - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
 
   # Go dependencies (SDK)
   - package-ecosystem: "gomod"
@@ -91,7 +82,15 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 1
+    groups:
+      go-all:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
 
   # Docker dependencies
   - package-ecosystem: "docker"
@@ -108,6 +107,14 @@ updates:
       prefix: "chore"
       include: "scope"
     open-pull-requests-limit: 1
+    groups:
+      docker-all:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
 
   # TypeScript SDK dependencies
   - package-ecosystem: "npm"
@@ -125,12 +132,22 @@ updates:
       include: "scope"
     open-pull-requests-limit: 2
     groups:
-      dev-dependencies:
-        dependency-type: "development"
+      typescript-minor-patch:
+        patterns:
+          - "*"
         update-types:
           - "minor"
           - "patch"
+      typescript-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
     ignore:
       # ts-jest's peer range does not yet include TypeScript 7.
       - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # Keep @types/node aligned with the minimum supported Node version
+      # rather than tracking Node's latest major automatically.
+      - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
