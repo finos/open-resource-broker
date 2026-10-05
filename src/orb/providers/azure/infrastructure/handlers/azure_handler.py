@@ -47,6 +47,12 @@ class AzureStatusProviderData(TypedDict, total=False):
     here per the ``metadata vs provider_data`` architecture rule. The
     HostFactory scheduler reads ``cloud_host_id`` from this dict to emit the
     Symphony wire ``cloudHostId`` field.
+
+    ``power_state`` carries the raw Azure ``PowerState/*`` code (e.g.
+    ``"PowerState/deallocated"``). The top-level ``status`` field collapses
+    both ``PowerState/stopped`` (still billed) and ``PowerState/deallocated``
+    (not billed) to the single domain status ``"stopped"`` -- consumers that
+    need to tell them apart (billing, diagnostics) must read this field.
     """
 
     resource_id: str
@@ -68,6 +74,7 @@ class AzureStatusProviderData(TypedDict, total=False):
     nic_name: str | None
     vnet_id: str | None
     fleet_errors: list[dict[str, Any]]
+    power_state: str | None
 
 
 class AzureHandlerStatusResult(TypedDict, total=False):
@@ -130,6 +137,7 @@ class AzureVmssReleaseProviderData(TypedDict, total=False):
     submitted_deletions: list[AzureSubmittedDeletion]
     failed_deletions: list[AzureSubmittedDeletion]
     resolved_instance_ids: list[str]
+    already_terminated_ids: list[str]
 
 
 class AzureSingleVmReleaseProviderData(TypedDict, total=False):

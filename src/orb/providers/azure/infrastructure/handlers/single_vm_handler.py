@@ -37,7 +37,10 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureSubmittedDeletion,
     azure_raise_on_status_error,
 )
-from orb.providers.azure.infrastructure.handlers.azure_status import resolve_power_state
+from orb.providers.azure.infrastructure.handlers.azure_status import (
+    resolve_power_state,
+    resolve_raw_power_state_code,
+)
 from orb.providers.azure.infrastructure.sdk_shapes import (
     AzureVmRuntimeStatusProtocol,
     AzureVmWithIdentityProtocol,
@@ -155,6 +158,7 @@ class SingleVMHandler(AzureHandler):
         resource_group: str,
         status: str,
         network_identity: AzureNetworkIdentity,
+        power_state: str | None = None,
     ) -> AzureHandlerStatusResult:
         """Build a typed status result for one Azure VM."""
         hw = vm.hardware_profile
@@ -172,6 +176,8 @@ class SingleVMHandler(AzureHandler):
         }
         if vm.vm_id is not None:
             provider_data["vm_id"] = vm.vm_id
+        if power_state is not None:
+            provider_data["power_state"] = power_state
         return {
             "instance_id": str(vm.name),
             "name": str(vm.name),
@@ -432,6 +438,9 @@ class SingleVMHandler(AzureHandler):
                             resolve_power_state(statuses) if statuses is not None else "unknown"
                         ),
                         network_identity=network_identity,
+                        power_state=(
+                            resolve_raw_power_state_code(statuses) if statuses is not None else None
+                        ),
                     )
                 )
             except Exception as exc:
