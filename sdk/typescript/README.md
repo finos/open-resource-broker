@@ -29,7 +29,7 @@ orb init
 npm install @finos/open-resource-broker
 ```
 
-Requires Node 18 or later.
+Requires Node.js 22 or later.
 
 ## IPC Model
 
