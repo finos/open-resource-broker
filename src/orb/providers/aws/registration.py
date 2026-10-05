@@ -181,16 +181,9 @@ def create_aws_resolver() -> Any:
     Returns:
         AWS template resolver instance
     """
-    try:
-        # Image resolution now handled by generic service
-        # Return None to indicate no legacy resolver needed
-        return None
-    except ImportError:
-        # AWS resolver not available, return None
-        return None
-    except Exception as e:
-        # Re-raise with context - let caller handle logging
-        raise RuntimeError(f"Failed to create AWS resolver: {e!s}")
+    # Image resolution is now handled by a generic service; return None to
+    # indicate no legacy resolver is needed.
+    return None
 
 
 def create_aws_validator(provider_config: Any = None) -> Any:

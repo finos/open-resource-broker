@@ -62,12 +62,14 @@ def injectable(cls: type[T]) -> type[T]:
         """Constructor with automatic dependency resolution."""
         # If positional arguments are provided, use original constructor directly
         if args:
-            return original_init(self, *args, **kwargs)
+            original_init(self, *args, **kwargs)
+            return
 
         # Check if we're being called from within the DI container
         # If so, skip our own resolution to avoid circular dependency
         if _is_called_from_di_container():
-            return original_init(self, **kwargs)
+            original_init(self, **kwargs)
+            return
 
         resolved_kwargs = {}
 

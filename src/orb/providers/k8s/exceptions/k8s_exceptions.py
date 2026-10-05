@@ -69,7 +69,6 @@ class K8sError(InfrastructureError):
         error_source: Optional[str] = None,
     ) -> None:
         super().__init__(message, error_code or self.__class__.__name__, details)
-        self.error_code = error_code or self.__class__.__name__
         self.http_status = http_status
         self.k8s_reason = k8s_reason
         self.k8s_message = k8s_message

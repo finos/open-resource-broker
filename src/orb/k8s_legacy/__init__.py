@@ -100,7 +100,8 @@ def handle_exceptions(
         def _handle_any(*args, **kwargs) -> None:  # noqa: ANN003, ANN002
             """Default exception handler."""
             try:
-                return wrapped_f(*args, **kwargs)
+                wrapped_f(*args, **kwargs)
+                return
 
             except click.UsageError as usage_err:
                 click.echo(f"Usage error: {usage_err!s}", err=True)

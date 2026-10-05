@@ -82,7 +82,6 @@ def create_json_unit_of_work(config: Any) -> Any:
     # Handle different config types
     if isinstance(config, ConfigurationManager):
         # Try to get scheduler strategy to determine base path
-        base_path = "data"  # Default fallback
         try:
             # Don't try to get container during registration - causes circular dependency
             # Use configuration fallback instead

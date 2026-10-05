@@ -452,6 +452,11 @@ class BaseProviderHandler(BaseHandler):
                         )
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
 
+        # Unreachable in practice: the loop above always either returns on
+        # success or raises on the final attempt. Guard explicitly so every
+        # path has an explicit outcome rather than an implicit None return.
+        raise RuntimeError(f"Retry loop for {operation_id} exited without a result")
+
     @abstractmethod
     async def execute_provider_operation(self, operation: str, **kwargs) -> Any:
         """
