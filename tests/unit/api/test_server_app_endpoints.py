@@ -80,6 +80,41 @@ class TestSystemEndpoints:
 
 @pytest.mark.unit
 @pytest.mark.api
+class TestFaviconEndpoint:
+    """The favicon is read once from a packaged resource at app creation,
+    never from request-controllable input, so there is no path for a
+    traversal attempt to reach a file outside the packaged asset."""
+
+    def test_favicon_serves_the_packaged_icon(self):
+        client = TestClient(_make_app())
+        resp = client.get("/favicon.ico")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "image/png"
+        assert resp.content.startswith(b"\x89PNG")
+
+    @pytest.mark.parametrize(
+        "suffix",
+        [
+            "/../../../../etc/passwd",
+            "/..%2f..%2f..%2fetc%2fpasswd",
+            "%2e%2e%2f%2e%2e%2fetc%2fpasswd",
+            "//etc/passwd",
+            "/etc/passwd",
+        ],
+    )
+    def test_favicon_path_traversal_attempts_do_not_escape_the_asset(self, suffix):
+        client = TestClient(_make_app())
+        resp = client.get(f"/favicon.ico{suffix}", follow_redirects=False)
+        # The route matches only the exact literal path, so any traversal
+        # attempt simply fails to match a route instead of ever reaching
+        # the filesystem.
+        assert resp.status_code == 404
+        if resp.headers.get("content-type") == "image/png":
+            pytest.fail("traversal attempt unexpectedly returned image content")
+
+
+@pytest.mark.unit
+@pytest.mark.api
 class TestGlobalExceptionHandler:
     def test_unhandled_route_exception_maps_to_structured_error(self):
         """An exception raised in a route is caught by the global handler and
