@@ -6,11 +6,15 @@ provisions fresh instances — no state is preserved between cycles.
 
 import logging
 import re
+import shlex
 import subprocess
 
 _logger = logging.getLogger(__name__)
 _NAME_RE = re.compile(r"^[a-zA-Z0-9\-_]+$")
 _IP_RE = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
+# Absolute path, no shell metacharacters, spaces, or traversal segments —
+# this value is interpolated into a root-run cloud-init `sed -i` command.
+_SAFE_ABS_PATH_RE = re.compile(r"^/[A-Za-z0-9_./-]+$")
 
 
 class SlurmNodeBootstrap:
@@ -67,6 +71,21 @@ class SlurmNodeBootstrap:
             return False
 
     @staticmethod
+    def _validate_slurm_conf_path(value: str) -> None:
+        """Reject anything that isn't a clean absolute path.
+
+        This value is interpolated into a `sed -i` command inside a root-run
+        cloud-init script — shell metacharacters, spaces, or traversal
+        segments here would be a command-injection risk if a caller ever
+        passes an untrusted path.
+        """
+        if not value or not _SAFE_ABS_PATH_RE.match(value) or ".." in value.split("/"):
+            raise ValueError(
+                f"Invalid slurm_conf_path '{value}': must be a clean absolute path "
+                "(alphanumeric, '.', '/', '_', '-' only, no '..' segments)"
+            )
+
+    @staticmethod
     def generate_user_data(
         node_name: str,
         slurmctld_host: str,
@@ -81,6 +100,12 @@ class SlurmNodeBootstrap:
             raise ValueError(f"Invalid node name '{node_name}'")
         if not slurmctld_host or not _NAME_RE.match(slurmctld_host.split(".")[0]):
             raise ValueError(f"Invalid slurmctld host '{slurmctld_host}'")
+        SlurmNodeBootstrap._validate_slurm_conf_path(slurm_conf_path)
+
+        # Belt-and-suspenders: the allowlist regex above already rejects shell
+        # metacharacters, but quote defensively in case the allowlist is ever
+        # loosened.
+        quoted_conf_path = shlex.quote(slurm_conf_path)
 
         return f"""#!/bin/bash
 # ORB-generated cloud-init script for SLURM elastic node
@@ -90,7 +115,7 @@ set -euo pipefail
 hostnamectl set-hostname {node_name}
 
 # Ensure slurm.conf has correct SlurmctldHost
-sed -i 's/^SlurmctldHost=.*/SlurmctldHost={slurmctld_host}/' {slurm_conf_path}
+sed -i 's/^SlurmctldHost=.*/SlurmctldHost={slurmctld_host}/' {quoted_conf_path}
 
 # Set NodeName in slurmd config
 echo "NodeName={node_name}" > /etc/slurm/node_name.conf
