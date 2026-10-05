@@ -92,6 +92,7 @@ class InMemoryTokenDenylist(TokenDenylistPort):
             try:
                 await self._cleanup_task
             except asyncio.CancelledError:
+                # Expected: we just cancelled this task above.
                 pass
             self._logger.info("Stopped automatic cleanup task")
 

@@ -56,7 +56,7 @@ def cqrs_buses(orb_config_dir):
             for instance in provider_config.get_active_providers():
                 registry.ensure_provider_instance_registered_from_config(instance)
     except Exception:
-        pass
+        pass  # Provider instance already registered or config unavailable; continue with the shared container
 
     command_bus = container.get(CommandBusPort)
     query_bus = container.get(QueryBusPort)
@@ -86,7 +86,7 @@ def orb_config_dir(orb_config_dir):
             for provider in cfg["provider"]["providers"]:
                 provider.get("config", {}).pop("profile", None)
         except (KeyError, TypeError):
-            pass
+            pass  # Config shape doesn't include a provider list; nothing to patch
         config_path.write_text(_json.dumps(cfg, indent=2))
 
     # Patch 2: replace SSM path image_id with literal AMI in default_config.json
@@ -98,7 +98,7 @@ def orb_config_dir(orb_config_dir):
                 "ami-12345678"
             )
         except (KeyError, TypeError):
-            pass
+            pass  # Default config doesn't define the AWS template defaults path; nothing to patch
         default_cfg_path.write_text(_json.dumps(cfg, indent=2))
 
     return orb_config_dir

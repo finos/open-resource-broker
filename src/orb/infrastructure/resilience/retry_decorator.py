@@ -101,8 +101,6 @@ def retry(
                     return result
 
                 except Exception as e:
-                    pass
-
                     # Check if we should retry
                     if not retry_strategy.should_retry(attempt, e):
                         if attempt >= max_attempts:

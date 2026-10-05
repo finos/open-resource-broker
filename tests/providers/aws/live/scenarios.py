@@ -41,7 +41,7 @@ def _get_templates_for_resolution() -> List[Dict[str, Any]]:
         if templates:
             return templates
     except Exception:
-        pass
+        pass  # Scheduler-managed templates unavailable; fall back to the filesystem catalog
 
     # Filesystem fallback
     templates_path = Path(__file__).parent.parent.parent / "config" / "aws_templates.json"

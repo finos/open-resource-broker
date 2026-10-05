@@ -435,7 +435,7 @@ class TestApplicationEventsComprehensive:
             module = importlib.import_module("orb.application.events.base.event_handler")
             event_modules.append(("base.event_handler", module))
         except ImportError:
-            pass
+            pass  # Module optional; absence is covered by the modules actually collected
 
         # Check event handlers
         handler_files = [

@@ -470,7 +470,7 @@ class TestSpotFleetHandlerEdgeCases:
         try:
             h.release_hosts(fake_instance_ids, resource_mapping=resource_mapping)
         except Exception:
-            pass
+            pass  # Fake instance IDs may be rejected by moto; only the fleet-mapping path is under test
 
 
 # ---------------------------------------------------------------------------

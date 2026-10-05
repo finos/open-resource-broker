@@ -5,6 +5,8 @@ provider with the provider registry, template extension registry, and
 DI container.
 """
 
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar
 
@@ -37,9 +39,9 @@ T = TypeVar("T")
 class PerformanceConfigSource(Protocol):
     """Configuration source shape used to resolve shared performance settings."""
 
-    def get_typed(self, config_type: type[T]) -> T:
+    def get_typed(self, config_type: type[T]) -> T:  # type: ignore[return]
         """Return a typed configuration object."""
-        ...
+        pass
 
 
 def _resolve_performance_config(
@@ -442,7 +444,7 @@ def register_azure_provider_settings() -> None:
 
         ProviderSettingsRegistry.register_provider_settings("azure", AzureProviderConfig)
     except ImportError:
-        pass
+        pass  # Azure SDK extra not installed; provider remains partially registered
     except Exception as exc:
         raise RuntimeError(f"Failed to register Azure provider settings: {exc!s}")
 
@@ -455,7 +457,7 @@ def register_azure_cli_spec() -> None:
 
         CLISpecRegistry.register("azure", AzureCLISpec())
     except ImportError:
-        pass
+        pass  # Azure SDK extra not installed; provider remains partially registered
     except Exception as exc:
         raise RuntimeError(f"Failed to register Azure CLI spec: {exc!s}")
 
@@ -472,7 +474,7 @@ def register_azure_hostfactory_field_mapping() -> None:
 
         FieldMappingRegistry.register("azure", AzureFieldMapping())
     except ImportError:
-        pass
+        pass  # Azure SDK extra not installed; provider remains partially registered
     except Exception as exc:
         raise RuntimeError(f"Failed to register Azure HostFactory field mapping: {exc!s}")
 
@@ -519,7 +521,7 @@ def initialize_azure_provider(
 
         cli_spec_instance = AzureCLISpec()
     except ImportError:
-        pass
+        pass  # Azure SDK extra not installed; provider remains partially registered
 
     field_mapping_instance: Optional[Any] = None
     try:
@@ -529,7 +531,7 @@ def initialize_azure_provider(
 
         field_mapping_instance = AzureFieldMapping()
     except ImportError:
-        pass
+        pass  # Azure SDK extra not installed; provider remains partially registered
 
     defaults_loader_instance: Optional[Any] = None
     try:
@@ -537,7 +539,7 @@ def initialize_azure_provider(
 
         defaults_loader_instance = AzureDefaultsLoader()
     except ImportError:
-        pass
+        pass  # Azure SDK extra not installed; provider remains partially registered
 
     template_class: Optional[type] = None
     try:
@@ -545,7 +547,7 @@ def initialize_azure_provider(
 
         template_class = AzureTemplate
     except ImportError:
-        pass
+        pass  # Azure SDK extra not installed; provider remains partially registered
 
     # Azure SDK credentials authenticate ORB to Azure Resource Manager; they do
     # not authenticate callers to ORB, so Azure intentionally has no inbound

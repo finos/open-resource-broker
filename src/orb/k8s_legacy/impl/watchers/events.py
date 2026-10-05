@@ -642,6 +642,8 @@ def _watch_events(eventdir, backends) -> None:
                     event_queue.get(timeout=1.0)
                     _process_events(_pending_events(eventdir), backends)
                 except queue.Empty:
+                    # No filesystem event arrived within the poll timeout;
+                    # loop back around to keep watching.
                     pass
         finally:
             observer.stop()

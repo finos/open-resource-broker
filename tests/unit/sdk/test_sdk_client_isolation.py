@@ -84,7 +84,7 @@ class TestContainerIsolation:
             try:
                 asyncio.run(client.initialize())
             except (ProviderError, Exception):
-                pass
+                pass  # Only container isolation is under test; initialize() failure is expected
 
             mock_create.assert_called_once()
 
@@ -114,6 +114,6 @@ class TestContainerIsolation:
             try:
                 asyncio.run(client.initialize())
             except (ProviderError, Exception):
-                pass
+                pass  # Only container isolation is under test; initialize() failure is expected
 
         assert captured.get("container") is mock_container

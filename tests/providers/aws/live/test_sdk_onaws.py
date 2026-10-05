@@ -77,7 +77,7 @@ def _get_boto_profile_and_region() -> tuple[str | None, str]:
                 profile = provider_cfg.get("profile")
                 region = provider_cfg.get("region")
         except Exception:
-            pass
+            pass  # Config file unreadable; fall back to env-provided region below
     region = (
         region
         or os.environ.get("AWS_REGION")
@@ -236,7 +236,7 @@ def setup_sdk_test(request, test_session_id):
 
         reset_container()
     except Exception:
-        pass
+        pass  # DI container already torn down; nothing left to reset
 
     processor.cleanup_test_templates(test_name)
 

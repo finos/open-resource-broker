@@ -180,6 +180,8 @@ class RequestSerializer(BaseEntitySerializer):
                     if isinstance(parsed, dict) and "value" in parsed:
                         return RequestId(value=parsed["value"])
                 except (ValueError, SyntaxError):
+                    # Not a valid stringified dict; fall through and treat the
+                    # raw string as the request id value below.
                     pass
             # Handle direct string format
             return RequestId(value=request_id_data)

@@ -91,7 +91,7 @@ def _get_aws_profile_and_region() -> tuple[str | None, str | None]:
             if profile or region:
                 return profile, region
     except FileNotFoundError:
-        pass
+        pass  # No ORB config file; fall back to environment-provided region
 
     region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
     return None, region

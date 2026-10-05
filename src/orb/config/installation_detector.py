@@ -41,6 +41,8 @@ def detect_installation_mode(package_name: str = "orb-py") -> Tuple[str, Optiona
                         source_path = source_url[7:]  # Remove file://
                         return "editable", Path(source_path)
             except (json.JSONDecodeError, OSError):
+                # direct_url.json is best-effort metadata; fall through to the
+                # egg-info heuristics below if it is missing or unreadable.
                 pass
 
         # Check for older editable install (egg-info in source tree)

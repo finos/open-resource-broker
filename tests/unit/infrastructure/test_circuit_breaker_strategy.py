@@ -66,7 +66,7 @@ class TestCircuitBreakerShouldRetry:
         try:
             cb.should_retry(1, IOError("f2"))  # failure_count=2 >= threshold -> OPEN -> raises
         except CircuitBreakerOpenError:
-            pass
+            pass  # Expected; the state assertion below is what this test verifies
         assert cb.get_circuit_info()["state"] == CircuitState.OPEN.value
 
     def test_open_circuit_raises_circuit_breaker_error(self) -> None:

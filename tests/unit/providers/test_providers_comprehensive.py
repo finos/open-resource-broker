@@ -750,7 +750,7 @@ class TestAWSAuthenticationComprehensive:
             strategy = CognitoAuthStrategy(Mock(), "us-east-1_test", "test_client_id")
             assert strategy is not None
         except ImportError:
-            pass
+            pass  # Optional auth strategy module not installed in this test environment
 
         # IAMAuthStrategy requires (logger,)
         try:
@@ -759,7 +759,7 @@ class TestAWSAuthenticationComprehensive:
             strategy = IAMAuthStrategy(Mock())
             assert strategy is not None
         except ImportError:
-            pass
+            pass  # Optional auth strategy module not installed in this test environment
 
 
 @pytest.mark.unit

@@ -188,7 +188,7 @@ def _run_sync(watcher: K8sNodeWatcher) -> None:
     try:
         watcher._run_one_session(None)
     except Exception:
-        pass
+        pass  # Only session completion matters here; errors are asserted separately per test
     watcher._stop_event.set()
 
 
