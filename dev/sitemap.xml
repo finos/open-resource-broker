@@ -377,6 +377,38 @@
          <lastmod>2026-10-05</lastmod>
     </url>
     <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/providers/azure/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/providers/azure/auth/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/providers/azure/configuration/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/providers/azure/handlers/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/providers/gcp/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/providers/gcp/auth/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/providers/gcp/configuration/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/providers/gcp/handlers/</loc>
+         <lastmod>2026-10-05</lastmod>
+    </url>
+    <url>
          <loc>https://finos.github.io/open-resource-broker/dev/providers/k8s/</loc>
          <lastmod>2026-10-05</lastmod>
     </url>

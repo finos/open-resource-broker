@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#aws-provider-architecture-design" class="md-skip">
+        <a href="#multi-provider-design" class="md-skip">
           Skip to content
         </a>
       
@@ -394,7 +394,7 @@
           
   
   
-  SLURM Integration
+  Slurm Integration
 
         </a>
       </li>
@@ -1447,334 +1447,66 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#architecture-components" class="md-nav__link">
+  <a href="#entry-points-and-discovery" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Architecture Components
+        Entry points and discovery
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Architecture Components">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cqrs-implementation-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CQRS Implementation Status
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#1-domain-model-extensions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Domain Model Extensions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="1. Domain Model Extensions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#template-aggregate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Aggregate
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#request-aggregate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Request Aggregate
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-provider-selection-service" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Provider Selection Service
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="2. Provider Selection Service">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#selection-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Selection Strategies
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#selection-algorithm" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Selection Algorithm
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-provider-capability-service" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Provider Capability Service
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="3. Provider Capability Service">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#validation-levels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Validation Levels
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#capability-validation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Capability Validation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-template-repository-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Template Repository Architecture
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="4. Template Repository Architecture">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#template-repository-implementation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Repository Implementation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#key-architecture-improvements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Architecture Improvements
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-loading-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Loading Architecture
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Template Loading Architecture">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#file-priority-order-highest-to-lowest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        File Priority Order (Highest to Lowest)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-override-behavior" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Override Behavior
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-providerplugin-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ProviderPlugin contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#providerstrategy-the-operation-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProviderStrategy: the operation contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-registry-and-named-instances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider registry and named instances
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-selection-and-load-balancing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider selection and load balancing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Provider selection and load balancing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#configuration-schema" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration Schema
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Configuration Schema">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#provider-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Examples
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Template Examples">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#explicit-provider-selection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Explicit Provider Selection
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#provider-type-selection-load-balanced" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Type Selection (Load Balanced)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#api-based-selection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        API-Based Selection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#provider-selection-algorithms" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Selection Algorithms
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Provider Selection Algorithms">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#weighted-round-robin" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Weighted Round Robin
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#priority-based-selection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Priority-Based Selection
+        Configuration schema
       
     </span>
   </a>
@@ -1787,425 +1519,46 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#template-file-organization" class="md-nav__link">
+  <a href="#template-extensions-defaults-and-field-mapping" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Template File Organization
+        Template extensions, defaults, and field mapping
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Template File Organization">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#directory-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Directory Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-inheritance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Inheritance
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#api-integration" class="md-nav__link">
+  <a href="#cli-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        API Integration
+        CLI integration
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="API Integration">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#rest-api-endpoints" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        REST API Endpoints
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="REST API Endpoints">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#provider-information" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Information
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Management
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#request-processing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Request Processing
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cli-commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CLI Commands
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="CLI Commands">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#provider-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Management
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Operations
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#error-handling-and-validation" class="md-nav__link">
+  <a href="#optional-extras-and-import-guards" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error Handling and Validation
+        Optional extras and import guards
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Error Handling and Validation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#provider-selection-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Selection Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-validation-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Validation Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#error-response-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Response Format
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#performance-considerations" class="md-nav__link">
+  <a href="#related-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Performance Considerations
+        Related documentation
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Performance Considerations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#template-caching" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Caching
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#provider-selection-optimization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Selection Optimization
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#file-io-optimization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        File I/O Optimization
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#monitoring-and-observability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitoring and Observability
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Monitoring and Observability">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Metrics
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logging
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#health-checks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Health Checks
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#migration-guide" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Migration Guide
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Migration Guide">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#from-single-provider" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        From Single Provider
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-migration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Migration
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Best Practices">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-organization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Organization
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#monitoring" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitoring
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#future-enhancements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future Enhancements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Future Enhancements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#planned-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Planned Features
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#extension-points" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Extension Points
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -4449,6 +3802,354 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Azure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../providers/azure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../providers/azure/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../providers/azure/handlers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handlers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../providers/azure/auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Google Cloud
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Google Cloud
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../providers/gcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../providers/gcp/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../providers/gcp/handlers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handlers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../providers/gcp/auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4488,7 +4189,7 @@
   <span class="md-ellipsis">
     
   
-    SLURM Integration
+    Slurm Integration
   
 
     
@@ -4504,7 +4205,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    SLURM Integration
+    Slurm Integration
   
 
           </label>
@@ -6257,334 +5958,66 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#architecture-components" class="md-nav__link">
+  <a href="#entry-points-and-discovery" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Architecture Components
+        Entry points and discovery
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Architecture Components">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cqrs-implementation-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CQRS Implementation Status
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#1-domain-model-extensions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Domain Model Extensions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="1. Domain Model Extensions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#template-aggregate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Aggregate
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#request-aggregate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Request Aggregate
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-provider-selection-service" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Provider Selection Service
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="2. Provider Selection Service">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#selection-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Selection Strategies
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#selection-algorithm" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Selection Algorithm
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-provider-capability-service" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Provider Capability Service
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="3. Provider Capability Service">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#validation-levels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Validation Levels
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#capability-validation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Capability Validation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-template-repository-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Template Repository Architecture
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="4. Template Repository Architecture">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#template-repository-implementation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Repository Implementation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#key-architecture-improvements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Architecture Improvements
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-loading-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Loading Architecture
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Template Loading Architecture">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#file-priority-order-highest-to-lowest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        File Priority Order (Highest to Lowest)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-override-behavior" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Override Behavior
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-providerplugin-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ProviderPlugin contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#providerstrategy-the-operation-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProviderStrategy: the operation contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-registry-and-named-instances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider registry and named instances
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provider-selection-and-load-balancing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider selection and load balancing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Provider selection and load balancing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#configuration-schema" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration Schema
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Configuration Schema">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#provider-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Examples
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Template Examples">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#explicit-provider-selection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Explicit Provider Selection
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#provider-type-selection-load-balanced" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Type Selection (Load Balanced)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#api-based-selection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        API-Based Selection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#provider-selection-algorithms" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Selection Algorithms
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Provider Selection Algorithms">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#weighted-round-robin" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Weighted Round Robin
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#priority-based-selection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Priority-Based Selection
+        Configuration schema
       
     </span>
   </a>
@@ -6597,425 +6030,46 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#template-file-organization" class="md-nav__link">
+  <a href="#template-extensions-defaults-and-field-mapping" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Template File Organization
+        Template extensions, defaults, and field mapping
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Template File Organization">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#directory-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Directory Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-inheritance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Inheritance
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#api-integration" class="md-nav__link">
+  <a href="#cli-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        API Integration
+        CLI integration
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="API Integration">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#rest-api-endpoints" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        REST API Endpoints
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="REST API Endpoints">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#provider-information" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Information
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Management
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#request-processing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Request Processing
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cli-commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CLI Commands
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="CLI Commands">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#provider-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Management
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Operations
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#error-handling-and-validation" class="md-nav__link">
+  <a href="#optional-extras-and-import-guards" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Error Handling and Validation
+        Optional extras and import guards
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Error Handling and Validation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#provider-selection-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Selection Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-validation-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Validation Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#error-response-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Response Format
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#performance-considerations" class="md-nav__link">
+  <a href="#related-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Performance Considerations
+        Related documentation
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Performance Considerations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#template-caching" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Caching
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#provider-selection-optimization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Provider Selection Optimization
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#file-io-optimization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        File I/O Optimization
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#monitoring-and-observability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitoring and Observability
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Monitoring and Observability">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Metrics
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logging
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#health-checks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Health Checks
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#migration-guide" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Migration Guide
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Migration Guide">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#from-single-provider" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        From Single Provider
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-migration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Migration
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Best Practices">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#template-organization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Template Organization
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#monitoring" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitoring
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#future-enhancements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future Enhancements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Future Enhancements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#planned-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Planned Features
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#extension-points" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Extension Points
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -7039,413 +6093,330 @@
   
 
 
-<h1 id="aws-provider-architecture-design">AWS Provider Architecture Design<a class="headerlink" href="#aws-provider-architecture-design" title="Permanent link">&para;</a></h1>
+<h1 id="multi-provider-design">Multi-Provider Design<a class="headerlink" href="#multi-provider-design" title="Permanent link">&para;</a></h1>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>The Open Resource Broker implements a provider architecture that enables dynamic provisioning of compute resources across multiple AWS configurations and provider instances. This document describes the design, implementation, and usage patterns of the AWS provider system.</p>
-<h2 id="architecture-components">Architecture Components<a class="headerlink" href="#architecture-components" title="Permanent link">&para;</a></h2>
-<h3 id="cqrs-implementation-status">CQRS Implementation Status<a class="headerlink" href="#cqrs-implementation-status" title="Permanent link">&para;</a></h3>
-<p>The system implements CQRS (Command Query Responsibility Segregation) architecture:</p>
-<p><strong>Completed CQRS Components:</strong>
-- <code>CommandBus</code> and <code>QueryBus</code> infrastructure in <code>src/infrastructure/di/buses.py</code>
-- Query DTOs: <code>ListTemplatesQuery</code>, <code>GetTemplateQuery</code>, <code>ValidateTemplateQuery</code>
-- Command DTOs: <code>CreateTemplateCommand</code>, <code>UpdateTemplateCommand</code>, <code>DeleteTemplateCommand</code>, <code>ValidateTemplateCommand</code>
-- Template list endpoint using <code>QueryBus</code></p>
-<p><strong>Implementation Status:</strong>
-- Template API endpoints (GET, POST, PUT, DELETE) - using CQRS handlers
-- Machine management endpoints - using CQRS pattern
-- Request processing endpoints - using CQRS pattern
-- Provider management endpoints - using CQRS pattern</p>
-<p><strong>Architecture Features:</strong>
-- All API endpoints using CQRS buses for command/query separation
-- Consistent async/await patterns across all handlers
-- Appropriate separation of read and write operations
-- Optimized query handling with caching support</p>
-<h3 id="1-domain-model-extensions">1. Domain Model Extensions<a class="headerlink" href="#1-domain-model-extensions" title="Permanent link">&para;</a></h3>
-<h4 id="template-aggregate">Template Aggregate<a class="headerlink" href="#template-aggregate" title="Permanent link">&para;</a></h4>
-<p>The <code>Template</code> aggregate has been extended with multi-provider fields:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Template</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">template_id</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">provider_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>  <span class="c1"># NEW: Provider type (aws)</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">provider_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>  <span class="c1"># NEW: Provider instance name (aws-us-east-1)</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">provider_api</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>  <span class="c1"># NEW: Specific API to use (EC2Fleet, SpotFleet)</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="c1"># ... existing fields</span>
+<p>Open Resource Broker (ORB) provisions compute capacity across multiple cloud and
+scheduler backends — AWS, Azure, Google Cloud, and Kubernetes — through a single
+plugin architecture. Each provider is a self-contained Python package under
+<code>src/orb/providers/&lt;name&gt;/</code> that registers itself with shared infrastructure at
+startup. The core (CLI, REST API, scheduler integration, DI container) never
+imports a provider package directly; it only talks to registries that providers
+populate during bootstrap.</p>
+<p>This document describes that plugin architecture: how providers are discovered
+and registered, the strategy contract every provider implements, how a request
+is routed to a specific provider instance (including load balancing across
+multiple instances of the same provider type), and the supporting registries
+for template extensions, configuration defaults, HostFactory field mapping, and
+CLI argument specs.</p>
+<p>For a step-by-step guide to adding a new provider, see
+<a href="../../developer_guide/adding_a_provider/">Adding a Provider</a>. For an overview of
+provider package layout from a developer's perspective, see
+<a href="../../developer_guide/providers/">Provider System</a>.</p>
+<h2 id="entry-points-and-discovery">Entry points and discovery<a class="headerlink" href="#entry-points-and-discovery" title="Permanent link">&para;</a></h2>
+<p>Providers declare themselves under the <code>orb.providers</code> entry-point group in
+<code>pyproject.toml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">[project.entry-points.</span><span class="s2">&quot;orb.providers&quot;</span><span class="k">]</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;orb.providers.aws.provider_plugin:AWSPlugin.register_plugin&quot;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">azure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;orb.providers.azure.provider_plugin:AzurePlugin.register_plugin&quot;</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">gcp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;orb.providers.gcp.provider_plugin:GCPPlugin.register_plugin&quot;</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">k8s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;orb.providers.k8s.provider_plugin:K8sPlugin.register_plugin&quot;</span>
 </code></pre></div>
-<h4 id="request-aggregate">Request Aggregate<a class="headerlink" href="#request-aggregate" title="Permanent link">&para;</a></h4>
-<p>The <code>Request</code> aggregate now tracks provider selection:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Request</span><span class="p">:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">provider_type</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">provider_instance</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>  <span class="c1"># NEW: Selected provider instance</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="c1"># ... existing fields</span>
-</code></pre></div>
-<h3 id="2-provider-selection-service">2. Provider Selection Service<a class="headerlink" href="#2-provider-selection-service" title="Permanent link">&para;</a></h3>
-<p>The <code>ProviderSelectionService</code> implements intelligent provider selection using multiple strategies:</p>
-<h4 id="selection-strategies">Selection Strategies<a class="headerlink" href="#selection-strategies" title="Permanent link">&para;</a></h4>
+<p>Each entry point points at a zero-argument, idempotent classmethod. At startup,
+<code>discover_provider_plugins()</code> (in <code>src/orb/providers/registration.py</code>) walks
+<code>importlib.metadata.entry_points(group="orb.providers")</code> and invokes each
+entry point's callable. A plugin that fails to load or raises during
+registration is logged at <code>ERROR</code> and skipped — ORB still boots with whatever
+providers loaded successfully. Loaded provider names are appended to the
+module-level <code>_REGISTERED_PROVIDERS</code> list, which the rest of bootstrap iterates
+over.</p>
+<p>Third-party plugins use the same mechanism: declare an entry point in the
+plugin package's own <code>pyproject.toml</code> with no changes required to any file in
+ORB itself. See <code>docs/root/providers/k8s/plugin-authoring.md</code> for the plugin
+callable contract (zero-argument, returns <code>None</code>, must not raise).</p>
+<p>Three bootstrap entry points consume the discovered provider list, each calling
+<code>discover_provider_plugins()</code> first so entry-point providers are present before
+iterating:</p>
+<ul>
+<li><code>register_all_providers(container)</code> — registers each provider's strategy and
+  config factories with the <code>ProviderRegistry</code>, then (when a DI container is
+  supplied) resolves <code>TemplateFactory</code> and <code>LoggingPort</code> and runs the
+  provider's DI-level initialization.</li>
+<li><code>register_all_provider_cli_specs()</code> — registers each provider's
+  <code>ProviderCLISpecPort</code> implementation with <code>CLISpecRegistry</code>, used by
+  <code>orb providers add</code> and related CLI commands.</li>
+<li><code>register_all_defaults_loaders()</code> — registers each provider's
+  <code>ProviderDefaultsLoaderPort</code> implementation with <code>DefaultsLoaderRegistry</code>.</li>
+</ul>
+<h2 id="the-providerplugin-contract">The <code>ProviderPlugin</code> contract<a class="headerlink" href="#the-providerplugin-contract" title="Permanent link">&para;</a></h2>
+<p><code>src/orb/providers/base/provider_plugin.py</code> defines <code>ProviderPlugin</code>, the
+abstract base every provider subclasses. It separates the pieces every
+provider must supply ("satellite accessors") from the orchestrated lifecycle
+that calls them in the correct order, so a new provider implements only the
+accessors.</p>
+<p>Mandatory satellite accessors:</p>
+<ul>
+<li><code>strategy_factory()</code> — callable that builds a <code>ProviderStrategy</code> instance
+  from a provider config.</li>
+<li><code>config_factory()</code> — callable that builds the provider's typed config object
+  (a <code>pydantic_settings.BaseSettings</code> subclass) from a dict.</li>
+<li><code>template_dto_config()</code> — the provider's template DTO extension class (or
+  <code>None</code>), registered with <code>TemplateExtensionRegistry</code>.</li>
+<li><code>cli_spec()</code> — an instance of the provider's <code>ProviderCLISpecPort</code>
+  implementation (or <code>None</code>), registered with <code>CLISpecRegistry</code>.</li>
+<li><code>field_mapping()</code> — an instance of the provider's HostFactory field-mapping
+  adapter (or <code>None</code>), registered with <code>FieldMappingRegistry</code>.</li>
+<li><code>defaults_loader()</code> — an instance of the provider's
+  <code>ProviderDefaultsLoaderPort</code> implementation (or <code>None</code>), registered with
+  <code>DefaultsLoaderRegistry</code>.</li>
+<li><code>template_example_generator(container)</code> — an instance of the provider's
+  template-example-generator port (or <code>None</code>), registered with
+  <code>TemplateExampleGeneratorRegistry</code> once the DI container is available.</li>
+</ul>
+<p>Optional hooks with no-op or empty defaults: <code>resolver_factory()</code>,
+<code>validator_factory()</code>, <code>strategy_class()</code>, <code>default_api()</code>,
+<code>provider_settings_class()</code>, <code>template_class()</code>, <code>register_auth_strategies()</code>,
+<code>register_additional_services()</code>, and <code>_do_initialize()</code> for any
+provider-specific steps that must run after the standard satellites (for
+example, AWS registers its DynamoDB and Aurora storage backends in
+<code>_do_initialize</code>).</p>
+<p>The orchestrated lifecycle methods are:</p>
+<ul>
+<li><code>register_provider(registry=None, logger=None, instance_name=None)</code> —
+  registers the strategy/config factories (and optionally resolver/validator)
+  with the live <code>ProviderRegistry</code>. Registers a named instance instead of the
+  provider type when <code>instance_name</code> is given.</li>
+<li><code>initialize_provider(template_factory=None, logger=None)</code> — registers
+  provider settings, the template DTO extension, auth strategies, the
+  template class, the CLI spec, the field mapping, and the defaults loader, in
+  that order, then runs <code>_do_initialize</code>. Guarded by a module-level
+  <code>_initialized_providers</code> set so a second call is a safe no-op; a failed
+  attempt is not recorded, so a retry after fixing the underlying problem
+  re-runs the full sequence.</li>
+<li><code>register_services_with_di(container)</code> — runs <code>register_additional_services</code>
+  and registers the template example generator.</li>
+</ul>
+<p>Every satellite accessor import inside a concrete plugin (for example
+<code>AWSPlugin</code>) is a local, deferred import wrapped in <code>try</code>/<code>except ImportError</code>
+where the accessor is optional, so a provider module can be imported — and the
+entry point loaded — even when that provider's SDK extra is not installed.
+Only calling the strategy at runtime requires the actual dependency.</p>
+<h2 id="providerstrategy-the-operation-contract"><code>ProviderStrategy</code>: the operation contract<a class="headerlink" href="#providerstrategy-the-operation-contract" title="Permanent link">&para;</a></h2>
+<p><code>src/orb/providers/base/strategy/provider_strategy.py</code> defines
+<code>ProviderStrategy</code>, the abstract class each provider's strategy implements
+(for example <code>AWSProviderStrategy</code>, <code>AzureProviderStrategy</code>,
+<code>GCPProviderStrategy</code>, <code>K8sProviderStrategy</code>). It is constructed with the
+provider's typed config and exposes:</p>
+<ul>
+<li><code>provider_type</code> (property) — the provider type identifier (<code>"aws"</code>,
+  <code>"azure"</code>, <code>"gcp"</code>, <code>"k8s"</code>).</li>
+<li><code>initialize() -&gt; bool</code> — cheap, synchronous setup; validate config, no I/O
+  or background tasks.</li>
+<li><code>execute_operation(operation: ProviderOperation) -&gt; ProviderResult</code> — the
+  core strategy-pattern entry point. All provider work (provisioning,
+  terminating, status, validation, health) flows through this single method.</li>
+<li><code>execute_operation_async(...)</code> — defaults to running the sync method in a
+  thread pool; providers may override for a native async implementation.</li>
+<li><code>start_daemon_services()</code> — no-op by default; providers that run background
+  tasks (watch streams, reconcilers, garbage collectors) override it. Only
+  called in long-lived daemon contexts (the REST API server), never from the
+  CLI.</li>
+<li><code>get_capabilities() -&gt; ProviderCapabilities</code> and
+  <code>check_health() -&gt; ProviderHealthStatus</code>.</li>
+<li><code>generate_provider_name(config)</code>, <code>parse_provider_name(name)</code>, and
+  <code>get_provider_name_pattern()</code> — provider-specific naming convention for
+  instance names.</li>
+<li><code>cleanup()</code> — resource teardown; the class also implements the context
+  manager protocol (<code>__enter__</code>/<code>__exit__</code>) calling <code>initialize</code>/<code>cleanup</code>.</li>
+</ul>
+<p><code>ProviderOperation</code> carries an <code>operation_type</code> (one of the
+<code>ProviderOperationType</code> enum values — <code>CREATE_INSTANCES</code>,
+<code>TERMINATE_INSTANCES</code>, <code>GET_INSTANCE_STATUS</code>,
+<code>DESCRIBE_RESOURCE_INSTANCES</code>, <code>VALIDATE_TEMPLATE</code>,
+<code>GET_AVAILABLE_TEMPLATES</code>, <code>HEALTH_CHECK</code>, <code>RESOLVE_IMAGE</code>, <code>START_INSTANCES</code>,
+<code>STOP_INSTANCES</code>, <code>CLEANUP_MACHINE_RESOURCES</code>, <code>GET_MACHINE_HEALTH</code>,
+<code>TAG_INSTANCES</code>), a <code>parameters</code> dict, and an optional <code>context</code> dict.
+<code>ProviderResult</code> is a Pydantic model with <code>success</code>, <code>data</code>, <code>error_message</code>,
+<code>error_code</code>, <code>metadata</code>, and <code>routing_info</code>; <code>error_message</code> is required
+whenever <code>success</code> is <code>False</code>.</p>
+<p>Additional classmethods let a strategy opt into CLI-driven onboarding and
+operator tooling without the core needing provider-specific code:
+<code>get_available_credential_sources()</code>, <code>test_credentials()</code>,
+<code>get_credential_requirements()</code>, <code>get_operational_requirements()</code>,
+<code>get_ui_column_schema()</code>, <code>get_cli_extra_config_keys()</code>,
+<code>get_cli_provider_config()</code>, <code>get_resource_id_pattern()</code>, and
+<code>get_cli_infrastructure_defaults()</code>. <code>resolve_api_alias()</code> lets a strategy map
+legacy or alternate API names to its canonical registry key.</p>
+<h2 id="provider-registry-and-named-instances">Provider registry and named instances<a class="headerlink" href="#provider-registry-and-named-instances" title="Permanent link">&para;</a></h2>
+<p><code>ProviderRegistry</code> (<code>src/orb/providers/registry/provider_registry.py</code>) is a
+thread-safe singleton, obtained via <code>get_provider_registry()</code>, that holds
+registered strategy/config factories in <code>MULTI_CHOICE</code> mode — multiple
+provider strategies can be registered and used simultaneously.</p>
+<ul>
+<li><code>register_provider(provider_type, strategy_factory, config_factory, ...)</code>
+  registers a provider <em>type</em> (one factory pair per type).</li>
+<li><code>register_provider_instance(provider_type, instance_name, strategy_factory,
+  config_factory, ...)</code> registers a named <em>instance</em> of a type (for example
+  two differently configured AWS instances), each with its own factories.</li>
+<li><code>get_or_create_strategy(provider_identifier, config)</code> looks up a cached
+  strategy by type or instance name, creating and caching it on first use.</li>
+<li><code>register_fallback_strategy(strategy)</code> / <code>get_fallback_strategy()</code> register
+  a <code>FallbackProviderStrategy</code> used when no provider configuration matches —
+  constructed via <code>register_fallback_provider()</code> in
+  <code>src/orb/providers/registration.py</code>.</li>
+</ul>
+<h2 id="provider-selection-and-load-balancing">Provider selection and load balancing<a class="headerlink" href="#provider-selection-and-load-balancing" title="Permanent link">&para;</a></h2>
+<p>Request-to-provider routing is implemented by <code>ProviderSelectionService</code>
+(<code>src/orb/infrastructure/services/provider_selection_service.py</code>), injected
+into <code>ProviderRegistry</code>. It depends only on <code>ProviderRegistryPort</code> and
+<code>ConfigurationPort</code>, so it has no dependency on any specific provider — the
+same selection logic applies whether the configured instances are AWS, Azure,
+Google Cloud, or Kubernetes.</p>
+<p><code>select_provider_for_template(template, provider_name=None, logger=None)</code>
+resolves a provider for a template request using this precedence:</p>
 <ol>
-<li><strong>Explicit Selection</strong>: Template specifies exact provider instance</li>
-<li><strong>Load Balanced Selection</strong>: Distribute across provider instances by type</li>
-<li><strong>Capability-Based Selection</strong>: Select based on API requirements</li>
-<li><strong>Default Selection</strong>: Use configuration defaults</li>
+<li>CLI override (<code>--provider-name</code>), if supplied.</li>
+<li>The template's explicit <code>provider_name</code> (a named instance).</li>
+<li>The template's <code>provider_type</code>, load-balanced across enabled instances of
+   that type.</li>
+<li>The template's <code>provider_api</code>, matched against instances whose effective
+   handlers or declared <code>capabilities</code> support that API.</li>
+<li>The configuration default (<code>default_provider_instance</code> /
+   <code>default_provider_type</code>, or the first enabled instance), falling back to
+   a registered fallback strategy if no provider configuration exists at all.</li>
 </ol>
-<h4 id="selection-algorithm">Selection Algorithm<a class="headerlink" href="#selection-algorithm" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">select_provider_for_template</span><span class="p">(</span><span class="n">template</span><span class="p">:</span> <span class="n">Template</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProviderSelectionResult</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="k">if</span> <span class="n">template</span><span class="o">.</span><span class="n">provider_name</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>        <span class="k">return</span> <span class="n">explicit_selection</span><span class="p">(</span><span class="n">template</span><span class="o">.</span><span class="n">provider_name</span><span class="p">)</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">elif</span> <span class="n">template</span><span class="o">.</span><span class="n">provider_type</span><span class="p">:</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="k">return</span> <span class="n">load_balanced_selection</span><span class="p">(</span><span class="n">template</span><span class="o">.</span><span class="n">provider_type</span><span class="p">)</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">elif</span> <span class="n">template</span><span class="o">.</span><span class="n">provider_api</span><span class="p">:</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="k">return</span> <span class="n">capability_based_selection</span><span class="p">(</span><span class="n">template</span><span class="o">.</span><span class="n">provider_api</span><span class="p">)</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="k">return</span> <span class="n">default_selection</span><span class="p">()</span>
+<p><code>select_active_provider(logger=None, provider_name=None, provider_type=None)</code>
+performs the equivalent resolution for operator-facing (CLI/REST) calls that
+are not tied to a specific template.</p>
+<h3 id="configuration-schema">Configuration schema<a class="headerlink" href="#configuration-schema" title="Permanent link">&para;</a></h3>
+<p>Provider instances and selection policy are defined by <code>ProviderConfig</code> and
+<code>ProviderInstanceConfig</code> in
+<code>src/orb/config/schemas/provider_strategy_schema.py</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">providers</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">selection_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WEIGHTED_ROUND_ROBIN</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">default_provider_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aws</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">default_provider_instance</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aws-us-east-1</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">providers</span><span class="p">:</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aws-us-east-1</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aws</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">      </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">      </span><span class="nt">priority</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">      </span><span class="nt">capabilities</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">EC2Fleet</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">SpotFleet</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">RunInstances</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aws-us-west-2</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aws</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">      </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">      </span><span class="nt">priority</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">      </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">      </span><span class="nt">capabilities</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">EC2Fleet</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">RunInstances</span><span class="p p-Indicator">]</span>
 </code></pre></div>
-<h3 id="3-provider-capability-service">3. Provider Capability Service<a class="headerlink" href="#3-provider-capability-service" title="Permanent link">&para;</a></h3>
-<p>The <code>ProviderCapabilityService</code> validates template requirements against provider capabilities:</p>
-<h4 id="validation-levels">Validation Levels<a class="headerlink" href="#validation-levels" title="Permanent link">&para;</a></h4>
+<p><code>selection_policy</code> is validated against a fixed set of named policies
+(<code>FIRST_AVAILABLE</code>, <code>ROUND_ROBIN</code>, <code>WEIGHTED_ROUND_ROBIN</code>,
+<code>LEAST_CONNECTIONS</code>, <code>FASTEST_RESPONSE</code>, <code>HIGHEST_SUCCESS_RATE</code>,
+<code>CAPABILITY_BASED</code>, <code>HEALTH_BASED</code>, <code>RANDOM</code>, <code>PERFORMANCE_BASED</code>). The
+load-balancing step actually implemented today
+(<code>_apply_load_balancing_strategy</code>) selects by priority first (lower
+<code>priority</code> wins) and only consults <code>weight</code> as a tie-breaker among instances
+sharing the highest priority when the policy is <code>WEIGHTED_ROUND_ROBIN</code>;
+<code>HEALTH_BASED</code> currently also resolves to the lowest-priority instance; any
+other configured policy falls back to the same priority-ordered selection.
+<code>get_active_providers()</code> treats <code>WEIGHTED_ROUND_ROBIN</code>, <code>ROUND_ROBIN</code>,
+<code>LEAST_CONNECTIONS</code>, <code>PERFORMANCE_BASED</code>, <code>FASTEST_RESPONSE</code>,
+<code>HIGHEST_SUCCESS_RATE</code>, <code>CAPABILITY_BASED</code>, and <code>HEALTH_BASED</code> as
+multi-provider policies that return every enabled instance; otherwise it
+returns the single <code>active_provider</code> instance, or the sole configured
+instance.</p>
+<p>Each <code>ProviderInstanceConfig</code> carries <code>name</code>, <code>type</code>, <code>enabled</code>, <code>priority</code>,
+<code>weight</code> (must be positive), <code>capabilities</code>, <code>handlers</code> /
+<code>handler_overrides</code> (merged with the provider type's defaults via
+<code>get_effective_handlers</code>), <code>template_defaults</code>, <code>extensions</code>, and
+<code>health_check</code>. None of these fields are AWS-specific — the same schema backs
+Azure, Google Cloud, and Kubernetes instances; the example above uses two AWS instances
+because multi-instance load balancing is most commonly exercised with
+multiple regions of one provider type, but an installation can equally define
+multiple named instances of <code>azure</code>, <code>gcp</code>, or <code>k8s</code>, or mix provider types
+under one <code>selection_policy</code>.</p>
+<h2 id="template-extensions-defaults-and-field-mapping">Template extensions, defaults, and field mapping<a class="headerlink" href="#template-extensions-defaults-and-field-mapping" title="Permanent link">&para;</a></h2>
+<p>Three registries let each provider contribute provider-specific behaviour to
+shared template and scheduler code without that code knowing about any
+specific provider:</p>
 <ul>
-<li><strong>STRICT</strong>: All warnings become errors</li>
-<li><strong>LENIENT</strong>: Warnings allowed, only critical errors fail</li>
-<li><strong>BASIC</strong>: Only critical validation, minimal checks</li>
+<li><strong><code>TemplateExtensionRegistry</code></strong>
+  (<code>src/orb/infrastructure/registry/template_extension_registry.py</code>) maps a
+  provider type to a Pydantic model class (the plugin's
+  <code>template_dto_config()</code>) so <code>TemplateDTO</code> can deserialize provider-specific
+  template fields. AWS and Kubernetes expose this as a
+  <code>&lt;name&gt;_template_dto_config.py</code> module under <code>domain/template/</code>; Azure and
+  Google Cloud expose an equivalent <code>TemplateExtensionConfig</code> class under
+  <code>configuration/template_extension.py</code>.</li>
+<li><strong><code>DefaultsLoaderRegistry</code></strong>
+  (<code>src/orb/providers/registry/defaults_loader_registry.py</code>) maps a provider
+  type to a <code>ProviderDefaultsLoaderPort</code> implementation (the plugin's
+  <code>defaults_loader()</code>, typically <code>&lt;Name&gt;DefaultsLoader</code> in
+  <code>defaults_loader.py</code>). Each loader's <code>load_defaults()</code> returns a raw config
+  dict in the same shape as <code>default_config.json</code>, which
+  <code>ConfigurationLoader</code> merges in during startup.</li>
+<li><strong><code>FieldMappingRegistry</code></strong>
+  (<code>src/orb/infrastructure/scheduler/hostfactory/field_mapping_registry.py</code>)
+  maps a provider type to a <code>FieldMappingPort</code> implementation (the plugin's
+  <code>field_mapping()</code>, in <code>scheduler/hostfactory_field_mapping.py</code>). Each
+  provider contributes its own camelCase-HostFactory-field to
+  internal-snake_case-field mappings — for example AWS maps <code>subnetId</code> to
+  <code>subnet_ids</code> and <code>fleetRole</code> to <code>fleet_role</code> — on top of the generic
+  mappings shared by all providers.</li>
 </ul>
-<h4 id="capability-validation">Capability Validation<a class="headerlink" href="#capability-validation" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">validate_template_requirements</span><span class="p">(</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">template</span><span class="p">:</span> <span class="n">Template</span><span class="p">,</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">provider_instance</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">level</span><span class="p">:</span> <span class="n">ValidationLevel</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ValidationResult</span><span class="p">:</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="c1"># Validate API support</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="c1"># Check instance limits</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="c1"># Verify pricing model support</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="c1"># Validate fleet type compatibility</span>
+<h2 id="cli-integration">CLI integration<a class="headerlink" href="#cli-integration" title="Permanent link">&para;</a></h2>
+<p><code>ProviderCLISpecPort</code> (<code>src/orb/providers/base/provider_cli_spec_port.py</code>) is
+the protocol each provider's <code>cli_spec()</code> instance implements:
+<code>add_arguments(parser)</code>, <code>extract_config(args)</code>,
+<code>extract_partial_config(args)</code>, <code>validate_add(args)</code>, <code>generate_name(args)</code>,
+and <code>format_display(config)</code>. Instances are registered under the provider
+name in <code>CLISpecRegistry</code> and used by the <code>orb providers</code> command group:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>orb<span class="w"> </span>providers<span class="w"> </span>list
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>orb<span class="w"> </span>providers<span class="w"> </span>show<span class="w"> </span>&lt;name&gt;
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>orb<span class="w"> </span>providers<span class="w"> </span>add
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>orb<span class="w"> </span>providers<span class="w"> </span>update<span class="w"> </span>&lt;name&gt;
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>orb<span class="w"> </span>providers<span class="w"> </span>remove<span class="w"> </span>&lt;name&gt;
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>orb<span class="w"> </span>providers<span class="w"> </span>set-default<span class="w"> </span>&lt;name&gt;
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>orb<span class="w"> </span>providers<span class="w"> </span>get-default
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>orb<span class="w"> </span>providers<span class="w"> </span>health
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>orb<span class="w"> </span>providers<span class="w"> </span>metrics
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>orb<span class="w"> </span>providers<span class="w"> </span><span class="k">select</span>
 </code></pre></div>
-<h3 id="4-template-repository-architecture">4. Template Repository Architecture<a class="headerlink" href="#4-template-repository-architecture" title="Permanent link">&para;</a></h3>
-<p>The template system implements a repository pattern that provides compliance with Clean Architecture principles:</p>
-<h4 id="template-repository-implementation">Template Repository Implementation<a class="headerlink" href="#template-repository-implementation" title="Permanent link">&para;</a></h4>
-<p>The <code>TemplateRepositoryImpl</code> class provides a complete implementation of both <code>AggregateRepository</code> and <code>TemplateRepository</code> interfaces:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">TemplateRepositoryImpl</span><span class="p">(</span><span class="n">TemplateRepository</span><span class="p">):</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Template repository implementation for configuration-based template management.&quot;&quot;&quot;</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="c1"># Abstract methods from AggregateRepository</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">aggregate</span><span class="p">:</span> <span class="n">Template</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Save a template aggregate.&quot;&quot;&quot;</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">find_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">aggregate_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Template</span><span class="p">]:</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Find template by aggregate ID.&quot;&quot;&quot;</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">aggregate_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Delete template by aggregate ID.&quot;&quot;&quot;</span>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    <span class="c1"># Abstract methods from TemplateRepository</span>
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">find_by_template_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">template_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Template</span><span class="p">]:</span>
-<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Find template by template ID (delegates to find_by_id).&quot;&quot;&quot;</span>
-<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
-<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">find_by_provider_api</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">provider_api</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Template</span><span class="p">]:</span>
-<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Find templates by provider API type.&quot;&quot;&quot;</span>
-<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
-<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">find_active_templates</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Template</span><span class="p">]:</span>
-<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Find all active templates.&quot;&quot;&quot;</span>
-<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>
-<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">search_templates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">criteria</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Template</span><span class="p">]:</span>
-<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Search templates by criteria.&quot;&quot;&quot;</span>
+<h2 id="optional-extras-and-import-guards">Optional extras and import guards<a class="headerlink" href="#optional-extras-and-import-guards" title="Permanent link">&para;</a></h2>
+<p>AWS's SDK dependencies (<code>boto3</code>, <code>botocore</code>) currently ship in ORB's core
+dependency set for backward compatibility, with an explicit <code>orb-py[aws]</code>
+extra as a forward-compatible alias. Azure, Google Cloud, and Kubernetes are
+genuinely optional and declared as separate extras in <code>pyproject.toml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;boto3&gt;=1.42.21&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;botocore&gt;=1.42.21&quot;</span><span class="p">]</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">k8s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;kubernetes&quot;</span><span class="p">]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">azure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="s2">&quot;azure-core&gt;=1.38.2&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="s2">&quot;azure-identity&gt;=1.25.2&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="s2">&quot;azure-mgmt-compute&gt;=37.2.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="s2">&quot;azure-mgmt-network&gt;=30.2.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="s2">&quot;azure-mgmt-resource&gt;=25.0.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="s2">&quot;azure-mgmt-resource-subscriptions==1.0.0b1&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="s2">&quot;httpx&gt;=0.27.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="p">]</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="n">gcp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;google-cloud-compute&gt;=1.14.0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;google-auth&gt;=2.23.0&quot;</span><span class="p">]</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="n">all-providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;orb-py[aws]&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;orb-py[azure]&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;orb-py[k8s]&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;orb-py[gcp]&quot;</span><span class="p">]</span>
 </code></pre></div>
-<h4 id="key-architecture-improvements">Key Architecture Improvements<a class="headerlink" href="#key-architecture-improvements" title="Permanent link">&para;</a></h4>
-<ol>
-<li><strong>Full Interface Compliance</strong>: Implements all required abstract methods from both base interfaces</li>
-<li><strong>Method Delegation</strong>: Avoids code duplication by delegating <code>find_by_template_id</code> to <code>find_by_id</code></li>
-<li><strong>Clean Dependency Injection</strong>: Uses factory pattern registration instead of decorator-based DI</li>
-<li><strong>Comprehensive Functionality</strong>: Provides both required methods and convenience methods</li>
-</ol>
-<h4 id="template-loading-architecture">Template Loading Architecture<a class="headerlink" href="#template-loading-architecture" title="Permanent link">&para;</a></h4>
-<p>The template system implements hierarchical template loading through the scheduler strategy:</p>
-<h5 id="file-priority-order-highest-to-lowest">File Priority Order (Highest to Lowest)<a class="headerlink" href="#file-priority-order-highest-to-lowest" title="Permanent link">&para;</a></h5>
-<ol>
-<li>Provider instance files: <code>{provider-instance}_templates.json</code></li>
-<li>Provider type files: <code>{provider-type}prov_templates.json</code></li>
-<li>Main templates file: <code>templates.json</code></li>
-<li>Legacy templates file: <code>awsprov_templates.json</code></li>
-</ol>
-<h5 id="template-override-behavior">Template Override Behavior<a class="headerlink" href="#template-override-behavior" title="Permanent link">&para;</a></h5>
-<p>Templates with the same <code>template_id</code> in higher priority files override those in lower priority files.</p>
-<h2 id="configuration-schema">Configuration Schema<a class="headerlink" href="#configuration-schema" title="Permanent link">&para;</a></h2>
-<h3 id="provider-configuration">Provider Configuration<a class="headerlink" href="#provider-configuration" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">providers</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">selection_policy</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;WEIGHTED_ROUND_ROBIN&quot;</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">default_provider_type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;aws&quot;</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">default_provider_instance</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;aws-us-east-1&quot;</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">providers</span><span class="p">:</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;aws-us-east-1&quot;</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;aws&quot;</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">      </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">      </span><span class="nt">priority</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">      </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">      </span><span class="nt">capabilities</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;EC2Fleet&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;SpotFleet&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;RunInstances&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;ASG&quot;</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;aws-us-west-2&quot;</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;aws&quot;</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">      </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">      </span><span class="nt">priority</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">      </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">      </span><span class="nt">capabilities</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;EC2Fleet&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;RunInstances&quot;</span><span class="p p-Indicator">]</span>
-</code></pre></div>
-<h3 id="template-examples">Template Examples<a class="headerlink" href="#template-examples" title="Permanent link">&para;</a></h3>
-<h4 id="explicit-provider-selection">Explicit Provider Selection<a class="headerlink" href="#explicit-provider-selection" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">&quot;template_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;explicit-aws-east&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">&quot;provider_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;aws-us-east-1&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">&quot;provider_api&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;EC2Fleet&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">&quot;image_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ami-12345&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">&quot;subnet_ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;subnet-123&quot;</span><span class="p">],</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nt">&quot;max_instances&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p">}</span>
-</code></pre></div>
-<h4 id="provider-type-selection-load-balanced">Provider Type Selection (Load Balanced)<a class="headerlink" href="#provider-type-selection-load-balanced" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">&quot;template_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;load-balanced-aws&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">&quot;provider_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;aws&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">&quot;provider_api&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SpotFleet&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">&quot;image_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ami-67890&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">&quot;subnet_ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;subnet-456&quot;</span><span class="p">],</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">&quot;max_instances&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="p">}</span>
-</code></pre></div>
-<h4 id="api-based-selection">API-Based Selection<a class="headerlink" href="#api-based-selection" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">&quot;template_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;api-based-selection&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">&quot;provider_api&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;RunInstances&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">&quot;image_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ami-abcdef&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">&quot;subnet_ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;subnet-789&quot;</span><span class="p">],</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">&quot;max_instances&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">}</span>
-</code></pre></div>
-<h2 id="provider-selection-algorithms">Provider Selection Algorithms<a class="headerlink" href="#provider-selection-algorithms" title="Permanent link">&para;</a></h2>
-<h3 id="weighted-round-robin">Weighted Round Robin<a class="headerlink" href="#weighted-round-robin" title="Permanent link">&para;</a></h3>
-<p>Distributes requests across provider instances based on configured weights:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">weighted_round_robin_selection</span><span class="p">(</span><span class="n">providers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ProviderInstance</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">total_weight</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">weight</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">providers</span><span class="p">)</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">random_value</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">total_weight</span><span class="p">)</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">current_weight</span> <span class="o">=</span> <span class="mi">0</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="k">for</span> <span class="n">provider</span> <span class="ow">in</span> <span class="n">providers</span><span class="p">:</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="n">current_weight</span> <span class="o">+=</span> <span class="n">provider</span><span class="o">.</span><span class="n">weight</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>        <span class="k">if</span> <span class="n">random_value</span> <span class="o">&lt;=</span> <span class="n">current_weight</span><span class="p">:</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>            <span class="k">return</span> <span class="n">provider</span><span class="o">.</span><span class="n">name</span>
-</code></pre></div>
-<h3 id="priority-based-selection">Priority-Based Selection<a class="headerlink" href="#priority-based-selection" title="Permanent link">&para;</a></h3>
-<p>Selects highest priority available provider:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">priority_based_selection</span><span class="p">(</span><span class="n">providers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ProviderInstance</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">enabled_providers</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">providers</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">enabled</span><span class="p">]</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">enabled_providers</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">priority</span><span class="p">)</span><span class="o">.</span><span class="n">name</span>
-</code></pre></div>
-<h2 id="template-file-organization">Template File Organization<a class="headerlink" href="#template-file-organization" title="Permanent link">&para;</a></h2>
-<h3 id="directory-structure">Directory Structure<a class="headerlink" href="#directory-structure" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>config/
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>- templates.json                    # Main templates
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>- awsprov_templates.json           # AWS provider type templates
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>- provider1prov_templates.json         # Provider1 provider type templates
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>- aws-us-east-1_templates.json    # AWS US East instance templates
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>- aws-us-west-2_templates.json    # AWS US West instance templates
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>- provider1-region-a_templates.json    # Provider1 Region A instance templates
-</code></pre></div>
-<h3 id="template-inheritance">Template Inheritance<a class="headerlink" href="#template-inheritance" title="Permanent link">&para;</a></h3>
-<p>Templates inherit and override properties based on file priority:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1">// templates.json (base)</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="p">{</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">&quot;template_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;web-server&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">&quot;image_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ami-base&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="nt">&quot;instance_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;t2.micro&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span><span class="nt">&quot;max_instances&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span>
-<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="p">}</span>
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>
-<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="c1">// awsprov_templates.json (provider override)</span>
-<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="p">{</span>
-<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="w">  </span><span class="nt">&quot;template_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;web-server&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="w">  </span><span class="nt">&quot;provider_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;aws&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="w">  </span><span class="nt">&quot;provider_api&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;EC2Fleet&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="w">  </span><span class="nt">&quot;instance_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;t3.small&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="w">  </span><span class="nt">&quot;max_instances&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span>
-<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="p">}</span>
-<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>
-<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a><span class="c1">// aws-us-east-1_templates.json (instance override)</span>
-<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a><span class="p">{</span>
-<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a><span class="w">  </span><span class="nt">&quot;template_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;web-server&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a><span class="w">  </span><span class="nt">&quot;provider_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;aws-us-east-1&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a><span class="w">  </span><span class="nt">&quot;image_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ami-east-optimized&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-23" name="__codelineno-12-23" href="#__codelineno-12-23"></a><span class="w">  </span><span class="nt">&quot;max_instances&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span>
-<a id="__codelineno-12-24" name="__codelineno-12-24" href="#__codelineno-12-24"></a><span class="p">}</span>
-</code></pre></div>
-<p>Final resolved template:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">&quot;template_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;web-server&quot;</span><span class="p">,</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">&quot;provider_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;aws-us-east-1&quot;</span><span class="p">,</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nt">&quot;provider_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;aws&quot;</span><span class="p">,</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">  </span><span class="nt">&quot;provider_api&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;EC2Fleet&quot;</span><span class="p">,</span>
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">  </span><span class="nt">&quot;image_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ami-east-optimized&quot;</span><span class="p">,</span>
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">  </span><span class="nt">&quot;instance_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;t3.small&quot;</span><span class="p">,</span>
-<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">  </span><span class="nt">&quot;max_instances&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span>
-<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="p">}</span>
-</code></pre></div></p>
-<h2 id="api-integration">API Integration<a class="headerlink" href="#api-integration" title="Permanent link">&para;</a></h2>
-<h3 id="rest-api-endpoints">REST API Endpoints<a class="headerlink" href="#rest-api-endpoints" title="Permanent link">&para;</a></h3>
-<h4 id="provider-information">Provider Information<a class="headerlink" href="#provider-information" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="err">GET /api/v1/providers</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="err">GET /api/v1/providers/{provider-instance}/capabilities</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="err">GET /api/v1/providers/{provider-instance}/templates</span>
-</code></pre></div>
-<h4 id="template-management">Template Management<a class="headerlink" href="#template-management" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="err">GET /api/v1/templates?provider_type=aws</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="err">GET /api/v1/templates?provider_name=aws-us-east-1</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="err">POST /api/v1/templates/validate</span>
-</code></pre></div>
-<h4 id="request-processing">Request Processing<a class="headerlink" href="#request-processing" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="err">POST /api/v1/requests</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="err">{</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="err">  &quot;templateId&quot;: &quot;web-server&quot;,</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="err">  &quot;maxNumber&quot;: 5,</span>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="err">  &quot;providerPreference&quot;: {</span>
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="err">    &quot;type&quot;: &quot;aws&quot;,</span>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="err">    &quot;instance&quot;: &quot;aws-us-east-1&quot;</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="err">  }</span>
-<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="err">}</span>
-</code></pre></div>
-<h3 id="cli-commands">CLI Commands<a class="headerlink" href="#cli-commands" title="Permanent link">&para;</a></h3>
-<h4 id="provider-management">Provider Management<a class="headerlink" href="#provider-management" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># List available providers</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>orb<span class="w"> </span>providers<span class="w"> </span>list
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Show provider capabilities</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>orb<span class="w"> </span>providers<span class="w"> </span>show<span class="w"> </span>aws-us-east-1
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Validate provider configuration</span>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>orb<span class="w"> </span>providers<span class="w"> </span>validate
-</code></pre></div>
-<h4 id="template-operations">Template Operations<a class="headerlink" href="#template-operations" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># List templates by provider</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--provider-type<span class="w"> </span>aws
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--provider-name<span class="w"> </span>aws-us-east-1
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="c1"># Show template source information</span>
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>orb<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>web-server<span class="w"> </span>--source-info
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="c1"># Validate template against provider</span>
-<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>orb<span class="w"> </span>templates<span class="w"> </span>validate<span class="w"> </span>web-server<span class="w"> </span>--provider-name<span class="w"> </span>aws-us-east-1
-</code></pre></div>
-<h2 id="error-handling-and-validation">Error Handling and Validation<a class="headerlink" href="#error-handling-and-validation" title="Permanent link">&para;</a></h2>
-<h3 id="provider-selection-errors">Provider Selection Errors<a class="headerlink" href="#provider-selection-errors" title="Permanent link">&para;</a></h3>
+<p>Each <code>provider_plugin.py</code> module imports only <code>ProviderPlugin</code> at module
+level; every satellite accessor defers its real import (the provider's
+strategy class, config class, CLI spec, and so on) to inside the method body,
+and several wrap that import in <code>try</code>/<code>except ImportError</code> to return <code>None</code>
+when the optional dependency is absent. This means the entry point for a
+provider whose extra is not installed can still be discovered and partially
+registered — the registry knows the provider type exists — while any attempt
+to actually construct and use its strategy fails only once the missing
+dependency is exercised, with a clear <code>ImportError</code>.</p>
+<h2 id="related-documentation">Related documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>No enabled providers</strong>: When no providers are available</li>
-<li><strong>Provider not found</strong>: When explicit provider doesn't exist</li>
-<li><strong>Provider disabled</strong>: When selected provider is disabled</li>
-<li><strong>No compatible providers</strong>: When no providers support required API</li>
-</ul>
-<h3 id="template-validation-errors">Template Validation Errors<a class="headerlink" href="#template-validation-errors" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>API not supported</strong>: Provider doesn't support required API</li>
-<li><strong>Instance limit exceeded</strong>: Request exceeds provider limits</li>
-<li><strong>Pricing model mismatch</strong>: Provider doesn't support pricing model</li>
-<li><strong>Fleet type incompatible</strong>: Provider doesn't support fleet type</li>
-</ul>
-<h3 id="error-response-format">Error Response Format<a class="headerlink" href="#error-response-format" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">{</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="nt">&quot;code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PROVIDER_NOT_FOUND&quot;</span><span class="p">,</span>
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">    </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Provider instance &#39;aws-invalid&#39; not found in configuration&quot;</span><span class="p">,</span>
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">    </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">      </span><span class="nt">&quot;requested_provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;aws-invalid&quot;</span><span class="p">,</span>
-<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">      </span><span class="nt">&quot;available_providers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;aws-us-east-1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;aws-us-west-2&quot;</span><span class="p">]</span>
-<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="p">}</span>
-</code></pre></div>
-<h2 id="performance-considerations">Performance Considerations<a class="headerlink" href="#performance-considerations" title="Permanent link">&para;</a></h2>
-<h3 id="template-caching">Template Caching<a class="headerlink" href="#template-caching" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Templates are cached in memory with file modification time tracking</li>
-<li>Cache is automatically refreshed when template files change</li>
-<li>Manual cache refresh available via API and CLI</li>
-</ul>
-<h3 id="provider-selection-optimization">Provider Selection Optimization<a class="headerlink" href="#provider-selection-optimization" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Provider configurations are cached at startup</li>
-<li>Selection algorithms use pre-computed weights and priorities</li>
-<li>Capability validation results are cached per provider-API combination</li>
-</ul>
-<h3 id="file-io-optimization">File I/O Optimization<a class="headerlink" href="#file-io-optimization" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Template files are loaded once and cached</li>
-<li>Only modified files are reloaded</li>
-<li>Batch operations minimize file system calls</li>
-</ul>
-<h2 id="monitoring-and-observability">Monitoring and Observability<a class="headerlink" href="#monitoring-and-observability" title="Permanent link">&para;</a></h2>
-<h3 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Provider selection distribution</li>
-<li>Template validation success/failure rates</li>
-<li>File loading performance</li>
-<li>Cache hit/miss ratios</li>
-</ul>
-<h3 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Provider selection decisions with reasoning</li>
-<li>Template override chains</li>
-<li>Validation failures with details</li>
-<li>Performance timing information</li>
-</ul>
-<h3 id="health-checks">Health Checks<a class="headerlink" href="#health-checks" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Provider availability status</li>
-<li>Template file accessibility</li>
-<li>Configuration validation status</li>
-<li>Cache consistency checks</li>
-</ul>
-<h2 id="migration-guide">Migration Guide<a class="headerlink" href="#migration-guide" title="Permanent link">&para;</a></h2>
-<h3 id="from-single-provider">From Single Provider<a class="headerlink" href="#from-single-provider" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Update configuration to include provider instances</li>
-<li>Migrate templates to provider-specific files (optional)</li>
-<li>Update API calls to include provider preferences (optional)</li>
-<li>Test provider selection behavior</li>
-</ol>
-<h3 id="template-migration">Template Migration<a class="headerlink" href="#template-migration" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># Migrate existing templates to provider-specific files</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>migrate<span class="w"> </span>--from<span class="w"> </span>templates.json<span class="w"> </span>--to-provider<span class="w"> </span>aws-us-east-1
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="c1"># Validate migrated templates</span>
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>orb<span class="w"> </span>templates<span class="w"> </span>validate<span class="w"> </span>--all<span class="w"> </span>--provider-name<span class="w"> </span>aws-us-east-1
-</code></pre></div>
-<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
-<h3 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Use meaningful provider instance names</li>
-<li>Set appropriate weights for load balancing</li>
-<li>Enable only necessary providers</li>
-<li>Regular validation of provider configurations</li>
-</ul>
-<h3 id="template-organization">Template Organization<a class="headerlink" href="#template-organization" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Use provider-specific files for customizations</li>
-<li>Keep common templates in main file</li>
-<li>Document template inheritance chains</li>
-<li>Regular cleanup of unused templates</li>
-</ul>
-<h3 id="monitoring">Monitoring<a class="headerlink" href="#monitoring" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Monitor provider selection distribution</li>
-<li>Track validation failure patterns</li>
-<li>Alert on provider availability issues</li>
-<li>Regular performance reviews</li>
-</ul>
-<h2 id="future-enhancements">Future Enhancements<a class="headerlink" href="#future-enhancements" title="Permanent link">&para;</a></h2>
-<h3 id="planned-features">Planned Features<a class="headerlink" href="#planned-features" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Dynamic provider discovery</li>
-<li>Cross-provider failover</li>
-<li>Improved scheduling algorithms</li>
-<li>Provider cost optimization</li>
-<li>Multi-region template synchronization</li>
-</ul>
-<h3 id="extension-points">Extension Points<a class="headerlink" href="#extension-points" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Custom selection strategies</li>
-<li>Provider-specific validation rules</li>
-<li>Template transformation pipelines</li>
-<li>External provider registries</li>
+<li><a href="../../developer_guide/providers/">Developer Guide: Provider System</a></li>
+<li><a href="../../developer_guide/adding_a_provider/">Adding a Provider</a></li>
+<li><a href="../../patterns/strategy_pattern/">Strategy Pattern</a></li>
+<li><a href="../../patterns/ports_and_adapters/">Ports and Adapters</a></li>
+<li><a href="../field_mapping_architecture/">Field Mapping Architecture</a></li>
 </ul>
 
 
