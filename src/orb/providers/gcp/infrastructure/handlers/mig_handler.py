@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
@@ -10,9 +11,10 @@ from typing import Protocol
 
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
-from orb.providers.gcp.domain.template.value_objects import GCPMIGScope
+from orb.providers.gcp.domain.template.value_objects import GCPMIGScope, validate_rfc1035_label
 from orb.providers.gcp.exceptions import (
     GCPEntityNotFoundError,
+    GCPError,
     GCPNetworkError,
     GCPValidationError,
     translate_gcp_exception,
@@ -148,10 +150,12 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                         **self._location_context(placement),
                     },
                 ) from exc
-        except (Exception, asyncio.CancelledError):
-            await self._run_rollback(
+        except (Exception, asyncio.CancelledError) as create_exc:
+            rollback_error = await self._run_rollback(
                 template_name, mig_name, placement, template_insert, mig_insert
             )
+            if rollback_error is not None:
+                raise rollback_error from create_exc
             raise
 
         provider_data: GCPProviderData = {
@@ -176,7 +180,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         placement: _MIGPlacement,
         template_insert: asyncio.Task[_GCPOperationWithName],
         mig_insert: asyncio.Task[_GCPOperationWithName] | None,
-    ) -> None:
+    ) -> GCPError | None:
         rollback = asyncio.create_task(
             self._rollback_create(template_name, mig_name, placement, template_insert, mig_insert)
         )
@@ -186,9 +190,10 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                 await asyncio.shield(rollback)
             except asyncio.CancelledError:
                 cancelled = True
-        rollback.result()
+        rollback_error = rollback.result()
         if cancelled:
             raise asyncio.CancelledError
+        return rollback_error
 
     async def _rollback_create(
         self,
@@ -197,7 +202,14 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         placement: _MIGPlacement,
         template_insert: asyncio.Task[_GCPOperationWithName],
         mig_insert: asyncio.Task[_GCPOperationWithName] | None,
-    ) -> None:
+    ) -> GCPError | None:
+        """Best-effort delete of the resources an aborted create left behind.
+
+        Returns the rollback failure (if any) rather than only logging it, so
+        the caller can surface a GCPError that carries the mig_name,
+        instance_template_name, and zone/region needed to find and manually
+        clean up a leaked billing resource.
+        """
         for insert in (template_insert, mig_insert):
             if insert is not None:
                 try:
@@ -207,40 +219,72 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                     pass
 
         if mig_insert is not None and not mig_insert.cancelled() and mig_insert.exception() is None:
-            try:
-                if placement.scope == GCPMIGScope.REGIONAL:
-                    delete_operation = await asyncio.to_thread(
-                        self._compute_client.delete_regional_mig,
-                        region=placement.location,
-                        mig_name=mig_name,
-                    )
-                else:
-                    delete_operation = await asyncio.to_thread(
-                        self._compute_client.delete_zonal_mig,
-                        zone=placement.location,
-                        mig_name=mig_name,
-                    )
-                await self._wait_for_operation(
-                    delete_operation,
-                    timeout_seconds=self._operation_wait_timeout_seconds(),
-                )
-            except Exception as cleanup_exc:
-                if isinstance(
-                    translate_gcp_exception(cleanup_exc, operation="delete_mig"),
-                    GCPEntityNotFoundError,
-                ):
-                    pass
-                else:
-                    self._logger.error(
-                        "Failed to roll back MIG %s and template %s: %s",
-                        mig_name,
-                        template_name,
-                        cleanup_exc,
-                    )
-                    return
+            mig_rollback_error = await self._rollback_mig(template_name, mig_name, placement)
+            if mig_rollback_error is not None:
+                # The MIG delete itself failed; leave the template in place
+                # rather than risk a second failure obscuring the first, and
+                # surface this one with enough detail to find and clean up
+                # both resources by hand.
+                return mig_rollback_error
 
         if template_insert.cancelled() or template_insert.exception() is not None:
-            return
+            return None
+
+        return await self._rollback_instance_template(template_name, mig_name, placement)
+
+    async def _rollback_mig(
+        self,
+        template_name: str,
+        mig_name: str,
+        placement: _MIGPlacement,
+    ) -> GCPError | None:
+        """Delete the MIG created by an aborted ``acquire_hosts`` call."""
+        try:
+            if placement.scope == GCPMIGScope.REGIONAL:
+                delete_operation = await asyncio.to_thread(
+                    self._compute_client.delete_regional_mig,
+                    region=placement.location,
+                    mig_name=mig_name,
+                )
+            else:
+                delete_operation = await asyncio.to_thread(
+                    self._compute_client.delete_zonal_mig,
+                    zone=placement.location,
+                    mig_name=mig_name,
+                )
+            await self._wait_for_operation(
+                delete_operation,
+                timeout_seconds=self._operation_wait_timeout_seconds(),
+            )
+        except Exception as cleanup_exc:
+            if isinstance(
+                translate_gcp_exception(cleanup_exc, operation="delete_mig"),
+                GCPEntityNotFoundError,
+            ):
+                return None
+            self._logger.error(
+                "Failed to roll back MIG %s and template %s: %s",
+                mig_name,
+                template_name,
+                cleanup_exc,
+            )
+            return GCPError(
+                f"Failed to roll back GCP MIG {mig_name} after create failure: {cleanup_exc}",
+                details={
+                    "mig_name": mig_name,
+                    "instance_template_name": template_name,
+                    **self._location_context(placement),
+                },
+            )
+        return None
+
+    async def _rollback_instance_template(
+        self,
+        template_name: str,
+        mig_name: str,
+        placement: _MIGPlacement,
+    ) -> GCPError | None:
+        """Delete the instance template created by an aborted ``acquire_hosts`` call."""
         try:
             delete_operation = await asyncio.to_thread(
                 self._compute_client.delete_instance_template,
@@ -256,6 +300,16 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                 template_name,
                 cleanup_exc,
             )
+            return GCPError(
+                f"Failed to roll back GCP instance template {template_name} after "
+                f"MIG create failure: {cleanup_exc}",
+                details={
+                    "mig_name": mig_name,
+                    "instance_template_name": template_name,
+                    **self._location_context(placement),
+                },
+            )
+        return None
 
     @staticmethod
     def _location_context(placement: _MIGPlacement) -> dict[str, str]:
@@ -650,11 +704,23 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         The ``instance`` field on ManagedInstance is a full URL
         (``projects/…/zones/…/instances/{name}``).  A suffix regex handles
         both short names and fully-qualified URLs as input.
+
+        Each name is validated against the GCP resource-name grammar and
+        escaped before interpolation: the filter value is itself a regex
+        evaluated server-side, so an unescaped name could change which
+        instances match (and the trailing ``$`` anchor guards against a
+        name like "vm-1" also matching "vm-10").
         """
         clauses = []
         for instance_id in instance_ids:
             name = str(instance_id).rsplit("/", 1)[-1]
-            clauses.append(f'(instance eq ".*/{name}")')
+            try:
+                validate_rfc1035_label(name, field_name="instance name")
+            except ValueError as exc:
+                raise GCPValidationError(
+                    str(exc), details={"instance_id": str(instance_id)}
+                ) from exc
+            clauses.append(f'(instance eq ".*/{re.escape(name)}$")')
         return " OR ".join(clauses)
 
     @staticmethod

@@ -154,7 +154,7 @@ def test_mig_template_payload_uses_configured_service_account_scopes(monkeypatch
     ]
 
 
-def test_gcp_template_defaults_to_compute_service_account_scope() -> None:
+def test_gcp_template_defaults_to_minimal_service_account_scopes() -> None:
     template = GCPTemplate.model_validate(
         {
             "template_id": "gcp-mig",
@@ -171,8 +171,45 @@ def test_gcp_template_defaults_to_compute_service_account_scope() -> None:
         }
     )
 
-    assert DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES == ("https://www.googleapis.com/auth/compute",)
-    assert template.service_account_scopes == ["https://www.googleapis.com/auth/compute"]
+    # The default must be the "Allow default access" scope set, not the
+    # broader https://www.googleapis.com/auth/compute scope, which grants
+    # read/write access to every Compute Engine resource in the project.
+    assert "https://www.googleapis.com/auth/compute" not in DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES
+    assert list(DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES) == template.service_account_scopes
+
+
+def test_gcp_template_applies_minimal_default_scopes_when_service_account_email_set() -> None:
+    """A template that attaches a service account without explicit scopes
+    must still get the documented minimal default, not the full compute
+    scope, since the default is only ever consumed when email is set."""
+    template = GCPTemplate.model_validate(
+        {
+            "template_id": "gcp-mig",
+            "provider_type": "gcp",
+            "provider_api": "MIG",
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "zones": ["us-central1-a", "us-central1-b"],
+            "mig_scope": "regional",
+            "instance_type": "e2-standard-4",
+            "max_instances": 2,
+            "source_image_family": "debian-12",
+            "source_image_project": "debian-cloud",
+            "service_account_email": "orb@example.iam.gserviceaccount.com",
+        }
+    )
+
+    assert template.service_account_scopes == list(DEFAULT_GCP_SERVICE_ACCOUNT_SCOPES)
+    assert "https://www.googleapis.com/auth/compute" not in template.service_account_scopes
+
+
+def test_gcp_template_preserves_explicit_scopes_when_service_account_email_set() -> None:
+    template = _template("MIG")
+
+    assert template.service_account_scopes == [
+        "https://www.googleapis.com/auth/compute.readonly",
+        "https://www.googleapis.com/auth/devstorage.read_only",
+    ]
 
 
 @pytest.mark.parametrize(

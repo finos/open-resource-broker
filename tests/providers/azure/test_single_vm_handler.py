@@ -768,3 +768,98 @@ async def test_resolve_vm_names_async_maps_vm_ids_via_resource_group_listing_aga
     )
 
     assert resolved == ["vm-1"]
+
+
+@pytest.mark.asyncio
+async def test_start_hosts_async_powers_on_resolved_vm_names():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+    async_compute = MagicMock()
+    async_compute.virtual_machines.begin_start = AsyncMock()
+    azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
+    handler._resolve_vm_names_async = AsyncMock(return_value=["vm-1"])
+
+    results = await handler.start_hosts_async(
+        machine_ids=["vm-1"],
+        resource_id="ignored",
+        context=AzureReleaseContext(resource_group="test-rg"),
+    )
+
+    assert results == {"vm-1": True}
+    async_compute.virtual_machines.begin_start.assert_awaited_once_with(
+        resource_group_name="test-rg",
+        vm_name="vm-1",
+    )
+
+
+@pytest.mark.asyncio
+async def test_stop_hosts_async_deallocates_by_default():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+    async_compute = MagicMock()
+    async_compute.virtual_machines.begin_deallocate = AsyncMock()
+    async_compute.virtual_machines.begin_power_off = AsyncMock()
+    azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
+    handler._resolve_vm_names_async = AsyncMock(return_value=["vm-1"])
+
+    results = await handler.stop_hosts_async(
+        machine_ids=["vm-1"],
+        resource_id="ignored",
+        context=AzureReleaseContext(resource_group="test-rg"),
+    )
+
+    assert results == {"vm-1": True}
+    async_compute.virtual_machines.begin_deallocate.assert_awaited_once_with(
+        resource_group_name="test-rg",
+        vm_name="vm-1",
+    )
+    async_compute.virtual_machines.begin_power_off.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_stop_hosts_async_powers_off_without_deallocating_when_requested():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+    async_compute = MagicMock()
+    async_compute.virtual_machines.begin_deallocate = AsyncMock()
+    async_compute.virtual_machines.begin_power_off = AsyncMock()
+    azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
+    handler._resolve_vm_names_async = AsyncMock(return_value=["vm-1"])
+
+    results = await handler.stop_hosts_async(
+        machine_ids=["vm-1"],
+        resource_id="ignored",
+        context=AzureReleaseContext(resource_group="test-rg"),
+        deallocate=False,
+    )
+
+    assert results == {"vm-1": True}
+    async_compute.virtual_machines.begin_power_off.assert_awaited_once_with(
+        resource_group_name="test-rg",
+        vm_name="vm-1",
+    )
+    async_compute.virtual_machines.begin_deallocate.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_start_hosts_async_reports_per_machine_failure_without_raising():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = SingleVMHandler(azure_client=azure_client, logger=logger)
+    async_compute = MagicMock()
+    async_compute.virtual_machines.begin_start = AsyncMock(
+        side_effect=[None, RuntimeError("start rejected")]
+    )
+    azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
+    handler._resolve_vm_names_async = AsyncMock(return_value=["vm-1", "vm-2"])
+
+    results = await handler.start_hosts_async(
+        machine_ids=["vm-1", "vm-2"],
+        resource_id="ignored",
+        context=AzureReleaseContext(resource_group="test-rg"),
+    )
+
+    assert results == {"vm-1": True, "vm-2": False}

@@ -256,3 +256,54 @@ def test_attach_provider_fulfilment_reports_failed_single_vm_deployment():
     assert fulfilment.state == "failed"
     assert fulfilment.target_units == 1
     assert fulfilment.fulfilled_units == 0
+
+
+def test_attach_provider_fulfilment_does_not_fail_on_spot_eviction_deallocate():
+    """A spot VM evicted with eviction_policy=Deallocate must not count as failed.
+
+    Azure collapses PowerState/stopped and PowerState/deallocated to the
+    single domain status "stopped" (see azure_status.py); that status is
+    non-terminal (MachineStatus.STOPPED can transition back to RUNNING) so
+    it must not be classified as a fulfilment failure, unlike a genuinely
+    "failed" or "terminated" instance.
+    """
+    service = AzureResourceMetadataService(
+        default_resource_group="test-rg",
+        logger=MagicMock(),
+    )
+    metadata: dict = {}
+
+    result = service.attach_provider_fulfilment(
+        metadata,
+        instances=[
+            {"instance_id": "vm-a", "status": "running"},
+            {"instance_id": "vm-b", "status": "stopped"},
+        ],
+        target_units=2,
+    )
+
+    fulfilment = metadata["provider_fulfilment"]
+    assert fulfilment.state != "failed"
+    assert fulfilment.state != "partial"
+    assert result.fulfilment is fulfilment
+
+
+def test_attach_provider_fulfilment_does_not_fail_when_all_instances_deallocated():
+    """All-stopped (fully evicted spot fleet) is a shortfall, not a failure."""
+    service = AzureResourceMetadataService(
+        default_resource_group="test-rg",
+        logger=MagicMock(),
+    )
+    metadata: dict = {}
+
+    service.attach_provider_fulfilment(
+        metadata,
+        instances=[
+            {"instance_id": "vm-a", "status": "stopped"},
+            {"instance_id": "vm-b", "status": "stopped"},
+        ],
+        target_units=2,
+    )
+
+    fulfilment = metadata["provider_fulfilment"]
+    assert fulfilment.state != "failed"

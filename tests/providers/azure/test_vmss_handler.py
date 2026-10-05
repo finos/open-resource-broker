@@ -11,7 +11,10 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     RAISE_ON_STATUS_ERROR_METADATA_KEY,
     AzureReleaseContext,
 )
-from orb.providers.azure.infrastructure.handlers.vmss_handler import VMSSHandler
+from orb.providers.azure.infrastructure.handlers.vmss_handler import (
+    VMSSHandler,
+    _validate_odata_filter_name,
+)
 from tests.providers.azure.strategy_test_support import (
     AsyncPager,
     make_azure_template,
@@ -443,6 +446,46 @@ def test_vmss_instance_status_includes_structured_provisioning_errors():
     assert "Allocation failed" in result[0]["provider_data"]["fleet_errors"][0]["error_message"]
 
 
+def test_vmss_status_surfaces_deallocated_power_state_for_spot_eviction():
+    """A spot VM evicted with eviction_policy=Deallocate is domain-'stopped'.
+
+    The raw Azure power state must still be recoverable from provider_data
+    so a deallocated (unbilled) member can be told apart from a merely
+    stopped (still billed) one.
+    """
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.UNIFORM
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+
+    status = MagicMock()
+    status.code = "PowerState/deallocated"
+    status.time = None
+
+    member_vm = MagicMock()
+    member_vm.instance_id = "3"
+    member_vm.name = "vmss-3"
+    member_vm.vm_id = "vm-guid-3"
+    member_vm.instance_view.statuses = [status]
+    member_vm.hardware_profile.vm_size = "Standard_D4s_v5"
+    member_vm.location = "eastus2"
+    member_vm.zones = ["1"]
+
+    azure_client.compute_client.virtual_machine_scale_set_vms.list.return_value = [member_vm]
+
+    request = MagicMock()
+    request.resource_ids = ["vmss-azure-test"]
+    request.metadata = {"resource_group": "test-rg"}
+
+    result = run_operation(handler.check_hosts_status_async(request))
+
+    assert result[0]["status"] == "stopped"
+    assert result[0]["provider_data"]["power_state"] == "PowerState/deallocated"
+
+
 @pytest.mark.asyncio
 async def test_release_hosts_async_submits_uniform_vmss_delete_when_returning_all_members():
     azure_client = _make_azure_client()
@@ -456,7 +499,7 @@ async def test_release_hosts_async_submits_uniform_vmss_delete_when_returning_al
         return_value=AzureVMSSOrchestrationMode.UNIFORM
     )
     handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "1"}])
-    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=["1"])
+    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=(["1"], []))
 
     result = await handler.release_hosts_async(
         machine_ids=["vmss-1"],
@@ -594,7 +637,7 @@ async def test_release_hosts_async_surfaces_uniform_vmss_delete_submission_failu
         return_value=AzureVMSSOrchestrationMode.UNIFORM
     )
     handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "1"}])
-    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=["1"])
+    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=(["1"], []))
 
     with pytest.raises(TerminationError, match="delete rejected"):
         await handler.release_hosts_async(
@@ -817,7 +860,7 @@ def test_vmss_release_deletes_only_requested_uniform_instances():
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
-    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=["3", "4"])
+    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=(["3", "4"], []))
     handler._list_vmss_instances_async = AsyncMock(
         return_value=[
             {"instance_id": "3"},
@@ -921,7 +964,13 @@ def test_vmss_release_waits_for_flexible_member_then_submits_vmss_delete():
     )
 
 
-def test_vmss_release_rejects_unresolved_flexible_member_ids():
+def test_vmss_release_treats_unresolved_flexible_member_ids_as_already_terminated():
+    """A retried Flexible release after a successful prior delete is a no-op.
+
+    IDs that no longer resolve against the live member list (because a
+    previous release attempt already deleted them) must be reported as
+    already terminated rather than failing the retry.
+    """
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
@@ -938,23 +987,27 @@ def test_vmss_release_rejects_unresolved_flexible_member_ids():
     azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
     azure_client.compute_client.virtual_machines.begin_delete.return_value = MagicMock()
 
-    with pytest.raises(TerminationError) as exc_info:
-        run_operation(
-            handler.release_hosts_async(
-                machine_ids=["guid-a", "guid-b", "guid-c"],
-                resource_id="vmss-azure-test",
-                context=AzureReleaseContext(resource_group="test-rg"),
-            )
+    result = run_operation(
+        handler.release_hosts_async(
+            machine_ids=["guid-a", "guid-b", "guid-c"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
         )
+    )
 
-    exc = exc_info.value
-    assert exc.resource_ids == ["guid-a", "guid-b", "guid-c"]
-    assert exc.details["unresolved_ids"] == ["guid-a", "guid-b", "guid-c"]
+    assert result["provider_data"]["operation_status"] == "submitted"
+    assert result["provider_data"]["submitted_deletions"] == []
+    assert sorted(result["provider_data"]["already_terminated_ids"]) == [
+        "guid-a",
+        "guid-b",
+        "guid-c",
+    ]
     azure_client.compute_client.virtual_machines.begin_delete.assert_not_called()
     azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
 
 
-def test_vmss_release_rejects_unresolved_uniform_member_ids():
+def test_vmss_release_treats_unresolved_uniform_member_ids_as_already_terminated():
+    """A retried Uniform release after a successful prior delete is a no-op."""
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
@@ -966,19 +1019,49 @@ def test_vmss_release_rejects_unresolved_uniform_member_ids():
     vmss.orchestration_mode = OrchestrationMode.UNIFORM
     azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
 
-    with pytest.raises(TerminationError) as exc_info:
-        run_operation(
-            handler.release_hosts_async(
-                machine_ids=["missing"],
-                resource_id="vmss-azure-test",
-                context=AzureReleaseContext(resource_group="test-rg"),
-            )
+    result = run_operation(
+        handler.release_hosts_async(
+            machine_ids=["missing"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
         )
+    )
 
-    exc = exc_info.value
-    assert exc.resource_ids == ["missing"]
-    assert exc.details["unresolved_ids"] == ["missing"]
+    assert result["provider_data"]["operation_status"] == "submitted"
+    assert result["provider_data"]["resolved_instance_ids"] == []
+    assert result["provider_data"]["already_terminated_ids"] == ["missing"]
     azure_client.compute_client.virtual_machine_scale_sets.begin_delete_instances.assert_not_called()
+    azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
+
+
+def test_vmss_release_is_idempotent_for_a_mix_of_live_and_already_deleted_members():
+    """A partial retry deletes only the members still present, no-ops the rest."""
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler._list_vmss_instances_async = AsyncMock(
+        return_value=[{"instance_id": "vm-a"}, {"instance_id": "vm-x"}]
+    )
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.FLEXIBLE
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+    azure_client.compute_client.virtual_machines.begin_delete.return_value = MagicMock()
+
+    result = run_operation(
+        handler.release_hosts_async(
+            machine_ids=["vm-a", "vm-b"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+        )
+    )
+
+    assert _deleted_vm_names(azure_client) == ["vm-a"]
+    assert result["provider_data"]["submitted_deletions"] == [
+        {"requested_id": "vm-a", "vm_name": "vm-a"}
+    ]
+    assert result["provider_data"]["already_terminated_ids"] == ["vm-b"]
+    azure_client.compute_client.virtual_machine_scale_sets.begin_delete.assert_not_called()
 
 
 def test_vmss_release_resolves_flexible_vm_ids_to_vm_names():
@@ -1031,7 +1114,7 @@ def test_vmss_release_submits_parent_delete_for_full_uniform_return():
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
-    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=["3"])
+    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=(["3"], []))
     handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "3"}])
 
     vmss = MagicMock()
@@ -1140,3 +1223,148 @@ def test_acquire_hosts_does_not_misclassify_unrelated_error_with_quota_in_resour
         run_operation(handler.acquire_hosts_async(request, _make_template()))
 
     assert exc_info.type.__name__ == "AzureValidationError"
+
+
+def test_validate_odata_filter_name_accepts_safe_names():
+    assert _validate_odata_filter_name("my-rg_01.test", field_name="resource_group") == (
+        "my-rg_01.test"
+    )
+
+
+def test_validate_odata_filter_name_rejects_embedded_quote():
+    """A name containing a single quote could break out of the OData filter literal."""
+    with pytest.raises(AzureValidationError, match="unsafe to interpolate"):
+        _validate_odata_filter_name("rg' or '1'='1", field_name="resource_group")
+
+
+def test_validate_odata_filter_name_rejects_empty_string():
+    with pytest.raises(AzureValidationError):
+        _validate_odata_filter_name("", field_name="vmss_name")
+
+
+def test_flexible_vmss_list_kwargs_quotes_names_into_the_filter():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+
+    kwargs = handler._flexible_vmss_list_kwargs(
+        resource_group="test-rg",
+        vmss_name="vmss-azure-test",
+        include_instance_view=False,
+    )
+
+    assert "'test-rg'" not in kwargs["filter"]
+    assert "resourceGroups/test-rg" in kwargs["filter"]
+    assert "virtualMachineScaleSets/vmss-azure-test" in kwargs["filter"]
+
+
+def test_flexible_vmss_list_kwargs_rejects_unsafe_vmss_name():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+
+    with pytest.raises(AzureValidationError, match="unsafe to interpolate"):
+        handler._flexible_vmss_list_kwargs(
+            resource_group="test-rg",
+            vmss_name="vmss' or '1'='1",
+            include_instance_view=False,
+        )
+
+
+def test_start_hosts_async_starts_flexible_members_by_vm_name():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "vm-a"}])
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.FLEXIBLE
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+    azure_client.compute_client.virtual_machines.begin_start.return_value = MagicMock()
+
+    results = run_operation(
+        handler.start_hosts_async(
+            machine_ids=["vm-a"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+        )
+    )
+
+    assert results == {"vm-a": True}
+    azure_client.compute_client.virtual_machines.begin_start.assert_called_once_with(
+        resource_group_name="test-rg",
+        vm_name="vm-a",
+    )
+
+
+def test_start_hosts_async_reports_unresolved_flexible_members_as_failed():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "vm-a"}])
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.FLEXIBLE
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+
+    results = run_operation(
+        handler.start_hosts_async(
+            machine_ids=["vm-missing"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+        )
+    )
+
+    assert results == {"vm-missing": False}
+    azure_client.compute_client.virtual_machines.begin_start.assert_not_called()
+
+
+def test_stop_hosts_async_deallocates_uniform_members_by_default():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=(["3", "4"], []))
+    handler._list_vmss_instances_async = AsyncMock(
+        return_value=[{"instance_id": "3"}, {"instance_id": "4"}]
+    )
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.UNIFORM
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+
+    results = run_operation(
+        handler.stop_hosts_async(
+            machine_ids=["3", "4"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+        )
+    )
+
+    assert results == {"3": True, "4": True}
+    azure_client.compute_client.virtual_machine_scale_sets.begin_deallocate.assert_called_once()
+    azure_client.compute_client.virtual_machine_scale_sets.begin_power_off.assert_not_called()
+
+
+def test_stop_hosts_async_powers_off_uniform_members_without_deallocating_when_requested():
+    azure_client = _make_azure_client()
+    logger = MagicMock()
+    handler = VMSSHandler(azure_client=azure_client, logger=logger)
+    handler._resolve_vmss_instance_ids_async = AsyncMock(return_value=(["3"], []))
+    handler._list_vmss_instances_async = AsyncMock(return_value=[{"instance_id": "3"}])
+
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.UNIFORM
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+
+    results = run_operation(
+        handler.stop_hosts_async(
+            machine_ids=["3"],
+            resource_id="vmss-azure-test",
+            context=AzureReleaseContext(resource_group="test-rg"),
+            deallocate=False,
+        )
+    )
+
+    assert results == {"3": True}
+    azure_client.compute_client.virtual_machine_scale_sets.begin_power_off.assert_called_once()
+    azure_client.compute_client.virtual_machine_scale_sets.begin_deallocate.assert_not_called()

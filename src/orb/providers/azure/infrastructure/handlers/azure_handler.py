@@ -47,6 +47,12 @@ class AzureStatusProviderData(TypedDict, total=False):
     here per the ``metadata vs provider_data`` architecture rule. The
     HostFactory scheduler reads ``cloud_host_id`` from this dict to emit the
     Symphony wire ``cloudHostId`` field.
+
+    ``power_state`` carries the raw Azure ``PowerState/*`` code (e.g.
+    ``"PowerState/deallocated"``). The top-level ``status`` field collapses
+    both ``PowerState/stopped`` (still billed) and ``PowerState/deallocated``
+    (not billed) to the single domain status ``"stopped"`` -- consumers that
+    need to tell them apart (billing, diagnostics) must read this field.
     """
 
     resource_id: str
@@ -68,6 +74,7 @@ class AzureStatusProviderData(TypedDict, total=False):
     nic_name: str | None
     vnet_id: str | None
     fleet_errors: list[dict[str, Any]]
+    power_state: str | None
 
 
 class AzureHandlerStatusResult(TypedDict, total=False):
@@ -130,6 +137,7 @@ class AzureVmssReleaseProviderData(TypedDict, total=False):
     submitted_deletions: list[AzureSubmittedDeletion]
     failed_deletions: list[AzureSubmittedDeletion]
     resolved_instance_ids: list[str]
+    already_terminated_ids: list[str]
 
 
 class AzureSingleVmReleaseProviderData(TypedDict, total=False):
@@ -236,6 +244,46 @@ class AzureHandler(ABC):
         context: Optional[AzureReleaseContext] = None,
     ) -> Optional[AzureReleaseHostsResult]:
         """Delete / deallocate cloud resources without blocking the event loop."""
+
+    async def start_hosts_async(
+        self,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext] = None,
+    ) -> dict[str, bool]:
+        """Power on stopped/deallocated machines; return per-machine success.
+
+        Default implementation documents the operation as unsupported for
+        provider APIs that have no concept of restarting an individual member
+        (e.g. CycleCloud, which manages node lifecycle at the cluster level).
+        Concrete handlers that support it (VMSS, SingleVM) override this.
+        """
+        raise AzureValidationError(
+            f"start_instances is not supported for {type(self).__name__}",
+            error_code="UNSUPPORTED_OPERATION",
+        )
+
+    async def stop_hosts_async(
+        self,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext] = None,
+        *,
+        deallocate: bool = True,
+    ) -> dict[str, bool]:
+        """Power off (deallocate by default) running machines; return per-machine success.
+
+        ``deallocate=True`` (the default) releases the compute allocation so
+        the VM stops being billed for compute, mirroring the AWS StopInstances
+        default. ``deallocate=False`` performs a plain power-off instead,
+        which Azure continues to bill for the reserved compute. Default
+        implementation documents the operation as unsupported; concrete
+        handlers that support it (VMSS, SingleVM) override this.
+        """
+        raise AzureValidationError(
+            f"stop_instances is not supported for {type(self).__name__}",
+            error_code="UNSUPPORTED_OPERATION",
+        )
 
     @classmethod
     def get_example_templates(cls) -> list[dict[str, Any]]:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import threading
 import uuid
 from concurrent.futures import TimeoutError as FutureTimeoutError
@@ -22,6 +23,7 @@ from orb.providers.gcp.configuration.config import GCPProviderConfig
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
 from orb.providers.gcp.exceptions import (
     GCPEntityNotFoundError,
+    GCPError,
     GCPNetworkError,
     GCPRateLimitError,
     GCPValidationError,
@@ -40,6 +42,26 @@ from orb.providers.gcp.types import (
     GCPMutationOutcome,
 )
 
+_FILTER_CLAUSE_RE = re.compile(r'\(instance eq "([^"]+)"\)')
+
+
+def _apply_instance_filter(members: list[object], instance_filter: str | None) -> list[object]:
+    """Simulate GCP's server-side ``instance eq <regex>`` filter evaluation.
+
+    Real GCP applies the filter server-side before returning results; the
+    production handlers build it from untrusted-ish instance names, so the
+    mock must actually evaluate it (rather than ignore it, as it previously
+    did) for a wrong-filter bug to be caught by these tests.
+    """
+    if not instance_filter:
+        return members
+    patterns = [re.compile(clause) for clause in _FILTER_CLAUSE_RE.findall(instance_filter)]
+    return [
+        member
+        for member in members
+        if any(pattern.search(str(member.instance_url)) for pattern in patterns)
+    ]
+
 
 class _ComputeClientStub:
     def __init__(self) -> None:
@@ -57,6 +79,7 @@ class _ComputeClientStub:
         self.fail_create_regional_mig = False
         self.fail_regional_mig_operation = False
         self.fail_delete_regional_mig = False
+        self.fail_delete_instance_template = False
         self.timeout_regional_mig_operation = False
         self.template_operation_result_called = False
         self.mig_operation_result_called = False
@@ -128,6 +151,8 @@ class _ComputeClientStub:
         )
 
     def delete_instance_template(self, *, template_name: str) -> object:
+        if self.fail_delete_instance_template:
+            raise RuntimeError("instance template delete failed")
         self.deleted_templates.append(template_name)
         return self._OperationStub(
             self, result_flag="template_delete_completed", name=f"delete-template-{template_name}"
@@ -164,8 +189,10 @@ class _ComputeClientStub:
         mig_name: str,
         instance_filter: str | None = None,
     ) -> list[object]:
-        _ = region, instance_filter
-        return self.regional_managed_instances.get(mig_name, [])
+        _ = region
+        return _apply_instance_filter(
+            self.regional_managed_instances.get(mig_name, []), instance_filter
+        )
 
     def start_instance(self, *, zone: str, instance_name: str) -> object:
         _ = zone
@@ -405,6 +432,54 @@ async def test_single_vm_handler_acquire_hosts_tracks_partial_failures() -> None
     assert len(result.resource_ids) == 1
 
 
+@pytest.mark.asyncio
+async def test_single_vm_handler_acquire_hosts_creates_instances_concurrently() -> None:
+    """Regression test: creates must fan out, not run one at a time.
+
+    Each create blocks on a 3-party barrier before returning; if the handler
+    still created instances sequentially, only one thread would ever reach
+    the barrier at a time and this test would time out.
+    """
+    compute_client = _ComputeClientStub()
+    handler = GCPSingleVMHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+    request = Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
+        template_id="gcp-single",
+        machine_count=3,
+        provider_type="gcp",
+    )
+    template = GCPTemplate.model_validate(
+        {
+            "template_id": "gcp-single",
+            "provider_type": "gcp",
+            "provider_api": "SingleVM",
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "zones": ["us-central1-a"],
+            "instance_type": "e2-standard-4",
+            "max_instances": 1,
+            "source_image_family": "debian-12",
+            "source_image_project": "debian-cloud",
+        }
+    )
+    barrier = threading.Barrier(3, timeout=2)
+    original_create_instance = compute_client.create_instance
+
+    def blocking_create_instance(*, zone: str, body: object) -> object:
+        barrier.wait()
+        return original_create_instance(zone=zone, body=body)
+
+    with patch.object(compute_client, "create_instance", side_effect=blocking_create_instance):
+        result = await handler.acquire_hosts(request, template)
+
+    assert len(result.resource_ids) == 3
+    assert len(compute_client.created_instances) == 3
+
+
 def test_single_vm_handler_start_instances_tracks_partial_failures() -> None:
     compute_client = _ComputeClientStub()
     compute_client.fail_start_instance_for = {"vm-b"}
@@ -424,6 +499,36 @@ def test_single_vm_handler_start_instances_tracks_partial_failures() -> None:
     assert [
         (f.target_id, f.error_code, f.error_message, f.operation) for f in result.failed_operations
     ] == [("vm-b", "GCPNetworkError", "503 service unavailable", "start_instance")]
+
+
+def test_single_vm_handler_start_instances_runs_mutations_concurrently() -> None:
+    """Regression test: per-instance mutations must fan out, not run serially.
+
+    Each start blocks on a 3-party barrier before returning; if the handler
+    still ran them one at a time, only one thread would ever reach the
+    barrier at a time and this test would time out.
+    """
+    compute_client = _ComputeClientStub()
+    handler = GCPSingleVMHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+    barrier = threading.Barrier(3, timeout=2)
+    original_start_instance = compute_client.start_instance
+
+    def blocking_start_instance(*, zone: str, instance_name: str) -> object:
+        barrier.wait()
+        return original_start_instance(zone=zone, instance_name=instance_name)
+
+    with patch.object(compute_client, "start_instance", side_effect=blocking_start_instance):
+        result = handler.start_instances(
+            instance_ids=["vm-a", "vm-b", "vm-c"],
+            context={"zone": "us-central1-a"},
+        )
+
+    assert result.attempted_ids == ["vm-a", "vm-b", "vm-c"]
+    assert result.successful_ids == ["vm-a", "vm-b", "vm-c"]
 
 
 def test_mig_handler_start_instances_returns_failed_results_for_unsupported_targets() -> None:
@@ -727,11 +832,48 @@ async def test_mig_rollback_keeps_template_when_mig_delete_fails() -> None:
     request = _mig_request()
     template = _regional_mig_template()
 
-    with pytest.raises(RuntimeError, match="regional mig operation failed"):
+    # The error surfaced to the request must be the rollback failure, with
+    # enough detail (mig_name/instance_template_name/region) to find and
+    # manually clean up the leaked MIG; the original create failure that
+    # triggered the rollback is preserved as the exception's cause.
+    with pytest.raises(GCPError, match="regional mig delete failed") as exc_info:
         await handler.acquire_hosts(request, template)
+
+    error = exc_info.value
+    assert error.details["mig_name"]
+    assert error.details["instance_template_name"]
+    assert error.details["region"] == "us-central1"
+    assert isinstance(error.__cause__, RuntimeError)
+    assert str(error.__cause__) == "regional mig operation failed"
 
     assert compute_client.deleted_templates == []
     logger.error.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_mig_rollback_surfaces_template_delete_failure() -> None:
+    compute_client = _ComputeClientStub()
+    compute_client.fail_regional_mig_operation = True
+    compute_client.fail_delete_instance_template = True
+    logger = MagicMock()
+    handler = GCPManagedInstanceGroupHandler(compute_client, _config(), logger)
+    request = _mig_request()
+    template = _regional_mig_template()
+
+    # The MIG delete succeeds (so it is not leaked), but the instance
+    # template delete fails; that failure must still be surfaced with its
+    # own identifying details rather than only logged.
+    with pytest.raises(GCPError, match="instance template delete failed") as exc_info:
+        await handler.acquire_hosts(request, template)
+
+    error = exc_info.value
+    assert error.details["mig_name"]
+    assert error.details["instance_template_name"]
+    assert error.details["region"] == "us-central1"
+    assert isinstance(error.__cause__, RuntimeError)
+    assert str(error.__cause__) == "regional mig operation failed"
+
+    assert compute_client.deleted_regional_migs != []
 
 
 @pytest.mark.asyncio
@@ -1196,6 +1338,75 @@ def test_mig_handler_terminates_subset_with_delete_managed_instances() -> None:
         )
     ]
     assert compute_client.deleted_templates == []
+
+
+def test_build_instance_filter_builds_exact_escaped_and_anchored_clauses() -> None:
+    result = GCPManagedInstanceGroupHandler._build_instance_filter(["vm-a", "vm-b"])
+
+    assert result == '(instance eq ".*/vm\\-a$") OR (instance eq ".*/vm\\-b$")'
+
+
+def test_build_instance_filter_accepts_full_urls_and_uses_the_trailing_name() -> None:
+    result = GCPManagedInstanceGroupHandler._build_instance_filter(
+        ["projects/orb-example-12345/zones/us-central1-a/instances/vm-a"]
+    )
+
+    assert result == '(instance eq ".*/vm\\-a$")'
+
+
+def test_build_instance_filter_rejects_a_name_outside_gcp_naming_rules() -> None:
+    with pytest.raises(GCPValidationError, match="RFC1035"):
+        GCPManagedInstanceGroupHandler._build_instance_filter(["Not_A_Valid_Name"])
+
+
+def test_mig_handler_terminate_filter_excludes_similarly_named_sibling() -> None:
+    """Regression test for the unanchored filter matching extra instances.
+
+    Without the trailing ``$`` anchor, a filter built for "vm-1" also
+    matches "vm-10" because GCP's filter evaluates the value as a regex
+    search rather than an exact match. The targeted delete must only ever
+    include the requested instance.
+    """
+    compute_client = _ComputeClientStub()
+    compute_client.regional_managed_instances = {
+        "mig-a": [
+            SimpleNamespace(
+                instance_url="projects/orb-example-12345/zones/us-central1-a/instances/vm-1",
+                instance_status="RUNNING",
+                current_action="NONE",
+            ),
+            SimpleNamespace(
+                instance_url="projects/orb-example-12345/zones/us-central1-a/instances/vm-10",
+                instance_status="RUNNING",
+                current_action="NONE",
+            ),
+        ],
+    }
+    handler = GCPManagedInstanceGroupHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+
+    result = handler.terminate_hosts(
+        resource_ids=["mig-a"],
+        instance_ids=["vm-1"],
+        context={
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "scope": "regional",
+            "instance_template_name": "orb-template-a",
+        },
+    )
+
+    assert result.attempted_ids == ["vm-1"]
+    assert compute_client.deleted_regional_managed_instances == [
+        (
+            "us-central1",
+            "mig-a",
+            ["projects/orb-example-12345/zones/us-central1-a/instances/vm-1"],
+        )
+    ]
 
 
 def test_mig_handler_status_treats_missing_mig_as_empty() -> None:

@@ -20,7 +20,13 @@ from orb.providers.azure.infrastructure.services.azure_deployment_service import
 
 _RUNNING_STATES = frozenset({"running"})
 _PENDING_STATES = frozenset({"pending", "creating", "starting", "updating", "unknown"})
-_FAILED_STATES = frozenset({"failed", "terminated", "stopped", "deallocated"})
+# "stopped" is deliberately excluded: it is the collapsed domain status for
+# both PowerState/stopped and PowerState/deallocated (see azure_status.py),
+# neither of which is a provisioning failure -- a stopped/deallocated VM
+# (e.g. a spot VM evicted with eviction_policy=Deallocate) is non-terminal
+# and can transition back to running (see MachineStatus.STOPPED), so it must
+# not count toward a failed/partial fulfilment verdict.
+_FAILED_STATES = frozenset({"failed", "terminated"})
 
 
 @dataclass

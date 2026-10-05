@@ -18,7 +18,9 @@ Important limitation:
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, cast
 
@@ -54,7 +56,10 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureVmssReleaseProviderData,
     azure_raise_on_status_error,
 )
-from orb.providers.azure.infrastructure.handlers.azure_status import resolve_power_state
+from orb.providers.azure.infrastructure.handlers.azure_status import (
+    resolve_power_state,
+    resolve_raw_power_state_code,
+)
 from orb.providers.azure.infrastructure.sdk_shapes import (
     AzureVmRuntimeStatusProtocol,
     AzureVmWithIdentityProtocol,
@@ -81,7 +86,32 @@ def _status_attr(status: Any, attr: str, default: Any = None) -> Any:
     (SDK InstanceViewStatus, plain dicts wrapped in SimpleNamespace, etc.) and
     the requested attribute varies per call-site.
     """
+    # getattr: see docstring -- heterogeneous status-like objects, variable attr.
     return getattr(status, attr, default)
+
+
+# Conservative allow-list for names interpolated into an OData filter literal.
+# Covers every character ARM permits in resource-group and VMSS names; in
+# particular it excludes the single quote that terminates an OData string
+# literal, so a name cannot break out of the quoted expression.
+_ODATA_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_.()\[\]-]+$")
+
+
+def _validate_odata_filter_name(value: str, *, field_name: str) -> str:
+    """Defensively validate a name before it is interpolated into an OData filter.
+
+    Azure resource-group and VMSS names are already constrained by ARM, but
+    this handler builds the filter string itself (``f"'...' eq '{value}'"``),
+    so it validates again at the point of interpolation rather than trusting
+    upstream validation to have run.
+    """
+    if not value or not _ODATA_SAFE_NAME_RE.match(value):
+        raise AzureValidationError(
+            f"{field_name} '{value}' contains characters that are unsafe to interpolate "
+            "into an Azure OData filter expression",
+            error_code="InvalidParameter",
+        )
+    return value
 
 
 @dataclass(frozen=True)
@@ -103,6 +133,8 @@ class _VmssReleasePlan:
     current_members: list[AzureHandlerStatusResult]
     resolved_instance_ids: list[str]
     resolved_vm_names: list[str]
+    requested_ids_to_delete: list[str]
+    already_terminated_ids: list[str]
     delete_vmss_when_empty: bool
 
 
@@ -113,6 +145,22 @@ def _build_vmss_delete_instance_ids(instance_ids: list[str]) -> Any:
     except ImportError:
         return {"instance_ids": instance_ids}
     return VirtualMachineScaleSetVMInstanceRequiredIDs(instance_ids=instance_ids)
+
+
+def _build_vmss_instance_ids(instance_ids: list[str]) -> Any:
+    """Build the VMSS start/power-off/deallocate payload using the SDK model when available.
+
+    Unlike delete (``VirtualMachineScaleSetVMInstanceRequiredIDs``), the
+    start/power-off/deallocate bulk operations use
+    ``VirtualMachineScaleSetVMInstanceIDs``, whose ``instance_ids`` is
+    optional (omitting it targets every instance) -- ORB always passes an
+    explicit list here.
+    """
+    try:
+        from azure.mgmt.compute.models import VirtualMachineScaleSetVMInstanceIDs
+    except ImportError:
+        return {"instance_ids": instance_ids}
+    return VirtualMachineScaleSetVMInstanceIDs(instance_ids=instance_ids)
 
 
 def _require_vmss_payload_object(
@@ -372,11 +420,12 @@ class VMSSHandler(AzureHandler):
         self._log_release_submission(vmss_name=vmss_name, machine_ids=machine_ids)
         try:
             if release_plan.orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE:
+                ids_to_delete = release_plan.requested_ids_to_delete
                 submitted_deletions: list[AzureSubmittedDeletion] = []
                 failed_deletions: list[AzureSubmittedDeletion] = []
                 deletion_pollers: list[Any] = []
                 for requested_id, vm_name in zip(
-                    machine_ids,
+                    ids_to_delete,
                     release_plan.resolved_vm_names,
                     strict=True,
                 ):
@@ -408,7 +457,7 @@ class VMSSHandler(AzureHandler):
                             }
                         )
                 self._raise_flexible_release_failures(
-                    machine_ids=machine_ids,
+                    machine_ids=ids_to_delete,
                     resource_group=resource_group,
                     vmss_name=vmss_name,
                     submitted_deletions=submitted_deletions,
@@ -417,7 +466,7 @@ class VMSSHandler(AzureHandler):
                 if release_plan.delete_vmss_when_empty:
                     await self._await_flexible_member_deletions(
                         deletion_pollers=deletion_pollers,
-                        machine_ids=machine_ids,
+                        machine_ids=ids_to_delete,
                         resource_group=resource_group,
                         vmss_name=vmss_name,
                     )
@@ -430,6 +479,7 @@ class VMSSHandler(AzureHandler):
                     vmss_name=vmss_name,
                     submitted_deletions=submitted_deletions,
                     failed_deletions=failed_deletions,
+                    already_terminated_ids=release_plan.already_terminated_ids,
                 )
 
             if release_plan.delete_vmss_when_empty:
@@ -437,7 +487,7 @@ class VMSSHandler(AzureHandler):
                     resource_group=resource_group,
                     vmss_name=vmss_name,
                 )
-            else:
+            elif release_plan.resolved_instance_ids:
                 await compute.virtual_machine_scale_sets.begin_delete_instances(
                     resource_group_name=resource_group,
                     vm_scale_set_name=vmss_name,
@@ -449,6 +499,7 @@ class VMSSHandler(AzureHandler):
                 resource_group=resource_group,
                 vmss_name=vmss_name,
                 resolved_instance_ids=release_plan.resolved_instance_ids,
+                already_terminated_ids=release_plan.already_terminated_ids,
             )
         except TerminationError:
             raise
@@ -457,6 +508,176 @@ class VMSSHandler(AzureHandler):
                 f"Failed to submit termination for VMSS '{vmss_name}': {exc}",
                 resource_ids=machine_ids,
             ) from exc
+
+    async def start_hosts_async(
+        self,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext] = None,
+    ) -> dict[str, bool]:
+        """Power on stopped/deallocated VMSS members."""
+        return await self._submit_vmss_power_operation_async(
+            machine_ids=machine_ids,
+            resource_id=resource_id,
+            context=context,
+            operation_name="start",
+            flexible_submit=lambda compute, resource_group, vm_name: (
+                compute.virtual_machines.begin_start(
+                    resource_group_name=resource_group,
+                    vm_name=vm_name,
+                )
+            ),
+            uniform_submit=lambda compute, resource_group, vmss_name, instance_ids: (
+                compute.virtual_machine_scale_sets.begin_start(
+                    resource_group_name=resource_group,
+                    vm_scale_set_name=vmss_name,
+                    vm_instance_i_ds=_build_vmss_instance_ids(instance_ids),
+                )
+            ),
+        )
+
+    async def stop_hosts_async(
+        self,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext] = None,
+        *,
+        deallocate: bool = True,
+    ) -> dict[str, bool]:
+        """Power off VMSS members; deallocates (stops billing) by default."""
+        if deallocate:
+
+            def flexible_submit(compute: Any, resource_group: str, vm_name: str) -> Any:
+                """Submit a deallocate request for a Flexible-orchestration VM."""
+                return compute.virtual_machines.begin_deallocate(
+                    resource_group_name=resource_group,
+                    vm_name=vm_name,
+                )
+
+            def uniform_submit(
+                compute: Any, resource_group: str, vmss_name: str, instance_ids: list[str]
+            ) -> Any:
+                """Submit a deallocate request for Uniform-orchestration VMSS instances."""
+                return compute.virtual_machine_scale_sets.begin_deallocate(
+                    resource_group_name=resource_group,
+                    vm_scale_set_name=vmss_name,
+                    vm_instance_i_ds=_build_vmss_instance_ids(instance_ids),
+                )
+        else:
+
+            def flexible_submit(compute: Any, resource_group: str, vm_name: str) -> Any:
+                """Submit a power-off request for a Flexible-orchestration VM."""
+                return compute.virtual_machines.begin_power_off(
+                    resource_group_name=resource_group,
+                    vm_name=vm_name,
+                )
+
+            def uniform_submit(
+                compute: Any, resource_group: str, vmss_name: str, instance_ids: list[str]
+            ) -> Any:
+                """Submit a power-off request for Uniform-orchestration VMSS instances."""
+                return compute.virtual_machine_scale_sets.begin_power_off(
+                    resource_group_name=resource_group,
+                    vm_scale_set_name=vmss_name,
+                    vm_instance_i_ds=_build_vmss_instance_ids(instance_ids),
+                )
+
+        return await self._submit_vmss_power_operation_async(
+            machine_ids=machine_ids,
+            resource_id=resource_id,
+            context=context,
+            operation_name="deallocate" if deallocate else "power_off",
+            flexible_submit=flexible_submit,
+            uniform_submit=uniform_submit,
+        )
+
+    async def _submit_vmss_power_operation_async(
+        self,
+        *,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext],
+        operation_name: str,
+        flexible_submit: Callable[[Any, str, str], Any],
+        uniform_submit: Callable[[Any, str, str, list[str]], Any],
+    ) -> dict[str, bool]:
+        """Resolve VMSS members and submit a start/power-off/deallocate.
+
+        Returns a per-requested-id success map, mirroring the AWS
+        ``start_instances``/``stop_instances`` result shape. An ID that no
+        longer resolves against the live member list is reported as failed
+        (unlike release, this is not a retried terminal operation -- there is
+        nothing to start or stop).
+        """
+        resource_group = self._resolve_release_resource_group(
+            machine_ids=machine_ids,
+            context=context,
+        )
+        vmss_name = resource_id
+        orchestration_mode = await self._get_vmss_orchestration_mode_async(
+            resource_group, vmss_name
+        )
+        current_members = await self._list_vmss_instances_async(
+            resource_group=resource_group,
+            vmss_name=vmss_name,
+            include_instance_view=False,
+            orchestration_mode=orchestration_mode,
+        )
+        compute = await self.azure_client.get_async_compute_client()
+        results: dict[str, bool] = {}
+
+        if orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE:
+            resolved_vm_names, requested_ids, already_missing_ids = (
+                self._resolve_flexible_vm_names_from_members(
+                    machine_ids=machine_ids,
+                    current_members=current_members,
+                    logger=self._logger,
+                    vmss_name=vmss_name,
+                )
+            )
+            for machine_id in already_missing_ids:
+                results[machine_id] = False
+            for requested_id, vm_name in zip(requested_ids, resolved_vm_names, strict=True):
+                try:
+                    await flexible_submit(compute, resource_group, vm_name)
+                    results[requested_id] = True
+                except Exception as exc:
+                    self._logger.error(
+                        "Failed to %s VMSS flexible member '%s' in '%s': %s",
+                        operation_name,
+                        vm_name,
+                        vmss_name,
+                        exc,
+                    )
+                    results[requested_id] = False
+            return results
+
+        resolved_instance_ids, already_missing_ids = await self._resolve_vmss_instance_ids_async(
+            resource_group=resource_group,
+            vmss_name=vmss_name,
+            machine_ids=machine_ids,
+            current_members=current_members,
+        )
+        for machine_id in already_missing_ids:
+            results[machine_id] = False
+        if resolved_instance_ids:
+            try:
+                await uniform_submit(compute, resource_group, vmss_name, resolved_instance_ids)
+                for machine_id in machine_ids:
+                    if machine_id not in already_missing_ids:
+                        results[str(machine_id)] = True
+            except Exception as exc:
+                self._logger.error(
+                    "Failed to %s VMSS '%s' instances %s: %s",
+                    operation_name,
+                    vmss_name,
+                    resolved_instance_ids,
+                    exc,
+                )
+                for machine_id in machine_ids:
+                    if machine_id not in already_missing_ids:
+                        results[str(machine_id)] = False
+        return results
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -518,9 +739,17 @@ class VMSSHandler(AzureHandler):
         - Uniform VMSS deletes by ``instance_id`` — populated from
           ``current_members``; ``resolved_vm_names`` is empty.
         - Flexible VMSS deletes individual VMs by ``vm_name`` — populated
-          from ``current_members``; ``resolved_instance_ids`` mirrors the
-          input ``machine_ids`` (Flexible accepts either, but we forward
-          the originals for traceability).
+          from ``current_members``; ``requested_ids_to_delete`` is the
+          subset of ``machine_ids`` that resolved to a live member, in the
+          same order as ``resolved_vm_names``.
+
+        A requested ID no longer present among the current members is
+        reported via ``already_terminated_ids`` instead of failing the
+        plan: a retried release after a prior successful delete must be a
+        no-op, not an error (Flexible VMSS release resolves IDs against a
+        live member list, so a successfully deleted member simply vanishes
+        from it on the next attempt — unlike SingleVM, which is naturally
+        idempotent via ARM DELETE semantics).
 
         Splitting plan-building from submission keeps the submission path
         flat and lets tests exercise the plan shape without mocking the
@@ -540,26 +769,34 @@ class VMSSHandler(AzureHandler):
             include_instance_view=False,
             orchestration_mode=orchestration_mode,
         )
-        resolved_instance_ids = (
-            await self._resolve_vmss_instance_ids_async(
-                resource_group=resource_group,
-                vmss_name=vmss_name,
-                machine_ids=machine_ids,
-                current_members=current_members,
-            )
-            if orchestration_mode != AzureVMSSOrchestrationMode.FLEXIBLE
-            else [str(machine_id) for machine_id in machine_ids]
-        )
-        resolved_vm_names = (
-            self._resolve_flexible_vm_names_from_members(
+
+        resolved_instance_ids: list[str] = []
+        resolved_vm_names: list[str] = []
+        requested_ids_to_delete: list[str] = []
+        already_terminated_ids: list[str] = []
+
+        if orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE:
+            (
+                resolved_vm_names,
+                requested_ids_to_delete,
+                already_terminated_ids,
+            ) = self._resolve_flexible_vm_names_from_members(
                 machine_ids=machine_ids,
                 current_members=current_members,
                 logger=self._logger,
                 vmss_name=vmss_name,
             )
-            if orchestration_mode == AzureVMSSOrchestrationMode.FLEXIBLE
-            else []
-        )
+        else:
+            (
+                resolved_instance_ids,
+                already_terminated_ids,
+            ) = await self._resolve_vmss_instance_ids_async(
+                resource_group=resource_group,
+                vmss_name=vmss_name,
+                machine_ids=machine_ids,
+                current_members=current_members,
+            )
+
         return _VmssReleasePlan(
             resource_group=resource_group,
             vmss_name=vmss_name,
@@ -567,6 +804,8 @@ class VMSSHandler(AzureHandler):
             current_members=current_members,
             resolved_instance_ids=resolved_instance_ids,
             resolved_vm_names=resolved_vm_names,
+            requested_ids_to_delete=requested_ids_to_delete,
+            already_terminated_ids=already_terminated_ids,
             delete_vmss_when_empty=self._should_delete_vmss_when_empty(
                 orchestration_mode=orchestration_mode,
                 machine_ids=machine_ids,
@@ -582,6 +821,7 @@ class VMSSHandler(AzureHandler):
         resource_group: str,
         vmss_name: str,
         resolved_instance_ids: list[str],
+        already_terminated_ids: list[str] | None = None,
     ) -> AzureReleaseHostsResult:
         """Build provider data for a uniform VMSS member-delete submission."""
         provider_data: AzureVmssReleaseProviderData = {
@@ -590,6 +830,8 @@ class VMSSHandler(AzureHandler):
             "operation_status": "submitted",
             "resolved_instance_ids": resolved_instance_ids,
         }
+        if already_terminated_ids:
+            provider_data["already_terminated_ids"] = already_terminated_ids
         return {"provider_data": provider_data}
 
     def _build_flexible_release_result(
@@ -599,6 +841,7 @@ class VMSSHandler(AzureHandler):
         vmss_name: str,
         submitted_deletions: list[AzureSubmittedDeletion],
         failed_deletions: list[AzureSubmittedDeletion],
+        already_terminated_ids: list[str] | None = None,
     ) -> AzureReleaseHostsResult:
         """Build provider data for a flexible VMSS member-delete submission."""
         provider_data: AzureVmssReleaseProviderData = {
@@ -609,6 +852,8 @@ class VMSSHandler(AzureHandler):
         }
         if failed_deletions:
             provider_data["failed_deletions"] = failed_deletions
+        if already_terminated_ids:
+            provider_data["already_terminated_ids"] = already_terminated_ids
         return {"provider_data": provider_data}
 
     @staticmethod
@@ -700,10 +945,20 @@ class VMSSHandler(AzureHandler):
         current_members: list[AzureHandlerStatusResult],
         logger: LoggingPort,
         vmss_name: str,
-    ) -> list[str]:
-        """Resolve Flexible VMSS requested IDs to Azure VM names."""
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Resolve Flexible VMSS requested IDs to Azure VM names.
+
+        Returns ``(resolved_vm_names, requested_ids_to_delete, already_terminated_ids)``.
+        A requested ID no longer present among the current members is treated
+        as already terminated rather than raising: Flexible VMSS release
+        resolves IDs against a live member list, so a member deleted by a
+        prior successful release attempt simply disappears from that list on
+        retry. Making this a no-op (instead of a ``TerminationError``) keeps
+        the release path idempotent, matching the SingleVM path which is
+        naturally idempotent via ARM DELETE semantics.
+        """
         if not machine_ids:
-            return []
+            return [], [], []
 
         lookup: dict[str, str] = {}
         for member in current_members:
@@ -726,29 +981,34 @@ class VMSSHandler(AzureHandler):
                 if candidate not in (None, ""):
                     lookup[str(candidate)] = resolved_vm_name
 
-        unresolved_ids = [
-            str(machine_id) for machine_id in machine_ids if str(machine_id) not in lookup
-        ]
-        if unresolved_ids:
-            raise TerminationError(
-                f"Could not resolve {len(unresolved_ids)} requested Flexible VMSS member ID(s)",
-                resource_ids=unresolved_ids,
-                details={
-                    "vmss_name": vmss_name,
-                    "unresolved_ids": unresolved_ids,
-                    "available_member_ids": sorted(lookup),
-                },
+        requested_ids_to_delete: list[str] = []
+        resolved_vm_names: list[str] = []
+        already_terminated_ids: list[str] = []
+        for machine_id in machine_ids:
+            key = str(machine_id)
+            if key in lookup:
+                requested_ids_to_delete.append(key)
+                resolved_vm_names.append(lookup[key])
+            else:
+                already_terminated_ids.append(key)
+
+        if already_terminated_ids:
+            logger.info(
+                "VMSS '%s': treating %d already-missing Flexible member ID(s) as already "
+                "terminated: %s",
+                vmss_name,
+                len(already_terminated_ids),
+                already_terminated_ids,
             )
 
-        resolved = [lookup[str(machine_id)] for machine_id in machine_ids]
-        if resolved != [str(machine_id) for machine_id in machine_ids]:
+        if resolved_vm_names != requested_ids_to_delete:
             logger.debug(
                 "Resolved Flexible VMSS machine IDs for '%s': %s -> %s",
                 vmss_name,
-                machine_ids,
-                resolved,
+                requested_ids_to_delete,
+                resolved_vm_names,
             )
-        return resolved
+        return resolved_vm_names, requested_ids_to_delete, already_terminated_ids
 
     @staticmethod
     def _resolve_vmss_instance_ids_from_members(
@@ -757,10 +1017,16 @@ class VMSSHandler(AzureHandler):
         current_members: list[AzureHandlerStatusResult],
         logger: LoggingPort,
         vmss_name: str,
-    ) -> list[str]:
-        """Resolve mixed IDs (vm_id/vm_name/instance_id) using already-fetched VMSS members."""
+    ) -> tuple[list[str], list[str]]:
+        """Resolve mixed IDs (vm_id/vm_name/instance_id) using already-fetched VMSS members.
+
+        Returns ``(resolved_instance_ids, already_terminated_ids)``. A
+        requested ID no longer present among the current members is treated
+        as already terminated rather than raising, so a retried release
+        after a prior successful delete is a no-op instead of failing.
+        """
         if not machine_ids:
-            return []
+            return [], []
 
         lookup: dict[str, str] = {}
         for vm in current_members:
@@ -778,29 +1044,33 @@ class VMSSHandler(AzureHandler):
             if vm_name:
                 lookup[str(vm_name)] = vmss_instance_id
 
-        unresolved_ids = [
-            str(machine_id) for machine_id in machine_ids if str(machine_id) not in lookup
-        ]
-        if unresolved_ids:
-            raise TerminationError(
-                f"Could not resolve {len(unresolved_ids)} requested VMSS member ID(s)",
-                resource_ids=unresolved_ids,
-                details={
-                    "vmss_name": vmss_name,
-                    "unresolved_ids": unresolved_ids,
-                    "available_member_ids": sorted(lookup),
-                },
+        resolved_instance_ids: list[str] = []
+        already_terminated_ids: list[str] = []
+        found_ids: list[str] = []
+        for machine_id in machine_ids:
+            key = str(machine_id)
+            if key in lookup:
+                found_ids.append(key)
+                resolved_instance_ids.append(lookup[key])
+            else:
+                already_terminated_ids.append(key)
+
+        if already_terminated_ids:
+            logger.info(
+                "VMSS '%s': treating %d already-missing member ID(s) as already terminated: %s",
+                vmss_name,
+                len(already_terminated_ids),
+                already_terminated_ids,
             )
 
-        resolved = [lookup[str(machine_id)] for machine_id in machine_ids]
-        if resolved != [str(mid) for mid in machine_ids]:
+        if resolved_instance_ids != found_ids:
             logger.debug(
                 "Resolved VMSS machine IDs for '%s': %s -> %s",
                 vmss_name,
-                machine_ids,
-                resolved,
+                found_ids,
+                resolved_instance_ids,
             )
-        return resolved
+        return resolved_instance_ids, already_terminated_ids
 
     async def _resolve_vmss_instance_ids_async(
         self,
@@ -808,10 +1078,13 @@ class VMSSHandler(AzureHandler):
         vmss_name: str,
         machine_ids: list[str],
         current_members: Optional[list[AzureHandlerStatusResult]] = None,
-    ) -> list[str]:
-        """Async resolve mixed IDs (vm_id/vm_name/instance_id) to VMSS instance IDs."""
+    ) -> tuple[list[str], list[str]]:
+        """Async resolve mixed IDs (vm_id/vm_name/instance_id) to VMSS instance IDs.
+
+        Returns ``(resolved_instance_ids, already_terminated_ids)``.
+        """
         if not machine_ids:
-            return []
+            return [], []
         if current_members is None:
             current_members = await self._list_vmss_instances_async(
                 resource_group=resource_group,
@@ -993,10 +1266,14 @@ class VMSSHandler(AzureHandler):
         include_instance_view: bool,
     ) -> dict[str, Any]:
         """Build the VM list filter Azure expects for Flexible VMSS membership."""
+        safe_resource_group = _validate_odata_filter_name(
+            resource_group, field_name="resource_group"
+        )
+        safe_vmss_name = _validate_odata_filter_name(vmss_name, field_name="vmss_name")
         vmss_resource_id = (
             f"/subscriptions/{self.azure_client.subscription_id}"
-            f"/resourceGroups/{resource_group}"
-            f"/providers/Microsoft.Compute/virtualMachineScaleSets/{vmss_name}"
+            f"/resourceGroups/{safe_resource_group}"
+            f"/providers/Microsoft.Compute/virtualMachineScaleSets/{safe_vmss_name}"
         )
         list_kwargs: dict[str, Any] = {
             "resource_group_name": resource_group,
@@ -1018,10 +1295,12 @@ class VMSSHandler(AzureHandler):
     ) -> AzureHandlerStatusResult:
         """Build the normalized VMSS member status once network identity is resolved."""
         status = "unknown"
+        raw_power_state: str | None = None
         instance_view = vm.instance_view
         vm_statuses = instance_view_statuses(instance_view)
         if vm_statuses is not None:
             status = resolve_power_state(vm_statuses)
+            raw_power_state = resolve_raw_power_state_code(vm_statuses)
             fleet_errors = self._extract_vm_errors(
                 vm_statuses,
                 instance_id=vm_identity.instance_id,
@@ -1065,6 +1344,8 @@ class VMSSHandler(AzureHandler):
             provider_data["vm_name"] = vm_identity.vm_name
         if location:
             provider_data["location"] = str(location)
+        if raw_power_state is not None:
+            provider_data["power_state"] = raw_power_state
         return {
             "instance_id": vm_identity.instance_id,
             "name": vm_identity.vm_name or vm_identity.instance_id,

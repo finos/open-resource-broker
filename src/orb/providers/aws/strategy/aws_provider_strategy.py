@@ -755,6 +755,22 @@ class AWSProviderStrategy(ProviderStrategy):
         return AWSSessionFactory.discover_credentials(credential_source, region)
 
     @classmethod
+    async def test_credentials_async(
+        cls, credential_source: Optional[str] = None, **kwargs
+    ) -> dict:
+        """Test AWS credentials off the event loop.
+
+        boto3 has no native async STS client, so the blocking credential
+        discovery call runs in a worker thread instead of the event loop.
+        """
+        from orb.providers.aws.session_factory import AWSSessionFactory
+
+        region = kwargs.get("region")
+        return await asyncio.to_thread(
+            AWSSessionFactory.discover_credentials, credential_source, region
+        )
+
+    @classmethod
     def get_credential_requirements(cls) -> dict:
         """AWS profiles are region-independent; region is collected separately."""
         return {}

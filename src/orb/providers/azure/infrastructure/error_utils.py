@@ -13,6 +13,8 @@ def _json_response_body(response: Any) -> dict[str, Any] | None:
     """
     if response is None:
         return None
+    # getattr: sync and async transport response objects don't share a typed
+    # protocol for an optional JSON body method.
     json_method = getattr(response, "json", None)
     if not callable(json_method):
         return None
@@ -37,6 +39,8 @@ def _normalise_error_details(details: Any) -> list[dict[str, Any]]:
         if isinstance(item, dict):
             normalised.append(item)
             continue
+        # getattr: a non-dict detail item may be a plain object or an SDK
+        # model instance depending on where the exception was raised.
         code = getattr(item, "code", None)
         message = getattr(item, "message", None)
         if code is None and message is None:
@@ -58,6 +62,10 @@ def extract_azure_error_details(exc: Exception) -> dict[str, Any]:
     etc.) plus non-Azure exceptions.  No single base class exposes all of
     error / response / error_code / status_code / message uniformly.
     """
+    # getattr throughout this function: normalises errors from the full
+    # azure-core hierarchy (HttpResponseError, ServiceRequestError,
+    # ODataV4Error, etc.) plus non-Azure exceptions. No single base class
+    # exposes error / response / error_code / status_code / message uniformly.
     error = getattr(exc, "error", None)
     response = getattr(exc, "response", None)
     exception_details = getattr(exc, "details", None)

@@ -8,7 +8,7 @@ is suitable for long-lived singleton workloads.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 from orb.domain.request.aggregate import Request
@@ -37,7 +37,10 @@ from orb.providers.azure.infrastructure.handlers.azure_handler import (
     AzureSubmittedDeletion,
     azure_raise_on_status_error,
 )
-from orb.providers.azure.infrastructure.handlers.azure_status import resolve_power_state
+from orb.providers.azure.infrastructure.handlers.azure_status import (
+    resolve_power_state,
+    resolve_raw_power_state_code,
+)
 from orb.providers.azure.infrastructure.sdk_shapes import (
     AzureVmRuntimeStatusProtocol,
     AzureVmWithIdentityProtocol,
@@ -155,6 +158,7 @@ class SingleVMHandler(AzureHandler):
         resource_group: str,
         status: str,
         network_identity: AzureNetworkIdentity,
+        power_state: str | None = None,
     ) -> AzureHandlerStatusResult:
         """Build a typed status result for one Azure VM."""
         hw = vm.hardware_profile
@@ -172,6 +176,8 @@ class SingleVMHandler(AzureHandler):
         }
         if vm.vm_id is not None:
             provider_data["vm_id"] = vm.vm_id
+        if power_state is not None:
+            provider_data["power_state"] = power_state
         return {
             "instance_id": str(vm.name),
             "name": str(vm.name),
@@ -432,6 +438,9 @@ class SingleVMHandler(AzureHandler):
                             resolve_power_state(statuses) if statuses is not None else "unknown"
                         ),
                         network_identity=network_identity,
+                        power_state=(
+                            resolve_raw_power_state_code(statuses) if statuses is not None else None
+                        ),
                     )
                 )
             except Exception as exc:
@@ -519,6 +528,89 @@ class SingleVMHandler(AzureHandler):
             failed_deletions=failed_deletions,
         )
         return self._build_release_result(resource_group, submitted_deletions)
+
+    async def start_hosts_async(
+        self,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext] = None,
+    ) -> dict[str, bool]:
+        """Power on stopped/deallocated SingleVM machines."""
+        return await self._submit_power_operation_async(
+            machine_ids=machine_ids,
+            context=context,
+            operation_name="start",
+            submit=lambda compute, resource_group, vm_name: compute.virtual_machines.begin_start(
+                resource_group_name=resource_group,
+                vm_name=vm_name,
+            ),
+        )
+
+    async def stop_hosts_async(
+        self,
+        machine_ids: list[str],
+        resource_id: str,
+        context: Optional[AzureReleaseContext] = None,
+        *,
+        deallocate: bool = True,
+    ) -> dict[str, bool]:
+        """Power off SingleVM machines; deallocates (stops billing) by default."""
+        if deallocate:
+            submit = lambda compute, resource_group, vm_name: (
+                compute.virtual_machines.begin_deallocate(
+                    resource_group_name=resource_group,
+                    vm_name=vm_name,
+                )
+            )
+        else:
+            submit = lambda compute, resource_group, vm_name: (
+                compute.virtual_machines.begin_power_off(
+                    resource_group_name=resource_group,
+                    vm_name=vm_name,
+                )
+            )
+        return await self._submit_power_operation_async(
+            machine_ids=machine_ids,
+            context=context,
+            operation_name="deallocate" if deallocate else "power_off",
+            submit=submit,
+        )
+
+    async def _submit_power_operation_async(
+        self,
+        *,
+        machine_ids: list[str],
+        context: Optional[AzureReleaseContext],
+        operation_name: str,
+        submit: Callable[[Any, str, str], Awaitable[Any]],
+    ) -> dict[str, bool]:
+        """Resolve VM names and submit a start/power-off/deallocate per machine.
+
+        Returns a per-requested-id success map, mirroring the AWS
+        ``start_instances``/``stop_instances`` result shape -- a submission
+        failure for one VM does not fail the whole batch.
+        """
+        resource_group = self._resolve_release_resource_group(
+            context=context,
+            machine_ids=machine_ids,
+        )
+        compute = await self.azure_client.get_async_compute_client()
+        vm_names = await self._resolve_vm_names_async(resource_group, machine_ids)
+        results: dict[str, bool] = {}
+        for original_id, vm_name in zip(machine_ids, vm_names, strict=True):
+            try:
+                await submit(compute, resource_group, vm_name)
+                results[str(original_id)] = True
+            except Exception as exc:
+                self._logger.error(
+                    "Failed to %s VM '%s' (requested id='%s'): %s",
+                    operation_name,
+                    vm_name,
+                    original_id,
+                    exc,
+                )
+                results[str(original_id)] = False
+        return results
 
     # ------------------------------------------------------------------
     # Internal helpers

@@ -1,6 +1,8 @@
 """Tests for GCP provider registration."""
 
-from unittest.mock import MagicMock
+import importlib
+import logging
+from unittest.mock import MagicMock, patch
 
 from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
 
@@ -26,9 +28,9 @@ def _raw_config_with_gcp() -> dict:
 
 
 def test_create_gcp_strategy_builds_initialized_strategy() -> None:
-    from orb.providers.gcp.registration import create_gcp_strategy
+    import orb.providers.gcp.registration as gcp_registration
 
-    strategy = create_gcp_strategy(
+    strategy = gcp_registration.create_gcp_strategy(
         {
             "project_id": "orb-example-12345",
             "region": "us-central1",
@@ -39,36 +41,57 @@ def test_create_gcp_strategy_builds_initialized_strategy() -> None:
     assert strategy.is_initialized is True
 
 
+def test_gcp_auto_registration_failure_on_import_logs_warning_and_does_not_raise(
+    caplog,
+) -> None:
+    """An import-time registration failure must warn, not crash app startup."""
+    import orb.providers.gcp.registration as gcp_registration
+    from orb.infrastructure.registry.template_extension_registry import (
+        TemplateExtensionRegistry,
+    )
+
+    try:
+        with patch.object(
+            TemplateExtensionRegistry,
+            "register_extension",
+            side_effect=RuntimeError("boom"),
+        ):
+            with caplog.at_level(logging.WARNING, logger="orb.providers.gcp.registration"):
+                importlib.reload(gcp_registration)
+
+        assert "Failed to auto-register GCP extensions on import" in caplog.text
+    finally:
+        # Re-run the real (unpatched) auto-registration so later tests see
+        # GCP's extensions registered again.
+        importlib.reload(gcp_registration)
+
+
 def test_register_gcp_provider_registers_cli_spec() -> None:
-    from orb.providers.gcp.registration import register_gcp_provider
+    import orb.providers.gcp.registration as gcp_registration
     from orb.providers.registry import get_provider_registry
 
     registry = get_provider_registry()
     registry.clear_registrations()
 
-    register_gcp_provider(registry=registry, logger=MagicMock())
+    gcp_registration.register_gcp_provider(registry=registry, logger=MagicMock())
 
     assert registry.is_provider_registered("gcp") is True
 
 
 def test_gcp_bootstrap_populates_required_satellites() -> None:
+    import orb.providers.gcp.registration as gcp_registration
     from orb.bootstrap.provider_completeness import assert_provider_registrations_complete
     from orb.infrastructure.registry.template_example_generator_registry import (
         TemplateExampleGeneratorRegistry,
     )
     from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import FieldMappingRegistry
-    from orb.providers.gcp.registration import (
-        initialize_gcp_provider,
-        register_gcp_provider,
-        register_gcp_services_with_di,
-    )
     from orb.providers.registry import get_provider_registry
 
     registry = get_provider_registry()
     registry.clear_registrations()
-    register_gcp_provider(registry=registry)
-    initialize_gcp_provider()
-    register_gcp_services_with_di(MagicMock())
+    gcp_registration.register_gcp_provider(registry=registry)
+    gcp_registration.initialize_gcp_provider()
+    gcp_registration.register_gcp_services_with_di(MagicMock())
 
     assert_provider_registrations_complete()
     mapping = FieldMappingRegistry.get("gcp")
@@ -169,11 +192,11 @@ def test_provider_config_builder_accepts_gcp_provider_instance_config() -> None:
 
 def test_get_typed_gcp_provider_config_via_registry() -> None:
     """get_typed(GCPProviderConfig) resolves through ProviderSettingsRegistry."""
+    import orb.providers.gcp.registration as gcp_registration
     from orb.config.managers.type_converter import ConfigTypeConverter
     from orb.providers.gcp.configuration.config import GCPProviderConfig
-    from orb.providers.gcp.registration import register_gcp_provider_settings
 
-    register_gcp_provider_settings()
+    gcp_registration.register_gcp_provider_settings()
 
     converter = ConfigTypeConverter(_raw_config_with_gcp())
     result = converter.get_typed(GCPProviderConfig)

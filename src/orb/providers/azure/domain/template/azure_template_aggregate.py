@@ -20,6 +20,8 @@ See: https://learn.microsoft.com/en-us/azure/virtual-machine-scale-sets/overview
      https://learn.microsoft.com/en-us/rest/api/compute/virtual-machine-scale-sets
 """
 
+import base64
+import binascii
 from typing import Any, Optional
 
 from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
@@ -662,6 +664,15 @@ class AzureTemplate(Template):
                     "cluster_name is required for CycleCloud templates. "
                     "Specify the name of an existing CycleCloud cluster."
                 )
+
+        # custom_data must be valid base64 -- Azure accepts it verbatim and
+        # fails the VM/VMSS create call opaquely at submission time otherwise,
+        # so reject malformed payloads at template validation instead.
+        if self.custom_data is not None:
+            try:
+                base64.b64decode(self.custom_data, validate=True)
+            except (binascii.Error, ValueError) as exc:
+                raise ValueError(f"custom_data must be valid base64: {exc}") from exc
 
         return self
 

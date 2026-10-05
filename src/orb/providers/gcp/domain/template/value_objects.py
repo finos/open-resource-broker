@@ -14,6 +14,32 @@ _REGION_RE = re.compile(r"^[a-z]+-[a-z0-9]+[0-9]$")
 _ZONE_RE = re.compile(r"^[a-z]+-[a-z0-9]+[0-9]-[a-z]$")
 _RESOURCE_NAME_RE = re.compile(r"^[a-z][a-z0-9-]*[a-z0-9]$")
 
+# https://cloud.google.com/compute/docs/naming-resources: Compute Engine
+# resource names (instances, instance templates, managed instance groups)
+# must satisfy RFC1035 and be at most 63 characters.
+RFC1035_LABEL_PATTERN = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
+GCP_RESOURCE_NAME_MAX_LENGTH = 63
+
+
+def validate_rfc1035_label(value: str, *, field_name: str, max_length: int = 63) -> str:
+    """Validate a GCP resource-name label against RFC1035.
+
+    ``max_length`` lets callers that build a longer resource name by
+    prefixing/suffixing ``value`` (for example
+    ``f"orb-mig-{value}-{uuid}"``) pass a smaller budget so the final
+    generated name still fits GCP's 63-character ceiling.
+    """
+    if not value:
+        raise ValueError(f"{field_name} cannot be empty")
+    if len(value) > max_length:
+        raise ValueError(f"{field_name} must be at most {max_length} characters, got {value!r}")
+    if not RFC1035_LABEL_PATTERN.match(value):
+        raise ValueError(
+            f"{field_name} must match RFC1035 ([a-z]([-a-z0-9]*[a-z0-9])?): "
+            f"lowercase letters, digits, and hyphens, starting with a letter, got {value!r}"
+        )
+    return value
+
 
 class GCPProviderApi(str, Enum):
     """GCP provider APIs."""

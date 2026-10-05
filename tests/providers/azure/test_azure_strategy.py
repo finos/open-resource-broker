@@ -511,6 +511,186 @@ class TestUnsupportedOperation:
         assert result.error_code == "UNSUPPORTED_OPERATION"
 
 
+# ---------------------------------------------------------------------------
+# START_INSTANCES / STOP_INSTANCES / CLEANUP_MACHINE_RESOURCES / GET_MACHINE_HEALTH
+# ---------------------------------------------------------------------------
+
+
+def _machine_coordinates(
+    *, resource_id: str, provider_api: str = "VMSS", resource_group: str = "test-rg"
+) -> dict:
+    return {
+        "provider_data": {"resource_group": resource_group},
+        "provider_api": provider_api,
+        "resource_id": resource_id,
+        "request_id": "req-1",
+    }
+
+
+class TestStartStopInstances:
+    def test_start_instances_dispatches_per_machine_coordinates(self, strategy_harness):
+        strategy = strategy_harness.strategy
+        handler = MagicMock()
+        handler.start_hosts_async = AsyncMock(return_value={"vm-1": True})
+        strategy_harness.handlers["VMSS"] = handler
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.START_INSTANCES,
+            parameters={
+                "instance_ids": ["vm-1"],
+                "machine_coordinates": {
+                    "vm-1": _machine_coordinates(resource_id="vmss-demo"),
+                },
+            },
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert result.success
+        assert result.data["results"] == {"vm-1": True}
+        handler.start_hosts_async.assert_awaited_once()
+        call_kwargs = handler.start_hosts_async.call_args.kwargs
+        assert call_kwargs["machine_ids"] == ["vm-1"]
+        assert call_kwargs["resource_id"] == "vmss-demo"
+        assert call_kwargs["context"].resource_group == "test-rg"
+
+    def test_start_instances_requires_machine_coordinates(self, strategy):
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.START_INSTANCES,
+            parameters={"instance_ids": ["vm-1"], "machine_coordinates": {}},
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "MISSING_MACHINE_COORDINATES"
+
+    def test_stop_instances_deallocates_by_default(self, strategy_harness):
+        strategy = strategy_harness.strategy
+        handler = MagicMock()
+        handler.stop_hosts_async = AsyncMock(return_value={"vm-1": True})
+        strategy_harness.handlers["VMSS"] = handler
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.STOP_INSTANCES,
+            parameters={
+                "instance_ids": ["vm-1"],
+                "machine_coordinates": {
+                    "vm-1": _machine_coordinates(resource_id="vmss-demo"),
+                },
+            },
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert result.success
+        handler.stop_hosts_async.assert_awaited_once()
+        assert handler.stop_hosts_async.call_args.kwargs["deallocate"] is True
+
+    def test_stop_instances_honors_explicit_deallocate_false(self, strategy_harness):
+        strategy = strategy_harness.strategy
+        handler = MagicMock()
+        handler.stop_hosts_async = AsyncMock(return_value={"vm-1": True})
+        strategy_harness.handlers["VMSS"] = handler
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.STOP_INSTANCES,
+            parameters={
+                "instance_ids": ["vm-1"],
+                "machine_coordinates": {
+                    "vm-1": _machine_coordinates(resource_id="vmss-demo"),
+                },
+                "deallocate": False,
+            },
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert result.success
+        assert handler.stop_hosts_async.call_args.kwargs["deallocate"] is False
+
+    def test_start_instances_groups_machines_by_resource(self, strategy_harness):
+        """One batch spanning two VMSS resources dispatches two handler calls."""
+        strategy = strategy_harness.strategy
+        handler = MagicMock()
+        handler.start_hosts_async = AsyncMock(side_effect=[{"vm-1": True}, {"vm-2": True}])
+        strategy_harness.handlers["VMSS"] = handler
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.START_INSTANCES,
+            parameters={
+                "instance_ids": ["vm-1", "vm-2"],
+                "machine_coordinates": {
+                    "vm-1": _machine_coordinates(resource_id="vmss-a"),
+                    "vm-2": _machine_coordinates(resource_id="vmss-b"),
+                },
+            },
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert result.success
+        assert result.data["results"] == {"vm-1": True, "vm-2": True}
+        assert handler.start_hosts_async.await_count == 2
+
+    def test_start_instances_handler_rejection_fails_only_that_group(self, strategy_harness):
+        """CycleCloud (and any handler without start support) fails its own group only."""
+        strategy = strategy_harness.strategy
+        vmss_handler = MagicMock()
+        vmss_handler.start_hosts_async = AsyncMock(return_value={"vm-1": True})
+        cyclecloud_handler = MagicMock()
+        cyclecloud_handler.start_hosts_async = AsyncMock(
+            side_effect=AzureValidationError(
+                "start_instances is not supported for CycleCloudHandler",
+                error_code="UNSUPPORTED_OPERATION",
+            )
+        )
+        strategy_harness.handlers["VMSS"] = vmss_handler
+        strategy_harness.handlers["CycleCloud"] = cyclecloud_handler
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.START_INSTANCES,
+            parameters={
+                "instance_ids": ["vm-1", "cc-1"],
+                "machine_coordinates": {
+                    "vm-1": _machine_coordinates(resource_id="vmss-a"),
+                    "cc-1": _machine_coordinates(
+                        resource_id="cluster-1", provider_api="CycleCloud"
+                    ),
+                },
+            },
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert result.success
+        assert result.data["results"] == {"vm-1": True, "cc-1": False}
+
+
+class TestCleanupAndHealthUnsupported:
+    def test_cleanup_machine_resources_is_documented_unsupported(self, strategy):
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.CLEANUP_MACHINE_RESOURCES,
+            parameters={},
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "CLEANUP_MACHINE_RESOURCES_NOT_SUPPORTED"
+
+    def test_get_machine_health_is_documented_unsupported(self, strategy):
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.GET_MACHINE_HEALTH,
+            parameters={},
+        )
+
+        result = run_operation(strategy.execute_operation(op))
+
+        assert not result.success
+        assert result.error_code == "GET_MACHINE_HEALTH_NOT_SUPPORTED"
+
+
 class TestSpotPlacementScoreAdapter:
     def test_score_candidates_uses_template_location_value_object(self, logger):
         adapter = AzureSpotPlacementScoreAdapter(
