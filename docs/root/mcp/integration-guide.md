@@ -41,6 +41,30 @@ orb mcp serve --transport http --host 127.0.0.1 --port 8000 --path /mcp
 When the transport is `stdio`, the `--host`/`--port`/`--path` flags are ignored;
 the client speaks JSON-RPC over the process's standard input and output.
 
+### Authentication for the Streamable HTTP transport
+
+The Streamable HTTP transport reuses the REST API's `server.auth` configuration.
+When `server.auth.enabled` is true, every request to the mounted path is
+authenticated with the configured strategy (bearer token, IAM, Cognito, and so
+on) before it reaches a tool, and each tool enforces the same minimum role its
+REST equivalent requires — `request_machines`, `return_machines`,
+`cancel_request`, `stop_machines`, and `start_machines` require at least the
+`operator` role; the remaining tools require `viewer`.
+
+When `server.auth.enabled` is false, every caller is treated as an anonymous
+viewer, so the mutating tools listed above are refused for everyone. Bind to
+`127.0.0.1` (the default) unless authentication is enabled; binding to a
+non-loopback host with authentication disabled logs a warning. The stdio
+transport has no network boundary and is not affected by this configuration.
+
+The REST API also accepts a daemon-issued loopback-admin token regardless of
+`server.auth.enabled`, so the CLI's reload command and local tooling can
+authenticate as admin without a configured auth strategy. The Streamable HTTP
+transport does not implement this bypass: its authentication is governed
+entirely by `server.auth.enabled` and the configured strategy, with no
+loopback-admin exception. A caller reaching the MCP transport from the same
+host as the broker gets no special treatment.
+
 ### Validating the tool set offline
 
 `orb mcp validate` builds the tool set straight from the catalog — no server or
