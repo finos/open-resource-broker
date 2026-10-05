@@ -15,7 +15,7 @@ Each SDK covers all 45 operations in the current API spec
 |----------|---------|-------------|-------------|
 | [Python](#python) | `pip install orb-py` | `orb.ORBClient` | Python 3.11 |
 | [Go](#go) | `go get github.com/finos/open-resource-broker/sdk/go` | `orb.Client` | Go 1.24 |
-| [TypeScript / Node](#typescript--node) | `npm install @finos/open-resource-broker` | `OrbClient` | Node 18 |
+| [TypeScript / Node](#typescript--node) | `npm install @finos/open-resource-broker` | `OrbClient` | Node 22 |
 | [Java](#java) | `org.finos.openresourcebroker:open-resource-broker-java:0.1.0` | `OrbClient` | Java 17 |
 | [Kotlin](#kotlin) | `org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0` | `OrbClient` | JVM 17 |
 | [.NET / C#](#net--c) | `dotnet add package FINOS.OpenResourceBroker` | `OrbClient` | .NET 8 |

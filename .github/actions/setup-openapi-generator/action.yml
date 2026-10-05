@@ -19,7 +19,7 @@ inputs:
   node-version:
     description: Node.js version for the openapi-generator-cli npm wrapper.
     required: false
-    default: '20'
+    default: '24'
   node-registry-url:
     description: >-
       Optional npm registry URL to configure on setup-node (used by the npm
