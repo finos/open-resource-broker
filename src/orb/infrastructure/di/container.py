@@ -8,7 +8,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any, Optional, TypeVar
 
-from orb.domain.base.ports import ContainerPort
 from orb.infrastructure.di.components import (
     CQRSHandlerRegistry,
     DependencyResolver,
@@ -47,10 +46,16 @@ def timed_operation(operation_name: str) -> Iterator[None]:
             logger.debug("DI operation '%s': %.3fs", operation_name, elapsed)
 
 
-class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
+class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort):
     """
     Dependency injection container using composition of focused components.
     Includes lazy loading capabilities for improved startup performance.
+
+    Does not implement the domain ``ContainerPort`` contract directly — that
+    port's ``register(service_type, instance)`` shape is intentionally
+    different from this class's CQRS-oriented ``register(DependencyRegistration)``.
+    ``ContainerAdapter`` wraps a ``DIContainer`` instance to provide the
+    ``ContainerPort``-shaped API for domain/application code.
     """
 
     def __init__(self) -> None:

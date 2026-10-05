@@ -31,7 +31,7 @@ class ContainerAdapter(ContainerPort):
 
     def register(self, service_type: type[T], instance: T) -> None:
         """Register service instance in container."""
-        self._container.register(service_type, instance)  # type: ignore[call-arg]
+        self._container.register_instance(service_type, instance)
 
     def register_factory(self, service_type: type[T], factory_func) -> None:
         """Register service factory in container."""
