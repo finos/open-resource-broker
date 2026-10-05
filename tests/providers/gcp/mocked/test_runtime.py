@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import threading
 import uuid
 from concurrent.futures import TimeoutError as FutureTimeoutError
@@ -40,6 +41,26 @@ from orb.providers.gcp.types import (
     GCPInstanceRecord,
     GCPMutationOutcome,
 )
+
+_FILTER_CLAUSE_RE = re.compile(r'\(instance eq "([^"]+)"\)')
+
+
+def _apply_instance_filter(members: list[object], instance_filter: str | None) -> list[object]:
+    """Simulate GCP's server-side ``instance eq <regex>`` filter evaluation.
+
+    Real GCP applies the filter server-side before returning results; the
+    production handlers build it from untrusted-ish instance names, so the
+    mock must actually evaluate it (rather than ignore it, as it previously
+    did) for a wrong-filter bug to be caught by these tests.
+    """
+    if not instance_filter:
+        return members
+    patterns = [re.compile(clause) for clause in _FILTER_CLAUSE_RE.findall(instance_filter)]
+    return [
+        member
+        for member in members
+        if any(pattern.search(str(member.instance_url)) for pattern in patterns)
+    ]
 
 
 class _ComputeClientStub:
@@ -168,8 +189,10 @@ class _ComputeClientStub:
         mig_name: str,
         instance_filter: str | None = None,
     ) -> list[object]:
-        _ = region, instance_filter
-        return self.regional_managed_instances.get(mig_name, [])
+        _ = region
+        return _apply_instance_filter(
+            self.regional_managed_instances.get(mig_name, []), instance_filter
+        )
 
     def start_instance(self, *, zone: str, instance_name: str) -> object:
         _ = zone
@@ -1237,6 +1260,75 @@ def test_mig_handler_terminates_subset_with_delete_managed_instances() -> None:
         )
     ]
     assert compute_client.deleted_templates == []
+
+
+def test_build_instance_filter_builds_exact_escaped_and_anchored_clauses() -> None:
+    result = GCPManagedInstanceGroupHandler._build_instance_filter(["vm-a", "vm-b"])
+
+    assert result == '(instance eq ".*/vm\\-a$") OR (instance eq ".*/vm\\-b$")'
+
+
+def test_build_instance_filter_accepts_full_urls_and_uses_the_trailing_name() -> None:
+    result = GCPManagedInstanceGroupHandler._build_instance_filter(
+        ["projects/orb-example-12345/zones/us-central1-a/instances/vm-a"]
+    )
+
+    assert result == '(instance eq ".*/vm\\-a$")'
+
+
+def test_build_instance_filter_rejects_a_name_outside_gcp_naming_rules() -> None:
+    with pytest.raises(GCPValidationError, match="RFC1035"):
+        GCPManagedInstanceGroupHandler._build_instance_filter(["Not_A_Valid_Name"])
+
+
+def test_mig_handler_terminate_filter_excludes_similarly_named_sibling() -> None:
+    """Regression test for the unanchored filter matching extra instances.
+
+    Without the trailing ``$`` anchor, a filter built for "vm-1" also
+    matches "vm-10" because GCP's filter evaluates the value as a regex
+    search rather than an exact match. The targeted delete must only ever
+    include the requested instance.
+    """
+    compute_client = _ComputeClientStub()
+    compute_client.regional_managed_instances = {
+        "mig-a": [
+            SimpleNamespace(
+                instance_url="projects/orb-example-12345/zones/us-central1-a/instances/vm-1",
+                instance_status="RUNNING",
+                current_action="NONE",
+            ),
+            SimpleNamespace(
+                instance_url="projects/orb-example-12345/zones/us-central1-a/instances/vm-10",
+                instance_status="RUNNING",
+                current_action="NONE",
+            ),
+        ],
+    }
+    handler = GCPManagedInstanceGroupHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+
+    result = handler.terminate_hosts(
+        resource_ids=["mig-a"],
+        instance_ids=["vm-1"],
+        context={
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "scope": "regional",
+            "instance_template_name": "orb-template-a",
+        },
+    )
+
+    assert result.attempted_ids == ["vm-1"]
+    assert compute_client.deleted_regional_managed_instances == [
+        (
+            "us-central1",
+            "mig-a",
+            ["projects/orb-example-12345/zones/us-central1-a/instances/vm-1"],
+        )
+    ]
 
 
 def test_mig_handler_status_treats_missing_mig_as_empty() -> None:

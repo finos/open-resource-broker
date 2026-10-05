@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
@@ -10,7 +11,7 @@ from typing import Protocol
 
 from orb.domain.request.aggregate import Request
 from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
-from orb.providers.gcp.domain.template.value_objects import GCPMIGScope
+from orb.providers.gcp.domain.template.value_objects import GCPMIGScope, validate_rfc1035_label
 from orb.providers.gcp.exceptions import (
     GCPEntityNotFoundError,
     GCPError,
@@ -703,11 +704,23 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         The ``instance`` field on ManagedInstance is a full URL
         (``projects/…/zones/…/instances/{name}``).  A suffix regex handles
         both short names and fully-qualified URLs as input.
+
+        Each name is validated against the GCP resource-name grammar and
+        escaped before interpolation: the filter value is itself a regex
+        evaluated server-side, so an unescaped name could change which
+        instances match (and the trailing ``$`` anchor guards against a
+        name like "vm-1" also matching "vm-10").
         """
         clauses = []
         for instance_id in instance_ids:
             name = str(instance_id).rsplit("/", 1)[-1]
-            clauses.append(f'(instance eq ".*/{name}")')
+            try:
+                validate_rfc1035_label(name, field_name="instance name")
+            except ValueError as exc:
+                raise GCPValidationError(
+                    str(exc), details={"instance_id": str(instance_id)}
+                ) from exc
+            clauses.append(f'(instance eq ".*/{re.escape(name)}$")')
         return " OR ".join(clauses)
 
     @staticmethod
