@@ -63,13 +63,41 @@ fi
 
 log "INFO: ResumeProgram called with nodes: ${NODE_LIST}"
 
-# --- Compute node count from SLURM hostlist ---
-NUM_NODES=$(scontrol show hostnames "${NODE_LIST}" | wc -l | tr -d ' ')
+# --- Expand SLURM hostlist (handles bracket ranges like compute-[001-003]) ---
+EXPANDED_NODES=$(scontrol show hostnames "${NODE_LIST}")
+NUM_NODES=$(printf '%s\n' "${EXPANDED_NODES}" | grep -c .)
 log "INFO: Resolved ${NUM_NODES} nodes from hostlist"
 
 # --- Single batch request to ORB ---
 if [ "${ORB_MODE}" = "api" ]; then
-    PAYLOAD="{\"node_names\": [\"${NODE_LIST// /\", \"}\"], \"request_type\": \"provision\"}"
+    # Build the node_names JSON array from the EXPANDED hostnames, not from
+    # NODE_LIST directly — NODE_LIST may still contain a SLURM bracket range
+    # (e.g. "compute-[001-003]"), which has no spaces, so naive
+    # ${NODE_LIST// /", "} substitution would produce one malformed element
+    # instead of N expanded node names.
+    if command -v jq >/dev/null 2>&1; then
+        NODE_NAMES_JSON=$(printf '%s\n' "${EXPANDED_NODES}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+    else
+        NODE_NAMES_JSON="["
+        FIRST=1
+        while IFS= read -r NODE; do
+            [ -z "${NODE}" ] && continue
+            if [ "${FIRST}" -eq 1 ]; then
+                FIRST=0
+            else
+                NODE_NAMES_JSON="${NODE_NAMES_JSON},"
+            fi
+            # Node names are already restricted to [][a-zA-Z0-9 ,_-] by the
+            # validation above, so only '"' and '\' need escaping for JSON.
+            ESCAPED=$(printf '%s' "${NODE}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+            NODE_NAMES_JSON="${NODE_NAMES_JSON}\"${ESCAPED}\""
+        done <<EOF
+${EXPANDED_NODES}
+EOF
+        NODE_NAMES_JSON="${NODE_NAMES_JSON}]"
+    fi
+
+    PAYLOAD="{\"node_names\": ${NODE_NAMES_JSON}, \"request_type\": \"provision\"}"
     RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
         -H "Content-Type: application/json" \
         -d "${PAYLOAD}" \

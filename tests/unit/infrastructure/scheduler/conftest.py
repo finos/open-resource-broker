@@ -10,6 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
+from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
     HostFactorySchedulerStrategy,
@@ -26,6 +27,45 @@ from tests.providers.aws.live.plugin_io_schemas import (
     expected_request_status_schema_hostfactory,
     expected_request_status_schema_slurm,
 )
+
+# ---------------------------------------------------------------------------
+# Shared fake LoggingPort — for Slurm helpers that require an injected logger
+# ---------------------------------------------------------------------------
+
+
+class FakeLoggingPort(LoggingPort):
+    """Records every call made through the LoggingPort interface."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, tuple]] = []
+
+    def debug(self, message, *args, **kwargs):
+        self.calls.append(("debug", (message, *args)))
+
+    def info(self, message, *args, **kwargs):
+        self.calls.append(("info", (message, *args)))
+
+    def warning(self, message, *args, **kwargs):
+        self.calls.append(("warning", (message, *args)))
+
+    def error(self, message, *args, **kwargs):
+        self.calls.append(("error", (message, *args)))
+
+    def critical(self, message, *args, **kwargs):
+        self.calls.append(("critical", (message, *args)))
+
+    def exception(self, message, *args, **kwargs):
+        self.calls.append(("exception", (message, *args)))
+
+    def log(self, level, message, *args, **kwargs):
+        self.calls.append(("log", (message, *args)))
+
+
+@pytest.fixture
+def fake_logger() -> FakeLoggingPort:
+    """A fresh FakeLoggingPort instance per test."""
+    return FakeLoggingPort()
+
 
 # ---------------------------------------------------------------------------
 # Minimal fixture templates

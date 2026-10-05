@@ -259,10 +259,139 @@ expected_request_status_schema_default = {
 }
 
 
-# SLURM scheduler schemas - same as default (snake_case) for now
-expected_get_available_templates_schema_slurm = expected_get_available_templates_schema_default
-expected_request_machines_schema_slurm = expected_request_machines_schema_default
-expected_request_status_schema_slurm = expected_request_status_schema_default
+# SLURM scheduler schemas — distinct from "default": SLURM's wire format uses
+# max_instances (not max_capacity), partition_name/node_list (not present on
+# "default" at all), a "count" envelope key (not total_count), and a machine
+# shape keyed by node_name (not name/launch_time) since node names are
+# fungible capacity slots rather than persistent machine identities.
+expected_get_available_templates_schema_slurm = {
+    "type": "object",
+    "required": ["templates", "message", "count"],
+    "properties": {
+        "templates": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["template_id", "max_instances", "partition_name", "is_active"],
+                "properties": {
+                    "template_id": {"type": "string"},
+                    "max_instances": {"type": "integer", "minimum": 1},
+                    "partition_name": {"type": "string"},
+                    "node_list": {"type": ["string", "null"]},
+                    "is_active": {"type": "boolean"},
+                    "attributes": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string"},
+                            "ncpus": {"type": ["integer", "null"]},
+                            "nram": {"type": ["integer", "null"]},
+                        },
+                        "additionalProperties": False,
+                    },
+                },
+                "additionalProperties": True,
+            },
+        },
+        "message": {"type": "string"},
+        "count": {"type": "integer"},
+    },
+    "additionalProperties": True,
+}
+
+expected_request_machines_schema_slurm = {
+    "type": "object",
+    "required": ["request_id", "message", "status"],
+    "properties": {
+        # Resume/suspend requests can return a null request_id (the batch
+        # power-save hooks don't always allocate one) — unlike hostfactory
+        # and "default", which always mint a req-<uuid> identifier.
+        "request_id": {
+            "type": ["string", "null"],
+            "pattern": "^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        },
+        "message": {"type": "string"},
+        "status": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "in_progress",
+                "complete",
+                "failed",
+                "cancelled",
+                "timeout",
+                "partial",
+                "acquiring",
+            ],
+        },
+    },
+    "additionalProperties": True,
+}
+
+expected_request_status_schema_slurm = {
+    "type": "object",
+    "required": ["requests", "message", "count"],
+    "properties": {
+        "requests": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["request_id", "status", "machines", "message"],
+                "properties": {
+                    "request_id": {"type": ["string", "null"]},
+                    # SLURM passes the full domain RequestStatus vocabulary through
+                    # unchanged (see SlurmFieldMapper / format_request_status_response
+                    # contract tests) rather than mapping to a scheduler-specific
+                    # status vocabulary like hostfactory does — so this enum covers
+                    # every domain value, including "acquiring" and "partial_pending",
+                    # which "default"'s schema does not enumerate.
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "in_progress",
+                            "complete",
+                            "failed",
+                            "cancelled",
+                            "partial",
+                            "partial_pending",
+                            "timeout",
+                            "acquiring",
+                        ],
+                    },
+                    "machines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["machine_id", "name", "result", "status"],
+                            "properties": {
+                                "machine_id": {"type": "string"},
+                                "name": {"type": "string"},
+                                "status": {"type": "string"},
+                                "instance_type": {"type": ["string", "null"]},
+                                "private_ip_address": {
+                                    "type": ["string", "null"],
+                                    "pattern": "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$",
+                                },
+                                "result": {
+                                    "type": "string",
+                                    "enum": ["executing", "succeed", "fail"],
+                                },
+                                "launch_time": {"type": ["integer", "null"]},
+                                "message": {"type": "string"},
+                            },
+                            "additionalProperties": True,
+                        },
+                    },
+                    "message": {"type": "string"},
+                },
+                "additionalProperties": True,
+            },
+        },
+        "message": {"type": "string"},
+        "count": {"type": "integer"},
+    },
+    "additionalProperties": True,
+}
 
 
 # Backward compatibility aliases (default to hostfactory for existing code)

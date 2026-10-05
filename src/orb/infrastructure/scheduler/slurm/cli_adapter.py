@@ -1,11 +1,13 @@
 """SLURM CLI adapter — fallback for environments without slurmrestd."""
 
-import logging
 import re
 import subprocess
+from typing import TYPE_CHECKING
 
-_logger = logging.getLogger(__name__)
 _NAME_RE = re.compile(r"^[a-zA-Z0-9\-_]+$")
+
+if TYPE_CHECKING:
+    from orb.domain.base.ports.logging_port import LoggingPort
 
 
 class SlurmCliAdapter:
@@ -17,6 +19,7 @@ class SlurmCliAdapter:
 
     def __init__(
         self,
+        logger: "LoggingPort",
         sinfo_path: str = "sinfo",
         scontrol_path: str = "scontrol",
         timeout: int = 30,
@@ -24,6 +27,7 @@ class SlurmCliAdapter:
         self._sinfo = sinfo_path
         self._scontrol = scontrol_path
         self._timeout = timeout
+        self._logger = logger
 
     @staticmethod
     def _validate_name(value: str, label: str) -> None:
@@ -32,12 +36,14 @@ class SlurmCliAdapter:
 
     def _run_command(self, cmd: list[str]) -> str:
         """Execute a command securely (no shell=True) with timeout."""
-        _logger.debug("Running command: %s", cmd)
+        self._logger.debug("Running command: %s", cmd)
         result = subprocess.run(
             cmd, capture_output=True, text=True, timeout=self._timeout, shell=False, check=False
         )
         if result.returncode != 0:
-            _logger.error("Command %s failed (rc=%d): %s", cmd, result.returncode, result.stderr)
+            self._logger.error(
+                "Command %s failed (rc=%d): %s", cmd, result.returncode, result.stderr
+            )
             raise RuntimeError(f"Command failed (rc={result.returncode}): {result.stderr.strip()}")
         return result.stdout
 
@@ -58,7 +64,7 @@ class SlurmCliAdapter:
         try:
             output = self._run_command([self._sinfo, "-N", "-h", "-o", "%N %T %P %c %m"])
         except (RuntimeError, subprocess.TimeoutExpired, FileNotFoundError) as e:
-            _logger.error("get_nodes failed: %s", e)
+            self._logger.error("get_nodes failed: %s", e)
             return {}
 
         nodes = []
@@ -82,7 +88,7 @@ class SlurmCliAdapter:
         try:
             output = self._run_command([self._scontrol, "show", "node", node_name])
         except (RuntimeError, subprocess.TimeoutExpired, FileNotFoundError) as e:
-            _logger.error("get_node(%s) failed: %s", node_name, e)
+            self._logger.error("get_node(%s) failed: %s", node_name, e)
             return {}
         return self._parse_scontrol_output(output)
 
@@ -93,7 +99,7 @@ class SlurmCliAdapter:
         try:
             output = self._run_command([self._sinfo, "-h", "-o", "%P %a %l %D %C"])
         except (RuntimeError, subprocess.TimeoutExpired, FileNotFoundError) as e:
-            _logger.error("get_partitions failed: %s", e)
+            self._logger.error("get_partitions failed: %s", e)
             return {}
 
         partitions = []
@@ -117,7 +123,7 @@ class SlurmCliAdapter:
         try:
             output = self._run_command([self._scontrol, "show", "partition", partition_name])
         except (RuntimeError, subprocess.TimeoutExpired, FileNotFoundError) as e:
-            _logger.error("get_partition(%s) failed: %s", partition_name, e)
+            self._logger.error("get_partition(%s) failed: %s", partition_name, e)
             return {}
         return self._parse_scontrol_output(output)
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
@@ -17,25 +16,15 @@ if TYPE_CHECKING:
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from orb.domain.base.operations import OperationType as ProviderOperationType
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
 
-
-class ProviderOperationType(str, Enum):
-    """Types of provider operations that can be executed via strategy pattern."""
-
-    CREATE_INSTANCES = "create_instances"
-    TERMINATE_INSTANCES = "terminate_instances"
-    GET_INSTANCE_STATUS = "get_instance_status"
-    DESCRIBE_RESOURCE_INSTANCES = "describe_resource_instances"
-    VALIDATE_TEMPLATE = "validate_template"
-    GET_AVAILABLE_TEMPLATES = "get_available_templates"
-    HEALTH_CHECK = "health_check"
-    RESOLVE_IMAGE = "resolve_image"
-    START_INSTANCES = "start_instances"
-    STOP_INSTANCES = "stop_instances"
-    CLEANUP_MACHINE_RESOURCES = "cleanup_machine_resources"
-    GET_MACHINE_HEALTH = "get_machine_health"
-    TAG_INSTANCES = "tag_instances"
+# ProviderOperationType is the domain OperationType re-exported under its
+# historical provider-layer name — this used to be a second, independently
+# declared enum with identical members, which risked drifting from the
+# domain enum. A single canonical enum is now defined once in
+# orb.domain.base.operations and re-exported here so every existing
+# ProviderOperationType.* call site keeps working unchanged.
 
 
 @dataclass

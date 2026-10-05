@@ -52,11 +52,23 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             from orb.infrastructure.scheduler.slurm.rest_client import SlurmRestClient
 
             token = os.environ.get("SLURM_ORB_JWT_TOKEN")
-            self._slurm_client = SlurmRestClient(base_url=slurmrestd_url, token=token)
+            allow_insecure_http = os.environ.get(
+                "SLURM_ORB_RESTD_ALLOW_HTTP", ""
+            ).strip().lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            self._slurm_client = SlurmRestClient(
+                base_url=slurmrestd_url,
+                token=token,
+                logger=self.logger,
+                allow_insecure_http=allow_insecure_http,
+            )
         else:
             from orb.infrastructure.scheduler.slurm.cli_adapter import SlurmCliAdapter
 
-            self._slurm_client = SlurmCliAdapter()
+            self._slurm_client = SlurmCliAdapter(logger=self.logger)
 
         return self._slurm_client
 
@@ -302,6 +314,14 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             self._node_mapper = SlurmNodeMapper()
         return self._node_mapper
 
+    def expand_node_range(self, node_spec: str) -> list[str]:
+        """Expand SLURM hostlist syntax (e.g. "compute-[001-003]") to individual node names.
+
+        Exposed via SchedulerPort so interface-layer callers (CLI/REST handlers)
+        don't need to import SlurmNodeMapper directly from infrastructure.
+        """
+        return self.node_mapper.expand_node_range(node_spec)
+
     def handle_resume_request(self, node_names: list[str]) -> dict[str, Any]:
         """Handle a batch ResumeProgram call for dynamic slot model.
 
@@ -358,16 +378,81 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
     def _resolve_template_for_nodes(self, node_names: list[str]) -> Any:
         """Resolve which template/partition these node slots belong to.
 
-        All nodes in a ResumeProgram call are from the same partition. Node names
-        are fungible slots — the backing instance is arbitrary.
+        All nodes in a ResumeProgram call are from the same partition (SLURM
+        guarantees this), so only the first node needs to be queried. The
+        partition is looked up via the configured SLURM client (REST or CLI)
+        and mapped to a template_id via `scheduler.slurm.partitions.<partition>
+        .template_id` if configured, otherwise by using the partition name
+        itself — matching the one-template-per-partition convention produced
+        by `generate_scheduler_templates`.
+
+        Raises ValueError if the partition cannot be determined, instead of
+        silently falling back to a "default" template that may have the wrong
+        instance type/AMI for the partition's actual resource requirements.
         """
-        # In a full implementation, this would query SLURM (via REST or CLI) to
-        # determine which partition the nodes belong to, then match to a template.
-        # For now, return a minimal template reference.
         from orb.infrastructure.template.dtos import TemplateDTO
 
-        # Default fallback template
-        return TemplateDTO(template_id="default", max_instances=len(node_names))
+        if not node_names:
+            raise ValueError("_resolve_template_for_nodes requires at least one node name")
+
+        partition_name = self._lookup_partition_for_node(node_names[0])
+        if not partition_name:
+            raise ValueError(
+                f"Could not determine SLURM partition for node '{node_names[0]}'; "
+                "cannot resolve a provisioning template. Configure "
+                "scheduler.slurm.partitions.<partition>.template_id or ensure the "
+                "node is defined in a SLURM partition reachable via sinfo/scontrol "
+                "or slurmrestd."
+            )
+
+        template_id = self._template_id_for_partition(partition_name)
+        return TemplateDTO(template_id=template_id, max_instances=len(node_names))
+
+    def _lookup_partition_for_node(self, node_name: str) -> str | None:
+        """Query SLURM (REST or CLI, whichever is configured) for a node's partition."""
+        try:
+            client = self._get_slurm_client()
+            node_data = client.get_node(node_name)
+        except Exception as e:
+            self.logger.warning("Could not query partition for node '%s': %s", node_name, e)
+            return None
+        return self._extract_partition_name(node_data)
+
+    @staticmethod
+    def _extract_partition_name(node_data: dict[str, Any]) -> str | None:
+        """Extract the first partition name from a CLI or REST node payload.
+
+        CLI adapter (scontrol show node): {"Partitions": "gpu,compute", ...}
+        REST client (slurmrestd GET /node/{name}): {"nodes": [{"partitions": ["gpu"]}]}
+        """
+        if not node_data:
+            return None
+
+        partitions_raw = node_data.get("Partitions")
+        if isinstance(partitions_raw, str) and partitions_raw:
+            return partitions_raw.split(",")[0].strip() or None
+
+        nodes = node_data.get("nodes")
+        if isinstance(nodes, list) and nodes:
+            node0 = nodes[0]
+            if isinstance(node0, dict):
+                partitions = node0.get("partitions")
+                if isinstance(partitions, list) and partitions:
+                    return str(partitions[0])
+
+        return None
+
+    def _template_id_for_partition(self, partition_name: str) -> str:
+        """Map a SLURM partition name to a template_id.
+
+        Honors an explicit override in scheduler.slurm.partitions.<partition>
+        .template_id; otherwise uses the partition name itself, matching the
+        convention used by generate_scheduler_templates (one template per
+        partition, keyed by PartitionName).
+        """
+        prefs = self._get_partition_preferences()
+        override = prefs.get(partition_name, {}).get("template_id")
+        return override or partition_name
 
     def register_provisioned_nodes(self, nodes: list[dict[str, str]]) -> None:
         """Register provisioned nodes: store mappings and call scontrol update.
@@ -377,7 +462,7 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         """
         from orb.infrastructure.scheduler.slurm.node_bootstrap import SlurmNodeBootstrap
 
-        bootstrap = SlurmNodeBootstrap()
+        bootstrap = SlurmNodeBootstrap(logger=self.logger)
 
         for node in nodes:
             node_name = node.get("node_name", "")
