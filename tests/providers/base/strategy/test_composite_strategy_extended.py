@@ -285,3 +285,77 @@ class TestCompositeRedundantMode:
         composite.initialize()
         result = _run(composite.execute_operation(make_op()))
         assert result.success
+
+
+# ---------------------------------------------------------------------------
+# remove_strategy — removing the last remaining strategy skips rebalancing
+# (branch 209->214: `if self._strategies:` false when the dict is now empty)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCompositeRemoveLastStrategy:
+    def test_removing_last_strategy_leaves_empty_weights(self, mock_logger):
+        s = ConcreteProviderStrategy("only_one")
+        composite = CompositeProviderStrategy(mock_logger, [s])
+        composite.initialize()
+
+        removed = composite.remove_strategy("only_one")
+
+        assert removed is True
+        assert composite.composed_strategies == {}
+
+
+# ---------------------------------------------------------------------------
+# _select_strategy_by_weight — fallback return when weighted random
+# selection never satisfies rand_val <= cumulative inside the loop
+# (line 459)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCompositeSelectStrategyByWeightLoopFallback:
+    def test_random_value_exceeding_total_weight_falls_back_to_first(self, mock_logger):
+        s_a = ConcreteProviderStrategy("fallback_a")
+        s_b = ConcreteProviderStrategy("fallback_b")
+        composite = CompositeProviderStrategy(mock_logger, [s_a, s_b])
+
+        fake_random = MagicMock()
+        # random() * total_weight must exceed total_weight so the loop's
+        # cumulative sum never reaches rand_val, falling through to the
+        # final `return next(iter(strategies.keys()))` statement.
+        fake_random.random.return_value = 1.5
+
+        with patch(
+            "orb.providers.base.strategy.composite_strategy.secrets.SystemRandom",
+            return_value=fake_random,
+        ):
+            selected = composite._select_strategy_by_weight(composite.composed_strategies)
+
+        assert selected in ("fallback_a", "fallback_b")
+
+
+# ---------------------------------------------------------------------------
+# _aggregate_results — unknown aggregation policy falls back to merge_all
+# (line 544)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCompositeAggregateResultsUnknownPolicyFallback:
+    def test_unknown_aggregation_policy_falls_back_to_merge_all(self, mock_logger):
+        s = ConcreteProviderStrategy(
+            "unknown_policy_s", operation_result=ProviderResult.success_result({"a": 1})
+        )
+        cfg = CompositionConfig(mode=CompositionMode.PARALLEL)
+        composite = CompositeProviderStrategy(mock_logger, [s], config=cfg)
+        composite.initialize()
+
+        # AggregationPolicy is a str Enum; bypass validation to force the
+        # `else` branch in _aggregate_results.
+        composite._config.aggregation_policy = "totally_unknown_policy"  # type: ignore[assignment]
+
+        result = _run(composite.execute_operation(make_op()))
+
+        assert result.success
+        assert result.metadata.get("aggregation_policy") == "merge_all"

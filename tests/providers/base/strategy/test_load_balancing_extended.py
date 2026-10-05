@@ -21,7 +21,11 @@ from orb.providers.base.strategy.load_balancing.config import LoadBalancingConfi
 from orb.providers.base.strategy.load_balancing.strategy import (
     LoadBalancingProviderStrategy,
 )
-from orb.providers.base.strategy.provider_strategy import ProviderResult
+from orb.providers.base.strategy.provider_strategy import (
+    ProviderOperation,
+    ProviderOperationType,
+    ProviderResult,
+)
 from tests.providers.base.strategy.conftest import ConcreteProviderStrategy, make_op
 
 # ---------------------------------------------------------------------------
@@ -164,3 +168,141 @@ class TestLoadBalancingShutdownWithThread:
         lb.shutdown()
         mock_thread.join.assert_called_once_with(timeout=5.0)
         assert lb._shutdown_event.is_set()
+
+
+# ---------------------------------------------------------------------------
+# _select_strategy dispatcher — remaining algorithm branches
+# (LEAST_CONNECTIONS, LEAST_RESPONSE_TIME, RANDOM, HASH_BASED)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestLoadBalancingSelectStrategyDispatcherBranches:
+    def test_least_connections_branch_selected_via_dispatcher(self):
+        s = ConcreteProviderStrategy("disp_lc")
+        cfg = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.LEAST_CONNECTIONS)
+        lb = LoadBalancingProviderStrategy(MagicMock(), [s], config=cfg)
+        lb.initialize()
+        selected = lb._select_strategy(make_op())
+        assert selected is not None
+        assert selected.provider_type == "disp_lc"
+
+    def test_least_response_time_branch_selected_via_dispatcher(self):
+        s = ConcreteProviderStrategy("disp_lrt")
+        cfg = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.LEAST_RESPONSE_TIME)
+        lb = LoadBalancingProviderStrategy(MagicMock(), [s], config=cfg)
+        lb.initialize()
+        selected = lb._select_strategy(make_op())
+        assert selected is not None
+        assert selected.provider_type == "disp_lrt"
+
+    def test_random_branch_selected_via_dispatcher(self):
+        s = ConcreteProviderStrategy("disp_rand")
+        cfg = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.RANDOM)
+        lb = LoadBalancingProviderStrategy(MagicMock(), [s], config=cfg)
+        lb.initialize()
+        selected = lb._select_strategy(make_op())
+        assert selected is not None
+        assert selected.provider_type == "disp_rand"
+
+    def test_hash_based_branch_selected_via_dispatcher(self):
+        s = ConcreteProviderStrategy("disp_hash")
+        cfg = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.HASH_BASED)
+        lb = LoadBalancingProviderStrategy(MagicMock(), [s], config=cfg)
+        lb.initialize()
+        selected = lb._select_strategy(make_op())
+        assert selected is not None
+        assert selected.provider_type == "disp_hash"
+
+
+# ---------------------------------------------------------------------------
+# Sticky session configured but the recorded session strategy is no longer
+# among the healthy strategies — falls through to normal algorithm
+# selection instead of returning early (branch 205->209).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestLoadBalancingStickySessionFallthrough:
+    def test_unknown_session_strategy_falls_through_to_algorithm_selection(self):
+        s_a = ConcreteProviderStrategy("sticky_fall_a")
+        s_b = ConcreteProviderStrategy("sticky_fall_b")
+        cfg = LoadBalancingConfig(
+            sticky_sessions=True,
+            algorithm=LoadBalancingAlgorithm.ROUND_ROBIN,
+        )
+        lb = LoadBalancingProviderStrategy(MagicMock(), [s_a, s_b], config=cfg)
+        lb.initialize()
+        # Session points at a strategy_type that no longer exists among the
+        # healthy strategies, so `session_strategy in healthy_strategies` is False.
+        lb._sessions["ghost-session"] = "no_such_strategy"
+        lb._session_timestamps["ghost-session"] = __import__("time").time()
+
+        op = ProviderOperation(
+            operation_type=ProviderOperationType.HEALTH_CHECK,
+            parameters={},
+        )
+        op.session_id = "ghost-session"  # type: ignore[attr-defined]
+
+        selected = lb._select_strategy(op)
+        assert selected is not None
+        assert selected.provider_type in ("sticky_fall_a", "sticky_fall_b")
+
+
+# ---------------------------------------------------------------------------
+# _least_connections_selection / _least_response_time_selection — loop
+# continuation branch where a later item does NOT beat the current minimum
+# (branches 255->253 and 270->268)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestLoadBalancingSelectionLoopContinuation:
+    def test_least_connections_third_strategy_does_not_win(self):
+        s_busy = ConcreteProviderStrategy("lc3_busy")
+        s_free = ConcreteProviderStrategy("lc3_free")
+        s_mid = ConcreteProviderStrategy("lc3_mid")
+        cfg = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.LEAST_CONNECTIONS)
+        lb = LoadBalancingProviderStrategy(MagicMock(), [s_busy, s_free, s_mid], config=cfg)
+        lb.initialize()
+        lb._stats["lc3_busy"].active_connections = 5
+        lb._stats["lc3_free"].active_connections = 0
+        lb._stats["lc3_mid"].active_connections = 2
+        selected = lb._least_connections_selection(lb._strategies)
+        assert selected.provider_type == "lc3_free"
+
+    def test_least_response_time_third_strategy_does_not_win(self):
+        s_slow = ConcreteProviderStrategy("lrt3_slow")
+        s_fast = ConcreteProviderStrategy("lrt3_fast")
+        s_mid = ConcreteProviderStrategy("lrt3_mid")
+        cfg = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.LEAST_RESPONSE_TIME)
+        lb = LoadBalancingProviderStrategy(MagicMock(), [s_slow, s_fast, s_mid], config=cfg)
+        lb.initialize()
+        lb._stats["lrt3_slow"].average_response_time = 200.0
+        lb._stats["lrt3_fast"].average_response_time = 10.0
+        lb._stats["lrt3_mid"].average_response_time = 50.0
+        selected = lb._least_response_time_selection(lb._strategies)
+        assert selected.provider_type == "lrt3_fast"
+
+
+# ---------------------------------------------------------------------------
+# Sticky sessions enabled but the operation carries no session_id at all
+# (branch 203->209: `if session_id is not None` is False)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestLoadBalancingStickySessionsNoSessionId:
+    def test_sticky_sessions_enabled_without_session_id_uses_normal_selection(self):
+        s = ConcreteProviderStrategy("sticky_no_session_id")
+        cfg = LoadBalancingConfig(
+            sticky_sessions=True,
+            algorithm=LoadBalancingAlgorithm.ROUND_ROBIN,
+        )
+        lb = LoadBalancingProviderStrategy(MagicMock(), [s], config=cfg)
+        lb.initialize()
+
+        # A plain ProviderOperation has no `session_id` attribute at all.
+        selected = lb._select_strategy(make_op())
+        assert selected is not None
+        assert selected.provider_type == "sticky_no_session_id"
