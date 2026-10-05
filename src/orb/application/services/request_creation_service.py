@@ -48,6 +48,7 @@ class RequestCreationService:
             provider_name=selection_result.provider_name,
             metadata={
                 **command.metadata,
+                **(command.additional_data or {}),
                 "dry_run": getattr(command, "dry_run", False),
                 "provider_selection_reason": selection_result.selection_reason,
                 "provider_confidence": selection_result.confidence,

@@ -16,6 +16,7 @@ STORAGE_BACKEND_MEMORY = "memory"
 # Scheduler types
 SCHEDULER_TYPE_DEFAULT = "default"
 SCHEDULER_TYPE_HOSTFACTORY = "hostfactory"
+SCHEDULER_TYPE_SLURM = "slurm"
 
 # Configuration file names
 CONFIG_FILE_NAME = "config.yaml"

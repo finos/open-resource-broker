@@ -35,6 +35,7 @@ class ProviderOperationType(str, Enum):
     STOP_INSTANCES = "stop_instances"
     CLEANUP_MACHINE_RESOURCES = "cleanup_machine_resources"
     GET_MACHINE_HEALTH = "get_machine_health"
+    TAG_INSTANCES = "tag_instances"
 
 
 @dataclass

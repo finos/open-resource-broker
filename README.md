@@ -42,6 +42,7 @@ Built for AWS today (EC2, Auto Scaling Groups, SpotFleet, EC2Fleet, Lambda Micro
 
 **Scheduler support:**
 - **HostFactory** — runs as an [IBM Spectrum Symphony provider plugin](#hostfactory-integration)
+- **SLURM** — integrates with SLURM workload manager via ResumeProgram/SuspendProgram power hooks
 - **Standalone** — direct usage without an external scheduler
 
 ![ORB](./ORB.gif)

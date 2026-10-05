@@ -112,6 +112,11 @@ async def handle_request_machines(
             "template_id": template_id,
             "requested_count": machine_count,
         }
+        node_names = getattr(args, "nodes", None)
+        if node_names:
+            from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
+
+            parsed_data["node_names"] = SlurmNodeMapper.expand_node_range(node_names)
 
     template_id = parsed_data.get("template_id")
     machine_count = parsed_data.get("requested_count", 1)
@@ -137,6 +142,9 @@ async def handle_request_machines(
             requested_count=int(machine_count),
             wait=bool(wait),
             timeout_seconds=int(timeout_seconds),
+            additional_data={
+                k: v for k, v in parsed_data.items() if k not in ("template_id", "requested_count")
+            },
         )
     )
 
@@ -196,6 +204,22 @@ async def handle_request_return_machines(
             ]
     else:
         machine_ids = getattr(args, "machine_ids_flag", None) or getattr(args, "machine_ids", [])
+
+    # Resolve --nodes to machine IDs by querying machine storage by name
+    nodes_arg = getattr(args, "nodes", None)
+    if nodes_arg and not machine_ids:
+        from orb.domain.base import UnitOfWorkFactory
+        from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
+
+        node_names_set = set(SlurmNodeMapper.expand_node_range(nodes_arg))
+        uow_factory = container.get(UnitOfWorkFactory)
+        with uow_factory.create_unit_of_work() as uow:
+            all_machines = uow.machines.get_all()
+        machine_ids = [
+            str(m.machine_id)
+            for m in all_machines
+            if m.name in node_names_set and not m.status.is_terminal
+        ]
 
     has_specific_ids = bool(machine_ids)
 
