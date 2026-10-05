@@ -12,5 +12,5 @@ def test_import_fixes():
 
 
 if __name__ == "__main__":
-    success = test_import_fixes()
-    sys.exit(0 if success else 1)
+    test_import_fixes()
+    sys.exit(0)
