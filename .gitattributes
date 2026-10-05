@@ -8,3 +8,7 @@
 # Legacy k8s-legacy/tools/ are shell scripts without .sh extension
 # (executed by kubelet via PATH lookup inside pods).
 k8s-legacy/tools/* text eol=lf
+
+# Windows batch files must use CRLF; cmd.exe can mis-resolve goto labels in LF-only files.
+*.bat text eol=crlf
+*.cmd text eol=crlf

@@ -6,4 +6,4 @@ if "%NODE_LIST%"=="" (
     echo ERROR: No node names provided
     exit /b 1
 )
-orb machines return --nodes "%NODE_LIST%" --scheduler slurm
+orb machines terminate --nodes "%NODE_LIST%" --force --scheduler slurm
