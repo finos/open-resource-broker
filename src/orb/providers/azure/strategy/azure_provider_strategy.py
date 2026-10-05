@@ -90,6 +90,17 @@ def _has_provider_config_value(
     return provider_config.get(key) not in (None, "")
 
 
+def _credential_result_from_health(health: ProviderHealthStatus) -> dict:
+    """Translate a health-check result into the test_credentials response shape."""
+    if health.is_healthy:
+        return {"success": True}
+    return {
+        "success": False,
+        "error": health.status_message,
+        "details": health.error_details or {},
+    }
+
+
 @injectable
 class AzureProviderStrategy(ProviderStrategy):
     """Azure implementation of ``ProviderStrategy``.
@@ -481,13 +492,19 @@ class AzureProviderStrategy(ProviderStrategy):
         """Validate Azure credentials by performing a health check."""
         del credential_source
         health = self._health_check_service.check_health()
-        if health.is_healthy:
-            return {"success": True}
-        return {
-            "success": False,
-            "error": health.status_message,
-            "details": health.error_details or {},
-        }
+        return _credential_result_from_health(health)
+
+    async def test_credentials_async(
+        self, credential_source: Optional[str] = None, **kwargs
+    ) -> dict:
+        """Validate Azure credentials off the event loop via the async credential path.
+
+        Uses ``check_health_async``, which fetches the token with the native
+        async ``DefaultAzureCredential`` instead of blocking the event loop.
+        """
+        del credential_source
+        health = await self._health_check_service.check_health_async()
+        return _credential_result_from_health(health)
 
     def generate_provider_name(self, config: dict[str, Any]) -> str:
         """Generate Azure provider name."""
