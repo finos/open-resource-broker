@@ -7,5 +7,7 @@
   "domain_pydantic_violations": 13,
   "interface_provider_direct_imports": 16,
   "circular_dependency_cycles": 18,
-  "cli_infrastructure_direct_imports": 14
+  "cli_infrastructure_direct_imports": 14,
+  "getattr_justification_aws": 100,
+  "getattr_justification_k8s": 294
 }
