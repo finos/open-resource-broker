@@ -1,5 +1,7 @@
 """Unit tests for request_repository: RequestSerializer and RequestRepositoryImpl."""
 
+import asyncio
+import gc
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
@@ -516,6 +518,86 @@ class TestRequestRepositoryImplSave:
         request = _make_request()
         with pytest.raises(InfrastructureError, match="Unexpected error: disk full"):
             repo.save(request)
+
+
+class _FakeAsyncEventBus:
+    """Minimal stand-in for the real async EventBus.publish coroutine."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.received: list = []
+        self.fail = fail
+
+    async def publish(self, event) -> None:
+        if self.fail:
+            raise RuntimeError("handler boom")
+        self.received.append(event)
+
+
+_EXPECTED_SAVE_EVENTS = [
+    "RepositoryOperationStartedEvent",
+    "RepositoryOperationCompletedEvent",
+]
+
+
+@pytest.mark.unit
+class TestRequestRepositoryImplAsyncPublish:
+    """save() must deliver events to an async event_publisher.publish."""
+
+    def test_async_publisher_is_awaited_inside_running_loop(self):
+        async def _run() -> _FakeAsyncEventBus:
+            bus = _FakeAsyncEventBus()
+            repo, _ = _make_repo(publisher=bus)
+            repo.save(_make_request())
+            # Yield so the scheduled publish tasks run and their done
+            # callbacks release the task references.
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            assert repo._pending_publish_tasks == set()
+            return bus
+
+        bus = asyncio.run(_run())
+        assert [type(e).__name__ for e in bus.received] == _EXPECTED_SAVE_EVENTS
+
+    @pytest.mark.filterwarnings("error::RuntimeWarning")
+    def test_async_publisher_without_running_loop_delivers_events(self):
+        bus = _FakeAsyncEventBus()
+        repo, _ = _make_repo(publisher=bus)
+        events = repo.save(_make_request())
+        gc.collect()  # surfaces any "coroutine was never awaited" warning
+        assert isinstance(events, list)
+        assert [type(e).__name__ for e in bus.received] == _EXPECTED_SAVE_EVENTS
+
+    @pytest.mark.filterwarnings("error::RuntimeWarning")
+    def test_async_publisher_from_worker_thread_while_main_loop_runs(self):
+        bus = _FakeAsyncEventBus()
+        repo, _ = _make_repo(publisher=bus)
+
+        async def _run() -> None:
+            await asyncio.to_thread(repo.save, _make_request())
+
+        asyncio.run(_run())
+        gc.collect()
+        assert [type(e).__name__ for e in bus.received] == _EXPECTED_SAVE_EVENTS
+
+    def test_async_publisher_failure_is_logged_not_raised(self):
+        bus = _FakeAsyncEventBus(fail=True)
+        repo, _ = _make_repo(publisher=bus)
+        repo.logger = MagicMock()
+
+        async def _run() -> None:
+            repo.save(_make_request())
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+
+        asyncio.run(_run())
+        assert repo.logger.warning.called
+        assert repo._pending_publish_tasks == set()
+
+    def test_sync_publisher_is_called_directly(self):
+        publisher = MagicMock()
+        repo, _ = _make_repo(publisher=publisher)
+        repo.save(_make_request())
+        assert publisher.publish.call_count == 2
 
 
 # ---------------------------------------------------------------------------
