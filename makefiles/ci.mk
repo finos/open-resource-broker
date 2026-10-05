@@ -59,8 +59,8 @@ ci-architecture: ci-arch-cqrs ci-arch-clean ci-arch-imports ci-arch-file-sizes c
 ci-security-bandit:  ## Run Bandit security scan
 	@./dev-tools/ci/ci_security_dispatcher.py bandit
 
-ci-security-safety:  ## Run Safety dependency scan
-	@./dev-tools/ci/ci_security_dispatcher.py safety
+ci-security-pip-audit:  ## Run pip-audit dependency scan
+	@./dev-tools/ci/ci_security_dispatcher.py pip-audit
 
 ci-security-trivy: dev-install  ## Run Trivy container scan
 	@./dev-tools/ci/ci_security_dispatcher.py trivy
@@ -81,7 +81,7 @@ ci-security-container: dev-install  ## Run container security scans (Trivy image
 	@./dev-tools/security/security_container.py
 
 # Composite target
-ci-security: ci-security-bandit ci-security-safety ci-security-semgrep ci-security-trivy-fs ci-security-trufflehog  ## Run all security scans
+ci-security: ci-security-bandit ci-security-pip-audit ci-security-semgrep ci-security-trivy-fs ci-security-trufflehog  ## Run all security scans
 
 ci-build-sbom:  ## Generate SBOM files (matches publish.yml workflow)
 	@echo "Generating SBOM files for CI..."

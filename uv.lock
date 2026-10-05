@@ -289,19 +289,6 @@ wheels = [
 ]
 
 [[package]]
-name = "authlib"
-version = "1.7.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "joserfc" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/36/98/7d93f30d029643c0275dbc0bd6d5a6f670661ee6c9a94d93af7ab4887600/authlib-1.7.2.tar.gz", hash = "sha256:2cea25fefcd4e7173bdf1372c0afc265c8034b23a8cd5dcb6a9164b826c64231", size = 176511, upload-time = "2026-05-06T08:10:23.116Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/95/adcb68e20c34162e9135f370d6e31737719c2b6f94bc953fe7ed1f10fe21/authlib-1.7.2-py2.py3-none-any.whl", hash = "sha256:3e1faedc9d87e7d56a164eca3ccb6ace0d61b94abe83e92242f8dc8bba9b4a9f", size = 259548, upload-time = "2026-05-06T08:10:21.436Z" },
-]
-
-[[package]]
 name = "aws-sam-translator"
 version = "1.111.0"
 source = { registry = "https://pypi.org/simple" }
@@ -442,40 +429,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/8e/ff/70dca7d7cb1cbc0edb2c6cc0c38b65cba36cccc491eca64cabd5fe7f8670/backports_asyncio_runner-1.2.0.tar.gz", hash = "sha256:a5aa7b2b7d8f8bfcaa2b57313f70792df84e32a2a746f585213373f900b42162", size = 69893, upload-time = "2025-07-02T02:27:15.685Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/59/76ab57e3fe74484f48a53f8e337171b4a2349e506eabe136d7e01d059086/backports_asyncio_runner-1.2.0-py3-none-any.whl", hash = "sha256:0da0a936a8aeb554eccb426dc55af3ba63bcdc69fa1a600b5bb305413a4477b5", size = 12313, upload-time = "2025-07-02T02:27:14.263Z" },
-]
-
-[[package]]
-name = "backports-datetime-fromisoformat"
-version = "2.0.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/71/81/eff3184acb1d9dc3ce95a98b6f3c81a49b4be296e664db8e1c2eeabef3d9/backports_datetime_fromisoformat-2.0.3.tar.gz", hash = "sha256:b58edc8f517b66b397abc250ecc737969486703a66eb97e01e6d51291b1a139d", size = 23588, upload-time = "2024-12-28T20:18:15.017Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/42/4b/d6b051ca4b3d76f23c2c436a9669f3be616b8cf6461a7e8061c7c4269642/backports_datetime_fromisoformat-2.0.3-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:5f681f638f10588fa3c101ee9ae2b63d3734713202ddfcfb6ec6cea0778a29d4", size = 27561, upload-time = "2024-12-28T20:16:47.974Z" },
-    { url = "https://files.pythonhosted.org/packages/6d/40/e39b0d471e55eb1b5c7c81edab605c02f71c786d59fb875f0a6f23318747/backports_datetime_fromisoformat-2.0.3-cp310-cp310-macosx_11_0_universal2.whl", hash = "sha256:cd681460e9142f1249408e5aee6d178c6d89b49e06d44913c8fdfb6defda8d1c", size = 34448, upload-time = "2024-12-28T20:16:50.712Z" },
-    { url = "https://files.pythonhosted.org/packages/f2/28/7a5c87c5561d14f1c9af979231fdf85d8f9fad7a95ff94e56d2205e2520a/backports_datetime_fromisoformat-2.0.3-cp310-cp310-macosx_11_0_x86_64.whl", hash = "sha256:ee68bc8735ae5058695b76d3bb2aee1d137c052a11c8303f1e966aa23b72b65b", size = 27093, upload-time = "2024-12-28T20:16:52.994Z" },
-    { url = "https://files.pythonhosted.org/packages/80/ba/f00296c5c4536967c7d1136107fdb91c48404fe769a4a6fd5ab045629af8/backports_datetime_fromisoformat-2.0.3-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8273fe7932db65d952a43e238318966eab9e49e8dd546550a41df12175cc2be4", size = 52836, upload-time = "2024-12-28T20:16:55.283Z" },
-    { url = "https://files.pythonhosted.org/packages/e3/92/bb1da57a069ddd601aee352a87262c7ae93467e66721d5762f59df5021a6/backports_datetime_fromisoformat-2.0.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:39d57ea50aa5a524bb239688adc1d1d824c31b6094ebd39aa164d6cadb85de22", size = 52798, upload-time = "2024-12-28T20:16:56.64Z" },
-    { url = "https://files.pythonhosted.org/packages/df/ef/b6cfd355982e817ccdb8d8d109f720cab6e06f900784b034b30efa8fa832/backports_datetime_fromisoformat-2.0.3-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:ac6272f87693e78209dc72e84cf9ab58052027733cd0721c55356d3c881791cf", size = 52891, upload-time = "2024-12-28T20:16:58.887Z" },
-    { url = "https://files.pythonhosted.org/packages/37/39/b13e3ae8a7c5d88b68a6e9248ffe7066534b0cfe504bf521963e61b6282d/backports_datetime_fromisoformat-2.0.3-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:44c497a71f80cd2bcfc26faae8857cf8e79388e3d5fbf79d2354b8c360547d58", size = 52955, upload-time = "2024-12-28T20:17:00.028Z" },
-    { url = "https://files.pythonhosted.org/packages/1e/e4/70cffa3ce1eb4f2ff0c0d6f5d56285aacead6bd3879b27a2ba57ab261172/backports_datetime_fromisoformat-2.0.3-cp310-cp310-win_amd64.whl", hash = "sha256:6335a4c9e8af329cb1ded5ab41a666e1448116161905a94e054f205aa6d263bc", size = 29323, upload-time = "2024-12-28T20:17:01.125Z" },
-    { url = "https://files.pythonhosted.org/packages/62/f5/5bc92030deadf34c365d908d4533709341fb05d0082db318774fdf1b2bcb/backports_datetime_fromisoformat-2.0.3-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:e2e4b66e017253cdbe5a1de49e0eecff3f66cd72bcb1229d7db6e6b1832c0443", size = 27626, upload-time = "2024-12-28T20:17:03.448Z" },
-    { url = "https://files.pythonhosted.org/packages/28/45/5885737d51f81dfcd0911dd5c16b510b249d4c4cf6f4a991176e0358a42a/backports_datetime_fromisoformat-2.0.3-cp311-cp311-macosx_11_0_universal2.whl", hash = "sha256:43e2d648e150777e13bbc2549cc960373e37bf65bd8a5d2e0cef40e16e5d8dd0", size = 34588, upload-time = "2024-12-28T20:17:04.459Z" },
-    { url = "https://files.pythonhosted.org/packages/bc/6d/bd74de70953f5dd3e768c8fc774af942af0ce9f211e7c38dd478fa7ea910/backports_datetime_fromisoformat-2.0.3-cp311-cp311-macosx_11_0_x86_64.whl", hash = "sha256:4ce6326fd86d5bae37813c7bf1543bae9e4c215ec6f5afe4c518be2635e2e005", size = 27162, upload-time = "2024-12-28T20:17:06.752Z" },
-    { url = "https://files.pythonhosted.org/packages/47/ba/1d14b097f13cce45b2b35db9898957578b7fcc984e79af3b35189e0d332f/backports_datetime_fromisoformat-2.0.3-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d7c8fac333bf860208fd522a5394369ee3c790d0aa4311f515fcc4b6c5ef8d75", size = 54482, upload-time = "2024-12-28T20:17:08.15Z" },
-    { url = "https://files.pythonhosted.org/packages/25/e9/a2a7927d053b6fa148b64b5e13ca741ca254c13edca99d8251e9a8a09cfe/backports_datetime_fromisoformat-2.0.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:24a4da5ab3aa0cc293dc0662a0c6d1da1a011dc1edcbc3122a288cfed13a0b45", size = 54362, upload-time = "2024-12-28T20:17:10.605Z" },
-    { url = "https://files.pythonhosted.org/packages/c1/99/394fb5e80131a7d58c49b89e78a61733a9994885804a0bb582416dd10c6f/backports_datetime_fromisoformat-2.0.3-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:58ea11e3bf912bd0a36b0519eae2c5b560b3cb972ea756e66b73fb9be460af01", size = 54162, upload-time = "2024-12-28T20:17:12.301Z" },
-    { url = "https://files.pythonhosted.org/packages/88/25/1940369de573c752889646d70b3fe8645e77b9e17984e72a554b9b51ffc4/backports_datetime_fromisoformat-2.0.3-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:8a375c7dbee4734318714a799b6c697223e4bbb57232af37fbfff88fb48a14c6", size = 54118, upload-time = "2024-12-28T20:17:13.609Z" },
-    { url = "https://files.pythonhosted.org/packages/b7/46/f275bf6c61683414acaf42b2df7286d68cfef03e98b45c168323d7707778/backports_datetime_fromisoformat-2.0.3-cp311-cp311-win_amd64.whl", hash = "sha256:ac677b1664c4585c2e014739f6678137c8336815406052349c85898206ec7061", size = 29329, upload-time = "2024-12-28T20:17:16.124Z" },
-    { url = "https://files.pythonhosted.org/packages/a2/0f/69bbdde2e1e57c09b5f01788804c50e68b29890aada999f2b1a40519def9/backports_datetime_fromisoformat-2.0.3-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:66ce47ee1ba91e146149cf40565c3d750ea1be94faf660ca733d8601e0848147", size = 27630, upload-time = "2024-12-28T20:17:19.442Z" },
-    { url = "https://files.pythonhosted.org/packages/d5/1d/1c84a50c673c87518b1adfeafcfd149991ed1f7aedc45d6e5eac2f7d19d7/backports_datetime_fromisoformat-2.0.3-cp312-cp312-macosx_11_0_universal2.whl", hash = "sha256:8b7e069910a66b3bba61df35b5f879e5253ff0821a70375b9daf06444d046fa4", size = 34707, upload-time = "2024-12-28T20:17:21.79Z" },
-    { url = "https://files.pythonhosted.org/packages/71/44/27eae384e7e045cda83f70b551d04b4a0b294f9822d32dea1cbf1592de59/backports_datetime_fromisoformat-2.0.3-cp312-cp312-macosx_11_0_x86_64.whl", hash = "sha256:a3b5d1d04a9e0f7b15aa1e647c750631a873b298cdd1255687bb68779fe8eb35", size = 27280, upload-time = "2024-12-28T20:17:24.503Z" },
-    { url = "https://files.pythonhosted.org/packages/a7/7a/a4075187eb6bbb1ff6beb7229db5f66d1070e6968abeb61e056fa51afa5e/backports_datetime_fromisoformat-2.0.3-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ec1b95986430e789c076610aea704db20874f0781b8624f648ca9fb6ef67c6e1", size = 55094, upload-time = "2024-12-28T20:17:25.546Z" },
-    { url = "https://files.pythonhosted.org/packages/71/03/3fced4230c10af14aacadc195fe58e2ced91d011217b450c2e16a09a98c8/backports_datetime_fromisoformat-2.0.3-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ffe5f793db59e2f1d45ec35a1cf51404fdd69df9f6952a0c87c3060af4c00e32", size = 55605, upload-time = "2024-12-28T20:17:29.208Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/0a/4b34a838c57bd16d3e5861ab963845e73a1041034651f7459e9935289cfd/backports_datetime_fromisoformat-2.0.3-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:620e8e73bd2595dfff1b4d256a12b67fce90ece3de87b38e1dde46b910f46f4d", size = 55353, upload-time = "2024-12-28T20:17:32.433Z" },
-    { url = "https://files.pythonhosted.org/packages/d9/68/07d13c6e98e1cad85606a876367ede2de46af859833a1da12c413c201d78/backports_datetime_fromisoformat-2.0.3-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:4cf9c0a985d68476c1cabd6385c691201dda2337d7453fb4da9679ce9f23f4e7", size = 55298, upload-time = "2024-12-28T20:17:34.919Z" },
-    { url = "https://files.pythonhosted.org/packages/60/33/45b4d5311f42360f9b900dea53ab2bb20a3d61d7f9b7c37ddfcb3962f86f/backports_datetime_fromisoformat-2.0.3-cp312-cp312-win_amd64.whl", hash = "sha256:d144868a73002e6e2e6fef72333e7b0129cecdd121aa8f1edba7107fd067255d", size = 29375, upload-time = "2024-12-28T20:17:36.018Z" },
-    { url = "https://files.pythonhosted.org/packages/be/03/7eaa9f9bf290395d57fd30d7f1f2f9dff60c06a31c237dc2beb477e8f899/backports_datetime_fromisoformat-2.0.3-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:90e202e72a3d5aae673fcc8c9a4267d56b2f532beeb9173361293625fe4d2039", size = 28980, upload-time = "2024-12-28T20:18:06.554Z" },
-    { url = "https://files.pythonhosted.org/packages/47/80/a0ecf33446c7349e79f54cc532933780341d20cff0ee12b5bfdcaa47067e/backports_datetime_fromisoformat-2.0.3-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2df98ef1b76f5a58bb493dda552259ba60c3a37557d848e039524203951c9f06", size = 28449, upload-time = "2024-12-28T20:18:07.77Z" },
 ]
 
 [[package]]
@@ -1200,19 +1153,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6a/ab/88d67f02024700b48cd8232579ad1316aa9df2272c63049c27cc094229d6/dotty_dict-1.3.1.tar.gz", hash = "sha256:4b016e03b8ae265539757a53eba24b9bfda506fb94fbce0bee843c6f05541a15", size = 7699, upload-time = "2022-07-09T18:50:57.727Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1a/91/e0d457ee03ec33d79ee2cd8d212debb1bc21dfb99728ae35efdb5832dc22/dotty_dict-1.3.1-py3-none-any.whl", hash = "sha256:5022d234d9922f13aa711b4950372a06a6d64cb6d6db9ba43d0ba133ebfce31f", size = 7014, upload-time = "2022-07-09T18:50:55.058Z" },
-]
-
-[[package]]
-name = "dparse"
-version = "0.6.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/29/ee/96c65e17222b973f0d3d0aa9bad6a59104ca1b0eb5b659c25c2900fccd85/dparse-0.6.4.tar.gz", hash = "sha256:90b29c39e3edc36c6284c82c4132648eaf28a01863eb3c231c2512196132201a", size = 27912, upload-time = "2024-11-08T16:52:06.444Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/26/035d1c308882514a1e6ddca27f9d3e570d67a0e293e7b4d910a70c8fe32b/dparse-0.6.4-py3-none-any.whl", hash = "sha256:fbab4d50d54d0e739fbb4dedfc3d92771003a5b9aa8545ca7a7045e3b174af57", size = 11925, upload-time = "2024-11-08T16:52:03.844Z" },
 ]
 
 [[package]]
@@ -2128,15 +2068,6 @@ wheels = [
 ]
 
 [[package]]
-name = "joblib"
-version = "1.5.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/41/f2/d34e8b3a08a9cc79a50b2208a93dce981fe615b64d5a4d4abee421d898df/joblib-1.5.3.tar.gz", hash = "sha256:8561a3269e6801106863fd0d6d84bb737be9e7631e33aaed3fb9ce5953688da3", size = 331603, upload-time = "2025-12-15T08:41:46.427Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/91/984aca2ec129e2757d1e4e3c81c3fcda9d0f85b74670a094cc443d9ee949/joblib-1.5.3-py3-none-any.whl", hash = "sha256:5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713", size = 309071, upload-time = "2025-12-15T08:41:44.973Z" },
-]
-
-[[package]]
 name = "joserfc"
 version = "1.7.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2667,19 +2598,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/df/5bd7a48c256faecd1d36edc13133e51397e41b73bb77e1a69deab746ebac/markupsafe-3.0.3-cp314-cp314t-win32.whl", hash = "sha256:915c04ba3851909ce68ccc2b8e2cd691618c4dc4c4232fb7982bca3f41fd8c3d", size = 14819, upload-time = "2025-09-27T18:37:26.285Z" },
     { url = "https://files.pythonhosted.org/packages/1a/8a/0402ba61a2f16038b48b39bccca271134be00c5c9f0f623208399333c448/markupsafe-3.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4faffd047e07c38848ce017e8725090413cd80cbc23d86e55c587bf979e579c9", size = 15426, upload-time = "2025-09-27T18:37:27.316Z" },
     { url = "https://files.pythonhosted.org/packages/70/bc/6f1c2f612465f5fa89b95bead1f44dcb607670fd42891d8fdcd5d039f4f4/markupsafe-3.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:32001d6a8fc98c8cb5c947787c5d08b0a50663d139f1305bac5885d98d9b40fa", size = 14146, upload-time = "2025-09-27T18:37:28.327Z" },
-]
-
-[[package]]
-name = "marshmallow"
-version = "4.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "backports-datetime-fromisoformat", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/25/7e/1dbd4096eb7c148cd2841841916f78820bb85a4d80a0c25c02d30815a7fb/marshmallow-4.3.0.tar.gz", hash = "sha256:fb43c53b3fe240b8f6af37223d6ef1636f927ad9bea8ab323afad95dff090880", size = 224485, upload-time = "2026-04-03T21:46:32.72Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/e0/ff24e25218bb59eb6290a530cea40651b14068b6e3659b20f9c175179632/marshmallow-4.3.0-py3-none-any.whl", hash = "sha256:46c4fe6984707e3cbd485dfebbf0a59874f58d695aad05c1668d15e8c6e13b46", size = 49148, upload-time = "2026-04-03T21:46:31.241Z" },
 ]
 
 [[package]]
@@ -3292,22 +3210,6 @@ wheels = [
 ]
 
 [[package]]
-name = "nltk"
-version = "3.10.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "click" },
-    { name = "defusedxml" },
-    { name = "joblib" },
-    { name = "regex" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e0/e6/fe51d2bb1a3b446f59c5c8165999a9fee208bc346af90a7cbf7657bc0d75/nltk-3.10.3.tar.gz", hash = "sha256:bb9327a461c3811c2fa4900e03840401f2126adfb30c0072827c433bd2444ea4", size = 5137152, upload-time = "2026-08-12T23:46:37.258Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b6/6d/ebd2af4640b12168fdf0cb74b6118df2f32a2f62ec7e0c06fbfd80706639/nltk-3.10.3-py3-none-any.whl", hash = "sha256:ff9598a8e20518ee0d557745890cc4435b9578489e2dcbc69c4f81fa060caf7c", size = 1798643, upload-time = "2026-08-12T23:44:13.478Z" },
-]
-
-[[package]]
 name = "nodeenv"
 version = "1.10.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3683,7 +3585,6 @@ dev = [
     { name = "kubernetes-stubs-elephant-fork" },
     { name = "line-profiler" },
     { name = "lxml" },
-    { name = "marshmallow" },
     { name = "mcp" },
     { name = "memory-profiler" },
     { name = "mike" },
@@ -3695,7 +3596,6 @@ dev = [
     { name = "mkdocstrings" },
     { name = "mkdocstrings-python" },
     { name = "moto", extra = ["all"] },
-    { name = "nltk" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-prometheus" },
     { name = "opentelemetry-instrumentation-botocore" },
@@ -3706,7 +3606,6 @@ dev = [
     { name = "opentelemetry-instrumentation-system-metrics" },
     { name = "opentelemetry-sdk" },
     { name = "pathspec" },
-    { name = "peewee" },
     { name = "pg8000" },
     { name = "pip-audit" },
     { name = "pip-tools" },
@@ -3733,7 +3632,6 @@ dev = [
     { name = "rich" },
     { name = "rich-argparse" },
     { name = "ruff" },
-    { name = "safety" },
     { name = "setuptools" },
     { name = "starlette" },
     { name = "tenacity" },
@@ -3859,7 +3757,6 @@ ci = [
     { name = "kubernetes" },
     { name = "kubernetes-stubs-elephant-fork" },
     { name = "lxml" },
-    { name = "marshmallow" },
     { name = "mcp" },
     { name = "mike" },
     { name = "mkdocs" },
@@ -3870,7 +3767,6 @@ ci = [
     { name = "mkdocstrings" },
     { name = "mkdocstrings-python" },
     { name = "moto", extra = ["all"], marker = "extra == 'group-6-orb-py-ci' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "nltk" },
     { name = "opentelemetry-exporter-prometheus" },
     { name = "opentelemetry-instrumentation-botocore" },
     { name = "opentelemetry-instrumentation-click" },
@@ -3881,7 +3777,6 @@ ci = [
     { name = "opentelemetry-sdk" },
     { name = "orb-py", extra = ["all"], marker = "extra == 'group-6-orb-py-ci' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "pathspec" },
-    { name = "peewee" },
     { name = "pg8000" },
     { name = "pip-audit" },
     { name = "prometheus-client" },
@@ -3898,7 +3793,6 @@ ci = [
     { name = "requests-mock" },
     { name = "responses" },
     { name = "ruff" },
-    { name = "safety" },
     { name = "setuptools" },
     { name = "tenacity" },
     { name = "tomli" },
@@ -3931,7 +3825,6 @@ dev = [
     { name = "kubernetes-stubs-elephant-fork" },
     { name = "line-profiler" },
     { name = "lxml" },
-    { name = "marshmallow" },
     { name = "mcp" },
     { name = "memory-profiler" },
     { name = "mike" },
@@ -3943,7 +3836,6 @@ dev = [
     { name = "mkdocstrings" },
     { name = "mkdocstrings-python" },
     { name = "moto", extra = ["all"], marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
-    { name = "nltk" },
     { name = "opentelemetry-exporter-prometheus" },
     { name = "opentelemetry-instrumentation-botocore" },
     { name = "opentelemetry-instrumentation-click" },
@@ -3954,7 +3846,6 @@ dev = [
     { name = "opentelemetry-sdk" },
     { name = "orb-py", extra = ["all"], marker = "extra == 'group-6-orb-py-ci' or extra == 'group-6-orb-py-dev' or extra != 'extra-6-orb-py-ui'" },
     { name = "pathspec" },
-    { name = "peewee" },
     { name = "pg8000" },
     { name = "pip-audit" },
     { name = "pip-tools" },
@@ -3977,7 +3868,6 @@ dev = [
     { name = "requests-mock" },
     { name = "responses" },
     { name = "ruff" },
-    { name = "safety" },
     { name = "setuptools" },
     { name = "tenacity" },
     { name = "tomli" },
@@ -4009,10 +3899,7 @@ security = [
     { name = "bandit-sarif-formatter" },
     { name = "cyclonedx-bom" },
     { name = "lxml" },
-    { name = "marshmallow" },
-    { name = "peewee" },
     { name = "pip-audit" },
-    { name = "safety" },
 ]
 test = [
     { name = "alembic" },
@@ -4026,7 +3913,6 @@ test = [
     { name = "kubernetes" },
     { name = "mcp" },
     { name = "moto", extra = ["all"] },
-    { name = "nltk" },
     { name = "opentelemetry-exporter-prometheus" },
     { name = "opentelemetry-instrumentation-botocore" },
     { name = "opentelemetry-instrumentation-click" },
@@ -4111,7 +3997,6 @@ requires-dist = [
     { name = "kubernetes-stubs-elephant-fork", marker = "extra == 'dev'", specifier = ">=36.0.2,<37.0.0" },
     { name = "line-profiler", marker = "extra == 'dev'", specifier = ">=4.1.1,<6.0.0" },
     { name = "lxml", marker = "extra == 'dev'", specifier = ">=6.1.0" },
-    { name = "marshmallow", marker = "extra == 'dev'", specifier = ">=4.1.2" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.28,<2" },
     { name = "memory-profiler", marker = "extra == 'dev'", specifier = ">=0.61.0,<1.0.0" },
     { name = "mike", marker = "extra == 'dev'", specifier = ">=1.1.0,<3.0.0" },
@@ -4124,7 +4009,6 @@ requires-dist = [
     { name = "mkdocstrings-python", marker = "extra == 'dev'", specifier = ">=1.1.0,<3.0.0" },
     { name = "moto", extras = ["all"], marker = "extra == 'dev'", specifier = ">=5.1.19,<6.0.0" },
     { name = "moto", extras = ["ec2", "iam", "ec2instanceconnect", "autoscaling", "ssm", "dynamodb", "sts", "sqs", "sns"], marker = "extra == 'test-aws'", specifier = ">=5.1.19,<6.0.0" },
-    { name = "nltk", marker = "extra == 'dev'", specifier = ">=3.10.2" },
     { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.20.0" },
     { name = "opentelemetry-exporter-prometheus", marker = "extra == 'monitoring'", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-instrumentation-botocore", marker = "extra == 'monitoring-aws'", specifier = ">=0.64b0,<1.0" },
@@ -4146,7 +4030,6 @@ requires-dist = [
     { name = "orb-py", extras = ["k8s"], marker = "extra == 'test-k8s'" },
     { name = "orb-py", extras = ["otel"], marker = "extra == 'monitoring'" },
     { name = "pathspec", marker = "extra == 'dev'", specifier = ">=0.11.0" },
-    { name = "peewee", marker = "extra == 'dev'", specifier = ">=3.18.3" },
     { name = "pg8000", marker = "extra == 'dev'" },
     { name = "pg8000", marker = "extra == 'k8s-legacy'" },
     { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.6.1,<3.0.0" },
@@ -4186,7 +4069,6 @@ requires-dist = [
     { name = "rich", marker = "extra == 'k8s-legacy'", specifier = ">=13.3.0" },
     { name = "rich-argparse", marker = "extra == 'cli'", specifier = ">=1.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
-    { name = "safety", marker = "extra == 'dev'", specifier = ">=3.7.0,<4.0.0" },
     { name = "setuptools", marker = "extra == 'dev'", specifier = ">=80.9.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "sqlalchemy", marker = "extra == 'k8s-legacy'", specifier = ">=2.0.0" },
@@ -4233,7 +4115,6 @@ ci = [
     { name = "kubernetes" },
     { name = "kubernetes-stubs-elephant-fork", specifier = ">=36.0.2,<37.0.0" },
     { name = "lxml", specifier = ">=6.1.0" },
-    { name = "marshmallow", specifier = ">=4.1.2" },
     { name = "mcp", specifier = ">=1.28,<2" },
     { name = "mike", specifier = ">=1.1.0,<3.0.0" },
     { name = "mkdocs", specifier = ">=1.5.0,<2.0.0" },
@@ -4244,7 +4125,6 @@ ci = [
     { name = "mkdocstrings", specifier = ">=0.22.0,<2.0.0" },
     { name = "mkdocstrings-python", specifier = ">=1.1.0,<3.0.0" },
     { name = "moto", extras = ["all"], specifier = ">=5.1.19,<6.0.0" },
-    { name = "nltk", specifier = ">=3.10.2" },
     { name = "opentelemetry-exporter-prometheus", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-instrumentation-click", specifier = ">=0.64b0,<1.0" },
@@ -4255,7 +4135,6 @@ ci = [
     { name = "opentelemetry-sdk", specifier = ">=1.20.0" },
     { name = "orb-py", extras = ["all"] },
     { name = "pathspec", specifier = ">=0.11.0" },
-    { name = "peewee", specifier = ">=3.18.3" },
     { name = "pg8000" },
     { name = "pip-audit", specifier = ">=2.6.1,<3.0.0" },
     { name = "prometheus-client", specifier = ">=0.17.0" },
@@ -4272,7 +4151,6 @@ ci = [
     { name = "requests-mock", specifier = ">=1.11.0,<2.0.0" },
     { name = "responses", specifier = ">=0.24.0,<1.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
-    { name = "safety", specifier = ">=3.7.0,<4.0.0" },
     { name = "setuptools", specifier = ">=80.9.0" },
     { name = "tenacity" },
     { name = "tomli", specifier = ">=2.0.0,<3.0.0" },
@@ -4305,7 +4183,6 @@ dev = [
     { name = "kubernetes-stubs-elephant-fork", specifier = ">=36.0.2,<37.0.0" },
     { name = "line-profiler", specifier = ">=4.1.1,<6.0.0" },
     { name = "lxml", specifier = ">=6.1.0" },
-    { name = "marshmallow", specifier = ">=4.1.2" },
     { name = "mcp", specifier = ">=1.28,<2" },
     { name = "memory-profiler", specifier = ">=0.61.0,<1.0.0" },
     { name = "mike", specifier = ">=1.1.0,<3.0.0" },
@@ -4317,7 +4194,6 @@ dev = [
     { name = "mkdocstrings", specifier = ">=0.22.0,<2.0.0" },
     { name = "mkdocstrings-python", specifier = ">=1.1.0,<3.0.0" },
     { name = "moto", extras = ["all"], specifier = ">=5.1.19,<6.0.0" },
-    { name = "nltk", specifier = ">=3.10.2" },
     { name = "opentelemetry-exporter-prometheus", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-instrumentation-click", specifier = ">=0.64b0,<1.0" },
@@ -4328,7 +4204,6 @@ dev = [
     { name = "opentelemetry-sdk", specifier = ">=1.20.0" },
     { name = "orb-py", extras = ["all"] },
     { name = "pathspec", specifier = ">=0.11.0" },
-    { name = "peewee", specifier = ">=3.18.3" },
     { name = "pg8000" },
     { name = "pip-audit", specifier = ">=2.6.1,<3.0.0" },
     { name = "pip-tools", specifier = ">=7.3.0,<8.0.0" },
@@ -4351,7 +4226,6 @@ dev = [
     { name = "requests-mock", specifier = ">=1.11.0,<2.0.0" },
     { name = "responses", specifier = ">=0.24.0,<1.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
-    { name = "safety", specifier = ">=3.7.0,<4.0.0" },
     { name = "setuptools", specifier = ">=80.9.0" },
     { name = "tenacity" },
     { name = "tomli", specifier = ">=2.0.0,<3.0.0" },
@@ -4383,10 +4257,7 @@ security = [
     { name = "bandit-sarif-formatter", specifier = ">=1.1.1,<2.0.0" },
     { name = "cyclonedx-bom", specifier = ">=4.0.0,<8.0.0" },
     { name = "lxml", specifier = ">=6.1.0" },
-    { name = "marshmallow", specifier = ">=4.1.2" },
-    { name = "peewee", specifier = ">=3.18.3" },
     { name = "pip-audit", specifier = ">=2.6.1,<3.0.0" },
-    { name = "safety", specifier = ">=3.7.0,<4.0.0" },
 ]
 test = [
     { name = "alembic", specifier = ">=1.13" },
@@ -4400,7 +4271,6 @@ test = [
     { name = "kubernetes" },
     { name = "mcp", specifier = ">=1.28,<2" },
     { name = "moto", extras = ["all"], specifier = ">=5.1.19,<6.0.0" },
-    { name = "nltk", specifier = ">=3.10.2" },
     { name = "opentelemetry-exporter-prometheus", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.64b0,<1.0" },
     { name = "opentelemetry-instrumentation-click", specifier = ">=0.64b0,<1.0" },
@@ -4500,15 +4370,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5e/ab/1de9a4f730edde1bdbbc2b8d19f8fa326f036b4f18b2f72cfbea7dc53c26/pbr-7.0.3.tar.gz", hash = "sha256:b46004ec30a5324672683ec848aed9e8fc500b0d261d40a3229c2d2bbfcedc29", size = 135625, upload-time = "2025-11-03T17:04:56.274Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c0/db/61efa0d08a99f897ef98256b03e563092d36cc38dc4ebe4a85020fe40b31/pbr-7.0.3-py2.py3-none-any.whl", hash = "sha256:ff223894eb1cd271a98076b13d3badff3bb36c424074d26334cd25aebeecea6b", size = 131898, upload-time = "2025-11-03T17:04:54.875Z" },
-]
-
-[[package]]
-name = "peewee"
-version = "4.3.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/94/d3/d506f871ca4173e1e3b0754459181f7dd4d7f12c32367865ab8cad3d16bf/peewee-4.3.0.tar.gz", hash = "sha256:f2e6686e6fc61d236fd12f370bfd42955b7b42bbd9954f207d02434a0328c3de", size = 795277, upload-time = "2026-07-31T16:51:22.784Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/fa/297ed34cba9ef22e29271a95b34d2b6191dba6de39e2d1918e3363cd6555/peewee-4.3.0-py3-none-any.whl", hash = "sha256:62a43d5934e7986747285124059c5ad8908cc70e538472aadae5cb5e9f10006c", size = 179479, upload-time = "2026-07-31T16:51:21.288Z" },
 ]
 
 [[package]]
@@ -6310,15 +6171,6 @@ wheels = [
 ]
 
 [[package]]
-name = "ruamel-yaml"
-version = "0.19.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c7/3b/ebda527b56beb90cb7652cb1c7e4f91f48649fbcd8d2eb2fb6e77cd3329b/ruamel_yaml-0.19.1.tar.gz", hash = "sha256:53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993", size = 142709, upload-time = "2026-01-02T16:50:31.84Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/0c/51f6841f1d84f404f92463fc2b1ba0da357ca1e3db6b7fbda26956c3b82a/ruamel_yaml-0.19.1-py3-none-any.whl", hash = "sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93", size = 118102, upload-time = "2026-01-02T16:50:29.201Z" },
-]
-
-[[package]]
 name = "ruff"
 version = "0.16.10"
 source = { registry = "https://pypi.org/simple" }
@@ -6353,52 +6205,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/76/43/35e4d8aa320bffe8287fe8f65f578fa2d2db0a64212f0e710dce58267854/s3transfer-0.19.2.tar.gz", hash = "sha256:ba0309fd86be3c27dbf78cdd813c13c5e1df16e5874b99d2535ebbdfb9892993", size = 165592, upload-time = "2026-07-22T19:30:44.432Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/e7/5c595c75e9f41a44f30e526eda465ea0b4eec93470e074e4a111b253f13a/s3transfer-0.19.2-py3-none-any.whl", hash = "sha256:d8168eccca828cbb2cd573675333f3bddd254313a9c42494b84c76b539e8ba25", size = 90216, upload-time = "2026-07-22T19:30:43.251Z" },
-]
-
-[[package]]
-name = "safety"
-version = "3.8.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "authlib" },
-    { name = "certifi" },
-    { name = "click" },
-    { name = "dparse" },
-    { name = "filelock" },
-    { name = "httpx" },
-    { name = "jinja2" },
-    { name = "marshmallow" },
-    { name = "nltk" },
-    { name = "packaging" },
-    { name = "pydantic" },
-    { name = "ruamel-yaml" },
-    { name = "safety-schemas" },
-    { name = "tenacity" },
-    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-    { name = "tomlkit" },
-    { name = "truststore" },
-    { name = "typer" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c2/7b/8e1d580c5178f0736b806b7199827e61e2a2569eec5b49ec75da6273bbdf/safety-3.8.1.tar.gz", hash = "sha256:e646123b976bbb6707cfaacae8c926e2f886b744a60e0f410e8610a3a4eaf7be", size = 412947, upload-time = "2026-05-29T15:09:33.355Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4b/f5/498db84333a644835e572c0d96cfa705bf9871f863289a7845082d54755e/safety-3.8.1-py3-none-any.whl", hash = "sha256:953c1c3c60c873f53a6cc250b2a9c4b38bb6ef45f0625990e43f20bff916c965", size = 340521, upload-time = "2026-05-29T15:09:31.622Z" },
-]
-
-[[package]]
-name = "safety-schemas"
-version = "0.0.16"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "dparse" },
-    { name = "packaging" },
-    { name = "pydantic" },
-    { name = "ruamel-yaml" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c2/ef/0e07dfdb4104c4e42ae9fc6e8a0da7be2d72ac2ee198b32f7500796de8f3/safety_schemas-0.0.16.tar.gz", hash = "sha256:3bb04d11bd4b5cc79f9fa183c658a6a8cf827a9ceec443a5ffa6eed38a50a24e", size = 54815, upload-time = "2025-09-16T14:35:31.973Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/84/a2/7840cc32890ce4b84668d3d9dfe15a48355b683ae3fb627ac97ac5a4265f/safety_schemas-0.0.16-py3-none-any.whl", hash = "sha256:6760515d3fd1e6535b251cd73014bd431d12fe0bfb8b6e8880a9379b5ab7aa44", size = 39292, upload-time = "2025-09-16T14:35:32.84Z" },
 ]
 
 [[package]]
@@ -6724,33 +6530,12 @@ wheels = [
 ]
 
 [[package]]
-name = "tqdm"
-version = "4.70.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/21/3b/6c24bec5be5e743ffd99576daa5cc077722fc7d5bbc00bd133fa0c698dc6/tqdm-4.70.0.tar.gz", hash = "sha256:55b0b0dbd97462d06ebee91e4dac24ed4d4702be82b24f07e6c1d27e08cea220", size = 795438, upload-time = "2026-07-27T11:33:15.271Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/1c/01bfd571a64e7f270e6bab5e33777debe0edc56759233ce84f27dec92d14/tqdm-4.70.0-py3-none-any.whl", hash = "sha256:7f585706bfddbdebf89daac705b2dfcc16890130727d3197ca62c732b4310953", size = 80184, upload-time = "2026-07-27T11:33:13.167Z" },
-]
-
-[[package]]
 name = "traitlets"
 version = "5.16.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/61/a1/d7e7d9f461575d8bb77e3c3bd78a6cdfdd2bb4a06bfbbb8a0e1f51ab7bc2/traitlets-5.16.0.tar.gz", hash = "sha256:7de0a3fabaf5971ff15c8905545f9febfa850309fb8e86e1b42bdb5b46b293ed", size = 165946, upload-time = "2026-07-31T12:23:49.785Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/01/bd/f8607e908605262e4926cbfd2560094bc5d04ef7f8aff1340e7fff503016/traitlets-5.16.0-py3-none-any.whl", hash = "sha256:94a9967ba45e89e837cf9934029c8d019bea9149cfffa115ed8c1900f679beba", size = 86093, upload-time = "2026-07-31T12:23:47.533Z" },
-]
-
-[[package]]
-name = "truststore"
-version = "0.10.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/53/a3/1585216310e344e8102c22482f6060c7a6ea0322b63e026372e6dcefcfd6/truststore-0.10.4.tar.gz", hash = "sha256:9d91bd436463ad5e4ee4aba766628dd6cd7010cf3e2461756b3303710eebc301", size = 26169, upload-time = "2025-08-12T18:49:02.73Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/19/97/56608b2249fe206a67cd573bc93cd9896e1efb9e98bce9c163bcdc704b88/truststore-0.10.4-py3-none-any.whl", hash = "sha256:adaeaecf1cbb5f4de3b1959b42d41f6fab57b2b1666adb59e89cb0b53361d981", size = 18660, upload-time = "2025-08-12T18:49:01.46Z" },
 ]
 
 [[package]]
@@ -6771,21 +6556,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/92/3c/58f808a359700f39a967dffede33efeac809262c03303fa3eec6afff8f49/twine-7.0.0.tar.gz", hash = "sha256:85cdb29c518efef867360ae4acd4b0dfd61c8654a22fca08e6f8539f05022177", size = 215032, upload-time = "2026-07-27T15:59:00.825Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/96/08/ddcdc06225eaad6de0e48e1002b06d919dbde20582d0662c7af51308e5d6/twine-7.0.0-py3-none-any.whl", hash = "sha256:b854164df26db268af05f49aa5c0344b10e27a494343ff05b1e0bad3b135f5a7", size = 43204, upload-time = "2026-07-27T15:58:59.26Z" },
-]
-
-[[package]]
-name = "typer"
-version = "0.25.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "annotated-doc" },
-    { name = "click" },
-    { name = "rich" },
-    { name = "shellingham" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e4/51/9aed62104cea109b820bbd6c14245af756112017d309da813ef107d42e7e/typer-0.25.1.tar.gz", hash = "sha256:9616eb8853a09ffeabab1698952f33c6f29ffdbceb4eaeecf571880e8d7664cc", size = 122276, upload-time = "2026-04-30T19:32:16.964Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/f9/2b3ff4e56e5fa7debfaf9eb135d0da96f3e9a1d5b27222223c7296336e5f/typer-0.25.1-py3-none-any.whl", hash = "sha256:75caa44ed46a03fb2dab8808753ffacdbfea88495e74c85a28c5eefcf5f39c89", size = 58409, upload-time = "2026-04-30T19:32:18.271Z" },
 ]
 
 [[package]]

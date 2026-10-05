@@ -4,14 +4,14 @@ Security Check Script
 
 Runs comprehensive security checks including:
 - Bandit (security linter)
-- Safety (dependency vulnerability check)
+- pip-audit (dependency vulnerability check)
 - Optional: Trivy, Semgrep, TruffleHog
 
 Usage:
     python dev-tools/security/security_check.py [--quick] [--container] [--all]
 
 Options:
-    --quick      Run only fast checks (bandit, safety)
+    --quick      Run only fast checks (bandit, pip-audit)
     --container  Include container security scans
     --all        Run all available security tools
 """
@@ -68,11 +68,11 @@ def run_bandit():
     return json_success and sarif_success
 
 
-def run_safety():
-    """Run Safety dependency vulnerability check."""
-    logger.info("=== Safety Dependency Check ===")
+def run_pip_audit():
+    """Run pip-audit dependency vulnerability check."""
+    logger.info("=== pip-audit Dependency Check ===")
 
-    success = run_tool("safety", "check")
+    success = run_tool("pip-audit", "--desc")
     if not success:
         logger.warning("Vulnerable dependencies found")
 
@@ -159,7 +159,7 @@ def main():
     # Always run core security tools
     results = []
     results.append(run_bandit())
-    results.append(run_safety())
+    results.append(run_pip_audit())
 
     # Run additional tools if requested
     if args.all or not args.quick:

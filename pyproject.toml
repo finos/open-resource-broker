@@ -299,7 +299,6 @@ dev = [
     "requests-mock>=1.11.0,<2.0.0",
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
-    "nltk>=3.10.2",
     # Security: Fix CVE-2026-76217, CVE-2026-76218, CVE-2026-76219,
     # CVE-2026-76220, CVE-2026-76222, CVE-2026-78675, CVE-2026-78676,
     # CVE-2026-78677, CVE-2026-78678, CVE-2026-78679, CVE-2026-87817,
@@ -321,11 +320,8 @@ dev = [
     # --- inlined from dependency-groups.security ---
     "bandit>=1.7.5,<2.0.0",
     "bandit-sarif-formatter>=1.1.1,<2.0.0",
-    "safety>=3.7.0,<4.0.0",
     "pip-audit>=2.6.1,<3.0.0",
     "cyclonedx-bom>=4.0.0,<8.0.0",
-    "peewee>=3.18.3",
-    "marshmallow>=4.1.2",
     "lxml>=6.1.0",
     # semgrep is intentionally excluded from this shim (as in the security group):
     # workflows pin and install their own version to avoid version drift.
@@ -365,7 +361,7 @@ dev = [
 #   arch      — import-linter (arch-validation job; pyyaml via project deps)
 #   test      — pytest stack + all test dependencies (all test legs)
 #   docs      — mkdocs stack (docs job)
-#   security  — bandit/safety/pip-audit/cyclonedx (security-bandit/safety jobs)
+#   security  — bandit/pip-audit/cyclonedx (security-bandit/security-pip-audit jobs)
 #   build     — build + wheel (build-and-package job)
 #
 # Umbrella groups (keep local dev + --all-groups unchanged):
@@ -427,9 +423,6 @@ test = [
     # Security overrides for vulnerable transitive deps pulled in by test tooling
     "joserfc>=1.6.1",
     "werkzeug>=3.1.6",
-    # Security override for safety's vulnerable and broken nltk versions
-    # (GHSA-7p94-766c-hgjp; 3.10.1 rejects packages in project-local virtualenvs)
-    "nltk>=3.10.2",
     # Security override for python-semantic-release's vulnerable gitpython
     # (GHSA-956x-8gvw-wg5v, GHSA-2f96-g7mh-g2hx, GHSA-v396-v7q4-x2qj argument
     # injection; GHSA-rwj8-pgh3-r573 os.path.expandvars in polish_url)
@@ -474,12 +467,8 @@ docs = [
 security = [
     "bandit>=1.7.5,<2.0.0",
     "bandit-sarif-formatter>=1.1.1,<2.0.0",
-    "safety>=3.7.0,<4.0.0",
     "pip-audit>=2.6.1,<3.0.0",
     "cyclonedx-bom>=4.0.0,<8.0.0",
-    # Security overrides for safety's vulnerable transitive deps
-    "peewee>=3.18.3",
-    "marshmallow>=4.1.2",
     # Security override for lxml (CVE-2026-41066) — transitive via cyclonedx-bom + pip-audit
     "lxml>=6.1.0",
     # semgrep is intentionally excluded: the workflow pins and installs its own

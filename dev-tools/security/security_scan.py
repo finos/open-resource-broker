@@ -8,6 +8,7 @@ and SBOM generation.
 """
 
 import argparse
+import importlib.util
 import json
 import logging
 import subprocess
@@ -36,12 +37,8 @@ class SecurityScanner:
 
         try:
             # Check if bandit-sarif-formatter is available
-            try:
-                import bandit_sarif_formatter  # noqa: F401
-
-                sarif_available = True
-            except ImportError:
-                sarif_available = False
+            sarif_available = importlib.util.find_spec("bandit_sarif_formatter") is not None
+            if not sarif_available:
                 logger.warning("bandit-sarif-formatter not available, falling back to JSON")
 
             # Generate JSON output (always)
@@ -87,26 +84,26 @@ class SecurityScanner:
         except Exception as e:
             return False, f"Bandit scan failed: {e}"
 
-    def run_safety(self) -> tuple[bool, str]:
-        """Run Safety dependency vulnerability check."""
-        logger.info("Running Safety dependency scan...")
+    def run_pip_audit(self) -> tuple[bool, str]:
+        """Run pip-audit dependency vulnerability check."""
+        logger.info("Running pip-audit dependency scan...")
 
         try:
             result = subprocess.run(
-                ["python", "-m", "safety", "check", "--json"],
+                ["python", "-m", "pip_audit", "--format=json", "--desc"],
                 check=False,
                 cwd=self.project_root,
                 capture_output=True,
                 text=True,
             )
 
-            with open(self.project_root / "safety-report.json", "w") as f:
+            with open(self.project_root / "pip-audit-report.json", "w") as f:
                 f.write(result.stdout)
 
-            return True, "Safety scan completed"
+            return True, "pip-audit scan completed"
 
         except Exception as e:
-            return False, f"Safety scan failed: {e}"
+            return False, f"pip-audit scan failed: {e}"
 
     def run_trivy(self) -> tuple[bool, str]:
         """Run Trivy container vulnerability scan."""
@@ -264,7 +261,7 @@ class SecurityScanner:
 ### Report Files
 - `security-report.json` - Detailed JSON report
 - `bandit-report.json` - Bandit security issues
-- `safety-report.json` - Dependency vulnerabilities
+- `pip-audit-report.json` - Dependency vulnerabilities
 - `trivy-results.json` - Container vulnerabilities
 - `*-sbom-*.json` - Software Bill of Materials
 
@@ -279,10 +276,9 @@ class SecurityScanner:
 ## Tools Used
 
 - **Bandit**: Python security linter
-- **Safety**: Python dependency vulnerability scanner
+- **pip-audit**: Python package vulnerability scanner
 - **Trivy**: Container vulnerability scanner
 - **Hadolint**: Dockerfile security linter
-- **pip-audit**: Python package vulnerability scanner
 - **Syft**: SBOM generator
 """
 
@@ -297,7 +293,7 @@ class SecurityScanner:
 
         # Core security scans
         self.results["Bandit"] = self.run_bandit()
-        self.results["Safety"] = self.run_safety()
+        self.results["pip-audit"] = self.run_pip_audit()
         self.results["SBOM Generation"] = self.generate_sbom()
 
         # Container scans (optional)
