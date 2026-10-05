@@ -562,8 +562,6 @@ def test_stop_watch_manager_respects_timeout_from_foreign_thread() -> None:
     so the loop exits promptly once the timeout has been measured, removing
     two long-sleep rendezvous.
     """
-    import asyncio
-
     loop_terminate = threading.Event()
 
     async def _slow_stop() -> None:

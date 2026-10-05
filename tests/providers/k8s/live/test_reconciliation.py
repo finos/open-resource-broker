@@ -131,7 +131,7 @@ async def test_startup_reconciler_rebuilds_cache_from_cluster(
     )
 
     # Run reconciler in a thread since it is a synchronous call.
-    report = await asyncio.to_thread(reconciler.run)
+    report = await asyncio.wait_for(asyncio.to_thread(reconciler.run), timeout=_RECONCILER_TIMEOUT)
 
     assert report.completed, f"Reconciler did not complete: {report.error}"
     assert report.pods_adopted >= 1, (
@@ -155,7 +155,7 @@ async def test_startup_reconciler_rebuilds_cache_from_cluster(
     try:
         k8s_core_v1.delete_namespaced_pod(name=pod_name, namespace=k8s_namespace)
     except Exception:
-        pass
+        pass  # Pod may already be gone; cleanup is best-effort
 
 
 async def test_orphan_gc_deletes_orphan_after_grace_period(
@@ -335,4 +335,4 @@ async def test_timeout_gc_deletes_pending_pod_past_threshold(
     try:
         await handler.release_hosts(pod_names, request_obj.provider_data)
     except Exception:
-        pass
+        pass  # Pods may already be gone; cleanup is best-effort

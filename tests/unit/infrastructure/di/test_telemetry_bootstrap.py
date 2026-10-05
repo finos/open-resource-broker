@@ -139,10 +139,8 @@ class TestConfigureTelemetryEnabled:
         would never be called (disabled path) OR would be called with None.
         Either way this test would fail.
         """
-        try:
-            from opentelemetry.sdk.metrics import MeterProvider as SDKMeterProvider
-        except ImportError:
-            pytest.skip("opentelemetry-sdk not installed")
+        pytest.importorskip("opentelemetry.sdk.metrics")
+        from opentelemetry.sdk.metrics import MeterProvider as SDKMeterProvider
 
         container = _make_container_with_otel(OtelConfig(enabled=True))
 

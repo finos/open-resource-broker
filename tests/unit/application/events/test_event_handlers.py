@@ -249,7 +249,6 @@ class TestMachineCreatedHandler:
     @pytest.mark.asyncio
     async def test_format_includes_template_and_instance_type(self):
         h = MachineCreatedHandler()
-        ev = _machine_event(aggregate_id="m-1", template_id="tmpl-x", instance_type="t3.micro")
         # Attach extra attrs as a simple namespace
         ev = MagicMock()
         ev.event_id = "eid"

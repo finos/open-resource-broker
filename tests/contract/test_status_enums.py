@@ -46,7 +46,7 @@ def test_hf_all_domain_statuses_map_to_allowed_output(hf_strategy):
     """Every RequestStatus value maps to a value in the HF allowed status set."""
     from orb.domain.request.request_types import RequestStatus
 
-    for domain_status in RequestStatus:
+    for domain_status in list(RequestStatus):
         mapped = hf_strategy._map_domain_status_to_hostfactory(domain_status.value)
         assert mapped in HF_ALLOWED_STATUSES, (
             f"RequestStatus.{domain_status.name} ('{domain_status.value}') "
@@ -173,7 +173,7 @@ def test_hf_no_domain_status_raises_on_mapping(hf_strategy):
     """_map_domain_status_to_hostfactory never raises for any RequestStatus value."""
     from orb.domain.request.request_types import RequestStatus
 
-    for domain_status in RequestStatus:
+    for domain_status in list(RequestStatus):
         try:
             result = hf_strategy._map_domain_status_to_hostfactory(domain_status.value)
             assert isinstance(result, str), (

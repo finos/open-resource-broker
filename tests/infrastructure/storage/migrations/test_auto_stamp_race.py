@@ -129,8 +129,10 @@ def pre_existing_db():
         try:
             os.unlink(db_path)
         except OSError:
-            # Best-effort teardown: tmpfile may be gone already.
-            return
+            # Best-effort teardown: tmpfile may be gone already. Avoid a bare
+            # `return` here — inside `finally`, it would silently discard any
+            # exception still propagating from the `try: yield engine` block.
+            pass
 
 
 # ---------------------------------------------------------------------------

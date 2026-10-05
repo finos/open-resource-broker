@@ -27,10 +27,8 @@ REGION = "eu-west-2"
 @pytest.fixture(scope="function")
 def moto_aws():
     """Start moto mock_aws context for the duration of each test."""
-    try:
-        from moto import mock_aws
-    except ImportError:
-        pytest.skip("moto not installed")
+    pytest.importorskip("moto")
+    from moto import mock_aws
 
     os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
     os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")  # nosec B105

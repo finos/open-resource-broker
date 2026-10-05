@@ -279,10 +279,11 @@ class TestDIPattern:
         # First resolution should initialize
         service1 = container.get(LazyService)
         assert initialization_count == 1
+        count_after_first_resolution = initialization_count
 
-        # Second resolution should reuse instance
+        # Second resolution should reuse instance, not re-initialize
         service2 = container.get(LazyService)
-        assert initialization_count == 1
+        assert initialization_count == count_after_first_resolution
         assert service1 is service2
 
     def test_thread_safety(self):

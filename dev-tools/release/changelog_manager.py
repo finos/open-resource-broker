@@ -20,15 +20,18 @@ logger = logging.getLogger(__name__)
 
 def clean_emojis(text: str) -> str:
     """Remove emojis and emoji-like characters from text."""
-    # Remove common emojis and symbols
+    # Remove common emojis and symbols.
+    # Each range gets its own character class joined by alternation (rather
+    # than one combined class) so static analyzers don't misread adjacent
+    # supplementary-plane ranges as overlapping.
     emoji_pattern = re.compile(
-        "["
-        "\U0001f600-\U0001f64f"  # emoticons
-        "\U0001f300-\U0001f5ff"  # symbols & pictographs
-        "\U0001f680-\U0001f6ff"  # transport & map symbols
-        "\U0001f1e0-\U0001f1ff"  # flags (iOS)
-        "\U00002700-\U000027bf"  # dingbats (fixed range)
-        "]+",
+        "(?:"
+        "[\U0001f600-\U0001f64f]"  # emoticons
+        "|[\U0001f300-\U0001f5ff]"  # symbols & pictographs
+        "|[\U0001f680-\U0001f6ff]"  # transport & map symbols
+        "|[\U0001f1e0-\U0001f1ff]"  # flags (iOS)
+        "|[\U00002700-\U000027bf]"  # dingbats (fixed range)
+        ")+",
         flags=re.UNICODE,
     )
     return emoji_pattern.sub("", text).strip()

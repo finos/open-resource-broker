@@ -126,16 +126,14 @@ class TestFileExporterFlushOnExit:
              that is valid JSON.
         """
         # All required classes are in opentelemetry-sdk which is a hard dep.
-        try:
-            from opentelemetry import metrics as otel_metrics
-            from opentelemetry.sdk.metrics import MeterProvider
-            from opentelemetry.sdk.metrics.export import (
-                ConsoleMetricExporter,
-                PeriodicExportingMetricReader,
-            )
-            from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-        except ImportError:
-            pytest.skip("opentelemetry-sdk not installed")
+        pytest.importorskip("opentelemetry.sdk.metrics")
+        from opentelemetry import metrics as otel_metrics
+        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics.export import (
+            ConsoleMetricExporter,
+            PeriodicExportingMetricReader,
+        )
+        from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 
         metrics_path = tmp_path / "metrics.jsonl"
 

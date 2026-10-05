@@ -121,7 +121,6 @@ class TestLazyLoadingPerformance:
 
         # Test with lazy loading disabled (if possible)
         with patch.dict(os.environ, {"LAZY_LOADING_ENABLED": "false"}):
-            start_time = time.time()
             # Note: This would require container recreation, which is complex
             # For now, just verify lazy loading is working
             eager_simulation_time = lazy_time * 2  # Simulate eager being slower

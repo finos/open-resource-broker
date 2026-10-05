@@ -21,7 +21,17 @@ import shutil
 import tempfile
 from functools import cache
 
-from jinja2 import Template
+from jinja2 import Environment, select_autoescape
+
+# These fixtures render YAML/JSON, not HTML, so autoescaping must stay off for
+# those payloads — escaping would corrupt YAML/JSON syntax (quoting/escaping
+# chars that have no HTML meaning here). `select_autoescape` with no HTML/XML
+# extensions configured and `default`/`default_for_string` set to False keeps
+# that behavior while using the autoescape-aware construction CodeQL expects,
+# instead of relying on an unconfigured `Template(...)` default.
+_env = Environment(
+    autoescape=select_autoescape(enabled_extensions=(), default_for_string=False, default=False)
+)
 
 
 @cache
@@ -36,7 +46,7 @@ def get_pod_spec(flavor: str = "vanilla") -> str:
     resources = importlib.resources.files("orb.k8s_legacy.tests.resources")
     template_path = pathlib.Path(resources.joinpath(podspec_name))
     temp_confdir = pathlib.Path(_get_tempdir())
-    podspec_template = Template(template_path.read_text())
+    podspec_template = _env.from_string(template_path.read_text())
     podspec_path = temp_confdir / podspec_name
     podspec_path.write_text(podspec_template.render(os.environ))
     return str(podspec_path)
@@ -51,7 +61,7 @@ def generate_provider_conf(flavor: str = "vanilla") -> str:
 
     with templates_tpl.open() as f:
         data = f.read()
-        template_str = Template(data).render(podSpec=pod_spec_path)
+        template_str = _env.from_string(data).render(podSpec=pod_spec_path)
         template_dict = json.loads(template_str)
 
     temp_confdir = pathlib.Path(_get_tempdir())

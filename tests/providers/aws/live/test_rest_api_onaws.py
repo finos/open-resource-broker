@@ -81,7 +81,7 @@ def _get_boto_profile_and_region() -> tuple[str | None, str]:
                 profile = provider_cfg.get("profile")
                 region = provider_cfg.get("region")
         except Exception:
-            pass
+            pass  # Config file unreadable; fall back to env-provided region below
     region = (
         region
         or os.environ.get("AWS_REGION")
@@ -492,7 +492,7 @@ def setup_rest_api_environment(request, test_session_id):
 
         reset_container()
     except Exception:
-        pass
+        pass  # DI container already torn down; nothing left to reset
     try:
         processor.cleanup_test_templates(test_name)
     except Exception as exc:
@@ -1445,7 +1445,8 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
             if not db_path.exists():
                 return ids
             try:
-                db_data = json.load(open(db_path))
+                with open(db_path) as db_file:
+                    db_data = json.load(db_file)
                 machines = db_data.get("machines") or {}
                 ids.update(machines.keys())
             except Exception as exc:  # pragma: no cover - defensive

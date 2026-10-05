@@ -41,10 +41,15 @@ class TestNativeSpecAllProviders:
                 try:
                     import base64
 
-                    from jinja2 import Environment, TemplateSyntaxError
+                    from jinja2 import Environment, TemplateSyntaxError, select_autoescape
                     from jinja2.exceptions import TemplateError
 
-                    env = Environment()
+                    # Mirrors the production SandboxedEnvironment's autoescape
+                    # policy (orb.infrastructure.template.jinja_spec_renderer):
+                    # select_autoescape() only escapes for named templates with
+                    # a matching extension, so from_string() rendering below is
+                    # unaffected and non-HTML spec values pass through as-is.
+                    env = Environment(autoescape=select_autoescape(["json", "yaml", "yml"]))
                     # Add b64encode filter so templates using it don't fail
                     env.filters["b64encode"] = lambda s: base64.b64encode(
                         s.encode() if isinstance(s, str) else s

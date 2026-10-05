@@ -38,7 +38,6 @@ from tests.unit.infrastructure.scheduler.conftest import make_default_strategy, 
 # ---------------------------------------------------------------------------
 
 _VALID_REQUEST_ID = "req-12345678-1234-1234-1234-123456789abc"
-_VALID_RETURN_ID = "ret-12345678-1234-1234-1234-123456789abc"
 _VALID_INSTANCE_ID = "i-0abcdef1234567890"
 
 

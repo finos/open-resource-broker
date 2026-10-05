@@ -531,7 +531,7 @@ def _get_capacity(provider_api: str, resource_id: str) -> int:
         resp = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[resource_id])
         asgs = resp.get("AutoScalingGroups") or [{}]
         return int(asgs[0].get("DesiredCapacity", 0))
-    pytest.fail(f"Unsupported provider API for capacity check: {provider_api}")
+    raise AssertionError(f"Unsupported provider API for capacity check: {provider_api}")
 
 
 def _wait_for_fleet_stable(resource_id: str, timeout: int = 300) -> None:
@@ -2137,6 +2137,7 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
             # Try graceful return first
             return_response = hfm.request_return_machines(remaining_ids)
             return_request_id = _extract_request_id(return_response)
+            log.info("3.2: Return request ID: %s", return_request_id)
 
             # Wait for graceful return with timeout
             log.info("3.2: Waiting for graceful return completion (timeout: 120s)")

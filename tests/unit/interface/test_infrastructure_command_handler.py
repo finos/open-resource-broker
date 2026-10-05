@@ -419,4 +419,4 @@ class TestShowProviderInfrastructure:
             _show_provider_infrastructure(provider, mock_container)
 
         info_calls = [call.args[0] for call in mock_console.info.call_args_list]
-        assert any("https://example.com" in c for c in info_calls)
+        assert any(c.find("https://example.com") >= 0 for c in info_calls)

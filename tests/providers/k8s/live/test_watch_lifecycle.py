@@ -28,7 +28,6 @@ pytestmark = [pytest.mark.asyncio]
 
 _CACHE_POPULATE_TIMEOUT = 60  # seconds to wait for cache to register a pod event
 _POLL_INTERVAL = 1  # seconds
-_POD_CREATE_TIMEOUT = 30  # seconds
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +160,7 @@ async def test_watch_receives_pod_create_event(
                 namespace=k8s_namespace,
             )
         except Exception:
-            pass
+            pass  # Pod may already be gone; cleanup is best-effort
 
 
 async def test_watch_receives_pod_delete_event(
@@ -204,7 +203,7 @@ async def test_watch_receives_pod_delete_event(
                 namespace=k8s_namespace,
             )
         except Exception:
-            pass
+            pass  # Pod already deleted by the test body; cleanup is best-effort
 
 
 @pytest.mark.xfail(

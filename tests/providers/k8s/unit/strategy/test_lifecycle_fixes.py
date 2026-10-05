@@ -380,7 +380,7 @@ class TestCheckHealthEnrichment:
             status = strategy.check_health()
 
         assert status.is_healthy is True
-        assert "my-cluster.example.com" in status.status_message
+        assert status.status_message.find("my-cluster.example.com") >= 0
         assert status.error_details is not None
         assert status.error_details.get("cluster_endpoint") == "https://my-cluster.example.com:6443"
 
