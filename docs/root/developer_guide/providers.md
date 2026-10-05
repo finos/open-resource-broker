@@ -41,7 +41,7 @@ src/orb/providers/<name>/
 ```
 
 AWS and Kubernetes additionally expose a `<name>_template_dto_config.py` under
-`domain/template/`; Azure and GCP expose the equivalent extension model as
+`domain/template/`; Azure and Google Cloud expose the equivalent extension model as
 `TemplateExtensionConfig` in `configuration/template_extension.py`. Either
 shape is returned from the plugin's `template_dto_config()` accessor and
 registered with `TemplateExtensionRegistry` so `TemplateDTO` can parse

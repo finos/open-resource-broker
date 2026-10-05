@@ -195,7 +195,7 @@ Request-to-provider routing is implemented by `ProviderSelectionService`
 into `ProviderRegistry`. It depends only on `ProviderRegistryPort` and
 `ConfigurationPort`, so it has no dependency on any specific provider — the
 same selection logic applies whether the configured instances are AWS, Azure,
-GCP, or Kubernetes.
+Google Cloud, or Kubernetes.
 
 `select_provider_for_template(template, provider_name=None, logger=None)`
 resolves a provider for a template request using this precedence:
@@ -262,7 +262,7 @@ Each `ProviderInstanceConfig` carries `name`, `type`, `enabled`, `priority`,
 `handler_overrides` (merged with the provider type's defaults via
 `get_effective_handlers`), `template_defaults`, `extensions`, and
 `health_check`. None of these fields are AWS-specific — the same schema backs
-Azure, GCP, and Kubernetes instances; the example above uses two AWS instances
+Azure, Google Cloud, and Kubernetes instances; the example above uses two AWS instances
 because multi-instance load balancing is most commonly exercised with
 multiple regions of one provider type, but an installation can equally define
 multiple named instances of `azure`, `gcp`, or `k8s`, or mix provider types
@@ -280,7 +280,7 @@ specific provider:
   `template_dto_config()`) so `TemplateDTO` can deserialize provider-specific
   template fields. AWS and Kubernetes expose this as a
   `<name>_template_dto_config.py` module under `domain/template/`; Azure and
-  GCP expose an equivalent `TemplateExtensionConfig` class under
+  Google Cloud expose an equivalent `TemplateExtensionConfig` class under
   `configuration/template_extension.py`.
 - **`DefaultsLoaderRegistry`**
   (`src/orb/providers/registry/defaults_loader_registry.py`) maps a provider

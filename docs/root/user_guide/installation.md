@@ -94,7 +94,7 @@ orb init --non-interactive \
 
 `--subnet-ids`, `--security-group-ids`, and `--fleet-role` are only used with `--non-interactive`. In interactive mode ORB discovers these from your AWS account automatically.
 
-This page uses AWS for its examples, but the same `orb init --provider-type <type>` flow applies to every provider — see the [Azure and GCP Provider Setup](https://github.com/finos/open-resource-broker#setup) sections in the README and the [Kubernetes Provider Guide](../providers/k8s/index.md).
+This page uses AWS for its examples, but the same `orb init --provider-type <type>` flow applies to every provider — see the [Azure Provider Guide](../providers/azure/index.md), the [Google Cloud Provider Guide](../providers/gcp/index.md), and the [Kubernetes Provider Guide](../providers/k8s/index.md).
 
 ## Basic Usage
 

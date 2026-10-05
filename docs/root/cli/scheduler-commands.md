@@ -196,7 +196,7 @@ $ orb scheduler validate
 
 ## Integration with Other Commands
 
-The scheduler system integrates seamlessly with all other CLI commands:
+The scheduler system integrates with all other CLI commands:
 
 - Template operations use the scheduler for field mapping and response formatting
 - Request operations use the scheduler for data parsing and validation

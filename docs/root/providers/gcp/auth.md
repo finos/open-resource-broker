@@ -1,6 +1,6 @@
-# GCP provider - authentication
+# Google Cloud provider - authentication
 
-The GCP provider authenticates exclusively with
+The Google Cloud provider authenticates exclusively with
 [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials).
 There is no provider-config field for credentials, no service-account-key
 file setting, and no credential-selection flag — `GCPProviderConfig` only
@@ -28,11 +28,11 @@ before reporting the provider healthy.
 
 ### Single identity, by design
 
-GCP's ADC model resolves to exactly one credential per process. Unlike
+Google Cloud's ADC model resolves to exactly one credential per process. Unlike
 the AWS provider (multiple named profiles) or the Azure provider
-(`client_id` to select a specific managed identity), the GCP provider has
+(`client_id` to select a specific managed identity), the Google Cloud provider has
 no mechanism to use a different identity per provider instance or per
-template. If you need to operate against more than one GCP project or
+template. If you need to operate against more than one Google Cloud project or
 service account, run separate ORB deployments (or processes) each with
 their own ADC source.
 
@@ -46,7 +46,7 @@ groups in `project_id`:
   instance, instance-template, and MIG lifecycle operations.
 * If instances are attached to a service account
   (`service_account_email`), the identity running ORB also needs
-  `roles/iam.serviceAccountUser` on that service account (GCP requires
+  `roles/iam.serviceAccountUser` on that service account (Google Cloud requires
   this to allow attaching it to a new instance).
 
 ## Setting up ADC
@@ -63,7 +63,7 @@ gcloud auth application-default login
 export GOOGLE_APPLICATION_CREDENTIALS="/etc/orb/gcp-service-account.json"
 ```
 
-### Running on GCP compute (recommended for production)
+### Running on Google Cloud compute (recommended for production)
 
 Attach a service account to the GCE instance, GKE node pool (with
 Workload Identity), or Cloud Run service running ORB. No environment

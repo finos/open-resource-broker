@@ -2,9 +2,9 @@
 
 ## Overview
 
-ORB acts as the **power management bridge** for SLURM elastic/cloud nodes. SLURM decides *when* to scale (based on job queue pressure), and ORB handles *how* to provision and deprovision cloud resources.
+ORB acts as the **power management bridge** for elastic/cloud nodes managed by the Slurm Workload Manager by SchedMD. Slurm decides *when* to scale, based on job queue pressure, and ORB handles *how* to provision and deprovision cloud resources.
 
-ORB integrates with SLURM's **ResumeProgram/SuspendProgram** power saving hooks — the same mechanism SLURM uses for elastic cloud bursting.
+ORB integrates with Slurm's **ResumeProgram/SuspendProgram** power saving hooks — the same mechanism Slurm uses for elastic cloud bursting.
 
 ## Prerequisites
 

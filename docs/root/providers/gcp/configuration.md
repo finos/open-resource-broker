@@ -1,4 +1,4 @@
-# GCP provider - configuration reference
+# Google Cloud provider - configuration reference
 
 This page documents every field on
 [`GCPProviderConfig`](https://github.com/finos/open-resource-broker/blob/main/src/orb/providers/gcp/configuration/config.py)
@@ -13,16 +13,16 @@ be set via environment variable.
 | Field             | Type           | Default         | Env var              | Description                                                                 |
 |-------------------|-----------------|-----------------|------------------------|--------------------------------------------------------------------------------|
 | `provider_type`   | `str`           | `"gcp"`         | `ORB_GCP_PROVIDER_TYPE`| Provider type identifier.                                                     |
-| `project_id`      | `str` (required)| -               | `ORB_GCP_PROJECT_ID`   | GCP project ID used for all Compute Engine operations. Must match the canonical GCP project ID format (lowercase letters, digits, hyphens; 6-30 characters). |
-| `region`          | `str`           | `"us-central1"` | `ORB_GCP_REGION`       | Default GCP region, e.g. `"us-central1"` or `"europe-west4"`.                |
+| `project_id`      | `str` (required)| -               | `ORB_GCP_PROJECT_ID`   | Google Cloud project ID used for all Compute Engine operations. Must match the canonical Google Cloud project ID format (lowercase letters, digits, hyphens; 6-30 characters). |
+| `region`          | `str`           | `"us-central1"` | `ORB_GCP_REGION`       | Default Google Cloud region, e.g. `"us-central1"` or `"europe-west4"`.                |
 | `zones`           | `list[str]`     | `[]`            | `ORB_GCP_ZONES`        | Optional preferred zones, e.g. `["us-central1-a", "us-central1-b"]`.         |
 | `network`         | `str \| None`   | `None`          | `ORB_GCP_NETWORK`      | Default VPC network self-link or name.                                       |
 | `subnetwork`      | `str \| None`   | `None`          | `ORB_GCP_SUBNETWORK`   | Default subnetwork self-link or name.                                        |
-| `max_retries`     | `int`           | `3`             | `ORB_GCP_MAX_RETRIES`  | Maximum retry attempts for GCP API calls.                                    |
+| `max_retries`     | `int`           | `3`             | `ORB_GCP_MAX_RETRIES`  | Maximum retry attempts for Google Cloud API calls.                                    |
 | `connect_timeout` | `int`           | `30`            | `ORB_GCP_CONNECT_TIMEOUT` | Connection timeout, in seconds.                                           |
 | `read_timeout`    | `int`           | `60`            | `ORB_GCP_READ_TIMEOUT` | Read timeout, in seconds.                                                     |
 
-There is no credential-related field on `GCPProviderConfig` — the GCP
+There is no credential-related field on `GCPProviderConfig` — the Google Cloud
 provider authenticates exclusively via Application Default Credentials.
 See [Authentication](auth.md).
 
@@ -69,7 +69,7 @@ but map to template defaults rather than the provider config above — see
 | `MIG`             | yes  | yes          | yes                  | no            | 1000              |
 | `SingleVM`         | yes  | yes          | no                   | yes           | 1                 |
 
-The GCP provider strategy supports `create_instances`,
+The Google Cloud provider strategy supports `create_instances`,
 `terminate_instances`, `cleanup_machine_resources`,
 `get_instance_status`, `describe_resource_instances`,
 `validate_template`, `get_available_templates`, `health_check`,
@@ -87,8 +87,8 @@ Every field below lives on `GCPTemplate`.
 | Field          | Type               | Required | Description                                                                 |
 |-----------------|--------------------|----------|--------------------------------------------------------------------------------|
 | `provider_api`  | enum               | no (default `MIG`) | `MIG` or `SingleVM`.                                                 |
-| `project_id`    | string             | yes      | GCP project ID (canonical format).                                           |
-| `region`        | string             | yes      | GCP region, e.g. `"us-central1"`.                                             |
+| `project_id`    | string             | yes      | Google Cloud project ID (canonical format).                                           |
+| `region`        | string             | yes      | Google Cloud region, e.g. `"us-central1"`.                                             |
 | `zones`         | list[string]       | conditionally | See placement rules below.                                              |
 | `mig_scope`     | enum               | no (default `regional`) | `regional` or `zonal`. Only used for `provider_api="MIG"`.    |
 
@@ -96,7 +96,7 @@ Placement rules enforced at validation time:
 
 * `provider_api="MIG"`, `mig_scope="zonal"` requires exactly one zone.
 * `provider_api="MIG"`, `mig_scope="regional"` should use at least two
-  zones when zones are specified at all (an empty list lets GCP choose).
+  zones when zones are specified at all (an empty list lets Google Cloud choose).
 * `provider_api="SingleVM"` requires `max_machines == 1` and exactly one
   explicit zone.
 
@@ -104,7 +104,7 @@ Placement rules enforced at validation time:
 
 | Field          | Type   | Default | Description                                                                 |
 |-----------------|--------|---------|--------------------------------------------------------------------------------|
-| `machine_type`  | string (required) | - | GCP machine type, e.g. `"e2-standard-4"`. Alias: `instance_type`.      |
+| `machine_type`  | string (required) | - | Google Cloud machine type, e.g. `"e2-standard-4"`. Alias: `instance_type`.      |
 
 ### Networking
 
@@ -151,7 +151,7 @@ A template must supply either `source_image`, or both
 
 | Field       | Behaviour                                                                        |
 |--------------|-------------------------------------------------------------------------------------|
-| `key_name`   | Rejected with a validation error. GCP does not support named SSH key pairs.         |
+| `key_name`   | Rejected with a validation error. Google Cloud does not support named SSH key pairs.         |
 
 ## Worked template examples
 

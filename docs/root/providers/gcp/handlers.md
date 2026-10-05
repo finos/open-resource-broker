@@ -1,6 +1,6 @@
-# GCP handlers
+# Google Cloud handlers
 
-The GCP provider ships two handlers, selected by `provider_api`.
+The Google Cloud provider ships two handlers, selected by `provider_api`.
 
 | `provider_api` | Handler class                   | Native resource(s)                                      | Selective release | Start/stop |
 |------------------|------------------------------------|--------------------------------------------------------------|---------------------|--------------|
@@ -12,7 +12,7 @@ The GCP provider ships two handlers, selected by `provider_api`.
 1. Does the workload need to run as a single, individually addressable VM
    rather than a scalable, policy-managed pool?
    * Yes - use **`SingleVM`**.
-2. Otherwise - use **`MIG`**, GCP's native scalable instance pool.
+2. Otherwise - use **`MIG`**, Google Cloud's native scalable instance pool.
 
 ## `MIG`
 
@@ -68,7 +68,7 @@ involved.
 ### Template fields the SingleVM handler honours
 
 `SingleVM` templates require `max_machines == 1` and exactly one explicit
-`zones` entry — GCP's `SingleVM` API operates on one VM in one zone per
+`zones` entry — Google Cloud's `SingleVM` API operates on one VM in one zone per
 template, by design.
 
 ## Capabilities summary

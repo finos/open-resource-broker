@@ -1,11 +1,11 @@
-# Google Cloud (GCP) provider
+# Google Cloud provider
 
-The GCP provider lets ORB acquire, track, and release compute capacity
-backed by Google Compute Engine, either as a Managed Instance Group (MIG)
-or as standalone VM instances. It reuses the same template, request, and
-machine model as the AWS, Kubernetes, and Azure providers, so callers of
-the CLI, REST API, SDK, and HostFactory plugin do not need to
-special-case GCP.
+The Google Cloud provider lets ORB acquire, track, and release compute
+capacity backed by Google Compute Engine, either as a Managed Instance
+Group (MIG) or as standalone VM instances. It reuses the same template,
+request, and machine model as the AWS, Kubernetes, and Azure providers,
+so callers of the CLI, REST API, SDK, and HostFactory plugin do not need
+to special-case Google Cloud.
 
 The provider supports two provisioning shapes (`provider_api` values):
 
@@ -18,9 +18,9 @@ See [Handlers](handlers.md) for how to pick between them.
 
 ## Install
 
-The GCP provider lives behind an optional install extra so operators who
-only target AWS, Kubernetes, or Azure do not pay for the Google Cloud
-SDKs.
+The Google Cloud provider lives behind an optional install extra so
+operators who only target AWS, Kubernetes, or Azure do not pay for the
+Google Cloud SDKs.
 
 ```bash
 pip install "orb-py[gcp]"
@@ -32,7 +32,7 @@ This pulls in `google-cloud-compute` and `google-auth`.
 
 ### 1. Authenticate
 
-The GCP provider authenticates exclusively with
+The Google Cloud provider authenticates exclusively with
 [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials) —
 there is no separate ORB-level credential configuration. See
 [Authentication](auth.md) for the supported ADC sources and
@@ -86,33 +86,33 @@ releasing every member of a group deletes the Managed Instance Group and
 its backing instance template; releasing a subset deletes only those
 managed instances.
 
-## AWS concepts mapped to GCP
+## AWS concepts mapped to Google Cloud
 
-| AWS concept                       | GCP equivalent                                                           |
+| AWS concept                       | Google Cloud equivalent                                                     |
 |-----------------------------------|-----------------------------------------------------------------------------|
 | EC2 instance                      | Compute Engine instance                                                     |
 | Auto Scaling Group / EC2 Fleet    | Managed Instance Group (MIG), regional or zonal                             |
 | Amazon Machine Image (AMI)        | `source_image`, or `source_image_family` + `source_image_project`           |
 | Instance type                     | `machine_type`, e.g. `e2-standard-4`                                        |
 | Spot / On-Demand                  | `price_type` (`"ondemand"` or `"spot"`)                                     |
-| Availability Zone                 | GCP zone, e.g. `us-central1-a` (`zones` field)                             |
-| EC2 key pair                      | Not supported — GCP does not use named SSH key pairs (`key_name` is rejected). |
+| Availability Zone                 | Google Cloud zone, e.g. `us-central1-a` (`zones` field)                     |
+| EC2 key pair                      | Not supported — Google Cloud does not use named SSH key pairs (`key_name` is rejected). |
 | VPC subnet                        | `network` / `subnetwork`                                                    |
 | IAM instance profile              | Attached service account (`service_account_email`, `service_account_scopes`) |
 | EC2 user data                     | Not modelled by the current template; use image-baked startup scripts.       |
 
 Key differences to keep in mind:
 
-* GCP has exactly one credential identity per ORB process: Application
+* Google Cloud has exactly one credential identity per ORB process: Application
   Default Credentials. There is no equivalent to AWS multi-profile or
   Azure managed-identity-selection — if you need to target more than one
-  GCP project or account, run separate ORB deployments with distinct ADC
+  Google Cloud project or account, run separate ORB deployments with distinct ADC
   sources.
 * Start/stop is only supported for `SingleVM`. `MIG`-managed instances
   follow group policy; ORB's `start`/`stop` operations against a MIG
   return a warning and perform no action. See
   [Provider capabilities](configuration.md#provider-capabilities).
-* GCP templates reject `key_name` (named SSH key pairs) outright — GCP
+* Google Cloud templates reject `key_name` (named SSH key pairs) outright — Google Cloud
   does not have that concept at the Compute Engine API level.
 
 ## What is in this section
