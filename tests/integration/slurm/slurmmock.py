@@ -5,7 +5,7 @@ Simulates the SLURM REST API (v0.0.44) without a real cluster.
 Supports node state transitions via /mock/resume and /mock/suspend endpoints.
 
 Usage:
-    python slurmmock.py --port 6820 --nodes 10 --partitions batch,gpu
+    python tests/integration/slurm/slurmmock.py --port 6820 --nodes 10 --partitions batch,gpu
 """
 
 import argparse
@@ -21,6 +21,15 @@ log = logging.getLogger("slurmmock")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [slurmmock] %(levelname)s %(message)s")
 
 API_VERSION = "v0.0.44"
+
+
+def _sanitize_log_value(value: str) -> str:
+    """Strip CR/LF from a request-derived value before it reaches the log stream.
+
+    Prevents a client from injecting fake log lines/records via the HTTP
+    request line (method or path).
+    """
+    return value.replace("\r", "").replace("\n", "")
 
 
 class ClusterState:
@@ -113,7 +122,10 @@ class SlurmMockHandler(BaseHTTPRequestHandler):
     cluster: ClusterState  # set by server
 
     def log_message(self, format, *args):
-        log.info("%s %s", self.command, self.path)
+        # self.command/self.path come straight from the client request line;
+        # strip CR/LF before logging so a client cannot inject fake log
+        # entries by crafting a request line with embedded newlines.
+        log.info("%s %s", _sanitize_log_value(self.command), _sanitize_log_value(self.path))
 
     def _send_json(self, data: dict, status: int = 200) -> None:
         body = json.dumps(data).encode()

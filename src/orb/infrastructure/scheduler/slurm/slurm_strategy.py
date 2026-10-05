@@ -44,11 +44,9 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
         # Check if slurmrestd URL is configured
         slurmrestd_url = os.environ.get("SLURM_ORB_RESTD_URL")
         if not slurmrestd_url and self._config_manager:
-            try:
-                # Future: could read slurmrestd_url from scheduler config
-                pass
-            except Exception:
-                pass
+            # Future: could read slurmrestd_url from scheduler config via
+            # self._config_manager once that lookup is implemented.
+            pass
 
         if slurmrestd_url:
             from orb.infrastructure.scheduler.slurm.rest_client import SlurmRestClient
@@ -509,8 +507,8 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             scheduler_config = self._config_manager.get_configuration_value("scheduler", {})
             if isinstance(scheduler_config, dict):
                 return scheduler_config.get("slurm", {}).get("partitions", {})
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.debug("Could not read scheduler.slurm.partitions config: %s", e)
         return {}
 
     def _validate_instance_types(
@@ -567,8 +565,8 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
                     config_path = scheduler_config.get("slurm", {}).get("config_path")
                 if config_path and Path(config_path).is_file():
                     return config_path
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug("Could not read scheduler.slurm.config_path config: %s", e)
 
         # 3. SLURM_CONF env var
         conf = os.environ.get("SLURM_CONF")

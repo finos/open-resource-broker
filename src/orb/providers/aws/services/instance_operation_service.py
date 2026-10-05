@@ -87,10 +87,10 @@ class AWSInstanceOperationService:
                     security_group_ids=template_config.get("security_group_ids", []),
                 )
 
-            # Ensure machine_types is populated — use instance_type as fallback
-            if not aws_template.machine_types and aws_template.instance_type:
+            # Ensure machine_types is populated — use machine_type as fallback
+            if not aws_template.machine_types and aws_template.machine_type:
                 aws_template = aws_template.model_copy(
-                    update={"machine_types": {aws_template.instance_type: 1}}
+                    update={"machine_types": {aws_template.machine_type: 1}}
                 )
 
             # Create request object

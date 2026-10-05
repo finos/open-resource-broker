@@ -602,7 +602,7 @@ class AWSLaunchTemplateManager:
             "instance_type": (
                 next(iter(template.machine_types.keys()))
                 if template.machine_types
-                else template.instance_type or "t3.medium"
+                else template.machine_type or "t3.medium"
             ),
             "request_id": str(request.request_id),
             "template_id": str(template.template_id),
@@ -732,7 +732,7 @@ class AWSLaunchTemplateManager:
             "InstanceType": (
                 next(iter(aws_template.machine_types.keys()))
                 if aws_template.machine_types
-                else aws_template.instance_type or "t3.medium"
+                else aws_template.machine_type or "t3.medium"
             ),
             "TagSpecifications": [
                 {

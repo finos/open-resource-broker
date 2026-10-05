@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -67,7 +68,7 @@ def _make_machine_handler(
     template: MagicMock | None = None,
     selection_result: MagicMock | None = None,
     request_agg: MagicMock | None = None,
-    provisioning_result: dict[str, Any] | None = None,
+    provisioning_result: Any | None = None,
 ) -> tuple[CreateMachineRequestHandler, MagicMock]:
     """Build a CreateMachineRequestHandler bypassing __init__ to avoid lazy-import deps."""
     if template is None:
@@ -77,7 +78,7 @@ def _make_machine_handler(
     if selection_result is None:
         selection_result = MagicMock()
     if provisioning_result is None:
-        provisioning_result = {"success": True, "errors": []}
+        provisioning_result = SimpleNamespace(success=True, errors=[])
 
     uow_factory = _make_uow_factory(request_agg)
     query_bus = AsyncMock()
@@ -272,7 +273,7 @@ class TestCreateMachineRequestHandlerProvisioning:
     async def test_execute_command_calls_status_update_with_provisioning_result(self):
         request_agg = _make_request_aggregate()
         request_agg.metadata = {}
-        prov_result = {"success": True, "errors": []}
+        prov_result = SimpleNamespace(success=True, errors=[])
         handler, _ = _make_machine_handler(request_agg=request_agg, provisioning_result=prov_result)
 
         cmd = CreateRequestCommand(template_id=_TEMPLATE_ID, requested_count=1)
