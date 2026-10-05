@@ -1,4 +1,4 @@
-# Supported SLURM APIs
+# Supported Slurm APIs
 
 ## What ORB Uses
 
@@ -6,10 +6,10 @@
 
 | Interface | Direction | Purpose |
 |-----------|-----------|---------|
-| `ResumeProgram` | SLURM → ORB | SLURM calls this to power up nodes. ORB provisions cloud instances. |
-| `SuspendProgram` | SLURM → ORB | SLURM calls this to power down nodes. ORB terminates instances. |
+| `ResumeProgram` | Slurm → ORB | The Slurm Workload Manager by SchedMD calls this to power up nodes. ORB provisions cloud instances. |
+| `SuspendProgram` | Slurm → ORB | Slurm calls this to power down nodes. ORB terminates instances. |
 
-These are the **only required** SLURM integration points. Everything else is optional.
+These are the **only required** Slurm integration points. Everything else is optional.
 
 ### Optional: slurmrestd REST API (Monitoring Only)
 
@@ -39,7 +39,7 @@ When slurmrestd is not available, ORB falls back to CLI commands for the same in
 
 ## What ORB Does NOT Use
 
-ORB is a **resource provider**, not a job scheduler. The following SLURM interfaces are intentionally NOT integrated:
+ORB is a **resource provider**, not a job scheduler. The following Slurm interfaces are intentionally NOT integrated:
 
 | Interface | Reason for Exclusion |
 |-----------|---------------------|
@@ -48,10 +48,10 @@ ORB is a **resource provider**, not a job scheduler. The following SLURM interfa
 | `squeue` | Job queue inspection — ORB doesn't manage jobs |
 | `scancel` | Job cancellation — ORB doesn't manage jobs |
 | `sacctmgr` | Account management — outside ORB's scope |
-| `salloc` | Resource allocation — SLURM handles this |
-| `sprio` | Job priority — SLURM handles this |
+| `salloc` | Resource allocation — Slurm handles this |
+| `sprio` | Job priority — Slurm handles this |
 | Job completion callbacks | ORB doesn't track individual jobs |
-| Prolog/Epilog scripts | Node setup/teardown managed by SLURM |
+| Prolog/Epilog scripts | Node setup/teardown managed by Slurm |
 
 ## Architecture Boundary
 

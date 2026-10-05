@@ -1,21 +1,21 @@
-# SLURM Integration Guide
+# Slurm Integration Guide
 
 ## Overview
 
-ORB acts as the **power management bridge** for SLURM elastic/cloud nodes. SLURM decides *when* to scale (based on job queue pressure), and ORB handles *how* to provision and deprovision cloud resources.
+ORB acts as the **power management bridge** for elastic/cloud nodes managed by the Slurm Workload Manager by SchedMD. Slurm decides *when* to scale, based on job queue pressure, and ORB handles *how* to provision and deprovision cloud resources.
 
-ORB integrates with SLURM's **ResumeProgram/SuspendProgram** power saving hooks — the same mechanism SLURM uses for elastic cloud bursting.
+ORB integrates with Slurm's **ResumeProgram/SuspendProgram** power saving hooks — the same mechanism Slurm uses for elastic cloud bursting.
 
 ## Prerequisites
 
-- SLURM cluster (≥ 23.02) with power saving enabled
+- Slurm cluster (≥ 23.02) with power saving enabled
 - ORB installed on the slurmctld node (or accessible via API)
 - Cloud provider credentials configured in ORB
 - Elastic node definitions in `slurm.conf`
 
 ### Cloud Node Model (Dynamic Slots)
 
-ORB treats SLURM cloud nodes as **fungible capacity slots**:
+ORB treats Slurm cloud nodes as **fungible capacity slots**:
 
 - `batch-[001-100]` defines 100 slots of identical shape
 - Each ResumeProgram call provisions FRESH instances
@@ -30,7 +30,7 @@ cloud-bursting recommendations.
 
 ## Configuration Steps
 
-### 1. Configure ORB for SLURM
+### 1. Configure ORB for Slurm
 
 Set the scheduler type in your ORB `config.json`:
 
@@ -76,7 +76,7 @@ PartitionName=batch Nodes=compute-[001-100] Default=YES MaxTime=INFINITE State=U
 
 ### 3. Install ORB Scripts
 
-Copy (or symlink) the ORB SLURM scripts:
+Copy (or symlink) the ORB Slurm scripts:
 
 ```bash
 cp /path/to/orb/infrastructure/scheduler/slurm/scripts/resumeProgram.sh /opt/orb/scripts/
@@ -86,7 +86,7 @@ chmod +x /opt/orb/scripts/*.sh
 
 ### 4. Hook Configuration File
 
-SLURM spawns ResumeProgram/SuspendProgram as child processes — systemd
+Slurm spawns ResumeProgram/SuspendProgram as child processes — systemd
 environment variables on slurmctld do NOT propagate. The hook scripts
 source a configuration file instead.
 
@@ -106,7 +106,7 @@ The scripts source this file before reading any `SLURM_ORB_*` variables.
 
 ### 5. Environment Variables
 
-Configure these environment variables for ORB's SLURM integration
+Configure these environment variables for ORB's Slurm integration
 (set them in `slurm_hooks.env` or the calling environment):
 
 | Variable | Description | Default |
@@ -153,7 +153,7 @@ scontrol show node compute-001
 
 ## CLI Usage with --nodes
 
-The `--nodes` flag lets ORB work directly with SLURM node names.
+The `--nodes` flag lets ORB work directly with Slurm node names.
 
 ### Provisioning by Node Name
 
@@ -162,7 +162,7 @@ The `--nodes` flag lets ORB work directly with SLURM node names.
 orb machines request EC2Fleet-Instant-OnDemand 3 --nodes "compute-[001-003]"
 ```
 
-ORB expands the SLURM hostlist format and stores the node name on each
+ORB expands the Slurm hostlist format and stores the node name on each
 provisioned machine's `name` field. This enables lookup by node name later.
 
 ### Terminating by Node Name
@@ -178,7 +178,7 @@ No in-memory state is needed — node names persist across CLI invocations.
 ### How Node Names Persist
 
 When machines are provisioned with `--nodes`:
-1. The SLURM hostlist is expanded to individual names (e.g. `compute-001`)
+1. The Slurm hostlist is expanded to individual names (e.g. `compute-001`)
 2. Each provisioned machine's `name` field is set to its assigned node name
 3. The name persists in machine storage (survives CLI restarts)
 4. `terminate --nodes` queries storage by name to find machine IDs
@@ -186,11 +186,11 @@ When machines are provisioned with `--nodes`:
 
 ## AMI/Image Requirements
 
-The provisioned cloud instances **must** have SLURM pre-installed and configured. ORB provisions the infrastructure; the image handles SLURM membership.
+The provisioned cloud instances **must** have Slurm pre-installed and configured. ORB provisions the infrastructure; the image handles Slurm membership.
 
 **Required on the AMI/image:**
 
-- **slurmd** installed (same SLURM version as the cluster)
+- **slurmd** installed (same Slurm version as the cluster)
 - **slurm.conf** configured with correct `SlurmctldHost` pointing to your controller
 - **Munge** authentication configured (shared munge key from the cluster)
 - **slurmd systemd service** enabled to start on boot

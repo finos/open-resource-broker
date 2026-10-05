@@ -69,14 +69,14 @@ orb --scheduler default templates list
 orb --scheduler hostfactory requests create --template-id test --count 5
 
 # Override scheduler for machine operations
-orb --scheduler hf machines list
+orb --scheduler slurm machines list
 ```
 
 ### Supported Schedulers
 
 - `default` - Default scheduler using native domain fields
-- `hostfactory` - Symphony HostFactory scheduler with field mapping
-- `hf` - Alias for hostfactory scheduler
+- `hostfactory` - IBM Spectrum Symphony (HostFactory) scheduler with field mapping
+- `slurm` - Slurm scheduler integration
 
 ## Examples
 
@@ -173,7 +173,7 @@ $ orb scheduler validate --scheduler unknown
 {
   "is_valid": false,
   "validation_errors": [
-    "Scheduler 'unknown' is not registered. Available: default, hostfactory, hf"
+    "Scheduler 'unknown' is not registered. Available: default, hostfactory, slurm"
   ],
   "warnings": []
 }
@@ -196,7 +196,7 @@ $ orb scheduler validate
 
 ## Integration with Other Commands
 
-The scheduler system integrates seamlessly with all other CLI commands:
+The scheduler system integrates with all other CLI commands:
 
 - Template operations use the scheduler for field mapping and response formatting
 - Request operations use the scheduler for data parsing and validation

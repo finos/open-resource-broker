@@ -8,7 +8,7 @@
 
 ---
 
-Welcome to the Open Resource Broker documentation. ORB lets you define what compute capacity you need in a template, request it, track it, and return it — through a CLI, REST API, Python SDK, or MCP server.
+Welcome to the Open Resource Broker documentation. ORB lets you define what compute capacity you need in a template, request it, track it, and return it — through a CLI, REST API, MCP server, the Python SDK, or a client SDK in another language.
 
 ## Getting Started
 
@@ -50,11 +50,30 @@ Welcome to the Open Resource Broker documentation. ORB lets you define what comp
 
 ## Features
 
-- **AWS Provider** — [EC2 Instances](providers/aws/run-instances.md), [Auto Scaling Groups](providers/aws/asg.md), [Spot Fleet](providers/aws/spot-fleet.md), [EC2 Fleet](providers/aws/ec2-fleet.md), [Lambda MicroVMs](providers/aws/microvm.md)
-- **CLI** — primary interface for all operations
-- **REST API** — HTTP endpoints for service integration
-- **Python SDK** — async-first programmatic access
-- **MCP Server** — AI assistant integration
+### Providers
+
+- **[AWS](providers/aws/run-instances.md)** — EC2 Instances, Auto Scaling Groups, Spot Fleet, EC2 Fleet, Lambda MicroVMs
+- **[Azure](providers/azure/index.md)** — Virtual Machine Scale Sets, single VMs, and CycleCloud cluster nodes
+- **[Google Cloud](providers/gcp/index.md)** — Managed Instance Groups and single Compute Engine VMs
+- **[Kubernetes](providers/k8s/index.md)** — Pods, Deployments, StatefulSets, and Jobs
+
+### Schedulers
+
+- **Default** — direct usage without an external scheduler
+- **[IBM Spectrum Symphony (HostFactory)](hostfactory/integration_guide.md)** — HostFactory provider plugin
+- **[Slurm Workload Manager by SchedMD](slurm/integration_guide.md)** — integrates via ResumeProgram/SuspendProgram power hooks
+- **HTC-Grid** and **OpenGRIS Scaler** — integrate through the default scheduler's native API rather than a dedicated ORB scheduler strategy; see [HTC-Grid](https://github.com/finos/htc-grid) and [OpenGRIS Scaler](https://github.com/finos/opengris-scaler)
+
+### Interfaces
+
+- **[CLI](cli/README.md)** — primary interface for all operations
+- **[REST API](api/readme.md)** — HTTP endpoints for service integration
+- **[MCP Server](mcp/integration-guide.md)** — AI assistant integration
+- **[Python SDK](sdk/quickstart.md)** — async-first, in-process programmatic access
+- **[Client SDKs](sdk/index.md)** — Go, TypeScript, Java, Kotlin, and .NET libraries that drive a managed `orb` server over a local socket
+
+### Architecture
+
 - **Clean Architecture** — Domain-Driven Design with CQRS patterns
 - **Extensible** — Strategy/Registry pattern for adding providers and schedulers
 

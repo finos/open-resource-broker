@@ -464,7 +464,7 @@ Symphony Host Factory
 
 ### Planned Enhancements
 
-- **Additional Providers**: Provider1, Provider2 support
+- **Additional Providers**: AWS, Azure, Google Cloud, and Kubernetes providers are available; further backends can be added through the provider plugin interface
 - **REST API Mode**: Optional web service mode
 - **Advanced Monitoring**: Metrics collection and alerting
 - **Multi-Region Support**: Cross-region deployments

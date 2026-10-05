@@ -23,7 +23,7 @@ Available for all commands:
 | `--filter` | Filter using `field=value`, `field~value`, or `field=~regex`. Repeatable (AND logic). | `--filter "status=running"` |
 | `--region` | AWS region override | `--region us-west-2` |
 | `--profile` | AWS profile override | `--profile production` |
-| `--scheduler` | Override scheduler strategy (`default`, `hostfactory`, `hf`) | `--scheduler hostfactory` |
+| `--scheduler` | Override scheduler strategy (`default`, `hostfactory`, `slurm`) | `--scheduler hostfactory` |
 | `--provider-name` | Override provider instance by name | `--provider-name aws_prod_us-east-1` |
 | `--completion` | Generate shell completion script (`bash`, `zsh`) | `--completion bash` |
 | `--version` | Show version and exit | `--version` |
@@ -1261,14 +1261,14 @@ orb --scheduler hostfactory templates list
 # Use default scheduler for this command  
 orb --scheduler default machines request aws-basic 3
 
-# Short alias for HostFactory
-orb --scheduler hf requests status req-123
+# Use Slurm scheduler for this command
+orb --scheduler slurm requests status req-123
 ```
 
 **Available Schedulers:**
 - `default` - Native domain format, CLI-friendly output
-- `hostfactory` - IBM Symphony HostFactory compatible format
-- `hf` - Alias for `hostfactory`
+- `hostfactory` - IBM Spectrum Symphony (HostFactory) compatible format
+- `slurm` - Slurm scheduler integration
 
 ### Provider Override
 

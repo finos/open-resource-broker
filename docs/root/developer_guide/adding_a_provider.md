@@ -1,6 +1,6 @@
 # Adding a Provider
 
-This guide walks through adding a new cloud provider (such as Azure, GCP, or OCI) to the Open Resource Broker. It is aimed at developers who are already familiar with the overall architecture and want a concrete checklist of required steps and extension points.
+This guide explains how to add a new provider to the Open Resource Broker. It is aimed at developers who are already familiar with the overall architecture and want a concrete checklist of required steps and extension points. The AWS, Azure, Google Cloud, and Kubernetes provider packages serve as reference implementations throughout this guide.
 
 ## Prerequisites
 
@@ -21,7 +21,7 @@ The goal of this model is that adding a new provider should touch exactly:
 - `src/orb/providers/<name>/` — your provider package (all provider logic lives here)
 - One line in `[project.entry-points."orb.providers"]` in `pyproject.toml`
 
-The AWS provider (`src/orb/providers/aws/provider_plugin.py`) and the Kubernetes provider (`src/orb/providers/k8s/provider_plugin.py`) are the canonical reference implementations.
+The AWS provider (`src/orb/providers/aws/provider_plugin.py`), the Azure provider (`src/orb/providers/azure/provider_plugin.py`), the Google Cloud provider (`src/orb/providers/gcp/provider_plugin.py`), and the Kubernetes provider (`src/orb/providers/k8s/provider_plugin.py`) are the canonical reference implementations.
 
 ### Provider package layout
 
