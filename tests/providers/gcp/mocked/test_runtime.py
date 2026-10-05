@@ -432,6 +432,54 @@ async def test_single_vm_handler_acquire_hosts_tracks_partial_failures() -> None
     assert len(result.resource_ids) == 1
 
 
+@pytest.mark.asyncio
+async def test_single_vm_handler_acquire_hosts_creates_instances_concurrently() -> None:
+    """Regression test: creates must fan out, not run one at a time.
+
+    Each create blocks on a 3-party barrier before returning; if the handler
+    still created instances sequentially, only one thread would ever reach
+    the barrier at a time and this test would time out.
+    """
+    compute_client = _ComputeClientStub()
+    handler = GCPSingleVMHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+    request = Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
+        template_id="gcp-single",
+        machine_count=3,
+        provider_type="gcp",
+    )
+    template = GCPTemplate.model_validate(
+        {
+            "template_id": "gcp-single",
+            "provider_type": "gcp",
+            "provider_api": "SingleVM",
+            "project_id": "orb-example-12345",
+            "region": "us-central1",
+            "zones": ["us-central1-a"],
+            "instance_type": "e2-standard-4",
+            "max_instances": 1,
+            "source_image_family": "debian-12",
+            "source_image_project": "debian-cloud",
+        }
+    )
+    barrier = threading.Barrier(3, timeout=2)
+    original_create_instance = compute_client.create_instance
+
+    def blocking_create_instance(*, zone: str, body: object) -> object:
+        barrier.wait()
+        return original_create_instance(zone=zone, body=body)
+
+    with patch.object(compute_client, "create_instance", side_effect=blocking_create_instance):
+        result = await handler.acquire_hosts(request, template)
+
+    assert len(result.resource_ids) == 3
+    assert len(compute_client.created_instances) == 3
+
+
 def test_single_vm_handler_start_instances_tracks_partial_failures() -> None:
     compute_client = _ComputeClientStub()
     compute_client.fail_start_instance_for = {"vm-b"}
@@ -451,6 +499,36 @@ def test_single_vm_handler_start_instances_tracks_partial_failures() -> None:
     assert [
         (f.target_id, f.error_code, f.error_message, f.operation) for f in result.failed_operations
     ] == [("vm-b", "GCPNetworkError", "503 service unavailable", "start_instance")]
+
+
+def test_single_vm_handler_start_instances_runs_mutations_concurrently() -> None:
+    """Regression test: per-instance mutations must fan out, not run serially.
+
+    Each start blocks on a 3-party barrier before returning; if the handler
+    still ran them one at a time, only one thread would ever reach the
+    barrier at a time and this test would time out.
+    """
+    compute_client = _ComputeClientStub()
+    handler = GCPSingleVMHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+    barrier = threading.Barrier(3, timeout=2)
+    original_start_instance = compute_client.start_instance
+
+    def blocking_start_instance(*, zone: str, instance_name: str) -> object:
+        barrier.wait()
+        return original_start_instance(zone=zone, instance_name=instance_name)
+
+    with patch.object(compute_client, "start_instance", side_effect=blocking_start_instance):
+        result = handler.start_instances(
+            instance_ids=["vm-a", "vm-b", "vm-c"],
+            context={"zone": "us-central1-a"},
+        )
+
+    assert result.attempted_ids == ["vm-a", "vm-b", "vm-c"]
+    assert result.successful_ids == ["vm-a", "vm-b", "vm-c"]
 
 
 def test_mig_handler_start_instances_returns_failed_results_for_unsupported_targets() -> None:

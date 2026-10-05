@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import uuid
 from typing import TYPE_CHECKING, Callable
 
@@ -31,53 +32,71 @@ except ImportError:  # pragma: no cover - exercised only when optional sdk deps 
     google_exceptions = None
 
 
+# Caps how many Compute Engine API calls a single acquire/mutate dispatch
+# issues at once, so a large request fans out concurrently without opening
+# an unbounded number of simultaneous connections to the API.
+_MAX_CONCURRENT_INSTANCE_OPERATIONS = 10
+
+
 class GCPSingleVMHandler(GCPHandler):
     """Create and manage standalone Compute Engine instances."""
 
     async def acquire_hosts(self, request: Request, template: GCPTemplate) -> GCPCreateOutcome:
-        """Create the requested number of standalone VM instances."""
+        """Create the requested number of standalone VM instances concurrently."""
         zone = self._template_zone(template)
         instances: list[GCPInstanceStatus] = []
         resource_ids: list[str] = []
         failed_operations: list[GCPFailedOperation] = []
 
-        for _ in range(request.requested_count):
-            instance_name = f"gcp-{template.template_id}-{uuid.uuid4().hex[:8]}"
+        instance_names = [
+            f"gcp-{template.template_id}-{uuid.uuid4().hex[:8]}"
+            for _ in range(request.requested_count)
+        ]
+        semaphore = asyncio.Semaphore(_MAX_CONCURRENT_INSTANCE_OPERATIONS)
+
+        async def _create_one(instance_name: str) -> ExtendedOperation | GCPFailedOperation:
             payload = self._build_instance_payload(instance_name, template)
-            try:
-                operation = await asyncio.to_thread(
-                    self._compute_client.create_instance,
-                    zone=zone,
-                    body=payload,
-                )
-            except _recoverable_gcp_operation_exceptions() as exc:
-                translated = translate_gcp_exception(
-                    exc,
-                    operation="create_instance",
-                    details={"instance_id": instance_name, "zone": zone},
-                )
-                self._logger.warning(
-                    "GCP create_instance failed for %s in %s: %s",
-                    instance_name,
-                    zone,
-                    translated,
-                )
-                failed_operations.append(
-                    GCPFailedOperation(
+            async with semaphore:
+                try:
+                    return await asyncio.to_thread(
+                        self._compute_client.create_instance,
+                        zone=zone,
+                        body=payload,
+                    )
+                except _recoverable_gcp_operation_exceptions() as exc:
+                    translated = translate_gcp_exception(
+                        exc,
+                        operation="create_instance",
+                        details={"instance_id": instance_name, "zone": zone},
+                    )
+                    self._logger.warning(
+                        "GCP create_instance failed for %s in %s: %s",
+                        instance_name,
+                        zone,
+                        translated,
+                    )
+                    return GCPFailedOperation(
                         target_id=instance_name,
                         error_code=translated.error_code,
                         error_message=str(translated),
                         operation="create_instance",
                     )
-                )
-                continue
 
+        # A failing create is captured as a GCPFailedOperation above rather
+        # than raised, so one instance's recoverable failure cannot cancel
+        # the sibling creates still in flight.
+        results = await asyncio.gather(*(_create_one(name) for name in instance_names))
+
+        for instance_name, outcome in zip(instance_names, results, strict=True):
+            if isinstance(outcome, GCPFailedOperation):
+                failed_operations.append(outcome)
+                continue
             resource_ids.append(instance_name)
             instances.append(
                 {
                     "instance_id": instance_name,
                     "status": "PROVISIONING",
-                    "provider_data": {"zone": zone, "operation_name": operation.name or ""},
+                    "provider_data": {"zone": zone, "operation_name": outcome.name or ""},
                 }
             )
 
@@ -213,15 +232,24 @@ class GCPSingleVMHandler(GCPHandler):
         operation_name: str,
         mutation: Callable[[str], ExtendedOperation],
     ) -> GCPMutationOutcome:
+        """Dispatch one mutation call per target concurrently, bounded by a thread pool.
+
+        Callers run this from a plain worker thread (no running event loop:
+        the strategy layer dispatches the whole handler call via
+        ``asyncio.to_thread``), so concurrency comes from a bounded
+        ``ThreadPoolExecutor`` rather than ``asyncio.gather``.
+        """
         result = GCPMutationOutcome(
             attempted_ids=list(target_ids),
             successful_ids=[],
             operations=[],
         )
+        if not target_ids:
+            return result
 
-        for instance_name in target_ids:
+        def _run_one(instance_name: str) -> tuple[str, ExtendedOperation | GCPFailedOperation]:
             try:
-                response = mutation(instance_name)
+                return instance_name, mutation(instance_name)
             except _recoverable_gcp_operation_exceptions() as exc:
                 translated = translate_gcp_exception(
                     exc,
@@ -234,20 +262,27 @@ class GCPSingleVMHandler(GCPHandler):
                     instance_name,
                     translated,
                 )
-                result.failed_operations.append(
-                    GCPFailedOperation(
-                        target_id=instance_name,
-                        error_code=translated.error_code,
-                        error_message=str(translated),
-                        operation=operation_name,
-                    )
+                return instance_name, GCPFailedOperation(
+                    target_id=instance_name,
+                    error_code=translated.error_code,
+                    error_message=str(translated),
+                    operation=operation_name,
                 )
-                continue
 
+        max_workers = min(len(target_ids), _MAX_CONCURRENT_INSTANCE_OPERATIONS)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # executor.map preserves input order in its output regardless of
+            # completion order, so results line up with target_ids.
+            ordered_results = list(executor.map(_run_one, target_ids))
+
+        for instance_name, outcome in ordered_results:
+            if isinstance(outcome, GCPFailedOperation):
+                result.failed_operations.append(outcome)
+                continue
             result.operations.append(
                 {
                     "instance_id": instance_name,
-                    "operation_name": response.name,
+                    "operation_name": outcome.name,
                 }
             )
             result.successful_ids.append(instance_name)
