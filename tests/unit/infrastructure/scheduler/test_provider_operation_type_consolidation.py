@@ -28,5 +28,5 @@ def test_tag_instances_member_is_shared():
 def test_all_members_are_identical_single_enum():
     """Every member of the (formerly duplicated) enum is the same object
     whichever import path is used — there is exactly one enum now."""
-    for member in OperationType:
+    for member in list(OperationType):
         assert getattr(ProviderOperationType, member.name) is member
