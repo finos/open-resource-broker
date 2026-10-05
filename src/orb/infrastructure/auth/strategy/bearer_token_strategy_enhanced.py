@@ -19,6 +19,7 @@ from orb.infrastructure.adapters.ports.auth import (
 )
 from orb.infrastructure.auth.claims import extract_authz_claims
 from orb.infrastructure.auth.token_denylist import TokenDenylistPort
+from orb.infrastructure.auth.token_fingerprint import fingerprint_token
 from orb.infrastructure.logging.logger import AuthAuditLogger, get_logger
 
 if TYPE_CHECKING:
@@ -211,7 +212,11 @@ class EnhancedBearerTokenStrategy(AuthPort):
                 user_id=user_id,
                 user_roles=user_roles,
                 permissions=permissions,
-                token=token,
+                # A fingerprint, not the raw JWT — AuthResult is attached
+                # wholesale to request.state, so the raw credential must
+                # never be retrievable from it. Denylisting still operates
+                # on the raw token passed to revoke_token() separately.
+                token=fingerprint_token(token),
                 expires_at=exp,
                 metadata={
                     "strategy": "enhanced_bearer_token",
@@ -272,7 +277,8 @@ class EnhancedBearerTokenStrategy(AuthPort):
                 user_id=user_id,
                 user_roles=user_roles,
                 permissions=permissions,
-                token=new_token,
+                # A fingerprint, not the raw JWT — see validate_token().
+                token=fingerprint_token(new_token),
                 expires_at=int(time.time()) + self.token_expiry,
                 metadata={"strategy": "enhanced_bearer_token", "refreshed": True},
             )

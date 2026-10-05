@@ -50,6 +50,11 @@ class AuthResult:
     user_id: Optional[str] = None
     user_roles: list[str] = field(default_factory=list)
     permissions: list[str] = field(default_factory=list)
+    # A non-reversible identifier for the credential (e.g. a hash of the raw
+    # token), not the raw credential itself. AuthResult is attached wholesale
+    # to request.state, so the raw token must never be retrievable from this
+    # field. Strategies that need to reference the original credential (e.g.
+    # for a denylist) do so with the raw value directly, outside AuthResult.
     token: Optional[str] = None
     expires_at: Optional[int] = None  # Unix timestamp
     error_message: Optional[str] = None

@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from orb.infrastructure.adapters.ports.auth import AuthContext, AuthStatus
+from orb.infrastructure.auth.token_fingerprint import fingerprint_token
 
 
 def _make_context(**kwargs) -> AuthContext:
@@ -672,6 +673,9 @@ async def test_cognito_validate_token_full_rs256_round_trip():
     assert result.status == AuthStatus.SUCCESS
     assert result.user_id == "user-cognito-123"
     assert "operator" in (result.user_roles or [])
+    # AuthResult.token is a non-reversible fingerprint, never the raw JWT.
+    assert result.token != token
+    assert result.token == fingerprint_token(token)
 
 
 @pytest.mark.asyncio
