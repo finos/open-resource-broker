@@ -204,6 +204,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
             headers=sanitized_headers,
             query_params=dict(request.query_params),
             client_ip=self._get_client_ip(request),
+            # The raw socket peer, never resolved through a forwarded header —
+            # see AuthContext.direct_client_ip for why this must stay separate
+            # from client_ip.
+            direct_client_ip=request.client.host if request.client else None,
             user_agent=request.headers.get("user-agent", "")[:500],  # Limit UA length
             metadata={
                 "url": str(request.url)[:2000],  # Limit URL length

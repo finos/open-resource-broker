@@ -14,6 +14,7 @@ import pytest
 from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.adapters.ports.auth import AuthContext, AuthStatus
 from orb.infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
+from orb.infrastructure.auth.token_fingerprint import fingerprint_token
 
 pytestmark = pytest.mark.unit
 
@@ -131,7 +132,9 @@ class TestValidateToken:
         result = asyncio_run(s.validate_token(token))
         assert result.status == AuthStatus.SUCCESS
         assert result.user_id == "user-1"
-        assert result.token == token
+        # AuthResult.token is a non-reversible fingerprint, never the raw JWT.
+        assert result.token != token
+        assert result.token == fingerprint_token(token)
 
     def test_expired_token_returns_expired(self):
         s = _make_strategy()

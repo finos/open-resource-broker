@@ -24,6 +24,7 @@ from orb.infrastructure.adapters.ports.auth import (
     AuthStatus,
 )
 from orb.infrastructure.auth.token_denylist import InMemoryTokenDenylist, TokenDenylistPort
+from orb.infrastructure.auth.token_fingerprint import fingerprint_token
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.aws.utilities.boto_config import get_boto3_config
 
@@ -195,7 +196,11 @@ class CognitoAuthStrategy(AuthPort):
                 user_id=user_id,
                 user_roles=roles,
                 permissions=permissions,
-                token=token,
+                # A fingerprint, not the raw JWT — AuthResult is attached
+                # wholesale to request.state, so the raw credential must
+                # never be retrievable from it. Revocation still operates
+                # on the raw token passed to revoke_token() separately.
+                token=fingerprint_token(token),
                 expires_at=payload.get("exp"),
                 metadata={
                     "strategy": "cognito",

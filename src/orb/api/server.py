@@ -1,5 +1,6 @@
 """FastAPI server factory and application setup."""
 
+import ipaddress
 import os
 import secrets
 from pathlib import Path
@@ -142,13 +143,26 @@ class _LoopbackAdminAuthWrapper:
                 secrets.compare_digest(candidate_bytes, t.encode("ascii"))
                 for t in _LoopbackAdminAuthWrapper._tokens
             ):
-                self._logger.debug("loopback-admin token accepted for %s", context.path)
-                return AuthResult(
-                    status=AuthStatus.SUCCESS,
-                    user_id="loopback-admin",
-                    user_roles=["admin"],
-                    permissions=["*"],
-                    metadata={"strategy": "loopback_admin_token"},
+                # Mirror _LoopbackAdminTokenMiddleware below: the token value
+                # alone is never enough. Only the direct TCP peer counts,
+                # never X-Forwarded-For/other client-supplied headers, and
+                # never context.client_ip (which can be resolved through a
+                # trusted proxy forwarded header) so a remote caller cannot
+                # spoof a loopback origin merely by presenting the token.
+                # A missing peer is treated as non-loopback.
+                if _is_loopback_address(getattr(context, "direct_client_ip", None)):
+                    self._logger.debug("loopback-admin token accepted for %s", context.path)
+                    return AuthResult(
+                        status=AuthStatus.SUCCESS,
+                        user_id="loopback-admin",
+                        user_roles=["admin"],
+                        permissions=["*"],
+                        metadata={"strategy": "loopback_admin_token"},
+                    )
+                self._logger.warning(
+                    "loopback-admin token presented from non-loopback peer for %s; "
+                    "ignoring and falling through to normal auth",
+                    context.path,
                 )
         return await self._inner.authenticate(context)
 
@@ -194,6 +208,43 @@ def _load_loopback_token(server_config: Any) -> None:
         _server_logger.debug("loopback-admin token load skipped: %s", exc)
 
 
+def _is_loopback_address(host: str | None) -> bool:
+    """Return True only when *host* is a loopback IP address literal.
+
+    Shared by every call site that needs to decide whether a request
+    originated on the local host. Callers must pass the *direct* socket
+    peer address — never a value derived from ``X-Forwarded-For`` or any
+    other client-supplied header — or this check can be spoofed by anyone
+    who can reach the server over the network. Accepts IPv4 loopback
+    (127.0.0.0/8), IPv6 loopback (``::1``), and IPv4-mapped IPv6 loopback
+    (``::ffff:127.0.0.1``).
+    """
+    if not host:
+        return False
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    mapped = getattr(addr, "ipv4_mapped", None)
+    if mapped is not None:
+        addr = mapped
+    return addr.is_loopback
+
+
+def _is_loopback_peer(request: Any) -> bool:
+    """Return True only when the request's direct TCP peer is loopback.
+
+    Deliberately reads only ``request.client`` — the actual socket peer
+    address as seen by the ASGI server — and never consults
+    ``X-Forwarded-For`` or any other client-supplied header. Those headers
+    can be set to any value by anyone who can reach the server over the
+    network, so trusting them here would defeat the whole point of this
+    check.
+    """
+    client = request.client
+    return _is_loopback_address(client.host if client else None)
+
+
 class _LoopbackAdminTokenMiddleware:
     """Always-on middleware that stamps admin identity for valid loopback tokens.
 
@@ -235,9 +286,23 @@ class _LoopbackAdminTokenMiddleware:
                 secrets.compare_digest(candidate_bytes, t.encode("ascii"))
                 for t in _LoopbackAdminAuthWrapper._tokens
             ):
-                request.state.user_id = "loopback-admin"
-                request.state.user_roles = ["admin"]
-                request.state.permissions = ["*"]
+                if _is_loopback_peer(request):
+                    request.state.user_id = "loopback-admin"
+                    request.state.user_roles = ["admin"]
+                    request.state.permissions = ["*"]
+                else:
+                    # Token value matched, but the request did not originate
+                    # from the local host. Never honour it from a
+                    # non-loopback peer, and never trust X-Forwarded-For (or
+                    # any other client-supplied header) for this decision —
+                    # fall through to normal auth instead. Never log the
+                    # token value itself.
+                    client = request.client
+                    _server_logger.warning(
+                        "loopback-admin token presented from non-loopback peer "
+                        "%s; ignoring and falling through to normal auth",
+                        client.host if client else "<no client>",
+                    )
         return await call_next(request)
 
 
@@ -324,6 +389,19 @@ def create_fastapi_app(server_config: Any) -> Any:
             bind_host,
         )
 
+    # Effective request-processing order (outermost first). Starlette wraps
+    # middleware in REVERSE registration order: each app.add_middleware()
+    # call wraps everything already registered, so the LAST call below ends
+    # up OUTERMOST and runs first on every request:
+    #   CORS -> TrustedHost -> Auth -> RateLimit -> AuditLog ->
+    #   LoopbackAdminToken -> Logging -> ReadOnly -> HTTPSRedirect ->
+    #   ForwardedProto -> SecurityHeaders -> router
+    # CORS is registered last (outermost) so a cross-origin preflight OPTIONS
+    # request is answered directly before TrustedHost, auth, or rate limiting
+    # ever see it. RateLimit is registered before AuthMiddleware so Auth ends
+    # up more deeply nested and runs first — request.state.user_id is already
+    # populated by the time RateLimitMiddleware resolves the caller's identity.
+
     # Add security headers middleware unconditionally — all responses, including
     # excluded-auth paths and auth-disabled deployments, must carry hardening headers.
     _require_https: bool = getattr(server_config, "require_https", False)
@@ -365,40 +443,10 @@ def create_fastapi_app(server_config: Any) -> Any:
                 "server.trusted_proxies to the proxy IP(s) so X-Forwarded-Proto is honoured."
             )
 
-    # Add trusted host middleware only when a restrictive allowlist is provided.
-    # An empty list or a wildcard ('*') disables Host-header validation entirely,
-    # so warn the operator that this protection has been turned off.
-    if not server_config.trusted_hosts or "*" in server_config.trusted_hosts:
-        logger.warning(
-            "SECURITY WARNING: trusted_hosts is %s — Host-header protection is "
-            "effectively DISABLED. The server will accept requests with any Host "
-            "header, exposing it to DNS-rebinding and Host-header spoofing attacks. "
-            "Set server.trusted_hosts to an explicit list of expected hostnames.",
-            "empty" if not server_config.trusted_hosts else "['*']",
-        )
-    else:
-        app.add_middleware(TrustedHostMiddleware, allowed_hosts=server_config.trusted_hosts)  # type: ignore[arg-type]
-
-    # Add read-only mode middleware (runs before CORS so preflight OPTIONS still pass freely)
+    # Add read-only mode middleware.
     if getattr(server_config, "read_only", False):
         app.add_middleware(ReadOnlyMiddleware, enabled=True)
         logger.info("Read-only mode middleware enabled")
-
-    # Add CORS middleware
-    if server_config.cors.enabled:
-        app.add_middleware(  # type: ignore[arg-type]
-            cast(Any, CORSMiddleware),
-            allow_origins=server_config.cors.origins,
-            allow_credentials=server_config.cors.credentials,
-            allow_methods=server_config.cors.methods,
-            allow_headers=server_config.cors.headers,
-        )
-        logger.info("CORS middleware enabled")
-        if server_config.cors.origins == ["*"] and server_config.auth.enabled:
-            logger.warning(
-                "CORS allows all origins (origins=['*']) with auth enabled — "
-                "consider restricting to known UI origins in production."
-            )
 
     # Add logging middleware
     app.add_middleware(LoggingMiddleware)
@@ -415,7 +463,57 @@ def create_fastapi_app(server_config: Any) -> Any:
     app.add_middleware(_LoopbackAdminTokenMiddleware)
     logger.info("Loopback-admin token middleware enabled")
 
-    # Add authentication middleware if enabled
+    # Add audit-log middleware. Registered before RateLimit/Auth below, which
+    # (per the effective-order note above) leaves it more deeply nested than
+    # both — by the time its post-response logging runs, Auth has already
+    # populated request.state.user_id/user_roles for the audit record.
+    if getattr(server_config, "audit_log_enabled", True):
+        app.add_middleware(AuditLogMiddleware)
+        logger.info("Audit-log middleware enabled")
+
+    # Workers count is used by both the rate-limit and SSE multi-worker warnings below.
+    _workers = getattr(server_config, "workers", 1) or 1
+
+    # Add rate-limit middleware. Registered before AuthMiddleware below so Auth
+    # ends up outside it (see the effective-order note above) and always runs
+    # first, populating request.state.user_id before this middleware resolves
+    # the caller's identity. Pass trusted_proxies so the limiter keys on the
+    # real client IP rather than the proxy's IP when requests arrive through a
+    # known reverse proxy.
+    rate_limiting_cfg = getattr(server_config, "rate_limiting", None)
+    if rate_limiting_cfg is not None and getattr(rate_limiting_cfg, "enabled", True):
+        app.add_middleware(
+            RateLimitMiddleware,
+            rate_limiting_config=rate_limiting_cfg,
+            trusted_proxies=server_config.trusted_proxies,
+        )
+        _rpm = getattr(rate_limiting_cfg, "requests_per_minute", 300)
+        logger.info(
+            "Rate-limit middleware enabled (%s req/min, burst %s)",
+            _rpm,
+            getattr(rate_limiting_cfg, "burst", 60),
+        )
+        # Rate-limit buckets are per-process: each worker maintains its own
+        # in-memory counter, so the effective limit seen by a single client is
+        # requests_per_minute × workers when requests are spread across processes
+        # by the load balancer.  Warn operators so they can scale the configured
+        # limit down (divide by workers) or move to a shared backend limiter.
+        if _workers > 1:
+            logger.warning(
+                "MULTI_WORKER_RATE_LIMIT: server.workers=%d but rate-limit buckets are "
+                "per-process. The effective per-client limit is %d req/min × %d workers = "
+                "%d req/min. Divide requests_per_minute by the worker count or use a "
+                "shared rate-limit backend to enforce the intended per-client cap.",
+                _workers,
+                _rpm,
+                _workers,
+                _rpm * _workers,
+            )
+
+    # Add authentication middleware if enabled. Registered after RateLimit
+    # above and before TrustedHost/CORS below, so Auth is more deeply nested
+    # than CORS/TrustedHost (both of which must clear the request first) but
+    # less deeply nested than RateLimit (see the effective-order note above).
     if server_config.auth.enabled:
         auth_strategy = _create_auth_strategy(server_config.auth)
         if auth_strategy:
@@ -458,46 +556,42 @@ def create_fastapi_app(server_config: Any) -> Any:
                 f"Authentication enabled but strategy '{server_config.auth.strategy}' could not be created"
             )
 
-    # Workers count is used by both the rate-limit and SSE multi-worker warnings below.
-    _workers = getattr(server_config, "workers", 1) or 1
+    # Add trusted host middleware only when a restrictive allowlist is provided.
+    # An empty list or a wildcard ('*') disables Host-header validation entirely,
+    # so warn the operator that this protection has been turned off. Registered
+    # second-to-last, just inside CORS (see the effective-order note above), so
+    # an untrusted Host header is rejected before any middleware above runs.
+    if not server_config.trusted_hosts or "*" in server_config.trusted_hosts:
+        logger.warning(
+            "SECURITY WARNING: trusted_hosts is %s — Host-header protection is "
+            "effectively DISABLED. The server will accept requests with any Host "
+            "header, exposing it to DNS-rebinding and Host-header spoofing attacks. "
+            "Set server.trusted_hosts to an explicit list of expected hostnames.",
+            "empty" if not server_config.trusted_hosts else "['*']",
+        )
+    else:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=server_config.trusted_hosts)  # type: ignore[arg-type]
 
-    # Add rate-limit middleware (runs inside Auth so user identity is already resolved).
-    # Pass trusted_proxies so the limiter keys on the real client IP rather than the
-    # proxy's IP when requests arrive through a known reverse proxy.
-    rate_limiting_cfg = getattr(server_config, "rate_limiting", None)
-    if rate_limiting_cfg is not None and getattr(rate_limiting_cfg, "enabled", True):
-        app.add_middleware(
-            RateLimitMiddleware,
-            rate_limiting_config=rate_limiting_cfg,
-            trusted_proxies=server_config.trusted_proxies,
+    # Add CORS middleware last so it is the outermost layer in the effective
+    # request order (see the note above). This lets CORSMiddleware answer a
+    # cross-origin preflight OPTIONS request directly, before TrustedHost,
+    # auth, or rate limiting ever see it — otherwise a preflight to any
+    # non-excluded route is authenticated like any other request and gets
+    # rejected with 401 instead of a CORS response.
+    if server_config.cors.enabled:
+        app.add_middleware(  # type: ignore[arg-type]
+            cast(Any, CORSMiddleware),
+            allow_origins=server_config.cors.origins,
+            allow_credentials=server_config.cors.credentials,
+            allow_methods=server_config.cors.methods,
+            allow_headers=server_config.cors.headers,
         )
-        _rpm = getattr(rate_limiting_cfg, "requests_per_minute", 300)
-        logger.info(
-            "Rate-limit middleware enabled (%s req/min, burst %s)",
-            _rpm,
-            getattr(rate_limiting_cfg, "burst", 60),
-        )
-        # Rate-limit buckets are per-process: each worker maintains its own
-        # in-memory counter, so the effective limit seen by a single client is
-        # requests_per_minute × workers when requests are spread across processes
-        # by the load balancer.  Warn operators so they can scale the configured
-        # limit down (divide by workers) or move to a shared backend limiter.
-        if _workers > 1:
+        logger.info("CORS middleware enabled")
+        if server_config.cors.origins == ["*"] and server_config.auth.enabled:
             logger.warning(
-                "MULTI_WORKER_RATE_LIMIT: server.workers=%d but rate-limit buckets are "
-                "per-process. The effective per-client limit is %d req/min × %d workers = "
-                "%d req/min. Divide requests_per_minute by the worker count or use a "
-                "shared rate-limit backend to enforce the intended per-client cap.",
-                _workers,
-                _rpm,
-                _workers,
-                _rpm * _workers,
+                "CORS allows all origins (origins=['*']) with auth enabled — "
+                "consider restricting to known UI origins in production."
             )
-
-    # Add audit-log middleware (innermost — status_code and latency are most accurate here)
-    if getattr(server_config, "audit_log_enabled", True):
-        app.add_middleware(AuditLogMiddleware)
-        logger.info("Audit-log middleware enabled")
 
     # Add global exception handler
     exception_handler = get_exception_handler()

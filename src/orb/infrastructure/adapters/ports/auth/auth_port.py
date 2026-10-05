@@ -29,6 +29,14 @@ class AuthContext:
     # Client information
     client_ip: Optional[str] = None
     user_agent: Optional[str] = None
+    # The direct TCP socket peer address, as seen by the ASGI server, never
+    # resolved through X-Forwarded-For or any other client-supplied header
+    # (unlike ``client_ip``, which may honour a trusted reverse proxy's
+    # forwarded header). Strategies that grant access based on the caller
+    # being on the local host (e.g. a loopback-only admin token) must use
+    # this field, never ``client_ip``, so that a request routed through a
+    # trusted proxy cannot spoof a loopback origin via a forwarded header.
+    direct_client_ip: Optional[str] = None
 
     # Additional context
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -42,6 +50,11 @@ class AuthResult:
     user_id: Optional[str] = None
     user_roles: list[str] = field(default_factory=list)
     permissions: list[str] = field(default_factory=list)
+    # A non-reversible identifier for the credential (e.g. a hash of the raw
+    # token), not the raw credential itself. AuthResult is attached wholesale
+    # to request.state, so the raw token must never be retrievable from this
+    # field. Strategies that need to reference the original credential (e.g.
+    # for a denylist) do so with the raw value directly, outside AuthResult.
     token: Optional[str] = None
     expires_at: Optional[int] = None  # Unix timestamp
     error_message: Optional[str] = None
