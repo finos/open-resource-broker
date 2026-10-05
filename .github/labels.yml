@@ -43,3 +43,147 @@
 - name: "ready-to-merge"
   color: "0e8a16"
   description: "Ready for merging"
+
+- name: "triage"
+  color: "d93f0b"
+  description: "Needs triage"
+
+- name: "integration"
+  color: "1d76db"
+  description: "New provider or scheduler integration"
+
+# Type
+- name: "type: bug"
+  color: "d73a4a"
+  description: "Something isn't working"
+
+- name: "type: enhancement"
+  color: "a2eeef"
+  description: "New feature or request"
+
+- name: "type: security"
+  color: "b60205"
+  description: "Security issue or hardening"
+
+- name: "type: documentation"
+  color: "0075ca"
+  description: "Documentation changes"
+
+- name: "type: testing"
+  color: "bfd4f2"
+  description: "Test coverage or test infrastructure"
+
+- name: "type: tech-debt"
+  color: "cfd3d7"
+  description: "Refactoring or technical debt"
+
+# Area
+- name: "area: providers/aws"
+  color: "ff9900"
+  description: "AWS provider"
+
+- name: "area: providers/azure"
+  color: "0078d4"
+  description: "Azure provider"
+
+- name: "area: providers/gcp"
+  color: "4285f4"
+  description: "Google Cloud provider"
+
+- name: "area: providers/k8s"
+  color: "326ce5"
+  description: "Kubernetes provider"
+
+- name: "area: scheduler"
+  color: "5319e7"
+  description: "Scheduler integrations"
+
+- name: "area: scheduler/default"
+  color: "5319e7"
+  description: "Default scheduler"
+
+- name: "area: scheduler/hostfactory"
+  color: "5319e7"
+  description: "IBM Spectrum Symphony (host factory) scheduler"
+
+- name: "area: scheduler/slurm"
+  color: "5319e7"
+  description: "Slurm Workload Manager scheduler"
+
+- name: "area: storage/json"
+  color: "0e8a16"
+  description: "JSON storage backend"
+
+- name: "area: storage/sql"
+  color: "0e8a16"
+  description: "SQL storage backend"
+
+- name: "area: storage/dynamodb"
+  color: "0e8a16"
+  description: "DynamoDB storage backend"
+
+- name: "area: storage/aurora"
+  color: "0e8a16"
+  description: "Aurora storage backend"
+
+- name: "area: api"
+  color: "c2e0c6"
+  description: "REST API"
+
+- name: "area: cli"
+  color: "c2e0c6"
+  description: "Command-line interface"
+
+- name: "area: sdk"
+  color: "c2e0c6"
+  description: "Client SDKs"
+
+- name: "area: ui"
+  color: "c2e0c6"
+  description: "Web UI"
+
+- name: "area: ci"
+  color: "e4e669"
+  description: "Continuous integration"
+
+- name: "area: deployment"
+  color: "e4e669"
+  description: "Packaging and deployment"
+
+- name: "area: observability"
+  color: "e4e669"
+  description: "Logging, metrics and tracing"
+
+- name: "area: docs"
+  color: "e4e669"
+  description: "Documentation"
+
+# Priority
+- name: "priority: p0"
+  color: "b60205"
+  description: "Critical, address immediately"
+
+- name: "priority: p1"
+  color: "d93f0b"
+  description: "High priority"
+
+- name: "priority: p2"
+  color: "fbca04"
+  description: "Normal priority"
+
+- name: "priority: p3"
+  color: "c5def5"
+  description: "Low priority"
+
+# Size
+- name: "size: S"
+  color: "c2e0c6"
+  description: "Small change"
+
+- name: "size: M"
+  color: "fbca04"
+  description: "Medium change"
+
+- name: "size: L"
+  color: "d93f0b"
+  description: "Large change"
