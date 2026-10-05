@@ -217,6 +217,7 @@ nav:
       - Generate Your Own SDK: sdk/generating-sdks.md
     - Authorization Claims: security/authorization.md
     - Security Scanning: security/security-scanning.md
+    - Security Hardening: security/hardening.md
   - Reference:
     - API Reference:
       - Overview: api/readme.md
