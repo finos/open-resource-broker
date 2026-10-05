@@ -55,8 +55,8 @@ class AWSAMIResolver(ImageResolver):
         if self._cache_enabled and self._persistent_cache_enabled and self._cache:
             self._load_persistent_cache()
 
-    def __del__(self):
-        """Save persistent cache on destruction."""
+    def close(self) -> None:
+        """Flush the persistent cache to disk if persistence is enabled."""
         if (
             self._cache_enabled
             and self._persistent_cache_enabled
@@ -64,6 +64,10 @@ class AWSAMIResolver(ImageResolver):
             and self._cache
         ):
             self._save_persistent_cache()
+
+    def __del__(self):
+        """Save persistent cache on destruction."""
+        self.close()
 
     def resolve_image_id(self, image_reference: str) -> str:
         """
