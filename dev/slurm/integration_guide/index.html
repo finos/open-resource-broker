@@ -6397,13 +6397,33 @@ source a configuration file instead.</p>
 <td>JWT token for slurmrestd auth</td>
 <td>Not set</td>
 </tr>
+<tr>
+<td><code>SLURM_ORB_RESTD_ALLOW_HTTP</code></td>
+<td>Allow plain <code>http://</code> for <code>SLURM_ORB_RESTD_URL</code> on a non-loopback host (not recommended)</td>
+<td><code>0</code> (rejected)</td>
+</tr>
 </tbody>
 </table>
 <h3 id="6-slurmrestd-integration-optional">6. slurmrestd Integration (Optional)<a class="headerlink" href="#6-slurmrestd-integration-optional" title="Permanent link">&para;</a></h3>
 <p>If slurmrestd is running on your cluster, ORB can use it for health monitoring:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SLURM_ORB_RESTD_URL</span><span class="o">=</span>http://slurmctld:6820
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SLURM_ORB_RESTD_URL</span><span class="o">=</span>https://slurmctld:6820
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SLURM_ORB_JWT_TOKEN</span><span class="o">=</span><span class="k">$(</span>scontrol<span class="w"> </span>token<span class="w"> </span><span class="nv">lifespan</span><span class="o">=</span><span class="m">3600</span><span class="k">)</span>
 </code></pre></div>
+<p><strong>Trusted host:</strong> <code>SLURM_ORB_RESTD_URL</code> must point to a slurmrestd endpoint
+you trust — normally the same cluster's slurmctld host, reachable only from
+ORB's control-plane network. ORB sends the JWT token above to whatever host
+this URL resolves to, so pointing it at an untrusted host would leak that
+token.</p>
+<p><strong>HTTPS by default, plain HTTP on loopback:</strong> slurmrestd has no built-in TLS
+and normally runs on <code>localhost</code> or a UNIX socket, so ORB allows plain
+<code>http://</code> without any extra configuration when the host is loopback
+(<code>localhost</code>, <code>127.0.0.0/8</code>, or <code>::1</code> — a subdomain like
+<code>localhost.example.com</code> or an all-interfaces address like <code>0.0.0.0</code> does
+not count). For any other host, plain <code>http://</code> sends the token and all
+node/partition data unencrypted, so ORB rejects it unless you explicitly
+opt in with <code>SLURM_ORB_RESTD_ALLOW_HTTP=1</code>. Only do this on a network you
+already trust — for anything crossing an untrusted network, put a
+TLS-terminating proxy in front of slurmrestd and use <code>https://</code> instead.</p>
 <p>This enables:
 - Cluster health checks via <code>orb system health</code>
 - Node state monitoring
