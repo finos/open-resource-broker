@@ -2,7 +2,7 @@
 
 ## 1. Co-located on slurmctld Node (Simplest)
 
-ORB runs directly on the SLURM controller node. The ResumeProgram/SuspendProgram scripts invoke the ORB CLI locally.
+ORB runs directly on the Slurm Workload Manager by SchedMD controller node. The ResumeProgram/SuspendProgram scripts invoke the ORB CLI locally.
 
 ```
 ┌─────────────────────────────────────┐
@@ -40,7 +40,7 @@ sudo chmod 644 /usr/orb/slurm_hooks.env
 
 ## 2. Separate Management Node (API Mode)
 
-ORB runs on a separate node with its REST API exposed. The SLURM scripts use `curl` to call the ORB API.
+ORB runs on a separate node with its REST API exposed. The Slurm scripts use `curl` to call the ORB API.
 
 ```
 ┌──────────────────┐       ┌──────────────────┐
@@ -63,9 +63,9 @@ export SLURM_ORB_API_URL=http://orb-manager:8000
 **Pros:** Separation of concerns, ORB can serve multiple clusters.
 **Cons:** Network dependency, additional infrastructure.
 
-## 3. Containerized ORB with SLURM Access
+## 3. Containerized ORB with Slurm Access
 
-ORB runs in a container (Docker/Podman) with access to cloud credentials and the SLURM controller.
+ORB runs in a container (Docker/Podman) with access to cloud credentials and the Slurm controller.
 
 ```
 ┌──────────────────┐       ┌─────────────────────┐
@@ -85,7 +85,7 @@ ORB runs in a container (Docker/Podman) with access to cloud credentials and the
 
 ## 4. Multi-Cluster Setup
 
-A single ORB instance manages cloud resources for multiple SLURM clusters, each with its own partition-to-template mapping.
+A single ORB instance manages cloud resources for multiple Slurm clusters, each with its own partition-to-template mapping.
 
 ```
 ┌─────────────┐

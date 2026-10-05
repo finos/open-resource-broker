@@ -1,11 +1,11 @@
-# Feature Mapping: SLURM ↔ ORB
+# Feature Mapping: Slurm ↔ ORB
 
 ## Concept Mapping
 
-| SLURM Concept | ORB Concept | Notes |
+| Slurm Concept | ORB Concept | Notes |
 |---------------|-------------|-------|
-| Partition | Template | Each SLURM partition maps to an ORB template defining instance specs |
-| Node | Machine | Each SLURM elastic node maps to an ORB machine (cloud instance) |
+| Partition | Template | Each Slurm Workload Manager by SchedMD partition maps to an ORB template defining instance specs |
+| Node | Machine | Each Slurm elastic node maps to an ORB machine (cloud instance) |
 | ResumeProgram | requestMachines | Provision N fresh instances for the given slot names (batch) |
 | SuspendProgram | returnMachines | Terminate instances, clear mappings (always terminate, never stop) |
 | slurmrestd | Health check | Optional monitoring of cluster state |
@@ -18,7 +18,7 @@
 
 ## Node State Mapping
 
-| SLURM Node State | ORB Machine Status | Description |
+| Slurm Node State | ORB Machine Status | Description |
 |------------------|-------------------|-------------|
 | IDLE | available | Node is up and ready for jobs |
 | ALLOCATED | running | Node is running jobs |

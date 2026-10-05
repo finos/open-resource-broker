@@ -1,8 +1,8 @@
-# SLURM Operations Guide
+# Slurm Operations Guide
 
 ## Template Generation
 
-ORB generates templates directly from your `slurm.conf` partition definitions, ensuring that provisioned instances match SLURM's expected resource specs.
+ORB generates templates directly from your `slurm.conf` partition definitions, ensuring that provisioned instances match the Slurm Workload Manager by SchedMD's expected resource specs.
 
 ### Basic Usage
 
@@ -116,16 +116,16 @@ The `--force` flag both overwrites existing template files and skips instance ty
 
 ### Mechanism
 
-When machines are provisioned with `--nodes` (or via SLURM ResumeProgram):
+When machines are provisioned with `--nodes` (or via Slurm ResumeProgram):
 
-1. Application layer assigns each instance a SLURM node name from the request
+1. Application layer assigns each instance a Slurm node name from the request
 2. After provisioning, ORB dispatches a `TAG_INSTANCES` operation to the provider
 3. Provider calls `ec2:CreateTags` with `orb:node-name=<node_name>` on each instance
 4. Compute nodes read this tag on boot to start slurmd with the correct identity
 
 ### Why It Exists
 
-SLURM requires each compute node to register with the name declared in `slurm.conf`. Since ORB provisions generic instances, the node name assignment happens post-launch via instance tags. The compute AMI's boot script reads the tag and starts `slurmd -N <name>`.
+Slurm requires each compute node to register with the name declared in `slurm.conf`. Since ORB provisions generic instances, the node name assignment happens post-launch via instance tags. The compute AMI's boot script reads the tag and starts `slurmd -N <name>`.
 
 ### Provider Requirements
 
@@ -193,10 +193,10 @@ The instance profile must be specified in config:
 }
 ```
 
-### SLURM Resource Matching
+### Slurm Resource Matching
 
-- SLURM requires all nodes in a partition to match the declared `CPUs` and `RealMemory`
-- Instances with MORE resources than declared are accepted (SLURM uses declared values for scheduling)
+- Slurm requires all nodes in a partition to match the declared `CPUs` and `RealMemory`
+- Instances with MORE resources than declared are accepted (Slurm uses declared values for scheduling)
 - Instances with FEWER resources will fail `slurmd` registration
 - Generated templates should use a single instance type per partition, OR multiple types that ALL exceed the partition's declared resources
 - `orb templates generate` validates this automatically
@@ -227,7 +227,7 @@ done
 ### Base Packages
 
 - Amazon Linux 2023 (al2023) or Ubuntu 22.04+
-- SLURM 24.05.5+ compiled with `--with-systemd` for cgroup/v2 support
+- Slurm 24.05.5+ compiled with `--with-systemd` for cgroup/v2 support
 - Build dependencies: `systemd-devel`, `dbus-devel`, `munge-devel`
 - Runtime: `munge`, `slurm-slurmd`
 
@@ -244,7 +244,7 @@ done
 The AMI must include a boot script (via cloud-init or systemd oneshot) that:
 
 1. Reads `orb:node-name` EC2 tag (with retry loop for propagation)
-2. Sets hostname to the SLURM node name
+2. Sets hostname to the Slurm node name
 3. Optionally fetches `slurm.conf` and `munge.key` from SSM Parameter Store
 4. Starts munge
 5. Starts slurmd with `-N <node_name>`
