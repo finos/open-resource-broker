@@ -1,468 +1,362 @@
-# AWS Provider Architecture Design
+# Multi-Provider Design
 
 ## Overview
 
-The Open Resource Broker implements a provider architecture that enables dynamic provisioning of compute resources across multiple AWS configurations and provider instances. This document describes the design, implementation, and usage patterns of the AWS provider system.
+Open Resource Broker (ORB) provisions compute capacity across multiple cloud and
+scheduler backends — AWS, Azure, Google Cloud, and Kubernetes — through a single
+plugin architecture. Each provider is a self-contained Python package under
+`src/orb/providers/<name>/` that registers itself with shared infrastructure at
+startup. The core (CLI, REST API, scheduler integration, DI container) never
+imports a provider package directly; it only talks to registries that providers
+populate during bootstrap.
 
-## Architecture Components
+This document describes that plugin architecture: how providers are discovered
+and registered, the strategy contract every provider implements, how a request
+is routed to a specific provider instance (including load balancing across
+multiple instances of the same provider type), and the supporting registries
+for template extensions, configuration defaults, HostFactory field mapping, and
+CLI argument specs.
 
-### CQRS Implementation Status
+For a step-by-step guide to adding a new provider, see
+[Adding a Provider](../developer_guide/adding_a_provider.md). For an overview of
+provider package layout from a developer's perspective, see
+[Provider System](../developer_guide/providers.md).
 
-The system implements CQRS (Command Query Responsibility Segregation) architecture:
+## Entry points and discovery
 
-**Completed CQRS Components:**
-- `CommandBus` and `QueryBus` infrastructure in `src/infrastructure/di/buses.py`
-- Query DTOs: `ListTemplatesQuery`, `GetTemplateQuery`, `ValidateTemplateQuery`
-- Command DTOs: `CreateTemplateCommand`, `UpdateTemplateCommand`, `DeleteTemplateCommand`, `ValidateTemplateCommand`
-- Template list endpoint using `QueryBus`
+Providers declare themselves under the `orb.providers` entry-point group in
+`pyproject.toml`:
 
-**Implementation Status:**
-- Template API endpoints (GET, POST, PUT, DELETE) - using CQRS handlers
-- Machine management endpoints - using CQRS pattern
-- Request processing endpoints - using CQRS pattern
-- Provider management endpoints - using CQRS pattern
-
-**Architecture Features:**
-- All API endpoints using CQRS buses for command/query separation
-- Consistent async/await patterns across all handlers
-- Appropriate separation of read and write operations
-- Optimized query handling with caching support
-
-### 1. Domain Model Extensions
-
-#### Template Aggregate
-The `Template` aggregate has been extended with multi-provider fields:
-
-```python
-class Template:
-    template_id: str
-    provider_type: Optional[str]  # NEW: Provider type (aws)
-    provider_name: Optional[str]  # NEW: Provider instance name (aws-us-east-1)
-    provider_api: Optional[str]  # NEW: Specific API to use (EC2Fleet, SpotFleet)
-    # ... existing fields
+```toml
+[project.entry-points."orb.providers"]
+aws = "orb.providers.aws.provider_plugin:AWSPlugin.register_plugin"
+azure = "orb.providers.azure.provider_plugin:AzurePlugin.register_plugin"
+gcp = "orb.providers.gcp.provider_plugin:GCPPlugin.register_plugin"
+k8s = "orb.providers.k8s.provider_plugin:K8sPlugin.register_plugin"
 ```
 
-#### Request Aggregate
-The `Request` aggregate now tracks provider selection:
+Each entry point points at a zero-argument, idempotent classmethod. At startup,
+`discover_provider_plugins()` (in `src/orb/providers/registration.py`) walks
+`importlib.metadata.entry_points(group="orb.providers")` and invokes each
+entry point's callable. A plugin that fails to load or raises during
+registration is logged at `ERROR` and skipped — ORB still boots with whatever
+providers loaded successfully. Loaded provider names are appended to the
+module-level `_REGISTERED_PROVIDERS` list, which the rest of bootstrap iterates
+over.
 
-```python
-class Request:
-    provider_type: str
-    provider_instance: Optional[str]  # NEW: Selected provider instance
-    # ... existing fields
-```
+Third-party plugins use the same mechanism: declare an entry point in the
+plugin package's own `pyproject.toml` with no changes required to any file in
+ORB itself. See `docs/root/providers/k8s/plugin-authoring.md` for the plugin
+callable contract (zero-argument, returns `None`, must not raise).
 
-### 2. Provider Selection Service
+Three bootstrap entry points consume the discovered provider list, each calling
+`discover_provider_plugins()` first so entry-point providers are present before
+iterating:
 
-The `ProviderSelectionService` implements intelligent provider selection using multiple strategies:
+- `register_all_providers(container)` — registers each provider's strategy and
+  config factories with the `ProviderRegistry`, then (when a DI container is
+  supplied) resolves `TemplateFactory` and `LoggingPort` and runs the
+  provider's DI-level initialization.
+- `register_all_provider_cli_specs()` — registers each provider's
+  `ProviderCLISpecPort` implementation with `CLISpecRegistry`, used by
+  `orb providers add` and related CLI commands.
+- `register_all_defaults_loaders()` — registers each provider's
+  `ProviderDefaultsLoaderPort` implementation with `DefaultsLoaderRegistry`.
 
-#### Selection Strategies
-1. **Explicit Selection**: Template specifies exact provider instance
-2. **Load Balanced Selection**: Distribute across provider instances by type
-3. **Capability-Based Selection**: Select based on API requirements
-4. **Default Selection**: Use configuration defaults
+## The `ProviderPlugin` contract
 
-#### Selection Algorithm
-```python
-def select_provider_for_template(template: Template) -> ProviderSelectionResult:
-    if template.provider_name:
-        return explicit_selection(template.provider_name)
-    elif template.provider_type:
-        return load_balanced_selection(template.provider_type)
-    elif template.provider_api:
-        return capability_based_selection(template.provider_api)
-    else:
-        return default_selection()
-```
+`src/orb/providers/base/provider_plugin.py` defines `ProviderPlugin`, the
+abstract base every provider subclasses. It separates the pieces every
+provider must supply ("satellite accessors") from the orchestrated lifecycle
+that calls them in the correct order, so a new provider implements only the
+accessors.
 
-### 3. Provider Capability Service
+Mandatory satellite accessors:
 
-The `ProviderCapabilityService` validates template requirements against provider capabilities:
+- `strategy_factory()` — callable that builds a `ProviderStrategy` instance
+  from a provider config.
+- `config_factory()` — callable that builds the provider's typed config object
+  (a `pydantic_settings.BaseSettings` subclass) from a dict.
+- `template_dto_config()` — the provider's template DTO extension class (or
+  `None`), registered with `TemplateExtensionRegistry`.
+- `cli_spec()` — an instance of the provider's `ProviderCLISpecPort`
+  implementation (or `None`), registered with `CLISpecRegistry`.
+- `field_mapping()` — an instance of the provider's HostFactory field-mapping
+  adapter (or `None`), registered with `FieldMappingRegistry`.
+- `defaults_loader()` — an instance of the provider's
+  `ProviderDefaultsLoaderPort` implementation (or `None`), registered with
+  `DefaultsLoaderRegistry`.
+- `template_example_generator(container)` — an instance of the provider's
+  template-example-generator port (or `None`), registered with
+  `TemplateExampleGeneratorRegistry` once the DI container is available.
 
-#### Validation Levels
-- **STRICT**: All warnings become errors
-- **LENIENT**: Warnings allowed, only critical errors fail
-- **BASIC**: Only critical validation, minimal checks
+Optional hooks with no-op or empty defaults: `resolver_factory()`,
+`validator_factory()`, `strategy_class()`, `default_api()`,
+`provider_settings_class()`, `template_class()`, `register_auth_strategies()`,
+`register_additional_services()`, and `_do_initialize()` for any
+provider-specific steps that must run after the standard satellites (for
+example, AWS registers its DynamoDB and Aurora storage backends in
+`_do_initialize`).
 
-#### Capability Validation
-```python
-def validate_template_requirements(
-    template: Template,
-    provider_instance: str,
-    level: ValidationLevel
-) -> ValidationResult:
-    # Validate API support
-    # Check instance limits
-    # Verify pricing model support
-    # Validate fleet type compatibility
-```
+The orchestrated lifecycle methods are:
 
-### 4. Template Repository Architecture
+- `register_provider(registry=None, logger=None, instance_name=None)` —
+  registers the strategy/config factories (and optionally resolver/validator)
+  with the live `ProviderRegistry`. Registers a named instance instead of the
+  provider type when `instance_name` is given.
+- `initialize_provider(template_factory=None, logger=None)` — registers
+  provider settings, the template DTO extension, auth strategies, the
+  template class, the CLI spec, the field mapping, and the defaults loader, in
+  that order, then runs `_do_initialize`. Guarded by a module-level
+  `_initialized_providers` set so a second call is a safe no-op; a failed
+  attempt is not recorded, so a retry after fixing the underlying problem
+  re-runs the full sequence.
+- `register_services_with_di(container)` — runs `register_additional_services`
+  and registers the template example generator.
 
-The template system implements a repository pattern that provides compliance with Clean Architecture principles:
+Every satellite accessor import inside a concrete plugin (for example
+`AWSPlugin`) is a local, deferred import wrapped in `try`/`except ImportError`
+where the accessor is optional, so a provider module can be imported — and the
+entry point loaded — even when that provider's SDK extra is not installed.
+Only calling the strategy at runtime requires the actual dependency.
 
-#### Template Repository Implementation
-The `TemplateRepositoryImpl` class provides a complete implementation of both `AggregateRepository` and `TemplateRepository` interfaces:
+## `ProviderStrategy`: the operation contract
 
-```python
-class TemplateRepositoryImpl(TemplateRepository):
-    """Template repository implementation for configuration-based template management."""
+`src/orb/providers/base/strategy/provider_strategy.py` defines
+`ProviderStrategy`, the abstract class each provider's strategy implements
+(for example `AWSProviderStrategy`, `AzureProviderStrategy`,
+`GCPProviderStrategy`, `K8sProviderStrategy`). It is constructed with the
+provider's typed config and exposes:
 
-    # Abstract methods from AggregateRepository
-    def save(self, aggregate: Template) -> None:
-        """Save a template aggregate."""
+- `provider_type` (property) — the provider type identifier (`"aws"`,
+  `"azure"`, `"gcp"`, `"k8s"`).
+- `initialize() -> bool` — cheap, synchronous setup; validate config, no I/O
+  or background tasks.
+- `execute_operation(operation: ProviderOperation) -> ProviderResult` — the
+  core strategy-pattern entry point. All provider work (provisioning,
+  terminating, status, validation, health) flows through this single method.
+- `execute_operation_async(...)` — defaults to running the sync method in a
+  thread pool; providers may override for a native async implementation.
+- `start_daemon_services()` — no-op by default; providers that run background
+  tasks (watch streams, reconcilers, garbage collectors) override it. Only
+  called in long-lived daemon contexts (the REST API server), never from the
+  CLI.
+- `get_capabilities() -> ProviderCapabilities` and
+  `check_health() -> ProviderHealthStatus`.
+- `generate_provider_name(config)`, `parse_provider_name(name)`, and
+  `get_provider_name_pattern()` — provider-specific naming convention for
+  instance names.
+- `cleanup()` — resource teardown; the class also implements the context
+  manager protocol (`__enter__`/`__exit__`) calling `initialize`/`cleanup`.
 
-    def find_by_id(self, aggregate_id: str) -> Optional[Template]:
-        """Find template by aggregate ID."""
+`ProviderOperation` carries an `operation_type` (one of the
+`ProviderOperationType` enum values — `CREATE_INSTANCES`,
+`TERMINATE_INSTANCES`, `GET_INSTANCE_STATUS`,
+`DESCRIBE_RESOURCE_INSTANCES`, `VALIDATE_TEMPLATE`,
+`GET_AVAILABLE_TEMPLATES`, `HEALTH_CHECK`, `RESOLVE_IMAGE`, `START_INSTANCES`,
+`STOP_INSTANCES`, `CLEANUP_MACHINE_RESOURCES`, `GET_MACHINE_HEALTH`,
+`TAG_INSTANCES`), a `parameters` dict, and an optional `context` dict.
+`ProviderResult` is a Pydantic model with `success`, `data`, `error_message`,
+`error_code`, `metadata`, and `routing_info`; `error_message` is required
+whenever `success` is `False`.
 
-    def delete(self, aggregate_id: str) -> None:
-        """Delete template by aggregate ID."""
+Additional classmethods let a strategy opt into CLI-driven onboarding and
+operator tooling without the core needing provider-specific code:
+`get_available_credential_sources()`, `test_credentials()`,
+`get_credential_requirements()`, `get_operational_requirements()`,
+`get_ui_column_schema()`, `get_cli_extra_config_keys()`,
+`get_cli_provider_config()`, `get_resource_id_pattern()`, and
+`get_cli_infrastructure_defaults()`. `resolve_api_alias()` lets a strategy map
+legacy or alternate API names to its canonical registry key.
 
-    # Abstract methods from TemplateRepository
-    def find_by_template_id(self, template_id: str) -> Optional[Template]:
-        """Find template by template ID (delegates to find_by_id)."""
+## Provider registry and named instances
 
-    def find_by_provider_api(self, provider_api: str) -> List[Template]:
-        """Find templates by provider API type."""
+`ProviderRegistry` (`src/orb/providers/registry/provider_registry.py`) is a
+thread-safe singleton, obtained via `get_provider_registry()`, that holds
+registered strategy/config factories in `MULTI_CHOICE` mode — multiple
+provider strategies can be registered and used simultaneously.
 
-    def find_active_templates(self) -> List[Template]:
-        """Find all active templates."""
+- `register_provider(provider_type, strategy_factory, config_factory, ...)`
+  registers a provider *type* (one factory pair per type).
+- `register_provider_instance(provider_type, instance_name, strategy_factory,
+  config_factory, ...)` registers a named *instance* of a type (for example
+  two differently configured AWS instances), each with its own factories.
+- `get_or_create_strategy(provider_identifier, config)` looks up a cached
+  strategy by type or instance name, creating and caching it on first use.
+- `register_fallback_strategy(strategy)` / `get_fallback_strategy()` register
+  a `FallbackProviderStrategy` used when no provider configuration matches —
+  constructed via `register_fallback_provider()` in
+  `src/orb/providers/registration.py`.
 
-    def search_templates(self, criteria: Dict[str, Any]) -> List[Template]:
-        """Search templates by criteria."""
-```
+## Provider selection and load balancing
 
-#### Key Architecture Improvements
-1. **Full Interface Compliance**: Implements all required abstract methods from both base interfaces
-2. **Method Delegation**: Avoids code duplication by delegating `find_by_template_id` to `find_by_id`
-3. **Clean Dependency Injection**: Uses factory pattern registration instead of decorator-based DI
-4. **Comprehensive Functionality**: Provides both required methods and convenience methods
+Request-to-provider routing is implemented by `ProviderSelectionService`
+(`src/orb/infrastructure/services/provider_selection_service.py`), injected
+into `ProviderRegistry`. It depends only on `ProviderRegistryPort` and
+`ConfigurationPort`, so it has no dependency on any specific provider — the
+same selection logic applies whether the configured instances are AWS, Azure,
+GCP, or Kubernetes.
 
-#### Template Loading Architecture
-The template system implements hierarchical template loading through the scheduler strategy:
+`select_provider_for_template(template, provider_name=None, logger=None)`
+resolves a provider for a template request using this precedence:
 
-##### File Priority Order (Highest to Lowest)
-1. Provider instance files: `{provider-instance}_templates.json`
-2. Provider type files: `{provider-type}prov_templates.json`
-3. Main templates file: `templates.json`
-4. Legacy templates file: `awsprov_templates.json`
+1. CLI override (`--provider-name`), if supplied.
+2. The template's explicit `provider_name` (a named instance).
+3. The template's `provider_type`, load-balanced across enabled instances of
+   that type.
+4. The template's `provider_api`, matched against instances whose effective
+   handlers or declared `capabilities` support that API.
+5. The configuration default (`default_provider_instance` /
+   `default_provider_type`, or the first enabled instance), falling back to
+   a registered fallback strategy if no provider configuration exists at all.
 
-##### Template Override Behavior
-Templates with the same `template_id` in higher priority files override those in lower priority files.
+`select_active_provider(logger=None, provider_name=None, provider_type=None)`
+performs the equivalent resolution for operator-facing (CLI/REST) calls that
+are not tied to a specific template.
 
-## Configuration Schema
+### Configuration schema
 
-### Provider Configuration
+Provider instances and selection policy are defined by `ProviderConfig` and
+`ProviderInstanceConfig` in
+`src/orb/config/schemas/provider_strategy_schema.py`:
+
 ```yaml
 providers:
-  selection_policy: "WEIGHTED_ROUND_ROBIN"
-  default_provider_type: "aws"
-  default_provider_instance: "aws-us-east-1"
+  selection_policy: WEIGHTED_ROUND_ROBIN
+  default_provider_type: aws
+  default_provider_instance: aws-us-east-1
   providers:
-    - name: "aws-us-east-1"
-      type: "aws"
+    - name: aws-us-east-1
+      type: aws
       enabled: true
       priority: 1
       weight: 10
-      capabilities: ["EC2Fleet", "SpotFleet", "RunInstances", "ASG"]
-    - name: "aws-us-west-2"
-      type: "aws"
+      capabilities: [EC2Fleet, SpotFleet, RunInstances]
+    - name: aws-us-west-2
+      type: aws
       enabled: true
       priority: 2
       weight: 5
-      capabilities: ["EC2Fleet", "RunInstances"]
+      capabilities: [EC2Fleet, RunInstances]
 ```
 
-### Template Examples
+`selection_policy` is validated against a fixed set of named policies
+(`FIRST_AVAILABLE`, `ROUND_ROBIN`, `WEIGHTED_ROUND_ROBIN`,
+`LEAST_CONNECTIONS`, `FASTEST_RESPONSE`, `HIGHEST_SUCCESS_RATE`,
+`CAPABILITY_BASED`, `HEALTH_BASED`, `RANDOM`, `PERFORMANCE_BASED`). The
+load-balancing step actually implemented today
+(`_apply_load_balancing_strategy`) selects by priority first (lower
+`priority` wins) and only consults `weight` as a tie-breaker among instances
+sharing the highest priority when the policy is `WEIGHTED_ROUND_ROBIN`;
+`HEALTH_BASED` currently also resolves to the lowest-priority instance; any
+other configured policy falls back to the same priority-ordered selection.
+`get_active_providers()` treats `WEIGHTED_ROUND_ROBIN`, `ROUND_ROBIN`,
+`LEAST_CONNECTIONS`, `PERFORMANCE_BASED`, `FASTEST_RESPONSE`,
+`HIGHEST_SUCCESS_RATE`, `CAPABILITY_BASED`, and `HEALTH_BASED` as
+multi-provider policies that return every enabled instance; otherwise it
+returns the single `active_provider` instance, or the sole configured
+instance.
 
-#### Explicit Provider Selection
-```json
-{
-  "template_id": "explicit-aws-east",
-  "provider_name": "aws-us-east-1",
-  "provider_api": "EC2Fleet",
-  "image_id": "ami-12345",
-  "subnet_ids": ["subnet-123"],
-  "max_instances": 5
-}
-```
+Each `ProviderInstanceConfig` carries `name`, `type`, `enabled`, `priority`,
+`weight` (must be positive), `capabilities`, `handlers` /
+`handler_overrides` (merged with the provider type's defaults via
+`get_effective_handlers`), `template_defaults`, `extensions`, and
+`health_check`. None of these fields are AWS-specific — the same schema backs
+Azure, GCP, and Kubernetes instances; the example above uses two AWS instances
+because multi-instance load balancing is most commonly exercised with
+multiple regions of one provider type, but an installation can equally define
+multiple named instances of `azure`, `gcp`, or `k8s`, or mix provider types
+under one `selection_policy`.
 
-#### Provider Type Selection (Load Balanced)
-```json
-{
-  "template_id": "load-balanced-aws",
-  "provider_type": "aws",
-  "provider_api": "SpotFleet",
-  "image_id": "ami-67890",
-  "subnet_ids": ["subnet-456"],
-  "max_instances": 10
-}
-```
+## Template extensions, defaults, and field mapping
 
-#### API-Based Selection
-```json
-{
-  "template_id": "api-based-selection",
-  "provider_api": "RunInstances",
-  "image_id": "ami-abcdef",
-  "subnet_ids": ["subnet-789"],
-  "max_instances": 3
-}
-```
+Three registries let each provider contribute provider-specific behaviour to
+shared template and scheduler code without that code knowing about any
+specific provider:
 
-## Provider Selection Algorithms
+- **`TemplateExtensionRegistry`**
+  (`src/orb/infrastructure/registry/template_extension_registry.py`) maps a
+  provider type to a Pydantic model class (the plugin's
+  `template_dto_config()`) so `TemplateDTO` can deserialize provider-specific
+  template fields. AWS and Kubernetes expose this as a
+  `<name>_template_dto_config.py` module under `domain/template/`; Azure and
+  GCP expose an equivalent `TemplateExtensionConfig` class under
+  `configuration/template_extension.py`.
+- **`DefaultsLoaderRegistry`**
+  (`src/orb/providers/registry/defaults_loader_registry.py`) maps a provider
+  type to a `ProviderDefaultsLoaderPort` implementation (the plugin's
+  `defaults_loader()`, typically `<Name>DefaultsLoader` in
+  `defaults_loader.py`). Each loader's `load_defaults()` returns a raw config
+  dict in the same shape as `default_config.json`, which
+  `ConfigurationLoader` merges in during startup.
+- **`FieldMappingRegistry`**
+  (`src/orb/infrastructure/scheduler/hostfactory/field_mapping_registry.py`)
+  maps a provider type to a `FieldMappingPort` implementation (the plugin's
+  `field_mapping()`, in `scheduler/hostfactory_field_mapping.py`). Each
+  provider contributes its own camelCase-HostFactory-field to
+  internal-snake_case-field mappings — for example AWS maps `subnetId` to
+  `subnet_ids` and `fleetRole` to `fleet_role` — on top of the generic
+  mappings shared by all providers.
 
-### Weighted Round Robin
-Distributes requests across provider instances based on configured weights:
+## CLI integration
 
-```python
-def weighted_round_robin_selection(providers: List[ProviderInstance]) -> str:
-    total_weight = sum(p.weight for p in providers)
-    random_value = random.randint(1, total_weight)
+`ProviderCLISpecPort` (`src/orb/providers/base/provider_cli_spec_port.py`) is
+the protocol each provider's `cli_spec()` instance implements:
+`add_arguments(parser)`, `extract_config(args)`,
+`extract_partial_config(args)`, `validate_add(args)`, `generate_name(args)`,
+and `format_display(config)`. Instances are registered under the provider
+name in `CLISpecRegistry` and used by the `orb providers` command group:
 
-    current_weight = 0
-    for provider in providers:
-        current_weight += provider.weight
-        if random_value <= current_weight:
-            return provider.name
-```
-
-### Priority-Based Selection
-Selects highest priority available provider:
-
-```python
-def priority_based_selection(providers: List[ProviderInstance]) -> str:
-    enabled_providers = [p for p in providers if p.enabled]
-    return min(enabled_providers, key=lambda p: p.priority).name
-```
-
-## Template File Organization
-
-### Directory Structure
-```
-config/
-- templates.json                    # Main templates
-- awsprov_templates.json           # AWS provider type templates
-- provider1prov_templates.json         # Provider1 provider type templates
-- aws-us-east-1_templates.json    # AWS US East instance templates
-- aws-us-west-2_templates.json    # AWS US West instance templates
-- provider1-region-a_templates.json    # Provider1 Region A instance templates
-```
-
-### Template Inheritance
-Templates inherit and override properties based on file priority:
-
-```json
-// templates.json (base)
-{
-  "template_id": "web-server",
-  "image_id": "ami-base",
-  "instance_type": "t2.micro",
-  "max_instances": 2
-}
-
-// awsprov_templates.json (provider override)
-{
-  "template_id": "web-server",
-  "provider_type": "aws",
-  "provider_api": "EC2Fleet",
-  "instance_type": "t3.small",
-  "max_instances": 5
-}
-
-// aws-us-east-1_templates.json (instance override)
-{
-  "template_id": "web-server",
-  "provider_name": "aws-us-east-1",
-  "image_id": "ami-east-optimized",
-  "max_instances": 10
-}
-```
-
-Final resolved template:
-```json
-{
-  "template_id": "web-server",
-  "provider_name": "aws-us-east-1",
-  "provider_type": "aws",
-  "provider_api": "EC2Fleet",
-  "image_id": "ami-east-optimized",
-  "instance_type": "t3.small",
-  "max_instances": 10
-}
-```
-
-## API Integration
-
-### REST API Endpoints
-
-#### Provider Information
-```http
-GET /api/v1/providers
-GET /api/v1/providers/{provider-instance}/capabilities
-GET /api/v1/providers/{provider-instance}/templates
-```
-
-#### Template Management
-```http
-GET /api/v1/templates?provider_type=aws
-GET /api/v1/templates?provider_name=aws-us-east-1
-POST /api/v1/templates/validate
-```
-
-#### Request Processing
-```http
-POST /api/v1/requests
-{
-  "templateId": "web-server",
-  "maxNumber": 5,
-  "providerPreference": {
-    "type": "aws",
-    "instance": "aws-us-east-1"
-  }
-}
-```
-
-### CLI Commands
-
-#### Provider Management
 ```bash
-# List available providers
 orb providers list
-
-# Show provider capabilities
-orb providers show aws-us-east-1
-
-# Validate provider configuration
-orb providers validate
+orb providers show <name>
+orb providers add
+orb providers update <name>
+orb providers remove <name>
+orb providers set-default <name>
+orb providers get-default
+orb providers health
+orb providers metrics
+orb providers select
 ```
 
-#### Template Operations
-```bash
-# List templates by provider
-orb templates list --provider-type aws
-orb templates list --provider-name aws-us-east-1
+## Optional extras and import guards
 
-# Show template source information
-orb templates show web-server --source-info
+AWS's SDK dependencies (`boto3`, `botocore`) currently ship in ORB's core
+dependency set for backward compatibility, with an explicit `orb-py[aws]`
+extra as a forward-compatible alias. Azure, Google Cloud, and Kubernetes are
+genuinely optional and declared as separate extras in `pyproject.toml`:
 
-# Validate template against provider
-orb templates validate web-server --provider-name aws-us-east-1
+```toml
+aws = ["boto3>=1.42.21", "botocore>=1.42.21"]
+k8s = ["kubernetes"]
+azure = [
+    "azure-core>=1.38.2",
+    "azure-identity>=1.25.2",
+    "azure-mgmt-compute>=37.2.0",
+    "azure-mgmt-network>=30.2.0",
+    "azure-mgmt-resource>=25.0.0",
+    "azure-mgmt-resource-subscriptions==1.0.0b1",
+    "httpx>=0.27.0",
+]
+gcp = ["google-cloud-compute>=1.14.0", "google-auth>=2.23.0"]
+all-providers = ["orb-py[aws]", "orb-py[azure]", "orb-py[k8s]", "orb-py[gcp]"]
 ```
 
-## Error Handling and Validation
+Each `provider_plugin.py` module imports only `ProviderPlugin` at module
+level; every satellite accessor defers its real import (the provider's
+strategy class, config class, CLI spec, and so on) to inside the method body,
+and several wrap that import in `try`/`except ImportError` to return `None`
+when the optional dependency is absent. This means the entry point for a
+provider whose extra is not installed can still be discovered and partially
+registered — the registry knows the provider type exists — while any attempt
+to actually construct and use its strategy fails only once the missing
+dependency is exercised, with a clear `ImportError`.
 
-### Provider Selection Errors
-- **No enabled providers**: When no providers are available
-- **Provider not found**: When explicit provider doesn't exist
-- **Provider disabled**: When selected provider is disabled
-- **No compatible providers**: When no providers support required API
+## Related documentation
 
-### Template Validation Errors
-- **API not supported**: Provider doesn't support required API
-- **Instance limit exceeded**: Request exceeds provider limits
-- **Pricing model mismatch**: Provider doesn't support pricing model
-- **Fleet type incompatible**: Provider doesn't support fleet type
-
-### Error Response Format
-```json
-{
-  "error": {
-    "code": "PROVIDER_NOT_FOUND",
-    "message": "Provider instance 'aws-invalid' not found in configuration",
-    "details": {
-      "requested_provider": "aws-invalid",
-      "available_providers": ["aws-us-east-1", "aws-us-west-2"]
-    }
-  }
-}
-```
-
-## Performance Considerations
-
-### Template Caching
-- Templates are cached in memory with file modification time tracking
-- Cache is automatically refreshed when template files change
-- Manual cache refresh available via API and CLI
-
-### Provider Selection Optimization
-- Provider configurations are cached at startup
-- Selection algorithms use pre-computed weights and priorities
-- Capability validation results are cached per provider-API combination
-
-### File I/O Optimization
-- Template files are loaded once and cached
-- Only modified files are reloaded
-- Batch operations minimize file system calls
-
-## Monitoring and Observability
-
-### Metrics
-- Provider selection distribution
-- Template validation success/failure rates
-- File loading performance
-- Cache hit/miss ratios
-
-### Logging
-- Provider selection decisions with reasoning
-- Template override chains
-- Validation failures with details
-- Performance timing information
-
-### Health Checks
-- Provider availability status
-- Template file accessibility
-- Configuration validation status
-- Cache consistency checks
-
-## Migration Guide
-
-### From Single Provider
-1. Update configuration to include provider instances
-2. Migrate templates to provider-specific files (optional)
-3. Update API calls to include provider preferences (optional)
-4. Test provider selection behavior
-
-### Template Migration
-```bash
-# Migrate existing templates to provider-specific files
-orb templates migrate --from templates.json --to-provider aws-us-east-1
-
-# Validate migrated templates
-orb templates validate --all --provider-name aws-us-east-1
-```
-
-## Best Practices
-
-### Configuration
-- Use meaningful provider instance names
-- Set appropriate weights for load balancing
-- Enable only necessary providers
-- Regular validation of provider configurations
-
-### Template Organization
-- Use provider-specific files for customizations
-- Keep common templates in main file
-- Document template inheritance chains
-- Regular cleanup of unused templates
-
-### Monitoring
-- Monitor provider selection distribution
-- Track validation failure patterns
-- Alert on provider availability issues
-- Regular performance reviews
-
-## Future Enhancements
-
-### Planned Features
-- Dynamic provider discovery
-- Cross-provider failover
-- Improved scheduling algorithms
-- Provider cost optimization
-- Multi-region template synchronization
-
-### Extension Points
-- Custom selection strategies
-- Provider-specific validation rules
-- Template transformation pipelines
-- External provider registries
+- [Developer Guide: Provider System](../developer_guide/providers.md)
+- [Adding a Provider](../developer_guide/adding_a_provider.md)
+- [Strategy Pattern](../patterns/strategy_pattern.md)
+- [Ports and Adapters](../patterns/ports_and_adapters.md)
+- [Field Mapping Architecture](field_mapping_architecture.md)
