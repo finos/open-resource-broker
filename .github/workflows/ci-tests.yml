@@ -372,7 +372,45 @@ jobs:
       - coverage-combine
       - test-report
     steps:
+    # Inline gate instead of a third-party gating action: GitHub can report a
+    # needed job's result as "abandoned" (no runner picked it up, e.g. under
+    # concurrency pressure) in addition to the documented success/failure/
+    # cancelled/skipped set, and no released gating action currently handles
+    # that value without crashing. Fail cleanly on any result other than
+    # "success", with an explicit allow-list for jobs permitted to be skipped.
     - name: Check all required jobs passed
-      uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35  # v1.3.0
-      with:
-        jobs: ${{ toJSON(needs) }}
+      env:
+        NEEDED_JOBS: ${{ toJSON(needs) }}
+        # Space-separated job names allowed to finish "skipped" without
+        # failing this gate. Empty today: every job listed in `needs:` above
+        # always runs regardless of upstream outcome.
+        ALLOWED_SKIPS: ""
+      run: |
+        set -euo pipefail
+
+        # Parse first so a jq failure aborts the step, and fail closed when
+        # there is nothing to check.
+        jobs=$(jq -r 'to_entries[] | [.key, .value.result] | @tsv' <<<"$NEEDED_JOBS")
+        if [ -z "$jobs" ]; then
+          echo "::error::CI gate received no job results"
+          exit 1
+        fi
+
+        failed=0
+        while IFS=$'\t' read -r job_name result; do
+          if [ "$result" = "success" ]; then
+            continue
+          fi
+          if [ "$result" = "skipped" ] && [[ " $ALLOWED_SKIPS " == *" $job_name "* ]]; then
+            continue
+          fi
+          echo "::error::job '$job_name' did not succeed (result: $result)"
+          failed=1
+        done <<<"$jobs"
+
+        if [ "$failed" -ne 0 ]; then
+          echo "::error::CI gate failed: one or more required jobs did not succeed"
+          exit 1
+        fi
+
+        echo "All required jobs succeeded."
