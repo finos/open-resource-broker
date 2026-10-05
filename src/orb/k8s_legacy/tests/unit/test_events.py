@@ -779,6 +779,25 @@ def test_sqlite_backend_create_backup_opens_connection_when_none(tmp_path) -> No
     backend.close()
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="backup progress callback divides by zero on an empty database",
+)
+def test_sqlite_backend_create_backup_succeeds_on_empty_database(tmp_path) -> None:
+    """_create_backup() should succeed even when the source database file
+    does not exist yet and has no pages (brand-new, never-written-to db)."""
+    dbfile = tmp_path / "events.db"
+    backend = SqliteEventBackend(str(dbfile), rotate=False)
+    assert backend.conn is None
+    assert not dbfile.exists()
+
+    backend._create_backup({"sqlite_backup": "empty"})
+
+    backup_dir = tmp_path / "backups"
+    assert list(backup_dir.glob("events_bkp_empty_*.db"))
+    backend.close()
+
+
 def test_sqlite_backend_create_backup_logs_database_error(tmp_path, caplog) -> None:
     """A sqlite3.DatabaseError during backup is logged, not raised."""
     dbfile = tmp_path / "events.db"

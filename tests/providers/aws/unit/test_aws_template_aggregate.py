@@ -330,37 +330,39 @@ class TestToAwsApiFormat:
 # ---------------------------------------------------------------------------
 # from_aws_format
 #
-# NOTE: AWSTemplate.from_aws_format() is dead code (not called anywhere in
-# src/ or tests/ outside this file) and is currently broken for every input,
-# including a minimal {"template_id": "..."} payload: it unconditionally
-# builds `core_data["tags"] = AWSTags.from_dict(...)`, but the inherited
+# NOTE: from_aws_format() unconditionally builds
+# `core_data["tags"] = AWSTags.from_dict(...)`, but the inherited
 # `Template.tags` field is typed `dict[str, Any]`, not `AWSTags`. Passing an
 # AWSTags value object into `cls.model_validate(aws_data)` always raises
 #   pydantic_core.ValidationError: tags - Input should be a valid dictionary
 #     [type=dict_type, input_value=AWSTags(tags={}), input_type=AWSTags]
-# This looks like a real, pre-existing bug (not something introduced by this
-# test change) rather than a test-authoring mistake — see tests below that
-# pin down the failure without working around it in src/.
+# The tests below assert the correct behaviour (a valid AWSTemplate is
+# returned) and are marked xfail so they flip to passing once the bug is
+# fixed in src/.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestFromAwsFormatTagsBug:
-    def test_minimal_payload_raises_due_to_tags_type_mismatch(self) -> None:
-        """Documents the from_aws_format() tags/AWSTags type-mismatch bug.
+    @pytest.mark.xfail(
+        strict=True,
+        reason="from_aws_format passes AWSTags where Template.tags expects a dict",
+    )
+    def test_minimal_payload_returns_valid_template(self) -> None:
+        """from_aws_format() should succeed for the smallest possible payload."""
+        template = AWSTemplate.from_aws_format({"template_id": "t-minimal"})
+        assert template.template_id == "t-minimal"
 
-        Even the smallest possible payload fails because `tags` is always
-        set to an AWSTags instance before being passed to model_validate(),
-        and Template.tags is declared as dict[str, Any].
-        """
-        with pytest.raises(ValidationError, match="tags"):
-            AWSTemplate.from_aws_format({"template_id": "t-minimal"})
-
-    def test_payload_with_tags_raises_same_bug(self) -> None:
-        with pytest.raises(ValidationError, match="tags"):
-            AWSTemplate.from_aws_format(
-                {"template_id": "t-with-tags", "instance_tags": {"Name": "x"}}
-            )
+    @pytest.mark.xfail(
+        strict=True,
+        reason="from_aws_format passes AWSTags where Template.tags expects a dict",
+    )
+    def test_payload_with_tags_returns_valid_template(self) -> None:
+        template = AWSTemplate.from_aws_format(
+            {"template_id": "t-with-tags", "instance_tags": {"Name": "x"}}
+        )
+        assert template.template_id == "t-with-tags"
+        assert template.tags == {"Name": "x"}
 
 
 # ---------------------------------------------------------------------------
