@@ -23,9 +23,9 @@
   "files": ["dist", "src", "generated"],
   "scripts": {
     "build": "tsup",
-    "test": "jest --testPathPattern=tests/unit --forceExit",
-    "test:contract": "jest --testPathPattern=tests/contract --forceExit --testTimeout=30000",
-    "test:parity": "jest --testPathPattern=tests/parity --forceExit --testTimeout=60000",
+    "test": "jest --testPathPatterns=tests/unit --forceExit",
+    "test:contract": "jest --testPathPatterns=tests/contract --forceExit --testTimeout=30000",
+    "test:parity": "jest --testPathPatterns=tests/parity --forceExit --testTimeout=60000",
     "test:all": "jest --forceExit",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
@@ -40,9 +40,9 @@
     "@aws-crypto/sha256-js": "^5.2.0"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
-    "jest": "^29.7.0",
+    "jest": "^30.5.2",
     "ts-jest": "^29.1.0",
     "tsup": "^8.0.0",
     "typescript": "^6.0.3"
