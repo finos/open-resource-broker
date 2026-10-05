@@ -27,6 +27,17 @@ _NON_TERMINAL_REQUEST_STATUS_STRINGS = {
 }
 
 
+def _safe_log_value(value: str) -> str:
+    """Strip CR/LF from a user-supplied identifier before it reaches a log line.
+
+    Request/machine IDs are logged verbatim for audit purposes; this only
+    neutralises newline characters that could be used to forge extra log
+    entries, it does not change the identifiers used for the actual lookup
+    or deletion.
+    """
+    return value.replace("\r", "").replace("\n", "")
+
+
 class NonTerminalStatusError(ValueError):
     """Raised when a purge is attempted on a non-terminal record."""
 
@@ -112,7 +123,7 @@ class CleanupDatabaseService:
 
             logger.warning(
                 "ADMIN_CLEANUP: deleted request=%s cascade_machines=%s machines_deleted=%d",
-                request_id,
+                _safe_log_value(request_id),
                 cascade_machines,
                 machines_deleted,
             )
@@ -149,7 +160,7 @@ class CleanupDatabaseService:
 
             logger.warning(
                 "ADMIN_CLEANUP: deleted machine=%s",
-                machine_id,
+                _safe_log_value(machine_id),
             )
 
         return result
