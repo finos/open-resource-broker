@@ -35,7 +35,7 @@ class TestAWSProviderConfigSecretStr:
 
     def test_secret_access_key_not_exposed_in_str(self):
         """str(config) must not contain the raw secret access key."""
-        config = self._make_config(secret_access_key="SuP3rS3cr3tV4lue")  # nosec B105
+        config = self._make_config(secret_access_key="SuP3rS3cr3tV4lue")
         assert "SuP3rS3cr3tV4lue" not in str(config)
 
     def test_access_key_id_not_exposed_in_repr(self):
@@ -45,12 +45,12 @@ class TestAWSProviderConfigSecretStr:
 
     def test_secret_access_key_not_exposed_in_repr(self):
         """repr(config) must not contain the raw secret access key."""
-        config = self._make_config(secret_access_key="SuP3rS3cr3tV4lue")  # nosec B105
+        config = self._make_config(secret_access_key="SuP3rS3cr3tV4lue")
         assert "SuP3rS3cr3tV4lue" not in repr(config)
 
     def test_model_dump_does_not_leak_secret_access_key(self):
         """model_dump() default mode must not expose the raw secret value."""
-        config = self._make_config(secret_access_key="SuP3rS3cr3tV4lue")  # nosec B105
+        config = self._make_config(secret_access_key="SuP3rS3cr3tV4lue")
         dumped = config.model_dump()
         secret_val = dumped.get("secret_access_key")
         # SecretStr objects in model_dump() are returned as SecretStr, not plain str
@@ -71,7 +71,7 @@ class TestAWSProviderConfigSecretStr:
 
     def test_get_secret_value_returns_real_secret_access_key(self):
         """get_secret_value() must return the real value so boto3 can use it."""
-        config = self._make_config(secret_access_key="SuP3rS3cr3tV4lue")  # nosec B105
+        config = self._make_config(secret_access_key="SuP3rS3cr3tV4lue")
         assert config.secret_access_key is not None
         assert config.secret_access_key.get_secret_value() == "SuP3rS3cr3tV4lue"
 
@@ -87,7 +87,7 @@ class TestAWSProviderConfigSecretStr:
         """model_dump(mode='json') produces a dict that json.dumps can serialise."""
         config = self._make_config(
             access_key_id="AKIATEST123SECRET",
-            secret_access_key="SuP3rS3cr3tV4lue",  # nosec B105
+            secret_access_key="SuP3rS3cr3tV4lue",
         )
         dumped = config.model_dump(mode="json")
         # Must not raise
@@ -101,7 +101,7 @@ class TestAWSProviderConfigSecretStr:
         """model_dump() (default mode) contains SecretStr which json.dumps cannot handle."""
         config = self._make_config(
             access_key_id="AKIATEST123SECRET",
-            secret_access_key="SuP3rS3cr3tV4lue",  # nosec B105
+            secret_access_key="SuP3rS3cr3tV4lue",
         )
         dumped = config.model_dump()
         # SecretStr is not JSON-serialisable; json.dumps must raise TypeError.
@@ -152,7 +152,7 @@ class TestMaskConfigDict:
 
     def test_masked_value_not_present_in_str_representation(self):
         """The raw secret must not appear anywhere in the masked dict's repr."""
-        result = self._mask({"secret_access_key": "SuP3rS3cr3t"})  # nosec B105
+        result = self._mask({"secret_access_key": "SuP3rS3cr3t"})
         assert "SuP3rS3cr3t" not in str(result)
 
     # --- Regression: bare "key" must NOT mask legitimate non-secret fields ---
@@ -210,7 +210,7 @@ class TestAWSSessionFactoryCredentials:
         with patch("orb.providers.aws.session_factory.boto3.Session") as mock_session:
             AWSSessionFactory.create_session(
                 aws_access_key_id="AKIATEST123",
-                aws_secret_access_key="s3cr3t",  # nosec B105
+                aws_secret_access_key="s3cr3t",
             )
             mock_session.assert_called_once()
             _, kwargs = mock_session.call_args
@@ -235,7 +235,7 @@ class TestAWSSessionFactoryCredentials:
         with patch("orb.providers.aws.session_factory.boto3.Session") as mock_session:
             AWSSessionFactory.create_session(
                 aws_access_key_id="AKIATEST",
-                aws_secret_access_key="secret",  # nosec B105
+                aws_secret_access_key="secret",
                 aws_session_token="token-abc",
             )
             _, kwargs = mock_session.call_args
@@ -248,7 +248,7 @@ class TestAWSSessionFactoryCredentials:
         with patch("orb.providers.aws.session_factory.boto3.Session") as mock_session:
             AWSSessionFactory.create_session(
                 aws_access_key_id="",
-                aws_secret_access_key="",  # nosec B105
+                aws_secret_access_key="",
             )
             _, kwargs = mock_session.call_args
             assert "aws_access_key_id" not in kwargs
@@ -266,7 +266,7 @@ class TestAWSSessionFactoryCredentials:
         provider_config = AWSProviderConfig(  # type: ignore[call-arg]
             region="us-east-1",
             access_key_id="AKIATEST123",
-            secret_access_key="MySuperSecret",  # nosec B105
+            secret_access_key="MySuperSecret",
         )
 
         config_mock = MagicMock()

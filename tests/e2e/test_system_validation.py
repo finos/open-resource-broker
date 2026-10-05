@@ -749,8 +749,9 @@ class TestSystemValidation:
             try:
                 validator.validate_configuration()
                 validation_checklist["error_handling"] = True
-            except Exception:  # nosec B110
-                pass
+            except Exception:
+                # Leave the checklist item unset; the final checklist assertion reports it
+                validation_checklist["error_handling"] = False
 
             # Performance
             import time
