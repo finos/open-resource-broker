@@ -287,3 +287,292 @@ class TestGetPackageName:
         config_port.get_package_info.side_effect = RuntimeError("error")
         ops._config_port = config_port
         assert ops._get_package_name() == "open-resource-broker"
+
+
+# ---------------------------------------------------------------------------
+# describe_with_pagination_and_retry / _paginate_method
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestDescribeWithPaginationAndRetry:
+    def test_raises_when_retry_not_set(self):
+        ops = _make_ops()
+        with pytest.raises(ValueError, match="Retry method not set"):
+            ops.describe_with_pagination_and_retry(MagicMock(), "Items", "describe-things")
+
+    def test_uses_pagination_func_when_set(self):
+        ops = _make_ops()
+        # retry_with_backoff simply invokes the callable passed to it.
+        ops.set_retry_method(lambda fn, operation_type=None: fn())
+        paginate_func = MagicMock(return_value=[{"InstanceId": "i-1"}, {"InstanceId": "i-2"}])
+        ops.set_pagination_method(paginate_func)
+
+        result = ops.describe_with_pagination_and_retry(
+            MagicMock(), "Items", "describe-things", Filter="x"
+        )
+
+        assert result == [{"InstanceId": "i-1"}, {"InstanceId": "i-2"}]
+        paginate_func.assert_called_once()
+
+    def test_propagates_exception_from_retry(self):
+        ops = _make_ops()
+        ops.set_retry_method(MagicMock(side_effect=RuntimeError("boom")))
+        with pytest.raises(RuntimeError, match="boom"):
+            ops.describe_with_pagination_and_retry(MagicMock(), "Items", "describe-things")
+
+
+@pytest.mark.unit
+class TestPaginateMethod:
+    def test_falls_back_to_simple_call_without_pagination_func(self):
+        ops = _make_ops()
+        client_method = MagicMock(return_value={"Items": [{"InstanceId": "i-1"}]})
+
+        result = ops._paginate_method(client_method, "Items", Filter="x")
+
+        assert result == [{"InstanceId": "i-1"}]
+        client_method.assert_called_once_with(Filter="x")
+
+    def test_fallback_returns_empty_list_when_key_missing(self):
+        ops = _make_ops()
+        client_method = MagicMock(return_value={})
+
+        result = ops._paginate_method(client_method, "Items")
+
+        assert result == []
+
+    def test_delegates_to_configured_pagination_func(self):
+        ops = _make_ops()
+        paginate_func = MagicMock(return_value=["a", "b"])
+        ops.set_pagination_method(paginate_func)
+
+        client_method = MagicMock()
+        result = ops._paginate_method(client_method, "Items", Filter="y")
+
+        assert result == ["a", "b"]
+        paginate_func.assert_called_once_with(client_method, "Items", Filter="y")
+
+
+# ---------------------------------------------------------------------------
+# check_resource_status
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCheckResourceStatus:
+    def test_returns_status_from_dict_response(self):
+        ops = _make_ops()
+        retry = MagicMock(return_value={"FleetState": "active"})
+        ops.set_retry_method(retry)
+
+        status = ops.check_resource_status("EC2Fleet", "fleet-1", MagicMock(), "FleetState")
+
+        assert status == "active"
+
+    def test_navigates_nested_status_path(self):
+        ops = _make_ops()
+        retry = MagicMock(return_value={"Group": {"LifecycleState": "InService"}})
+        ops.set_retry_method(retry)
+
+        status = ops.check_resource_status("ASG", "asg-1", MagicMock(), "Group.LifecycleState")
+
+        assert status == "InService"
+
+    def test_navigates_status_path_through_list_response(self):
+        ops = _make_ops()
+        retry = MagicMock(return_value=[{"FleetState": "active"}])
+        ops.set_retry_method(retry)
+
+        status = ops.check_resource_status("EC2Fleet", "fleet-1", MagicMock(), "FleetState")
+
+        assert status == "active"
+
+    def test_warns_when_status_does_not_match_expected(self):
+        ops = _make_ops()
+        retry = MagicMock(return_value={"FleetState": "modifying"})
+        ops.set_retry_method(retry)
+
+        status = ops.check_resource_status(
+            "EC2Fleet", "fleet-1", MagicMock(), "FleetState", expected_status="active"
+        )
+
+        assert status == "modifying"
+        ops._logger.warning.assert_called()  # type: ignore[attr-defined]
+
+    def test_returns_unknown_when_retry_not_set(self):
+        ops = _make_ops()
+        status = ops.check_resource_status("EC2Fleet", "fleet-1", MagicMock(), "FleetState")
+        assert status == "unknown"
+
+    def test_returns_unknown_on_exception(self):
+        ops = _make_ops()
+        retry = MagicMock(side_effect=RuntimeError("boom"))
+        ops.set_retry_method(retry)
+
+        status = ops.check_resource_status("EC2Fleet", "fleet-1", MagicMock(), "FleetState")
+
+        assert status == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Tagging operations: apply_base_tags_to_resource, discover_and_tag_fleet_instances
+# ---------------------------------------------------------------------------
+
+
+def _make_request_and_template():
+    request = MagicMock()
+    request.request_id = "req-123"
+    template = MagicMock()
+    template.template_id = "tmpl-456"
+    return request, template
+
+
+@pytest.mark.unit
+class TestApplyBaseTagsToResource:
+    def test_tags_resource_successfully(self):
+        ops = _make_ops()
+        request, template = _make_request_and_template()
+
+        result = ops.apply_base_tags_to_resource("i-abc", request, template)
+
+        assert result is True
+        ops.aws_client.ec2_client.create_tags.assert_called_once()
+        _, kwargs = ops.aws_client.ec2_client.create_tags.call_args
+        assert kwargs["Resources"] == ["i-abc"]
+
+    def test_returns_false_and_logs_warning_on_failure(self):
+        ops = _make_ops()
+        request, template = _make_request_and_template()
+        ops.aws_client.ec2_client.create_tags.side_effect = RuntimeError("boom")
+
+        result = ops.apply_base_tags_to_resource("i-abc", request, template)
+
+        assert result is False
+        ops._logger.warning.assert_called()  # type: ignore[attr-defined]
+
+
+@pytest.mark.unit
+class TestDiscoverAndTagFleetInstances:
+    def test_tags_ec2_fleet_instances(self):
+        ops = _make_ops()
+        request, template = _make_request_and_template()
+        ops.aws_client.ec2_client.describe_fleet_instances.return_value = {
+            "ActiveInstances": [{"InstanceId": "i-1"}, {"InstanceId": "i-2"}]
+        }
+
+        count = ops.discover_and_tag_fleet_instances("fleet-1", request, template, "EC2Fleet")
+
+        assert count == 2
+        assert ops.aws_client.ec2_client.create_tags.call_count == 2
+
+    def test_tags_spot_fleet_instances(self):
+        ops = _make_ops()
+        request, template = _make_request_and_template()
+        ops.aws_client.ec2_client.describe_spot_fleet_instances.return_value = {
+            "ActiveInstances": [{"InstanceId": "i-1"}]
+        }
+
+        count = ops.discover_and_tag_fleet_instances("spot-fleet-1", request, template, "SpotFleet")
+
+        assert count == 1
+
+    def test_unknown_provider_api_returns_zero(self):
+        ops = _make_ops()
+        request, template = _make_request_and_template()
+
+        count = ops.discover_and_tag_fleet_instances("fleet-1", request, template, "Unknown")
+
+        assert count == 0
+        ops._logger.warning.assert_called()  # type: ignore[attr-defined]
+
+    def test_no_instances_found_returns_zero(self):
+        ops = _make_ops()
+        request, template = _make_request_and_template()
+        ops.aws_client.ec2_client.describe_fleet_instances.return_value = {"ActiveInstances": []}
+
+        count = ops.discover_and_tag_fleet_instances("fleet-1", request, template, "EC2Fleet")
+
+        assert count == 0
+
+    def test_exception_during_discovery_returns_zero(self):
+        ops = _make_ops()
+        request, template = _make_request_and_template()
+        ops.aws_client.ec2_client.describe_fleet_instances.side_effect = RuntimeError("boom")
+
+        # _get_ec2_fleet_instances swallows the exception and returns [],
+        # so discover_and_tag_fleet_instances short-circuits via "no instances found".
+        count = ops.discover_and_tag_fleet_instances("fleet-1", request, template, "EC2Fleet")
+
+        assert count == 0
+
+
+@pytest.mark.unit
+class TestGetFleetInstancesHelpers:
+    def test_get_ec2_fleet_instances_returns_ids(self):
+        ops = _make_ops()
+        ops.aws_client.ec2_client.describe_fleet_instances.return_value = {
+            "ActiveInstances": [{"InstanceId": "i-1"}, {"InstanceId": "i-2"}]
+        }
+
+        result = ops._get_ec2_fleet_instances("fleet-1")
+
+        assert result == ["i-1", "i-2"]
+
+    def test_get_ec2_fleet_instances_returns_empty_on_error(self):
+        ops = _make_ops()
+        ops.aws_client.ec2_client.describe_fleet_instances.side_effect = RuntimeError("boom")
+
+        result = ops._get_ec2_fleet_instances("fleet-1")
+
+        assert result == []
+
+    def test_get_spot_fleet_instances_returns_ids(self):
+        ops = _make_ops()
+        ops.aws_client.ec2_client.describe_spot_fleet_instances.return_value = {
+            "ActiveInstances": [{"InstanceId": "i-9"}]
+        }
+
+        result = ops._get_spot_fleet_instances("spot-fleet-1")
+
+        assert result == ["i-9"]
+
+    def test_get_spot_fleet_instances_returns_empty_on_error(self):
+        ops = _make_ops()
+        ops.aws_client.ec2_client.describe_spot_fleet_instances.side_effect = RuntimeError("boom")
+
+        result = ops._get_spot_fleet_instances("spot-fleet-1")
+
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# execute_with_standard_error_handling
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestExecuteWithStandardErrorHandling:
+    def test_successful_operation_returns_result(self):
+        ops = _make_ops()
+        operation = MagicMock(return_value={"FleetId": "fleet-1"})
+
+        result = ops.execute_with_standard_error_handling(
+            operation, "create-fleet", context="EC2Fleet", DryRun=False
+        )
+
+        assert result == {"FleetId": "fleet-1"}
+        operation.assert_called_once_with(DryRun=False)
+
+    def test_client_error_converted_and_reraised(self):
+        ops = _make_ops()
+        operation = MagicMock(side_effect=_client_error("InvalidParameterValue"))
+
+        with pytest.raises(AWSValidationError):
+            ops.execute_with_standard_error_handling(operation, "create-fleet")
+
+    def test_generic_exception_wrapped_in_aws_infrastructure_error(self):
+        ops = _make_ops()
+        operation = MagicMock(side_effect=RuntimeError("unexpected failure"))
+
+        with pytest.raises(AWSInfrastructureError, match="Failed to create-fleet"):
+            ops.execute_with_standard_error_handling(operation, "create-fleet")
