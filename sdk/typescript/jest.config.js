@@ -15,6 +15,7 @@ module.exports = {
           strict: true,
           esModuleInterop: true,
           skipLibCheck: true,
+          types: ["jest", "node"],
         },
       },
     ],
