@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && useradd -r -g "${PACKAGE_NAME_SHORT}" -s /bin/false "${PACKAGE_NAME_SHORT}"
 
 # Install UV (pinned version for consistency)
-RUN pip install --no-cache-dir uv==0.8.11
+RUN pip install --no-cache-dir uv==0.12.23
 
 # Set working directory and create directories
 WORKDIR /app
