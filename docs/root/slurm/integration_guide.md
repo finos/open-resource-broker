@@ -118,7 +118,7 @@ Configure these environment variables for ORB's Slurm integration
 | `SLURM_ORB_API_URL` | ORB API URL (for api mode) | `http://localhost:8000` |
 | `SLURM_ORB_RESTD_URL` | slurmrestd URL (for health checks) | Not set |
 | `SLURM_ORB_JWT_TOKEN` | JWT token for slurmrestd auth | Not set |
-| `SLURM_ORB_RESTD_ALLOW_HTTP` | Allow plain `http://` for `SLURM_ORB_RESTD_URL` (not recommended) | `0` (rejected) |
+| `SLURM_ORB_RESTD_ALLOW_HTTP` | Allow plain `http://` for `SLURM_ORB_RESTD_URL` on a non-loopback host (not recommended) | `0` (rejected) |
 
 ### 6. slurmrestd Integration (Optional)
 
@@ -135,10 +135,16 @@ ORB's control-plane network. ORB sends the JWT token above to whatever host
 this URL resolves to, so pointing it at an untrusted host would leak that
 token.
 
-**HTTPS by default:** plain `http://` sends the token and all node/partition
-data unencrypted, so ORB rejects it unless you explicitly opt in with
-`SLURM_ORB_RESTD_ALLOW_HTTP=1` — only do this on a network you already trust
-(e.g. loopback, or where TLS termination happens elsewhere).
+**HTTPS by default, plain HTTP on loopback:** slurmrestd has no built-in TLS
+and normally runs on `localhost` or a UNIX socket, so ORB allows plain
+`http://` without any extra configuration when the host is loopback
+(`localhost`, `127.0.0.0/8`, or `::1` — a subdomain like
+`localhost.example.com` or an all-interfaces address like `0.0.0.0` does
+not count). For any other host, plain `http://` sends the token and all
+node/partition data unencrypted, so ORB rejects it unless you explicitly
+opt in with `SLURM_ORB_RESTD_ALLOW_HTTP=1`. Only do this on a network you
+already trust — for anything crossing an untrusted network, put a
+TLS-terminating proxy in front of slurmrestd and use `https://` instead.
 
 This enables:
 - Cluster health checks via `orb system health`

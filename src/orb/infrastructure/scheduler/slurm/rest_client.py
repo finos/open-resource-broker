@@ -1,7 +1,9 @@
 """slurmrestd REST API client for node and partition queries."""
 
+import ipaddress
 import re
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 import requests
 
@@ -9,6 +11,25 @@ _NAME_RE = re.compile(r"^[a-zA-Z0-9\-_]+$")
 
 if TYPE_CHECKING:
     from orb.domain.base.ports.logging_port import LoggingPort
+
+
+def _is_loopback_host(hostname: str | None) -> bool:
+    """True if hostname is "localhost" or a loopback IP literal (IPv4 or IPv6).
+
+    ``urlparse(...).hostname`` already lowercases the host and strips the
+    brackets from an IPv6 literal (e.g. ``[::1]`` -> ``::1``), so this only
+    needs an exact "localhost" check plus ``ipaddress`` for IP literals.
+    A hostname like ``localhost.example.com`` is intentionally NOT treated
+    as loopback: it is an arbitrary name that could resolve anywhere.
+    """
+    if not hostname:
+        return False
+    if hostname.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
 
 
 class SlurmRestClientError(Exception):
@@ -25,10 +46,20 @@ class SlurmRestClient:
     same cluster's slurmctld host, reachable only from the ORB control plane's
     private network. ORB sends the JWT auth token to whatever host this URL
     resolves to, so pointing it at an untrusted or attacker-controlled host
-    would leak that token. Plain ``http://`` is rejected by default (it sends
-    the token and all node/partition data unencrypted); pass
-    ``allow_insecure_http=True`` to opt in for local development or networks
-    where TLS termination happens elsewhere.
+    would leak that token.
+
+    slurmrestd itself has no built-in TLS — per SchedMD's REST API docs, "Only
+    unencrypted and uncompressed HTTP communications are supported" and sites
+    that need encryption are told to "use a proxy to wrap all communications
+    with TLS" — so a stock slurmrestd install normally only listens on
+    loopback or a UNIX socket. Plain ``http://`` is therefore allowed without
+    any opt-in when the host is loopback (``localhost``, ``127.0.0.0/8``,
+    ``::1``). Plain ``http://`` to any other host is rejected by default,
+    since it would send the JWT token and all node/partition data
+    unencrypted; pass ``allow_insecure_http=True`` (or set
+    ``SLURM_ORB_RESTD_ALLOW_HTTP=1`` at the strategy level) to opt in for a
+    network you already trust, or put a TLS-terminating proxy in front of
+    slurmrestd and use ``https://`` instead.
     """
 
     def __init__(
@@ -41,22 +72,32 @@ class SlurmRestClient:
         logger: "LoggingPort | None" = None,
         allow_insecure_http: bool = False,
     ) -> None:
-        if not base_url.startswith(("http://", "https://")):
+        self._logger = logger
+        parsed = urlparse(base_url)
+        if parsed.scheme not in ("http", "https"):
             raise ValueError(f"base_url must start with http:// or https://, got: {base_url}")
-        if base_url.startswith("http://") and not allow_insecure_http:
-            raise ValueError(
-                f"Refusing plain http:// slurmrestd URL '{base_url}': this would send "
-                "the JWT auth token and all node/partition data unencrypted. Use "
-                "https:// for any slurmrestd endpoint outside a fully trusted "
-                "loopback/private network, or pass allow_insecure_http=True "
-                "(SLURM_ORB_RESTD_ALLOW_HTTP=1 at the strategy level) to opt in."
+        if parsed.scheme == "http" and not _is_loopback_host(parsed.hostname):
+            if not allow_insecure_http:
+                raise ValueError(
+                    f"Refusing plain http:// slurmrestd URL '{base_url}' to a "
+                    "non-loopback host: slurmrestd has no built-in TLS, so this "
+                    "would send the JWT auth token and all node/partition data "
+                    "unencrypted. Put a TLS-terminating proxy in front of "
+                    "slurmrestd and use https://, or set "
+                    "SLURM_ORB_RESTD_ALLOW_HTTP=1 to opt in for a network you "
+                    "already trust."
+                )
+            self._log.warning(
+                "slurmrestd base_url '%s' uses plain http:// to a non-loopback "
+                "host with SLURM_ORB_RESTD_ALLOW_HTTP=1 set; the JWT token and "
+                "all node/partition data will be sent unencrypted.",
+                base_url,
             )
         self._base_url = base_url.rstrip("/")
         self._api_version = api_version
         self._token = token
         self._timeout = timeout
         self._verify_ssl = verify_ssl
-        self._logger = logger
 
     @property
     def _log(self) -> Any:

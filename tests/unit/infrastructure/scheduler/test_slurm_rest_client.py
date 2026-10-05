@@ -11,6 +11,7 @@ from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.scheduler.slurm.rest_client import (
     SlurmRestClient,
     SlurmRestClientError,
+    _is_loopback_host,
 )
 
 
@@ -57,6 +58,101 @@ def test_allows_plain_http_when_explicitly_opted_in():
 def test_https_never_requires_the_insecure_opt_in():
     c = SlurmRestClient(base_url="https://slurmrestd.example.com")
     assert c._base_url == "https://slurmrestd.example.com"
+
+
+# ---------------------------------------------------------------------------
+# http:// loopback vs non-loopback host handling
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://localhost",
+        "http://localhost:6820",
+        "http://LOCALHOST:6820",
+        "http://127.0.0.1:6820",
+        "http://127.5.5.5",
+        "http://[::1]:6820",
+    ],
+)
+def test_allows_plain_http_to_loopback_without_opt_in(base_url):
+    c = SlurmRestClient(base_url=base_url)
+    assert c._base_url == base_url
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://slurmrestd.example.com",
+        "http://localhost.example.com",
+        "http://0.0.0.0",
+        "http://slurmctld:6820",
+    ],
+)
+def test_rejects_plain_http_to_non_loopback_host_by_default(base_url):
+    with pytest.raises(ValueError, match="Refusing plain http"):
+        SlurmRestClient(base_url=base_url)
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://slurmrestd.example.com",
+        "http://localhost.example.com",
+        "http://0.0.0.0",
+        "http://slurmctld:6820",
+    ],
+)
+def test_allows_plain_http_to_non_loopback_host_when_opted_in(base_url):
+    c = SlurmRestClient(base_url=base_url, allow_insecure_http=True)
+    assert c._base_url == base_url
+
+
+def test_opting_in_for_non_loopback_host_logs_a_warning():
+    fake_logger = _FakeLogger()
+    SlurmRestClient(
+        base_url="http://slurmrestd.example.com",
+        allow_insecure_http=True,
+        logger=fake_logger,
+    )
+    assert any(call[0] == "warning" for call in fake_logger.calls)
+
+
+def test_opting_in_for_loopback_host_does_not_log_a_warning():
+    fake_logger = _FakeLogger()
+    SlurmRestClient(
+        base_url="http://localhost:6820",
+        allow_insecure_http=True,
+        logger=fake_logger,
+    )
+    assert not any(call[0] == "warning" for call in fake_logger.calls)
+
+
+def test_loopback_host_does_not_log_a_warning_without_opt_in():
+    fake_logger = _FakeLogger()
+    SlurmRestClient(base_url="http://localhost:6820", logger=fake_logger)
+    assert not any(call[0] == "warning" for call in fake_logger.calls)
+
+
+@pytest.mark.parametrize(
+    ("hostname", "expected"),
+    [
+        ("localhost", True),
+        ("LOCALHOST", True),
+        ("127.0.0.1", True),
+        ("127.5.5.5", True),
+        ("::1", True),
+        ("localhost.example.com", False),
+        ("0.0.0.0", False),
+        ("slurmctld", False),
+        ("slurmrestd.example.com", False),
+        (None, False),
+        ("", False),
+    ],
+)
+def test_is_loopback_host(hostname, expected):
+    assert _is_loopback_host(hostname) is expected
 
 
 def test_headers_include_token_when_set(client):
