@@ -3588,6 +3588,7 @@ all = [
     { name = "boto3" },
     { name = "botocore" },
     { name = "fastapi" },
+    { name = "google-api-core" },
     { name = "google-auth" },
     { name = "google-cloud-compute" },
     { name = "httpx" },
@@ -3620,6 +3621,7 @@ all-providers = [
     { name = "azure-mgmt-resource-subscriptions" },
     { name = "boto3" },
     { name = "botocore" },
+    { name = "google-api-core" },
     { name = "google-auth" },
     { name = "google-cloud-compute" },
     { name = "httpx" },
@@ -3667,6 +3669,7 @@ dev = [
     { name = "fastapi" },
     { name = "git-changelog" },
     { name = "gitpython" },
+    { name = "google-api-core" },
     { name = "google-auth" },
     { name = "google-cloud-compute" },
     { name = "httpx" },
@@ -3745,6 +3748,7 @@ dev = [
     { name = "wheel" },
 ]
 gcp = [
+    { name = "google-api-core" },
     { name = "google-auth" },
     { name = "google-cloud-compute" },
 ]
@@ -3817,6 +3821,7 @@ test-azure = [
     { name = "azure-mgmt-compute" },
 ]
 test-gcp = [
+    { name = "google-api-core" },
     { name = "google-auth" },
     { name = "google-cloud-compute" },
 ]
@@ -4087,6 +4092,7 @@ requires-dist = [
     { name = "filelock", specifier = ">=3.20.1" },
     { name = "git-changelog", marker = "extra == 'dev'", specifier = ">=2.6.0,<3.0.0" },
     { name = "gitpython", marker = "extra == 'dev'", specifier = ">=3.1.62" },
+    { name = "google-api-core", marker = "extra == 'gcp'", specifier = ">=2.17.0" },
     { name = "google-auth", marker = "extra == 'gcp'", specifier = ">=2.23.0" },
     { name = "google-cloud-compute", marker = "extra == 'gcp'", specifier = ">=1.14.0" },
     { name = "httpx", marker = "extra == 'azure'", specifier = ">=0.27.0" },
