@@ -20,6 +20,15 @@ class SlurmRestClient:
 
     Supports node and partition read endpoints only — ORB acts as a resource
     provider, not a job scheduler.
+
+    ``base_url`` must point to a trusted slurmrestd endpoint — typically the
+    same cluster's slurmctld host, reachable only from the ORB control plane's
+    private network. ORB sends the JWT auth token to whatever host this URL
+    resolves to, so pointing it at an untrusted or attacker-controlled host
+    would leak that token. Plain ``http://`` is rejected by default (it sends
+    the token and all node/partition data unencrypted); pass
+    ``allow_insecure_http=True`` to opt in for local development or networks
+    where TLS termination happens elsewhere.
     """
 
     def __init__(
@@ -30,9 +39,18 @@ class SlurmRestClient:
         timeout: int = 30,
         verify_ssl: bool = True,
         logger: "LoggingPort | None" = None,
+        allow_insecure_http: bool = False,
     ) -> None:
         if not base_url.startswith(("http://", "https://")):
             raise ValueError(f"base_url must start with http:// or https://, got: {base_url}")
+        if base_url.startswith("http://") and not allow_insecure_http:
+            raise ValueError(
+                f"Refusing plain http:// slurmrestd URL '{base_url}': this would send "
+                "the JWT auth token and all node/partition data unencrypted. Use "
+                "https:// for any slurmrestd endpoint outside a fully trusted "
+                "loopback/private network, or pass allow_insecure_http=True "
+                "(SLURM_ORB_RESTD_ALLOW_HTTP=1 at the strategy level) to opt in."
+            )
         self._base_url = base_url.rstrip("/")
         self._api_version = api_version
         self._token = token

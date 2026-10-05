@@ -52,8 +52,18 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             from orb.infrastructure.scheduler.slurm.rest_client import SlurmRestClient
 
             token = os.environ.get("SLURM_ORB_JWT_TOKEN")
+            allow_insecure_http = os.environ.get(
+                "SLURM_ORB_RESTD_ALLOW_HTTP", ""
+            ).strip().lower() in (
+                "1",
+                "true",
+                "yes",
+            )
             self._slurm_client = SlurmRestClient(
-                base_url=slurmrestd_url, token=token, logger=self._logger
+                base_url=slurmrestd_url,
+                token=token,
+                logger=self._logger,
+                allow_insecure_http=allow_insecure_http,
             )
         else:
             from orb.infrastructure.scheduler.slurm.cli_adapter import SlurmCliAdapter

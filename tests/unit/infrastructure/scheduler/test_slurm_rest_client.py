@@ -44,6 +44,21 @@ def test_strips_trailing_slash_from_base_url():
     assert c._url("nodes") == "https://slurmrestd.example.com/slurm/v0.0.44/nodes"
 
 
+def test_rejects_plain_http_by_default():
+    with pytest.raises(ValueError, match="Refusing plain http"):
+        SlurmRestClient(base_url="http://slurmrestd.example.com")
+
+
+def test_allows_plain_http_when_explicitly_opted_in():
+    c = SlurmRestClient(base_url="http://slurmrestd.example.com", allow_insecure_http=True)
+    assert c._base_url == "http://slurmrestd.example.com"
+
+
+def test_https_never_requires_the_insecure_opt_in():
+    c = SlurmRestClient(base_url="https://slurmrestd.example.com")
+    assert c._base_url == "https://slurmrestd.example.com"
+
+
 def test_headers_include_token_when_set(client):
     headers = client._get_headers()
     assert headers["X-SLURM-USER-TOKEN"] == "tok-123"

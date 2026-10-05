@@ -59,6 +59,26 @@ def test_get_slurm_client_uses_rest_client_when_url_configured(strategy, monkeyp
     assert client._token == "tok-abc"
 
 
+def test_get_slurm_client_rejects_plain_http_restd_url_by_default(strategy, monkeypatch):
+    monkeypatch.setenv("SLURM_ORB_RESTD_URL", "http://slurmrestd.example.com")
+    monkeypatch.delenv("SLURM_ORB_RESTD_ALLOW_HTTP", raising=False)
+
+    with pytest.raises(ValueError, match="Refusing plain http"):
+        strategy._get_slurm_client()
+
+
+def test_get_slurm_client_allows_plain_http_when_opted_in_via_env(strategy, monkeypatch):
+    monkeypatch.setenv("SLURM_ORB_RESTD_URL", "http://slurmrestd.example.com")
+    monkeypatch.setenv("SLURM_ORB_RESTD_ALLOW_HTTP", "1")
+
+    from orb.infrastructure.scheduler.slurm.rest_client import SlurmRestClient
+
+    client = strategy._get_slurm_client()
+
+    assert isinstance(client, SlurmRestClient)
+    assert client._base_url == "http://slurmrestd.example.com"
+
+
 def test_get_slurm_client_is_cached(strategy, monkeypatch):
     monkeypatch.delenv("SLURM_ORB_RESTD_URL", raising=False)
 
