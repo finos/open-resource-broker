@@ -145,6 +145,7 @@ def register_sql_storage() -> None:
             strategy_factory=create_sql_strategy,
             config_factory=create_sql_config,
             unit_of_work_factory=create_sql_unit_of_work,
+            display_name="SQL",
         )
 
         logger.info("Successfully registered SQL storage type")

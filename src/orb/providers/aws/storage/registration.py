@@ -154,6 +154,7 @@ def register_dynamodb_storage(
             strategy_factory=create_dynamodb_strategy,
             config_factory=create_dynamodb_config,
             unit_of_work_factory=create_dynamodb_unit_of_work,
+            display_name="DynamoDB",
         )
 
         if logger:
@@ -296,6 +297,7 @@ def register_aurora_storage(
             strategy_factory=create_aurora_strategy,
             config_factory=create_aurora_config,
             unit_of_work_factory=create_aurora_unit_of_work,
+            display_name="Aurora",
         )
 
         if logger:

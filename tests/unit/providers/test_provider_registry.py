@@ -438,3 +438,25 @@ class TestListMachinesQueryProviderFilter:
         q = ListMachinesQuery()
         assert q.provider_name is None
         assert q.provider_type is None
+
+
+@pytest.mark.unit
+class TestGetDisplayNameFallback:
+    """get_display_name() falls back to the raw identifier for unregistered types."""
+
+    def test_unregistered_type_returns_raw_identifier(self):
+        """No registration exists, so the raw type string is returned unchanged."""
+        registry = cast(ProviderRegistry, ProviderRegistry())
+
+        result = registry.get_display_name("totally-unregistered-type")
+
+        assert result == "totally-unregistered-type"
+
+    def test_unregistered_type_does_not_raise(self):
+        """The internal ValueError from the missing registration is handled, not propagated."""
+        registry = cast(ProviderRegistry, ProviderRegistry())
+
+        try:
+            registry.get_display_name("another-unregistered-type")
+        except ValueError:
+            pytest.fail("get_display_name() must not propagate ValueError for unregistered types")

@@ -158,6 +158,7 @@ def register_json_storage() -> None:
             strategy_factory=create_json_strategy,
             config_factory=create_json_config,
             unit_of_work_factory=unit_of_work_factory,  # Accepts config parameter
+            display_name="JSON",
         )
 
         logger.info("Successfully registered JSON storage type")

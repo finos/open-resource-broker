@@ -35,6 +35,7 @@ class StorageRegistration(BaseRegistration):
         strategy_factory: Callable,
         config_factory: Callable,
         unit_of_work_factory: Optional[Callable] = None,
+        display_name: Optional[str] = None,
     ) -> None:
         """Initialize the instance."""
         super().__init__(
@@ -44,6 +45,7 @@ class StorageRegistration(BaseRegistration):
             unit_of_work_factory=unit_of_work_factory,
         )
         self.unit_of_work_factory = unit_of_work_factory
+        self.display_name = display_name
 
 
 class StorageRegistry(BaseRegistry):
@@ -64,6 +66,7 @@ class StorageRegistry(BaseRegistry):
         strategy_factory: Callable,
         config_factory: Callable,
         unit_of_work_factory: Optional[Callable] = None,
+        display_name: Optional[str] = None,
     ) -> None:
         """Register storage strategy factory - implements abstract method."""
         self.register_type(
@@ -71,6 +74,7 @@ class StorageRegistry(BaseRegistry):
             strategy_factory,
             config_factory,
             unit_of_work_factory=unit_of_work_factory,
+            display_name=display_name,
         )
 
     def register_storage(
@@ -79,6 +83,7 @@ class StorageRegistry(BaseRegistry):
         strategy_factory: Callable,
         config_factory: Callable,
         unit_of_work_factory: Optional[Callable] = None,
+        display_name: Optional[str] = None,
     ) -> None:
         """
         Register a storage type with its factories - backward compatibility method.
@@ -88,6 +93,7 @@ class StorageRegistry(BaseRegistry):
             strategy_factory: Factory function to create storage strategy
             config_factory: Factory function to create storage configuration
             unit_of_work_factory: Optional factory function to create unit of work
+            display_name: Optional human-readable name for this storage backend
 
         Raises:
             ConfigurationError: If storage type is already registered
@@ -104,6 +110,7 @@ class StorageRegistry(BaseRegistry):
                 strategy_factory,
                 config_factory,
                 unit_of_work_factory=unit_of_work_factory,
+                display_name=display_name,
             )
         except ValueError as e:
             raise ConfigurationError(str(e))
@@ -170,6 +177,25 @@ class StorageRegistry(BaseRegistry):
             return uow_factory(config)
         return None
 
+    def get_display_name(self, storage_type: str) -> str:
+        """Return the human-readable display name for *storage_type*.
+
+        Falls back to the raw type identifier when the backend did not
+        register one.
+        """
+        try:
+            registration = self._get_type_registration(storage_type)
+        except ValueError:
+            _logger.debug(
+                "No display name registered for storage type %r; "
+                "falling back to the raw identifier.",
+                storage_type,
+            )
+            return storage_type
+        if isinstance(registration, StorageRegistration) and registration.display_name:
+            return registration.display_name
+        return storage_type
+
     def get_registered_storage_types(self) -> list[str]:
         """Get list of registered storage types - backward compatibility method."""
         return self.get_registered_types()
@@ -196,6 +222,7 @@ class StorageRegistry(BaseRegistry):
             strategy_factory,
             config_factory,
             additional_factories.get("unit_of_work_factory"),
+            display_name=additional_factories.get("display_name"),
         )
 
 

@@ -72,6 +72,9 @@ class K8sPlugin(ProviderPlugin):
     def default_api(self) -> Optional[str]:
         return "Pod"
 
+    def display_name(self) -> Optional[str]:
+        return "Kubernetes"
+
     def provider_settings_class(self) -> Optional[type]:
         try:
             from orb.providers.k8s.configuration.config import K8sProviderConfig

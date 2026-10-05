@@ -36,6 +36,10 @@ class GCPPlugin(ProviderPlugin):
 
         return GCPProviderStrategy
 
+    def display_name(self) -> str:
+        """Return Google Cloud's official product name."""
+        return "Google Cloud"
+
     def provider_settings_class(self) -> type:
         """Return the GCP provider settings type."""
         from orb.providers.gcp.configuration.config import GCPProviderConfig

@@ -38,13 +38,13 @@ class SchedulerRegistry(BaseRegistry):
     """
 
     _SCHEDULER_METADATA: ClassVar[dict[str, dict[str, str]]] = {
-        "default": {"display_name": "default", "description": "Standalone usage"},
+        "default": {"display_name": "Default", "description": "Standalone usage"},
         "hostfactory": {
-            "display_name": "hostfactory",
+            "display_name": "IBM Spectrum Symphony (host factory)",
             "description": "IBM Spectrum Symphony integration",
         },
         "slurm": {
-            "display_name": "slurm",
+            "display_name": "Slurm Workload Manager",
             "description": "SLURM workload manager integration",
         },
     }
@@ -52,6 +52,15 @@ class SchedulerRegistry(BaseRegistry):
     _SCHEDULER_EXTRA_CONFIG: ClassVar[dict[str, dict[str, str]]] = {
         "hostfactory": {"config_root": "$ORB_CONFIG_DIR"},
         "slurm": {"config_root": "$SLURM_ORB_CONFIG_DIR"},
+    }
+
+    # Grid schedulers that consume ORB through the default scheduler's native
+    # API rather than a dedicated scheduler strategy of their own. Declared
+    # here, on the scheduler they integrate through, so anything that needs
+    # the full list of integrations ORB supports (docs, issue templates) can
+    # read it instead of hardcoding it.
+    _SCHEDULER_INTEGRATIONS: ClassVar[dict[str, tuple[str, ...]]] = {
+        "default": ("HTC-Grid", "OpenGRIS Scaler"),
     }
 
     def __init__(self) -> None:
@@ -67,6 +76,14 @@ class SchedulerRegistry(BaseRegistry):
             scheduler_type,
             {"display_name": scheduler_type, "description": f"{scheduler_type} scheduler"},
         )
+
+    def get_integrations(self, scheduler_type: str) -> tuple[str, ...]:
+        """Return the names of third-party integrations that use *scheduler_type*.
+
+        Empty tuple when the scheduler type has no declared integrations
+        (the common case).
+        """
+        return self._SCHEDULER_INTEGRATIONS.get(scheduler_type, ())
 
     def get_extra_config_for_type(self, scheduler_type: str) -> dict[str, str]:
         """Return extra config keys to inject under scheduler config for this type.
