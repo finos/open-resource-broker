@@ -4,25 +4,42 @@ Handles post-provisioning setup for ephemeral cloud nodes. Each resume cycle
 provisions fresh instances — no state is preserved between cycles.
 """
 
-import logging
 import re
 import shlex
 import subprocess
+from typing import TYPE_CHECKING, Any
 
-_logger = logging.getLogger(__name__)
 _NAME_RE = re.compile(r"^[a-zA-Z0-9\-_]+$")
 _IP_RE = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
 # Absolute path, no shell metacharacters, spaces, or traversal segments —
 # this value is interpolated into a root-run cloud-init `sed -i` command.
 _SAFE_ABS_PATH_RE = re.compile(r"^/[A-Za-z0-9_./-]+$")
 
+if TYPE_CHECKING:
+    from orb.domain.base.ports.logging_port import LoggingPort
+
 
 class SlurmNodeBootstrap:
     """Handles post-provisioning node registration for ephemeral cloud nodes."""
 
-    def __init__(self, scontrol_path: str = "scontrol", timeout: int = 30) -> None:
+    def __init__(
+        self,
+        scontrol_path: str = "scontrol",
+        timeout: int = 30,
+        logger: "LoggingPort | None" = None,
+    ) -> None:
         self._scontrol = scontrol_path
         self._timeout = timeout
+        self._logger = logger
+
+    @property
+    def _log(self) -> Any:
+        """Injected LoggingPort, falling back to the module logger when not supplied."""
+        if self._logger is None:
+            from orb.infrastructure.logging.logger import get_logger
+
+            return get_logger(__name__)
+        return self._logger
 
     @staticmethod
     def _validate_node_name(value: str) -> None:
@@ -57,9 +74,9 @@ class SlurmNodeBootstrap:
                 cmd, capture_output=True, text=True, timeout=self._timeout, shell=False, check=False
             )
             if result.returncode == 0:
-                _logger.info("Registered node %s with addr %s", node_name, ip_address)
+                self._log.info("Registered node %s with addr %s", node_name, ip_address)
                 return True
-            _logger.warning(
+            self._log.warning(
                 "scontrol update failed for %s (rc=%d): %s",
                 node_name,
                 result.returncode,
@@ -67,7 +84,7 @@ class SlurmNodeBootstrap:
             )
             return False
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-            _logger.warning("scontrol update failed for %s: %s", node_name, e)
+            self._log.warning("scontrol update failed for %s: %s", node_name, e)
             return False
 
     @staticmethod

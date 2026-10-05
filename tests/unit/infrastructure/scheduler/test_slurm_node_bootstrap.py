@@ -11,6 +11,7 @@ import subprocess
 
 import pytest
 
+from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.scheduler.slurm.node_bootstrap import SlurmNodeBootstrap
 
 
@@ -162,3 +163,52 @@ def test_register_node_address_rejects_invalid_ip(bootstrap):
 def test_register_node_address_rejects_invalid_hostname(bootstrap):
     with pytest.raises(ValueError, match="Invalid node name"):
         bootstrap.register_node_address("compute-001", "10.0.0.5", hostname="bad; host")
+
+
+# ---------------------------------------------------------------------------
+# Logging — injected LoggingPort instead of module-level logging.getLogger
+# ---------------------------------------------------------------------------
+
+
+class _FakeLogger(LoggingPort):
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, tuple]] = []
+
+    def debug(self, message, *args, **kwargs):
+        self.calls.append(("debug", (message, *args)))
+
+    def info(self, message, *args, **kwargs):
+        self.calls.append(("info", (message, *args)))
+
+    def warning(self, message, *args, **kwargs):
+        self.calls.append(("warning", (message, *args)))
+
+    def error(self, message, *args, **kwargs):
+        self.calls.append(("error", (message, *args)))
+
+    def critical(self, message, *args, **kwargs):
+        self.calls.append(("critical", (message, *args)))
+
+    def exception(self, message, *args, **kwargs):
+        self.calls.append(("exception", (message, *args)))
+
+    def log(self, level, message, *args, **kwargs):
+        self.calls.append(("log", (message, *args)))
+
+
+def test_uses_injected_logger_when_provided(monkeypatch):
+    fake_logger = _FakeLogger()
+    bootstrap = SlurmNodeBootstrap(logger=fake_logger)
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed(returncode=0))
+
+    bootstrap.register_node_address("compute-001", "10.0.0.5")
+
+    assert any(call[0] == "info" for call in fake_logger.calls)
+
+
+def test_falls_back_to_module_logger_when_none_injected(monkeypatch):
+    sentinel = _FakeLogger()
+    monkeypatch.setattr("orb.infrastructure.logging.logger.get_logger", lambda name: sentinel)
+    bootstrap = SlurmNodeBootstrap()
+
+    assert bootstrap._log is sentinel

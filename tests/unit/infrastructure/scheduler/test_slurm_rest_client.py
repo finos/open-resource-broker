@@ -7,6 +7,7 @@ REST client implementation (only mocks at a higher layer).
 import pytest
 import requests
 
+from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.scheduler.slurm.rest_client import (
     SlurmRestClient,
     SlurmRestClientError,
@@ -194,3 +195,53 @@ def test_is_available_false_on_unexpected_error(client, monkeypatch):
     monkeypatch.setattr(client, "ping", _raise)
 
     assert client.is_available() is False
+
+
+# ---------------------------------------------------------------------------
+# Logging — injected LoggingPort instead of module-level logging.getLogger
+# ---------------------------------------------------------------------------
+
+
+class _FakeLogger(LoggingPort):
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, tuple]] = []
+
+    def debug(self, message, *args, **kwargs):
+        self.calls.append(("debug", (message, *args)))
+
+    def info(self, message, *args, **kwargs):
+        self.calls.append(("info", (message, *args)))
+
+    def warning(self, message, *args, **kwargs):
+        self.calls.append(("warning", (message, *args)))
+
+    def error(self, message, *args, **kwargs):
+        self.calls.append(("error", (message, *args)))
+
+    def critical(self, message, *args, **kwargs):
+        self.calls.append(("critical", (message, *args)))
+
+    def exception(self, message, *args, **kwargs):
+        self.calls.append(("exception", (message, *args)))
+
+    def log(self, level, message, *args, **kwargs):
+        self.calls.append(("log", (message, *args)))
+
+
+def test_uses_injected_logger_when_provided(monkeypatch):
+    fake_logger = _FakeLogger()
+    c = SlurmRestClient(base_url="https://slurmrestd.example.com", logger=fake_logger)
+    monkeypatch.setattr(requests, "get", lambda *a, **k: _FakeResponse(500, text="boom"))
+
+    with pytest.raises(SlurmRestClientError):
+        c.get_nodes()
+
+    assert any(call[0] == "error" for call in fake_logger.calls)
+
+
+def test_falls_back_to_module_logger_when_none_injected(monkeypatch):
+    sentinel = _FakeLogger()
+    monkeypatch.setattr("orb.infrastructure.logging.logger.get_logger", lambda name: sentinel)
+    c = SlurmRestClient(base_url="https://slurmrestd.example.com")
+
+    assert c._log is sentinel

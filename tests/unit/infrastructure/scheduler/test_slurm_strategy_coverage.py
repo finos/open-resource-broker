@@ -68,6 +68,26 @@ def test_get_slurm_client_is_cached(strategy, monkeypatch):
     assert first is second
 
 
+def test_get_slurm_client_propagates_injected_logger_to_cli_adapter(monkeypatch):
+    monkeypatch.delenv("SLURM_ORB_RESTD_URL", raising=False)
+    fake_logger = object()
+    strategy_with_logger = SlurmSchedulerStrategy(logger=fake_logger)
+
+    client = strategy_with_logger._get_slurm_client()
+
+    assert client._logger is fake_logger
+
+
+def test_get_slurm_client_propagates_injected_logger_to_rest_client(monkeypatch):
+    monkeypatch.setenv("SLURM_ORB_RESTD_URL", "https://slurmrestd.example.com")
+    fake_logger = object()
+    strategy_with_logger = SlurmSchedulerStrategy(logger=fake_logger)
+
+    client = strategy_with_logger._get_slurm_client()
+
+    assert client._logger is fake_logger
+
+
 # ---------------------------------------------------------------------------
 # check_slurm_health
 # ---------------------------------------------------------------------------

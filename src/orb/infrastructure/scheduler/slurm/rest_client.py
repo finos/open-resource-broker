@@ -1,12 +1,14 @@
 """slurmrestd REST API client for node and partition queries."""
 
-import logging
 import re
+from typing import TYPE_CHECKING, Any
 
 import requests
 
-_logger = logging.getLogger(__name__)
 _NAME_RE = re.compile(r"^[a-zA-Z0-9\-_]+$")
+
+if TYPE_CHECKING:
+    from orb.domain.base.ports.logging_port import LoggingPort
 
 
 class SlurmRestClientError(Exception):
@@ -27,6 +29,7 @@ class SlurmRestClient:
         token: str | None = None,
         timeout: int = 30,
         verify_ssl: bool = True,
+        logger: "LoggingPort | None" = None,
     ) -> None:
         if not base_url.startswith(("http://", "https://")):
             raise ValueError(f"base_url must start with http:// or https://, got: {base_url}")
@@ -35,6 +38,16 @@ class SlurmRestClient:
         self._token = token
         self._timeout = timeout
         self._verify_ssl = verify_ssl
+        self._logger = logger
+
+    @property
+    def _log(self) -> Any:
+        """Injected LoggingPort, falling back to the module logger when not supplied."""
+        if self._logger is None:
+            from orb.infrastructure.logging.logger import get_logger
+
+            return get_logger(__name__)
+        return self._logger
 
     def set_token(self, token: str) -> None:
         """Set or update the JWT authentication token."""
@@ -61,16 +74,16 @@ class SlurmRestClient:
                 url, headers=self._get_headers(), timeout=self._timeout, verify=self._verify_ssl
             )
             if resp.status_code >= 400:
-                _logger.error(
+                self._log.error(
                     "slurmrestd %s returned HTTP %d: %s", url, resp.status_code, resp.text
                 )
                 raise SlurmRestClientError(f"slurmrestd HTTP {resp.status_code}: {resp.text[:200]}")
             return resp.json()  # type: ignore[no-any-return]
         except requests.ConnectionError as e:
-            _logger.error("slurmrestd connection failed for %s: %s", url, e)
+            self._log.error("slurmrestd connection failed for %s: %s", url, e)
             return {}
         except requests.Timeout as e:
-            _logger.error("slurmrestd timeout for %s: %s", url, e)
+            self._log.error("slurmrestd timeout for %s: %s", url, e)
             return {}
 
     # --- Node endpoints ---
