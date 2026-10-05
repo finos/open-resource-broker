@@ -76,6 +76,35 @@ class GCPComputeClient:
         self._images_client: Optional[ImagesClient] = None
         self._retry_policies: dict[str, Any] = {}
 
+    def close(self) -> None:
+        """Close the transport of every lazily created Compute Engine client.
+
+        ``google-cloud-compute`` client classes expose no public ``close()``;
+        the only release path is ``transport.close()`` (what the SDK's own
+        context-manager ``__exit__`` calls). Dropping references alone leaves
+        the underlying connection pool to be reclaimed by garbage collection,
+        which is not guaranteed to happen promptly.
+        """
+        clients: tuple[Optional[Any], ...] = (
+            self._instances_client,
+            self._instance_templates_client,
+            self._region_igm_client,
+            self._zone_igm_client,
+            self._images_client,
+        )
+        for client in clients:
+            if client is None:
+                continue
+            try:
+                client.transport.close()
+            except Exception as exc:
+                self._logger.warning("Failed to close GCP compute client transport: %s", exc)
+        self._instances_client = None
+        self._instance_templates_client = None
+        self._region_igm_client = None
+        self._zone_igm_client = None
+        self._images_client = None
+
     def create_instance(
         self,
         *,

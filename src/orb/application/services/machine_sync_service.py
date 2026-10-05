@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from orb.application.services.provider_registry_service import ProviderRegistryService
 
 from orb.application.ports.command_bus_port import CommandBusPort
+from orb.application.services.machine_coordinates import load_machine_coordinates
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
@@ -73,6 +74,9 @@ class MachineSyncService:
                 parameters = {
                     "instance_ids": request.machine_ids,
                     "template_id": request.template_id,
+                    "machine_coordinates": load_machine_coordinates(
+                        self.uow_factory, list(request.machine_ids)
+                    ),
                 }
             # Use resource-level discovery for acquire requests (handles scaling/replacement)
             elif request.resource_ids:
@@ -90,6 +94,7 @@ class MachineSyncService:
                 parameters = {
                     "instance_ids": instance_ids,
                     "template_id": request.template_id,
+                    "machine_coordinates": load_machine_coordinates(self.uow_factory, instance_ids),
                 }
             else:
                 return [], {}

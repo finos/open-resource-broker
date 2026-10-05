@@ -10,6 +10,7 @@ import asyncio
 from typing import Any
 
 from orb.application.ports.query_bus_port import QueryBusPort
+from orb.application.services.machine_coordinates import load_machine_coordinates
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports import ContainerPort, LoggingPort, ProviderSelectionPort
 
@@ -173,6 +174,7 @@ class DeprovisioningOrchestrator:
                     "provider_api": provider_api,
                     "resource_id": resource_id,
                     "resource_mapping": {iid: (resource_id, 1) for iid in instance_ids},
+                    "machine_coordinates": load_machine_coordinates(self.uow_factory, instance_ids),
                     "request_id": origin_request_id,
                     "request": request,
                 },

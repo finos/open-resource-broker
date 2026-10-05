@@ -701,7 +701,9 @@ class GCPProviderStrategy(ProviderStrategy):
         return {"valid": len(errors) == 0, "errors": errors, "warnings": []}
 
     def cleanup(self) -> None:
-        """Release provider-owned state."""
+        """Close owned compute client transports and release provider state."""
+        if self._compute_client is not None:
+            self._compute_client.close()
         self._handler_factory = None
         self._compute_client = None
         self._initialized = False

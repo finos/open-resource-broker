@@ -220,6 +220,10 @@ class GCPOperationContextService:
         if mapped_resource_ids:
             return mapped_resource_ids
 
+        coordinate_resource_ids = params.coordinate_resource_ids()
+        if coordinate_resource_ids:
+            return coordinate_resource_ids
+
         mig_name = handler_context.get("mig_name")
         if mig_name:
             return [mig_name]

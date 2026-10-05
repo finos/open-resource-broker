@@ -299,3 +299,44 @@ class TestInstanceTypeRefreshOnSync:
         # Nothing changed → no machine save (only the request timestamp save).
         assert len(updated) == 1
         assert len(saved) == 0
+
+
+@pytest.mark.unit
+class TestReturnStatusCarriesMachineCoordinates:
+    """Return requests have no placement; persisted machine data must be forwarded."""
+
+    @pytest.mark.asyncio
+    async def test_return_status_operation_includes_machine_coordinates(self):
+        from unittest.mock import patch
+
+        from orb.providers.base.strategy.provider_strategy import ProviderResult
+
+        svc = _make_service()
+        captured: list = []
+
+        async def _capture(provider_name, operation):
+            captured.append(operation)
+            return ProviderResult.success_result(data={"instances": []})
+
+        registry_svc = MagicMock()
+        registry_svc.execute_operation = _capture
+        svc._provider_registry_service = registry_svc
+
+        req = _make_request(request_type="return")
+        req.machine_ids = ["vm-a"]
+        coordinates = {
+            "vm-a": {
+                "provider_api": "MIG",
+                "resource_id": "mig-a",
+                "provider_data": {"scope": "zonal", "zone": "us-central1-b"},
+            }
+        }
+
+        with patch(
+            "orb.application.services.machine_sync_service.load_machine_coordinates",
+            return_value=coordinates,
+        ) as loader:
+            await svc.fetch_provider_machines(req, [_make_machine("vm-a")])  # type: ignore[arg-type]
+
+        loader.assert_called_once_with(svc.uow_factory, ["vm-a"])
+        assert captured[0].parameters["machine_coordinates"] == coordinates
