@@ -35,7 +35,10 @@ class TestUnitOfWorkTransactions:
         assert unit_of_work.in_transaction is False
 
     def test_context_manager_rolls_back_on_exception(self, unit_of_work):
-        with pytest.raises(RuntimeError):
+        def _raise_inside_transaction():
             with unit_of_work:
                 raise RuntimeError("boom")
+
+        with pytest.raises(RuntimeError):
+            _raise_inside_transaction()
         assert unit_of_work.in_transaction is False

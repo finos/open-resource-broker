@@ -342,11 +342,10 @@ def test_configuration_combinations():
                 elif not create_per_request and reuse_existing:
                     # Should create one LT per template and reuse
                     behavior = "one_per_template"
-                elif not create_per_request and not reuse_existing:
+                else:
+                    # not create_per_request and not reuse_existing
                     # Should create multiple versions per template
                     behavior = "multiple_versions"
-                else:
-                    behavior = "unknown"
 
                 if behavior == expected:
                     print(f"       PASS: Configuration behavior correct: {expected}")

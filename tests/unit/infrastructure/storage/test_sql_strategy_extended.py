@@ -383,7 +383,8 @@ class TestSQLStrategyTransaction:
 
     def test_transaction_rollback_on_exception(self) -> None:
         strategy = _make_strategy()
-        with pytest.raises(RuntimeError):
+
+        def _raise_inside_transaction():
             with strategy.transaction() as session:
                 from sqlalchemy import text
 
@@ -392,6 +393,9 @@ class TestSQLStrategyTransaction:
                     {"id": "txr1", "data": "val"},
                 )
                 raise RuntimeError("forced rollback")
+
+        with pytest.raises(RuntimeError):
+            _raise_inside_transaction()
         assert not strategy.exists("txr1")
 
 
