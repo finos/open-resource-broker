@@ -151,8 +151,6 @@ class TestSystemValidation:
 
         # Test interface integration (simplified)
         try:
-            pass
-
             mock_command = Mock()
             mock_command.file = None
             mock_command.data = None
@@ -707,8 +705,6 @@ class TestSystemValidation:
 
             # Interface integration (simplified)
             try:
-                pass
-
                 # Mock the result since we can't fully test async handlers in this context
                 interface_result = {"status": "success", "provider_info": provider_info}
 

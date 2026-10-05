@@ -168,8 +168,6 @@ def test_repository_factory_machine_support():
 
         # Test that machine repository implementation exists
         try:
-            pass
-
             print("   PASS: MachineRepositoryImpl implementation exists")
         except ImportError:
             print("   WARN:  MachineRepositoryImpl implementation not found")
@@ -251,16 +249,12 @@ def test_service_dependencies():
 
         # Test that AWS client exists
         try:
-            pass
-
             print("   PASS: AWSClient import successful")
         except ImportError:
             print("   WARN:  AWSClient import failed (may be expected)")
 
         # Test that AWS operations utility exists
         try:
-            pass
-
             print("   PASS: AWSOperations import successful")
         except ImportError:
             print("   WARN:  AWSOperations import failed (may be expected)")
