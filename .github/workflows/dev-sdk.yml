@@ -48,10 +48,86 @@ permissions:
   contents: read
 
 jobs:
+  # Cross-workflow quality gate.  Unit Tests (the workflow_run sentinel) does
+  # NOT include ruff / pyright / architecture validation — those run in the
+  # separate "Quality Checks" workflow.  Because a job cannot `needs:` a job in
+  # another workflow file, we enforce the dependency here at runtime: block
+  # publishing unless the Quality Checks run for THIS commit concluded
+  # 'success'.  Mirrors dev-pypi.yml's quality-gate job so the TestPyPI wheel
+  # and the dev SDKs publish off the same gate.
+  quality-gate:
+    name: Quality Checks Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip when the sentinel Unit Tests run did not succeed, and never run off a
+    # schedule/cron-originated upstream run — nightly Unit Tests must not drive
+    # dev publishing. Manual workflow_dispatch has no upstream run, so the API
+    # step below is skipped and this job passes as a deliberate no-op.
+    if: |
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    permissions:
+      actions: read   # read the Quality Checks workflow run conclusion
+      contents: read
+    steps:
+    - name: Require Quality Checks success on this commit
+      if: github.event_name == 'workflow_run'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      run: |
+        set -euo pipefail
+
+        # Look up the "Quality Checks" run (ci-quality.yml) for the exact commit
+        # that the sentinel Unit Tests run tested.  Quality Checks runs in
+        # parallel with Unit Tests and usually finishes first, but it may lag,
+        # so poll for a bounded window before deciding.
+        attempts=30
+        sleep_s=20
+        latest=""
+        for i in $(seq 1 "$attempts"); do
+          latest=$(gh api \
+            "/repos/${REPO}/actions/workflows/ci-quality.yml/runs?head_sha=${HEAD_SHA}&per_page=100" \
+            --jq '[.workflow_runs[]] | sort_by(.created_at) | last // empty | {status: .status, conclusion: .conclusion}')
+
+          if [ -z "$latest" ]; then
+            # No Quality Checks run exists for this commit.  Quality Checks has a
+            # path filter (src/**, tests/**, pyproject.toml, requirements*.txt,
+            # uv.lock, .ruff.toml) that is a superset of everything affecting
+            # ruff/pyright/arch outcomes.  No run means no quality-relevant file
+            # changed on this commit, so the quality status is unchanged and it
+            # is safe to proceed.
+            echo "No Quality Checks run for ${HEAD_SHA}; no quality-relevant paths changed. Allowing publish."
+            exit 0
+          fi
+
+          status=$(echo "$latest" | jq -r '.status')
+          if [ "$status" = "completed" ]; then
+            break
+          fi
+          echo "Quality Checks still running for ${HEAD_SHA} (attempt ${i}/${attempts}); waiting ${sleep_s}s..."
+          sleep "$sleep_s"
+        done
+
+        status=$(echo "$latest" | jq -r '.status')
+        conclusion=$(echo "$latest" | jq -r '.conclusion')
+
+        if [ "$status" != "completed" ]; then
+          echo "::error::Quality Checks did not complete for ${HEAD_SHA} within the wait window. Blocking publish."
+          exit 1
+        fi
+        if [ "$conclusion" != "success" ]; then
+          echo "::error::Quality Checks concluded '${conclusion}' (not success) for ${HEAD_SHA}. Blocking publish."
+          exit 1
+        fi
+        echo "Quality Checks succeeded for ${HEAD_SHA}. Proceeding with publish."
+
   config:
     name: Get Configuration
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [quality-gate]
     # Guard the workflow_run path on a successful upstream run, exactly like
     # dev-pypi.yml.  workflow_dispatch (force) always runs.
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
