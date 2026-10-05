@@ -43,6 +43,10 @@ class AzurePlugin(ProviderPlugin):
 
         return AzureProviderStrategy
 
+    def display_name(self) -> Optional[str]:
+        """Return Azure's official product name."""
+        return "Microsoft Azure"
+
     def provider_settings_class(self) -> Optional[type]:
         """Return the Azure settings model used by configuration loading."""
         from orb.providers.azure.configuration.config import AzureProviderConfig

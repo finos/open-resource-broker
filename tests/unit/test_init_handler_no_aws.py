@@ -194,7 +194,7 @@ def test_scheduler_registry_get_display_metadata_known_type():
 
     registry = cast(SchedulerRegistry, SchedulerRegistry())
     meta = registry.get_display_metadata("default")
-    assert meta["display_name"] == "default"
+    assert meta["display_name"] == "Default"
     assert meta["description"] == "Standalone usage"
 
 
@@ -206,7 +206,7 @@ def test_scheduler_registry_get_display_metadata_hostfactory():
 
     registry = cast(SchedulerRegistry, SchedulerRegistry())
     meta = registry.get_display_metadata("hostfactory")
-    assert meta["display_name"] == "hostfactory"
+    assert meta["display_name"] == "IBM Spectrum Symphony (host factory)"
     assert "Symphony" in meta["description"]
 
 

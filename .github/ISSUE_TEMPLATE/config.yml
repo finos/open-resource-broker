@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/finos/open-resource-broker/discussions
+    about: Ask a question or discuss an idea with the community before filing an issue.
+  - name: Report a security vulnerability
+    url: https://github.com/finos/open-resource-broker/security/advisories/new
+    about: Report a security vulnerability privately through a GitHub security advisory.

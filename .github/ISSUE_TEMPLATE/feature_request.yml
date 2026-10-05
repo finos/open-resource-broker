@@ -1,7 +1,7 @@
 name: feature-request
 description: Suggest an idea for this project
 title: "[Feature]: "
-labels: ["enhancement"]
+labels: ["enhancement", "triage"]
 assignees:
   - hostfactory-maintainers
 
@@ -73,6 +73,36 @@ body:
         - Other (specify in context)
     validations:
       required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which provider, scheduler or interface does this feature affect? Select all that apply.
+      multiple: true
+      options:
+        - Amazon Web Services (AWS)
+        - Microsoft Azure
+        - Google Cloud
+        - Kubernetes
+        - Not provider-specific
+        - Default
+        - IBM Spectrum Symphony (host factory)
+        - Slurm Workload Manager
+        - HTC-Grid (via default scheduler)
+        - OpenGRIS Scaler (via default scheduler)
+        - Not scheduler-specific
+        - CLI
+        - REST API
+        - MCP server
+        - Python SDK
+        - Go SDK
+        - TypeScript SDK
+        - Java SDK
+        - Kotlin SDK
+        - C# SDK
+        - Web UI
+        - Other
 
   - type: textarea
     id: context

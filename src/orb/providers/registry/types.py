@@ -34,6 +34,7 @@ class ProviderRegistration(BaseRegistration):
         validator_factory: Optional[Callable] = None,
         strategy_class: Optional[type] = None,
         default_api: Optional[str] = None,
+        display_name: Optional[str] = None,
     ) -> None:
         """Initialize the instance."""
         super().__init__(
@@ -47,3 +48,4 @@ class ProviderRegistration(BaseRegistration):
         self.validator_factory = validator_factory
         self.strategy_class = strategy_class
         self.default_api = default_api
+        self.display_name = display_name

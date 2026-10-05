@@ -64,6 +64,9 @@ class AWSPlugin(ProviderPlugin):
 
         return _load_aws_default_api()
 
+    def display_name(self) -> Optional[str]:
+        return "Amazon Web Services (AWS)"
+
     def provider_settings_class(self) -> Optional[type]:
         try:
             from orb.providers.aws.configuration.config import AWSProviderConfig

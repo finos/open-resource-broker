@@ -226,6 +226,17 @@ class ProviderPlugin(ABC):
         """
         return None
 
+    def display_name(self) -> Optional[str]:
+        """Return the human-readable name for this provider, or ``None``.
+
+        Defaults to ``None``, in which case the registry falls back to
+        :attr:`provider_name`.  Override to supply the official product name
+        (for example ``"Amazon Web Services (AWS)"``) so that anything built
+        on top of the registry — CLI prompts, issue templates, docs checks —
+        can present and verify a real name instead of the bare type id.
+        """
+        return None
+
     def provider_settings_class(self) -> Optional[type]:
         """Return the ``BaseSettings`` subclass for this provider's config-file section.
 
@@ -342,6 +353,7 @@ class ProviderPlugin(ABC):
                     validator_factory=self.validator_factory(),
                     strategy_class=self.strategy_class(),
                     default_api=self.default_api(),
+                    display_name=self.display_name(),
                 )
 
             if logger:

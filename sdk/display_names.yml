@@ -1,0 +1,8 @@
+# Display names for the generated SDKs, keyed by their sdk/<id> directory name.
+# Read by the issue-template drift check (tests/unit/test_issue_template_options.py)
+# so a new SDK's name only needs to be declared once, here.
+go: Go SDK
+typescript: TypeScript SDK
+java: Java SDK
+kotlin: Kotlin SDK
+csharp: C# SDK

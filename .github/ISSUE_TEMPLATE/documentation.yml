@@ -1,0 +1,46 @@
+name: documentation
+description: Report incorrect, unclear or missing documentation
+title: "[Docs]: "
+labels: ["documentation", "triage"]
+assignees:
+  - hostfactory-maintainers
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to report a problem with the documentation or request a documentation improvement.
+
+  - type: input
+    id: page
+    attributes:
+      label: Page URL or path
+      description: Which page or file is affected?
+      placeholder: e.g., docs/root/providers/aws/index.md
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong or missing?
+      description: Describe the inaccuracy, ambiguity or gap you found.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested change
+      description: Describe how the documentation should read instead, if you have a suggestion.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
+        - label: I have searched the existing issues and confirmed this is not a duplicate
+          required: true
