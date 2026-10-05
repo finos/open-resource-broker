@@ -262,7 +262,7 @@ class DevToolsInstaller:
                 elif "fedora" in content:
                     return "fedora"
         except FileNotFoundError:
-            pass
+            pass  # /etc/os-release not present; fall back to the generic Linux path
 
         return "generic"
 
@@ -293,14 +293,17 @@ class DevToolsInstaller:
             return True
 
         # Download installer to a temp file, then execute it — avoids inline iex eval.
+        powershell_install_script = (
+            "Set-ExecutionPolicy Bypass -Scope Process -Force; "
+            + "[System.Net.ServicePointManager]::SecurityProtocol = "
+            + "[System.Net.ServicePointManager]::SecurityProtocol -bor 3072; "
+            + "Invoke-WebRequest -Uri 'https://community.chocolatey.org/install.ps1' "
+            + "-OutFile $env:TEMP\\choco_install.ps1"
+        )
         powershell_download_cmd = [
             "powershell",
             "-Command",
-            "Set-ExecutionPolicy Bypass -Scope Process -Force; "
-            "[System.Net.ServicePointManager]::SecurityProtocol = "
-            "[System.Net.ServicePointManager]::SecurityProtocol -bor 3072; "
-            "Invoke-WebRequest -Uri 'https://community.chocolatey.org/install.ps1' "
-            "-OutFile $env:TEMP\\choco_install.ps1",
+            powershell_install_script,
         ]
         powershell_exec_cmd = [
             "powershell",

@@ -291,7 +291,9 @@ class TestAddMiddlewareAfterInit:
         mw = MagicMock(spec=SDKMiddleware)
 
         # build_middleware_chain is imported into client module namespace
-        import orb.sdk.client as client_module
+        import importlib
+
+        client_module = importlib.import_module("orb.sdk.client")
 
         orig_build = client_module.build_middleware_chain
 
@@ -299,11 +301,11 @@ class TestAddMiddlewareAfterInit:
             called.append(name)
             return fn
 
-        client_module.build_middleware_chain = _spy_build
+        client_module.build_middleware_chain = _spy_build  # type: ignore[attr-defined]
         try:
             client.add_middleware(mw)
         finally:
-            client_module.build_middleware_chain = orig_build
+            client_module.build_middleware_chain = orig_build  # type: ignore[attr-defined]
 
         assert "test_method" in called
 

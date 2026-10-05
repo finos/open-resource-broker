@@ -58,7 +58,7 @@ class TestInitialization:
             raise AuthenticationError("credential rejected")
 
         resolver_kwargs: dict[str, Any] = {
-            "azure_client_resolver": lambda: MagicMock(),
+            "azure_client_resolver": MagicMock,
             resolver_name: fail_resolution,
         }
         runtime = AzureRuntimeDependencies(

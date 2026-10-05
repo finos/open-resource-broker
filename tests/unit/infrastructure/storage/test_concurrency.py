@@ -298,12 +298,14 @@ class TestGetOptimisticConcurrencyControl:
         assert a is b
 
     def test_singleton_reset_creates_new_instance(self) -> None:
-        import orb.infrastructure.storage.concurrency as concurrency_module
+        import importlib
+
+        concurrency_module = importlib.import_module("orb.infrastructure.storage.concurrency")
 
         original = concurrency_module._optimistic_concurrency_control
         try:
-            concurrency_module._optimistic_concurrency_control = None
+            concurrency_module._optimistic_concurrency_control = None  # type: ignore[attr-defined]
             fresh = get_optimistic_concurrency_control()
             assert isinstance(fresh, OptimisticConcurrencyControl)
         finally:
-            concurrency_module._optimistic_concurrency_control = original
+            concurrency_module._optimistic_concurrency_control = original  # type: ignore[attr-defined]

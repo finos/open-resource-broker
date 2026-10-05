@@ -18,7 +18,6 @@ import pathlib
 import shutil
 import tempfile
 import unittest
-from unittest import mock
 
 from orb.k8s_legacy import fsutils
 from orb.k8s_legacy.impl.watchers import handlers
@@ -26,11 +25,11 @@ from orb.k8s_legacy.impl.watchers import request
 from orb.k8s_legacy.tests import get_workdir
 
 
-@mock.patch(
+@unittest.mock.patch(
     "orb.k8s_legacy.impl.watchers.request.Observer",
-    return_value=mock.MagicMock(),
+    return_value=unittest.mock.MagicMock(),
 )
-@mock.patch("orb.k8s_legacy.impl.watchers.handlers._create_pod")
+@unittest.mock.patch("orb.k8s_legacy.impl.watchers.handlers._create_pod")
 class TestRequestMachinesWatcher(unittest.TestCase):
     """Validate Hostfactory request machines watcher"""
 
@@ -61,7 +60,7 @@ class TestRequestMachinesWatcher(unittest.TestCase):
 
         temp_dir.rename(self.req_dir)
 
-        mock_k8s_client = mock.MagicMock()
+        mock_k8s_client = unittest.mock.MagicMock()
         request._process_pending_events(
             request_dir=self.workdir / "requests",
             workdir=self.workdir,
@@ -70,17 +69,17 @@ class TestRequestMachinesWatcher(unittest.TestCase):
 
         assert mock_create_pod.call_count == 3
         calls = [
-            mock.call(mock_k8s_client, self.req_dir / f"machine{i}")
+            unittest.mock.call(mock_k8s_client, self.req_dir / f"machine{i}")
             for i in range(1, 4)
         ]
         mock_create_pod.assert_has_calls(calls, any_order=True)
 
 
-@mock.patch(
+@unittest.mock.patch(
     "orb.k8s_legacy.impl.watchers.request.Observer",
-    return_value=mock.MagicMock(),
+    return_value=unittest.mock.MagicMock(),
 )
-@mock.patch("orb.k8s_legacy.impl.watchers.handlers._delete_pod")
+@unittest.mock.patch("orb.k8s_legacy.impl.watchers.handlers._delete_pod")
 class TestRequestReturnMachinesWatcher(unittest.TestCase):
     """Validate Hostfactory request return machines watcher"""
 
@@ -116,7 +115,7 @@ class TestRequestReturnMachinesWatcher(unittest.TestCase):
             (self.pods_dir / file_name).write_text(json.dumps(mock_pod))
         temp_dir.rename(self.req_dir)
 
-        mock_k8s_client = mock.MagicMock()
+        mock_k8s_client = unittest.mock.MagicMock()
         request._process_pending_events(
             request_dir=self.workdir / "return-requests",
             workdir=self.workdir,
@@ -125,7 +124,7 @@ class TestRequestReturnMachinesWatcher(unittest.TestCase):
 
         assert mock_delete_pod.call_count == 3
         # k8s_client, workdir, pod_name
-        calls = [mock.call(mock_k8s_client, f"machine{i}") for i in range(1, 4)]
+        calls = [unittest.mock.call(mock_k8s_client, f"machine{i}") for i in range(1, 4)]
         mock_delete_pod.assert_has_calls(calls, any_order=True)
 
         assert pathlib.Path(self.req_dir / ".processed").exists()

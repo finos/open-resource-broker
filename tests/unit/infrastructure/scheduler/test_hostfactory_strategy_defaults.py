@@ -24,7 +24,7 @@ class TestMapTemplateFieldsCallsApplyTemplateDefaults:
         self.strategy = make_strategy()
         # Provide a minimal field mapper that returns the input unchanged
         mock_mapper = MagicMock()
-        mock_mapper.map_input_fields.side_effect = lambda t: dict(t)
+        mock_mapper.map_input_fields.side_effect = dict
         self.strategy._field_mapper = mock_mapper
 
     def _minimal_template(self):

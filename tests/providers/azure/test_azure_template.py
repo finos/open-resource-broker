@@ -632,13 +632,13 @@ class TestValueObjects:
             "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/diskEncryptionSets/",
             "/subscriptions/sub/providers/Microsoft.Compute/diskEncryptionSets/des-1",
             "/subscriptions/sub/resourceGroups/rg/providers/Contoso/widgets/widget-1/"
-            "providers/Microsoft.Compute/diskEncryptionSets/des-1",
+            + "providers/Microsoft.Compute/diskEncryptionSets/des-1",
             "/subscriptions/sub/resourceGroups/rg/providers/"
-            "Microsoft.Compute/diskEncryptionSets/des-1/children/child-1",
+            + "Microsoft.Compute/diskEncryptionSets/des-1/children/child-1",
             "/subscriptions//resourceGroups/rg/providers/"
-            "Microsoft.Compute/diskEncryptionSets/des-1",
+            + "Microsoft.Compute/diskEncryptionSets/des-1",
             "/subscriptions/sub/resourceGroups//providers/"
-            "Microsoft.Compute/diskEncryptionSets/des-1",
+            + "Microsoft.Compute/diskEncryptionSets/des-1",
         ],
     )
     def test_arm_resource_id_rejects_invalid_structure(self, value):
