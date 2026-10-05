@@ -103,11 +103,12 @@ jobs:
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
       with:
         # npm OIDC trusted publishing requires Node >= 22.14.0 (in addition to
-        # npm CLI >= 11.5.1); on Node 20 the publish never performs the OIDC
+        # npm CLI >= 11.5.1); below that the publish never performs the OIDC
         # exchange and falls back to token auth, failing with ENEEDAUTH on the
         # trusted path. Token/GitHub-Packages publishing works on any Node, but
-        # the shared setup must satisfy the strictest (trusted) path.
-        node-version: '22'
+        # the shared setup must satisfy the strictest (trusted) path. Node 24
+        # (Active LTS) comfortably clears that floor.
+        node-version: '24'
         # Point npm at the destination registry so setup-node writes the matching
         # auth line into .npmrc for NODE_AUTH_TOKEN.
         #   github            -> npm.pkg.github.com  (GITHUB_TOKEN auth)
@@ -152,7 +153,7 @@ jobs:
 
     - name: Upgrade npm CLI for OIDC trusted publishing (>= 11.5.1)
       # OIDC trusted publishing to registry.npmjs.org requires npm CLI >= 11.5.1;
-      # the Node 20 runner ships an older npm (10.x), so upgrade before publish.
+      # the setup-node-bundled npm may still be older, so upgrade before publish.
       # Only needed on the npmjs + trusted path (github uses GITHUB_TOKEN, and
       # the npmjs + token path uses the NODE_AUTH_TOKEN auth line, neither of
       # which needs the newer OIDC-capable npm).
@@ -177,19 +178,29 @@ jobs:
       # _authToken can break OIDC trusted publishing.
       env:
         NODE_AUTH_TOKEN: ${{ matrix.destination == 'github' && secrets.GITHUB_TOKEN || (inputs.auth-mode == 'token' && secrets.NODE_AUTH_TOKEN || '') }}
+        SDK_VERSION: ${{ inputs.version }}
       run: |
         cd sdk/typescript
         # Record the toolchain versions: trusted publishing needs Node >= 22.14
         # and npm >= 11.5.1, and an OIDC failure otherwise surfaces only as an
         # opaque ENEEDAUTH — so make the active versions explicit in the log.
         echo "node: $(node --version), npm: $(npm --version)"
+        # npm (since the CLI bundled with Node >= 24) refuses to publish a
+        # prerelease version — dry-run included — without an explicit --tag,
+        # since an unqualified publish would otherwise move the "latest" dist-tag
+        # to a prerelease. Dev builds (X.Y.Z-dev.N) therefore publish under the
+        # "dev" tag; real releases keep the default "latest" tag.
+        NPM_TAG="latest"
+        if [[ "$SDK_VERSION" == *".dev"* ]]; then
+          NPM_TAG="dev"
+        fi
         if [[ "${{ inputs.dry-run }}" == "true" ]]; then
-          npm publish --access public --dry-run
+          npm publish --access public --tag "$NPM_TAG" --dry-run
           echo "npm -> ${{ matrix.destination }}: dry-run OK (nothing published)"
           exit 0
         fi
         if [[ "${{ matrix.destination }}" == "github" ]]; then
-          npm publish --access public
+          npm publish --access public --tag "$NPM_TAG"
           echo "npm -> github: published"
         elif [[ "${{ inputs.auth-mode }}" == "token" ]]; then
           if [[ -z "$NODE_AUTH_TOKEN" ]]; then
@@ -197,12 +208,12 @@ jobs:
             echo "npm -> npmjs: failed: NODE_AUTH_TOKEN not set"
             exit 1
           fi
-          npm publish --access public --provenance
+          npm publish --access public --tag "$NPM_TAG" --provenance
           echo "npm -> npmjs: published (token)"
         else
           # Trusted publishing (OIDC). No token in env; npm CLI >= 11.5.1
           # (upgraded above) performs the OIDC exchange with registry.npmjs.org.
-          npm publish --access public --provenance
+          npm publish --access public --tag "$NPM_TAG" --provenance
           echo "npm -> npmjs: published (OIDC trusted publishing)"
         fi
 
@@ -246,10 +257,10 @@ jobs:
 
     # openapi-generator-cli resolves its jar via the npm package cache; Node is
     # required even though the SDK itself builds with Gradle.
-    - name: Set up Node.js 20 (openapi-generator-cli)
+    - name: Set up Node.js 24 (openapi-generator-cli)
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
       with:
-        node-version: '20'
+        node-version: '24'
 
     - name: Install openapi-generator-cli
       run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
@@ -352,10 +363,10 @@ jobs:
 
     # openapi-generator-cli resolves its jar via the npm package cache; Node is
     # required even though the SDK itself builds with Gradle.
-    - name: Set up Node.js 20 (openapi-generator-cli)
+    - name: Set up Node.js 24 (openapi-generator-cli)
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
       with:
-        node-version: '20'
+        node-version: '24'
 
     - name: Install openapi-generator-cli
       run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0

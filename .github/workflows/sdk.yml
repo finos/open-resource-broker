@@ -155,7 +155,10 @@ jobs:
   # before building so the published artifacts always ship the models.
   # ---------------------------------------------------------------------------
   build-and-test:
-    name: ${{ matrix.display-name }} SDK Build & Test
+    # Only the TypeScript leg varies by Node version (see the matrix below), so
+    # fold it into the job name there and leave the other four langs alone.
+    name: >-
+      ${{ matrix.display-name }} SDK Build & Test${{ matrix.lang == 'typescript' && format(' (Node {0})', matrix.node-version) || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [config, build-orb-wheel]
@@ -166,6 +169,29 @@ jobs:
       fail-fast: false
       matrix:
         lang: [ go, typescript, java, kotlin, dotnet ]
+        # node-version only matters for the typescript leg (its Node setup step
+        # below reads matrix.node-version) and for the shared Node install the
+        # other four langs use to resolve the openapi-generator-cli jar. The
+        # excludes prune every non-typescript lang down to a single Node 24
+        # (Active LTS) row, while typescript runs its full support matrix.
+        node-version: [ 22, 24, 26 ]
+        exclude:
+          - lang: go
+            node-version: 22
+          - lang: go
+            node-version: 26
+          - lang: java
+            node-version: 22
+          - lang: java
+            node-version: 26
+          - lang: kotlin
+            node-version: 22
+          - lang: kotlin
+            node-version: 26
+          - lang: dotnet
+            node-version: 22
+          - lang: dotnet
+            node-version: 26
         include:
           - lang: go
             display-name: Go
@@ -237,11 +263,11 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js ${{ matrix.node-version }}
         if: matrix.lang == 'typescript'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
           cache-dependency-path: sdk/typescript/package-lock.json
 
@@ -258,7 +284,7 @@ jobs:
         if: matrix.lang != 'typescript'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node-version }}
 
       - name: Install openapi-generator-cli
         run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0

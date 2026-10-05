@@ -9,7 +9,7 @@ module.exports = {
       "ts-jest",
       {
         tsconfig: {
-          target: "ES2020",
+          target: "ES2023",
           module: "commonjs",
           moduleResolution: "node",
           strict: true,
