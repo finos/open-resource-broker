@@ -1,12 +1,12 @@
 """Scheduler Registry - Registry pattern for scheduler strategy factories."""
 
-import logging
 from typing import Any, Callable, ClassVar
 
 from orb.domain.base.exceptions import ConfigurationError
+from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.registry.base_registry import BaseRegistration, BaseRegistry, RegistryMode
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class UnsupportedSchedulerError(Exception):
