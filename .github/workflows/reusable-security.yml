@@ -31,6 +31,7 @@ permissions:
 jobs:
   security-scan:
     name: ${{ inputs.scan-type }} Security Scan
+    if: inputs.scan-type != 'codeql'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -41,11 +42,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          fetch-depth: ${{ inputs.scan-type == 'codeql' && 0 || 1 }}
 
       - name: Setup Python and UV
-        if: contains('bandit,pip-audit,codeql', inputs.scan-type)
+        if: contains('bandit,pip-audit', inputs.scan-type)
         uses: ./.github/actions/setup-uv-cached
         with:
           # Use the caller-supplied cache key when set; otherwise derive the
@@ -145,44 +144,57 @@ jobs:
         with:
           sarif_file: hadolint-results.sarif
 
-      # CodeQL Analysis
-      #
-      # continue-on-error: true on the init step is INTENTIONAL: the primary init
-      # requests the broader security-extended query pack which may not be available
-      # in all runner environments.  If it fails, the fallback init step re-runs with
-      # the narrower security-and-quality pack.  The analyze step runs unconditionally
-      # (conditioned only on scan-type == 'codeql') so that results are always
-      # uploaded regardless of which init path succeeded.  This ensures CodeQL
-      # findings always reach the GitHub Security tab even when the extended pack is
-      # unavailable.
-      #
-      # KNOWN COVERAGE GAPS (flagged for a future task):
-      # - CodeQL only runs on a schedule or when a commit message contains "[security]".
-      #   Regular PR pushes do NOT trigger CodeQL, so new code can land without a scan.
-      #   TODO: evaluate adding CodeQL to the standard PR gate (cost vs. latency trade-off).
-      # - TruffleHog (secret scanning) skips scheduled runs; it only runs on push/PR.
-      #   TODO: verify scheduled secret-scanning coverage or add a separate nightly job.
-      # - dependency-review only runs on pull_request events (PR-only by design in the
-      #   GitHub action), so direct pushes to main bypass it.
-      #   TODO: ensure branch protection prevents direct pushes to main.
-      - name: Initialize CodeQL
-        if: inputs.scan-type == 'codeql'
-        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2  # v4.38.2
-        with:
-          languages: python
-          queries: security-extended,security-and-quality
-        continue-on-error: true
-        id: codeql-init-extended
+  # CodeQL runs once per language so each analysis uploads under a stable
+  # `/language:<lang>` category and keeps matching existing alerts.
+  #
+  # Known coverage gaps:
+  # - TruffleHog (secret scanning) skips scheduled runs; it only runs on push/PR.
+  # - dependency-review only runs on pull_request events, so direct pushes to
+  #   main bypass it; branch protection is expected to prevent those.
+  codeql:
+    name: ${{ inputs.scan-type }} Security Scan (${{ matrix.language }})
+    if: inputs.scan-type == 'codeql'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, actions]
 
-      - name: Initialize CodeQL (fallback)
-        if: inputs.scan-type == 'codeql' && steps.codeql-init-extended.outcome == 'failure'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python and UV
+        if: matrix.language == 'python'
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache-key: >-
+            ${{
+              inputs.cache-key != ''
+              && inputs.cache-key
+              || format('deps-py3.12-security-{0}',
+                   hashFiles('.project.yml', 'pyproject.toml', 'uv.lock'))
+            }}
+          group: security
+          fail-on-cache-miss: false
+
+      # A configuration or query-suite error fails the job rather than falling
+      # back to a narrower scan.
+      - name: Initialize CodeQL
         uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2  # v4.38.2
         with:
-          languages: python
-          queries: security-and-quality
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Perform CodeQL Analysis
-        if: inputs.scan-type == 'codeql'
         uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2  # v4.38.2
         with:
-          category: "/language:python"
+          category: "/language:${{ matrix.language }}"

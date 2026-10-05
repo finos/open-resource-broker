@@ -7,7 +7,6 @@ queries:
   - uses: security-extended
 
 paths-ignore:
-  - "tests/**"
   - "docs/**"
   - "examples/**"
   - "scripts/**"
@@ -24,15 +23,20 @@ paths-ignore:
   - "src/orb/infrastructure/storage/sql/migrations/versions/**"
   - "src/orb/k8s_legacy/alembic/versions/**"
 
-paths:
-  - "src/**"
+# No top-level `paths:` restriction: paths-ignore above is sufficient.
 
 packs:
   - codeql/python-queries:AlertSuppression.ql
   - codeql/python-queries:Security/CWE-022/PathInjection.ql
-  - codeql/python-queries:Security/CWE-079/XSS.ql
+  # ReflectedXss.ql, not XSS.ql: CWE-079 ships Jinja2WithoutEscaping.ql and
+  # ReflectedXss.ql; there is no XSS.ql in codeql/python-queries.
+  - codeql/python-queries:Security/CWE-079/ReflectedXss.ql
   - codeql/python-queries:Security/CWE-089/SqlInjection.ql
   - codeql/python-queries:Security/CWE-094/CodeInjection.ql
-  - codeql/python-queries:Security/CWE-295/MissingHostnameVerification.ql
+  # RequestWithoutValidation.ql, not MissingHostnameVerification.ql: CWE-295
+  # ships MissingHostKeyValidation.ql (SSH) and RequestWithoutValidation.ql
+  # (disabled TLS certificate validation); there is no
+  # MissingHostnameVerification.ql in codeql/python-queries.
+  - codeql/python-queries:Security/CWE-295/RequestWithoutValidation.ql
   - codeql/python-queries:Security/CWE-327/BrokenCryptoAlgorithm.ql
   - codeql/python-queries:Security/CWE-502/UnsafeDeserialization.ql

@@ -19,8 +19,8 @@ on:
       - 'dev-tools/ci/check_runtime_licenses.py'
       - 'dev-tools/ci/ci_security_dispatcher.py'
       - '.trivyignore.yaml'
-      - '.github/workflows/security-code.yml'
-      - '.github/workflows/reusable-security.yml'
+      - '.github/workflows/**'
+      - '.github/codeql/**'
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -39,16 +39,17 @@ on:
       - 'dev-tools/ci/check_runtime_licenses.py'
       - 'dev-tools/ci/ci_security_dispatcher.py'
       - '.trivyignore.yaml'
-      - '.github/workflows/security-code.yml'
-      - '.github/workflows/reusable-security.yml'
+      - '.github/workflows/**'
+      - '.github/codeql/**'
   schedule:
     - cron: '0 3 * * 0'
 
 # Per-ref concurrency: a rapid series of pushes to the same branch only runs
-# one security scan at a time; the newer push cancels the older.
+# one security scan at a time; the newer push cancels the older. Pushes to
+# main are never cancelled so every commit on main keeps its scan results.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Belt-and-suspenders: prevent any accidental implicit uv sync from firing
 # the SPA build hook (setup.py build_ui.sh) in this workflow.
@@ -267,7 +268,9 @@ jobs:
   codeql-analysis:
     name: CodeQL Analysis
     needs: [config]
-    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || contains(github.event.head_commit.message, '[security]')
+    # Also scan direct pushes to main so a fix merged outside a PR closes its
+    # own alerts on the next scan, instead of waiting for the weekly schedule.
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || contains(github.event.head_commit.message, '[security]')
     permissions:
       contents: read
       actions: read
