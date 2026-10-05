@@ -602,7 +602,7 @@ def _process_events(eventfiles, backends) -> None:
             for backend in backends:
                 try:
                     backend.post(all_events)
-                except BaseException as e:  # noqa: BLE001
+                except Exception as e:  # noqa: BLE001 - deliberately broad so one failing backend still lets the rest post; the error is deferred and re-raised below
                     backend_exception = e
             if backend_exception:
                 raise backend_exception
