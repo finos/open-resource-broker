@@ -294,3 +294,58 @@ def test_gcp_template_accepts_provider_config_extension_payload() -> None:
     assert template.project_id.value == "orb-example-12345"
     assert [zone.value for zone in template.zones] == ["us-central1-a", "us-central1-b"]
     assert template.instance_template_name_prefix == "orb"
+
+
+def _single_vm_template_config(template_id: str) -> dict:
+    return {
+        "template_id": template_id,
+        "provider_type": "gcp",
+        "provider_api": "SingleVM",
+        "project_id": "orb-example-12345",
+        "region": "us-central1",
+        "zones": ["us-central1-a"],
+        "instance_type": "e2-standard-4",
+        "max_instances": 1,
+        "source_image_family": "debian-12",
+        "source_image_project": "debian-cloud",
+    }
+
+
+def test_validate_gcp_template_accepts_rfc1035_template_id() -> None:
+    result = validate_gcp_template(_single_vm_template_config("web-tier-1"))
+
+    assert result["valid"] is True
+    assert result["errors"] == []
+
+
+def test_validate_gcp_template_rejects_underscore_template_id() -> None:
+    # The example from the original bug report: an underscore is not legal
+    # in a GCP resource name, so every create/retry using this template_id
+    # would otherwise fail at the GCP API with a generic error.
+    result = validate_gcp_template(_single_vm_template_config("WebTier_1"))
+
+    assert result["valid"] is False
+    assert any("RFC1035" in error for error in result["errors"])
+
+
+def test_validate_gcp_template_rejects_template_id_starting_with_digit() -> None:
+    result = validate_gcp_template(_single_vm_template_config("1-web-tier"))
+
+    assert result["valid"] is False
+    assert any("RFC1035" in error for error in result["errors"])
+
+
+def test_validate_gcp_template_rejects_overlong_template_id() -> None:
+    # 47 chars exceeds the 46-char budget left after mig_handler's
+    # "orb-mig-" prefix and "-{8 hex chars}" suffix.
+    result = validate_gcp_template(_single_vm_template_config("a" * 47))
+
+    assert result["valid"] is False
+    assert any("at most 46 characters" in error for error in result["errors"])
+
+
+def test_validate_gcp_template_accepts_template_id_at_max_length() -> None:
+    result = validate_gcp_template(_single_vm_template_config("a" * 46))
+
+    assert result["valid"] is True
+    assert result["errors"] == []

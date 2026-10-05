@@ -1,6 +1,17 @@
 """GCP errors retain the domain exception's error-code contract."""
 
-from orb.providers.gcp.exceptions import GCPValidationError
+from google.api_core import exceptions as google_exceptions
+
+from orb.providers.gcp.exceptions import GCPValidationError, translate_gcp_exception
+
+
+def test_translate_gcp_exception_maps_invalid_argument_to_validation_error() -> None:
+    exc = google_exceptions.InvalidArgument("Invalid value for field 'resource.name'")
+
+    translated = translate_gcp_exception(exc, operation="create_instance")
+
+    assert isinstance(translated, GCPValidationError)
+    assert translated.details["operation"] == "create_instance"
 
 
 def test_gcp_error_uses_default_domain_error_code() -> None:

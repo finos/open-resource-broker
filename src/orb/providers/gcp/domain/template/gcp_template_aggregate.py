@@ -21,7 +21,18 @@ from orb.providers.gcp.domain.template.value_objects import (
     GCPProviderApi,
     GCPRegion,
     GCPZone,
+    validate_rfc1035_label,
 )
+
+# The handlers build generated resource names by wrapping template_id with a
+# fixed prefix/suffix, e.g. mig_handler's default mig_name:
+# f"orb-mig-{template_id}-{uuid.uuid4().hex[:8]}" reserves 17 characters
+# ("orb-mig-" + "-" + 8 hex chars), which is the tightest budget among all
+# generated names (single_vm's "gcp-{id}-{8hex}" reserves 13; the instance
+# template name reserves 13 with the default prefix). GCP resource names
+# must stay within 63 characters in total, so template_id itself is capped
+# at 63 - 17 = 46 to guarantee every generated name is still valid.
+_MAX_TEMPLATE_ID_LENGTH = 46
 
 
 def _has_template_value(value: object) -> bool:
@@ -147,6 +158,11 @@ class GCPTemplate(Template):
     @model_validator(mode="after")
     def validate_gcp_template(self) -> GCPTemplate:
         """Validate GCP-specific template semantics."""
+        validate_rfc1035_label(
+            self.template_id,
+            field_name="template_id",
+            max_length=_MAX_TEMPLATE_ID_LENGTH,
+        )
         if self.key_name:
             raise ValueError("GCP does not support named SSH key pairs; key_name is unsupported")
         if self.provider_api == GCPProviderApi.MIG:

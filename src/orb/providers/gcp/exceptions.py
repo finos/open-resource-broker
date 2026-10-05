@@ -101,6 +101,8 @@ def _translate_google_api_exception(
 
     if isinstance(exc, google_exceptions.NotFound):
         return GCPEntityNotFoundError(message, details=details)
+    if isinstance(exc, google_exceptions.InvalidArgument):
+        return GCPValidationError(message, details=details)
     if isinstance(
         exc,
         (
