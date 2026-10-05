@@ -59,10 +59,29 @@ ci-docs-deploy:  ## Deploy documentation to GitHub Pages (matches docs.yml main 
 # Dummy targets removed (consolidated in quality.mk)
 
 # @SECTION Build & Deploy
+# Skip the SPA build inside dev-install's `uv sync` -- orb's own editable
+# reinstall would otherwise trigger it via setup.py's build_py hook, nested
+# inside uv's own venv lock. build.sh's explicit, timed SPA-build step below
+# builds it instead. Also sync only the `build` dependency-group instead of
+# the full dev/test surface -- a wheel build needs the build toolchain (plus
+# the project's own runtime deps, which `uv sync` always installs regardless
+# of group) and nothing else; the SPA's own [ui] extra is installed
+# separately by build_ui.sh. Both are scoped to this target only (target-
+# specific variables, forwarded by dev-install to its own `uv sync` command
+# line): plain `make dev-install`/`make install` are unaffected.
+build: UV_SYNC_ENV := ORB_SKIP_UI_BUILD=1
+build: UV_SYNC_GROUPS := --no-default-groups --group build
+build: UV_SYNC_LABEL := build
 build: clean dev-install  ## Build package
 	VERSION=$${VERSION:-$$(make -s get-version)} $(MAKE) generate-pyproject && \
 	VERSION=$${VERSION:-$$(make -s get-version)} BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh
 
+# Same rationale as `build` above: keep the SPA build out of dev-install's
+# `uv sync`, and sync only the `build` dependency-group, letting build.sh's
+# explicit step build the SPA afterward.
+build-with-version: UV_SYNC_ENV := ORB_SKIP_UI_BUILD=1
+build-with-version: UV_SYNC_GROUPS := --no-default-groups --group build
+build-with-version: UV_SYNC_LABEL := build
 build-with-version: clean dev-install  ## Build package with explicit version (skips generate-pyproject)
 	@if [ -z "$$VERSION" ]; then \
 		echo "ERROR: VERSION environment variable must be set"; \
