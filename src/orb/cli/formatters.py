@@ -94,9 +94,9 @@ def format_generic_table(items: list[dict], title: str = "Items") -> str:
         return capture.get()
 
     except ImportError:
-        # Fallback to ASCII table when Rich not available
-        if not items:
-            return f"No {title.lower()} found."
+        # Fallback to ASCII table when Rich not available.
+        # `items` is already known non-empty from the guard at the top of
+        # this function, so no need to re-check it here.
 
         # Get all unique keys from all items
         all_keys = set()

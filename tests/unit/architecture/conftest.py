@@ -5,6 +5,13 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+__all__ = [
+    "EXCEPTION_PATHS",
+    "SRC_ORB",
+    "collect_python_files",
+    "extract_imports",
+]
+
 # Root of the orb source tree — resolved relative to this file's location
 _TESTS_ARCH_DIR = Path(__file__).parent
 _REPO_ROOT = _TESTS_ARCH_DIR.parent.parent.parent

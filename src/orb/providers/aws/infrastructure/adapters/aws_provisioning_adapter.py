@@ -26,9 +26,8 @@ from orb.providers.aws.exceptions.aws_exceptions import (
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
 
-# Removed TYPE_CHECKING import to avoid circular dependency issues during DI resolution
-# if TYPE_CHECKING:
-#     from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+# Note: AWSProviderStrategy is intentionally not imported here (not even under
+# TYPE_CHECKING) to avoid circular dependency issues during DI resolution.
 
 
 @injectable
@@ -271,7 +270,6 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             AWSEntityNotFoundError: If the resource is not found
             InfrastructureError: For other infrastructure errors
         """
-        context = context or {}
         resource_mapping = resource_mapping or {}
 
         self._logger.info(

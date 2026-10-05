@@ -17,7 +17,9 @@ class DefaultFieldMapper(SchedulerFieldMapper):
         """Identity mapping - no conversion needed."""
         return external_template
 
-    def map_output_fields(self, internal_template: Dict[str, Any]) -> Dict[str, Any]:
+    def map_output_fields(
+        self, internal_template: Dict[str, Any], copy_unmapped: bool = True
+    ) -> Dict[str, Any]:
         """Identity mapping - no conversion needed."""
         return internal_template
 

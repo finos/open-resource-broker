@@ -35,8 +35,8 @@ class SchedulerStrategyFactory:
                 try:
                     register_default_scheduler()
                 except Exception as e:
+                    # Ignore registration errors - scheduler may already be registered
                     logger.debug("Failed to register default scheduler: %s", e)
-                    pass  # Ignore registration errors - scheduler may already be registered
         return self._scheduler_registry
 
     def create_strategy(self, scheduler_type: str, config: Any) -> Any:

@@ -22,6 +22,7 @@ paths-ignore:
   # SQLAlchemy API (no request handling, no user input, no injection surface),
   # so excluding them from code-quality scanning loses no security coverage.
   - "src/orb/infrastructure/storage/sql/migrations/versions/**"
+  - "src/orb/k8s_legacy/alembic/versions/**"
 
 paths:
   - "src/**"

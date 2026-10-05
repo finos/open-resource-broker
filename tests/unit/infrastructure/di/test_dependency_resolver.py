@@ -139,8 +139,14 @@ class TestDependencyResolver:
                 self.b = b
 
         class ClassB:
-            def __init__(self, a: ClassA):
-                self.a = a
+            """Exists only so the forward reference above has a name to find.
+
+            Resolution still fails below: typing's forward-ref lookup uses the
+            function's module globals, not this local scope, so ClassB being
+            locally defined doesn't change the outcome.
+            """
+
+        assert ClassB.__name__ == "ClassB"
 
         # String annotation 'ClassB' can't be resolved in local scope,
         # so we get a DependencyResolutionError (which wraps the lookup failure)
@@ -412,12 +418,13 @@ class TestDependencyResolverEdgeCases:
                 self.b = b
 
         class ClassB:
-            def __init__(self, c: "ClassC"):
-                self.c = c
+            """Exists only so the forward reference above has a name to find.
 
-        class ClassC:
-            def __init__(self, a: ClassA):  # Creates circular dependency
-                self.a = a
+            Resolution still fails below: typing's forward-ref lookup uses the
+            function's module globals, not this local scope.
+            """
+
+        assert ClassB.__name__ == "ClassB"
 
         with pytest.raises((CircularDependencyError, DependencyResolutionError)):
             self.resolver.resolve(ClassA)

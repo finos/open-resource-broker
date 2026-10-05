@@ -22,7 +22,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-_project = yaml.safe_load(open(Path(__file__).parent.parent.parent / ".project.yml"))
+with open(Path(__file__).parent.parent.parent / ".project.yml") as _project_file:
+    _project = yaml.safe_load(_project_file)
 PACKAGE_ROOT = _project.get("build", {}).get("package_root", "src/orb")
 
 

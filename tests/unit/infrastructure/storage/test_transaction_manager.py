@@ -150,9 +150,13 @@ class TestMemoryTransactionManagerContextManager:
 
     def test_context_manager_rolls_back_on_exception(self) -> None:
         mgr = MemoryTransactionManager()
-        with pytest.raises(ValueError):
+
+        def _raise_inside_transaction():
             with mgr.transaction():
                 raise ValueError("fail")
+
+        with pytest.raises(ValueError):
+            _raise_inside_transaction()
         assert mgr.state == TransactionState.ROLLED_BACK
 
     def test_execute_in_transaction(self) -> None:
@@ -200,9 +204,13 @@ class TestNoOpTransactionManager:
 
     def test_context_manager_rollback_on_exception(self) -> None:
         mgr = NoOpTransactionManager()
-        with pytest.raises(RuntimeError):
+
+        def _raise_inside_transaction():
             with mgr.transaction():
                 raise RuntimeError("oops")
+
+        with pytest.raises(RuntimeError):
+            _raise_inside_transaction()
         assert mgr.state == TransactionState.ROLLED_BACK
 
     def test_execute_in_transaction_returns_value(self) -> None:

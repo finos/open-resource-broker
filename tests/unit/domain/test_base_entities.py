@@ -292,43 +292,9 @@ class TestValueObjects:
             with pytest.raises((ValueError, ValidationError)):
                 IPAddress(value=invalid_ip)
 
-    # TODO: AvailabilityZone tests - class not yet implemented
-    # noqa:COMMENTED section-start
-    # def test_availability_zone_creation(self):
-    #     """Test AvailabilityZone value object creation."""
-    #     az = AvailabilityZone("us-east-1a")
-    #     assert str(az) == "us-east-1a"
-    #     assert az.value == "us-east-1a"
-
-    # TODO: AvailabilityZone tests - class not yet implemented
-    # def test_availability_zone_validation(self):
-    #     """Test AvailabilityZone validation."""
-    #     # Valid availability zones
-    #     valid_azs = [
-    #         "us-east-1a", "us-east-1b", "us-east-1c",
-    #         "us-west-2a", "us-west-2b", "us-west-2c",
-    #         "eu-west-1a", "eu-west-1b", "eu-west-1c",
-    #         "ap-southeast-1a", "ap-southeast-1b",
-    #     ]
-    #
-    #     for valid_az in valid_azs:
-    #         az = AvailabilityZone(valid_az)
-    #         assert az.value == valid_az
-
-    # def test_availability_zone_invalid(self):
-    #     """Test AvailabilityZone with invalid values."""
-    #     invalid_azs = [
-    #         "",
-    #         "invalid-az",
-    #         "us-east-1",  # Missing zone letter
-    #         "us-east-1aa",  # Invalid zone letter
-    #         "invalid-region-1a",
-    #     ]
-    #
-    #     for invalid_az in invalid_azs:
-    #         with pytest.raises((ValueError, ValidationError)):
-    #             AvailabilityZone(invalid_az)
-    # noqa:COMMENTED section-end
+    # AvailabilityZone value object does not exist yet; coverage for it will
+    # be added alongside its implementation rather than carried here as
+    # commented-out placeholders.
 
 
 @pytest.mark.unit

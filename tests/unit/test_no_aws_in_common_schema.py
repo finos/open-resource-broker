@@ -1,9 +1,11 @@
 """Tests asserting common_schema.py has no AWS-specific handler type leakage."""
 
+import importlib
 import inspect
 
-import orb.config.schemas.common_schema as common_schema_module
 from orb.config.schemas.common_schema import NamingConfig
+
+common_schema_module = importlib.import_module("orb.config.schemas.common_schema")
 
 
 def test_naming_config_has_no_handler_types_field() -> None:

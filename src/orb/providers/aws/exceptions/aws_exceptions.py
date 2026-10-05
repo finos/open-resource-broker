@@ -33,7 +33,6 @@ class AWSError(InfrastructureError):
             error_source: AWS service.operation that failed (e.g. aws.ec2.RunInstances)
         """
         super().__init__(message, error_code or self.__class__.__name__, details)
-        self.error_code = error_code or self.__class__.__name__
         self.aws_error_code = aws_error_code
         self.aws_error_message = aws_error_message
         self.aws_request_id = aws_request_id

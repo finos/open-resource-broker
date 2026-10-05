@@ -40,25 +40,6 @@ _TEMPLATES_LIST_SCHEMA = {
     "additionalProperties": True,
 }
 
-_REQUEST_MACHINES_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "requestId": {"type": "string"},
-        "request_id": {"type": "string"},
-        "message": {"type": "string"},
-    },
-    "additionalProperties": True,
-}
-
-_REQUEST_STATUS_SCHEMA = {
-    "type": "object",
-    "required": ["requests"],
-    "properties": {
-        "requests": {"type": "array"},
-    },
-    "additionalProperties": True,
-}
-
 _ERROR_SCHEMA = {
     "type": "object",
     "properties": {
@@ -90,6 +71,7 @@ def _validate(instance: dict, schema: dict, label: str = "") -> None:
 @pytest.fixture
 def rest_client(orb_config_dir_hf):
     """FastAPI TestClient with DI container booted against moto config."""
+    create_fastapi_app = None
     try:
         from orb.api.server import create_fastapi_app
     except ImportError as exc:
@@ -139,6 +121,7 @@ def test_rest_request_status_unknown_id_returns_json(rest_client):
     )
     body = response.json()
     assert isinstance(body, dict), f"Response must be a JSON object, got: {body!r}"
+    _validate(body, _ERROR_SCHEMA, "request_status_unknown_id")
 
 
 # ---------------------------------------------------------------------------

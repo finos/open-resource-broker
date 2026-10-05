@@ -18,7 +18,7 @@ class ProviderValidationPort(Protocol):
     - Provider-specific constraint validation
     """
 
-    def validate_provider_api(self, api: str) -> bool:
+    def validate_provider_api(self, api: str) -> bool:  # type: ignore[return]
         """
         Validate if a provider API is supported by this provider.
 
@@ -28,18 +28,18 @@ class ProviderValidationPort(Protocol):
         Returns:
             True if the API is supported, False otherwise
         """
-        ...
+        pass
 
-    def get_supported_provider_apis(self) -> list[str]:
+    def get_supported_provider_apis(self) -> list[str]:  # type: ignore[return]
         """
         Get list of all supported provider APIs.
 
         Returns:
             List of supported provider API identifiers
         """
-        ...
+        pass
 
-    def get_default_fleet_type_for_api(self, api: str) -> str:
+    def get_default_fleet_type_for_api(self, api: str) -> str:  # type: ignore[return]
         """
         Get the default fleet type for a specific provider API.
 
@@ -52,9 +52,9 @@ class ProviderValidationPort(Protocol):
         Raises:
             ValueError: If API is not supported
         """
-        ...
+        pass
 
-    def get_valid_fleet_types_for_api(self, api: str) -> list[str]:
+    def get_valid_fleet_types_for_api(self, api: str) -> list[str]:  # type: ignore[return]
         """
         Get valid fleet types for a specific provider API.
 
@@ -67,9 +67,9 @@ class ProviderValidationPort(Protocol):
         Raises:
             ValueError: If API is not supported
         """
-        ...
+        pass
 
-    def validate_fleet_type_for_api(self, fleet_type: str, api: str) -> bool:
+    def validate_fleet_type_for_api(self, fleet_type: str, api: str) -> bool:  # type: ignore[return]
         """
         Validate if a fleet type is compatible with a provider API.
 
@@ -80,18 +80,18 @@ class ProviderValidationPort(Protocol):
         Returns:
             True if the fleet type is compatible with the API
         """
-        ...
+        pass
 
-    def get_provider_type(self) -> str:
+    def get_provider_type(self) -> str:  # type: ignore[return]
         """
         Get the provider type this validation port supports.
 
         Returns:
             Provider type identifier (e.g., 'aws', 'provider1', 'provider2')
         """
-        ...
+        pass
 
-    def validate_template_configuration(self, template_config: dict[str, Any]) -> dict[str, Any]:
+    def validate_template_configuration(self, template_config: dict[str, Any]) -> dict[str, Any]:  # type: ignore[return]
         """
         Validate a complete template configuration for this provider.
 
@@ -101,7 +101,7 @@ class ProviderValidationPort(Protocol):
         Returns:
             Validation result with 'valid', 'errors', and 'warnings' keys
         """
-        ...
+        pass
 
 
 class BaseProviderValidationAdapter(ABC):

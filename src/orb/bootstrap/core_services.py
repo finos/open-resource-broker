@@ -159,8 +159,10 @@ def register_core_services(container: DIContainer) -> None:
         from orb.application.services.native_spec_service import NativeSpecService
         from orb.domain.base.ports.spec_rendering_port import SpecRenderingPort
 
-        return NativeSpecService(  # type: ignore[call-arg]
-            config_port=c.get(ConfigurationPort), spec_renderer=c.get(SpecRenderingPort)
+        return NativeSpecService(
+            config_port=c.get(ConfigurationPort),
+            spec_renderer=c.get(SpecRenderingPort),
+            logger=c.get(LoggingPort),
         )
 
     from orb.application.services.native_spec_service import NativeSpecService

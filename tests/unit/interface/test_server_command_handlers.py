@@ -114,7 +114,7 @@ class TestHandleServerStart:
         mock_build_runtime.return_value = (runtime, server_cfg, None)
 
         mock_daemon = MagicMock()
-        mock_daemon._expand.side_effect = lambda p: Path(p)
+        mock_daemon._expand.side_effect = Path
         mock_daemon._acquire_pid_lock.return_value = 99
 
         with (

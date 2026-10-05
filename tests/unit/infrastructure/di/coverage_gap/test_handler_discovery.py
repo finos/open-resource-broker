@@ -53,7 +53,7 @@ def _make_service_with_cache_disabled() -> HandlerDiscoveryService:
         ),
         patch(
             "orb.infrastructure.di.handler_discovery.HandlerDiscoveryService.__init__",
-            lambda self, c: _init_no_cache(self, c),
+            _init_no_cache,
         ),
     ):
         svc = HandlerDiscoveryService.__new__(HandlerDiscoveryService)

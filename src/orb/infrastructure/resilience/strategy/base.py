@@ -8,7 +8,7 @@ class RetryStrategy(Protocol):
     """Strategy interface for retry mechanisms."""
 
     @abstractmethod
-    def should_retry(self, attempt: int, exception: Exception) -> bool:
+    def should_retry(self, attempt: int, exception: Exception) -> bool:  # type: ignore[return]
         """
         Determine if operation should be retried.
 
@@ -19,10 +19,10 @@ class RetryStrategy(Protocol):
         Returns:
             True if operation should be retried, False otherwise
         """
-        ...
+        pass
 
     @abstractmethod
-    def get_delay(self, attempt: int) -> float:
+    def get_delay(self, attempt: int) -> float:  # type: ignore[return]
         """
         Calculate delay before next attempt.
 
@@ -32,7 +32,7 @@ class RetryStrategy(Protocol):
         Returns:
             Delay in seconds before next retry
         """
-        ...
+        pass
 
     def on_retry(self, attempt: int, exception: Exception) -> None:
         """

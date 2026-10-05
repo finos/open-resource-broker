@@ -261,7 +261,8 @@ def setup_logging(config: LoggingConfig) -> None:
     get_logger("botocore").setLevel(logging.WARNING)
     get_logger("urllib3").setLevel(logging.WARNING)
 
-    # Mark logging as initialized
+    # Mark logging as initialized; read by the guard check at the top of
+    # this function on the next call.
     _logging_initialized = True
 
     # Log initialization

@@ -602,7 +602,7 @@ def _process_events(eventfiles, backends) -> None:
             for backend in backends:
                 try:
                     backend.post(all_events)
-                except BaseException as e:  # noqa: BLE001
+                except Exception as e:  # noqa: BLE001 - deliberately broad so one failing backend still lets the rest post; the error is deferred and re-raised below
                     backend_exception = e
             if backend_exception:
                 raise backend_exception
@@ -642,6 +642,8 @@ def _watch_events(eventdir, backends) -> None:
                     event_queue.get(timeout=1.0)
                     _process_events(_pending_events(eventdir), backends)
                 except queue.Empty:
+                    # No filesystem event arrived within the poll timeout;
+                    # loop back around to keep watching.
                     pass
         finally:
             observer.stop()

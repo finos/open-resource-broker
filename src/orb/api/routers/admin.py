@@ -229,7 +229,15 @@ async def init_orb(
 
     caller_ip = request.client.host if request.client else "unknown"
     caller_id = getattr(request.state, "user_id", "anonymous") or "anonymous"
-    logger.warning("ORB_INIT called by user=%s ip=%s force=%s", caller_id, caller_ip, body.force)
+    # Strip CR/LF before logging so a crafted caller id/ip can't forge extra
+    # log entries, and render force as one of two fixed literals rather than
+    # the request-controlled bool itself.
+    logger.warning(
+        "ORB_INIT called by user=%s ip=%s force=%s",
+        str(caller_id).replace("\r", "").replace("\n", ""),
+        str(caller_ip).replace("\r", "").replace("\n", ""),
+        "True" if body.force else "False",
+    )
 
     created_files: list[str] = []
     created_dirs: list[str] = []

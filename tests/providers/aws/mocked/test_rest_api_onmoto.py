@@ -98,15 +98,15 @@ class TestHealthCheck:
         """GET /health returns 200 with status=healthy."""
         from unittest.mock import MagicMock
 
-        import orb.api.dependencies as deps
+        from orb.api.dependencies import get_health_check_port
 
         mock_health_port = MagicMock()
         mock_health_port.get_status.return_value = {"status": "healthy"}
-        fastapi_app.dependency_overrides[deps.get_health_check_port] = lambda: mock_health_port
+        fastapi_app.dependency_overrides[get_health_check_port] = lambda: mock_health_port
         try:
             resp = await rest_client.get("/health")
         finally:
-            fastapi_app.dependency_overrides.pop(deps.get_health_check_port, None)
+            fastapi_app.dependency_overrides.pop(get_health_check_port, None)
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "healthy"

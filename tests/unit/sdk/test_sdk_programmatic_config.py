@@ -219,18 +219,20 @@ class TestORBClientAppConfig:
                 # care that the argument was forwarded correctly.
                 raise RuntimeError("stop after capture")
 
-        import orb.sdk.client as client_module
+        import importlib
+
+        client_module = importlib.import_module("orb.sdk.client")
 
         original_cls = client_module.Application
-        client_module.Application = CapturingApplication
+        client_module.Application = CapturingApplication  # type: ignore[attr-defined]
 
         try:
             import asyncio
 
             asyncio.run(sdk.initialize())
         except Exception:
-            pass
+            pass  # Only the captured Application construction args are under test
         finally:
-            client_module.Application = original_cls
+            client_module.Application = original_cls  # type: ignore[attr-defined]
 
         assert captured.get("config_dict") is MINIMAL_CONFIG

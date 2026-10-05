@@ -45,7 +45,7 @@ def _reset_circuit_breaker_states() -> None:
 
         CircuitBreakerStrategy._circuit_states.clear()
     except ImportError:
-        pass
+        pass  # Module absent in this environment; skip reset
 
 
 def reset_provider_registry() -> None:

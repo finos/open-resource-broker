@@ -180,7 +180,7 @@ class TestCleanArchitecture:
                                 violations.append(f"{file_path}: {import_name}")
                                 break
         except (SyntaxError, UnicodeDecodeError):
-            pass
+            pass  # Unparseable source file; skip it rather than failing the architecture scan
 
         return violations
 

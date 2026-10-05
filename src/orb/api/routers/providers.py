@@ -174,9 +174,11 @@ def _get_schema_for_provider_type(provider_type: str) -> list[dict[str, Any]]:
         schema = reg.strategy_class.get_ui_column_schema()
         return [col.to_dict() for col in schema]
     except Exception as exc:
+        # Strip CR/LF before logging so a crafted provider_type can't forge
+        # extra log entries.
         logger.warning(
             "Failed to retrieve UI column schema for provider '%s': %s",
-            provider_type,
+            provider_type.replace("\r", "").replace("\n", ""),
             exc,
             exc_info=True,
         )
@@ -245,7 +247,14 @@ async def get_provider_schema(
     try:
         schema = _get_schema_for_provider_type(name)
     except Exception as exc:
-        logger.warning("Failed to build schema for provider '%s': %s", name, exc, exc_info=True)
+        # Strip CR/LF before logging so a crafted provider name can't forge
+        # extra log entries.
+        logger.warning(
+            "Failed to build schema for provider '%s': %s",
+            name.replace("\r", "").replace("\n", ""),
+            exc,
+            exc_info=True,
+        )
         schema = []
 
     return JSONResponse(

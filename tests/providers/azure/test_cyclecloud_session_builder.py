@@ -222,7 +222,7 @@ def test_cyclecloud_credential_data_repr_masks_secret_fields():
     assert "cc_admin" not in credential_repr
     assert "changeme" not in credential_repr
     assert "tok-123" not in credential_repr
-    assert "https://cc.example.com" in credential_repr
+    assert credential_repr.find("https://cc.example.com") >= 0
     assert "bearer" in credential_repr
 
 

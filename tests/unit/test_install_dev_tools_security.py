@@ -391,7 +391,9 @@ class TestDockerInstallNoLiteralPipe:
 
         # Find the curl command that downloads the GPG key
         curl_cmds = [
-            c for c in captured if c and c[0] in ("curl", "sudo") and "docker.com" in " ".join(c)
+            c
+            for c in captured
+            if c and c[0] in ("curl", "sudo") and " ".join(c).find("docker.com") >= 0
         ]
         assert curl_cmds, "Expected a curl command fetching the Docker GPG key"
         for cmd in curl_cmds:

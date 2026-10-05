@@ -740,7 +740,6 @@ class TestEC2FleetHandler:
             ImageId="ami-12345678", MinCount=2, MaxCount=2, InstanceType="t2.micro"
         )
         instance_ids = [i["InstanceId"] for i in response["Instances"]]
-        instance_ids = [i["InstanceId"] for i in response["Instances"]]
 
         # Mock AWS operations to raise an exception
         aws_ops.terminate_instances_with_fallback = Mock(

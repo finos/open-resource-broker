@@ -439,10 +439,17 @@ def set_file_permissions(file_path: str, permissions: int) -> None:
 
     Raises:
         FileNotFoundError: If file doesn't exist
+        ValueError: If permissions grant world-writable access
         OSError: If permissions cannot be set
     """
     if not file_exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
+
+    # Reject world-writable modes outright. This is a generic chmod wrapper,
+    # so the caller-supplied mode is validated here rather than trusted —
+    # a world-writable mode would let any user on the host modify the file.
+    if permissions & 0o002:
+        raise ValueError(f"Refusing to set world-writable permissions: {oct(permissions)}")
 
     try:
         os.chmod(file_path, permissions)

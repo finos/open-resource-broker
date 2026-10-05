@@ -17,7 +17,7 @@ class AzureStatusWithCodeProtocol(Protocol):
     @property
     def code(self) -> str | None:
         """Return the Azure status code."""
-        ...
+        pass
 
 
 class AzureVmWithNameProtocol(Protocol):
@@ -26,7 +26,7 @@ class AzureVmWithNameProtocol(Protocol):
     @property
     def name(self) -> str | None:
         """Return the Azure VM resource name."""
-        ...
+        pass
 
 
 class AzureVmWithIdentityProtocol(Protocol):
@@ -35,12 +35,12 @@ class AzureVmWithIdentityProtocol(Protocol):
     @property
     def name(self) -> Optional[str]:
         """Return the Azure VM resource name."""
-        ...
+        pass
 
     @property
     def vm_id(self) -> Optional[str]:
         """Return Azure's stable VM identifier."""
-        ...
+        pass
 
 
 class AzureVmHardwareProfileProtocol(Protocol):
@@ -49,7 +49,7 @@ class AzureVmHardwareProfileProtocol(Protocol):
     @property
     def vm_size(self) -> Optional[str]:
         """Return the Azure VM size."""
-        ...
+        pass
 
 
 class AzureVmRuntimeStatusProtocol(AzureVmWithIdentityProtocol, Protocol):
@@ -63,36 +63,36 @@ class AzureVmRuntimeStatusProtocol(AzureVmWithIdentityProtocol, Protocol):
     @property
     def hardware_profile(self) -> Optional[AzureVmHardwareProfileProtocol]:
         """Return the VM hardware profile when Azure included one."""
-        ...
+        pass
 
     @property
     def instance_view(self) -> object | None:
         """Return the VM instance view when Azure included one."""
-        ...
+        pass
 
     @property
     def location(self) -> Optional[str]:
         """Return the Azure location for the VM."""
-        ...
+        pass
 
     @property
     def zones(self) -> Optional[list[str]]:
         """Return the availability zones attached to the VM."""
-        ...
+        pass
 
     @property
     def tags(self) -> Optional[dict[str, str]]:
         """Return the user-supplied tag dict applied to the VM, if any."""
-        ...
+        pass
 
 
 class AzureInstanceViewWithStatusesProtocol(Protocol):
     """Azure instance-view-like object exposing ``statuses``."""
 
     @property
-    def statuses(self) -> list[Any]:
+    def statuses(self) -> list[Any]:  # type: ignore[return]
         """Return Azure instance-view status entries."""
-        ...
+        pass
 
 
 def instance_view_statuses(instance_view: object | None) -> list[Any] | None:

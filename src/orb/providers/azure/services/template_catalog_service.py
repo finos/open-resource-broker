@@ -11,13 +11,13 @@ from orb.providers.azure.domain.template.value_objects import AzureProviderApi
 class SchedulerTemplateStrategy(Protocol):
     """Structural subset used from the active scheduler strategy."""
 
-    def get_template_paths(self) -> list[str]:
+    def get_template_paths(self) -> list[str]:  # type: ignore[return]
         """Return configured template search paths."""
-        ...
+        pass
 
-    def load_templates_from_path(self, path: str) -> list[dict[str, Any]]:
+    def load_templates_from_path(self, path: str) -> list[dict[str, Any]]:  # type: ignore[return]
         """Load templates from one scheduler-managed path."""
-        ...
+        pass
 
 
 class AzureTemplateCatalogService:

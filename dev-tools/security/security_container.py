@@ -28,7 +28,7 @@ def _get_config_value(key: str) -> str:
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         logger.error(f"Error reading config key '{key}': {e}")
         logger.error("Make sure yq is installed and .project.yml exists")
-        sys.exit(1)
+        raise SystemExit(1) from e
 
 
 def run_command(cmd: list[str]) -> int:

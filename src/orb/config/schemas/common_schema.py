@@ -29,7 +29,7 @@ class ResourceConfig(BaseModel):
     """Resource configuration."""
 
     default_prefix: str = Field("", description="Default prefix for all resources")
-    prefixes: ResourcePrefixConfig = Field(default_factory=lambda: ResourcePrefixConfig())  # type: ignore[call-arg]
+    prefixes: ResourcePrefixConfig = Field(default_factory=ResourcePrefixConfig)  # type: ignore[call-arg]
 
     @model_validator(mode="after")
     def set_default_prefix(self) -> "ResourceConfig":
@@ -122,7 +122,7 @@ class NamingConfig(BaseModel):
         },
         description="Table names for SQL databases",
     )
-    statuses: StatusValuesConfig = Field(default_factory=lambda: StatusValuesConfig())
+    statuses: StatusValuesConfig = Field(default_factory=StatusValuesConfig)
     patterns: dict[str, str] = Field(
         default_factory=lambda: {
             # No shared "region" pattern: region format varies by provider, so
@@ -137,7 +137,7 @@ class NamingConfig(BaseModel):
             "own naming configuration, not declared here."
         ),
     )
-    prefixes: PrefixConfig = Field(default_factory=lambda: PrefixConfig())  # type: ignore[call-arg]
+    prefixes: PrefixConfig = Field(default_factory=PrefixConfig)  # type: ignore[call-arg]
 
 
 class RequestConfig(BaseModel):

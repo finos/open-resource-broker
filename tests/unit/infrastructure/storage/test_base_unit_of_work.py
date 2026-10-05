@@ -126,9 +126,13 @@ class TestBaseUnitOfWorkContextManager:
 
     def test_exception_in_block_calls_rollback_and_reraises(self) -> None:
         uow = _ConcreteUoW()
-        with pytest.raises(RuntimeError):
+
+        def _raise_inside_transaction():
             with uow:
                 raise RuntimeError("oops")
+
+        with pytest.raises(RuntimeError):
+            _raise_inside_transaction()
         assert uow.rolled_back == 1
         assert uow.committed == 0
 
@@ -274,9 +278,13 @@ class TestStrategyUoWContextManager:
     def test_exception_triggers_rollback(self) -> None:
         repo = _make_repo()
         uow = _ConcreteStrategyUoW([repo])
-        with pytest.raises(ValueError):
+
+        def _raise_inside_transaction():
             with uow:
                 raise ValueError("fail")
+
+        with pytest.raises(ValueError):
+            _raise_inside_transaction()
         repo.storage_strategy.rollback_transaction.assert_called_once()
 
     def test_empty_repository_list_works(self) -> None:

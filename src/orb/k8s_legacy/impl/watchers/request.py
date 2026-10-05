@@ -104,6 +104,8 @@ def watch(
                     )
                     request.joinpath(".processed").touch()
             except queue.Empty:
+                # No new request directory arrived within the poll timeout;
+                # loop back around to keep watching.
                 pass
     finally:
         observer.stop()

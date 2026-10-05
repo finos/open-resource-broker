@@ -12,8 +12,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-import orb.api.dependencies as deps
-from orb.api.dependencies import CurrentUser, get_current_user
+from orb.api.dependencies import (
+    CurrentUser,
+    get_acquire_machines_orchestrator,
+    get_current_user,
+    get_request_status_orchestrator,
+)
 from orb.api.server import create_fastapi_app
 from orb.config.schemas.server_schema import AuthConfig, ServerConfig
 
@@ -65,18 +69,18 @@ def client(app):
 def machines_orchestrator(app):
     """Install a mock acquire-machines orchestrator via dependency_overrides."""
     orchestrator = AsyncMock()
-    app.dependency_overrides[deps.get_acquire_machines_orchestrator] = lambda: orchestrator
+    app.dependency_overrides[get_acquire_machines_orchestrator] = lambda: orchestrator
     yield orchestrator
-    app.dependency_overrides.pop(deps.get_acquire_machines_orchestrator, None)
+    app.dependency_overrides.pop(get_acquire_machines_orchestrator, None)
 
 
 @pytest.fixture
 def status_orchestrator(app):
     """Install a mock request-status orchestrator via dependency_overrides."""
     orchestrator = AsyncMock()
-    app.dependency_overrides[deps.get_request_status_orchestrator] = lambda: orchestrator
+    app.dependency_overrides[get_request_status_orchestrator] = lambda: orchestrator
     yield orchestrator
-    app.dependency_overrides.pop(deps.get_request_status_orchestrator, None)
+    app.dependency_overrides.pop(get_request_status_orchestrator, None)
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +224,7 @@ class TestRequestStatusStream:
                     try:
                         events.append(json.loads(data_str))
                     except json.JSONDecodeError:
-                        pass
+                        pass  # Skip malformed SSE data chunks when parsing test fixtures
         return events
 
     def test_stream_returns_200_with_sse_content_type(self, client, status_orchestrator):

@@ -14,7 +14,7 @@ class RegistryPort(ABC, Generic[T]):
     """
 
     @abstractmethod
-    def get(self, key: str) -> T:
+    def get(self, key: str) -> T:  # type: ignore[return]
         """Get a provider by key.
 
         Args:
@@ -26,7 +26,7 @@ class RegistryPort(ABC, Generic[T]):
         Raises:
             ProviderNotFoundError: If provider is not registered
         """
-        ...
+        pass
 
     @abstractmethod
     def register(self, key: str, provider: T) -> None:
@@ -36,13 +36,13 @@ class RegistryPort(ABC, Generic[T]):
             key: The provider key
             provider: The provider instance
         """
-        ...
+        pass
 
     @abstractmethod
-    def list_keys(self) -> list[str]:
+    def list_keys(self) -> list[str]:  # type: ignore[return]
         """List all registered provider keys.
 
         Returns:
             List of provider keys
         """
-        ...
+        pass

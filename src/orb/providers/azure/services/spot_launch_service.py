@@ -43,9 +43,9 @@ class SpotPlacementExecutionPort(Protocol):
         build_child_request: Callable[[int, int], Request],
         launch_child: Callable[[Request, AzureTemplate], Awaitable[Mapping[str, Any]]],
         is_capacity_like_failure: Callable[[dict[str, Any]], bool],
-    ) -> SpotPlacementExecutionSummary:
+    ) -> SpotPlacementExecutionSummary:  # type: ignore[return]
         """Execute a placement plan asynchronously and return the aggregated summary."""
-        ...
+        pass
 
 
 @dataclass

@@ -247,9 +247,13 @@ class TestExclusiveWriteLock:
 
     def test_lock_released_on_exception(self, tmp_path: Path) -> None:
         fm = _fm(tmp_path)
-        with pytest.raises(RuntimeError):
+
+        def _raise_inside_lock():
             with fm.exclusive_write_lock():
                 raise RuntimeError("inside lock")
+
+        with pytest.raises(RuntimeError):
+            _raise_inside_lock()
         # If we reach here, the lock was released (no deadlock)
         with fm.exclusive_write_lock():
             pass  # should not hang

@@ -272,27 +272,9 @@ class AzureClient:
         clients, so cleanup belongs here rather than in unrelated orchestration
         layers.
         """
-        close_errors: list[Exception] = []
-
         with self._lazy_init_lock:
             if self._closed:
                 return
-
-            def close_resource(close_fn: Any, *close_args: Any) -> None:
-                """Invoke a close function, logging and collecting any errors."""
-                resource_name = str(close_args[0])
-                resource = close_args[-1]
-                if resource is None:
-                    return
-                try:
-                    close_fn(*close_args)
-                except Exception as exc:  # pragma: no cover - exercised via public close tests
-                    close_errors.append(exc)
-                    self._logger.warning(
-                        "Failed closing Azure resource %s: %s",
-                        resource_name,
-                        exc,
-                    )
 
             async_resources_present = any(
                 resource is not None
@@ -331,9 +313,6 @@ class AzureClient:
                         )
 
                 close_task.add_done_callback(_log_async_close_completion)
-
-        if close_errors:
-            raise close_errors[0]
 
     async def aclose(self) -> None:
         """Close owned async Azure SDK resources."""

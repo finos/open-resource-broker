@@ -143,6 +143,7 @@ class TestAssertNeverExhaustiveness:
                 return "failed"
             case _ as unreachable:
                 assert_never(unreachable)
+                raise AssertionError("unreachable")  # pragma: no cover
 
     def test_accepted_classified(self):
         assert self._classify(Accepted(request_id="r")) == "accepted"

@@ -7,11 +7,20 @@ from typing import Any, Optional, Protocol, runtime_checkable
 class StorageBackend(Protocol):
     """Minimal protocol for storage backends (both StoragePort and BaseStorageStrategy)."""
 
-    def find_by_id(self, entity_id: str) -> Optional[dict[str, Any]]: ...
-    def find_by_criteria(self, criteria: dict[str, Any]) -> list[dict[str, Any]]: ...
-    def find_all(self) -> Optional[dict[str, Any]]: ...
-    def delete(self, entity_id: str) -> None: ...
-    def exists(self, entity_id: str) -> bool: ...
+    def find_by_id(self, entity_id: str) -> Optional[dict[str, Any]]:
+        pass
+
+    def find_by_criteria(self, criteria: dict[str, Any]) -> list[dict[str, Any]]:  # type: ignore[return]
+        pass
+
+    def find_all(self) -> Optional[dict[str, Any]]:
+        pass
+
+    def delete(self, entity_id: str) -> None:
+        pass
+
+    def exists(self, entity_id: str) -> bool:  # type: ignore[return]
+        pass
 
 
 class StorageRepositoryMixin:

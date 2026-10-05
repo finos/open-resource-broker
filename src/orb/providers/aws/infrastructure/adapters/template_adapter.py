@@ -522,7 +522,16 @@ def create_aws_template_adapter(
     Returns:
         AWS template adapter instance
     """
+    from orb.application.ports.scheduler_port import SchedulerPort
+    from orb.config.managers.configuration_manager import ConfigurationManager
+    from orb.infrastructure.di.container import get_container
     from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 
-    template_config_manager = TemplateConfigurationManager(aws_client, logger)  # type: ignore[arg-type]
+    container = get_container()
+    resolved_config_manager = config_manager or container.get(ConfigurationManager)
+    scheduler_strategy = container.get(SchedulerPort)
+
+    template_config_manager = TemplateConfigurationManager(
+        resolved_config_manager, scheduler_strategy, logger
+    )
     return AWSTemplateAdapter(template_config_manager, aws_client, logger, config_manager)

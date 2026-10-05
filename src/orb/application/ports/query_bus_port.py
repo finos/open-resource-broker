@@ -14,7 +14,7 @@ class QueryBusPort(ABC):
     """
 
     @abstractmethod
-    async def execute(self, query: Query) -> Any:
+    async def execute(self, query: Query) -> Any:  # type: ignore[return]
         """Execute a query and return the result.
 
         Args:
@@ -26,4 +26,4 @@ class QueryBusPort(ABC):
         Raises:
             QueryExecutionError: If query execution fails
         """
-        ...
+        pass

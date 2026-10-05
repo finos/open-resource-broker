@@ -62,8 +62,6 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             return []
 
         try:
-            import json
-
             with open(template_path) as f:
                 raw_data = json.load(f)
 

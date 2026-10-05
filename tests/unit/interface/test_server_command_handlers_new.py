@@ -541,9 +541,7 @@ class TestHandleServerReloadModePaths:
                 "orb.interface.server_command_handlers._loopback_reload_request",
                 side_effect=fake_loopback,
             ):
-                with patch(
-                    "asyncio.to_thread", new=lambda fn, *a, **kw: _fake_to_thread(fn, *a, **kw)
-                ):
+                with patch("asyncio.to_thread", new=_fake_to_thread):
                     from orb.interface.server_command_handlers import handle_server_reload
 
                     await handle_server_reload(_args())
@@ -578,9 +576,7 @@ class TestHandleServerReloadModePaths:
                 "orb.interface.server_command_handlers._loopback_reload_request",
                 side_effect=fake_loopback,
             ):
-                with patch(
-                    "asyncio.to_thread", new=lambda fn, *a, **kw: _fake_to_thread(fn, *a, **kw)
-                ):
+                with patch("asyncio.to_thread", new=_fake_to_thread):
                     from orb.interface.server_command_handlers import handle_server_reload
 
                     await handle_server_reload(_args())
@@ -616,9 +612,7 @@ class TestHandleServerReloadModePaths:
                 "orb.interface.server_command_handlers._loopback_reload_request",
                 side_effect=fake_loopback,
             ):
-                with patch(
-                    "asyncio.to_thread", new=lambda fn, *a, **kw: _fake_to_thread(fn, *a, **kw)
-                ):
+                with patch("asyncio.to_thread", new=_fake_to_thread):
                     from orb.interface.server_command_handlers import handle_server_reload
 
                     await handle_server_reload(_args())

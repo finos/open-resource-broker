@@ -200,8 +200,6 @@ class TestCLIIntegration:
         mock_command.data = '{"include_sensitive": true}'
 
         # Test data parsing logic directly
-        import json
-
         parsed_data = json.loads(mock_command.data)
 
         assert parsed_data["include_sensitive"] is True

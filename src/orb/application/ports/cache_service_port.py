@@ -12,7 +12,7 @@ class CacheServicePort(ABC):
     """
 
     @abstractmethod
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Optional[Any]:  # type: ignore[return]
         """Get value from cache.
 
         Args:
@@ -21,7 +21,7 @@ class CacheServicePort(ABC):
         Returns:
             Cached value or None if not found
         """
-        ...
+        pass
 
     @abstractmethod
     async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
@@ -32,7 +32,7 @@ class CacheServicePort(ABC):
             value: Value to cache
             ttl: Time to live in seconds (optional)
         """
-        ...
+        pass
 
     @abstractmethod
     async def delete(self, key: str) -> None:
@@ -41,15 +41,15 @@ class CacheServicePort(ABC):
         Args:
             key: Cache key
         """
-        ...
+        pass
 
     @abstractmethod
     async def clear(self) -> None:
         """Clear all cache entries."""
-        ...
+        pass
 
     @abstractmethod
-    async def exists(self, key: str) -> bool:
+    async def exists(self, key: str) -> bool:  # type: ignore[return]
         """Check if key exists in cache.
 
         Args:
@@ -58,7 +58,7 @@ class CacheServicePort(ABC):
         Returns:
             True if key exists, False otherwise
         """
-        ...
+        pass
 
     def is_caching_enabled(self) -> bool:
         """Check if caching is enabled. Override to customize."""

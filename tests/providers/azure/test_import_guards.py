@@ -18,6 +18,11 @@ _MISSING_AZURE_MODULES = {
 }
 
 
+def _module_depth(item: tuple[str, object]) -> int:
+    """Sort key: number of dotted segments in a module name, for parent-first restoration."""
+    return item[0].count(".")
+
+
 @contextmanager
 def _isolated_azure_provider_import():
     """Re-import Azure provider modules with Azure SDK packages hidden."""
@@ -46,9 +51,7 @@ def _isolated_azure_provider_import():
             else:
                 sys.modules.pop(key, None)
         sys.modules.update(saved_orb_modules)
-        for module_name, module in sorted(
-            saved_orb_modules.items(), key=lambda item: item[0].count(".")
-        ):
+        for module_name, module in sorted(saved_orb_modules.items(), key=_module_depth):
             parent_name, attribute_name = module_name.rsplit(".", maxsplit=1)
             parent_module = sys.modules.get(parent_name)
             if parent_module is not None:

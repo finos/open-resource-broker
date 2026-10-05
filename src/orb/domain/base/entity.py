@@ -41,6 +41,19 @@ class AggregateRoot(Entity):
         super().__init__(**data)
         self._domain_events: list[Any] = []
 
+    def __eq__(self, other: object) -> bool:
+        """Aggregate roots are equal by identity, same as Entity.
+
+        The pending-events queue (``_domain_events``) is transient publish
+        state, not part of the aggregate's identity, so it deliberately does
+        not participate in equality.
+        """
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        """Hash based on entity ID (see Entity.__hash__)."""
+        return super().__hash__()
+
     def add_domain_event(self, event: Any) -> None:
         """Add a domain event to be published."""
         self._domain_events.append(event)

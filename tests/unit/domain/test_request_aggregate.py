@@ -323,7 +323,7 @@ class TestRequestValueObjects:
 
         # Test enum comparison
         assert RequestStatus.PENDING != RequestStatus.IN_PROGRESS
-        assert RequestStatus.COMPLETED == RequestStatus.COMPLETED
+        assert RequestStatus.COMPLETED == RequestStatus("complete")
 
     def test_request_type_enum(self):
         """Test RequestType enum."""
@@ -332,7 +332,7 @@ class TestRequestValueObjects:
 
         # Test enum comparison
         assert RequestType.ACQUIRE != RequestType.RETURN
-        assert RequestType.ACQUIRE == RequestType.ACQUIRE
+        assert RequestType.ACQUIRE == RequestType("acquire")
 
     def test_machine_count_validation(self):
         """Test MachineCount value object validation."""

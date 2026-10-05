@@ -4,7 +4,7 @@ Covers:
 - _make_bus_handler() naming, async nature, ValueError on missing factory
 - All major (resource, action) pairs registered after build_registry()
 
-Isolates from the module-level _built singleton so tests are independent.
+Isolates from the module-level _REGISTRY singleton so tests are independent.
 """
 
 from __future__ import annotations

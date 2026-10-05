@@ -21,7 +21,6 @@ _ALIASES: dict[str, str] = {
 }
 
 _REGISTRY: dict[tuple[str, str], Handler] = {}
-_built: bool = False
 
 
 def register(resource: str, action: str, handler: Handler) -> None:
@@ -80,10 +79,8 @@ def _make_bus_handler(factory_method_name: str) -> Handler:
 
 def build_registry() -> None:
     """Populate _REGISTRY with all (resource, action) → handler pairs."""
-    global _built
-    if _built:
+    if _REGISTRY:
         return
-    _built = True
 
     # --- init ---
     from orb.interface.init_command_handler import handle_init

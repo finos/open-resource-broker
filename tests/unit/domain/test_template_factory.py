@@ -106,6 +106,7 @@ class TestTemplateFactoryRegister:
 
         class BadTemplate(Template):
             def __init__(self, **data):
+                super().__init__(**data)
                 raise RuntimeError("always fails")
 
         factory = TemplateFactory()

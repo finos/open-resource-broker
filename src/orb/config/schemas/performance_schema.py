@@ -96,10 +96,10 @@ class CachingConfig(BaseModel):
     """
 
     handler_discovery: HandlerDiscoveryCacheConfig = Field(
-        default_factory=lambda: HandlerDiscoveryCacheConfig()  # type: ignore[call-arg]
+        default_factory=HandlerDiscoveryCacheConfig  # type: ignore[call-arg]
     )
     request_status: RequestStatusCacheConfig = Field(
-        default_factory=lambda: RequestStatusCacheConfig()  # type: ignore[call-arg]
+        default_factory=RequestStatusCacheConfig  # type: ignore[call-arg]
     )
 
 
@@ -121,7 +121,7 @@ class PerformanceConfig(BaseModel):
     """Performance optimization configuration."""
 
     lazy_loading: LazyLoadingConfig = Field(
-        default_factory=lambda: LazyLoadingConfig()  # type: ignore[call-arg]
+        default_factory=LazyLoadingConfig  # type: ignore[call-arg]
     )
     enable_batching: bool = Field(True, description="Whether to enable batching of API calls")
     enable_parallel: bool = Field(True, description="Whether to enable parallel processing")
@@ -132,9 +132,9 @@ class PerformanceConfig(BaseModel):
         True, description="Whether to enable adaptive batch sizing"
     )
     adaptive_batch_sizing: AdaptiveBatchSizingConfig = Field(
-        default_factory=lambda: AdaptiveBatchSizingConfig()  # type: ignore[call-arg]
+        default_factory=AdaptiveBatchSizingConfig  # type: ignore[call-arg]
     )
-    caching: CachingConfig = Field(default_factory=lambda: CachingConfig())  # type: ignore[call-arg]
+    caching: CachingConfig = Field(default_factory=CachingConfig)  # type: ignore[call-arg]
     sync_timeout_seconds: float = Field(
         30.0,
         description=(

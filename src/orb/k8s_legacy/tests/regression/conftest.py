@@ -165,6 +165,7 @@ def run_custom_hostfactory_test(  # noqa: C901, PLR0912
     """Run a custom open-resource-broker test."""
     logger.info("Test spec is %s", test_spec)
 
+    json_in = None
     if "open-resource-broker-admin" in test_spec:
         args = ""
         if "request-return-machines" in test_spec["open-resource-broker-admin"]:

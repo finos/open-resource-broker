@@ -142,7 +142,7 @@ def hadolint_check(files=None, install_help=False):
         logger.info("Install hadolint:")
         logger.info("  macOS: brew install hadolint")
         logger.info("  Linux: See https://github.com/hadolint/hadolint#install")
-        return
+        return True
 
     if not shutil.which("hadolint"):
         logger.error("Error: hadolint not found")

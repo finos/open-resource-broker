@@ -19,29 +19,29 @@ class TemplateId(ResourceId):
 class FleetTypePort(Protocol):
     """Contract for provider-specific fleet type implementations."""
 
-    def get_valid_types_for_handler(self, handler_type: "ProviderHandlerTypePort") -> list[str]:
+    def get_valid_types_for_handler(self, handler_type: "ProviderHandlerTypePort") -> list[str]:  # type: ignore[return]
         """Get valid fleet types for a specific handler type."""
-        ...
+        pass
 
-    def get_default_for_handler(self, handler_type: "ProviderHandlerTypePort") -> str:
+    def get_default_for_handler(self, handler_type: "ProviderHandlerTypePort") -> str:  # type: ignore[return]
         """Get default fleet type for a specific handler type."""
-        ...
+        pass
 
-    def validate_for_handler(self, handler_type: "ProviderHandlerTypePort") -> bool:
+    def validate_for_handler(self, handler_type: "ProviderHandlerTypePort") -> bool:  # type: ignore[return]
         """Validate if this fleet type is supported by the handler type."""
-        ...
+        pass
 
 
 class ProviderHandlerTypePort(Protocol):
     """Contract for provider-specific handler type implementations."""
 
-    def validate(self, value: str) -> bool:
+    def validate(self, value: str) -> bool:  # type: ignore[return]
         """Validate if the handler type value is supported."""
-        ...
+        pass
 
-    def get_supported_types(self) -> list[str]:
+    def get_supported_types(self) -> list[str]:  # type: ignore[return]
         """Get all supported handler type values."""
-        ...
+        pass
 
 
 # Provider-agnostic configuration

@@ -22,10 +22,17 @@ import pytest
 
 
 class _ImportBlocker(ModuleType):
-    """A fake module that raises ImportError on attribute access, simulating absence."""
+    """A fake module that raises AttributeError on attribute access, simulating absence.
+
+    ``__getattr__`` must raise ``AttributeError`` to follow Python's attribute
+    protocol. For ``from boto3 import X`` statements this is equivalent to the
+    simulated absence: CPython's import machinery converts an AttributeError
+    raised while resolving ``X`` on the module into the expected
+    ``ImportError: cannot import name 'X' from 'boto3'``.
+    """
 
     def __getattr__(self, name: str) -> object:
-        raise ImportError("boto3 extra not installed (simulated)")
+        raise AttributeError(f"boto3 extra not installed (simulated): {name!r}")
 
 
 def _block_modules(*names: str) -> dict[str, ModuleType | None]:
@@ -53,8 +60,6 @@ def test_cleanup_schema_import_without_aws() -> None:
 
     try:
         with patch.dict(sys.modules, blocked):
-            import importlib
-
             mod = importlib.import_module("orb.config.schemas.cleanup_schema")
             # CleanupConfig should be None when AWS extra is absent
             assert mod.CleanupConfig is None, (

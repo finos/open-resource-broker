@@ -107,29 +107,29 @@ class TestMachineRegistrations:
         reg.build_registry()
 
     def test_machines_list_registered(self):
-        from orb.cli.registry import lookup
+        import orb.cli.registry as reg
 
-        assert lookup("machines", "list") is not None
+        assert reg.lookup("machines", "list") is not None
 
     def test_machines_show_registered(self):
-        from orb.cli.registry import lookup
+        import orb.cli.registry as reg
 
-        assert lookup("machines", "show") is not None
+        assert reg.lookup("machines", "show") is not None
 
     def test_machines_stop_registered(self):
-        from orb.cli.registry import lookup
+        import orb.cli.registry as reg
 
-        assert lookup("machines", "stop") is not None
+        assert reg.lookup("machines", "stop") is not None
 
     def test_machines_start_registered(self):
-        from orb.cli.registry import lookup
+        import orb.cli.registry as reg
 
-        assert lookup("machines", "start") is not None
+        assert reg.lookup("machines", "start") is not None
 
     def test_machines_return_registered(self):
-        from orb.cli.registry import lookup
+        import orb.cli.registry as reg
 
-        assert lookup("machines", "return") is not None
+        assert reg.lookup("machines", "return") is not None
 
 
 @pytest.mark.unit
@@ -140,16 +140,16 @@ class TestProviderRegistrations:
         reg.build_registry()
 
     def test_providers_list_registered(self):
-        from orb.cli.registry import lookup
+        import orb.cli.registry as reg
 
-        assert lookup("providers", "list") is not None
+        assert reg.lookup("providers", "list") is not None
 
     def test_providers_health_registered(self):
-        from orb.cli.registry import lookup
+        import orb.cli.registry as reg
 
-        assert lookup("providers", "health") is not None
+        assert reg.lookup("providers", "health") is not None
 
     def test_providers_metrics_registered(self):
-        from orb.cli.registry import lookup
+        import orb.cli.registry as reg
 
-        assert lookup("providers", "metrics") is not None
+        assert reg.lookup("providers", "metrics") is not None

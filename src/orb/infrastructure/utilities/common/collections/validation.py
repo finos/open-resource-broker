@@ -7,10 +7,17 @@ from typing import Callable, Protocol, TypeVar
 class Comparable(Protocol):
     """Protocol for types that support comparison operators."""
 
-    def __lt__(self, other: "Comparable") -> bool: ...
-    def __le__(self, other: "Comparable") -> bool: ...
-    def __gt__(self, other: "Comparable") -> bool: ...
-    def __ge__(self, other: "Comparable") -> bool: ...
+    def __lt__(self, other: "Comparable") -> bool:  # type: ignore[return]
+        pass
+
+    def __le__(self, other: "Comparable") -> bool:  # type: ignore[return]
+        pass
+
+    def __gt__(self, other: "Comparable") -> bool:  # type: ignore[return]
+        pass
+
+    def __ge__(self, other: "Comparable") -> bool:  # type: ignore[return]
+        pass
 
 
 T = TypeVar("T")

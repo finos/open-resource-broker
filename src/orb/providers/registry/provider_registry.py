@@ -316,7 +316,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             if isinstance(registration, ProviderRegistration):
                 return registration.default_api
         except (ValueError, KeyError):
-            pass
+            pass  # Unregistered provider type; fall through to the None default
         return None
 
     def register_provider(

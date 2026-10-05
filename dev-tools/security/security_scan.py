@@ -37,7 +37,7 @@ class SecurityScanner:
         try:
             # Check if bandit-sarif-formatter is available
             try:
-                pass
+                import bandit_sarif_formatter  # noqa: F401
 
                 sarif_available = True
             except ImportError:
@@ -161,12 +161,13 @@ class SecurityScanner:
         logger.info("Running Hadolint Dockerfile scan...")
 
         try:
-            subprocess.run(
-                ["hadolint", "Dockerfile", "--format", "sarif"],
-                cwd=self.project_root,
-                stdout=open(self.project_root / "hadolint-results.sarif", "w"),
-                check=False,
-            )
+            with open(self.project_root / "hadolint-results.sarif", "w") as sarif_file:
+                subprocess.run(
+                    ["hadolint", "Dockerfile", "--format", "sarif"],
+                    cwd=self.project_root,
+                    stdout=sarif_file,
+                    check=False,
+                )
 
             self.sarif_files.append("hadolint-results.sarif")
             return True, "Hadolint scan completed"

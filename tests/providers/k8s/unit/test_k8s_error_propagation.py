@@ -48,10 +48,8 @@ def _make_api_exception(
     message: str | None = None,
 ) -> Any:
     """Return a minimal ApiException-like object with structured body."""
-    try:
-        from kubernetes.client.exceptions import ApiException
-    except ImportError:
-        pytest.skip("kubernetes extra not installed")
+    pytest.importorskip("kubernetes")
+    from kubernetes.client.exceptions import ApiException
 
     body_dict: dict[str, Any] = {"kind": "Status", "apiVersion": "v1", "code": status}
     if reason:
@@ -179,10 +177,8 @@ class TestStructuredFields:
 
     def test_all_fields_none_for_empty_body(self) -> None:
         """A body-less exception still produces a valid typed exception."""
-        try:
-            from kubernetes.client.exceptions import ApiException
-        except ImportError:
-            pytest.skip("kubernetes extra not installed")
+        pytest.importorskip("kubernetes")
+        from kubernetes.client.exceptions import ApiException
 
         exc = ApiException(status=404)
         exc.status = 404
@@ -231,10 +227,8 @@ class TestToDictShape:
 
     def test_to_dict_omits_none_fields(self) -> None:
         """Fields that are None must not appear in to_dict()."""
-        try:
-            from kubernetes.client.exceptions import ApiException
-        except ImportError:
-            pytest.skip("kubernetes extra not installed")
+        pytest.importorskip("kubernetes")
+        from kubernetes.client.exceptions import ApiException
 
         exc = ApiException(status=500)
         exc.status = 500
@@ -425,10 +419,8 @@ class TestAuthenticationError:
         """The retry classifier must treat 401 as non-retryable after Fix 2."""
         from orb.providers.k8s.resilience.retry_classifier import K8sRetryClassifier
 
-        try:
-            from kubernetes.client.exceptions import ApiException
-        except ImportError:
-            pytest.skip("kubernetes extra not installed")
+        pytest.importorskip("kubernetes")
+        from kubernetes.client.exceptions import ApiException
 
         clf = K8sRetryClassifier()
         exc = ApiException(status=401)
@@ -456,10 +448,8 @@ class TestBaseMessageTruncation:
     """A huge apiserver Status body must not produce a > 512-char base_message."""
 
     def test_large_exc_str_is_truncated_to_512_chars(self) -> None:
-        try:
-            from kubernetes.client.exceptions import ApiException
-        except ImportError:
-            pytest.skip("kubernetes extra not installed")
+        pytest.importorskip("kubernetes")
+        from kubernetes.client.exceptions import ApiException
 
         # Build a very large exception body (> 1 KB) without a k8s_message,
         # so base_message falls back to str(exc).

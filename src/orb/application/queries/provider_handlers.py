@@ -305,18 +305,6 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
                 start_time = end_time - timedelta(hours=1)
 
             with self.uow_factory.create_unit_of_work() as uow:
-                all_requests = uow.requests.find_all()
-                _all_time_metrics = {
-                    "total": len(all_requests),
-                    "completed": sum(1 for r in all_requests if r.status.value == "complete"),
-                    "failed": sum(1 for r in all_requests if r.status.value == "failed"),
-                    "in_progress": sum(
-                        1
-                        for r in all_requests
-                        if r.status.value in ["in_progress", "running", "shutting-down"]
-                    ),
-                    "pending": sum(1 for r in all_requests if r.status.value == "pending"),
-                }
                 timeframe_requests = uow.requests.find_by_date_range(start_time, end_time)
                 timeframe_metrics = {
                     "total": len(timeframe_requests),
