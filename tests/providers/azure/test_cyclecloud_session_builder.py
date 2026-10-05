@@ -1,6 +1,7 @@
 """Focused tests for CycleCloud session settings resolution."""
 
 import json
+import re
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -222,7 +223,9 @@ def test_cyclecloud_credential_data_repr_masks_secret_fields():
     assert "cc_admin" not in credential_repr
     assert "changeme" not in credential_repr
     assert "tok-123" not in credential_repr
-    assert credential_repr.find("https://cc.example.com") >= 0
+    url_field = re.search(r"url='([^']*)'", credential_repr)
+    assert url_field is not None, f"expected a url field in {credential_repr!r}"
+    assert url_field.group(1) == "https://cc.example.com"
     assert "bearer" in credential_repr
 
 
