@@ -24,6 +24,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import mcp.types as mcp_types
 import pytest
+from mcp.server.context import ServerRequestContext
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.machine.dto import MachineDTO
@@ -40,23 +41,29 @@ def _mcp_exposed_keys() -> set[str]:
     return {key for key, entry in OPERATION_CATALOG.items() if Interface.MCP in entry.exposed_on}
 
 
-async def _list_tools(server: Any) -> list[Any]:
-    """Invoke the server's registered tools/list handler."""
-    handler = server.request_handlers
-    result = await handler[mcp_types.ListToolsRequest](
-        mcp_types.ListToolsRequest(method="tools/list")
+def _make_ctx() -> ServerRequestContext[Any, Any]:
+    """A ``ServerRequestContext`` with no HTTP request in scope (stdio-style)."""
+    return ServerRequestContext(
+        session=MagicMock(),
+        lifespan_context={},
+        protocol_version="2026-07-28",
+        method="tools/call",
+        request=None,
     )
-    return result.root.tools
+
+
+async def _list_tools(server: Any) -> list[Any]:
+    """Invoke the server's registered tools/list handler directly."""
+    entry = server.get_request_handler("tools/list")
+    result = await entry.handler(_make_ctx(), None)
+    return result.tools
 
 
 async def _call_tool(server: Any, name: str, arguments: dict[str, Any]) -> Any:
-    """Invoke the server's registered tools/call handler and return the result."""
-    handler = server.request_handlers
-    return await handler[mcp_types.CallToolRequest](
-        mcp_types.CallToolRequest(
-            method="tools/call",
-            params=mcp_types.CallToolRequestParams(name=name, arguments=arguments),
-        )
+    """Invoke the server's registered tools/call handler directly and return the result."""
+    entry = server.get_request_handler("tools/call")
+    return await entry.handler(
+        _make_ctx(), mcp_types.CallToolRequestParams(name=name, arguments=arguments)
     )
 
 
@@ -87,7 +94,7 @@ async def test_every_tool_input_schema_is_a_serialisable_object_schema() -> None
 
     assert tools, "server advertised no tools"
     for tool in tools:
-        schema = tool.inputSchema
+        schema = tool.input_schema
         assert isinstance(schema, dict), f"{tool.name}: inputSchema is not an object"
         assert schema.get("type") == "object", f"{tool.name}: inputSchema type is not 'object'"
         assert isinstance(schema.get("properties"), dict), (
@@ -139,8 +146,8 @@ async def test_unknown_tool_resolves_to_error_result_not_a_raised_exception() ->
     # The call must return normally (no exception escapes the handler).
     result = await _call_tool(server, "no_such_tool", {})
 
-    assert isinstance(result.root, mcp_types.CallToolResult)
-    assert result.root.isError is True
+    assert isinstance(result, mcp_types.CallToolResult)
+    assert result.is_error is True
 
 
 @pytest.mark.asyncio
@@ -158,10 +165,10 @@ async def test_handler_that_raises_is_surfaced_as_error_result() -> None:
     server = build_server(container)
     result = await _call_tool(server, "list_machines", {})
 
-    assert isinstance(result.root, mcp_types.CallToolResult)
-    assert result.root.isError is True
-    assert isinstance(result.root.content[0], mcp_types.TextContent)
-    assert result.root.content[0].type == "text"
+    assert isinstance(result, mcp_types.CallToolResult)
+    assert result.is_error is True
+    assert isinstance(result.content[0], mcp_types.TextContent)
+    assert result.content[0].type == "text"
 
 
 @pytest.mark.asyncio
@@ -193,13 +200,9 @@ async def test_successful_call_returns_text_content_carrying_the_rendered_body()
     server = build_server(container)
     result = await _call_tool(server, "list_machines", {"limit": 50})
 
-    # Successful calls may return either the content list or a non-error result.
-    root = result.root
-    if isinstance(root, mcp_types.CallToolResult):
-        assert root.isError is False
-        content = root.content
-    else:
-        content = root.content
+    assert isinstance(result, mcp_types.CallToolResult)
+    assert result.is_error is False
+    content = result.content
 
     assert len(content) == 1
     part = content[0]

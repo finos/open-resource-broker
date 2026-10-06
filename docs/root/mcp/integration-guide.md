@@ -65,6 +65,13 @@ entirely by `server.auth.enabled` and the configured strategy, with no
 loopback-admin exception. A caller reaching the MCP transport from the same
 host as the broker gets no special treatment.
 
+### Session limits for the Streamable HTTP transport
+
+Stateful Streamable HTTP sessions use the MCP SDK defaults: a session that is
+idle for 30 minutes is closed, at most 10,000 sessions are open at once (further
+requests that would open a session receive a 503 response), and a request body
+larger than 4 MiB is rejected.
+
 ### Validating the tool set offline
 
 `orb mcp validate` builds the tool set straight from the catalog — no server or

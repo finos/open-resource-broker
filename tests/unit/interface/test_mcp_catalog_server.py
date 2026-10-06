@@ -9,7 +9,6 @@ operation. The catalog is the single source; the MCP surface follows it.
 
 from __future__ import annotations
 
-import contextlib
 import dataclasses
 import json
 from types import SimpleNamespace
@@ -17,6 +16,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from mcp.server.context import ServerRequestContext
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.machine.dto import MachineDTO
@@ -42,15 +42,27 @@ def _mcp_keys() -> set[str]:
     return {key for key, entry in OPERATION_CATALOG.items() if Interface.MCP in entry.exposed_on}
 
 
-async def _list_tools(server: Any) -> list[Any]:
-    """Invoke the server's registered list_tools handler."""
-    handler = server.request_handlers
-    import mcp.types as mcp_types
+def _make_ctx(request: Any = None) -> ServerRequestContext[Any, Any]:
+    """Build a ``ServerRequestContext`` for direct handler invocation in tests.
 
-    result = await handler[mcp_types.ListToolsRequest](
-        mcp_types.ListToolsRequest(method="tools/list")
+    ``request`` carries the fake HTTP request (or ``None`` for stdio-style
+    calls with no caller identity), the way the Streamable HTTP transport
+    attaches it in production.
+    """
+    return ServerRequestContext(
+        session=MagicMock(),
+        lifespan_context={},
+        protocol_version="2026-07-28",
+        method="tools/call",
+        request=request,
     )
-    return result.root.tools
+
+
+async def _list_tools(server: Any) -> list[Any]:
+    """Invoke the server's registered tools/list handler directly."""
+    entry = server.get_request_handler("tools/list")
+    result = await entry.handler(_make_ctx(), None)
+    return result.tools
 
 
 @pytest.mark.asyncio
@@ -72,11 +84,11 @@ async def test_each_tool_schema_carries_its_dto_fields() -> None:
     for tool in tools:
         entry = OPERATION_CATALOG[tool.name]
         expected_fields = {f.name for f in dataclasses.fields(entry.input_dto)}
-        schema_fields = set(tool.inputSchema["properties"].keys())
+        schema_fields = set(tool.input_schema["properties"].keys())
         assert schema_fields == expected_fields, (
             f"{tool.name}: schema properties {schema_fields} != DTO fields {expected_fields}"
         )
-        assert tool.inputSchema["type"] == "object"
+        assert tool.input_schema["type"] == "object"
 
 
 def test_schema_marks_required_fields_without_defaults() -> None:
@@ -96,16 +108,13 @@ def test_schema_marks_required_fields_without_defaults() -> None:
     assert list_schema["properties"]["filter_expressions"]["type"] == "array"
 
 
-async def _call_tool(server: Any, name: str, arguments: dict[str, Any]) -> Any:
-    """Invoke the server's registered call_tool handler and return the result."""
+async def _call_tool(server: Any, name: str, arguments: dict[str, Any], request: Any = None) -> Any:
+    """Invoke the server's registered tools/call handler directly and return the result."""
     import mcp.types as mcp_types
 
-    handler = server.request_handlers
-    return await handler[mcp_types.CallToolRequest](
-        mcp_types.CallToolRequest(
-            method="tools/call",
-            params=mcp_types.CallToolRequestParams(name=name, arguments=arguments),
-        )
+    entry = server.get_request_handler("tools/call")
+    return await entry.handler(
+        _make_ctx(request), mcp_types.CallToolRequestParams(name=name, arguments=arguments)
     )
 
 
@@ -138,10 +147,9 @@ async def test_call_tool_returns_mcp_rendered_body() -> None:
     }.get(cls)
 
     server = build_server(container)
-    result = await _call_tool(server, "list_machines", {"limit": 100})
+    tool_result = await _call_tool(server, "list_machines", {"limit": 100})
 
-    tool_result = result.root
-    assert tool_result.isError is False
+    assert tool_result.is_error is False
     assert len(tool_result.content) == 1
     parsed = json.loads(tool_result.content[0].text)
 
@@ -156,10 +164,9 @@ async def test_call_tool_returns_mcp_rendered_body() -> None:
 async def test_call_tool_unknown_name_is_error_result() -> None:
     """An unknown tool name yields an isError result, not a raised exception."""
     server = build_server(MagicMock(spec=DIContainer))
-    result = await _call_tool(server, "does_not_exist", {})
+    tool_result = await _call_tool(server, "does_not_exist", {})
 
-    tool_result = result.root
-    assert tool_result.isError is True
+    assert tool_result.is_error is True
     assert "Unknown tool" in tool_result.content[0].text
 
 
@@ -176,10 +183,9 @@ async def test_call_tool_execution_failure_is_error_result() -> None:
     }.get(cls)
 
     server = build_server(container)
-    result = await _call_tool(server, "list_machines", {})
+    tool_result = await _call_tool(server, "list_machines", {})
 
-    tool_result = result.root
-    assert tool_result.isError is True
+    assert tool_result.is_error is True
     assert "list_machines failed" in tool_result.content[0].text
 
 
@@ -207,36 +213,15 @@ def _acquire_machines_container() -> tuple[MagicMock, AsyncMock]:
     return container, orchestrator
 
 
-@contextlib.contextmanager
-def _http_request_context(user_roles: list[str] | None):
-    """Set the MCP request context's ``.request`` for the duration of the ``with`` block.
+def _http_request(user_roles: list[str] | None) -> Any:
+    """A fake HTTP request carrying the given resolved roles on ``.state``.
 
     Mirrors how the Streamable HTTP transport attaches the Starlette
-    ``Request`` to the current MCP request so ``call_tool`` can read
-    ``request.state.user_roles`` the same way it would for a real HTTP call,
-    without driving a full ASGI/uvicorn request. Implemented as a plain
-    context manager (rather than a pytest fixture) so the set and reset of
-    the ``request_ctx`` contextvar both happen inside the same test
-    coroutine's context — a fixture's teardown can run in a different task's
-    context under some event-loop configurations, which would make
-    ``request_ctx.reset`` raise.
+    ``Request`` to the current MCP request's context so ``call_tool`` can
+    read ``request.state.user_roles`` the same way it would for a real HTTP
+    call, without driving a full ASGI/uvicorn request.
     """
-    from mcp.server.lowlevel.server import RequestContext, request_ctx
-
-    fake_request = SimpleNamespace(state=SimpleNamespace(user_roles=user_roles))
-    token = request_ctx.set(
-        RequestContext(
-            request_id=1,
-            meta=None,
-            session=MagicMock(),
-            lifespan_context=None,
-            request=fake_request,
-        )
-    )
-    try:
-        yield
-    finally:
-        request_ctx.reset(token)
+    return SimpleNamespace(state=SimpleNamespace(user_roles=user_roles))
 
 
 @pytest.mark.asyncio
@@ -245,13 +230,14 @@ async def test_call_tool_denies_mutating_tool_for_viewer_role() -> None:
     container, orchestrator = _acquire_machines_container()
 
     server = build_server(container)
-    with _http_request_context(["viewer"]):
-        result = await _call_tool(
-            server, "request_machines", {"template_id": "t1", "requested_count": 1}
-        )
+    tool_result = await _call_tool(
+        server,
+        "request_machines",
+        {"template_id": "t1", "requested_count": 1},
+        request=_http_request(["viewer"]),
+    )
 
-    tool_result = result.root
-    assert tool_result.isError is True
+    assert tool_result.is_error is True
     assert "insufficient permissions" in tool_result.content[0].text
     orchestrator.execute.assert_not_called()
 
@@ -262,13 +248,14 @@ async def test_call_tool_allows_mutating_tool_for_operator_role() -> None:
     container, orchestrator = _acquire_machines_container()
 
     server = build_server(container)
-    with _http_request_context(["operator"]):
-        result = await _call_tool(
-            server, "request_machines", {"template_id": "t1", "requested_count": 1}
-        )
+    tool_result = await _call_tool(
+        server,
+        "request_machines",
+        {"template_id": "t1", "requested_count": 1},
+        request=_http_request(["operator"]),
+    )
 
-    tool_result = result.root
-    assert tool_result.isError is False
+    assert tool_result.is_error is False
     orchestrator.execute.assert_called_once()
 
 
@@ -278,13 +265,14 @@ async def test_call_tool_denies_mutating_tool_with_no_identity() -> None:
     container, orchestrator = _acquire_machines_container()
 
     server = build_server(container)
-    with _http_request_context(None):
-        result = await _call_tool(
-            server, "request_machines", {"template_id": "t1", "requested_count": 1}
-        )
+    tool_result = await _call_tool(
+        server,
+        "request_machines",
+        {"template_id": "t1", "requested_count": 1},
+        request=_http_request(None),
+    )
 
-    tool_result = result.root
-    assert tool_result.isError is True
+    assert tool_result.is_error is True
     assert "insufficient permissions" in tool_result.content[0].text
     orchestrator.execute.assert_not_called()
 
@@ -295,12 +283,11 @@ async def test_call_tool_mutating_tool_unaffected_outside_http_context() -> None
     container, orchestrator = _acquire_machines_container()
 
     server = build_server(container)
-    result = await _call_tool(
+    tool_result = await _call_tool(
         server, "request_machines", {"template_id": "t1", "requested_count": 1}
     )
 
-    tool_result = result.root
-    assert tool_result.isError is False
+    assert tool_result.is_error is False
     orchestrator.execute.assert_called_once()
 
 
@@ -343,7 +330,63 @@ async def test_call_tool_read_only_tool_allowed_for_viewer_role() -> None:
     }.get(cls)
 
     server = build_server(container)
-    with _http_request_context(["viewer"]):
-        result = await _call_tool(server, "list_machines", {})
+    tool_result = await _call_tool(server, "list_machines", {}, request=_http_request(["viewer"]))
 
-    assert result.root.isError is False
+    assert tool_result.is_error is False
+
+
+@pytest.mark.asyncio
+async def test_call_tool_rejects_wrong_typed_argument() -> None:
+    """An argument whose type contradicts the tool's input schema is refused."""
+    container, orchestrator = _acquire_machines_container()
+
+    server = build_server(container)
+    tool_result = await _call_tool(
+        server, "request_machines", {"template_id": "t1", "requested_count": "abc"}
+    )
+
+    assert tool_result.is_error is True
+    assert "Input validation error" in tool_result.content[0].text
+    assert "'abc' is not of type 'integer'" in tool_result.content[0].text
+    orchestrator.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_call_tool_rejects_scalar_for_array_argument() -> None:
+    """A scalar where the schema declares an array is refused."""
+    container = MagicMock(spec=DIContainer)
+    server = build_server(container)
+
+    tool_result = await _call_tool(server, "return_machines", {"machine_ids": "i-123"})
+
+    assert tool_result.is_error is True
+    assert "Input validation error" in tool_result.content[0].text
+    container.get.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_call_tool_rejects_missing_required_argument() -> None:
+    """Omitting a required field is reported as a validation error."""
+    container, orchestrator = _acquire_machines_container()
+
+    server = build_server(container)
+    tool_result = await _call_tool(server, "request_machines", {"template_id": "t1"})
+
+    assert tool_result.is_error is True
+    assert "Input validation error" in tool_result.content[0].text
+    assert "requested_count" in tool_result.content[0].text
+    orchestrator.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_call_tool_accepts_valid_arguments() -> None:
+    """Arguments matching the schema reach the orchestrator."""
+    container, orchestrator = _acquire_machines_container()
+
+    server = build_server(container)
+    tool_result = await _call_tool(
+        server, "request_machines", {"template_id": "t1", "requested_count": 2}
+    )
+
+    assert tool_result.is_error is False
+    orchestrator.execute.assert_called_once()

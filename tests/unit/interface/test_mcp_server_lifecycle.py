@@ -494,36 +494,28 @@ async def _call_tool_over_real_transport(
 
     The caller must already have the Starlette app's lifespan entered (the
     real ``StreamableHTTPSessionManager`` instance only supports being run
-    once). The MCP client's ``streamablehttp_client``/``ClientSession`` then
-    carries the actual wire protocol over an in-process httpx ASGI transport
-    — no transport-layer mock — so the request reaches ``AuthMiddleware`` and
-    the session manager exactly as a real network client's would.
+    once). The MCP client's ``streamable_http_client``/``ClientSession`` then
+    carries the actual wire protocol over an in-process ASGI transport — no
+    transport-layer mock — so the request reaches ``AuthMiddleware`` and the
+    session manager exactly as a real network client's would.
     """
-    import httpx
+    import httpx2
     from mcp import ClientSession
-    from mcp.client.streamable_http import streamablehttp_client
+    from mcp.client.streamable_http import streamable_http_client
 
-    def http_client_factory(
-        headers: dict[str, str] | None = None,
-        timeout: Any = None,
-        auth: Any = None,
-    ) -> httpx.AsyncClient:
-        return httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app),
-            base_url="http://testserver",
-            headers=headers,
-            timeout=timeout,
-            auth=auth,
-        )
-
-    async with streamablehttp_client(
-        "http://testserver/mcp/",
+    http_client = httpx2.AsyncClient(
+        transport=httpx2.ASGITransport(app=app),
+        base_url="http://testserver",
         headers={"Authorization": f"Bearer {token}"},
-        httpx_client_factory=http_client_factory,
-    ) as (read_stream, write_stream, _get_session_id):
-        async with ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
-            return await session.call_tool(tool_name, arguments)
+    )
+    async with http_client:
+        async with streamable_http_client("http://testserver/mcp/", http_client=http_client) as (
+            read_stream,
+            write_stream,
+        ):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                return await session.call_tool(tool_name, arguments)
 
 
 @pytest.mark.asyncio
@@ -580,7 +572,7 @@ async def test_real_streamable_http_session_enforces_bearer_auth_and_tool_roles(
         denied = await _call_tool_over_real_transport(
             app, viewer_token, "request_machines", arguments
         )
-        assert denied.isError is True
+        assert denied.is_error is True
         assert "insufficient permissions" in denied.content[0].text
         orchestrator.execute.assert_not_called()
 
@@ -592,8 +584,67 @@ async def test_real_streamable_http_session_enforces_bearer_auth_and_tool_roles(
         allowed = await _call_tool_over_real_transport(
             app, operator_token, "request_machines", arguments
         )
-        assert allowed.isError is False
+        assert allowed.is_error is False
         orchestrator.execute.assert_called_once()
+
+
+# --------------------------------------------------------------------------- #
+# Real stdio-equivalent session round trip (no mocked transport)             #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_real_stdio_session_lists_and_calls_tools() -> None:
+    """A real ClientSession round-trips tools/list and tools/call over the server's
+    own ``server.run()`` loop, connected through in-process memory streams rather
+    than real OS pipes — the same read/write-stream contract stdio hands it, with
+    no caller identity attached, so role enforcement stays bypassed as it does
+    for a real stdio client.
+    """
+    import anyio
+    import mcp.shared.memory as mcp_memory
+    from mcp import ClientSession
+
+    from orb.application.services.orchestration.dtos import ListMachinesOutput
+    from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
+    from orb.infrastructure.di.container import DIContainer
+    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+    from orb.interface.response_formatting_service import ResponseFormattingService
+
+    orchestrator = AsyncMock(spec=ListMachinesOrchestrator)
+    orchestrator.execute.return_value = ListMachinesOutput(
+        machines=[], count=0, next_cursor=None, total_count=0
+    )
+    formatter = ResponseFormattingService(DefaultSchedulerStrategy(logger=MagicMock()))
+    container = MagicMock(spec=DIContainer)
+    container.get.side_effect = lambda cls: {
+        ListMachinesOrchestrator: orchestrator,
+        ResponseFormattingService: formatter,
+    }.get(cls)
+
+    server = catalog_server.build_server(container)
+
+    async with mcp_memory.create_client_server_memory_streams() as (
+        client_streams,
+        server_streams,
+    ):
+        client_read, client_write = client_streams
+        server_read, server_write = server_streams
+
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(
+                server.run, server_read, server_write, server.create_initialization_options()
+            )
+
+            async with ClientSession(client_read, client_write) as session:
+                await session.initialize()
+
+                listed = await session.list_tools()
+                assert any(tool.name == "list_machines" for tool in listed.tools)
+
+                result = await session.call_tool("list_machines", {})
+                assert result.is_error is False
+                orchestrator.execute.assert_called_once()
 
 
 def test_flush_telemetry_invokes_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:

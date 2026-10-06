@@ -5,7 +5,7 @@ This document provides a complete reference for the Open Resource Broker MCP ser
 ## Protocol Information
 
 - **Protocol**: Model Context Protocol (MCP)
-- **Version**: 2024-11-05
+- **Version**: negotiated during `initialize`; the server answers with the newest revision it supports that the client also offers (currently 2025-11-25)
 - **Transport**: JSON-RPC 2.0
 - **Server Name**: open-resource-broker
 - **Server Version**: 1.0.0
@@ -16,14 +16,7 @@ This document provides a complete reference for the Open Resource Broker MCP ser
 {
   "capabilities": {
     "tools": {
-      "listChanged": true
-    },
-    "resources": {
-      "subscribe": true,
-      "listChanged": true
-    },
-    "prompts": {
-      "listChanged": true
+      "listChanged": false
     }
   }
 }
@@ -33,7 +26,10 @@ This document provides a complete reference for the Open Resource Broker MCP ser
 
 ### initialize
 
-Initialize the MCP session.
+Initialize the MCP session. The server returns the protocol revision it
+supports that best matches the one the client sent. Clients using the
+stateless 2026-07-28 revision send per-request headers instead of an
+`initialize` call.
 
 **Request**:
 ```json
@@ -42,7 +38,7 @@ Initialize the MCP session.
   "id": 1,
   "method": "initialize",
   "params": {
-    "protocolVersion": "2024-11-05",
+    "protocolVersion": "2025-11-25",
     "clientInfo": {
       "name": "client-name",
       "version": "1.0.0"
@@ -57,11 +53,9 @@ Initialize the MCP session.
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "protocolVersion": "2024-11-05",
+    "protocolVersion": "2025-11-25",
     "capabilities": {
-      "tools": {"listChanged": true},
-      "resources": {"subscribe": true, "listChanged": true},
-      "prompts": {"listChanged": true}
+      "tools": {"listChanged": false}
     },
     "serverInfo": {
       "name": "open-resource-broker",
