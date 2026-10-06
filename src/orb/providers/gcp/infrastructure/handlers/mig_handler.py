@@ -341,7 +341,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         """Delete specific MIG members or tear down whole MIG resources."""
         mig_names = self._require_mig_names(resource_ids, context)
         template_name = context.get("instance_template_name")
-        scope = str(context.get("scope") or GCPMIGScope.REGIONAL.value)
+        scope = self._require_scope(context)
 
         if instance_ids:
             managed_instances_by_mig = {
@@ -426,7 +426,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
     ) -> list[GCPInstanceStatus]:
         """Describe the current status of instances managed by the MIG."""
         mig_names = self._require_mig_names(resource_ids, context)
-        scope = str(context.get("scope") or GCPMIGScope.REGIONAL.value)
+        scope = self._require_scope(context)
         results: list[GCPInstanceStatus] = []
         for mig_name in mig_names:
             payload = self._list_managed_instances_for_status(
@@ -454,6 +454,7 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
                             "cloud_host_id": instance_name,
                             "resource_id": mig_name,
                             "scope": scope,
+                            **self._location_for_status(scope, context),
                             "instance_url": instance.instance_url,
                             "gcp_instance_status": instance.instance_status,
                             "gcp_current_action": instance.current_action,
@@ -648,6 +649,30 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
         if not mig_name:
             raise GCPValidationError("MIG operations require a mig resource id")
         return [str(mig_name)]
+
+    @staticmethod
+    def _location_for_status(scope: str, context: GCPHandlerContext) -> dict[str, str]:
+        """Return the zone or region identifying where the MIG lives, if known."""
+        key = "zone" if scope == GCPMIGScope.ZONAL.value else "region"
+        value = context.get(key)
+        return {key: str(value)} if value else {}
+
+    @staticmethod
+    def _require_scope(context: GCPHandlerContext) -> str:
+        """Require an explicit regional/zonal scope instead of guessing one.
+
+        ``context["region"]`` is always populated with a provider default, so
+        a missing ``scope`` cannot be detected by checking for region alone.
+        Defaulting to regional here would query a zonal MIG under the wrong
+        scope and silently report it as empty instead of failing loudly.
+        """
+        scope = context.get("scope")
+        if scope not in (GCPMIGScope.REGIONAL.value, GCPMIGScope.ZONAL.value):
+            raise GCPValidationError(
+                "MIG operations require an explicit scope of 'regional' or 'zonal'",
+                details={"scope": scope},
+            )
+        return str(scope)
 
     def _group_instance_urls_by_mig(
         self,

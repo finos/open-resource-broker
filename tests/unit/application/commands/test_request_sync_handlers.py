@@ -177,3 +177,23 @@ class TestPopulateMachineIdsDispatch:
         await handler.execute_command(PopulateMachineIdsCommand(request_id=_VALID_REQUEST_ID))
 
         request.update_machine_ids.assert_called_once_with(["i-111", "i-222"])
+
+
+class TestPopulateMachineIdsRequestContext:
+    @pytest.mark.asyncio
+    async def test_dispatch_forwards_request_so_provider_can_resolve_placement(self):
+        """The provider needs the request's persisted data to locate its resources."""
+        request = _make_request(provider_api="MIG")
+        captured_operations: list[Operation] = []
+
+        async def _execute_operation(provider_name: str, operation: Operation) -> OperationResult:
+            captured_operations.append(operation)
+            return OperationResult.success_result(data={"instances": []})
+
+        provider_selection_port = MagicMock()
+        provider_selection_port.execute_operation = _execute_operation
+
+        handler = _make_handler(request, provider_selection_port)
+        await handler.execute_command(PopulateMachineIdsCommand(request_id=_VALID_REQUEST_ID))
+
+        assert captured_operations[0].parameters["request"] is request

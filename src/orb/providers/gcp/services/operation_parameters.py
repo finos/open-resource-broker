@@ -75,6 +75,64 @@ class GCPMutationParameters(BaseModel):
                 data.setdefault("provider_api", request.provider_api)
             data.setdefault("request_metadata", request.provider_data)
         try:
-            return cls.model_validate(data)
+            params = cls.model_validate(data)
         except ValidationError as exc:
             raise GCPValidationError("Invalid GCP mutation operation parameters") from exc
+        params.fill_metadata_from_machine_coordinates()
+        return params
+
+    def _targeted_coordinates(self) -> list[GCPMachineCoordinates]:
+        """Return the persisted coordinates of the machines this operation targets."""
+        if not self.instance_ids:
+            return list(self.machine_coordinates.values())
+        return [
+            self.machine_coordinates[instance_id]
+            for instance_id in self.instance_ids
+            if instance_id in self.machine_coordinates
+        ]
+
+    def fill_metadata_from_machine_coordinates(self) -> None:
+        """Fill placement the request lacks from the targeted machines' persisted data.
+
+        Return requests carry no placement of their own; the machines (and the
+        request that provisioned them) do. Values already present on the
+        request metadata win. A scope is only taken when every targeted machine
+        agrees on it, so a mixed set never resolves to a guessed value.
+        """
+        coordinates = self._targeted_coordinates()
+        if not coordinates:
+            return
+        metadata = self.request_metadata
+
+        scopes = {c.provider_data.scope for c in coordinates if c.provider_data.scope}
+        if metadata.scope is None and scopes:
+            if len(scopes) > 1:
+                raise GCPValidationError(
+                    "Targeted machines disagree on MIG scope", details={"scopes": sorted(scopes)}
+                )
+            metadata.scope = scopes.pop()
+
+        location_field = {"zonal": "zone", "regional": "region"}.get(metadata.scope or "")
+        if location_field is not None and getattr(metadata, location_field) is None:
+            locations = {
+                getattr(c.provider_data, location_field)
+                for c in coordinates
+                if getattr(c.provider_data, location_field)
+            }
+            if len(locations) == 1:
+                setattr(metadata, location_field, locations.pop())
+
+        if metadata.project_id is None:
+            projects = {
+                c.provider_data.project_id for c in coordinates if c.provider_data.project_id
+            }
+            if len(projects) == 1:
+                metadata.project_id = projects.pop()
+
+    def coordinate_resource_ids(self) -> list[str]:
+        """Return the distinct resource ids of the targeted machines, in order."""
+        resource_ids: list[str] = []
+        for coordinate in self._targeted_coordinates():
+            if coordinate.resource_id and coordinate.resource_id not in resource_ids:
+                resource_ids.append(coordinate.resource_id)
+        return resource_ids

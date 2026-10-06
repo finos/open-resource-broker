@@ -1436,6 +1436,55 @@ def test_mig_handler_status_treats_missing_mig_as_empty() -> None:
     assert result == []
 
 
+def test_mig_handler_check_hosts_status_requires_explicit_scope() -> None:
+    """A zonal MIG queried without scope must raise, not report zero instances."""
+    compute_client = _ComputeClientStub()
+    handler = GCPManagedInstanceGroupHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+
+    with pytest.raises(GCPValidationError, match="explicit scope"):
+        handler.check_hosts_status(
+            resource_ids=["mig-a"],
+            instance_ids=[],
+            context={"region": "us-central1"},
+        )
+
+
+def test_mig_handler_check_hosts_status_rejects_unknown_scope_value() -> None:
+    compute_client = _ComputeClientStub()
+    handler = GCPManagedInstanceGroupHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+
+    with pytest.raises(GCPValidationError, match="explicit scope"):
+        handler.check_hosts_status(
+            resource_ids=["mig-a"],
+            instance_ids=[],
+            context={"region": "us-central1", "scope": "global"},
+        )
+
+
+def test_mig_handler_terminate_hosts_requires_explicit_scope() -> None:
+    compute_client = _ComputeClientStub()
+    handler = GCPManagedInstanceGroupHandler(
+        compute_client=compute_client,
+        config=_config(),
+        logger=MagicMock(),
+    )
+
+    with pytest.raises(GCPValidationError, match="explicit scope"):
+        handler.terminate_hosts(
+            resource_ids=["mig-a"],
+            instance_ids=[],
+            context={"region": "us-central1"},
+        )
+
+
 @pytest.mark.asyncio
 async def test_strategy_create_instances_delegates_to_handler() -> None:
     strategy = GCPProviderStrategy(
@@ -2376,3 +2425,16 @@ def test_mig_handler_missing_membership_raises_gcp_entity_not_found() -> None:
                 "scope": "regional",
             },
         )
+
+
+def test_strategy_cleanup_closes_compute_client() -> None:
+    strategy = GCPProviderStrategy(config=_config(), logger=MagicMock())
+    assert strategy.initialize() is True
+
+    fake_compute_client = MagicMock()
+    strategy._compute_client = fake_compute_client
+
+    strategy.cleanup()
+
+    fake_compute_client.close.assert_called_once()
+    assert strategy._compute_client is None

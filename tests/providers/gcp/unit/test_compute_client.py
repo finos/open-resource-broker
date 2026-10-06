@@ -332,3 +332,48 @@ def test_compute_client_blocks_real_calls_when_dry_run_is_active() -> None:
 
         with pytest.raises(GCPDryRunBlockedError, match="get_image_from_family"):
             client.get_image_from_family(image_project="debian-cloud", family="debian-12")
+
+
+def test_close_closes_each_created_client_transport_and_clears_the_cache() -> None:
+    client = GCPComputeClient(config=_config(), logger=MagicMock())
+    created_clients = [MagicMock(name=f"client-{index}") for index in range(5)]
+    (
+        client._instances_client,
+        client._instance_templates_client,
+        client._region_igm_client,
+        client._zone_igm_client,
+        client._images_client,
+    ) = created_clients
+
+    client.close()
+
+    for created_client in created_clients:
+        created_client.transport.close.assert_called_once()
+    assert client._instances_client is None
+    assert client._instance_templates_client is None
+    assert client._region_igm_client is None
+    assert client._zone_igm_client is None
+    assert client._images_client is None
+
+
+def test_close_is_a_no_op_when_no_clients_were_ever_created() -> None:
+    client = GCPComputeClient(config=_config(), logger=MagicMock())
+
+    client.close()
+
+
+def test_close_logs_and_continues_past_a_transport_close_failure() -> None:
+    logger = MagicMock()
+    client = GCPComputeClient(config=_config(), logger=logger)
+    failing_client = MagicMock()
+    failing_client.transport.close.side_effect = RuntimeError("boom")
+    healthy_client = MagicMock()
+    client._instances_client = failing_client
+    client._images_client = healthy_client
+
+    client.close()
+
+    healthy_client.transport.close.assert_called_once()
+    logger.warning.assert_called_once()
+    assert client._instances_client is None
+    assert client._images_client is None

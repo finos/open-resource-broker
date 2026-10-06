@@ -170,3 +170,31 @@ class TestProcessResourceGroup:
 
         assert result["success"] is False
         assert result["error_message"] == "rejected"
+
+
+@pytest.mark.unit
+class TestMachineCoordinatesForwarded:
+    @pytest.mark.asyncio
+    async def test_terminate_operation_includes_persisted_machine_coordinates(self):
+        from unittest.mock import patch
+
+        orchestrator, provider_selection_port = _make_orchestrator()
+        request = MagicMock(request_id="req-correlation")
+        coordinates = {
+            "i-1": {
+                "provider_api": "MIG",
+                "resource_id": "mig-a",
+                "provider_data": {"scope": "zonal", "zone": "us-central1-b"},
+            }
+        }
+
+        with patch(
+            "orb.application.services.deprovisioning_orchestrator.load_machine_coordinates",
+            return_value=coordinates,
+        ):
+            await orchestrator.execute_deprovisioning(
+                {("gcp", "MIG", "mig-a"): [_make_machine("i-1")]}, request
+            )
+
+        operation = provider_selection_port.execute_operation.call_args.args[1]
+        assert operation.parameters["machine_coordinates"] == coordinates
