@@ -129,14 +129,14 @@ def _reset_telemetry_state() -> None:
     if _state.metrics_file_handle is not None:
         try:
             _state.metrics_file_handle.close()
-        except Exception:
-            pass  # Closing errors must not prevent state reset.
+        except Exception:  # noqa: S110  # Closing errors must not prevent state reset.
+            pass
         _state.metrics_file_handle = None
     if _state.traces_file_handle is not None:
         try:
             _state.traces_file_handle.close()
-        except Exception:
-            pass  # Closing errors must not prevent state reset.
+        except Exception:  # noqa: S110  # Closing errors must not prevent state reset.
+            pass
         _state.traces_file_handle = None
     _state.configured = False
     _state.meter_provider = None
@@ -477,14 +477,14 @@ def shutdown_telemetry() -> None:
     if _state.meter_provider is not None:
         try:
             _state.meter_provider.shutdown()  # type: ignore[union-attr]
-        except Exception:
-            pass  # Shutdown errors must never interrupt process teardown.
+        except Exception:  # noqa: S110  # Shutdown errors must never interrupt process teardown.
+            pass
 
     if _state.tracer_provider is not None:
         try:
             _state.tracer_provider.shutdown()  # type: ignore[union-attr]
-        except Exception:
-            pass  # Shutdown errors must never interrupt process teardown.
+        except Exception:  # noqa: S110  # Shutdown errors must never interrupt process teardown.
+            pass
 
     # Close file handles opened for the SDK-native Console*Exporter fallbacks.
     # Shutdown() above cascades force_flush() to all readers, so data is
@@ -493,12 +493,12 @@ def shutdown_telemetry() -> None:
     if _state.metrics_file_handle is not None:
         try:
             _state.metrics_file_handle.close()
-        except Exception:
-            pass  # Closing errors must not interrupt process teardown.
+        except Exception:  # noqa: S110  # Closing errors must not interrupt process teardown.
+            pass
         _state.metrics_file_handle = None
     if _state.traces_file_handle is not None:
         try:
             _state.traces_file_handle.close()
-        except Exception:
-            pass  # Closing errors must not interrupt process teardown.
+        except Exception:  # noqa: S110  # Closing errors must not interrupt process teardown.
+            pass
         _state.traces_file_handle = None

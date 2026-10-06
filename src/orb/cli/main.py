@@ -36,15 +36,15 @@ def _flush_telemetry() -> None:
         from orb.bootstrap.telemetry import shutdown_telemetry
 
         shutdown_telemetry()
-    except Exception:
-        pass  # Telemetry flush must never abort the CLI exit path.
+    except Exception:  # noqa: S110  # Telemetry flush must never abort the CLI exit path.
+        pass
 
 
 async def _show_resource_help(resource):
     """Show help for a resource when no action is provided."""
-    import subprocess  # nosec B404
+    import subprocess
 
-    subprocess.run([sys.executable, "-m", "orb", resource, "--help"], check=False)  # nosec B603
+    subprocess.run([sys.executable, "-m", "orb", resource, "--help"], check=False)  # noqa: S603  # fixed argv, check=False
     return {"success": True, "message": f"Showed help for {resource}"}
 
 

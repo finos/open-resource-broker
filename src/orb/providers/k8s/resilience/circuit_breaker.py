@@ -105,7 +105,7 @@ class K8sCircuitBreaker(CircuitBreakerStrategy):
                 name=self.service_name,
                 state=_STATE_TO_GAUGE.get(state, 0),
             )
-        except Exception:  # pragma: no cover — defensive against misconfigured metrics
+        except Exception:  # noqa: S110  # pragma: no cover — defensive against misconfigured metrics
             pass
 
     # ------------------------------------------------------------------

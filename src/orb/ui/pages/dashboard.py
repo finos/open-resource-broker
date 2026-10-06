@@ -380,7 +380,7 @@ class DashboardState(rx.State):
                 t_new = datetime.datetime.fromisoformat(newest)
                 diff_hours = (t_new - t_old).total_seconds() / 3600
                 use_day = diff_hours > 48
-            except Exception:
+            except Exception:  # noqa: S110 - malformed timestamps fall back to hourly bucketing
                 # Malformed or non-ISO timestamps — fall back to hourly bucketing
                 pass
 

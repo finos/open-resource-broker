@@ -35,4 +35,6 @@ class KubernetesDefaultsLoader:
             return {}
 
 
-assert isinstance(KubernetesDefaultsLoader(), ProviderDefaultsLoaderPort)
+assert isinstance(  # noqa: S101  # module-level protocol-conformance smoke check, also enforced statically by pyright
+    KubernetesDefaultsLoader(), ProviderDefaultsLoaderPort
+)

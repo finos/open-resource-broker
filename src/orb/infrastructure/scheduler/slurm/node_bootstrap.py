@@ -61,7 +61,7 @@ class SlurmNodeBootstrap:
             cmd.append(f"NodeHostname={hostname}")
 
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603  # argv is the configured scontrol path plus validated node_name/ip_address; shell=False
                 cmd, capture_output=True, text=True, timeout=self._timeout, shell=False, check=False
             )
             if result.returncode == 0:

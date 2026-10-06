@@ -278,7 +278,7 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
         import random
 
         # Using standard random for load balancing is appropriate (not cryptographic)
-        return random.choice(list(strategies.values()))  # nosec B311
+        return random.choice(list(strategies.values()))
 
     def _weighted_random_selection(
         self, strategies: dict[str, ProviderStrategy]

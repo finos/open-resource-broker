@@ -213,8 +213,8 @@ def get_request_formatter(
                 try:
                     scheduler = registry.create_strategy(scheduler_override, container)
                     return ResponseFormattingService(scheduler)
-                except Exception:
-                    pass  # Fall through to default
+                except Exception:  # noqa: S110  # Fall through to default scheduler
+                    pass
     return container.get(ResponseFormattingService)
 
 
@@ -241,8 +241,8 @@ def get_request_scheduler(
             if registry.is_registered(scheduler_override):
                 try:
                     return registry.create_strategy(scheduler_override, container)
-                except Exception:
-                    pass  # Fall through to default
+                except Exception:  # noqa: S110  # Fall through to default scheduler
+                    pass
     return container.get(SchedulerPort)
 
 

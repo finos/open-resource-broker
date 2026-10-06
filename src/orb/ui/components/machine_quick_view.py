@@ -187,7 +187,7 @@ class MachineQuickViewState(rx.State):
                             and not self.syncing_drawer
                         ):
                             self.selected_machine = {**_EMPTY_MACHINE, **full}
-            except Exception:
+            except Exception:  # noqa: S110 - stale drawer data is acceptable; the next poll retries
                 # API error during background poll — keep polling; drawer will show stale data
                 pass
             async with self:

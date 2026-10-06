@@ -35,4 +35,6 @@ class AzureDefaultsLoader:
         }
 
 
-assert isinstance(AzureDefaultsLoader(), ProviderDefaultsLoaderPort)
+assert isinstance(  # noqa: S101  # module-level protocol-conformance smoke check, also enforced statically by pyright
+    AzureDefaultsLoader(), ProviderDefaultsLoaderPort
+)

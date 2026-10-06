@@ -830,7 +830,7 @@ For more information, visit: {DOCS_URL}
 
     def _add_server_start_args(p):
         # Intentional binding for server deployment.
-        p.add_argument("--host", default=None, help="Server host (overrides config)")  # nosec B104
+        p.add_argument("--host", default=None, help="Server host (overrides config)")
         p.add_argument("--port", type=int, default=None, help="Server port (overrides config)")
         p.add_argument("--workers", type=int, default=None, help="Number of workers")
         p.add_argument("--reload", action="store_true", help="Enable uvicorn auto-reload (dev)")

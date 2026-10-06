@@ -332,7 +332,7 @@ class CognitoAuthStrategy(AuthPort):
             # This invalidates all access tokens derived from that refresh token on the
             # Cognito side.  The unsigned token_use hint is acceptable here: the worst
             # case of a forged "refresh" claim is a spurious but harmless API call.
-            if token_use == "refresh":
+            if token_use == "refresh":  # noqa: S105  # token type identifier, not a password
                 try:
                     await asyncio.to_thread(
                         self.cognito_client.revoke_token,

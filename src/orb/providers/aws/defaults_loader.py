@@ -34,4 +34,6 @@ class AWSDefaultsLoader:
 
 
 # Runtime check that AWSDefaultsLoader satisfies the protocol
-assert isinstance(AWSDefaultsLoader(), ProviderDefaultsLoaderPort)
+assert isinstance(  # noqa: S101  # module-level protocol-conformance smoke check, also enforced statically by pyright
+    AWSDefaultsLoader(), ProviderDefaultsLoaderPort
+)

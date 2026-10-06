@@ -157,7 +157,7 @@ class BearerTokenStrategy(AuthPort):
 
             # Check if it's actually a refresh token
             token_type = payload.get("type")
-            if token_type != "refresh":  # This is a token type identifier, not a password
+            if token_type != "refresh":  # noqa: S105  # token type identifier, not a password
                 return AuthResult(status=AuthStatus.INVALID, error_message="Invalid refresh token")
 
             # Create new access token

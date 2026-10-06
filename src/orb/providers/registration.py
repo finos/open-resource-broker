@@ -241,7 +241,7 @@ def register_all_provider_cli_specs() -> None:
                 continue
             try:
                 instance = attr()
-            except Exception:
+            except Exception:  # noqa: S112  # other classes in the module may not construct with zero args; keep scanning
                 continue
             if isinstance(instance, ProviderCLISpecPort):
                 spec_instance = instance
@@ -293,7 +293,7 @@ def register_all_defaults_loaders() -> None:
                 continue
             try:
                 instance = attr()
-            except Exception:
+            except Exception:  # noqa: S112  # other classes in the module may not construct with zero args; keep scanning
                 continue
             if isinstance(instance, ProviderDefaultsLoaderPort):
                 loader_instance = instance

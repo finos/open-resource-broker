@@ -250,7 +250,7 @@ class K8sHandlerRegistry:
                 continue
             try:
                 examples.extend(getter())
-            except Exception:
+            except Exception:  # noqa: S112  # a handler failing to produce examples must not block the others
                 continue
         return examples
 

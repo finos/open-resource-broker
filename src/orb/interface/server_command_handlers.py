@@ -260,13 +260,13 @@ def _health_url(server_config: Any, ui_config: Any | None) -> str:
     if ui_config and ui_config.enabled:
         if ui_config.mode == "embedded":
             host = server_config.host
-            if host in ("0.0.0.0", "::"):
+            if host in ("0.0.0.0", "::"):  # noqa: S104  # translating the configured bind-all host into a loopback health-check URL
                 host = "127.0.0.1"
             return f"http://{host}:{server_config.port}/orb/health"
         if ui_config.mode == "dev":
             return f"http://127.0.0.1:{ui_config.backend_port}/orb/health"
     host = server_config.host
-    if host in ("0.0.0.0", "::"):
+    if host in ("0.0.0.0", "::"):  # noqa: S104  # translating the configured bind-all host into a loopback health-check URL
         host = "127.0.0.1"
     return f"http://{host}:{server_config.port}/health"
 
@@ -446,7 +446,7 @@ async def handle_server_reload(args) -> dict[str, Any]:
     if ui_config and ui_config.enabled and ui_config.mode == "embedded":
         # Embedded mode: single uvicorn on server_config.port, API at /orb.
         host = server_config.host
-        if host in ("0.0.0.0", "::"):
+        if host in ("0.0.0.0", "::"):  # noqa: S104  # translating the configured bind-all host into a loopback admin request target
             host = "127.0.0.1"
         port = server_config.port
         path = "/orb/api/v1/admin/reload-config"
@@ -456,7 +456,7 @@ async def handle_server_reload(args) -> dict[str, Any]:
         path = "/orb/api/v1/admin/reload-config"
     else:
         host = server_config.host
-        if host in ("0.0.0.0", "::"):
+        if host in ("0.0.0.0", "::"):  # noqa: S104  # translating the configured bind-all host into a loopback admin request target
             host = "127.0.0.1"
         port = server_config.port
         path = "/api/v1/admin/reload-config"

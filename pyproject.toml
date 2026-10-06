@@ -724,12 +724,15 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# ENFORCED: These rules fail CI (replace black/isort/flake8)
+# ENFORCED: These rules fail CI (replace black/isort/flake8).  S (flake8-bandit)
+# is enforced too — see makefiles/ci.mk's ci-quality-ruff target, which runs it
+# as a separate pass scoped to src/ (not the whole repo).
 select = ["E", "W", "F", "I"]
 # OPTIONAL: These warn but don't fail CI (replace pylint functionality)
-extend-select = ["N", "UP", "B", "PL", "C90", "RUF"]
+extend-select = ["N", "UP", "B", "PL", "C90", "RUF", "S"]
 ignore = [
     "E501",  # Line too long (handled by formatter)
+    "S311",  # Standard pseudo-random generator use - no crypto/token generation uses random in this codebase
     "PLR0913",  # Too many arguments
     "PLR0912",  # Too many branches
     "PLR0915",  # Too many statements
@@ -787,6 +790,8 @@ classmethod-decorators = [
     "PLC0415",  # Allow conditional imports in tests for optional dependencies
     "N803",     # Allow PascalCase argument names (e.g. StateClass helper)
     "N806",     # Allow PascalCase local names for dynamically-constructed test subclasses
+    "S",        # flake8-bandit: assert, dummy credentials/tokens, subprocess and
+                # tmp-file patterns are normal test-harness code, not production risk
 ]
 
 [tool.ruff.format]

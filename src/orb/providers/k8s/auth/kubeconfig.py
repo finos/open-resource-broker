@@ -233,7 +233,7 @@ def _redact_proxy_url(url: str) -> str:
             parsed = parsed._replace(netloc=redacted_netloc)
             return urllib.parse.urlunparse(parsed)
         return _redact_schemeless_userinfo(url)
-    except Exception:  # pragma: no cover — malformed URLs passed through
+    except Exception:  # noqa: S110  # pragma: no cover — malformed URLs passed through unredacted
         pass
     return url
 

@@ -136,8 +136,8 @@ class OrphanGarbageCollector:
                 task.cancel()
                 try:
                     await task
-                except (asyncio.CancelledError, Exception):  # pragma: no cover
-                    pass
+                except (asyncio.CancelledError, Exception) as exc:  # pragma: no cover
+                    self._logger.debug("Orphan GC task raised during cancellation: %s", exc)
         self._task = None
 
     # ------------------------------------------------------------------

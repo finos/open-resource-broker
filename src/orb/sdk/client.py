@@ -275,8 +275,8 @@ class ORBClient:
             from orb.bootstrap.telemetry import shutdown_telemetry
 
             shutdown_telemetry()
-        except Exception:
-            pass  # Never let telemetry flush abort SDK cleanup.
+        except Exception:  # noqa: S110  # Never let telemetry flush abort SDK cleanup.
+            pass
 
         # Always clean up state
         self._initialized = False
@@ -523,7 +523,7 @@ class ORBClient:
         from orb.interface.catalog import OPERATION_CATALOG, Interface
         from orb.interface.response_formatting_service import ResponseFormattingService
 
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; callers always check self._initialized before invoking this helper
         entry = OPERATION_CATALOG[key]
         orchestrator = self._container.get(entry.orchestrator)
         formatter = self._container.get(ResponseFormattingService)
@@ -537,7 +537,7 @@ class ORBClient:
         """
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import AcquireMachinesInput
 
@@ -566,7 +566,7 @@ class ORBClient:
         """
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         # Resolve the list of IDs from either parameter name.
         ids: list = list(request_ids) if request_ids is not None else []
@@ -591,7 +591,7 @@ class ORBClient:
         """List requests via ListRequestsOrchestrator."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import ListRequestsInput
 
@@ -612,7 +612,7 @@ class ORBClient:
         """Return machines via ReturnMachinesOrchestrator."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import ReturnMachinesInput
 
@@ -633,7 +633,7 @@ class ORBClient:
         """Cancel a request via CancelRequestOrchestrator."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import CancelRequestInput
 
@@ -649,7 +649,7 @@ class ORBClient:
         """List machines via ListMachinesOrchestrator with unified formatting."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import ListMachinesInput
 
@@ -671,7 +671,7 @@ class ORBClient:
         """Get a single machine via GetMachineOrchestrator with unified formatting."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import GetMachineInput
         from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
@@ -692,7 +692,7 @@ class ORBClient:
         """List templates via ListTemplatesOrchestrator with unified formatting."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import ListTemplatesInput
 
@@ -713,7 +713,7 @@ class ORBClient:
         """Get a single template via GetTemplateOrchestrator with unified formatting."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import GetTemplateInput
         from orb.application.services.orchestration.get_template import GetTemplateOrchestrator
@@ -736,7 +736,7 @@ class ORBClient:
         """Create a template via CreateTemplateOrchestrator with unified formatting."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import CreateTemplateInput
 
@@ -771,7 +771,7 @@ class ORBClient:
         """Update a template via UpdateTemplateOrchestrator with unified formatting."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import UpdateTemplateInput
 
@@ -804,7 +804,7 @@ class ORBClient:
         """Delete a template via DeleteTemplateOrchestrator with unified formatting."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import DeleteTemplateInput
         from orb.domain.base.exceptions import EntityNotFoundError
@@ -821,7 +821,7 @@ class ORBClient:
         """Validate a template via ValidateTemplateOrchestrator with unified formatting."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import ValidateTemplateInput
 
@@ -837,7 +837,7 @@ class ORBClient:
         """Refresh templates via RefreshTemplatesOrchestrator with unified formatting."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import RefreshTemplatesInput
 
@@ -895,7 +895,7 @@ class ORBClient:
         """List return requests via ListReturnRequestsOrchestrator."""
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; self._initialized guard above already raises SDKError
 
         from orb.application.services.orchestration.dtos import ListReturnRequestsInput
 
@@ -1101,7 +1101,7 @@ class ORBClient:
         from orb.application.services.admin.cleanup_database import CleanupDatabaseService
         from orb.domain.base import UnitOfWorkFactory
 
-        assert self._container is not None
+        assert self._container is not None  # noqa: S101  # type-narrowing; callers always check self._initialized before invoking this helper
         service = CleanupDatabaseService(uow_factory=self._container.get(UnitOfWorkFactory))
 
         target_statuses = statuses if statuses else list(_TERMINAL_REQUEST_STATUSES)

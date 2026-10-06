@@ -98,7 +98,7 @@ class FileManager:
             yield
             return
 
-        assert _fcntl is not None  # narrowed: _FCNTL_AVAILABLE implies _fcntl was imported
+        assert _fcntl is not None  # noqa: S101  # narrowed: _FCNTL_AVAILABLE implies _fcntl was imported
 
         lock_path = self.file_path.parent / f".{self.file_path.name}.lock"
         # Open (or create) the lock file; O_CREAT handles the not-yet-exists case.

@@ -585,7 +585,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
                 else:
                     # Fall back to the provider type name itself as a minimal key.
                     apis.append(provider_type)
-            except Exception:
+            except Exception:  # noqa: S112 - one provider failing to list its APIs must not block the others
                 # A single provider failing to expose its APIs must not
                 # block the caller: skip and continue collecting from the
                 # remaining providers.
