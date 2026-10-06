@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,37 @@ import httpx
 _cached_token: str | None = None
 _cached_token_file: Path | None = None
 _cached_token_mtime: float = 0.0
+
+# Short-lived cache for the resolved auth.enabled flag. In split mode the
+# API and the dashboard backend restart independently, so the value must be
+# re-read periodically rather than resolved once per process. Failed
+# resolutions are retried sooner than successful ones.
+_AUTH_ENABLED_TTL_SECONDS = 30.0
+_AUTH_ENABLED_FAILURE_TTL_SECONDS = 5.0
+
+
+class _AuthEnabledCache:
+    """Holds the last resolved ``auth.enabled`` value and when it goes stale."""
+
+    def __init__(self) -> None:
+        self.value: bool | None = None
+        self.expiry: float = 0.0
+
+    def get(self, now: float) -> bool | None:
+        if self.value is not None and now < self.expiry:
+            return self.value
+        return None
+
+    def set(self, value: bool, expiry: float) -> None:
+        self.value = value
+        self.expiry = expiry
+
+    def clear(self) -> None:
+        self.value = None
+        self.expiry = 0.0
+
+
+_auth_enabled_cache = _AuthEnabledCache()
 
 ORB_BASE_URL = os.getenv("ORB_BASE_URL", "http://localhost:8000")
 # In embedded mode ORB is mounted at /orb inside the Reflex process, so the
@@ -81,11 +113,78 @@ def _loopback_token() -> str | None:
     return None
 
 
+def _auth_enabled() -> bool:
+    """Return the configured ``server.auth.enabled`` value.
+
+    Resolved directly through ``ConfigurationManager`` (the same default
+    config discovery the server itself uses, see
+    ``orb.bootstrap.core_services.register_core_services``) rather than the
+    DI container, so this check never triggers full provider/service
+    registration in a UI-only process (split mode's Reflex backend never
+    otherwise builds that container).
+
+    With no ``server.auth`` section the value is ``ServerConfig``'s own
+    default (auth off), exactly what the server enforces in that case.
+    A resolution failure is logged and treated as "auth enabled", which
+    withholds the loopback-admin token. The failure is not cached for long:
+    it is retried after a few seconds.
+    """
+    now = time.monotonic()
+    cached = _auth_enabled_cache.get(now)
+    if cached is not None:
+        return cached
+    try:
+        from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.config.schemas.server_schema import ServerConfig
+
+        enabled = bool(ConfigurationManager().get_typed(ServerConfig).auth.enabled)
+        ttl = _AUTH_ENABLED_TTL_SECONDS
+    except Exception as exc:
+        from orb.infrastructure.logging.logger import get_logger
+
+        get_logger(__name__).warning(
+            "Could not resolve server.auth.enabled; treating authentication as "
+            "enabled and withholding the loopback token: %s",
+            exc,
+        )
+        enabled = True
+        ttl = _AUTH_ENABLED_FAILURE_TTL_SECONDS
+    _auth_enabled_cache.set(enabled, now + ttl)
+    return enabled
+
+
+def warn_if_dashboard_unauthenticated(server_config: Any, logger: Any) -> None:
+    """Log a warning when the dashboard runs under configured authentication.
+
+    The dashboard's backend client no longer escalates browser sessions to
+    admin once ``auth.enabled`` is True. It forwards no credential and lets
+    requests go through the configured auth strategy like any other caller,
+    so the dashboard is effectively read-only until a browser login flow is
+    configured.
+    """
+    if getattr(getattr(server_config, "auth", None), "enabled", False):
+        logger.warning(
+            "Authentication is enabled, but the dashboard's backend client "
+            "no longer escalates to admin on behalf of browser sessions. "
+            "Dashboard requests go through the same auth as any other API "
+            "caller and are rejected until a browser login flow is "
+            "configured. The dashboard is effectively read-only under this "
+            "configuration."
+        )
+
+
 def _headers() -> dict[str, str]:
     headers = dict(_DEFAULT_HEADERS)
-    token = _loopback_token()
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    if not _auth_enabled():
+        # The loopback-admin token promotes every call this client makes to
+        # admin. That is only safe when the operator has not configured a
+        # real auth strategy — otherwise every browser session reaching the
+        # dashboard would silently inherit admin, regardless of who the
+        # browser user actually is. When auth is enabled, calls go through
+        # unauthenticated and are rejected by the normal auth strategy.
+        token = _loopback_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
     return headers
 
 

@@ -13,8 +13,11 @@ the env var, so they do not require a running ORB daemon.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -162,13 +165,23 @@ class TestLoopbackToken:
 
 
 class TestHeaders:
-    """Exercises _headers() — the dict sent on every httpx request."""
+    """Exercises _headers() — the dict sent on every httpx request.
 
-    def test_includes_authorization_when_token_present(self):
-        """Token present → Authorization: Bearer <token> is in headers."""
+    ``_headers()`` only attaches the loopback-admin token when
+    ``_auth_enabled()`` reports ``False`` (operator has not configured a
+    real auth strategy). All cases here patch ``_auth_enabled`` directly to
+    isolate the gating behaviour from config resolution, which is covered
+    separately in ``TestAuthEnabled`` below.
+    """
+
+    def test_includes_authorization_when_token_present_and_auth_disabled(self):
+        """Token present + auth disabled → Authorization: Bearer <token> is in headers."""
         mod = _import_api_http()
 
-        with patch.object(mod, "_loopback_token", return_value="test-token-xyz"):
+        with (
+            patch.object(mod, "_auth_enabled", return_value=False),
+            patch.object(mod, "_loopback_token", return_value="test-token-xyz"),
+        ):
             headers = mod._headers()
 
         assert "Authorization" in headers
@@ -178,7 +191,27 @@ class TestHeaders:
         """No token → Authorization key absent from headers."""
         mod = _import_api_http()
 
-        with patch.object(mod, "_loopback_token", return_value=None):
+        with (
+            patch.object(mod, "_auth_enabled", return_value=False),
+            patch.object(mod, "_loopback_token", return_value=None),
+        ):
+            headers = mod._headers()
+
+        assert "Authorization" not in headers
+
+    def test_excludes_authorization_when_auth_enabled_even_with_token(self):
+        """Auth enabled → Authorization is withheld even though a valid token exists.
+
+        This is the regression guard for the dashboard self-escalation bug:
+        the loopback-admin token must never be forwarded once the operator
+        has configured real authentication.
+        """
+        mod = _import_api_http()
+
+        with (
+            patch.object(mod, "_auth_enabled", return_value=True),
+            patch.object(mod, "_loopback_token", return_value="test-token-xyz"),
+        ):
             headers = mod._headers()
 
         assert "Authorization" not in headers
@@ -187,7 +220,10 @@ class TestHeaders:
         """Other default headers (e.g. X-ORB-Scheduler) survive when no token."""
         mod = _import_api_http()
 
-        with patch.object(mod, "_loopback_token", return_value=None):
+        with (
+            patch.object(mod, "_auth_enabled", return_value=False),
+            patch.object(mod, "_loopback_token", return_value=None),
+        ):
             headers = mod._headers()
 
         # _DEFAULT_HEADERS always includes X-ORB-Scheduler
@@ -197,8 +233,119 @@ class TestHeaders:
         """Both Authorization and default headers coexist."""
         mod = _import_api_http()
 
-        with patch.object(mod, "_loopback_token", return_value="tok"):
+        with (
+            patch.object(mod, "_auth_enabled", return_value=False),
+            patch.object(mod, "_loopback_token", return_value="tok"),
+        ):
             headers = mod._headers()
 
         assert "X-ORB-Scheduler" in headers
         assert "Authorization" in headers
+
+
+# ---------------------------------------------------------------------------
+# _auth_enabled
+# ---------------------------------------------------------------------------
+
+
+class TestAuthEnabled:
+    """Exercises _auth_enabled() against real configuration resolution.
+
+    ORB_CONFIG_DIR points the default config discovery at a temp directory,
+    so the real ConfigurationManager and ServerConfig schema are used.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _isolate(self, tmp_path: Path, monkeypatch):
+        mod = _import_api_http()
+        monkeypatch.setenv("ORB_CONFIG_DIR", str(tmp_path))
+        mod._auth_enabled_cache.clear()
+        self.mod = mod
+        self.config_dir = tmp_path
+        yield
+        mod._auth_enabled_cache.clear()
+
+    def _write_config(self, auth: dict) -> None:
+        (self.config_dir / "config.json").write_text(json.dumps({"server": {"auth": auth}}))
+
+    def test_returns_true_when_configured_enabled(self):
+        self._write_config({"enabled": True, "strategy": "bearer_token"})
+        assert self.mod._auth_enabled() is True
+
+    def test_returns_false_when_configured_disabled(self):
+        self._write_config({"enabled": False, "strategy": "none"})
+        assert self.mod._auth_enabled() is False
+
+    def test_missing_config_matches_server_default(self):
+        """No config file: same value the server's own ServerConfig default yields."""
+        from orb.config.schemas.server_schema import ServerConfig
+
+        assert self.mod._auth_enabled() is ServerConfig().auth.enabled
+
+    def test_result_is_cached_within_ttl(self):
+        self._write_config({"enabled": False, "strategy": "none"})
+        assert self.mod._auth_enabled() is False
+
+        self._write_config({"enabled": True, "strategy": "bearer_token"})
+        assert self.mod._auth_enabled() is False
+
+    def test_config_is_resolved_once_within_ttl_and_again_after(self, monkeypatch):
+        from orb.config.managers import configuration_manager as cm
+
+        clock = [1000.0]
+        monkeypatch.setattr(self.mod.time, "monotonic", lambda: clock[0])
+        calls = []
+        real = cm.ConfigurationManager
+
+        def counting(*args, **kwargs):
+            calls.append(1)
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(cm, "ConfigurationManager", counting)
+        self._write_config({"enabled": False, "strategy": "none"})
+
+        assert self.mod._auth_enabled() is False
+        clock[0] += self.mod._AUTH_ENABLED_TTL_SECONDS - 1
+        assert self.mod._auth_enabled() is False
+        assert len(calls) == 1
+
+        self._write_config({"enabled": True, "strategy": "bearer_token"})
+        clock[0] += 2
+        assert self.mod._auth_enabled() is True
+        assert len(calls) == 2
+
+    def test_value_is_refreshed_after_ttl(self):
+        self._write_config({"enabled": False, "strategy": "none"})
+        assert self.mod._auth_enabled() is False
+
+        self._write_config({"enabled": True, "strategy": "bearer_token"})
+        self.mod._auth_enabled_cache.expiry = 0.0
+        assert self.mod._auth_enabled() is True
+
+    def test_resolution_failure_is_logged_and_fails_safe(self):
+        with (
+            patch(
+                "orb.config.managers.configuration_manager.ConfigurationManager",
+                side_effect=RuntimeError("config boom"),
+            ),
+            patch("orb.infrastructure.logging.logger.get_logger") as get_logger,
+        ):
+            result = self.mod._auth_enabled()
+
+        assert result is True
+        get_logger.return_value.warning.assert_called_once()
+        assert "config boom" in str(get_logger.return_value.warning.call_args)
+
+    def test_resolution_failure_is_retried_and_recovers(self):
+        with patch(
+            "orb.config.managers.configuration_manager.ConfigurationManager",
+            side_effect=RuntimeError("config boom"),
+        ):
+            assert self.mod._auth_enabled() is True
+
+        # The failure is cached only for the short failure TTL, far below the
+        # success TTL, so a later call re-resolves instead of sticking at True.
+        assert self.mod._AUTH_ENABLED_FAILURE_TTL_SECONDS < self.mod._AUTH_ENABLED_TTL_SECONDS
+        self._write_config({"enabled": False, "strategy": "none"})
+        self.mod._auth_enabled_cache.expiry = 0.0
+        assert self.mod._auth_enabled() is False
