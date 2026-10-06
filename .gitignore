@@ -39,9 +39,6 @@ scorecard.png
 *-results.sarif
 *-report.json
 *-report.sarif
-bandit-report.json
-bandit-report.sarif
-bandit-results.sarif
 hadolint-results.sarif
 trivy-results.json
 trivy-results.sarif
@@ -153,7 +150,6 @@ htmlcov/
 .tox/
 nosetests.xml
 coverage/
-bandit-*
 
 # Logs
 logs/
@@ -268,7 +264,6 @@ instance/
 .webassets-cache
 
 # Security scan results
-bandit-results*.json
 trivy-*.sarif
 semgrep-results.json
 safety-results.json

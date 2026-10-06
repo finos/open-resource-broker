@@ -64,19 +64,6 @@ jobs:
     name: Configuration
     uses: ./.github/workflows/shared-config.yml
 
-  security-bandit:
-    name: Bandit (Security Scan)
-    needs: [config]
-    permissions:
-      contents: read
-      actions: read
-      security-events: write
-    uses: ./.github/workflows/reusable-security.yml
-    with:
-      scan-type: bandit
-      default-python-version: ${{ needs.config.outputs.default-python-version }}
-      python-version: ${{ needs.config.outputs.default-python-version }}
-
   security-pip-audit:
     name: pip-audit (Dependency Scan)
     needs: [config]

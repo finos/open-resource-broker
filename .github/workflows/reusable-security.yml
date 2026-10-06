@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       scan-type:
-        description: 'Type of security scan (bandit, pip-audit, semgrep, trivy-fs, hadolint, codeql)'
+        description: 'Type of security scan (pip-audit, semgrep, trivy-fs, hadolint, codeql)'
         required: true
         type: string
       python-version:
@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Setup Python and UV
-        if: contains('bandit,pip-audit', inputs.scan-type)
+        if: inputs.scan-type == 'pip-audit'
         uses: ./.github/actions/setup-uv-cached
         with:
           # Use the caller-supplied cache key when set; otherwise derive the
@@ -59,11 +59,6 @@ jobs:
             }}
           group: security
           fail-on-cache-miss: false
-
-      # Bandit Security Scan
-      - name: Run Bandit security scan
-        if: inputs.scan-type == 'bandit'
-        run: make ci-security-bandit
 
       # pip-audit Dependency Scan
       - name: Run pip-audit dependency scan

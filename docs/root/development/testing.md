@@ -354,8 +354,8 @@ def test_machine_type_validation(self, machine_type: str):
    - Comprehensive test coverage
 
 3. **Security Scan** (`.github/workflows/security.yml`):
-   - Bandit security linting
-   - Safety dependency vulnerability check
+   - Ruff security rules (flake8-bandit)
+   - pip-audit dependency vulnerability check
    - Semgrep security analysis
    - CodeQL analysis
 

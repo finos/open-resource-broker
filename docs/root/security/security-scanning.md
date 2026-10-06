@@ -15,25 +15,28 @@ The project implements a multi-layered security scanning approach that includes:
 
 ## Security Tools
 
-### 1. Bandit - Python Security Linter
+### 1. Ruff (flake8-bandit rules) - Python Security Linter
 
-**Purpose**: Static analysis of Python code for common security issues.
+**Purpose**: Static analysis of Python code for common security issues (hardcoded
+credentials, unsafe subprocess calls, SQL string construction, and similar
+patterns).
 
 **Usage**:
 ```bash
-# Run via Makefile
-make security
+# Run via Makefile (part of the Ruff quality gate)
+make ci-quality-ruff
 
 # Run directly
-python -m bandit -r src/ -f sarif -o bandit-results.sarif
+ruff check --select S --ignore S311 src/
 ```
 
-**Configuration**: `.bandit.yaml`
+**Configuration**: `pyproject.toml` (`[tool.ruff.lint]`). Findings are either
+fixed or suppressed with a per-line `# noqa: Sxxx` comment carrying the
+justification; `tests/**` carries a blanket suppression since assert and
+dummy-credential patterns are normal test code.
 
 **Output Formats**:
-- SARIF (for GitHub Security tab)
-- JSON (for CI/CD processing)
-- Text (for human review)
+- Text (CI job log and local terminal)
 
 ### 2. Safety - Dependency Vulnerability Scanner
 
@@ -115,7 +118,6 @@ All security tools generate SARIF (Static Analysis Results Interchange Format) f
 
 ### SARIF Files Generated
 
-- `bandit-results.sarif` - Python security issues
 - `trivy-results.sarif` - Container vulnerabilities
 - `hadolint-results.sarif` - Dockerfile issues
 - `semgrep.sarif` - Static analysis results
@@ -189,8 +191,8 @@ Security checks integrated into pre-commit workflow:
 
 ```yaml
 # Security checks in .pre-commit-config.yaml
-- id: bandit-security-check
-- id: safety-dependency-check
+- id: ruff-check
+- id: pip-audit
 - id: secrets-detection
 - id: dockerfile-security
 ```
@@ -212,11 +214,6 @@ make security-full
 **Comprehensive Report**:
 ```bash
 make security-report
-```
-
-**Custom Security Scan**:
-```bash
-python scripts/security/security_scan.py
 ```
 
 ### SARIF Validation
@@ -293,10 +290,10 @@ Access security information through:
 
 ### Common Issues
 
-**Bandit False Positives**:
+**Ruff Security Rule False Positives**:
 ```python
-# Use # nosec comment for false positives
-password = get_password_from_env()  # nosec B105
+# Use a per-line # noqa comment with the rule code and a reason
+password = get_password_from_env()  # noqa: S105  # env lookup, not a literal credential
 ```
 
 **Safety Dependency Conflicts**:

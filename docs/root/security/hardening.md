@@ -167,8 +167,8 @@ ORB_REDIS_URL="redis://localhost:6379"
 ## Security Scanning
 
 ```bash
-bandit -r src/
-safety check
+ruff check --select S --ignore S311 src/
+pip-audit
 semgrep --config=auto src/
 ```
 

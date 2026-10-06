@@ -36,15 +36,6 @@ repos:
         description: "Check Python type annotations with pyright"
 
 
-      - id: bandit
-        name: bandit (Security Analysis)
-        entry: make ci-security-bandit
-        language: system
-        files: \.(py)$
-        pass_filenames: false
-        description: "Run bandit security analysis"
-        stages: [pre-push]
-
       - id: pip-audit
         name: pip-audit (Dependency Security)
         entry: make ci-security-pip-audit
