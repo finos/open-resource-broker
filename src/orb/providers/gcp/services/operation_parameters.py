@@ -113,7 +113,10 @@ class GCPMutationParameters(BaseModel):
             metadata.scope = scopes.pop()
 
         location_field = {"zonal": "zone", "regional": "region"}.get(metadata.scope or "")
+        # getattr: location_field is "zone" or "region", chosen by scope; both are
+        # declared on the request metadata and on the persisted machine data.
         if location_field is not None and getattr(metadata, location_field) is None:
+            # getattr: same scope-selected field name as above.
             locations = {
                 getattr(c.provider_data, location_field)
                 for c in coordinates
