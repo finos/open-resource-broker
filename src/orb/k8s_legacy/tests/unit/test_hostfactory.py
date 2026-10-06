@@ -145,7 +145,7 @@ class TestRequestReturnMachines(unittest.TestCase):
                 "--workdir",
                 self.workdir,
                 "request-return-machines",
-                str(list_machines),
+                *list_machines,
             ],
         ).output
         self.json_in = _create_json_in(req_in, self.workdir)

@@ -69,6 +69,9 @@ def audit_pod_spec(pod_spec: dict[str, Any], logger: LoggingPort) -> list[str]:
       equivalent ``{"host_network": True, ...}``).
     * The full pod manifest
       (``{"apiVersion": ..., "spec": {...}}``).
+    * A Job, Deployment or StatefulSet manifest (or CronJob), in which case
+      the pod template under ``spec.template.spec`` (CronJob:
+      ``spec.jobTemplate.spec.template.spec``) is audited.
 
     Both camelCase (native-spec / Jinja-rendered) and snake_case
     (``kubernetes.client.V1Pod.to_dict()``) key formats are handled.
@@ -79,6 +82,10 @@ def audit_pod_spec(pod_spec: dict[str, Any], logger: LoggingPort) -> list[str]:
     * ``spec.hostPID`` / ``host_pid`` == ``True``
     * ``spec.hostIPC`` / ``host_ipc`` == ``True``
     * ``spec.volumes[*].hostPath`` / ``host_path`` (any non-empty entry)
+    * ``spec.securityContext.runAsUser`` / ``run_as_user`` == ``0``
+      (pod-level security context), for every container that does not
+      set its own ``runAsUser`` — a container-level ``securityContext``
+      overrides the pod-level value for that container
     * ``spec.containers[*].securityContext.privileged`` == ``True``
     * ``spec.containers[*].securityContext.allowPrivilegeEscalation`` /
       ``allow_privilege_escalation`` == ``True``
@@ -113,6 +120,18 @@ def audit_pod_spec(pod_spec: dict[str, Any], logger: LoggingPort) -> list[str]:
     if "apiVersion" in pod_spec or "api_version" in pod_spec or "kind" in pod_spec:
         spec = pod_spec.get("spec") or {}
 
+    # Workload kinds (Job, Deployment, StatefulSet) carry the pod spec under
+    # ``spec.template.spec``; CronJob nests it one level deeper under
+    # ``spec.jobTemplate.spec``.  Descend until the pod spec is reached.
+    for _ in range(2):
+        job_template = _get(spec, "jobTemplate", "job_template")
+        if isinstance(job_template, dict) and isinstance(job_template.get("spec"), dict):
+            spec = job_template["spec"]
+        template = spec.get("template")
+        if isinstance(template, dict) and isinstance(template.get("spec"), dict):
+            spec = template["spec"]
+            break
+
     findings: list[str] = []
 
     # ------------------------------------------------------------------
@@ -145,6 +164,44 @@ def audit_pod_spec(pod_spec: dict[str, Any], logger: LoggingPort) -> list[str]:
                 f"high-risk pod-spec field detected: "
                 f"spec.volumes[{i}].hostPath ({vol_name}) = {path_value!r}"
             )
+            logger.warning("WARN: %s", msg)
+            findings.append(msg)
+
+    # ------------------------------------------------------------------
+    # Pod-level security context — runAsUser == 0
+    # ------------------------------------------------------------------
+    # A container-level securityContext.runAsUser, when set, overrides the
+    # pod-level value for that container, so only containers that leave
+    # runAsUser unset actually inherit the pod-level setting.
+    containers = _get(spec, "containers", "containers") or []
+    init_containers = _get(spec, "initContainers", "init_containers") or []
+
+    pod_sc = _get(spec, "securityContext", "security_context") or {}
+    if isinstance(pod_sc, dict) and _get(pod_sc, "runAsUser", "run_as_user") == 0:
+        inheriting: list[str] = []
+        for section, section_containers in (
+            ("containers", containers),
+            ("initContainers", init_containers),
+        ):
+            for ci, container in enumerate(section_containers):
+                if not isinstance(container, dict):
+                    continue
+                csc = container.get("securityContext") or container.get("security_context") or {}
+                if isinstance(csc, dict) and _get(csc, "runAsUser", "run_as_user") is not None:
+                    # Container sets its own runAsUser — overrides pod-level.
+                    continue
+                inheriting.append(container.get("name", f"{section}[{ci}]"))
+
+        if inheriting:
+            names = ", ".join(inheriting)
+            msg = (
+                "high-risk pod-spec field detected: "
+                f"spec.securityContext.runAsUser = 0 (inherited by: {names})"
+            )
+            logger.warning("WARN: %s", msg)
+            findings.append(msg)
+        elif not containers and not init_containers:
+            msg = "high-risk pod-spec field detected: spec.securityContext.runAsUser = 0"
             logger.warning("WARN: %s", msg)
             findings.append(msg)
 
@@ -201,10 +258,7 @@ def audit_pod_spec(pod_spec: dict[str, Any], logger: LoggingPort) -> list[str]:
                         logger.warning("WARN: %s", msg)
                         findings.append(msg)
 
-    containers = _get(spec, "containers", "containers") or []
     _check_containers(containers, "containers")
-
-    init_containers = _get(spec, "initContainers", "init_containers") or []
     _check_containers(init_containers, "initContainers")
 
     return findings

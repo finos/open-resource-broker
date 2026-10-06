@@ -346,3 +346,140 @@ def test_get_return_requests(
     response = api.get_return_requests("/path/to/workdir", machines)
     extra = {request["machine"] for request in response["requests"]}
     assert extra == {"pod3"}
+
+
+# ---------------------------------------------------------------------------
+# request_id validation (path traversal hardening)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "request_id",
+    [
+        "req1",
+        "mock_request_id",
+        "a" * 12,
+        "with-dash",
+        "with_underscore",
+    ],
+)
+def test_validate_request_id_accepts_safe_values(request_id: str) -> None:
+    """Values matching the ORB-generated/allow-list charset must pass."""
+    assert api._validate_request_id(request_id) == request_id
+
+
+@pytest.mark.parametrize(
+    "request_id",
+    [
+        "../../etc/passwd",
+        "..",
+        "/etc/passwd",
+        "foo/../bar",
+        "foo/bar",
+        "foo\\bar",
+        "",
+        "req-1\n",
+    ],
+)
+def test_validate_request_id_rejects_traversal_and_separators(request_id: str) -> None:
+    with pytest.raises(ValueError, match="Invalid request id"):
+        api._validate_request_id(request_id)
+
+
+def test_validate_request_id_rejects_non_string() -> None:
+    with pytest.raises(ValueError, match="Invalid request id"):
+        api._validate_request_id(None)  # type: ignore[arg-type]
+
+
+def test_resolve_within_workdir_rejects_escaping_path(temp_workdir) -> None:
+    outside = pathlib.Path("/etc/passwd")
+    with pytest.raises(ValueError, match="escapes workdir"):
+        api._resolve_within_workdir(temp_workdir, outside)
+
+
+def test_resolve_within_workdir_accepts_nested_path(temp_workdir) -> None:
+    nested = temp_workdir / "requests" / "req1"
+    assert api._resolve_within_workdir(temp_workdir, nested) == nested
+
+
+def test_get_request_dir_rejects_traversal_request_id(temp_workdir) -> None:
+    with pytest.raises(ValueError, match="Invalid request id"):
+        api._get_request_dir(temp_workdir, "../../etc")
+
+
+def test_get_machines_dir_rejects_traversal_request_id(temp_workdir) -> None:
+    with pytest.raises(ValueError, match="Invalid request id"):
+        api._get_machines_dir(temp_workdir, "../escape")
+
+
+@mock.patch("orb.k8s_legacy.events.EventsBuffer")
+def test_request_machines_rejects_traversal_request_id(_mock_event_buffer, temp_workdir) -> None:
+    with pytest.raises(ValueError, match="Invalid request id"):
+        api.request_machines(
+            temp_workdir,
+            "/path/to/templates.json",
+            "mock_template_id",
+            1,
+            "../../etc/passwd",
+        )
+
+
+@mock.patch("orb.k8s_legacy.events.EventsBuffer")
+def test_request_return_machines_rejects_traversal_request_id(
+    _mock_event_buffer, temp_workdir
+) -> None:
+    with pytest.raises(ValueError, match="Invalid request id"):
+        api.request_return_machines(temp_workdir, [], "../../etc/passwd")
+
+
+@mock.patch("orb.k8s_legacy.events.EventsBuffer")
+def test_get_request_status_rejects_traversal_request_id(_mock_event_buffer, temp_workdir) -> None:
+    with pytest.raises(ValueError, match="Invalid request id"):
+        api.get_request_status(temp_workdir, ["../../etc/passwd"])
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["machine-0", "pod1", "a", "my-pod.example", "a" * 253],
+)
+def test_validate_machine_name_accepts_dns_subdomains(name: str) -> None:
+    assert api._validate_machine_name(name) == name
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "",
+        "..",
+        "../escape",
+        "/etc/passwd",
+        "a/b",
+        "a\\b",
+        "a..b",
+        ".a",
+        "a.",
+        "-a",
+        "Upper",
+        "pod\n",
+        "a" * 254,
+    ],
+)
+def test_validate_machine_name_rejects_unsafe_values(name: str) -> None:
+    with pytest.raises(ValueError, match="Invalid machine name"):
+        api._validate_machine_name(name)
+
+
+def test_validate_machine_name_rejects_non_string() -> None:
+    with pytest.raises(ValueError, match="Invalid machine name"):
+        api._validate_machine_name(None)  # type: ignore[arg-type]
+
+
+@mock.patch("orb.k8s_legacy.events.EventsBuffer")
+def test_request_return_machines_rejects_traversal_machine_name(
+    _mock_event_buffer, temp_workdir
+) -> None:
+    with pytest.raises(ValueError, match="Invalid machine name"):
+        api.request_return_machines(
+            temp_workdir, [{"machineId": "m0", "name": "../../escape"}], "ret-1"
+        )
+    assert not (temp_workdir.parent / "escape").exists()
