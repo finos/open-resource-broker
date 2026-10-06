@@ -394,8 +394,8 @@ def create_fastapi_app(server_config: Any) -> Any:
     # call wraps everything already registered, so the LAST call below ends
     # up OUTERMOST and runs first on every request:
     #   CORS -> TrustedHost -> Auth -> RateLimit -> AuditLog ->
-    #   LoopbackAdminToken -> Logging -> ReadOnly -> HTTPSRedirect ->
-    #   ForwardedProto -> SecurityHeaders -> router
+    #   LoopbackAdminToken -> Logging -> ReadOnly -> ForwardedProto ->
+    #   HTTPSRedirect -> SecurityHeaders -> router
     # CORS is registered last (outermost) so a cross-origin preflight OPTIONS
     # request is answered directly before TrustedHost, auth, or rate limiting
     # ever see it. RateLimit is registered before AuthMiddleware so Auth ends
@@ -468,7 +468,7 @@ def create_fastapi_app(server_config: Any) -> Any:
     # both — by the time its post-response logging runs, Auth has already
     # populated request.state.user_id/user_roles for the audit record.
     if getattr(server_config, "audit_log_enabled", True):
-        app.add_middleware(AuditLogMiddleware)
+        app.add_middleware(AuditLogMiddleware, trusted_proxies=server_config.trusted_proxies)
         logger.info("Audit-log middleware enabled")
 
     # Workers count is used by both the rate-limit and SSE multi-worker warnings below.

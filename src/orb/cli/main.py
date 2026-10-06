@@ -11,6 +11,7 @@ Command routing logic:   cli.router
 import asyncio
 import logging
 import sys
+from typing import Any
 
 # Re-export for backward compatibility
 from orb.cli.args import parse_args
@@ -46,6 +47,16 @@ async def _show_resource_help(resource):
 
     subprocess.run([sys.executable, "-m", "orb", resource, "--help"], check=False)  # noqa: S603  # fixed argv, check=False
     return {"success": True, "message": f"Showed help for {resource}"}
+
+
+def _apply_log_level_flag(args: Any) -> None:
+    """Set the root log level only when --log-level was given explicitly.
+
+    Without the flag the level from configuration or ORB_LOG_LEVEL applies.
+    """
+    level = getattr(args, "log_level", None)
+    if level:
+        logging.getLogger().setLevel(getattr(logging, level.upper()))
 
 
 async def main() -> None:
@@ -97,7 +108,7 @@ async def main() -> None:
                 print(generate_zsh_completion())
             return
 
-        getattr(logging, args.log_level.upper())
+        _apply_log_level_flag(args)
         logger = get_logger(__name__)
 
         # Handle help display early - no need for app initialization
@@ -215,6 +226,10 @@ async def main() -> None:
             dry_run = getattr(args, "dry_run", False)
             if not await app.initialize(dry_run=dry_run):
                 raise RuntimeError("Failed to initialize application")
+            # Application.initialize() re-applies logging configuration from
+            # the config file (setup_logging), which would discard an
+            # explicit --log-level. Reapply it so the flag wins.
+            _apply_log_level_flag(args)
         except Exception as e:
             logger.error("Failed to initialize application: %s", e, exc_info=True)
             if args.verbose:

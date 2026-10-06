@@ -706,8 +706,8 @@ For more information, visit: {DOCS_URL}
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        default="INFO",
-        help="Set logging level",
+        default=None,
+        help="Set logging level (default: from configuration or ORB_LOG_LEVEL)",
     )
     parser.add_argument("--output", help="Output file (default: stdout)")
     parser.add_argument(
