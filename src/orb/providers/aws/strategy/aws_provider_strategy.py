@@ -957,7 +957,7 @@ class AWSProviderStrategy(ProviderStrategy):
             if needs_resolution:
                 service = self._create_image_resolution_service()
                 for spec in needs_resolution:
-                    resolved_images[spec] = service.resolve_image_id(spec)
+                    resolved_images[spec] = await asyncio.to_thread(service.resolve_image_id, spec)
 
             return ProviderResult.success_result({"resolved_images": resolved_images})
 

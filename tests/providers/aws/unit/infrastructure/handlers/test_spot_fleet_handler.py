@@ -38,6 +38,16 @@ def _make_client_error(code="InternalError"):
     return ClientError({"Error": {"Code": code, "Message": "boom"}}, "DescribeSpotFleetRequests")
 
 
+class TestSpotFleetReleaseManagerRetryWiring:
+    def test_release_manager_uses_handlers_own_retry_method_directly(self):
+        """SpotFleetReleaseManager must receive the handler's own bound
+        _retry_with_backoff directly, like EC2FleetReleaseManager, instead
+        of a getattr lookup on aws_ops that only worked because of
+        constructor-ordering side effects."""
+        handler = _make_handler()
+        assert handler._release_manager._retry == handler._retry_with_backoff
+
+
 def _formatted_instances(instance_ids, resource_id="sfr-test"):
     """Return already-formatted instance dicts."""
     return [

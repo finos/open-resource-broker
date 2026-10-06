@@ -122,7 +122,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             request_adapter,
             self._cleanup_on_zero_capacity,
             logger,
-            retry_fn=getattr(aws_ops, "_retry_with_backoff", None),
+            retry_fn=self._retry_with_backoff,
         )
 
     @handle_infrastructure_exceptions(context="spot_fleet_creation")

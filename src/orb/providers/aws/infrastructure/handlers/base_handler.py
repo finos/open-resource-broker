@@ -119,6 +119,9 @@ class AWSHandler(ProviderHandlerBase, ABC):
         self._setup_aws_operations(aws_ops)
         self._setup_dependencies(request_adapter, machine_adapter)
 
+        if hasattr(launch_template_manager, "set_retry_method"):
+            launch_template_manager.set_retry_method(self._retry_with_backoff)
+
     def _setup_aws_operations(self, aws_ops) -> None:
         """Configure AWS operations utility - eliminates duplication across handlers."""
         self.aws_ops = aws_ops
@@ -700,7 +703,10 @@ class AWSHandler(ProviderHandlerBase, ABC):
         """
         try:
             # Use AWS client's EC2 client for describe_instances
-            response = self.aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
+            response = self._retry_with_backoff(
+                lambda: self.aws_client.ec2_client.describe_instances(InstanceIds=instance_ids),
+                operation_type="read_only",
+            )
 
             instances: list[dict[str, Any]] = []
             reservations = response.get("Reservations", [])
