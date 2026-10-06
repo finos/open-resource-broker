@@ -354,12 +354,13 @@ sdk-typescript-check-drift: sdk-typescript-generate  ## Verify TypeScript SDK: g
 
 sdk-csharp-check-drift: sdk-csharp-generate  ## Verify C# SDK: generate from spec + compile
 	@echo "Verifying C# SDK builds cleanly from the current spec..."
-	@# OrbSdk.sln includes the generated OpenResourceBroker.Sdk project, and the
-	@# hand-written client references it (hybrid model — see sdk/ARCHITECTURE.md).
-	@# Building the sln therefore compiles the generated models AND the client
-	@# against them, giving C# real spec-drift protection: a spec change that
-	@# produces uncompilable generated code, or that breaks the client's use of a
-	@# model, fails here instead of silently.
+	@# The generated OpenResourceBroker.Sdk project is not part of OrbSdk.sln
+	@# (it is not checked in, and restoring the solution on a clean checkout would
+	@# fail). sdk-csharp-generate produces it, and the hand-written client
+	@# references it (hybrid model - see sdk/ARCHITECTURE.md), so building the
+	@# solution after generation compiles the generated models AND the client
+	@# against them: a spec change that produces uncompilable generated code, or
+	@# that breaks the client's use of a model, fails here instead of silently.
 	@dotnet build sdk/csharp/OrbSdk.sln --configuration Release
 	@echo "C# SDK: spec → generate → build (client + generated models) OK."
 

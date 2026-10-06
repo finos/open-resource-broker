@@ -24,9 +24,10 @@ hand-written transport.
 This holds for **all five SDKs, including C#**: the .NET client references the
 generated `OpenResourceBroker.Sdk` models (produced by `make sdk-csharp-generate`
 with the `generichost` library, which emits System.Text.Json-native models) and
-marshals through them.  The generated project is included in `OrbSdk.sln`, so
-`sdk-csharp-check-drift` builds the client *against* the generated models — a
-spec change that breaks either fails the build.
+marshals through them.  The generated project is not listed in `OrbSdk.sln` (it is not checked in), but
+the client references it, so `sdk-csharp-check-drift` generates it first and then
+builds the client *against* the generated models — a spec change that breaks
+either fails the build.
 
 ## Five Mandatory Hand-Written Layers
 

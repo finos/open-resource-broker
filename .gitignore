@@ -50,6 +50,7 @@ vulnerability-reports/
 safety-report.json
 security-report.json
 security-report.md
+*-sbom.json
 *-sbom-*.json
 *-sbom-*.spdx
 *-sbom-*.cyclonedx
