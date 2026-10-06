@@ -322,6 +322,19 @@ class TestGetAvailableCredentialSources:
         assert "" not in names
         assert "valid" in names
 
+    def test_uses_injected_logger_not_module_logger(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Debug logging on the exception paths must go through the
+        constructor-injected LoggingPort, not a separately created logger."""
+        logger = _make_logger()
+        svc = K8sCapabilityService(logger=logger)  # type: ignore[arg-type]
+        self._make_fake_k8s_config(monkeypatch, raise_on_list=True)
+        with patch(
+            "orb.providers.k8s.auth.in_cluster.is_in_cluster",
+            side_effect=RuntimeError("no in-cluster detection"),
+        ):
+            svc.get_available_credential_sources()
+        assert logger.debug.call_count == 2
+
 
 @pytest.mark.unit
 class TestTestCredentials:
