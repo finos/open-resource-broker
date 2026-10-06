@@ -25,7 +25,7 @@ from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
-from orb.infrastructure.resilience import retry
+from orb.infrastructure.resilience import MaxRetriesExceededError, retry
 from orb.providers.aws.configuration.cleanup_config import CleanupConfig
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (
@@ -118,9 +118,6 @@ class AWSHandler(ProviderHandlerBase, ABC):
         # Setup required dependencies
         self._setup_aws_operations(aws_ops)
         self._setup_dependencies(request_adapter, machine_adapter)
-
-        if hasattr(launch_template_manager, "set_retry_method"):
-            launch_template_manager.set_retry_method(self._retry_with_backoff)
 
     def _setup_aws_operations(self, aws_ops) -> None:
         """Configure AWS operations utility - eliminates duplication across handlers."""
@@ -761,8 +758,15 @@ class AWSHandler(ProviderHandlerBase, ABC):
             self._logger.debug("Converted %d instances to domain format", len(instances))
             return instances
 
-        except ClientError as e:
-            error = self._convert_client_error(e)
+        except (ClientError, MaxRetriesExceededError) as e:
+            # The retry wrapper reports exhausted attempts as
+            # MaxRetriesExceededError; unwrap it so callers still receive the
+            # typed not-found, rate-limit and authorization errors.
+            cause = e.last_exception if isinstance(e, MaxRetriesExceededError) else e
+            if not isinstance(cause, ClientError):
+                self._logger.error("Unexpected error getting instance details: %s", str(e))
+                raise InfrastructureError(f"Failed to get instance details: {e!s}")
+            error = self._convert_client_error(cause)
             self._logger.error("Failed to get instance details: %s", str(error))
             raise error
         except Exception as e:

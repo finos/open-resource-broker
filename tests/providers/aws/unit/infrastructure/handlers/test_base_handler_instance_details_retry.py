@@ -10,7 +10,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from orb.providers.aws.exceptions.aws_exceptions import InfrastructureError
+from orb.providers.aws.exceptions.aws_exceptions import (
+    AuthorizationError,
+    AWSEntityNotFoundError,
+    RateLimitError,
+)
 from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
 
 
@@ -72,13 +76,35 @@ class TestGetInstanceDetailsRetry:
         assert len(result) == 1
         assert result[0]["name"] == "i-123"
 
-    def test_exhausts_retries_and_raises_on_persistent_throttling(self):
+    def test_exhausted_throttling_keeps_rate_limit_type(self):
         handler = _make_handler()
         handler.aws_client.ec2_client.describe_instances.side_effect = _throttle_error()
 
         with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
-            with pytest.raises(InfrastructureError):
+            with pytest.raises(RateLimitError):
                 handler._get_instance_details(["i-123"], provider_api="EC2Fleet")
 
         # read_only strategy allows one retry on top of the initial attempt.
         assert handler.aws_client.ec2_client.describe_instances.call_count == 3
+
+    def test_exhausted_not_found_keeps_entity_not_found_type(self):
+        handler = _make_handler()
+        handler.aws_client.ec2_client.describe_instances.side_effect = ClientError(
+            {"Error": {"Code": "InvalidInstanceID.NotFound", "Message": "gone"}},
+            "DescribeInstances",
+        )
+
+        with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
+            with pytest.raises(AWSEntityNotFoundError):
+                handler._get_instance_details(["i-123"], provider_api="EC2Fleet")
+
+    def test_exhausted_authorization_keeps_authorization_type(self):
+        handler = _make_handler()
+        handler.aws_client.ec2_client.describe_instances.side_effect = ClientError(
+            {"Error": {"Code": "UnauthorizedOperation", "Message": "denied"}},
+            "DescribeInstances",
+        )
+
+        with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
+            with pytest.raises(AuthorizationError):
+                handler._get_instance_details(["i-123"], provider_api="EC2Fleet")

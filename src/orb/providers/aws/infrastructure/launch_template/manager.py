@@ -9,7 +9,7 @@ import base64
 import hashlib
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from botocore.exceptions import ClientError
 
@@ -86,24 +86,6 @@ class AWSLaunchTemplateManager:
         self._logger = logger
         self.config_port = config_port
         self.aws_native_spec_service = aws_native_spec_service
-        self._retry_with_backoff: Optional[Callable[..., Any]] = None
-
-    def set_retry_method(self, retry_method: Callable[..., Any]) -> None:
-        """Wire in the owning handler's retry wrapper.
-
-        Called by ``AWSHandler`` once it is constructed, since this manager
-        is built before the handler and has no retry logic of its own.
-        """
-        self._retry_with_backoff = retry_method
-
-    def _retry_or_call(self, func: Callable[..., Any], **kwargs: Any) -> Any:
-        """Run an AWS call through the handler's retry wrapper, falling back
-        to a direct call when no retry method has been wired in (e.g. when
-        this manager is used standalone, outside an ``AWSHandler``).
-        """
-        if self._retry_with_backoff is not None:
-            return self._retry_with_backoff(func, operation_type="critical", **kwargs)
-        return func(**kwargs)
 
     def create_or_update_launch_template(
         self, aws_template: AWSTemplate, request: Request
@@ -401,8 +383,7 @@ class AWSLaunchTemplateManager:
                 ebs["Iops"] = iops
             lt_data["BlockDeviceMappings"] = [{"DeviceName": "/dev/xvda", "Ebs": ebs}]
 
-        response = self._retry_or_call(
-            self.aws_client.ec2_client.create_launch_template_version,
+        response = self.aws_client.ec2_client.create_launch_template_version(
             LaunchTemplateId=template_id,
             VersionDescription=f"Override for request {request.request_id}",
             LaunchTemplateData=lt_data,
@@ -565,8 +546,7 @@ class AWSLaunchTemplateManager:
 
         lt_tags = self._create_launch_template_tags(aws_template, request)
 
-        response = self._retry_or_call(
-            self.aws_client.ec2_client.create_launch_template,
+        response = self.aws_client.ec2_client.create_launch_template(
             LaunchTemplateName=template_name,
             VersionDescription=f"Created for request {request.request_id}",
             LaunchTemplateData=template_data,
