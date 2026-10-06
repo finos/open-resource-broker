@@ -731,15 +731,23 @@ def create_fastapi_app(server_config: Any) -> Any:
             "description": "REST API for Open Resource Broker",
         }
 
-    # Serve favicon from project logo assets
-    _favicon_path = Path(__file__).resolve().parents[3] / "docs" / "assets" / "orb-icon.png"
-    if _favicon_path.exists():
+    # Serve the favicon from a packaged resource rather than a path derived
+    # from __file__, so the route never touches request-controllable input
+    # and works regardless of install layout (editable, sdist, wheel).
+    try:
+        from importlib import resources as _resources
+
+        _favicon_bytes: bytes | None = (
+            _resources.files("orb.api.assets").joinpath("orb-icon.png").read_bytes()
+        )
+    except (FileNotFoundError, ModuleNotFoundError, OSError):
+        _favicon_bytes = None
+
+    if _favicon_bytes is not None:
 
         @app.get("/favicon.ico", include_in_schema=False)
         async def favicon() -> Any:
-            from fastapi.responses import FileResponse
-
-            return FileResponse(_favicon_path, media_type="image/png")
+            return Response(content=_favicon_bytes, media_type="image/png")  # type: ignore[misc]
 
     # Stamp auth-enabled status on app state so request-time dependencies
     # (get_current_user) can distinguish "auth disabled → grant admin" from

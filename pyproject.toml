@@ -567,6 +567,7 @@ include-package-data = true
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
 "orb.config" = ["default_config.json"]
+"orb.api.assets" = ["*.png"]
 "orb.providers.aws.config" = ["*.json"]
 "orb.ui" = ["rxconfig.py", "_static/**/*", "_static/*"]
 "orb.k8s_legacy.alembic" = ["alembic.ini", "script.py.mako"]

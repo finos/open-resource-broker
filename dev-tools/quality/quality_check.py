@@ -133,10 +133,44 @@ DOC_EXTENSIONS = {".md", ".rst", ".txt"}
 CONFIG_EXTENSIONS = {".yaml", ".yml", ".json", ".toml"}
 ALL_EXTENSIONS = CODE_EXTENSIONS | DOC_EXTENSIONS | CONFIG_EXTENSIONS
 
+# Directories under src/orb/providers/ that hold cross-provider abstractions
+# or infrastructure (interfaces, the provider registry, shared execution
+# services) rather than a specific SDK boundary, and are therefore not
+# subject to getattr() justification scoping.
+_NON_PROVIDER_PROVIDER_DIRS = frozenset({"base", "registry", "services"})
+
+_PROVIDERS_ROOT = Path(__file__).resolve().parents[2] / "src" / "orb" / "providers"
+
+
+def discover_provider_names() -> tuple[str, ...]:
+    """Return every provider package name under src/orb/providers/.
+
+    A provider package is any immediate subdirectory of providers/ that is a
+    real Python package (has an __init__.py) and is not one of the shared,
+    non-provider-specific trees in _NON_PROVIDER_PROVIDER_DIRS. This makes
+    getattr() justification scoping discover new providers automatically
+    instead of requiring a hard-coded list to be kept in sync.
+    """
+    if not _PROVIDERS_ROOT.is_dir():
+        return ()
+    names = []
+    for entry in sorted(_PROVIDERS_ROOT.iterdir()):
+        if not entry.is_dir() or entry.name.startswith("_"):
+            continue
+        if entry.name in _NON_PROVIDER_PROVIDER_DIRS:
+            continue
+        if not (entry / "__init__.py").is_file():
+            continue
+        names.append(entry.name)
+    return tuple(names)
+
+
 # Provider trees where getattr() usage must carry a justification comment,
 # because their SDKs expose heterogeneous, loosely-typed objects that make
 # getattr() an easy way to silently paper over a missing attribute.
-GETATTR_JUSTIFICATION_SCOPES = ("/orb/providers/azure/", "/orb/providers/gcp/")
+GETATTR_JUSTIFICATION_SCOPES = tuple(
+    f"/orb/providers/{name}/" for name in discover_provider_names()
+)
 
 # A justification may be a per-call comment ("# getattr: <reason>") or a
 # function-level one ("# getattr throughout this function: <reason>") placed

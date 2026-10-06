@@ -14,7 +14,7 @@ def mock_hf_environment(tmp_path):
     Mock HF_PROVIDER environment variables for testing.
 
     Creates temporary directories and sets environment variables
-    to point to test fixtures instead of real awscpinst files.
+    to point to test fixtures instead of the real plugin config files.
 
     Args:
         tmp_path: pytest temporary directory fixture

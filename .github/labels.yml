@@ -77,6 +77,10 @@
   color: "cfd3d7"
   description: "Refactoring or technical debt"
 
+- name: "type: research"
+  color: "d4c5f9"
+  description: "Research spike or design investigation"
+
 # Area
 - name: "area: providers/aws"
   color: "ff9900"

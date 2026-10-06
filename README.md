@@ -31,9 +31,9 @@
 
 ---
 
-Open Resource Broker (ORB) is a unified API for orchestrating and provisioning compute capacity programmatically. Define what you need in a template, request it, track it, return it — through a CLI, REST API, MCP server, or native SDKs in six languages (Python, Go, TypeScript, Java, Kotlin, .NET).
+Open Resource Broker (ORB) is a unified API for orchestrating and provisioning compute capacity programmatically. Define what you need in a template, request it, track it, return it — through a CLI, REST API, MCP server, or native SDKs for Python, Go, TypeScript, Java, Kotlin, and .NET.
 
-ORB ships with provider backends for AWS, Azure, Google Cloud, and Kubernetes, plus an extensible provider system for adding new backends.
+ORB includes provider backends for AWS, Azure, Google Cloud, and Kubernetes, plus an extensible provider system for adding new backends.
 
 **Provider support:**
 - **AWS** — EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups, Lambda MicroVMs (built in; see [AWS Provider Setup](#setup) below)
@@ -266,7 +266,7 @@ Install with `pip install "orb-py[k8s]"`. Minimum RBAC is in [`docs/root/provide
 
 ## Interfaces
 
-ORB provides multiple ways to interact with your infrastructure — a CLI, a REST API, an MCP server, and native SDKs in six languages.
+ORB provides multiple ways to interact with your infrastructure — a CLI, a REST API, an MCP server, and native SDKs for Python, Go, TypeScript, Java, Kotlin, and .NET.
 
 <details>
 <summary>CLI Reference</summary>
@@ -325,7 +325,7 @@ curl -X GET "http://localhost:8000/api/v1/requests/req-12345"
 <details>
 <summary>SDKs (Python, Go, TypeScript, Java, Kotlin, .NET)</summary>
 
-Native client libraries in six languages. Python is async-first and in-process; the other five drive a managed `orb` server over a local socket, so they share one OpenAPI contract and behave identically.
+Native client libraries for Python, Go, TypeScript, Java, Kotlin, and .NET. Python is async-first and in-process; the others drive a managed `orb` server over a local socket, so they share one OpenAPI contract and behave identically.
 
 | Language | Install | Entry point |
 |---|---|---|
