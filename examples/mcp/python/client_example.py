@@ -55,7 +55,7 @@ async def call_tool(
     logger.info("Calling tool %s with %s", name, arguments or {})
     result = await session.call_tool(name, arguments or {})
     body = _tool_body(result)
-    logger.info("Tool %s isError=%s body=%s", name, result.isError, body)
+    logger.info("Tool %s isError=%s body=%s", name, result.is_error, body)
     return body
 
 
@@ -95,7 +95,7 @@ async def example_error_handling() -> None:
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.call_tool("non_existent_tool", {})
-            logger.info("Unknown tool isError=%s", result.isError)
+            logger.info("Unknown tool isError=%s", result.is_error)
 
 
 async def main() -> None:
