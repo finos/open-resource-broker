@@ -174,11 +174,10 @@ api = [
     "jinja2>=3.1.0",
 ]
 
-# Model Context Protocol server. The <2 cap holds to the stable 1.x line; the
-# 2.0 rewrite renames the server class and changes the handler surface, so the
-# upgrade is a deliberate migration rather than an implicit resolve.
+# Model Context Protocol server. The 2.x line registers low-level server
+# handlers through constructor callbacks instead of decorators.
 mcp = [
-    "mcp>=1.28,<2",
+    "mcp>=2.3,<3",
 ]
 
 # OTel API only — for embedders that want instrumentation without the SDK weight.
@@ -415,7 +414,8 @@ test = [
     "httpx>=0.27.0",  # Required by FastAPI TestClient
     "jinja2>=3.1.0",
     # MCP server tests exercise the official SDK, so the test surface needs it.
-    "mcp>=1.28,<2",
+    "mcp>=2.3,<3",
+    "httpx2>=2.13,<3",  # HTTP client of the MCP SDK; the transport tests drive it directly
     # AWS Testing
     "moto[all]>=5.1.19,<6.0.0",
     "responses>=0.24.0,<1.0.0",
