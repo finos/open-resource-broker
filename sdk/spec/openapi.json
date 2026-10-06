@@ -196,6 +196,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
               "description": "Limit number of results",
               "default": 50,
               "title": "Limit"
@@ -208,6 +210,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "description": "Number of results to skip",
               "default": 0,
               "title": "Offset"
@@ -810,6 +813,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -1120,7 +1125,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "maximum": 1000,
+                  "minimum": 1
                 },
                 {
                   "type": "null"
@@ -1336,6 +1343,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
               "description": "Limit number of results",
               "default": 50,
               "title": "Limit"

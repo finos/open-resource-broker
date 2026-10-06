@@ -67,7 +67,7 @@ RETURN_LIST_ORCHESTRATOR = Depends(get_list_return_requests_orchestrator)
 CANCEL_ORCHESTRATOR = Depends(get_cancel_request_orchestrator)
 FORMATTER = Depends(get_request_formatter)
 STATUS_QUERY = Query(None, description="Filter by request status")
-LIMIT_QUERY = Query(50, description="Limit number of results")
+LIMIT_QUERY = Query(50, ge=1, le=1000, description="Limit number of results")
 OFFSET_QUERY = Query(0, ge=0, description="Number of results to skip")
 
 # Server-side ceiling for blocking ``?wait=true`` requests. Callers may pass a
