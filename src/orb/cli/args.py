@@ -11,6 +11,7 @@ import sys
 
 # Optional: Rich formatting for help text
 import sys as _sys
+from typing import cast
 
 from orb.cli.parsers.common_args import add_provider_type_arg
 from orb.domain.machine.machine_status import MachineStatus
@@ -20,11 +21,11 @@ from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 try:
     import rich.console as _rich_console  # type: ignore[import-untyped,import-not-found]
     from rich_argparse import (  # type: ignore[import-untyped,import-not-found]
-        RichHelpFormatter as _RichHelpFormatter,
+        RawDescriptionRichHelpFormatter as _RichHelpFormatter,
     )
 
     class _TtyAwareFormatter(_RichHelpFormatter):
-        """RichHelpFormatter that produces plain text when stderr is not a TTY."""
+        """Rich formatter that keeps description/epilog layout and produces plain text when stderr is not a TTY."""
 
         @property
         def console(self) -> _rich_console.Console:
@@ -40,6 +41,18 @@ try:
     HELP_FORMATTER = _TtyAwareFormatter
 except ImportError:
     HELP_FORMATTER = argparse.RawDescriptionHelpFormatter
+
+
+class _OrbArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser whose sub-parsers all default to HELP_FORMATTER.
+
+    argparse builds sub-parsers with ``type(parser)``, so using this class at the
+    top level gives every nested parser the same help layout.
+    """
+
+    def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        kwargs.setdefault("formatter_class", HELP_FORMATTER)
+        super().__init__(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -667,11 +680,13 @@ def build_parser() -> tuple[argparse.ArgumentParser, dict]:
 
     from orb._package import DESCRIPTION, DOCS_URL
 
-    parser = argparse.ArgumentParser(
-        prog=os.path.basename(sys.argv[0]),
-        description=DESCRIPTION,
-        formatter_class=HELP_FORMATTER,
-        epilog=f"""
+    parser = cast(
+        argparse.ArgumentParser,
+        _OrbArgumentParser(
+            prog=os.path.basename(sys.argv[0]),
+            description=DESCRIPTION,
+            formatter_class=HELP_FORMATTER,
+            epilog=f"""
 Examples:
   %(prog)s templates list                              # List all templates
   %(prog)s templates list --provider-name aws-prod    # Use specific provider instance
@@ -684,6 +699,7 @@ Examples:
 
 For more information, visit: {DOCS_URL}
         """,
+        ),
     )
 
     parser.add_argument("--config", help="Configuration file path")
@@ -715,9 +731,48 @@ For more information, visit: {DOCS_URL}
     pp = ParentParsers()
 
     subparsers = parser.add_subparsers(
-        dest="resource", help="Available resources or legacy commands"
+        dest="resource", metavar="<command>", help="Available resources or legacy commands"
     )
     resource_parsers = {}
+
+    # Init
+    init_parser = subparsers.add_parser(
+        "init",
+        help="Initialize ORB configuration",
+        description="Initialize ORB configuration, optionally discovering infrastructure interactively.",
+    )
+    add_force_argument(init_parser)
+    init_parser.add_argument("--non-interactive", action="store_true", help="Non-interactive mode")
+    init_parser.add_argument(
+        "--scheduler", choices=["default", "hostfactory", "slurm"], help="Scheduler type"
+    )
+    add_provider_type_arg(
+        init_parser,
+        default="aws",
+        extra_help="Provider type to initialise.",
+    )
+    init_parser.add_argument("--config-dir", help="Custom configuration directory")
+    init_parser.add_argument(
+        "--scripts-dir",
+        dest="scripts_dir",
+        help="Directory for ORB scripts (default: derived from config dir or ORB_SCRIPTS_DIR)",
+    )
+    init_parser.add_argument(
+        "--subnet-ids",
+        help="Comma-separated subnet IDs for template_defaults (non-interactive only)",
+    )
+    init_parser.add_argument(
+        "--security-group-ids",
+        help="Comma-separated security group IDs for template_defaults (non-interactive only)",
+    )
+    init_parser.add_argument(
+        "--fleet-role",
+        help="Spot Fleet IAM role ARN or name for template_defaults (non-interactive only)",
+    )
+    # Inject per-provider CLI flags (e.g. --aws-profile, --aws-region) so that
+    # _get_default_config can use spec.extract_config() in non-interactive mode.
+    for _spec in CLISpecRegistry.all().values():
+        _spec.add_arguments(init_parser)
 
     # Templates
     templates_parser = subparsers.add_parser(
@@ -726,15 +781,18 @@ For more information, visit: {DOCS_URL}
         description="Manage compute templates — list, show, create, update, and validate them.",
     )
     resource_parsers["templates"] = templates_parser
-    templates_subparsers = templates_parser.add_subparsers(dest="action", help="Template actions")
+    templates_subparsers = templates_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Template actions"
+    )
 
     template_parser = subparsers.add_parser(
         "template",
-        help="Manage compute templates (alias for templates)",
         description="Manage compute templates (singular alias for templates).",
     )
     resource_parsers["template"] = template_parser
-    template_subparsers = template_parser.add_subparsers(dest="action", help="Template actions")
+    template_subparsers = template_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Template actions"
+    )
 
     add_template_actions(templates_subparsers, pp)
     add_template_actions(template_subparsers, pp)
@@ -746,15 +804,18 @@ For more information, visit: {DOCS_URL}
         description="Manage compute instances — request, list, show, return, and control machines.",
     )
     resource_parsers["machines"] = machines_parser
-    machines_subparsers = machines_parser.add_subparsers(dest="action", help="Machine actions")
+    machines_subparsers = machines_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Machine actions"
+    )
 
     machine_parser = subparsers.add_parser(
         "machine",
-        help="Manage compute instances (alias for machines)",
         description="Manage compute instances (singular alias for machines).",
     )
     resource_parsers["machine"] = machine_parser
-    machine_subparsers = machine_parser.add_subparsers(dest="action", help="Machine actions")
+    machine_subparsers = machine_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Machine actions"
+    )
 
     add_machine_actions(machines_subparsers, pp)
     add_machine_actions(machine_subparsers, pp)
@@ -766,18 +827,204 @@ For more information, visit: {DOCS_URL}
         description="Manage provisioning requests — list, show, cancel, and watch them.",
     )
     resource_parsers["requests"] = requests_parser
-    requests_subparsers = requests_parser.add_subparsers(dest="action", help="Request actions")
+    requests_subparsers = requests_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Request actions"
+    )
 
     request_parser = subparsers.add_parser(
         "request",
-        help="Manage provisioning requests (alias for requests)",
         description="Manage provisioning requests (singular alias for requests).",
     )
     resource_parsers["request"] = request_parser
-    request_subparsers = request_parser.add_subparsers(dest="action", help="Request actions")
+    request_subparsers = request_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Request actions"
+    )
 
     add_request_actions(requests_subparsers, pp)
     add_request_actions(request_subparsers, pp)
+
+    # Providers
+    providers_parser = subparsers.add_parser(
+        "providers",
+        help="Manage cloud providers",
+        description="Manage cloud providers — list, add, update, remove, and inspect provider instances.",
+    )
+    resource_parsers["providers"] = providers_parser
+    providers_subparsers = providers_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Provider actions"
+    )
+
+    provider_parser = subparsers.add_parser(
+        "provider",
+        description="Manage cloud providers (singular alias for providers).",
+    )
+    resource_parsers["provider"] = provider_parser
+    provider_subparsers = provider_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Provider actions"
+    )
+
+    add_provider_actions(providers_subparsers, pp)
+    add_provider_actions(provider_subparsers, pp)
+
+    # Config
+    config_parser = subparsers.add_parser(
+        "config",
+        help="Manage ORB configuration",
+        description="Manage ORB configuration — show, get, set, validate, and reload settings.",
+    )
+    resource_parsers["config"] = config_parser
+    config_subparsers = config_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Config actions", required=True
+    )
+
+    config_subparsers.add_parser(
+        "show",
+        help="Show configuration",
+        description="Show the current ORB configuration.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+
+    config_set = config_subparsers.add_parser(
+        "set",
+        help="Set configuration",
+        description="Set a configuration value by key.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    config_set.add_argument("key", help="Configuration key")
+    config_set.add_argument("value", help="Configuration value")
+    config_set.add_argument(
+        "--no-persist",
+        dest="persist",
+        action="store_false",
+        default=True,
+        help="Set the value in memory only; do not write it to the config file",
+    )
+
+    config_get = config_subparsers.add_parser(
+        "get",
+        help="Get configuration",
+        description="Get a configuration value by key.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    config_get.add_argument("key", help="Configuration key")
+
+    config_validate = config_subparsers.add_parser(
+        "validate",
+        help="Validate configuration",
+        description="Validate the ORB configuration file for correctness.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    config_validate.add_argument("--file", help="Configuration file to validate")
+
+    config_subparsers.add_parser(
+        "reload",
+        help="Reload provider configuration",
+        description="Reload provider configuration from disk.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+
+    # Scheduler
+    scheduler_parser = subparsers.add_parser(
+        "scheduler",
+        help="Manage scheduler strategies",
+        description="Manage scheduler strategies — list, inspect, and validate them.",
+    )
+    resource_parsers["scheduler"] = scheduler_parser
+    scheduler_subparsers = scheduler_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Scheduler actions", required=True
+    )
+
+    scheduler_subparsers.add_parser(
+        "list",
+        help="List scheduler strategies",
+        description="List the available scheduler strategies.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+
+    scheduler_show = scheduler_subparsers.add_parser(
+        "show",
+        help="Show scheduler details",
+        description="Show the configuration of a scheduler strategy.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    scheduler_show.add_argument("--strategy", help="Show specific scheduler strategy details")
+
+    scheduler_validate = scheduler_subparsers.add_parser(
+        "validate",
+        help="Validate scheduler",
+        description="Validate the configuration of a scheduler strategy.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    scheduler_validate.add_argument("--strategy", help="Validate specific scheduler strategy")
+
+    # Storage
+    storage_parser = subparsers.add_parser(
+        "storage",
+        help="Manage storage backends",
+        description="Manage storage backends — list, inspect, validate, test, and migrate strategies.",
+    )
+    resource_parsers["storage"] = storage_parser
+    storage_subparsers = storage_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Storage actions", required=True
+    )
+
+    storage_subparsers.add_parser(
+        "list",
+        help="List storage strategies",
+        description="List the available storage strategies.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+
+    storage_show = storage_subparsers.add_parser(
+        "show",
+        help="Show storage configuration",
+        description="Show the configuration of the active or selected storage strategy.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    storage_show.add_argument("--strategy", help="Show specific storage strategy details")
+
+    storage_validate = storage_subparsers.add_parser(
+        "validate",
+        help="Validate storage",
+        description="Validate the configuration of a storage strategy.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    storage_validate.add_argument("--strategy", help="Validate specific storage strategy")
+
+    storage_test = storage_subparsers.add_parser(
+        "test",
+        help="Test storage connectivity",
+        description="Test connectivity to a storage strategy backend.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    storage_test.add_argument("--strategy", help="Test specific storage strategy")
+    storage_test.add_argument("--timeout", type=int, default=30, help="Test timeout in seconds")
+
+    storage_subparsers.add_parser(
+        "health",
+        help="Check storage health",
+        description="Check the health of the active storage backend.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    storage_metrics = storage_subparsers.add_parser(
+        "metrics",
+        help="Show storage metrics",
+        description="Show operational metrics for a storage strategy.",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    storage_metrics.add_argument("--strategy", help="Show metrics for specific storage strategy")
+
+    storage_migrate = storage_subparsers.add_parser(
+        "migrate",
+        help="Run SQL storage migrations (Alembic). No-op for JSON backend.",
+        description="Run SQL storage migrations via Alembic (no-op for the JSON backend).",
+        parents=[pp.common, pp.list, pp.provider_scope],
+    )
+    storage_migrate.add_argument(
+        "migrate_subcommand",
+        choices=["up", "down", "current", "history"],
+        help="Alembic action: up (upgrade head), down (downgrade -1), current (show), history (list)",
+    )
 
     # System
     system_parser = subparsers.add_parser(
@@ -787,7 +1034,7 @@ For more information, visit: {DOCS_URL}
     )
     resource_parsers["system"] = system_parser
     system_subparsers = system_parser.add_subparsers(
-        dest="action", help="System actions", required=True
+        dest="action", metavar="<action>", help="System actions", required=True
     )
 
     system_subparsers.add_parser(
@@ -817,6 +1064,29 @@ For more information, visit: {DOCS_URL}
         parents=[pp.common, pp.list, pp.provider_scope],
     )
 
+    # Infrastructure
+    infrastructure_parser = subparsers.add_parser(
+        "infrastructure",
+        help="Discover and inspect infrastructure",
+        description="Discover and inspect cloud infrastructure — VPCs, subnets, and security groups.",
+    )
+    resource_parsers["infrastructure"] = infrastructure_parser
+    infrastructure_subparsers = infrastructure_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Infrastructure actions"
+    )
+
+    infra_parser = subparsers.add_parser(
+        "infra",
+        description="Discover and inspect cloud infrastructure (alias for infrastructure).",
+    )
+    resource_parsers["infra"] = infra_parser
+    infra_subparsers = infra_parser.add_subparsers(
+        dest="action", metavar="<action>", help="Infrastructure actions"
+    )
+
+    add_infrastructure_actions(infrastructure_subparsers, pp)
+    add_infrastructure_actions(infra_subparsers, pp)
+
     # Server (process lifecycle — local daemon control)
     server_parser = subparsers.add_parser(
         "server",
@@ -825,7 +1095,7 @@ For more information, visit: {DOCS_URL}
     )
     resource_parsers["server"] = server_parser
     server_subparsers = server_parser.add_subparsers(
-        dest="action", help="Server actions", required=True
+        dest="action", metavar="<action>", help="Server actions", required=True
     )
 
     def _add_server_start_args(p):
@@ -929,208 +1199,6 @@ For more information, visit: {DOCS_URL}
         help="Allow overwriting into a non-empty or already-existing destination",
     )
 
-    # Infrastructure
-    infrastructure_parser = subparsers.add_parser(
-        "infrastructure",
-        help="Discover and inspect infrastructure",
-        description="Discover and inspect cloud infrastructure — VPCs, subnets, and security groups.",
-    )
-    resource_parsers["infrastructure"] = infrastructure_parser
-    infrastructure_subparsers = infrastructure_parser.add_subparsers(
-        dest="action", help="Infrastructure actions"
-    )
-
-    infra_parser = subparsers.add_parser(
-        "infra",
-        help="Discover and inspect infrastructure (alias for infrastructure)",
-        description="Discover and inspect cloud infrastructure (alias for infrastructure).",
-    )
-    resource_parsers["infra"] = infra_parser
-    infra_subparsers = infra_parser.add_subparsers(dest="action", help="Infrastructure actions")
-
-    add_infrastructure_actions(infrastructure_subparsers, pp)
-    add_infrastructure_actions(infra_subparsers, pp)
-
-    # Config
-    config_parser = subparsers.add_parser(
-        "config",
-        help="Manage ORB configuration",
-        description="Manage ORB configuration — show, get, set, validate, and reload settings.",
-    )
-    resource_parsers["config"] = config_parser
-    config_subparsers = config_parser.add_subparsers(
-        dest="action", help="Config actions", required=True
-    )
-
-    config_subparsers.add_parser(
-        "show",
-        help="Show configuration",
-        description="Show the current ORB configuration.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-
-    config_set = config_subparsers.add_parser(
-        "set",
-        help="Set configuration",
-        description="Set a configuration value by key.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    config_set.add_argument("key", help="Configuration key")
-    config_set.add_argument("value", help="Configuration value")
-    config_set.add_argument(
-        "--no-persist",
-        dest="persist",
-        action="store_false",
-        default=True,
-        help="Set the value in memory only; do not write it to the config file",
-    )
-
-    config_get = config_subparsers.add_parser(
-        "get",
-        help="Get configuration",
-        description="Get a configuration value by key.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    config_get.add_argument("key", help="Configuration key")
-
-    config_validate = config_subparsers.add_parser(
-        "validate",
-        help="Validate configuration",
-        description="Validate the ORB configuration file for correctness.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    config_validate.add_argument("--file", help="Configuration file to validate")
-
-    config_subparsers.add_parser(
-        "reload",
-        help="Reload provider configuration",
-        description="Reload provider configuration from disk.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-
-    # Providers
-    providers_parser = subparsers.add_parser(
-        "providers",
-        help="Manage cloud providers",
-        description="Manage cloud providers — list, add, update, remove, and inspect provider instances.",
-    )
-    resource_parsers["providers"] = providers_parser
-    providers_subparsers = providers_parser.add_subparsers(dest="action", help="Provider actions")
-
-    provider_parser = subparsers.add_parser(
-        "provider",
-        help="Manage cloud providers (alias for providers)",
-        description="Manage cloud providers (singular alias for providers).",
-    )
-    resource_parsers["provider"] = provider_parser
-    provider_subparsers = provider_parser.add_subparsers(dest="action", help="Provider actions")
-
-    add_provider_actions(providers_subparsers, pp)
-    add_provider_actions(provider_subparsers, pp)
-
-    # Storage
-    storage_parser = subparsers.add_parser(
-        "storage",
-        help="Manage storage backends",
-        description="Manage storage backends — list, inspect, validate, test, and migrate strategies.",
-    )
-    resource_parsers["storage"] = storage_parser
-    storage_subparsers = storage_parser.add_subparsers(
-        dest="action", help="Storage actions", required=True
-    )
-
-    storage_subparsers.add_parser(
-        "list",
-        help="List storage strategies",
-        description="List the available storage strategies.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-
-    storage_show = storage_subparsers.add_parser(
-        "show",
-        help="Show storage configuration",
-        description="Show the configuration of the active or selected storage strategy.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    storage_show.add_argument("--strategy", help="Show specific storage strategy details")
-
-    storage_validate = storage_subparsers.add_parser(
-        "validate",
-        help="Validate storage",
-        description="Validate the configuration of a storage strategy.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    storage_validate.add_argument("--strategy", help="Validate specific storage strategy")
-
-    storage_test = storage_subparsers.add_parser(
-        "test",
-        help="Test storage connectivity",
-        description="Test connectivity to a storage strategy backend.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    storage_test.add_argument("--strategy", help="Test specific storage strategy")
-    storage_test.add_argument("--timeout", type=int, default=30, help="Test timeout in seconds")
-
-    storage_subparsers.add_parser(
-        "health",
-        help="Check storage health",
-        description="Check the health of the active storage backend.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    storage_metrics = storage_subparsers.add_parser(
-        "metrics",
-        help="Show storage metrics",
-        description="Show operational metrics for a storage strategy.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    storage_metrics.add_argument("--strategy", help="Show metrics for specific storage strategy")
-
-    storage_migrate = storage_subparsers.add_parser(
-        "migrate",
-        help="Run SQL storage migrations (Alembic). No-op for JSON backend.",
-        description="Run SQL storage migrations via Alembic (no-op for the JSON backend).",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    storage_migrate.add_argument(
-        "migrate_subcommand",
-        choices=["up", "down", "current", "history"],
-        help="Alembic action: up (upgrade head), down (downgrade -1), current (show), history (list)",
-    )
-
-    # Scheduler
-    scheduler_parser = subparsers.add_parser(
-        "scheduler",
-        help="Manage scheduler strategies",
-        description="Manage scheduler strategies — list, inspect, and validate them.",
-    )
-    resource_parsers["scheduler"] = scheduler_parser
-    scheduler_subparsers = scheduler_parser.add_subparsers(
-        dest="action", help="Scheduler actions", required=True
-    )
-
-    scheduler_subparsers.add_parser(
-        "list",
-        help="List scheduler strategies",
-        description="List the available scheduler strategies.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-
-    scheduler_show = scheduler_subparsers.add_parser(
-        "show",
-        help="Show scheduler details",
-        description="Show the configuration of a scheduler strategy.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    scheduler_show.add_argument("--strategy", help="Show specific scheduler strategy details")
-
-    scheduler_validate = scheduler_subparsers.add_parser(
-        "validate",
-        help="Validate scheduler",
-        description="Validate the configuration of a scheduler strategy.",
-        parents=[pp.common, pp.list, pp.provider_scope],
-    )
-    scheduler_validate.add_argument("--strategy", help="Validate specific scheduler strategy")
-
     # MCP
     mcp_parser = subparsers.add_parser(
         "mcp",
@@ -1138,7 +1206,9 @@ For more information, visit: {DOCS_URL}
         description="Operate the MCP (Model Context Protocol) interface — manage tools, validate, and serve.",
     )
     resource_parsers["mcp"] = mcp_parser
-    mcp_subparsers = mcp_parser.add_subparsers(dest="action", help="MCP actions", required=True)
+    mcp_subparsers = mcp_parser.add_subparsers(
+        dest="action", metavar="<action>", help="MCP actions", required=True
+    )
 
     mcp_subparsers.add_parser(
         "validate",
@@ -1174,45 +1244,6 @@ For more information, visit: {DOCS_URL}
     from orb.interface.cli.k8s_legacy import add_k8s_legacy_subparser
 
     add_k8s_legacy_subparser(subparsers)
-
-    # Init
-    init_parser = subparsers.add_parser(
-        "init",
-        help="Initialize ORB configuration",
-        description="Initialize ORB configuration, optionally discovering infrastructure interactively.",
-    )
-    add_force_argument(init_parser)
-    init_parser.add_argument("--non-interactive", action="store_true", help="Non-interactive mode")
-    init_parser.add_argument(
-        "--scheduler", choices=["default", "hostfactory", "slurm"], help="Scheduler type"
-    )
-    add_provider_type_arg(
-        init_parser,
-        default="aws",
-        extra_help="Provider type to initialise.",
-    )
-    init_parser.add_argument("--config-dir", help="Custom configuration directory")
-    init_parser.add_argument(
-        "--scripts-dir",
-        dest="scripts_dir",
-        help="Directory for ORB scripts (default: derived from config dir or ORB_SCRIPTS_DIR)",
-    )
-    init_parser.add_argument(
-        "--subnet-ids",
-        help="Comma-separated subnet IDs for template_defaults (non-interactive only)",
-    )
-    init_parser.add_argument(
-        "--security-group-ids",
-        help="Comma-separated security group IDs for template_defaults (non-interactive only)",
-    )
-    init_parser.add_argument(
-        "--fleet-role",
-        help="Spot Fleet IAM role ARN or name for template_defaults (non-interactive only)",
-    )
-    # Inject per-provider CLI flags (e.g. --aws-profile, --aws-region) so that
-    # _get_default_config can use spec.extract_config() in non-interactive mode.
-    for _spec in CLISpecRegistry.all().values():
-        _spec.add_arguments(init_parser)
 
     return parser, resource_parsers
 
