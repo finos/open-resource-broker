@@ -6,11 +6,11 @@ on:
       - '.github/workflows/**'
       - 'Makefile'
       - 'makefiles/**'
-  pull_request:
-    paths:
-      - '.github/workflows/**'
-      - 'Makefile'
-      - 'makefiles/**'
+  # No paths filter on pull_request: Validate Workflow Files is becoming a
+  # required status check, so it must report (even if there's nothing of
+  # its own concern to check) on every PR, including docs-only ones. The
+  # job itself is cheap, so no job-level change detection is needed here.
+  pull_request: {}
 
 permissions:
   contents: read

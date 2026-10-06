@@ -21,26 +21,14 @@ on:
       - '.trivyignore.yaml'
       - '.github/workflows/**'
       - '.github/codeql/**'
+  # No paths filter on pull_request: several jobs in this workflow are
+  # becoming required status checks, which must report (even if skipped) on
+  # every PR including docs-only ones — a missing check blocks merge forever,
+  # a skipped one does not. The `changes` job below detects whether the paths
+  # that used to gate this trigger actually changed, and the heavy jobs skip
+  # themselves accordingly instead of the workflow never running at all.
   pull_request:
     branches: [ main, develop ]
-    paths:
-      - 'src/**'
-      - 'requirements*.txt'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - 'sdk/**/package.json'
-      - 'sdk/**/package-lock.json'
-      - 'sdk/**/go.mod'
-      - 'sdk/**/go.sum'
-      - 'sdk/**/pom.xml'
-      - 'sdk/**/build.gradle'
-      - 'sdk/**/build.gradle.kts'
-      - 'sdk/**/*.csproj'
-      - 'dev-tools/ci/check_runtime_licenses.py'
-      - 'dev-tools/ci/ci_security_dispatcher.py'
-      - '.trivyignore.yaml'
-      - '.github/workflows/**'
-      - '.github/codeql/**'
   schedule:
     - cron: '0 3 * * 0'
 
@@ -64,9 +52,53 @@ jobs:
     name: Configuration
     uses: ./.github/workflows/shared-config.yml
 
+  # Reports which heavy jobs below are actually relevant to this PR, so a
+  # docs-only or unrelated-module PR still gets a (skipped) report from every
+  # job instead of no check at all. The job runs on every event so that jobs
+  # depending on it are never skipped by a skipped dependency; on events other
+  # than pull_request there is no diff to inspect, so it reports everything as
+  # relevant and each job's own trigger gating (push paths filter, schedule)
+  # decides whether it runs.
+  changes:
+    name: Detect Relevant Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      relevant: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.relevant }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+    - name: Filter changed paths
+      if: github.event_name == 'pull_request'
+      uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36  # v3.0.2
+      id: filter
+      with:
+        filters: |
+          relevant:
+            - 'src/**'
+            - 'requirements*.txt'
+            - 'pyproject.toml'
+            - 'uv.lock'
+            - 'sdk/**/package.json'
+            - 'sdk/**/package-lock.json'
+            - 'sdk/**/go.mod'
+            - 'sdk/**/go.sum'
+            - 'sdk/**/pom.xml'
+            - 'sdk/**/build.gradle'
+            - 'sdk/**/build.gradle.kts'
+            - 'sdk/**/*.csproj'
+            - 'dev-tools/ci/check_runtime_licenses.py'
+            - 'dev-tools/ci/ci_security_dispatcher.py'
+            - '.trivyignore.yaml'
+            - '.github/workflows/**'
+            - '.github/codeql/**'
+
   security-pip-audit:
     name: pip-audit (Dependency Scan)
-    needs: [config]
+    needs: [config, changes]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' && needs.config.result == 'success' }}
     permissions:
       contents: read
       actions: read
@@ -79,7 +111,8 @@ jobs:
 
   security-semgrep:
     name: Semgrep (Static Analysis)
-    needs: config
+    needs: [config, changes]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' && needs.config.result == 'success' }}
     permissions:
       contents: read
       actions: read
@@ -91,7 +124,8 @@ jobs:
 
   security-trivy-fs:
     name: Trivy (Filesystem Scan)
-    needs: config
+    needs: [config, changes]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' && needs.config.result == 'success' }}
     permissions:
       contents: read
       actions: read
@@ -105,7 +139,8 @@ jobs:
     name: TruffleHog (Secrets Scan)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
+    needs: [changes]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && ((github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true') || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')) }}
 
     permissions:
       security-events: write
@@ -130,7 +165,8 @@ jobs:
     name: Dependency Review
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name == 'pull_request'
+    needs: [changes]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true' }}
 
     steps:
     - name: Checkout code
@@ -187,7 +223,8 @@ jobs:
 
   license-gate:
     name: Runtime License Gate
-    needs: [config]
+    needs: [config, changes]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' && needs.config.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -255,10 +292,10 @@ jobs:
 
   codeql-analysis:
     name: CodeQL Analysis
-    needs: [config]
+    needs: [config, changes]
     # Also scan direct pushes to main so a fix merged outside a PR closes its
     # own alerts on the next scan, instead of waiting for the weekly schedule.
-    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || contains(github.event.head_commit.message, '[security]')
+    if: ${{ !cancelled() && needs.config.result == 'success' && needs.changes.result == 'success' && ((github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true') || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || contains(github.event.head_commit.message, '[security]')) }}
     permissions:
       contents: read
       actions: read

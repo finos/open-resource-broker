@@ -18,20 +18,13 @@ on:
       - 'src/orb/api/server.py'           # inline /health,/metrics,/info operations + router registration
       - 'src/orb/api/dependencies.py'     # response-model deps wired into routes
       - 'dev-tools/release/export_openapi_spec.sh'  # the exporter itself
+  # No paths filter on pull_request: SDK CI Passed is becoming a required
+  # status check, so it must report (even if skipped) on every PR, including
+  # docs-only ones. The `changes` job below detects whether the paths that
+  # used to gate this trigger actually changed, and the heavy jobs skip
+  # themselves accordingly instead of the workflow never running at all.
   pull_request:
     branches: [ main, develop ]
-    paths:
-      - 'sdk/**'
-      - '.github/workflows/sdk.yml'
-      # See the push filter above — the same API-source paths must trigger the
-      # spec-drift-guard on PRs so a route change without a spec regen fails at
-      # PR time rather than silently drifting all five SDKs from the real API.
-      - 'src/orb/api/routers/**'
-      - 'src/orb/api/models/**'
-      - 'src/orb/api/documentation/**'
-      - 'src/orb/api/server.py'
-      - 'src/orb/api/dependencies.py'
-      - 'dev-tools/release/export_openapi_spec.sh'
   schedule:
     - cron: '0 2 * * *'
 
@@ -53,6 +46,45 @@ jobs:
     uses: ./.github/workflows/shared-config.yml
 
   # ---------------------------------------------------------------------------
+  # Reports whether this PR touches SDK-relevant paths, so a docs-only or
+  # unrelated-module PR still gets a (skipped) report from every job below
+  # instead of no check at all. The job runs on every event so that jobs
+  # depending on it are never skipped by a skipped dependency; on events other
+  # than pull_request there is no diff to inspect, so it reports everything as
+  # relevant and the push paths filter / schedule decide whether the workflow
+  # runs at all.
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Detect Relevant Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      relevant: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.relevant }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Filter changed paths
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36  # v3.0.2
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'sdk/**'
+              - '.github/workflows/sdk.yml'
+              # build-orb-wheel builds the orb wheel from these
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'src/orb/api/routers/**'
+              - 'src/orb/api/models/**'
+              - 'src/orb/api/documentation/**'
+              - 'src/orb/api/server.py'
+              - 'src/orb/api/dependencies.py'
+              - 'dev-tools/release/export_openapi_spec.sh'
+
+  # ---------------------------------------------------------------------------
   # Static spec-conformance: asserts sdk/parity/scenario.json matches the
   # hardened OpenAPI spec (method/path/operationId).  Needs no server or SDK
   # build, so it is a fast fail-early gate that wires the parity fixture into CI.
@@ -61,6 +93,8 @@ jobs:
     name: SDK Spec Conformance
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: [changes]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' }}
     permissions:
       contents: read
     steps:
@@ -81,7 +115,8 @@ jobs:
     name: SDK Spec Drift Guard
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [config, build-orb-wheel]
+    needs: [config, changes, build-orb-wheel]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' && needs.config.result == 'success' && needs['build-orb-wheel'].result == 'success' }}
     permissions:
       contents: read
     steps:
@@ -124,6 +159,8 @@ jobs:
     name: Build orb Wheel
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: [changes]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' }}
     permissions:
       contents: read
 
@@ -161,7 +198,8 @@ jobs:
       ${{ matrix.display-name }} SDK Build & Test${{ matrix.lang == 'typescript' && format(' (Node {0})', matrix.node-version) || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [config, build-orb-wheel]
+    needs: [config, changes, build-orb-wheel]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' && needs.config.result == 'success' && needs['build-orb-wheel'].result == 'success' }}
     permissions:
       contents: read
 
@@ -519,3 +557,59 @@ jobs:
           AWS_ACCESS_KEY_ID: testing
           AWS_SECRET_ACCESS_KEY: testing
         run: dotnet test sdk/csharp/tests/parity/ParityTests.csproj --no-build --configuration Release --verbosity normal
+
+  # ---------------------------------------------------------------------------
+  # Single stable required status check for branch protection.  Replaces
+  # listing every matrix leg name (which drifts silently when the matrix
+  # changes). Jobs skipped because change detection found nothing SDK-relevant
+  # in this PR are allowed to be skipped; anything else must have succeeded.
+  # ---------------------------------------------------------------------------
+  sdk-ci-passed:
+    name: SDK CI Passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    needs:
+      - config
+      - changes
+      - spec-conformance
+      - spec-drift-guard
+      - build-orb-wheel
+      - build-and-test
+    steps:
+    - name: Check all required jobs passed
+      env:
+        NEEDED_JOBS: ${{ toJSON(needs) }}
+        # Space-separated job names allowed to finish "skipped" without
+        # failing this gate. A skip is only tolerated when change detection
+        # itself succeeded and reported nothing SDK-relevant; `config` and
+        # `changes` must always succeed.
+        ALLOWED_SKIPS: "spec-conformance spec-drift-guard build-orb-wheel build-and-test"
+      run: |
+        set -euo pipefail
+
+        changes_result=$(jq -r '.changes.result' <<<"$NEEDED_JOBS")
+        relevant=$(jq -r '.changes.outputs.relevant // ""' <<<"$NEEDED_JOBS")
+        skips_ok=0
+        if [ "$changes_result" = "success" ] && [ "$relevant" = "false" ]; then
+          skips_ok=1
+        fi
+
+        failed=0
+        while IFS=$'\t' read -r job_name result; do
+          if [ "$result" = "success" ]; then
+            continue
+          fi
+          if [ "$result" = "skipped" ] && [ "$skips_ok" -eq 1 ] && [[ " $ALLOWED_SKIPS " == *" $job_name "* ]]; then
+            continue
+          fi
+          echo "::error::job '$job_name' did not succeed (result: $result)"
+          failed=1
+        done < <(jq -r 'to_entries[] | [.key, .value.result] | @tsv' <<<"$NEEDED_JOBS")
+
+        if [ "$failed" -ne 0 ]; then
+          echo "::error::SDK CI gate failed: one or more required jobs did not succeed"
+          exit 1
+        fi
+
+        echo "All required jobs succeeded."
