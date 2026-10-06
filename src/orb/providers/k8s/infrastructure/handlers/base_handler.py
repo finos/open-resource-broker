@@ -294,7 +294,7 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
 
         * ``audit_high_risk_pod_fields`` (default ``True``) — when
           ``False``, the entire audit is skipped silently.
-        * ``reject_high_risk_pod_fields`` (default ``False``) — when
+        * ``reject_high_risk_pod_fields`` (default ``True``) — when
           ``True`` *and* findings are non-empty, a
           :class:`orb.providers.k8s.exceptions.k8s_exceptions.K8sError` is
           raised with the joined findings so the acquire call fails fast

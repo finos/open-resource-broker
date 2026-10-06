@@ -194,9 +194,6 @@ class K8sCapabilityService:
 
     def get_available_credential_sources(self) -> list[dict]:
         """Return Kubernetes credential sources visible to ORB."""
-        from orb.infrastructure.logging.logger import get_logger as _get_logger
-
-        _log = _get_logger(__name__)
         sources: list[dict] = []
 
         try:
@@ -211,7 +208,7 @@ class K8sCapabilityService:
                     }
                 )
         except Exception as exc:
-            _log.debug("in_cluster detection failed: %s", exc)
+            self._logger.debug("in_cluster detection failed: %s", exc)
 
         try:
             import kubernetes.config as _k8s_config
@@ -236,7 +233,7 @@ class K8sCapabilityService:
                     }
                 )
         except Exception as exc:
-            _log.debug("kubeconfig context enumeration failed: %s", exc)
+            self._logger.debug("kubeconfig context enumeration failed: %s", exc)
 
         if not sources:
             sources.append(
