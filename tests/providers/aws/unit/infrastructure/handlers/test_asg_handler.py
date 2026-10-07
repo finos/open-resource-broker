@@ -229,6 +229,51 @@ class TestASGHandlerCheckHostsStatus:
         assert result.fulfilment.target_units is None
 
 
+class TestGetASGStatusProviderApiResolution:
+    """_get_asg_status must resolve provider_api via _resolve_provider_api(request),
+    matching EC2Fleet/RunInstances, instead of a self.metadata getattr that is
+    never set and so always fell back to a hardcoded "ASG" default."""
+
+    @staticmethod
+    def _describe_auto_scaling_groups_response(asg_name, instance_id):
+        return {
+            "AutoScalingGroups": [
+                {
+                    "AutoScalingGroupName": asg_name,
+                    "DesiredCapacity": 1,
+                    "Instances": [{"InstanceId": instance_id, "LifecycleState": "InService"}],
+                }
+            ]
+        }
+
+    def test_resolves_provider_api_override_from_request_metadata(self):
+        handler = _make_handler()
+        request = _make_request(["asg-333"])
+        request.metadata = {"provider_api": "CustomASG"}
+        handler.aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = (
+            self._describe_auto_scaling_groups_response("asg-333", "i-1")
+        )
+
+        with patch.object(handler, "_get_instance_details", return_value=[{"instance_id": "i-1"}]):
+            result = handler._get_asg_status("asg-333", request)
+
+        assert result.instances[0]["provider_api"] == "CustomASG"
+
+    def test_defaults_to_asg_when_no_override_present(self):
+        handler = _make_handler()
+        request = _make_request(["asg-444"])
+        request.metadata = {}
+        request.provider_api = None
+        handler.aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = (
+            self._describe_auto_scaling_groups_response("asg-444", "i-2")
+        )
+
+        with patch.object(handler, "_get_instance_details", return_value=[{"instance_id": "i-2"}]):
+            result = handler._get_asg_status("asg-444", request)
+
+        assert result.instances[0]["provider_api"] == "ASG"
+
+
 class TestASGHandlerNameTag:
     def test_tag_asg_uses_config_prefix(self):
         """Name tag on ASG uses config_port prefix, not a hardcoded string."""

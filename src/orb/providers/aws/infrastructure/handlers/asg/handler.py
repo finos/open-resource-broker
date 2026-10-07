@@ -552,7 +552,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 try:
                     result = self._get_asg_status(
                         asg_name,
-                        request_id=str(request.request_id),
+                        request=request,
                         requested_count=request.requested_count,
                     )
                     all_instances.extend(result.instances)
@@ -602,7 +602,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
     def _get_asg_status(
         self,
         asg_name: str,
-        request_id: str = "",
+        request: Request,
         requested_count: int = 1,
     ) -> CheckHostsStatusResult:
         """Get status + fulfilment for a specific ASG."""
@@ -662,7 +662,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         try:
             instance_details = self._get_instance_details(
                 instance_ids,
-                request_id=request_id,
+                request_id=str(request.request_id),
                 resource_id=asg_name,
                 provider_api="ASG",
             )
@@ -670,7 +670,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._logger.warning("Failed to describe EC2 instances for ASG %s: %s", asg_name, e)
             instance_details = []
 
-        provider_api_value = (getattr(self, "metadata", {}) or {}).get("provider_api", "ASG")
+        provider_api_value = self._resolve_provider_api(request)
         formatted = (
             self._format_instance_data(instance_details, asg_name, provider_api_value)
             if instance_details

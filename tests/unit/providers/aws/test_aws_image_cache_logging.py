@@ -36,7 +36,7 @@ class TestAWSImageCacheFailureLogging:
             "orb.providers.aws.infrastructure.caching.aws_image_cache._logger"
         ) as mock_logger:
             with patch(
-                "orb.providers.aws.infrastructure.caching.aws_image_cache.open",
+                "orb.providers.aws.infrastructure.caching.aws_image_cache.tempfile.mkstemp",
                 side_effect=IOError("disk full"),
             ):
                 cache.set("al2023", "ami-123")
@@ -48,3 +48,23 @@ class TestAWSImageCacheFailureLogging:
         cache.set("al2023", "ami-123")
         assert cache.get("al2023") == "ami-123"
         assert os.path.exists(cache._cache_file)
+
+
+@pytest.mark.unit
+class TestAWSImageCacheConcurrency:
+    def test_concurrent_writers_leave_valid_json(self, tmp_path) -> None:
+        import json
+        from concurrent.futures import ThreadPoolExecutor
+
+        def write(i: int) -> None:
+            cache = AWSImageCache(provider_name="aws", cache_dir=str(tmp_path))
+            for j in range(10):
+                cache.set(f"spec-{i}-{j}", f"ami-{i}-{j}")
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(write, range(8)))
+
+        with open(os.path.join(str(tmp_path), "image_cache_aws.json")) as f:
+            data = json.load(f)
+        assert data
+        assert [p for p in os.listdir(tmp_path) if p.endswith(".tmp")] == []

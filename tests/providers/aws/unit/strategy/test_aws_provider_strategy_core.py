@@ -9,7 +9,9 @@ Deliberately excludes `test_credentials` internals (covered elsewhere, and
 being actively reworked to an async variant on another branch).
 """
 
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
+import time
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -1105,6 +1107,76 @@ def test_create_image_resolution_service_builds_with_cache(monkeypatch):
 
     service = strategy._create_image_resolution_service()
     assert service._aws_client is aws_client
+
+
+@pytest.mark.asyncio
+async def test_resolve_image_runs_blocking_call_via_to_thread(monkeypatch):
+    """The synchronous resolve_image_id call must be offloaded via
+    asyncio.to_thread, matching every other blocking AWS call in this
+    class, instead of blocking the event loop directly."""
+    monkeypatch.setattr(
+        "orb.providers.aws.infrastructure.services.aws_image_resolution_service"
+        ".AWSImageResolutionService.is_resolution_needed_static",
+        staticmethod(lambda spec: True),
+    )
+    strategy = _make_strategy()
+    fake_service = MagicMock()
+    fake_service.resolve_image_id.return_value = "ami-resolved"
+    strategy._create_image_resolution_service = MagicMock(return_value=fake_service)
+
+    operation = ProviderOperation(
+        operation_type=ProviderOperationType.RESOLVE_IMAGE,
+        parameters={"image_specifications": ["/aws/service/x"]},
+    )
+
+    with patch(
+        "orb.providers.aws.strategy.aws_provider_strategy.asyncio.to_thread",
+        new=AsyncMock(return_value="ami-resolved"),
+    ) as to_thread:
+        result = await strategy._handle_resolve_image(operation)
+
+    to_thread.assert_awaited_once_with(fake_service.resolve_image_id, "/aws/service/x")
+    assert result.data == {"resolved_images": {"/aws/service/x": "ami-resolved"}}
+
+
+@pytest.mark.asyncio
+async def test_resolve_image_does_not_block_concurrent_coroutines(monkeypatch):
+    """A slow synchronous resolve_image_id must not stall other coroutines
+    sharing the event loop (e.g. concurrent status polls)."""
+    monkeypatch.setattr(
+        "orb.providers.aws.infrastructure.services.aws_image_resolution_service"
+        ".AWSImageResolutionService.is_resolution_needed_static",
+        staticmethod(lambda spec: True),
+    )
+    strategy = _make_strategy()
+
+    order: list[str] = []
+
+    def slow_resolve(spec):
+        order.append("resolve-start")
+        time.sleep(0.05)
+        order.append("resolve-end")
+        return "ami-resolved"
+
+    fake_service = MagicMock()
+    fake_service.resolve_image_id.side_effect = slow_resolve
+    strategy._create_image_resolution_service = MagicMock(return_value=fake_service)
+
+    operation = ProviderOperation(
+        operation_type=ProviderOperationType.RESOLVE_IMAGE,
+        parameters={"image_specifications": ["/aws/service/x"]},
+    )
+
+    async def concurrent_task():
+        await asyncio.sleep(0)
+        order.append("other-task")
+
+    await asyncio.gather(strategy._handle_resolve_image(operation), concurrent_task())
+
+    # If resolve_image_id ran synchronously on the event loop, the
+    # concurrent task could only run after "resolve-end". Offloading it via
+    # asyncio.to_thread lets the other coroutine interleave instead.
+    assert order.index("other-task") < order.index("resolve-end")
 
 
 # ---------------------------------------------------------------------------
