@@ -74,8 +74,10 @@ jobs:
           fail-on-cache-miss: false
 
       - name: Build documentation
+        env:
+          GIT_REF: ${{ github.ref }}
         run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          if [ "$GIT_REF" = "refs/heads/main" ]; then
             # Deploy dev alias via mike, export docs/site for Pages upload.
             bash dev-tools/docs/mike_deploy.sh dev --push
           else
