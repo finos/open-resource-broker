@@ -1,0 +1,204 @@
+# OpenSSF Security Insights, schema v2: https://github.com/ossf/security-insights
+header:
+  schema-version: 2.2.0
+  last-reviewed: '2026-10-07'
+  last-updated: '2026-10-07'
+  url: https://raw.githubusercontent.com/finos/open-resource-broker/main/SECURITY-INSIGHTS.yml
+
+project:
+  name: Open Resource Broker
+  homepage: https://finos.github.io/open-resource-broker
+  administrators:
+    - name: Flamur Gogolli
+      primary: true
+      affiliation: Amazon Web Services (AWS)
+      email: flamurg@amazon.co.uk
+      social: https://github.com/fgogolli
+    - name: Kirill Bogdanov
+      primary: false
+      affiliation: Amazon Web Services (AWS)
+      email: kirillb@amazon.ch
+      social: https://github.com/kirillsc
+    - name: Cyriaque Millot
+      primary: false
+      affiliation: Morgan Stanley
+      email: cyriaque.millot@morganstanley.com
+      social: https://github.com/cyriaquem
+  repositories:
+    - name: open-resource-broker
+      comment: The single repository of the project. It contains the CLI, REST API, MCP server, provider and scheduler integrations, the Python package, and the client SDKs under sdk/.
+      url: https://github.com/finos/open-resource-broker
+  vulnerability-reporting:
+    reports-accepted: true
+    bug-bounty-available: false
+    policy: https://github.com/finos/open-resource-broker/blob/main/SECURITY.md
+    contact:
+      name: Open Resource Broker maintainers
+      primary: true
+      affiliation: FINOS
+      email: open-resource-broker-maintainers@lists.finos.org
+    comment: Report privately through GitHub private vulnerability reporting at https://github.com/finos/open-resource-broker/security/advisories/new, or by email to the maintainers list with security@finos.org in copy. The project follows the FINOS Security Vulnerabilities Policy at https://community.finos.org/docs/governance/Software-Projects/cve-responsible-disclosure.
+  documentation:
+    detailed-guide: https://finos.github.io/open-resource-broker/latest/
+    quickstart-guide: https://finos.github.io/open-resource-broker/latest/getting_started/quick_start/
+    code-of-conduct: https://github.com/finos/open-resource-broker/blob/main/CODE_OF_CONDUCT.md
+    release-process: https://finos.github.io/open-resource-broker/latest/developer_guide/releases/
+    support-policy: https://github.com/finos/open-resource-broker/blob/main/SECURITY.md#supported-versions
+
+repository:
+  status: active
+  url: https://github.com/finos/open-resource-broker
+  accepts-change-request: true
+  accepts-automated-change-request: true
+  core-team:
+    - name: Flamur Gogolli
+      primary: true
+      affiliation: Amazon Web Services (AWS)
+      email: flamurg@amazon.co.uk
+      social: https://github.com/fgogolli
+    - name: Kirill Bogdanov
+      primary: false
+      affiliation: Amazon Web Services (AWS)
+      email: kirillb@amazon.ch
+      social: https://github.com/kirillsc
+    - name: Cyriaque Millot
+      primary: false
+      affiliation: Morgan Stanley
+      email: cyriaque.millot@morganstanley.com
+      social: https://github.com/cyriaquem
+  license:
+    expression: Apache-2.0
+    url: https://github.com/finos/open-resource-broker/blob/main/LICENSE
+  documentation:
+    contributing-guide: https://github.com/finos/open-resource-broker/blob/main/CONTRIBUTING.md
+    governance: https://github.com/finos/open-resource-broker/blob/main/MAINTAINERS.md
+    security-policy: https://github.com/finos/open-resource-broker/blob/main/SECURITY.md
+    dependency-management-policy: https://github.com/finos/open-resource-broker/blob/main/.github/dependabot.yml
+  release:
+    automated-pipeline: true
+    changelog: https://github.com/finos/open-resource-broker/blob/main/CHANGELOG.md
+    distribution-points:
+      - uri: https://pypi.org/project/orb-py/
+        comment: Python package orb-py on PyPI.
+      - uri: https://github.com/finos/open-resource-broker/pkgs/container/open-resource-broker
+        comment: Container images at ghcr.io/finos/open-resource-broker.
+      - uri: https://github.com/finos/open-resource-broker/releases
+        comment: GitHub Releases with the wheel, SDK artifacts, OpenAPI specification, checksums, and the provenance attestation.
+      - uri: https://www.npmjs.com/package/@finos/open-resource-broker
+        comment: TypeScript SDK on npm.
+      - uri: https://www.nuget.org/packages/FINOS.OpenResourceBroker
+        comment: .NET SDK on NuGet.
+    attestations:
+      - name: SLSA build provenance for the release wheel and source distribution
+        location: https://github.com/finos/open-resource-broker/attestations
+        predicate-uri: https://slsa.dev/provenance/v1
+        comment: In-toto attestation signed through Sigstore. It is published to GitHub's attestation store and attached to each release as an .intoto.jsonl asset. Verify with gh attestation verify.
+      - name: SLSA build provenance for container images
+        location: https://github.com/finos/open-resource-broker/attestations
+        predicate-uri: https://slsa.dev/provenance/v1
+        comment: Release container images are signed with keyless cosign and carry a Sigstore build provenance attestation and a buildx SBOM. Attestations are recorded in GitHub's attestation store and pushed to the registry for the primary manifest-list tag.
+  security:
+    assessments:
+      self:
+        name: Security hardening reference
+        comment: Description of the security controls implemented in Open Resource Broker, including authentication, token revocation, input validation, and security headers.
+        evidence: https://github.com/finos/open-resource-broker/blob/main/docs/root/security/hardening.md
+    champions:
+      - name: Flamur Gogolli
+        primary: true
+        affiliation: Amazon Web Services (AWS)
+        email: flamurg@amazon.co.uk
+        social: https://github.com/fgogolli
+    tools:
+      - name: CodeQL
+        type: SAST
+        comment: Runs per language on pull requests, on pushes to main, and weekly. Results are reported as GitHub code scanning alerts.
+        rulesets:
+          - default
+        integration:
+          adhoc: true
+          ci: true
+          release: false
+        results: {}
+      - name: Semgrep
+        type: SAST
+        comment: Advisory. Findings are uploaded as SARIF to GitHub code scanning and do not fail the workflow.
+        rulesets:
+          - p/security-audit
+          - p/secrets
+          - p/python
+        integration:
+          adhoc: true
+          ci: true
+          release: false
+        results: {}
+      - name: Ruff security rules
+        type: SAST
+        comment: The flake8-bandit (S) rules run over src/ as part of the required Ruff check.
+        rulesets:
+          - S
+        integration:
+          adhoc: true
+          ci: true
+          release: false
+        results: {}
+      - name: Trivy
+        type: container
+        comment: The filesystem scan on pull requests and weekly is advisory. The release workflow scans the container images. Only the default-Python image gates publishing, blocking on CRITICAL or HIGH findings and honouring the suppressions in .trivyignore.yaml. Other Python variants are scanned without gating.
+        rulesets:
+          - default
+        integration:
+          adhoc: true
+          ci: true
+          release: true
+        results: {}
+      - name: Hadolint
+        type: container
+        comment: Advisory Dockerfile lint. Findings are uploaded as SARIF to GitHub code scanning and do not fail the workflow.
+        rulesets:
+          - default
+        integration:
+          adhoc: false
+          ci: true
+          release: false
+        results: {}
+      - name: TruffleHog
+        type: secret
+        comment: Scans the commits of each pull request and push for verified secrets and fails the workflow when one is found.
+        rulesets:
+          - default
+        integration:
+          adhoc: false
+          ci: true
+          release: false
+        results: {}
+      - name: pip-audit
+        type: SCA
+        comment: Audits Python dependencies against known vulnerabilities. Advisory only. Findings are reported in the job logs and do not fail the workflow.
+        rulesets:
+          - default
+        integration:
+          adhoc: true
+          ci: true
+          release: false
+        results: {}
+      - name: Dependency Review
+        type: SCA
+        comment: Fails pull requests that introduce dependencies with vulnerabilities of moderate severity or higher, or with licenses outside the FINOS allowed categories.
+        rulesets:
+          - default
+        integration:
+          adhoc: false
+          ci: true
+          release: false
+        results: {}
+      - name: OpenSSF Scorecard
+        type: other
+        comment: Runs weekly and on pushes to main. Results are published to the OpenSSF Scorecard API and uploaded to GitHub code scanning.
+        rulesets:
+          - default
+        integration:
+          adhoc: true
+          ci: true
+          release: false
+        results: {}
