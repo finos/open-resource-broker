@@ -956,7 +956,8 @@ class OutputManager:
                 try:
                     max_length = max(max_length, len(str(cell.value)))
                 except (AttributeError, TypeError, ValueError):
-                    pass
+                    # Cells whose value cannot be rendered as text do not affect the width.
+                    continue
             adjusted_width = min(max_length + 2, 50)
             worksheet.column_dimensions[column_letter].width = adjusted_width
 
@@ -1439,7 +1440,8 @@ def _load_input_files(input_path, logger):
     machine_lookup = {}
     if request_db_path.exists():
         try:
-            request_db = json.load(open(request_db_path))
+            with open(request_db_path, encoding="utf-8") as db_file:
+                request_db = json.load(db_file)
             machines = request_db.get("machines") or {}
             machine_lookup = {
                 mid: (info.get("instance_type") or "unknown") for mid, info in machines.items()
