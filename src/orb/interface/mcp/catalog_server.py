@@ -23,7 +23,10 @@ import json
 import typing
 from typing import Any, Union, get_args, get_origin
 
+import jsonschema
 import mcp.types as mcp_types
+from jsonschema.exceptions import best_match
+from mcp.server.context import ServerRequestContext
 from mcp.server.lowlevel import Server
 
 from orb._package import PACKAGE_NAME, __version__
@@ -175,16 +178,83 @@ def _tool_for(entry: CatalogEntry[Any, Any]) -> mcp_types.Tool:
     return mcp_types.Tool(
         name=entry.key,
         description=description,
-        inputSchema=schema_from_input_dto(entry.input_dto),
+        input_schema=schema_from_input_dto(entry.input_dto),
     )
 
 
 def _error_result(message: str) -> mcp_types.CallToolResult:
-    """A tool-level error result (isError=True), not a protocol error."""
+    """A tool-level error result (is_error=True), not a protocol error."""
     return mcp_types.CallToolResult(
         content=[mcp_types.TextContent(type="text", text=message)],
-        isError=True,
+        is_error=True,
     )
+
+
+# Minimum RBAC role required to invoke each MCP-exposed tool once the
+# Streamable HTTP transport has authenticated a caller. Mirrors the role each
+# operation's REST (or, for the provider/CLI-only tools, its intent) requires:
+# the mutating machine/request operations require "operator"; every read-only
+# tool requires "viewer", the same floor REST enforces on its read routes.
+# Every catalog entry exposed on Interface.MCP must have an entry here —
+# ``test_mcp_catalog_server.py`` asserts this so a newly added tool fails that
+# test until classified, rather than defaulting to an open role. Irrelevant to
+# stdio, which has no caller identity to check.
+_MCP_TOOL_MIN_ROLE: dict[str, str] = {
+    "request_machines": "operator",
+    "return_machines": "operator",
+    "get_request_status": "viewer",
+    "list_requests": "viewer",
+    "list_return_requests": "viewer",
+    "cancel_request": "operator",
+    "list_machines": "viewer",
+    "get_machine": "viewer",
+    "stop_machines": "operator",
+    "start_machines": "operator",
+    "list_templates": "viewer",
+    "get_template": "viewer",
+    "validate_template": "viewer",
+    "get_provider_health": "viewer",
+    "list_providers": "viewer",
+    "get_provider_config": "viewer",
+    "get_provider_metrics": "viewer",
+}
+
+# Role required for a tool with no entry above. A tool only reaches this
+# fallback if it is registered on the catalog's MCP interface without being
+# added to _MCP_TOOL_MIN_ROLE; defaulting to "operator" keeps such a gap from
+# silently granting unauthenticated-equivalent viewer access.
+_MCP_DEFAULT_MIN_ROLE = "operator"
+
+
+def _authorization_denial(
+    ctx: ServerRequestContext[Any, Any], tool_name: str
+) -> mcp_types.CallToolResult | None:
+    """Return a denial result when the HTTP caller's role is below the tool's minimum.
+
+    Reads the identity ``AuthMiddleware`` already resolved onto the Streamable
+    HTTP request's ``state`` — the same place REST's ``require_role``
+    dependency reads it from — through the raw transport request the current
+    MCP request's context carries.
+
+    Returns ``None`` (call permitted) when there is no HTTP request in scope:
+    the stdio transport never attaches one, and a ``call_tool`` handler
+    invoked directly (as the unit tests do) does not either, so both keep
+    today's unrestricted behavior. Also returns ``None`` when the resolved
+    role meets the tool's minimum.
+    """
+    request = ctx.request
+    if request is None:
+        return None
+
+    from orb.api.dependencies import _ROLE_RANK, _resolve_role
+
+    raw_roles: list[str] = list(getattr(request.state, "user_roles", None) or [])
+    meaningful_roles = [r for r in raw_roles if r.lower() != "anonymous"]
+    role = _resolve_role(meaningful_roles) if meaningful_roles else "viewer"
+    min_role = _MCP_TOOL_MIN_ROLE.get(tool_name, _MCP_DEFAULT_MIN_ROLE)
+    if _ROLE_RANK.get(role, 0) < _ROLE_RANK[min_role]:
+        return _error_result(f"{tool_name}: insufficient permissions (requires {min_role} role)")
+    return None
 
 
 def build_server(container: Any) -> Server:
@@ -195,22 +265,32 @@ def build_server(container: Any) -> Server:
     registered data-driven from :data:`OPERATION_CATALOG`; adding an MCP-exposed
     operation to the catalog adds a tool here with no further change.
     """
-    server: Server = Server(PACKAGE_NAME, version=__version__)
 
-    @server.list_tools()
-    async def list_tools() -> list[mcp_types.Tool]:
-        return list_catalog_tools()
+    async def list_tools(
+        _ctx: ServerRequestContext[Any, Any], _params: mcp_types.PaginatedRequestParams | None
+    ) -> mcp_types.ListToolsResult:
+        return mcp_types.ListToolsResult(tools=list_catalog_tools())
 
-    @server.call_tool()
     async def call_tool(
-        name: str, arguments: dict[str, Any]
-    ) -> list[mcp_types.TextContent] | mcp_types.CallToolResult:
+        ctx: ServerRequestContext[Any, Any], params: mcp_types.CallToolRequestParams
+    ) -> mcp_types.CallToolResult:
+        name = params.name
         entry = OPERATION_CATALOG.get(name)
         if entry is None or Interface.MCP not in entry.exposed_on:
             return _error_result(f"Unknown tool: {name}")
 
+        denial = _authorization_denial(ctx, name)
+        if denial is not None:
+            return denial
+
+        arguments = params.arguments or {}
+        validator = jsonschema.Draft202012Validator(schema_from_input_dto(entry.input_dto))
+        first_error = best_match(validator.iter_errors(arguments))
+        if first_error is not None:
+            return _error_result(f"Input validation error: {first_error.message}")
+
         try:
-            dto = bind_from_mapping(entry, arguments or {})
+            dto = bind_from_mapping(entry, arguments)
             orchestrator = container.get(entry.orchestrator)
             formatter = container.get(ResponseFormattingService)
             result = await orchestrator.execute(dto)
@@ -219,9 +299,11 @@ def build_server(container: Any) -> Server:
             return _error_result(f"{name} failed: {exc}")
 
         text = json.dumps(body, default=str)
-        return [mcp_types.TextContent(type="text", text=text)]
+        return mcp_types.CallToolResult(content=[mcp_types.TextContent(type="text", text=text)])
 
-    return server
+    return Server(
+        PACKAGE_NAME, version=__version__, on_list_tools=list_tools, on_call_tool=call_tool
+    )
 
 
 async def run_stdio(container: Any) -> None:
@@ -238,13 +320,32 @@ async def run_stdio(container: Any) -> None:
 
 
 def run_streamable_http(
-    container: Any, host: str = "127.0.0.1", port: int = 8080, path: str = "/mcp"
+    container: Any,
+    host: str = "127.0.0.1",
+    port: int = 8080,
+    path: str = "/mcp",
+    server_config: Any = None,
 ) -> None:
     """Serve the catalog MCP server over Streamable HTTP.
 
     Wraps the SDK's :class:`StreamableHTTPSessionManager` in a minimal Starlette
     app mounted at ``path`` (default ``/mcp``) and runs it under uvicorn. Blocks
     until the server is stopped.
+
+    When ``server_config.auth.enabled`` is true, every request to the mounted
+    path is authenticated with the same strategy and bearer-token validation
+    REST uses: an :class:`AuthMiddleware` built over the configured auth
+    strategy rejects a missing or invalid credential before it reaches a
+    tool. Per-tool role enforcement (see :data:`_MCP_TOOL_MIN_ROLE`) happens
+    inside :func:`build_server`'s ``call_tool`` handler, mirroring each
+    tool's REST equivalent's ``require_role``.
+
+    When auth is disabled (or ``server_config`` is not supplied), callers are
+    treated as anonymous viewers — the same default REST's
+    ``get_current_user`` falls back to — so read-only tools still work but
+    every mutating tool is refused for every caller. Binding to a
+    non-loopback host with auth disabled logs a warning, matching the REST
+    server's posture for the same combination.
     """
     import contextlib
     from collections.abc import AsyncIterator
@@ -254,6 +355,10 @@ def run_streamable_http(
     from starlette.applications import Starlette
     from starlette.routing import Mount
     from starlette.types import Receive, Scope, Send
+
+    from orb.infrastructure.logging.logger import get_logger
+
+    logger = get_logger(__name__)
 
     server = build_server(container)
     session_manager = StreamableHTTPSessionManager(app=server)
@@ -270,6 +375,36 @@ def run_streamable_http(
         routes=[Mount(path, app=handle_mcp)],
         lifespan=lifespan,
     )
+
+    auth_config = getattr(server_config, "auth", None)
+    _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+    if auth_config is not None and auth_config.enabled:
+        from orb.api.middleware.auth_middleware import AuthMiddleware
+        from orb.infrastructure.auth.registry import get_auth_registry
+
+        auth_strategy = get_auth_registry().get_strategy(auth_config.strategy, auth_config)
+        app.add_middleware(
+            AuthMiddleware,
+            auth_port=auth_strategy,
+            require_auth=True,
+            excluded_paths=[],
+            trusted_proxies=getattr(server_config, "trusted_proxies", None),
+        )
+        logger.info(
+            "MCP Streamable HTTP transport authentication enabled with strategy: %s",
+            auth_strategy.get_strategy_name(),
+        )
+    elif host not in _LOOPBACK_HOSTS:
+        logger.warning(
+            "SECURITY WARNING: MCP authentication is DISABLED and the server is bound to "
+            "'%s' (non-loopback). Every caller is treated as an anonymous viewer, so "
+            "mutating tools (request_machines, return_machines, cancel_request, "
+            "stop_machines, start_machines) are refused, but read-only tools are reachable "
+            "without credentials. Enable authentication (server.auth.enabled=true) before "
+            "exposing this transport on a network interface.",
+            host,
+        )
+
     uvicorn.run(app, host=host, port=port)
 
 
@@ -321,9 +456,24 @@ async def handle_mcp_serve(args: Any) -> dict[str, Any]:
 
     try:
         if transport == "http":
+            # Reuse the REST server's auth configuration (server.auth) so the
+            # Streamable HTTP transport is authenticated with the same strategy
+            # an operator already configured for the REST API. Falls back to
+            # None (treated as auth-disabled) if the config cannot be read —
+            # e.g. the container passed in has no ConfigurationPort, as in
+            # tests that exercise transport dispatch without a real app.
+            server_config = None
+            try:
+                from orb.config.schemas.server_schema import ServerConfig
+                from orb.domain.base.ports.configuration_port import ConfigurationPort
+
+                server_config = container.get(ConfigurationPort).get_typed(ServerConfig)
+            except Exception as exc:  # noqa: BLE001 — fall back to auth-disabled semantics
+                logger.debug("MCP server config lookup skipped: %s", exc)
+
             logger.info("Starting MCP server over Streamable HTTP on %s:%s%s", host, port, path)
             await asyncio.get_running_loop().run_in_executor(
-                None, run_streamable_http, container, host, port, path
+                None, run_streamable_http, container, host, port, path, server_config
             )
             return {"message": f"MCP server stopped ({host}:{port}{path})"}
         logger.info("Starting MCP server over stdio")
@@ -348,7 +498,7 @@ async def handle_mcp_validate(args: Any) -> Any:
     problems: list[str] = []
     tools = list_catalog_tools()
     for tool in tools:
-        schema = tool.inputSchema
+        schema = tool.input_schema
         if not isinstance(schema, dict) or schema.get("type") != "object":
             problems.append(f"{tool.name}: input schema is not a JSON object schema")
         elif not isinstance(schema.get("properties"), dict):

@@ -19,10 +19,12 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import mcp.types as mcp_types
 import pytest
 import pytest_asyncio
+from mcp.server.context import ServerRequestContext
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
@@ -66,26 +68,31 @@ async def mcp_server_k8s(orb_config_dir_k8s, kmock_k8s):
 # ---------------------------------------------------------------------------
 
 
-async def _call(server: Any, name: str, arguments: dict[str, Any]) -> tuple[bool, Any]:
-    """Invoke tools/call and return (isError, parsed JSON body)."""
-    handler = server.request_handlers
-    result = await handler[mcp_types.CallToolRequest](
-        mcp_types.CallToolRequest(
-            method="tools/call",
-            params=mcp_types.CallToolRequestParams(name=name, arguments=arguments),
-        )
+def _make_ctx() -> ServerRequestContext[Any, Any]:
+    """A ``ServerRequestContext`` with no HTTP request in scope (stdio-style)."""
+    return ServerRequestContext(
+        session=MagicMock(),
+        lifespan_context={},
+        protocol_version="2026-07-28",
+        method="tools/call",
+        request=None,
     )
-    root = result.root
-    is_error = bool(getattr(root, "isError", False))
-    return is_error, json.loads(root.content[0].text)
+
+
+async def _call(server: Any, name: str, arguments: dict[str, Any]) -> tuple[bool, Any]:
+    """Invoke tools/call directly and return (isError, parsed JSON body)."""
+    entry = server.get_request_handler("tools/call")
+    result = await entry.handler(
+        _make_ctx(), mcp_types.CallToolRequestParams(name=name, arguments=arguments)
+    )
+    is_error = bool(getattr(result, "is_error", False))
+    return is_error, json.loads(result.content[0].text)
 
 
 async def _list_tools(server: Any) -> set[str]:
-    handler = server.request_handlers
-    result = await handler[mcp_types.ListToolsRequest](
-        mcp_types.ListToolsRequest(method="tools/list")
-    )
-    return {tool.name for tool in result.root.tools}
+    entry = server.get_request_handler("tools/list")
+    result = await entry.handler(_make_ctx(), None)
+    return {tool.name for tool in result.tools}
 
 
 def _request_id(body: dict) -> str | None:
