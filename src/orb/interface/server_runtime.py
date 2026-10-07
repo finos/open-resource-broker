@@ -457,6 +457,10 @@ async def _run_split_mode(
 
     orb_ui = _orb_ui_dir()
 
+    from orb.ui.api_http import warn_if_dashboard_unauthenticated
+
+    warn_if_dashboard_unauthenticated(server_config, logger)
+
     api_host = server_config.host or "0.0.0.0"  # noqa: S104  # explicit bind-all-interfaces default for the API-only process
     api_port = server_config.port
     reflex_port = ui_config.backend_port

@@ -126,6 +126,36 @@ class TestListMachinesProviderNameFilter:
 
 @pytest.mark.unit
 @pytest.mark.api
+class TestListMachinesLimitOffsetBounds:
+    """limit/offset query params on GET /machines/ must be bounded."""
+
+    def _client_with_empty_list(self, machines_app):
+        orchestrator = MagicMock()
+        orchestrator.execute = AsyncMock(return_value=ListMachinesOutput(machines=[]))
+        return _make_machines_client(
+            machines_app, {get_list_machines_orchestrator: lambda: orchestrator}
+        )
+
+    @pytest.mark.parametrize("limit", [0, -1, 1001, 100000])
+    def test_limit_out_of_bounds_rejected(self, machines_app, limit):
+        client = self._client_with_empty_list(machines_app)
+        resp = client.get(f"/machines/?limit={limit}")
+        assert resp.status_code == 422
+
+    def test_offset_negative_rejected(self, machines_app):
+        client = self._client_with_empty_list(machines_app)
+        resp = client.get("/machines/?offset=-1")
+        assert resp.status_code == 422
+
+    @pytest.mark.parametrize("limit", [1, 50, 1000])
+    def test_limit_within_bounds_accepted(self, machines_app, limit):
+        client = self._client_with_empty_list(machines_app)
+        resp = client.get(f"/machines/?limit={limit}")
+        assert resp.status_code == 200
+
+
+@pytest.mark.unit
+@pytest.mark.api
 class TestReturnMachinesByRequestId:
     def test_return_with_request_id_calls_orchestrator(self, machines_app):
         """POST /machines/return with request_id → orchestrator called with request_id set."""

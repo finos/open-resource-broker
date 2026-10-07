@@ -3,11 +3,12 @@
 import logging
 import time
 from datetime import datetime, timezone
+from typing import Any, Optional
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from orb.api.middleware._utils import get_or_generate_correlation_id
+from orb.api.middleware._utils import get_or_generate_correlation_id, get_real_client_ip
 
 logger = logging.getLogger("orb.audit")
 
@@ -47,6 +48,10 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         "/api/v1/me",
     )
 
+    def __init__(self, app: Any, trusted_proxies: Optional[list[str]] = None) -> None:
+        super().__init__(app)
+        self._trusted_proxies: frozenset[str] = frozenset(trusted_proxies or [])
+
     async def dispatch(self, request: Request, call_next):
         """Process request; emit an audit log entry for mutating requests."""
         path = request.url.path
@@ -74,7 +79,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         # a crafted X-Correlation-ID that embeds CR/LF or other C0 controls).
         # Generate a uuid4 when the header is absent or becomes empty after stripping.
         correlation_id: str = get_or_generate_correlation_id(request, fallback=request_id)
-        client_ip: str = request.client.host if request.client else "unknown"
+        client_ip: str = get_real_client_ip(request, self._trusted_proxies) or "unknown"
 
         logger.info(
             "audit",

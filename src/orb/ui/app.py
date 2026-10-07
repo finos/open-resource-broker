@@ -18,6 +18,7 @@ import os
 
 import reflex as rx
 
+from orb.ui.api_http import warn_if_dashboard_unauthenticated
 from orb.ui.pages.config import config_page
 from orb.ui.pages.dashboard import dashboard_page
 from orb.ui.pages.machines import machines_page
@@ -196,8 +197,11 @@ def _orb_api_transformer(reflex_app):
     from orb.infrastructure.logging.logger import get_logger
 
     logger = get_logger(__name__)
-    orb_app = create_fastapi_app(get_server_config())
+    server_config = get_server_config()
+    orb_app = create_fastapi_app(server_config)
     static_dir = _resolve_static_dir()
+
+    warn_if_dashboard_unauthenticated(server_config, logger)
 
     # ``/orb`` must be inserted BEFORE the SPA catch-all fallback route
     # would swallow it.  Insert at the head to also precede Reflex's

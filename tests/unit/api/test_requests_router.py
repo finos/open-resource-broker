@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from orb.api.dependencies import (
+    get_list_requests_orchestrator,
     get_list_return_requests_orchestrator,
     get_request_formatter,
     get_request_status_orchestrator,
@@ -16,6 +17,7 @@ from orb.api.dependencies import (
 from orb.api.routers.requests import list_return_requests, router as requests_router
 from orb.application.services.orchestration.dtos import (
     GetRequestStatusOutput,
+    ListRequestsOutput,
     ListReturnRequestsOutput,
 )
 
@@ -563,3 +565,49 @@ class TestListReturnRequestsLimitType:
 
         call_input = orchestrator.execute.call_args[0][0]
         assert call_input.limit == 50
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestListRequestsLimitOffsetBounds:
+    """limit/offset query params on GET /requests/ and /requests/return must be bounded."""
+
+    def _list_requests_client(self, requests_app):
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(return_value=ListRequestsOutput(requests=[]))
+        return _make_client(requests_app, {get_list_requests_orchestrator: lambda: orchestrator})
+
+    @pytest.mark.parametrize("limit", [0, -1, 1001, 100000])
+    def test_list_requests_limit_out_of_bounds_rejected(self, requests_app, limit):
+        client = self._list_requests_client(requests_app)
+        resp = client.get(f"/requests/?limit={limit}")
+        assert resp.status_code == 422
+
+    def test_list_requests_offset_negative_rejected(self, requests_app):
+        client = self._list_requests_client(requests_app)
+        resp = client.get("/requests/?offset=-1")
+        assert resp.status_code == 422
+
+    @pytest.mark.parametrize("limit", [1, 50, 1000])
+    def test_list_requests_limit_within_bounds_accepted(self, requests_app, limit):
+        client = self._list_requests_client(requests_app)
+        resp = client.get(f"/requests/?limit={limit}")
+        assert resp.status_code == 200
+
+    def _list_return_requests_client(self, requests_app):
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(return_value=ListReturnRequestsOutput(requests=[]))
+        return _make_client(
+            requests_app, {get_list_return_requests_orchestrator: lambda: orchestrator}
+        )
+
+    @pytest.mark.parametrize("limit", [0, -1, 1001])
+    def test_list_return_requests_limit_out_of_bounds_rejected(self, requests_app, limit):
+        client = self._list_return_requests_client(requests_app)
+        resp = client.get(f"/requests/return?limit={limit}")
+        assert resp.status_code == 422
+
+    def test_list_return_requests_offset_negative_rejected(self, requests_app):
+        client = self._list_return_requests_client(requests_app)
+        resp = client.get("/requests/return?offset=-1")
+        assert resp.status_code == 422

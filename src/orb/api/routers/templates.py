@@ -129,8 +129,8 @@ async def list_templates(
     provider_name: Optional[str] = Query(None, description="Filter by provider instance name"),
     provider_type: Optional[str] = Query(None, description="Filter by provider type"),
     provider_api: Optional[str] = PROVIDER_API_QUERY,
-    limit: int = Query(50, description="Limit number of results"),
-    offset: int = Query(0, description="Number of results to skip"),
+    limit: int = Query(50, ge=1, le=1000, description="Limit number of results"),
+    offset: int = Query(0, ge=0, description="Number of results to skip"),
     cursor: Optional[str] = Query(
         None, description="Opaque pagination cursor (preferred over offset)"
     ),

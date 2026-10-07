@@ -377,6 +377,67 @@ class TestRunSplitMode:
 
 
 # ---------------------------------------------------------------------------
+# _run_split_mode — unauthenticated-dashboard startup warning
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestRunSplitModeAuthWarning:
+    async def _run_with_auth(self, auth_enabled: bool):
+        from orb.interface.server_runtime import _run_split_mode
+
+        ui_cfg = _make_ui_config(mode="split", backend_port=3001)
+        server_cfg = _make_server_config()
+        server_cfg.auth = MagicMock()
+        server_cfg.auth.enabled = auth_enabled
+        logger = MagicMock()
+
+        api_proc = AsyncMock()
+        api_proc.pid = 600
+        api_proc.returncode = 0
+        api_proc.wait = AsyncMock(return_value=0)
+
+        reflex_proc = AsyncMock()
+        reflex_proc.pid = 601
+        reflex_proc.returncode = 0
+        reflex_proc.wait = AsyncMock(return_value=0)
+
+        procs = [api_proc, reflex_proc]
+        call_count = 0
+
+        async def fake_create_subprocess(*args, **kwargs):
+            nonlocal call_count
+            proc = procs[call_count % len(procs)]
+            call_count += 1
+            return proc
+
+        with patch("shutil.which", return_value="/usr/bin/reflex"):
+            with patch("asyncio.create_subprocess_exec", side_effect=fake_create_subprocess):
+                with patch("os.getpgid", side_effect=ProcessLookupError):
+                    loop = asyncio.get_event_loop()
+                    with patch.object(loop, "add_signal_handler", MagicMock()):
+                        await _run_split_mode(ui_cfg, server_cfg, None, logger)
+
+        return logger
+
+    @pytest.mark.asyncio
+    async def test_warns_when_auth_enabled(self):
+        """auth.enabled=True must log a warning before launching the dashboard."""
+        logger = await self._run_with_auth(auth_enabled=True)
+
+        warnings = [call.args[0] for call in logger.warning.call_args_list]
+        assert any("dashboard" in msg.lower() for msg in warnings)
+
+    @pytest.mark.asyncio
+    async def test_no_warning_when_auth_disabled(self):
+        """auth.enabled=False must not emit the unauthenticated-dashboard warning."""
+        logger = await self._run_with_auth(auth_enabled=False)
+
+        warnings = [call.args[0] for call in logger.warning.call_args_list]
+        assert not any("dashboard" in msg.lower() for msg in warnings)
+
+
+# ---------------------------------------------------------------------------
 # run_embedded_foreground — embedded mode cleanup when proc still running
 # ---------------------------------------------------------------------------
 

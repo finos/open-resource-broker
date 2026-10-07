@@ -195,7 +195,7 @@ async def list_machines(
     provider_name: Optional[str] = Query(None),
     provider_type: Optional[str] = Query(None),
     request_id: Optional[str] = REQUEST_ID_QUERY,
-    limit: int = Query(50),
+    limit: int = Query(50, ge=1, le=1000),
     offset: int = OFFSET_QUERY,
     cursor: Optional[str] = Query(None, description="Opaque pagination cursor"),
     q: Optional[str] = Query(None, description="Substring search"),

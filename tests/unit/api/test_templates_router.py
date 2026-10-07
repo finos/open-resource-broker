@@ -522,6 +522,34 @@ class TestTemplatesRouter:
         inp = orchestrator.execute.call_args.args[0]
         assert inp.provider_api == "aws"
 
+    # ------------------------------------------------------------------
+    # GET /templates/ — limit/offset bounds
+    # ------------------------------------------------------------------
+
+    def _client_with_empty_list(self, templates_app):
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(return_value=ListTemplatesOutput(templates=[]))
+        return self._make_client(
+            templates_app, {get_list_templates_orchestrator: lambda: orchestrator}
+        )
+
+    @pytest.mark.parametrize("limit", [0, -1, 1001, 100000])
+    def test_list_templates_limit_out_of_bounds_rejected(self, templates_app, limit):
+        client = self._client_with_empty_list(templates_app)
+        resp = client.get(f"/templates/?limit={limit}")
+        assert resp.status_code == 422
+
+    def test_list_templates_offset_negative_rejected(self, templates_app):
+        client = self._client_with_empty_list(templates_app)
+        resp = client.get("/templates/?offset=-1")
+        assert resp.status_code == 422
+
+    @pytest.mark.parametrize("limit", [1, 50, 1000])
+    def test_list_templates_limit_within_bounds_accepted(self, templates_app, limit):
+        client = self._client_with_empty_list(templates_app)
+        resp = client.get(f"/templates/?limit={limit}")
+        assert resp.status_code == 200
+
     def test_list_templates_serializes_correctly(self, templates_app):
         orchestrator = AsyncMock()
         orchestrator.execute = AsyncMock(

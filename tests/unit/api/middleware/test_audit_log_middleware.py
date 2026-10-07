@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -17,10 +17,10 @@ from orb.api.middleware.audit_log_middleware import AuditLogMiddleware
 # ---------------------------------------------------------------------------
 
 
-def _make_app_with_middleware():
+def _make_app_with_middleware(trusted_proxies=None):
     """Return a minimal FastAPI app with AuditLogMiddleware attached."""
     app = FastAPI()
-    app.add_middleware(AuditLogMiddleware)
+    app.add_middleware(AuditLogMiddleware, trusted_proxies=trusted_proxies)
 
     @app.get("/api/v1/machines")
     async def machines():
@@ -257,3 +257,74 @@ class TestAuditLogLatencySemantics:
 
         # monotonic must have been called at least twice (start + end)
         assert len(call_times) >= 2
+
+
+# ---------------------------------------------------------------------------
+# trusted-proxy client IP resolution
+# ---------------------------------------------------------------------------
+
+
+def _make_request(client_host: str, headers: dict[str, str] | None = None) -> MagicMock:
+    request = MagicMock()
+    request.client.host = client_host
+    headers_map = headers or {}
+    request.headers.get = lambda k, d=None: headers_map.get(k, d)
+    request.url.path = "/api/v1/admin/status"
+    request.method = "GET"
+    request.state = MagicMock(spec=[])
+    return request
+
+
+async def _call_next(_request):
+    response = MagicMock()
+    response.status_code = 200
+    return response
+
+
+@pytest.mark.unit
+class TestAuditLogTrustedProxies:
+    """AuditLogMiddleware resolves client_ip via get_real_client_ip, honouring
+    trusted_proxies, instead of reading request.client.host directly."""
+
+    @pytest.mark.asyncio
+    async def test_direct_peer_ip_used_without_trusted_proxies(self):
+        mw = AuditLogMiddleware(app=MagicMock())
+        request = _make_request("4.4.4.4", headers={"x-forwarded-for": "203.0.113.5"})
+
+        with patch("orb.api.middleware.audit_log_middleware.logger") as mock_logger:
+            await mw.dispatch(request, _call_next)
+
+        extra = mock_logger.info.call_args.kwargs["extra"]
+        assert extra["client_ip"] == "4.4.4.4"
+
+    @pytest.mark.asyncio
+    async def test_forwarded_ip_used_behind_trusted_proxy(self):
+        mw = AuditLogMiddleware(app=MagicMock(), trusted_proxies=["10.0.0.1"])
+        request = _make_request("10.0.0.1", headers={"x-forwarded-for": "203.0.113.5"})
+
+        with patch("orb.api.middleware.audit_log_middleware.logger") as mock_logger:
+            await mw.dispatch(request, _call_next)
+
+        extra = mock_logger.info.call_args.kwargs["extra"]
+        assert extra["client_ip"] == "203.0.113.5"
+
+    @pytest.mark.asyncio
+    async def test_untrusted_peer_forwarded_header_ignored(self):
+        """A caller claiming to be a trusted proxy without actually being the
+        direct peer must not have its X-Forwarded-For header honoured."""
+        mw = AuditLogMiddleware(app=MagicMock(), trusted_proxies=["10.0.0.1"])
+        request = _make_request("6.6.6.6", headers={"x-forwarded-for": "203.0.113.5"})
+
+        with patch("orb.api.middleware.audit_log_middleware.logger") as mock_logger:
+            await mw.dispatch(request, _call_next)
+
+        extra = mock_logger.info.call_args.kwargs["extra"]
+        assert extra["client_ip"] == "6.6.6.6"
+
+    def test_trusted_proxies_stored_as_frozenset(self):
+        mw = AuditLogMiddleware(app=MagicMock(), trusted_proxies=["10.0.0.1", "10.0.0.2"])
+        assert mw._trusted_proxies == frozenset({"10.0.0.1", "10.0.0.2"})
+
+    def test_defaults_to_empty_trusted_proxies(self):
+        mw = AuditLogMiddleware(app=MagicMock())
+        assert mw._trusted_proxies == frozenset()

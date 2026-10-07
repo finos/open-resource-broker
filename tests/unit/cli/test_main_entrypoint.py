@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import sys
 from unittest.mock import AsyncMock, MagicMock
 
@@ -452,6 +453,104 @@ class TestMainTemplatesGenerateDispatch:
         with pytest.raises(SystemExit):
             _run(cli_main.main())
         get_container_mock.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# main(): --log-level is applied to the root logger
+# ---------------------------------------------------------------------------
+
+
+class TestMainLogLevelApplied:
+    @pytest.fixture(autouse=True)
+    def _restore_root_log_level(self):
+        """Root logger level is process-global state; restore it after each test."""
+        original = logging.getLogger().level
+        yield
+        logging.getLogger().setLevel(original)
+
+    def test_log_level_set_before_app_initialization(self, monkeypatch):
+        """The flag must take effect even on early-exit paths (before bootstrap)."""
+        args = _base_args(log_level="debug")
+        monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
+        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        app_instance = MagicMock()
+        app_instance.initialize = AsyncMock(return_value=True)
+        monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
+        monkeypatch.setattr(cli_main, "execute_command", AsyncMock(return_value=("ok", 0)))
+
+        _run(cli_main.main())
+
+        assert logging.getLogger().level == logging.DEBUG
+
+    def test_log_level_reapplied_after_bootstrap_overwrites_it(self, monkeypatch):
+        """Application.initialize() re-runs setup_logging() from file config, which
+        would reset the root logger level; --log-level must win regardless."""
+        args = _base_args(log_level="debug")
+        monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
+        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+
+        async def _initialize_and_clobber_level(*_args, **_kwargs):
+            # Simulate setup_logging() resetting the root logger to a
+            # file-configured level different from the CLI flag.
+            logging.getLogger().setLevel(logging.ERROR)
+            return True
+
+        app_instance = MagicMock()
+        app_instance.initialize = _initialize_and_clobber_level
+        monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
+        monkeypatch.setattr(cli_main, "execute_command", AsyncMock(return_value=("ok", 0)))
+
+        _run(cli_main.main())
+
+        assert logging.getLogger().level == logging.DEBUG
+
+    def test_no_flag_keeps_level_from_config(self, monkeypatch):
+        """Without --log-level, the level set by config/ORB_LOG_LEVEL is left alone."""
+        args = _base_args(log_level=None)
+        monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
+        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+
+        async def _initialize_with_config_level(*_args, **_kwargs):
+            # setup_logging() applies the config/env-configured level.
+            logging.getLogger().setLevel(logging.WARNING)
+            return True
+
+        app_instance = MagicMock()
+        app_instance.initialize = _initialize_with_config_level
+        monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
+        monkeypatch.setattr(cli_main, "execute_command", AsyncMock(return_value=("ok", 0)))
+
+        _run(cli_main.main())
+
+        assert logging.getLogger().level == logging.WARNING
+
+    def test_flag_overrides_level_from_config(self, monkeypatch):
+        """An explicit --log-level wins over the level applied during bootstrap."""
+        args = _base_args(log_level="ERROR")
+        monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
+        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+
+        async def _initialize_with_config_level(*_args, **_kwargs):
+            logging.getLogger().setLevel(logging.DEBUG)
+            return True
+
+        app_instance = MagicMock()
+        app_instance.initialize = _initialize_with_config_level
+        monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
+        monkeypatch.setattr(cli_main, "execute_command", AsyncMock(return_value=("ok", 0)))
+
+        _run(cli_main.main())
+
+        assert logging.getLogger().level == logging.ERROR
+
+    def test_flag_defaults_to_none(self):
+        from orb.cli.args import parse_args
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(sys, "argv", ["orb", "system", "status"])
+            args, _ = parse_args()
+
+        assert args.log_level is None
 
 
 # ---------------------------------------------------------------------------
