@@ -123,7 +123,9 @@ class SchedulerRegistry(BaseRegistry):
         Useful for calling classmethods before app initialization.
         """
         registration = self._get_type_registration(scheduler_type)
-        assert isinstance(registration, SchedulerRegistration)
+        assert isinstance(  # noqa: S101  # type-narrowing only; _get_type_registration always returns this type
+            registration, SchedulerRegistration
+        )
         if registration.strategy_class is None:
             raise ValueError(f"No strategy class registered for scheduler type: {scheduler_type}")
         return registration.strategy_class

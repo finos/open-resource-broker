@@ -18,7 +18,7 @@ This configures git to use `.githooks/` instead of `.git/hooks/`.
 Runs quality checks via `pre-commit run` (reads `.pre-commit-config.yaml`, skips manual-stage hooks).
 
 ### pre-push
-Runs pre-push stage hooks from `.pre-commit-config.yaml` (bandit, safety, validate-imports, validate-cqrs, check-architecture, validate-workflows).
+Runs pre-push stage hooks from `.pre-commit-config.yaml` (pip-audit, validate-imports, validate-cqrs, check-architecture, validate-workflows).
 
 ## Adding Custom Hooks
 

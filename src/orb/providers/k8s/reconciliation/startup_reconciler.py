@@ -172,7 +172,7 @@ class StartupReconciler:
                     if classified is None:
                         continue
                     if classified.kind == "adopted":
-                        assert classified.state is not None  # narrow for pyright
+                        assert classified.state is not None  # noqa: S101  # narrow for pyright
                         self._cache.upsert(classified.state)
                         report.pods_adopted += 1
                     else:
@@ -312,7 +312,7 @@ class StartupReconciler:
             if classified is None:
                 continue
             if classified.kind == "adopted":
-                assert classified.state is not None  # narrow for pyright
+                assert classified.state is not None  # noqa: S101  # narrow for pyright
                 self._cache.upsert(classified.state)
                 adopted += 1
             else:

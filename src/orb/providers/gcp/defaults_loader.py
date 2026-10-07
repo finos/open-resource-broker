@@ -14,4 +14,6 @@ class GCPDefaultsLoader:
         return GCPProviderStrategy.get_defaults_config()
 
 
-assert isinstance(GCPDefaultsLoader(), ProviderDefaultsLoaderPort)
+assert isinstance(  # noqa: S101  # module-level protocol-conformance smoke check, also enforced statically by pyright
+    GCPDefaultsLoader(), ProviderDefaultsLoaderPort
+)

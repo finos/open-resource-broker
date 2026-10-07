@@ -83,8 +83,8 @@ class K8sCLISpec:
             sanitized_context = re.sub(r"[^a-zA-Z0-9\-_]", "-", context)
             sanitized_namespace = re.sub(r"[^a-zA-Z0-9\-_]", "-", namespace)
             return f"kubernetes_{sanitized_context}_{sanitized_namespace}"
-        except Exception:
-            pass  # best-effort name generation; fall back to "kubernetes_default" on any error
+        except Exception:  # noqa: S110  # best-effort name generation; fall back to "kubernetes_default" on any error
+            pass
         return "kubernetes_default"
 
     def format_display(self, config: dict[str, Any]) -> list[tuple[str, str]]:

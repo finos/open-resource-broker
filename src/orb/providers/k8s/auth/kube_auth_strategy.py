@@ -247,8 +247,9 @@ class KubeAuthStrategy(AuthPort):
             from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
             kubernetes_client = get_container().get(K8sClient)
-        except Exception:
-            pass  # type: ignore[return]
+        except Exception as exc:
+            # Falls back to None; the strategy constructs an in-cluster client on first use.
+            logger.debug("K8sClient not available from DI container: %s", exc)
 
         # Respect the per-instance enabled flag from config rather than hardcoding
         # True.  The registration-gate (inbound_auth_enabled=False → strategy never

@@ -191,7 +191,7 @@ class SQLQueryBuilder(QueryManager):
         # 1. Validating table_name and column names against a whitelist pattern
         # 2. Using parameterized queries for all values with :param syntax
         query = (
-            f"INSERT INTO {self.table_name} "  # nosec B608 - table_name and columns validated via _validate_identifier; values are parameterized
+            f"INSERT INTO {self.table_name} "  # noqa: S608  # table_name and columns validated via _validate_identifier; values are parameterized
             f"({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
         )
 
@@ -210,7 +210,7 @@ class SQLQueryBuilder(QueryManager):
         """
         # Validate identifier
         self._validate_identifier(id_column)
-        query = f"SELECT * FROM {self.table_name} WHERE {id_column} = :{id_column}"  # nosec B608 - table_name and id_column validated via _validate_identifier; value is parameterized
+        query = f"SELECT * FROM {self.table_name} WHERE {id_column} = :{id_column}"  # noqa: S608  # table_name and id_column validated via _validate_identifier; value is parameterized
 
         self.logger.debug("Built SELECT by ID query for %s", self.table_name)
         return query, id_column
@@ -223,7 +223,7 @@ class SQLQueryBuilder(QueryManager):
             SELECT all SQL statement
         """
         # Table name already validated in constructor
-        query = f"SELECT * FROM {self.table_name}"  # nosec B608 - table_name validated via _validate_identifier in constructor
+        query = f"SELECT * FROM {self.table_name}"  # noqa: S608  # table_name validated via _validate_identifier in constructor
 
         self.logger.debug("Built SELECT all query for %s", self.table_name)
         return query
@@ -283,11 +283,11 @@ class SQLQueryBuilder(QueryManager):
             # CAS path: add version predicate so only the row with the expected
             # version is touched.  A zero rowcount signals a concurrent write won.
             query = (
-                f"UPDATE {self.table_name} SET {', '.join(set_clauses)} "  # nosec B608 - table_name, id_column and set columns validated via _validate_identifier; values are parameterized
+                f"UPDATE {self.table_name} SET {', '.join(set_clauses)} "  # noqa: S608  # table_name, id_column and set columns validated via _validate_identifier; values are parameterized
                 f"WHERE {id_column} = :entity_id AND version = :expected_version"
             )
         else:
-            query = f"UPDATE {self.table_name} SET {', '.join(set_clauses)} WHERE {id_column} = :entity_id"  # nosec B608 - table_name, id_column and set columns validated via _validate_identifier; values are parameterized
+            query = f"UPDATE {self.table_name} SET {', '.join(set_clauses)} WHERE {id_column} = :entity_id"  # noqa: S608  # table_name, id_column and set columns validated via _validate_identifier; values are parameterized
 
         # Add entity_id (and optional version predicate) to parameters
         parameters = filtered_data.copy()
@@ -310,7 +310,7 @@ class SQLQueryBuilder(QueryManager):
         """
         # Validate id_column
         self._validate_identifier(id_column)
-        query = f"DELETE FROM {self.table_name} WHERE {id_column} = :{id_column}"  # nosec B608 - table_name and id_column validated via _validate_identifier; value is parameterized
+        query = f"DELETE FROM {self.table_name} WHERE {id_column} = :{id_column}"  # noqa: S608  # table_name and id_column validated via _validate_identifier; value is parameterized
 
         self.logger.debug("Built DELETE query for %s", self.table_name)
         return query, id_column
@@ -325,7 +325,7 @@ class SQLQueryBuilder(QueryManager):
         Returns:
             Tuple of (query, parameter_name)
         """
-        query = f"SELECT 1 FROM {self.table_name} WHERE {id_column} = :{id_column} LIMIT 1"  # nosec B608 - table_name and id_column validated via _validate_identifier; value is parameterized
+        query = f"SELECT 1 FROM {self.table_name} WHERE {id_column} = :{id_column} LIMIT 1"  # noqa: S608  # table_name and id_column validated via _validate_identifier; value is parameterized
 
         self.logger.debug("Built EXISTS query for %s", self.table_name)
         return query, id_column
@@ -380,7 +380,7 @@ class SQLQueryBuilder(QueryManager):
                 param_name = f"{column}_eq"
                 where_clauses.append(f"{column} = :{param_name}")
                 parameters[param_name] = value
-        query = f"SELECT * FROM {self.table_name} WHERE {' AND '.join(where_clauses)}"  # nosec B608 - table_name and columns validated via _validate_identifier; values are parameterized
+        query = f"SELECT * FROM {self.table_name} WHERE {' AND '.join(where_clauses)}"  # noqa: S608  # table_name and columns validated via _validate_identifier; values are parameterized
 
         self.logger.debug("Built SELECT with criteria query for %s", self.table_name)
         return query, parameters
@@ -393,7 +393,7 @@ class SQLQueryBuilder(QueryManager):
             COUNT SQL statement
         """
         # Table name already validated in constructor
-        query = f"SELECT COUNT(*) FROM {self.table_name}"  # nosec B608 - table_name validated via _validate_identifier in constructor
+        query = f"SELECT COUNT(*) FROM {self.table_name}"  # noqa: S608  # table_name validated via _validate_identifier in constructor
 
         self.logger.debug("Built COUNT query for %s", self.table_name)
         return query
@@ -426,7 +426,7 @@ class SQLQueryBuilder(QueryManager):
 
         placeholders = [f":{col}" for col in filtered_columns]
         query = (
-            f"INSERT INTO {self.table_name} "  # nosec B608 - table_name and columns validated via _validate_identifier; values are parameterized
+            f"INSERT INTO {self.table_name} "  # noqa: S608  # table_name and columns validated via _validate_identifier; values are parameterized
             f"({', '.join(filtered_columns)}) VALUES ({', '.join(placeholders)})"
         )
 

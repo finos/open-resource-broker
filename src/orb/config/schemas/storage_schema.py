@@ -129,7 +129,7 @@ def _get_valid_storage_strategies() -> set[str]:
         from orb.infrastructure.storage.registry import get_storage_registry
 
         valid.update(get_storage_registry().get_registered_storage_types())
-    except Exception:
+    except Exception:  # noqa: S110 - registry may be unavailable before bootstrap; baseline types apply
         # Validator may run before bootstrap registers backends, and storage_schema
         # must stay importable without orb.infrastructure.storage being initialised.
         # Fall back to the baseline so config validation never depends on registry health.

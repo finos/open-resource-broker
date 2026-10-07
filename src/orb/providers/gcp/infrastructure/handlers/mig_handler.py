@@ -214,9 +214,9 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
             if insert is not None:
                 try:
                     await insert
-                except Exception:
+                except Exception as exc:
                     # A failed insert must not prevent cleanup of the other accepted resource.
-                    pass
+                    self._logger.debug("Rollback insert raised (ignored): %s", exc)
 
         if mig_insert is not None and not mig_insert.cancelled() and mig_insert.exception() is None:
             mig_rollback_error = await self._rollback_mig(template_name, mig_name, placement)

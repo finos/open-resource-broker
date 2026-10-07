@@ -274,8 +274,8 @@ class K8sWatcher:
                 resync_task.cancel()
                 try:
                     await resync_task
-                except (asyncio.CancelledError, Exception):  # pragma: no cover
-                    pass
+                except (asyncio.CancelledError, Exception) as exc:  # pragma: no cover
+                    self._logger.debug("Resync task raised during cancellation: %s", exc)
         self._resync_task = None
 
         task = self._task
@@ -288,8 +288,8 @@ class K8sWatcher:
                 task.cancel()
                 try:
                     await task
-                except (asyncio.CancelledError, Exception):  # pragma: no cover
-                    pass
+                except (asyncio.CancelledError, Exception) as exc:  # pragma: no cover
+                    self._logger.debug("Watch task raised during cancellation: %s", exc)
         self._task = None
 
     # ------------------------------------------------------------------

@@ -281,7 +281,6 @@ Hooks that run on every commit (enforced):
 - `validate-imports` — import validation
 
 Additional hooks run via `make pre-commit-full` (manual stage):
-- `bandit` — security analysis
 - `detect-secrets` — hardcoded secret detection
 - `validate-workflows` — GitHub Actions YAML validation
 

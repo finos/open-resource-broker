@@ -149,8 +149,8 @@ def get_scripts_location() -> Path:
                 scripts_dir = strategy.get_scripts_directory()
                 if scripts_dir is not None:
                     return scripts_dir
-        except Exception:
-            pass  # Best-effort: DI container may not be ready during installation detection
+        except Exception:  # noqa: S110  # Best-effort: DI container may not be ready during installation detection
+            pass
 
         from orb.config.platform_dirs import get_root_location
 

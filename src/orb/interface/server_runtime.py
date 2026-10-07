@@ -260,7 +260,10 @@ async def run_embedded_foreground(
         # port, falling back to ui_config.backend_port when server_config
         # is not provided (e.g. tests, standalone Reflex invocations).
         backend_port = server_config.port if server_config is not None else ui_config.backend_port
-        host = getattr(server_config, "host", "0.0.0.0") if server_config is not None else "0.0.0.0"
+        # Embedded-mode default; the server is explicitly meant to listen on all interfaces.
+        host = (
+            getattr(server_config, "host", "0.0.0.0") if server_config is not None else "0.0.0.0"  # noqa: S104 - embedded mode listens on all interfaces by design
+        )
 
         env = os.environ.copy()
         env["ORB_MODE"] = "embedded"
@@ -454,7 +457,7 @@ async def _run_split_mode(
 
     orb_ui = _orb_ui_dir()
 
-    api_host = server_config.host or "0.0.0.0"
+    api_host = server_config.host or "0.0.0.0"  # noqa: S104  # explicit bind-all-interfaces default for the API-only process
     api_port = server_config.port
     reflex_port = ui_config.backend_port
 

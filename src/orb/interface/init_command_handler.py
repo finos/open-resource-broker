@@ -767,8 +767,9 @@ def _write_config_file(
             if container is not None:
                 registry = container.get(ProviderRegistryPort)
                 strategy_class = _get_provider_strategy(provider_type, registry=registry)
-        except Exception:
-            pass  # best-effort; fall back to generic name and all-defaults-in-template
+        except Exception as exc:
+            # Best-effort; fall back to generic name and all-defaults-in-template.
+            logger.debug("Could not resolve provider strategy class: %s", exc)
 
         # Generate provider name via the strategy class so each provider type
         # can apply its own naming convention.  Fall back to the generic

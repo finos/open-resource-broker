@@ -59,7 +59,9 @@ def resolve_namespace(
     if candidate is None:
         candidate = config.namespace
 
-    assert candidate is not None, "namespace must be resolved by model_validator"
+    assert candidate is not None, (  # noqa: S101  # type-narrowing; K8sProviderConfig's model_validator guarantees this
+        "namespace must be resolved by model_validator"
+    )
 
     # Validate the resolved namespace against RFC 1123 DNS label rules
     # before constructing any API request.  This guards against requests
@@ -110,7 +112,9 @@ def resolve_namespace_from_provider_data(
     if isinstance(ns, str) and ns:
         return ns
     namespace = config.namespace
-    assert namespace is not None, "namespace must be resolved by model_validator"
+    assert namespace is not None, (  # noqa: S101  # type-narrowing; K8sProviderConfig's model_validator guarantees this
+        "namespace must be resolved by model_validator"
+    )
     return namespace
 
 

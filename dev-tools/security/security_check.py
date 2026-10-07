@@ -3,7 +3,6 @@
 Security Check Script
 
 Runs comprehensive security checks including:
-- Bandit (security linter)
 - pip-audit (dependency vulnerability check)
 - Optional: Trivy, Semgrep, TruffleHog
 
@@ -11,7 +10,7 @@ Usage:
     python dev-tools/security/security_check.py [--quick] [--container] [--all]
 
 Options:
-    --quick      Run only fast checks (bandit, pip-audit)
+    --quick      Run only fast checks (pip-audit)
     --container  Include container security scans
     --all        Run all available security tools
 """
@@ -50,22 +49,6 @@ def run_tool(tool_name, *args):
     except Exception as e:
         logger.error(f"FAIL {tool_name} failed: {e}")
         return False
-
-
-def run_bandit():
-    """Run Bandit security linter."""
-    logger.info("=== Bandit Security Linter ===")
-
-    # Run bandit with JSON output
-    json_success = run_tool("bandit", "-r", "src", "-f", "json", "-o", "bandit-report.json")
-
-    # Run bandit with SARIF output
-    sarif_success = run_tool("bandit", "-r", "src", "-f", "sarif", "-o", "bandit-results.sarif")
-
-    if not json_success or not sarif_success:
-        logger.warning("Security issues found - check bandit-report.json")
-
-    return json_success and sarif_success
 
 
 def run_pip_audit():
@@ -158,7 +141,6 @@ def main():
 
     # Always run core security tools
     results = []
-    results.append(run_bandit())
     results.append(run_pip_audit())
 
     # Run additional tools if requested

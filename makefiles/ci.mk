@@ -7,6 +7,11 @@ ci-quality-ruff:  ## Run Ruff formatting and linting check (basic rules only)
 	@# Local fresh-checkout: run `make dev-install` first.
 	@echo "Running Ruff formatting and linting check (basic rules only)..."
 	@uv run --no-sync ruff check --select W,F,I --ignore E501 --quiet .
+	@# flake8-bandit security rules, scoped to src/ (src/orb/k8s_legacy is
+	@# excluded via the shared [tool.ruff] exclude). Tests carry a blanket S
+	@# per-file-ignore in pyproject.toml: assert, dummy-credential and
+	@# subprocess patterns are normal there. S311 is ignored repo-wide.
+	@uv run --no-sync ruff check --select S --ignore S311 --quiet src/
 	@uv run --no-sync ruff format --check --quiet .
 
 ci-quality-ruff-optional:  ## Run Ruff extended linting (warnings only)
@@ -56,9 +61,6 @@ ci-arch-lint-imports:  ## Run import-linter layer-boundary contracts
 ci-architecture: ci-arch-cqrs ci-arch-clean ci-arch-imports ci-arch-file-sizes ci-arch-lint-imports  ## Run all architecture checks
 
 # Individual security targets (with tool names)
-ci-security-bandit:  ## Run Bandit security scan
-	@./dev-tools/ci/ci_security_dispatcher.py bandit
-
 ci-security-pip-audit:  ## Run pip-audit dependency scan
 	@./dev-tools/ci/ci_security_dispatcher.py pip-audit
 
@@ -81,7 +83,7 @@ ci-security-container: dev-install  ## Run container security scans (Trivy image
 	@./dev-tools/security/security_container.py
 
 # Composite target
-ci-security: ci-security-bandit ci-security-pip-audit ci-security-semgrep ci-security-trivy-fs ci-security-trufflehog  ## Run all security scans
+ci-security: ci-security-pip-audit ci-security-semgrep ci-security-trivy-fs ci-security-trufflehog  ## Run all security scans
 
 ci-build-sbom:  ## Generate SBOM files (matches publish.yml workflow)
 	@echo "Generating SBOM files for CI..."

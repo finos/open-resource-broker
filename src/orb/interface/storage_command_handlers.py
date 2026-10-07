@@ -195,8 +195,8 @@ async def handle_storage_migrate(
             storage_cfg = cfg.get_typed(StorageConfig)
             sql_cfg = storage_cfg.sql_strategy
             db_url = _build_connection_string(sql_cfg)
-        except Exception:
-            pass  # Fall back to alembic.ini default
+        except Exception:  # noqa: S110  # Fall back to alembic.ini default
+            pass
 
         env = os.environ.copy()
         if db_url:

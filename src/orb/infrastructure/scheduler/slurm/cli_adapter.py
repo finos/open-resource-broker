@@ -37,7 +37,7 @@ class SlurmCliAdapter:
     def _run_command(self, cmd: list[str]) -> str:
         """Execute a command securely (no shell=True) with timeout."""
         self._logger.debug("Running command: %s", cmd)
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603  # argv is the configured binary path plus caller-validated identifiers; shell=False
             cmd, capture_output=True, text=True, timeout=self._timeout, shell=False, check=False
         )
         if result.returncode != 0:

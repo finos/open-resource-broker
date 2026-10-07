@@ -588,8 +588,8 @@ class AWSHandler(ProviderHandlerBase, ABC):
         self,
         client_method: Callable,
         result_key: str,
-        request_token_param: str = "NextToken",  # nosec B107
-        response_token_key: str = "NextToken",  # nosec B107
+        request_token_param: str = "NextToken",  # noqa: S107  # AWS pagination token key name, not a secret
+        response_token_key: str = "NextToken",  # noqa: S107  # AWS pagination token key name, not a secret
         **kwargs,
     ) -> list[dict[str, Any]]:
         """

@@ -785,8 +785,8 @@ def create_fastapi_app(server_config: Any) -> Any:
                 logger.info("FastAPI OTel auto-instrumentation enabled")
             except ImportError:
                 pass  # opentelemetry-instrumentation-fastapi not installed; skip.
-    except Exception:
-        pass  # Config or DI resolution failed; skip without crashing.
+    except Exception as exc:
+        logger.debug("Config or DI resolution failed; skipping without crashing: %s", exc)
 
     # Warn when multiple uvicorn workers are configured alongside the SSE
     # events router.  The in-process pubsub (SseEventBus) is not shared across
