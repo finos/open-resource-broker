@@ -36,6 +36,7 @@ runs:
       uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
 
     - name: Setup Python
+      id: setup-python
       uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
       with:
         python-version: ${{ inputs.python-version }}
@@ -53,11 +54,28 @@ runs:
           ~/.cache/uv
           ~/.local/bin/uv
           /opt/hostedtoolcache/uv
-        key: ${{ inputs.cache-key }}
+        # The virtualenv holds symlinks into the runner's hosted Python, so the
+        # key carries the exact interpreter version (major.minor.patch).  A
+        # runner image that moves to a new patch release then misses and
+        # rebuilds instead of restoring a venv whose interpreter is gone.
+        key: ${{ inputs.cache-key }}-${{ steps.setup-python.outputs.python-version }}
         fail-on-cache-miss: ${{ inputs.fail-on-cache-miss }}
 
-    - name: Install dependencies (scoped, on cache miss)
-      if: steps.restore-cache.outputs.cache-hit != 'true'
+    - name: Check restored environment
+      id: venv-check
+      if: steps.restore-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        if .venv/bin/python -c 'import sys' >/dev/null 2>&1; then
+          echo "healthy=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "::warning::Restored .venv interpreter is not runnable; rebuilding"
+          rm -rf .venv
+          echo "healthy=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Install dependencies (scoped, on cache miss or unusable restore)
+      if: steps.restore-cache.outputs.cache-hit != 'true' || steps.venv-check.outputs.healthy != 'true'
       shell: bash
       env:
         ORB_SKIP_UI_BUILD: "1"
