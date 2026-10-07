@@ -30,9 +30,9 @@
   <ItemGroup>
     <!-- AWS SigV4: canonical request built from HttpRequestMessage; signing delegated to
          Amazon.Runtime.Internal.Auth.AWS4Signer.ComputeSignature (AWSSDK.Core native) -->
-    <PackageReference Include="AWSSDK.Core" Version="3.7.400.47" />
+    <PackageReference Include="AWSSDK.Core" Version="4.0.102.8" />
     <!-- JSON serialization -->
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="System.Text.Json" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>
