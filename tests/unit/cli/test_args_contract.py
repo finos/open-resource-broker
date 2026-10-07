@@ -414,7 +414,12 @@ def _collect_subparsers() -> list[tuple[str, str | None, argparse.ArgumentParser
 def test_every_subparser_has_help_and_description():
     subparsers = _collect_subparsers()
     assert subparsers, "expected at least one sub-parser"
-    missing_help = [name for name, help_text, _ in subparsers if not help_text]
+    # Singular aliases are intentionally unlisted in help output.
+    missing_help = [
+        name
+        for name, help_text, sub in subparsers
+        if not help_text and "alias for" not in (sub.description or "")
+    ]
     missing_description = [name for name, _, sub in subparsers if not sub.description]
     assert not missing_description, f"sub-parsers missing description=: {missing_description}"
     assert not missing_help, f"sub-parsers missing help text: {missing_help}"

@@ -14,7 +14,7 @@ _orb_completion() {
     local cur prev words cword
     _init_completion || return
 
-    local resources="templates machines requests providers storage system config"
+    local resources="templates machines requests providers config storage system"
     local global_opts="--config --log-level --format --output --quiet --verbose --dry-run --completion --version --help"
 
     # Handle global options with values
@@ -128,9 +128,9 @@ _orb_resources() {
         'machines:Manage compute instances'
         'requests:Manage provisioning requests'
         'providers:Manage cloud providers'
+        'config:Configuration management'
         'storage:Manage storage resources'
         'system:System operations'
-        'config:Configuration management'
     )
     _describe 'resources' resources
 }

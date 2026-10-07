@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from orb.cli.args import parse_args
+from orb.cli.args import HELP_FORMATTER, build_parser, parse_args
 
 
 def _parse(argv: list[str]):
@@ -321,3 +321,86 @@ class TestRequestsWatch:
     def test_watch_interval_default(self):
         ns = _parse(["requests", "watch"])
         assert ns.interval == 5
+
+
+class TestHelpLayout:
+    """Top-level and nested help output."""
+
+    @staticmethod
+    def _help(argv: list[str] | None = None) -> str:
+        with patch.object(sys, "argv", ["orb"]):
+            parser, _ = build_parser()
+        for name in argv or []:
+            parser = next(
+                a for a in parser._actions if getattr(a, "choices", None) and name in a.choices
+            ).choices[name]
+        return parser.format_help()
+
+    @pytest.mark.parametrize("formatter_name", ["rich", "raw"])
+    def test_epilog_examples_stay_on_separate_lines(self, formatter_name):
+        import argparse
+
+        formatter = (
+            HELP_FORMATTER if formatter_name == "rich" else argparse.RawDescriptionHelpFormatter
+        )
+        with patch("orb.cli.args.HELP_FORMATTER", formatter):
+            text = self._help()
+        lines = [ln.strip() for ln in text.splitlines()]
+        assert any(ln.startswith("orb templates list ") for ln in lines)
+        assert any(ln.startswith("orb machines request template-id 5") for ln in lines)
+        assert any(ln.startswith("orb requests status req-123") for ln in lines)
+
+    def test_singular_aliases_hidden_from_help(self):
+        text = self._help()
+        assert "<command>" in text
+        for alias in ("template", "machine", "request", "provider", "infra"):
+            assert f"{{{alias}," not in text
+            assert f",{alias}," not in text
+            assert not any(ln.split()[:1] == [alias] for ln in text.splitlines())
+
+    @pytest.mark.parametrize(
+        "alias,action",
+        [
+            ("template", "list"),
+            ("machine", "list"),
+            ("request", "list"),
+            ("provider", "list"),
+            ("infra", "discover"),
+        ],
+    )
+    def test_singular_aliases_still_parse(self, alias, action):
+        ns = _parse([alias, action])
+        assert ns.resource == alias
+        assert ns.action == action
+
+    def test_subcommand_help_uses_same_formatter(self):
+        with patch.object(sys, "argv", ["orb"]):
+            parser, resource_parsers = build_parser()
+        assert parser.formatter_class is HELP_FORMATTER
+        for name in ("templates", "machines", "config", "providers"):
+            assert resource_parsers[name].formatter_class is HELP_FORMATTER
+        top, sub = self._help(), self._help(["templates"])
+        assert ("Positional Arguments:" in top) == ("Positional Arguments:" in sub)
+
+    def test_top_level_command_order(self):
+        text = self._help()
+        listed = [
+            ln.split()[0]
+            for ln in text.splitlines()
+            if ln.startswith("    ") and not ln.startswith("     ") and ln.split()
+        ]
+        assert listed == [
+            "init",
+            "templates",
+            "machines",
+            "requests",
+            "providers",
+            "config",
+            "scheduler",
+            "storage",
+            "system",
+            "infrastructure",
+            "server",
+            "mcp",
+            "k8s-legacy",
+        ]
