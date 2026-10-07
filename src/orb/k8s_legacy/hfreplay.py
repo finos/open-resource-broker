@@ -43,7 +43,7 @@ def _read_events(dbfile: pathlib.Path | str) -> list[tuple]:
         WHERE category IN ({",".join(["?"] * len(_CATEGORY_COMMAND_MAPPING))})
         AND type = "input"
         ORDER BY timestamp ASC
-        """,  # noqa: S608
+        """,
         list(_CATEGORY_COMMAND_MAPPING.keys()),
     )
     rows = cursor.fetchall()

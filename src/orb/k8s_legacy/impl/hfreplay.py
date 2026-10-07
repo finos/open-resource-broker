@@ -59,7 +59,7 @@ def _run_hostfactory_command(
         cli_args.extend(args)
 
     logger.info("Running orb k8s-legacy CLI with args: %s", cli_args)
-    result = subprocess.run(  # noqa ruff: S603
+    result = subprocess.run(
         cli_args,
         capture_output=True,
         text=True,

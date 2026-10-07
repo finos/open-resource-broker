@@ -48,7 +48,7 @@ class CleanupPodsTask:
         self.podstatusdir = workdir / "pods-status"
         self.namespace = k8sutils.get_namespace()
         self.dry_run = dry_run
-        self.deadline = time.time() + randint(0, 15)  # noqa: S311
+        self.deadline = time.time() + randint(0, 15)
 
     def _is_timeout_reached(
         self: "CleanupPodsTask",
@@ -119,7 +119,7 @@ class RefreshNodesTask:
     ) -> None:
         """init node refresh"""
         self.interval = interval
-        self.deadline = time.time() + randint(0, 15)  # noqa: S311
+        self.deadline = time.time() + randint(0, 15)
         self.k8s_client = k8s_client
         self.nodesdir = workdir / "nodes"
         self.dry_run = dry_run
@@ -178,7 +178,7 @@ class RefreshPodsTask:
     ) -> None:
         """init pod list"""
         self.interval = interval
-        self.deadline = time.time() + randint(0, 15)  # noqa: S311
+        self.deadline = time.time() + randint(0, 15)
         self.k8s_client = k8s_client
         self.namespace = k8sutils.get_namespace()
         self.dry_run = dry_run
@@ -240,7 +240,7 @@ def run(
             queue = sorted(tasks, key=lambda task: task.deadline)
             next_task = queue[0]
             time_remaining = next_task.deadline - time.time()
-            if time_remaining < 3:  # noqa: PLR2004
+            if time_remaining < 3:
                 next_task()
             else:
                 logger.info(

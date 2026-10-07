@@ -139,7 +139,7 @@ class TestCommandHandlersComprehensive:
                                     mock_command = Mock()
                                     await handle_method(mock_command)
 
-                                except Exception:  # nosec B110
+                                except Exception:
                                     # Handler might require specific command type
                                     pass
 
@@ -238,7 +238,7 @@ class TestQueryHandlersComprehensive:
                                     result = await handle_method(mock_query)
                                     assert result is not None or result == []
 
-                                except Exception:  # nosec B110
+                                except Exception:
                                     # Handler might require specific query type
                                     pass
 

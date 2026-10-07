@@ -73,7 +73,7 @@ class EventsBuffer:
     def _buffer(self: "EventsBuffer", *events: list[dict[str, Any]]) -> None:
         timestamp = None
         for event in events:
-            assert isinstance(event, dict)  # noqa: S101
+            assert isinstance(event, dict)
             if event.get("timestamp") is None:
                 if timestamp is None:
                     timestamp = int(time())
@@ -82,7 +82,7 @@ class EventsBuffer:
 
     def __enter__(self: "EventsBuffer") -> "EventsBuffer":
         """Enter the context manager"""
-        assert not self.events  # noqa: S101
+        assert not self.events
         return self
 
     def __exit__(self: "EventsBuffer", exc_type, exc_val, exc_tb) -> bool | None:
@@ -93,8 +93,8 @@ class EventsBuffer:
     def post(self: "EventsBuffer", *args: list[Any], **kwargs: dict[str, Any]) -> None:
         """Buffer event(s)."""
         if args:
-            assert not kwargs  # noqa: S101
+            assert not kwargs
             self._buffer(*args)
         else:
-            assert kwargs  # noqa: S101
+            assert kwargs
             self._buffer(kwargs)

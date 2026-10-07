@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from orb.domain.base.ports import LoggingPort
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 
-if TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
 # Maximum concurrent delete calls during cancel to avoid flooding the apiserver.
@@ -300,7 +300,7 @@ def _is_404(exc: BaseException) -> bool:
     """Return ``True`` when *exc* is an ``ApiException`` with status 404."""
     try:
         from kubernetes.client.exceptions import ApiException
-    except ImportError:  # pragma: no cover
+    except ImportError:
         return False
     return isinstance(exc, ApiException) and getattr(exc, "status", None) == 404
 

@@ -2554,7 +2554,7 @@ def test_unknown_template_returns_error(setup_host_factory_mock):
 
 def test_requests_list_cli_shows_request_id(setup_host_factory_mock):
     """orb requests list output includes a request_id after request_machines."""
-    import subprocess  # nosec B404
+    import subprocess
     import sys as _sys
 
     hfm = setup_host_factory_mock
@@ -2562,7 +2562,7 @@ def test_requests_list_cli_shows_request_id(setup_host_factory_mock):
     request_id = res.get("requestId") or res.get("request_id") or ""
     assert request_id, f"No request_id in request_machines response: {res}"
 
-    proc = subprocess.run(  # nosec B603
+    proc = subprocess.run(
         [_sys.executable, "-m", "orb", "requests", "list"],
         capture_output=True,
         text=True,

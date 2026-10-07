@@ -2,6 +2,7 @@
 
 import importlib
 import inspect
+import logging
 from unittest.mock import Mock
 
 import pytest
@@ -50,15 +51,16 @@ class TestDependencyInjectionComprehensive:
                     container.register("test_service", Mock())
                     # Should not raise exception
                     assert True
-                except Exception:  # nosec B110
+                except Exception:
                     # Registration might require specific format
                     pass
             elif hasattr(container, "bind"):
                 try:
                     container.bind("test_service", Mock())
                     assert True
-                except Exception:  # nosec B110
-                    pass
+                except Exception:
+                    # Binding might require a specific signature or key format
+                    logging.getLogger(__name__).debug("container.bind rejected the test signature")
 
         except ImportError:
             pytest.skip("DI Container not available")
@@ -134,7 +136,7 @@ class TestDependencyInjectionComprehensive:
                 try:
                     mock_command = Mock()
                     await command_bus.execute(mock_command)
-                except Exception:  # nosec B110
+                except Exception:
                     # Execute might require registered handlers
                     pass
 
@@ -146,7 +148,7 @@ class TestDependencyInjectionComprehensive:
                     mock_query = Mock()
                     result = await query_bus.execute(mock_query)
                     assert result is not None or result is None  # Both are valid
-                except Exception:  # nosec B110
+                except Exception:
                     # Send might require registered handlers
                     pass
 
@@ -273,7 +275,7 @@ class TestPersistenceLayerComprehensive:
                                         else:
                                             # Methods that need parameters
                                             await method(Mock())
-                                    except Exception:  # nosec B110
+                                    except Exception:
                                         # Method might require specific parameters
                                         pass
 

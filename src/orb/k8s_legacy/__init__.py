@@ -52,7 +52,7 @@ class DateTimeEncoder(json.JSONEncoder):
     This encoder is used to serialize `datetime` objects into ISO 8601 format.
     """
 
-    def default(self: "DateTimeEncoder", o):  # noqa: ANN201
+    def default(self: "DateTimeEncoder", o):
         """Convert the given date object to a JSON-serializable format."""
         if isinstance(o, datetime):
             return int(o.timestamp())
@@ -74,7 +74,7 @@ def handle_exceptions(
         """Returns decorator that wraps/handles exceptions."""
         exclist_copy = list(exclist)
 
-        def wrapped_f(*args, **kwargs) -> None:  # noqa: ANN003, ANN002
+        def wrapped_f(*args, **kwargs) -> None:
             """Wrapped function."""
             if not exclist_copy:
                 f(*args, **kwargs)
@@ -97,7 +97,7 @@ def handle_exceptions(
                     sys.exit(EXIT_CODE_DEFAULT)
 
         @functools.wraps(f)
-        def _handle_any(*args, **kwargs) -> None:  # noqa: ANN003, ANN002
+        def _handle_any(*args, **kwargs) -> None:
             """Default exception handler."""
             try:
                 wrapped_f(*args, **kwargs)
@@ -107,10 +107,10 @@ def handle_exceptions(
                 click.echo(f"Usage error: {usage_err!s}", err=True)
                 sys.exit(EXIT_CODE_DEFAULT)
 
-            except Exception as unhandled:  # pylint: disable=W0703  # noqa: BLE001
+            except Exception as unhandled:  # pylint: disable=W0703
                 with tempfile.NamedTemporaryFile(
                     delete=False, mode="w", encoding="utf-8"
-                ) as f:  # noqa: PLR1704
+                ) as f:
                     traceback.print_exc(file=f)
                     click.echo(
                         f"Error: {unhandled} [ {f.name} ]",

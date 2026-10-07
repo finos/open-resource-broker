@@ -24,18 +24,18 @@ from orb.k8s_legacy import fsutils
 def test_atomic_symlink() -> None:
     """Tests creation of symlink."""
     workdir = tempfile.mkdtemp()
-    link = os.path.join(workdir, "1")  # noqa: PTH118
+    link = os.path.join(workdir, "1")
 
     fsutils.atomic_symlink("/foo/bar", link)
-    assert os.readlink(link) == "/foo/bar"  # noqa: PTH115
+    assert os.readlink(link) == "/foo/bar"
 
     fsutils.atomic_symlink("/foo/baz", link)
-    assert os.readlink(link) == "/foo/baz"  # noqa: PTH115
+    assert os.readlink(link) == "/foo/baz"
 
-    os.unlink(link)  # noqa: PTH108
+    os.unlink(link)
 
     pathlib.Path(link).touch()
     fsutils.atomic_symlink("/foo/baz", link)
-    assert os.readlink(link) == "/foo/baz"  # noqa: PTH115
+    assert os.readlink(link) == "/foo/baz"
 
     shutil.rmtree(workdir)

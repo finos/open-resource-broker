@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from orb.domain.base.ports.health_check_port import HealthCheckPort
 from orb.monitoring.health import HealthStatus
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
 

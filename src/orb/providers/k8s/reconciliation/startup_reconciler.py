@@ -43,7 +43,7 @@ from orb.providers.k8s.utilities.labels import build_label_selector as _build_la
 from orb.providers.k8s.utilities.pod_state import pod_status_string as _canonical_pod_status_string
 from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from kubernetes.client import V1Pod
 
 

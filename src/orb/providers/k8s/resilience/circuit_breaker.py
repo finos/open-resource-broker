@@ -28,7 +28,7 @@ from orb.infrastructure.resilience.strategy.circuit_breaker import (
     CircuitState,
 )
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     pass
 
 # Map CircuitState enum → integer gauge value (0=closed 1=open 2=half_open).

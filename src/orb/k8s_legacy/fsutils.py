@@ -34,7 +34,7 @@ def atomic_symlink(src, dst) -> str:
             dir=pathlib.Path(dst).parent,
         ) as tf:
             temp_path = tf.name
-        os.symlink(src, temp_path)  # noqa: PTH211, RUF100
+        os.symlink(src, temp_path)
         pathlib.Path(temp_path).rename(dst)
     except OSError as exc:
         logger.exception("Exception occurred: %s", exc)

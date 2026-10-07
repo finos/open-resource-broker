@@ -16,7 +16,7 @@ from orb.domain.base.ports import LoggingPort
 from orb.providers.base.strategy import ProviderHealthStatus
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 
-if TYPE_CHECKING:  # pragma: no cover
+if TYPE_CHECKING:
     from orb.monitoring.health import HealthCheck
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 

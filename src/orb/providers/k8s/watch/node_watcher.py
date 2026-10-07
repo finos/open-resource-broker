@@ -54,7 +54,7 @@ from orb.infrastructure.di.injectable import injectable
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.watch.node_state_cache import K8sNodeState, K8sNodeStateCache
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from kubernetes.client import V1Node
     from kubernetes.watch import Watch
 
@@ -397,7 +397,7 @@ class K8sNodeWatcher:
         """Return ``True`` when ``exc`` is a 410 ``ApiException``."""
         try:
             from kubernetes.client.exceptions import ApiException
-        except ImportError:  # pragma: no cover — extra not installed
+        except ImportError:
             return False
         if not isinstance(exc, ApiException):
             return False

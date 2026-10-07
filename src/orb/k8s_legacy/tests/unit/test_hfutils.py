@@ -120,7 +120,7 @@ def test_push_eventsdb_creates_event_file(client, temp_workdir, monkeypatch):
         f.unlink()
 
     # Mock _push_backup_event to return a specific identifier
-    def mock_push_backup_event(workdir):  # noqa: ARG001
+    def mock_push_backup_event(workdir):
         return _mock_id
 
     monkeypatch.setattr(

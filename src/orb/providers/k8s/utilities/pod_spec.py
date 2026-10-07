@@ -27,7 +27,7 @@ from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     upcast_to_k8s_template,
 )
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from kubernetes.client import V1Pod
 
 

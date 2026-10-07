@@ -73,7 +73,7 @@ def _is_forbidden(exc: BaseException) -> bool:
     """Return ``True`` when ``exc`` is a 403 ``ApiException``."""
     try:
         from kubernetes.client.exceptions import ApiException
-    except ImportError:  # pragma: no cover — extra not installed
+    except ImportError:
         return False
     return isinstance(exc, ApiException) and getattr(exc, "status", None) == 403
 
@@ -82,7 +82,7 @@ def _is_not_found(exc: BaseException) -> bool:
     """Return ``True`` when ``exc`` is a 404 ``ApiException``."""
     try:
         from kubernetes.client.exceptions import ApiException
-    except ImportError:  # pragma: no cover — extra not installed
+    except ImportError:
         return False
     return isinstance(exc, ApiException) and getattr(exc, "status", None) == 404
 

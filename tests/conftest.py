@@ -343,7 +343,7 @@ def test_config_dict() -> dict[str, Any]:
                         "region": "us-east-1",
                         "profile": "default",
                         "access_key_id": "testing",
-                        "secret_access_key": "testing",  # nosec B105
+                        "secret_access_key": "testing",
                     },
                 }
             ],
@@ -352,7 +352,7 @@ def test_config_dict() -> dict[str, Any]:
             "region": "us-east-1",
             "profile": "default",
             "access_key_id": "testing",
-            "secret_access_key": "testing",  # nosec B105
+            "secret_access_key": "testing",
         },
         "logging": {
             "level": "DEBUG",

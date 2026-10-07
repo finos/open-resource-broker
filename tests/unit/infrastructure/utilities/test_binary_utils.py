@@ -93,7 +93,7 @@ class TestGetFileHash:
     def test_get_file_hash_md5(self, tmp_path):
         f = tmp_path / "hash.txt"
         f.write_bytes(b"test")
-        expected = hashlib.md5(b"test").hexdigest()  # nosec B324
+        expected = hashlib.md5(b"test").hexdigest()
         assert get_file_hash(str(f), algorithm="md5") == expected
 
     def test_get_file_hash_empty_file(self, tmp_path):

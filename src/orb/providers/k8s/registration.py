@@ -27,7 +27,7 @@ from orb.providers.k8s.configuration.template_extension import (
     K8sTemplateExtensionConfig,
 )
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
     from orb.domain.template.factory import TemplateFactory
     from orb.providers.registry import ProviderRegistry

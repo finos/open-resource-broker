@@ -66,7 +66,7 @@ from orb.providers.k8s.auth.kubeconfig import load_kubeconfig
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.exceptions.k8s_exceptions import K8sAuthError
 
-if TYPE_CHECKING:  # pragma: no cover — type-checking only
+if TYPE_CHECKING:
     from kubernetes.client import AppsV1Api, BatchV1Api, CoreV1Api
     from kubernetes.client.api_client import ApiClient
 

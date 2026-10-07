@@ -132,7 +132,7 @@ def _poll_events_bkp(workdir: Path, identifier: str) -> Path | None:
                         continue
                     data = json.loads(lines[-1])
                 percent_complete = data.get("percent_complete", 0)
-                if percent_complete >= 100:  # noqa: PLR2004
+                if percent_complete >= 100:
                     bkp_file = _fetch_file(backup_file_expr)
                     if bkp_file:
                         return bkp_file

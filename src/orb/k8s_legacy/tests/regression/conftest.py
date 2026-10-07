@@ -51,7 +51,7 @@ def pytest_collect_file(parent, file_path):
 class YamlFile(pytest.File):
     """A test group to run from a yaml file."""
 
-    def collect(self):  # noqa: D102
+    def collect(self):
         yaml_tests = yaml.safe_load(self.path.open(encoding="utf-8"))
         logger.info("Raw spec is %s", yaml_tests)
         delete_pods_in_namespace()
@@ -154,13 +154,13 @@ def run_event_command() -> click.testing.Result:
     )
 
 
-def run_custom_hostfactory_test(  # noqa: C901, PLR0912
+def run_custom_hostfactory_test(
     test_spec: dict,
     flavor: str,
-    run_hostfactory_pods,  # noqa: ARG001
-    run_hostfactory_machines,  # noqa: ARG001
-    run_hostfactory_events,  # noqa: ARG001
-    run_hostfactory_returns,  # noqa: ARG001
+    run_hostfactory_pods,
+    run_hostfactory_machines,
+    run_hostfactory_events,
+    run_hostfactory_returns,
 ) -> None:
     """Run a custom open-resource-broker test."""
     logger.info("Test spec is %s", test_spec)
@@ -259,7 +259,7 @@ def find_event_average(workdir, event_from, event_to):
                 events where category='pod' and type='status' and value='{event_to}'
                     group by id) as t2
             on t1.id = t2.id
-        """  # noqa: S608
+        """
         return conn.execute(sql).fetchone()[0]
     finally:
         if conn:
@@ -282,15 +282,15 @@ def verify_timings(expected_timings: dict) -> None:
 class PodWatcher:
     """Pod watcher class."""
 
-    def __init__(self) -> None:  # noqa: D107
+    def __init__(self) -> None:
         self.output = None
         logger.info("In pod watcher init")
 
-    def __enter__(self):  # noqa: D105
+    def __enter__(self):
         logger.info("In pod watcher enter")
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: D105
+    def __exit__(self, exc_type, exc_val, exc_tb):
         logger.info("In pod watcher exit: %s", self.output)
 
     def run_pod_watcher(self):
@@ -305,15 +305,15 @@ class PodWatcher:
 class EventsWatcher:
     """Event watcher class."""
 
-    def __init__(self) -> None:  # noqa: D107
+    def __init__(self) -> None:
         self.output = None
         logger.info("In event watcher init")
 
-    def __enter__(self):  # noqa: D105
+    def __enter__(self):
         logger.info("In event watcher enter")
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: D105
+    def __exit__(self, exc_type, exc_val, exc_tb):
         logger.info("In event watcher exit: %s", self.output)
 
     def run_events_watcher(self):
@@ -328,15 +328,15 @@ class EventsWatcher:
 class RequestMachineWatcher:
     """Request machine watcher class."""
 
-    def __init__(self) -> None:  # noqa: D107
+    def __init__(self) -> None:
         self.output = None
         logger.info("In request machine watcher init")
 
-    def __enter__(self):  # noqa: D105
+    def __enter__(self):
         logger.info("In request machine watcher enter")
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: D105
+    def __exit__(self, exc_type, exc_val, exc_tb):
         logger.info("In request machine watcher exit: %s", self.output)
 
     def run_request_machine_watcher(self):
@@ -351,15 +351,15 @@ class RequestMachineWatcher:
 class ReturnMachineWatcher:
     """Return machine watcher class."""
 
-    def __init__(self) -> None:  # noqa: D107
+    def __init__(self) -> None:
         self.output = None
         logger.info("In return machine watcher init")
 
-    def __enter__(self):  # noqa: D105
+    def __enter__(self):
         logger.info("In return machine watcher enter")
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: D105
+    def __exit__(self, exc_type, exc_val, exc_tb):
         logger.info("In return machine watcher exit: %s", self.output)
 
     def run_request_return_watcher(self):

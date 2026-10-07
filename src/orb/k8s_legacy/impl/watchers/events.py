@@ -275,7 +275,7 @@ class PrometheusEventBackend:
                 yield from self.pods.collect()
                 yield from self.nodes.collect()
         except BaseException:
-            with open("/tmp/hf-collector-trace.log", "at") as f:  # noqa: PTH123, S108, UP015, RUF100
+            with open("/tmp/hf-collector-trace.log", "at") as f:
                 print(f"\n\n\n{datetime.utcnow()}\n\n\n", file=f)
                 print_exc(file=f)
             raise
@@ -300,7 +300,7 @@ class PrometheusEventBackend:
             label_values.append(label_value)
         return metrics, tuple(label_names), tuple(label_values)
 
-    def post(self: "PrometheusEventBackend", events) -> None:  # noqa: C901
+    def post(self: "PrometheusEventBackend", events) -> None:
         """Select metrics from event stream and store them for in the buffer
         so that they can be later scraped.
         """
@@ -345,7 +345,7 @@ class PrometheusEventBackend:
 
                 self._expire()
         except BaseException:
-            with open("/tmp/hf-poster-trace.log", "at") as f:  # noqa: PTH123, S108, UP015, RUF100
+            with open("/tmp/hf-poster-trace.log", "at") as f:
                 print(f"\n\n\n{datetime.utcnow()}\n\n\n", file=f)
                 print_exc(file=f)
             raise
@@ -388,7 +388,7 @@ class SqliteEventBackend:
         if self.rotate:
             signal.signal(signal.SIGHUP, self.sighup)
 
-    def sighup(self: "SqliteEventBackend", signum, frame) -> None:  # noqa: ARG002
+    def sighup(self: "SqliteEventBackend", signum, frame) -> None:
         """Handle the SIGHUP"""
         self.close()
 
@@ -494,7 +494,7 @@ class SqliteEventBackend:
         backup_dir.mkdir(parents=True, exist_ok=True)
         backup_path = backup_dir / f"events_bkp_{identifier}.db"
 
-        def _progress_callback(status, remaining, total) -> None:  # noqa: ARG001
+        def _progress_callback(status, remaining, total) -> None:
             """Callback function to report backup progress."""
             percent = (total - remaining) / total * 100
             # Write backup progress to a file under backup_dir using pathlib
@@ -560,7 +560,7 @@ class SqliteEventBackend:
                 f"""
                 INSERT INTO events ({columns_str}) VALUES ({placeholders})
                 ON CONFLICT DO NOTHING
-                """,  # noqa: S608
+                """,
                 db_events,
             )
         logger.info("Inserted events into the database: %s", db_events)
@@ -602,7 +602,9 @@ def _process_events(eventfiles, backends) -> None:
             for backend in backends:
                 try:
                     backend.post(all_events)
-                except Exception as e:  # noqa: BLE001 - deliberately broad so one failing backend still lets the rest post; the error is deferred and re-raised below
+                except Exception as e:
+                    # Deliberately broad so one failing backend still lets the
+                    # rest post; the error is deferred and re-raised below.
                     backend_exception = e
             if backend_exception:
                 raise backend_exception
@@ -653,7 +655,7 @@ def _watch_events(eventdir, backends) -> None:
         for backend in backends:
             try:
                 backend.close()
-            except BaseException as e:  # noqa: BLE001
+            except BaseException as e:
                 backend_exception = e
         if backend_exception:
             raise backend_exception
