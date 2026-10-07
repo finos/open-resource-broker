@@ -1,8 +1,10 @@
 """Single request repository implementation using storage strategy composition."""
 
+import asyncio
+import inspect
 import time
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Awaitable, Optional
 from uuid import uuid4
 
 from orb.domain.base.events import DomainEvent
@@ -338,14 +340,56 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
         self.logger = get_logger(__name__)
         self.event_publisher = event_publisher
         self.slow_query_threshold_ms = 1000.0  # 1 second threshold
+        # Strong references to in-flight async publish tasks. asyncio only
+        # holds a weak reference to a scheduled task, so without this the
+        # task can be garbage-collected before it runs.
+        self._pending_publish_tasks: set[asyncio.Task[Any]] = set()
 
     def _publish_storage_event(self, event: DomainEvent) -> None:
-        """Publish storage event if publisher is available."""
-        if self.event_publisher:
+        """Publish storage event if a publisher is available.
+
+        ``save()`` and its callers here are synchronous, but ``event_publisher``
+        may be the real async ``EventBus`` (``publish`` is a coroutine function)
+        or a synchronous legacy publisher. An async ``publish`` is scheduled on
+        the running loop; when the calling thread has no running loop it is run
+        to completion on a temporary one, so events are delivered either way.
+        """
+        if not self.event_publisher:
+            return
+
+        try:
+            result = self.event_publisher.publish(event)
+            if not inspect.isawaitable(result):
+                return
+
             try:
-                self.event_publisher.publish(event)
-            except Exception as e:
-                self.logger.warning("Failed to publish storage event: %s", e)
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # No loop in this thread (synchronous CLI path or a worker
+                # thread): run the publish to completion on a private loop.
+                # EventBus keeps no loop-bound state, so this is safe even
+                # when another thread is running its own loop.
+                asyncio.run(self._await(result))
+                return
+
+            task = loop.create_task(self._await(result))
+            self._pending_publish_tasks.add(task)
+            task.add_done_callback(self._on_publish_task_done)
+        except Exception as e:
+            self.logger.warning("Failed to publish storage event: %s", e)
+
+    @staticmethod
+    async def _await(awaitable: Awaitable[Any]) -> Any:
+        return await awaitable
+
+    def _on_publish_task_done(self, task: "asyncio.Task[Any]") -> None:
+        """Drop the strong reference and surface any publish failure."""
+        self._pending_publish_tasks.discard(task)
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            self.logger.warning("Failed to publish storage event: %s", exc)
 
     @handle_infrastructure_exceptions(context="request_repository_save")
     def save(self, request: Request) -> list[Any]:

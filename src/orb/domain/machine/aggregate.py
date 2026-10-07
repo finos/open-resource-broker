@@ -222,9 +222,9 @@ class Machine(AggregateRoot):
         fields = self.model_dump()
 
         if private_ip:
-            fields["private_ip"] = IPAddress(value=private_ip)
+            fields["private_ip"] = IPAddress(value=private_ip).value
         if public_ip:
-            fields["public_ip"] = IPAddress(value=public_ip)
+            fields["public_ip"] = IPAddress(value=public_ip).value
 
         fields["version"] = self.version + 1
         return Machine.model_validate(fields)
@@ -368,9 +368,9 @@ class Machine(AggregateRoot):
 
         # Handle optional fields
         if data.get("private_ip"):
-            core_data["private_ip"] = IPAddress(value=data["private_ip"])
+            core_data["private_ip"] = IPAddress(value=data["private_ip"]).value
         if data.get("public_ip"):
-            core_data["public_ip"] = IPAddress(value=data["public_ip"])
+            core_data["public_ip"] = IPAddress(value=data["public_ip"]).value
         if data.get("launch_time"):
             core_data["launch_time"] = datetime.fromisoformat(data["launch_time"])
         if data.get("termination_time"):
