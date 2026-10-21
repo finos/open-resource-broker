@@ -1,5 +1,5 @@
 # eclipse-temurin:17-jdk
-FROM eclipse-temurin:17-jdk@sha256:5d6042fb8cdc14d614e4e421f52e3211fc5aeadddce44cbf9de8ed37c791f824
+FROM eclipse-temurin:25-jdk@sha256:2d5d5e9b533342a565907c84f47a2ec298c40cde7b13a3ca85d4950fa456a641
 
 # Install Python (for ORB subprocess in contract tests)
 RUN apt-get update && apt-get install -y --no-install-recommends \
