@@ -40,27 +40,27 @@ sourceSets {
 dependencies {
     // Kotlin
     implementation(kotlin("stdlib"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     // HTTP client (OkHttp 4 — LTS, widely used, supports custom SocketFactory for UDS)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // JSON
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.code.gson:gson:2.14.0")
 
     // OkIO (transitive via OkHttp, explicitly listed for clarity)
-    implementation("com.squareup.okio:okio:3.9.0")
+    implementation("com.squareup.okio:okio:3.18.2")
 
     // AWS SDK v2 auth — provides the native SigV4 signer (AwsV4HttpSigner / Aws4Signer)
     // and the standard credential provider chain. No AWS service stubs are pulled in;
     // only the auth/signer module and its minimal transitive dependencies are included.
-    implementation("software.amazon.awssdk:auth:2.25.60")
-    implementation("software.amazon.awssdk:regions:2.25.60")
+    implementation("software.amazon.awssdk:auth:2.56.0")
+    implementation("software.amazon.awssdk:regions:2.56.0")
 
     // Test
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
-    testImplementation("io.mockk:mockk:1.13.11")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation("io.mockk:mockk:1.14.11")
 
     // JUnit versions come from the BOM, and junit-platform-launcher is declared
     // explicitly rather than left to Gradle's bundled copy: from JUnit 6 onwards
