@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.9.25"
+    kotlin("jvm") version "2.4.21"
     `java-library`
     `maven-publish`
     signing
@@ -43,8 +43,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
     // HTTP client (OkHttp 4 — LTS, widely used, supports custom SocketFactory for UDS)
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
 
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
@@ -67,9 +67,9 @@ dependencies {
     // the engine will not load against the launcher Gradle injects by default,
     // which fails at test-discovery time ("TestEngine with ID 'junit-jupiter'
     // failed to discover tests"). Declaring it keeps a JUnit major bump buildable.
-    testImplementation(platform("org.junit:junit-bom:5.10.3"))
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.5.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
