@@ -56,7 +56,7 @@ RUN mkdir -p /app/logs /app/data /app/tmp
 # urllib3, msgpack); those copies are not reachable at runtime but still
 # show up as vulnerable packages in image scans, so dropping pip removes
 # them entirely instead of just patching the top-level entries.
-RUN pip install --no-cache-dir uv==0.12.23 \
+RUN pip install --no-cache-dir uv==0.13.4 \
     && uv venv /opt/venv \
     && rm -rf /usr/local/lib/python*/ensurepip \
         /usr/local/lib/python*/site-packages/pip \
