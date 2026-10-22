@@ -2,6 +2,8 @@
 
 This guide covers the AWS IAM permissions required to run Open Resource Broker (ORB). Permissions are grouped by handler type and feature area so you can build a least-privilege policy for your deployment.
 
+For OCI, see [broker instance-principal permissions](oci-integration.md#broker-instance-principal-setup).
+
 ## Required permissions by handler
 
 ### EC2Fleet

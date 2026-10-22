@@ -31,6 +31,13 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### [Cloud] Cloud Platform Deployment
 
+#### OCI Compute
+
+See [OCI deployment and authentication](oci-integration.md) for a broker running
+on OCI Compute with instance-principal credentials, or a workstation using an OCI
+CLI profile. See [OCICompute](../providers/oci/compute.md) for worker templates and
+lifecycle behaviour.
+
 #### AWS ECS/Fargate
 ```bash
 # Build and push to ECR

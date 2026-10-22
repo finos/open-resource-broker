@@ -144,7 +144,21 @@ Each provider generates templates optimized for its configuration:
 | `ASG` | Auto Scaling Groups | Auto-scaling workloads |
 | `RunInstances` | Basic EC2 API | Simple instance launches |
 
-### Template Examples per API
+### OCI Provider API
+
+| API | Description | Configuration |
+| --- | --- | --- |
+| `OCICompute` | Individual VM Flex and fixed bare metal workers | OCI `capacity_type` (`ondemand` or `preemptible`), explicit shape sizing, optional existing compute-cluster membership |
+
+Generate OCI examples from an enabled OCI provider using
+`orb templates generate --provider-api OCICompute`. See
+[OCICompute](../providers/oci/compute.md) for the handler contract and
+[Compute Templates and Flex Sizing](../providers/oci/templates.md) for the catalog.
+OCI uses `capacity_type` rather than the AWS `price_type` field to select
+preemptible capacity. Generated templates need compatible image and deployment
+settings before a live request.
+
+### Template Examples per AWS API
 
 #### EC2Fleet Templates
 - `EC2Fleet-Instant-OnDemand` - Instant on-demand instances

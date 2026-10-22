@@ -11,8 +11,8 @@ pytestmark = pytest.mark.serial
 
 
 def test_acquire_status_return(monkeypatch, tmp_path, request):
-    if not request.config.getoption("--run-oci") and os.environ.get("ORB_RUN_OCI_LIVE") != "1":
-        pytest.skip("Use --run-oci or ORB_RUN_OCI_LIVE=1 to provision a canary")
+    if not request.config.getoption("--live"):
+        pytest.skip("Use --live to provision an OCI canary")
     config = os.environ.get("ORB_OCI_LIVE_CONFIG")
     templates = os.environ.get("ORB_OCI_LIVE_TEMPLATES")
     assert config and templates, "Set ORB_OCI_LIVE_CONFIG and ORB_OCI_LIVE_TEMPLATES"
