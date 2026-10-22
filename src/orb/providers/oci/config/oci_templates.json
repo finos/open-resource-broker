@@ -1,0 +1,510 @@
+{
+  "scheduler_type": "default",
+  "templates": [
+    {
+      "template_id": "oci-vm-flex-ondemand-small",
+      "name": "OCI VM Flex On-Demand Small",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "AMD",
+      "generation": "E6",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard.E6.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-flex-preemptible-small",
+      "name": "OCI VM Flex Preemptible Small",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "AMD",
+      "generation": "E6",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard.E6.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "preemptible",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-flex-preemptible-fallback-medium",
+      "name": "OCI VM Flex Preemptible Fallback Medium",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "AMD",
+      "generation": "E6",
+      "max_instances": 2,
+      "machine_types": {
+        "VM.Standard.E6.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 2,
+        "memoryInGBs": 16
+      },
+      "boot_volume_gbs": 100,
+      "capacity_type": "preemptible",
+      "fallback_to_ondemand": true
+    },
+    {
+      "template_id": "oci-bm-optimized3-rdma",
+      "name": "OCI BM Optimized3 RDMA",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "Intel",
+      "generation": "Optimized3",
+      "max_instances": 2,
+      "machine_types": {
+        "BM.Optimized3.36": 1
+      },
+      "compute_cluster_id": "ocid1.computecluster.oc1..<replace-compute-cluster-ocid>",
+      "agent_config": {
+        "areAllPluginsDisabled": false,
+        "isManagementDisabled": false,
+        "pluginsConfig": [
+          {
+            "name": "Compute HPC RDMA Authentication",
+            "desiredState": "ENABLED"
+          },
+          {
+            "name": "Compute HPC RDMA Auto-Configuration",
+            "desiredState": "ENABLED"
+          }
+        ]
+      },
+      "availability_domain": "<replace-availability-domain>",
+      "image_id": "ocid1.image.oc1..<replace-hpc-image-ocid>",
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-bm-standard-ondemand",
+      "name": "OCI BM Standard On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "AMD",
+      "generation": "E5",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.Standard.E5.192": 1
+      },
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-standard-e5-ondemand",
+      "name": "OCI VM.Standard.E5.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "AMD",
+      "generation": "E5",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard.E5.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-standard-e6-ax-ondemand",
+      "name": "OCI VM.Standard.E6.Ax.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "AMD",
+      "generation": "E6.Ax",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard.E6.Ax.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-standard3-ondemand",
+      "name": "OCI VM.Standard3.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "Intel",
+      "generation": "Standard3",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard3.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-standard4-ax-ondemand",
+      "name": "OCI VM.Standard4.Ax.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "Intel",
+      "generation": "Standard4.Ax",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard4.Ax.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-optimized3-ondemand",
+      "name": "OCI VM.Optimized3.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "Intel",
+      "generation": "Optimized3",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Optimized3.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-standard-a1-ondemand",
+      "name": "OCI VM.Standard.A1.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "Ampere",
+      "generation": "A1",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard.A1.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-standard-a2-ondemand",
+      "name": "OCI VM.Standard.A2.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "Ampere",
+      "generation": "A2",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard.A2.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-standard-a4-ondemand",
+      "name": "OCI VM.Standard.A4.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "Ampere",
+      "generation": "A4",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard.A4.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-standard-a4-ax-ondemand",
+      "name": "OCI VM.Standard.A4.Ax.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "Ampere",
+      "generation": "A4.Ax",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.Standard.A4.Ax.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 1,
+        "memoryInGBs": 8
+      },
+      "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-denseio-e5-ondemand",
+      "name": "OCI VM.DenseIO.E5.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "AMD",
+      "generation": "E5",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.DenseIO.E5.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 8,
+        "memoryInGBs": 96
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-vm-denseio-e6-ax-ondemand",
+      "name": "OCI VM.DenseIO.E6.Ax.Flex On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "VM",
+      "cpu_vendor": "AMD",
+      "generation": "E6.Ax",
+      "max_instances": 1,
+      "machine_types": {
+        "VM.DenseIO.E6.Ax.Flex": 1
+      },
+      "shape_config": {
+        "ocpus": 8,
+        "memoryInGBs": 96
+      },
+      "boot_volume_gbs": 50,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-bm-standard-e6-256-ondemand",
+      "name": "OCI BM.Standard.E6.256 On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "AMD",
+      "generation": "E6",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.Standard.E6.256": 1
+      },
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-bm-standard-e6-ax-192-ondemand",
+      "name": "OCI BM.Standard.E6.Ax.192 On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "AMD",
+      "generation": "E6.Ax",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.Standard.E6.Ax.192": 1
+      },
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-bm-standard3-64-ondemand",
+      "name": "OCI BM.Standard3.64 On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "Intel",
+      "generation": "Standard3",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.Standard3.64": 1
+      },
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-bm-standard4-ax-120-ondemand",
+      "name": "OCI BM.Standard4.Ax.120 On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "Intel",
+      "generation": "Standard4.Ax",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.Standard4.Ax.120": 1
+      },
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-bm-standard-a1-160-ondemand",
+      "name": "OCI BM.Standard.A1.160 On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "Ampere",
+      "generation": "A1",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.Standard.A1.160": 1
+      },
+      "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-bm-standard-a4-48-ondemand",
+      "name": "OCI BM.Standard.A4.48 On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "Ampere",
+      "generation": "A4",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.Standard.A4.48": 1
+      },
+      "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-bm-standard-a4-ax-48-ondemand",
+      "name": "OCI BM.Standard.A4.Ax.48 On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "Ampere",
+      "generation": "A4.Ax",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.Standard.A4.Ax.48": 1
+      },
+      "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-bm-denseio-e5-128-ondemand",
+      "name": "OCI BM.DenseIO.E5.128 On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "AMD",
+      "generation": "E5",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.DenseIO.E5.128": 1
+      },
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    },
+    {
+      "template_id": "oci-bm-denseio-e6-ax-192-ondemand",
+      "name": "OCI BM.DenseIO.E6.Ax.192 On-Demand",
+      "provider_name": "oci-default",
+      "provider_api": "OCICompute",
+      "provider_type": "oci",
+      "form_factor": "BM",
+      "cpu_vendor": "AMD",
+      "generation": "E6.Ax",
+      "max_instances": 1,
+      "machine_types": {
+        "BM.DenseIO.E6.Ax.192": 1
+      },
+      "boot_volume_gbs": 200,
+      "capacity_type": "ondemand",
+      "fallback_to_ondemand": false
+    }
+  ]
+}

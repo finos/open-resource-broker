@@ -4182,7 +4182,7 @@ requires-dist = [
     { name = "werkzeug", marker = "extra == 'dev'", specifier = ">=3.1.6" },
     { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.41.3,<1.0.0" },
 ]
-provides-extras = ["sql", "aws", "k8s", "azure", "gcp", "all-providers", "k8s-legacy", "ui", "cli", "api", "mcp", "otel", "monitoring", "monitoring-aws", "all", "test-aws", "test-azure", "test-gcp", "test-k8s", "dev"]
+provides-extras = ["sql", "aws", "k8s", "azure", "gcp", "all-providers", "k8s-legacy", "ui", "cli", "api", "mcp", "otel", "monitoring", "monitoring-aws", "all", "test-aws", "test-azure", "test-oci", "test-gcp", "test-k8s", "dev"]
 
 [package.metadata.requires-dev]
 arch = [{ name = "import-linter", specifier = ">=2.0,<3.0.0" }]
