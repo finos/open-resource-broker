@@ -223,8 +223,6 @@ def test_explicit_api_key_auth_is_passed_to_cli_without_mutating_environment(mon
 
 
 def test_launch_passes_network_security_groups_to_cli():
-    import json
-
     strategy = create_oci_strategy({"credential_source": "instance_principal"})
     handler = strategy._compute_handler
     handler._run_oci = MagicMock(return_value={"data": {"id": "ocid1.instance.oc1..test"}})
@@ -238,11 +236,12 @@ def test_launch_passes_network_security_groups_to_cli():
         }
     )
     args = handler._run_oci.call_args.args[0]
-    assert json.loads(args[args.index("--nsg-ids") + 1]) == ["nsg-1"]
+    body = handler._run_oci.call_args.kwargs["payload"]
+    assert body["createVnicDetails"]["nsgIds"] == ["nsg-1"]
     assert "--max-retries" not in args
-    assert "--no-retry" not in args
-    assert "--agent-config" not in args
-    assert "--read-timeout" not in args
+    assert "--no-retry" in args
+    assert "agentConfig" not in body
+    assert "--read-timeout" in args
 
 
 def test_pre_live_helper_resolves_one_catalog_entry(tmp_path, monkeypatch, plugin):

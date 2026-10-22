@@ -22,6 +22,11 @@ class OCIProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
 
     provider_type: str = "oci"
     region: str = Field(default="us-phoenix-1", description="OCI region")  # type: ignore[assignment]
+    realm_domain_component: str = Field(
+        default="oraclecloud.com",
+        pattern=r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+        description="OCI realm DNS suffix for signed Compute launch requests",
+    )
     credential_source: Optional[str] = Field(
         default=None,
         description=(

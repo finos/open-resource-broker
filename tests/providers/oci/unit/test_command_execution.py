@@ -39,7 +39,9 @@ async def test_pytest_environment_does_not_suppress_command_execution(monkeypatc
     )
     runner = MagicMock(
         return_value=subprocess.CompletedProcess(
-            [], 0, '{"data": {"id": "actual-runner-result", "lifecycle-state": "PROVISIONING"}}'
+            [],
+            0,
+            '{"status": "200 OK", "data": {"id": "actual-runner-result", "lifecycleState": "PROVISIONING"}}',
         )
     )
     monkeypatch.setattr("orb.providers.oci.handlers.oci_compute_handler.subprocess.run", runner)
@@ -52,7 +54,7 @@ async def test_pytest_environment_does_not_suppress_command_execution(monkeypatc
     assert result.success
     assert result.data["instance_ids"] == ["actual-runner-result"]
     runner.assert_called_once()
-    assert runner.call_args.args[0][1:4] == ["compute", "instance", "launch"]
+    assert runner.call_args.args[0][1] == "raw-request"
 
 
 @pytest.mark.parametrize(
