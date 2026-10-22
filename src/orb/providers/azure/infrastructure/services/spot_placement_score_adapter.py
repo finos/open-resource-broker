@@ -7,8 +7,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-import httpx
-
 from orb.domain.base.ports import LoggingPort
 from orb.providers.azure.domain.template.value_objects import AzureLocationName
 from orb.providers.azure.infrastructure.azure_client import AzureClient
@@ -149,6 +147,10 @@ class AzureSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
         )
 
         try:
+            # Optional Azure transport is only needed when scoring is requested.
+            # Provider discovery also runs in installations of other providers.
+            import httpx
+
             credential = await self._azure_client.get_async_credential()
             token = await credential.get_token("https://management.azure.com/.default")
             async with httpx.AsyncClient(timeout=30.0) as client:
