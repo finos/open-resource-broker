@@ -13,7 +13,7 @@ ARG PACKAGE_NAME_SHORT=orb
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-        ca-certificates=20250419 && \
+        ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" wheel

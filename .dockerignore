@@ -1,0 +1,23 @@
+# Local credentials, validation evidence, and runtime state are not build inputs.
+.git/
+.venv/
+.cache/
+work/
+logs/
+data/
+.oci/
+.aws/
+.ssh/
+.env
+.env.*
+
+# Dockerfile copies config/. Only portable, reviewed examples belong in images.
+config/*
+!config/README.md
+!config/*.example.json
+!config/default_config.json
+!config/aws_templates.json
+!config/k8s_templates.json
+!config/sample_user_data_script.sh
+!config/specs/
+!config/specs/**
