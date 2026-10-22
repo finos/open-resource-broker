@@ -81,6 +81,7 @@ class OCIComputeHandler:
         args: list[str],
         payload: dict[str, Any] | None = None,
         region_override: str | None = None,
+        payload_argument: str = "--from-json",
     ) -> dict[str, Any]:
         if region_override and region_override != self._region:
             raise ValueError("OCI operations must use the provider's configured region")
@@ -92,6 +93,7 @@ class OCIComputeHandler:
             auth_config=self._auth_config,
             runner=self._run_command,
             payload=payload,
+            payload_argument=payload_argument,
         )
 
     _service_error_summary = staticmethod(service_error_summary)
@@ -206,68 +208,74 @@ class OCIComputeHandler:
         if not image_id:
             raise RuntimeError("Missing image_id for OCI launch")
 
-        args = [
-            "compute",
-            "instance",
-            "launch",
-            "--availability-domain",
-            str(resolved_ad),
-            "--compartment-id",
-            str(compartment_id),
-            "--shape",
-            str(shape),
-            "--subnet-id",
-            str(subnet_id),
-            "--image-id",
-            str(image_id),
-        ]
-
+        # The high-level launch command does not expose opc-retry-token.
+        # raw-request retains CLI signing and lets us set the idempotency header.
+        region = self._region_aliases.get(self._region.lower(), self._region.lower())
+        domain = self._auth_config.get("realm_domain_component", "oraclecloud.com")
+        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)+", region) or not re.fullmatch(
+            r"[a-z0-9]+(?:[.-][a-z0-9]+)*", domain
+        ):
+            raise ValueError("OCI launch requires a full region name and valid realm domain")
+        body: dict[str, Any] = {
+            "availabilityDomain": str(resolved_ad),
+            "compartmentId": str(compartment_id),
+            "shape": str(shape),
+            "createVnicDetails": {"subnetId": str(subnet_id)},
+            "sourceDetails": {"sourceType": "image", "imageId": str(image_id)},
+        }
+        nsg_ids = vnic.get("nsg_ids")
+        if nsg_ids:
+            body["createVnicDetails"]["nsgIds"] = nsg_ids
         shape_config = launch_payload.get("shape_config")
-        if launch_payload.get("compute_cluster_id"):
-            args.extend(["--compute-cluster-id", str(launch_payload["compute_cluster_id"])])
-            # Surface placement/capacity errors inside the subprocess deadline.
-            # CLI retries can otherwise outlive the command and hide partial launches.
-            args.extend(["--no-retry", "--connection-timeout", "15", "--read-timeout", "90"])
-        if not isinstance(shape_config, dict) and isinstance(shape, str) and "Flex" in shape:
-            # Reasonable default for Flex shapes when template omits explicit values.
+        if not isinstance(shape_config, dict) and "Flex" in str(shape):
             shape_config = {"ocpus": 1, "memoryInGBs": 16}
         if isinstance(shape_config, dict) and shape_config:
-            args.extend(["--shape-config", json.dumps(shape_config)])
+            body["shapeConfig"] = shape_config
         boot_volume_gbs = launch_payload.get("boot_volume_gbs")
         if boot_volume_gbs is not None:
-            args.extend(["--boot-volume-size-in-gbs", str(int(float(boot_volume_gbs)))])
-        requested_capacity_type = str(launch_payload.get("capacity_type") or "ondemand").lower()
-        if not force_ondemand and requested_capacity_type == "preemptible":
-            preemptible_cfg = launch_payload.get("preemptible_instance_config") or {
-                "preemptionAction": {"type": "TERMINATE", "preserveBootVolume": False}
-            }
-            args.extend(["--preemptible-instance-config", json.dumps(preemptible_cfg)])
-
-        if launch_payload.get("display_name"):
-            args.extend(["--display-name", str(launch_payload.get("display_name"))])
-        metadata = launch_payload.get("metadata")
-        agent_config = launch_payload.get("agent_config")
-        if isinstance(agent_config, dict) and agent_config:
-            args.extend(["--agent-config", json.dumps(agent_config)])
-        tags = launch_payload.get("freeform_tags")
-        if isinstance(tags, dict) and tags:
-            args.extend(["--freeform-tags", json.dumps(tags)])
-
-        nsg_ids = vnic.get("nsg_ids")
-        if isinstance(nsg_ids, list) and nsg_ids:
-            args.extend(["--nsg-ids", json.dumps(nsg_ids)])
-        if requested_capacity_type == "preemptible" and not force_ondemand:
-            self._logger.info(
-                "OCI template requests preemptible capacity; launching with OCI preemptible config"
-            )
-        if force_ondemand and requested_capacity_type == "preemptible":
-            self._logger.info("Retrying OCI launch as on-demand after preemptible attempt failure")
-
+            body["sourceDetails"]["bootVolumeSizeInGBs"] = int(float(boot_volume_gbs))
+        for field, target in {
+            "compute_cluster_id": "computeClusterId",
+            "display_name": "displayName",
+            "metadata": "metadata",
+            "agent_config": "agentConfig",
+            "freeform_tags": "freeformTags",
+        }.items():
+            if launch_payload.get(field):
+                body[target] = launch_payload[field]
+        if launch_payload.get("capacity_type") == "preemptible" and not force_ondemand:
+            body["preemptibleInstanceConfig"] = launch_payload.get(
+                "preemptible_instance_config"
+            ) or {"preemptionAction": {"type": "TERMINATE", "preserveBootVolume": False}}
         retry_token = launch_payload.get("retry_token") or str(uuid4())
         if force_ondemand:
             retry_token = str(uuid5(NAMESPACE_URL, retry_token + ":ondemand"))
-        args.extend(["--opc-retry-token", retry_token])
-        return self._run_oci(args, payload={"metadata": metadata} if metadata else None)
+        result = self._run_oci(
+            [
+                "raw-request",
+                "--http-method",
+                "POST",
+                "--target-uri",
+                f"https://iaas.{region}.{domain}/20160918/instances",
+                "--request-headers",
+                json.dumps({"opc-retry-token": retry_token, "content-type": "application/json"}),
+                "--no-retry",
+                "--connection-timeout",
+                "15",
+                "--read-timeout",
+                "90",
+            ],
+            payload=body,
+            payload_argument="--request-body",
+        )
+        # raw-request uses API field casing; existing CLI reads use kebab case.
+        data = result.get("data", {})
+        return {
+            "data": {
+                **data,
+                "lifecycle-state": data.get("lifecycleState") or data.get("lifecycle-state"),
+            }
+        }
 
     def _reconcile_launch(self, launch_payload: dict[str, Any]) -> dict[str, Any] | None:
         """Find only this logical launch after an uncertain response, including eventual visibility."""

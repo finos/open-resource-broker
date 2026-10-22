@@ -171,7 +171,7 @@ and verify the workload separately.
 
 `orb machines return` terminates the named instances directly and polls their
 termination. It leaves a shared compute cluster intact. Normal returns use OCI
-CLI termination defaults; verify boot-volume cleanup independently. 
+CLI termination defaults; verify boot-volume cleanup independently.
 
 Each logical launch carries a stable retry token and request/launch tags. After
 a timeout, ORB searches for the matching worker without issuing an on-demand

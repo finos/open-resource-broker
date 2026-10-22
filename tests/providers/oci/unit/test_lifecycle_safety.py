@@ -18,6 +18,67 @@ from orb.providers.oci.strategy.oci_provider_strategy import OCIProviderStrategy
 from tests.providers.oci.unit.test_command_execution import make_operation
 
 
+@pytest.mark.parametrize("status", [400, 403, 500])
+def test_raw_http_error_is_failure_even_when_cli_exits_zero(status):
+    marker = "sensitive-error-body"
+    runner = MagicMock(
+        return_value=subprocess.CompletedProcess(
+            [],
+            0,
+            json.dumps(
+                {
+                    "status": f"{status} Error",
+                    "data": {"code": "OutOfHostCapacity", "message": marker},
+                }
+            ),
+        )
+    )
+    with pytest.raises(OCICommandError) as error:
+        run_oci(["raw-request"], region="us-phoenix-1", runner=runner)
+    assert error.value.status == status
+    assert error.value.code == "OutOfHostCapacity"
+    assert error.value.ambiguous is (status >= 500)
+    assert marker not in str(error.value)
+
+
+@pytest.mark.asyncio
+async def test_signed_launch_sends_stable_header_and_private_api_body():
+    requests = []
+    paths = []
+
+    def run(cmd, **kwargs):
+        assert cmd[1] == "raw-request"
+        assert "--opc-retry-token" not in cmd
+        assert (
+            cmd[cmd.index("--target-uri") + 1]
+            == "https://iaas.us-phoenix-1.oraclecloud.com/20160918/instances"
+        )
+        path = Path(cmd[cmd.index("--request-body") + 1].removeprefix("file://"))
+        paths.append(path)
+        body = json.loads(path.read_text())
+        assert body["metadata"]["ssh_authorized_keys"] == "private-input-marker"
+        assert body["sourceDetails"]["sourceType"] == "image"
+        assert "private-input-marker" not in " ".join(cmd)
+        token = json.loads(cmd[cmd.index("--request-headers") + 1])["opc-retry-token"]
+        assert body["freeformTags"]["orb_launch_id"] == token
+        requests.append(token)
+        return subprocess.CompletedProcess(
+            cmd, 0, '{"status":"200 OK","data":{"id":"instance","lifecycleState":"PROVISIONING"}}'
+        )
+
+    handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=run)
+    operation = make_operation()
+    operation.parameters.update(
+        request_id="same-request", ssh_authorized_keys="private-input-marker"
+    )
+    for _ in range(2):
+        result = await handler.create_instances(operation)
+        assert result.success, result.error_message
+        assert result.data["instances"][0]["status"] == "PROVISIONING"
+    assert requests[0] == requests[1]
+    assert all(not p.exists() for p in paths)
+
+
 @pytest.mark.asyncio
 async def test_cross_region_launch_is_rejected_before_mutation():
     runner = MagicMock(side_effect=AssertionError("cross-region request reached OCI"))
@@ -36,13 +97,13 @@ async def test_launch_status_return_and_rollback_use_provider_region():
 
     def run(command, **kwargs):
         commands.append(command)
-        if command[1:4] == ["compute", "instance", "launch"]:
+        if command[1] == "raw-request":
             if sum(c[1:4] == command[1:4] for c in commands) == 2:
                 return subprocess.CompletedProcess(
                     command, 1, "", 'ServiceError: {"code":"InvalidParameter","status":400}'
                 )
             return subprocess.CompletedProcess(
-                command, 0, '{"data":{"id":"ocid1.instance.oc1.phx.example"}}'
+                command, 0, '{"status":"200 OK","data":{"id":"ocid1.instance.oc1.phx.example"}}'
             )
         return subprocess.CompletedProcess(command, 0, '{"data":{"lifecycle-state":"TERMINATED"}}')
 

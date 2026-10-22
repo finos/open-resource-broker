@@ -117,13 +117,14 @@ def run_oci(
     auth_config: dict[str, Any] | None = None,
     runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
     payload: dict[str, Any] | None = None,
+    payload_argument: str = "--from-json",
 ) -> dict[str, Any]:
     executable = shutil.which("oci")
     if executable is None and runner is None:
         raise OCICommandError(
             "OCI CLI is unavailable; install oci-cli and add oci to PATH", reason="unavailable"
         )
-    cmd = [executable or "oci", *args, "--region", region]
+    cmd = [executable or "oci", *args, "--region", region, "--output", "json"]
     cmd.extend(build_oci_cli_extra_args(profile=profile, credential_source=credential_source))
     operation = " ".join(
         args[: next((i for i, arg in enumerate(args) if arg.startswith("--")), len(args))]
@@ -159,17 +160,32 @@ def run_oci(
             parsed = json.loads(completed.stdout) if completed.stdout.strip() else {}
             if not isinstance(parsed, dict):
                 raise ValueError
+            if args and args[0] == "raw-request":
+                status_match = re.match(r"^(\d{3})\b", str(parsed.get("status", "")))
+                if not status_match:
+                    raise ValueError
+                status = int(status_match[1])
+                if not 200 <= status < 300:
+                    data = parsed.get("data")
+                    code, _ = service_error_details(json.dumps(data))
+                    raise OCICommandError(
+                        f"OCI launch failed: status={status}" + (f", code={code}" if code else ""),
+                        code=code,
+                        status=status,
+                    )
             return parsed
         except (ValueError, TypeError):
             raise OCICommandError(
                 f"OCI CLI returned invalid JSON during {operation}", reason="invalid_response"
             ) from None
 
+    if payload_argument not in {"--from-json", "--request-body"}:
+        raise ValueError("Unsupported OCI payload argument")
     if payload is None:
         return execute(cmd)
     try:
         with private_json_input(payload) as path:
-            return execute([*cmd, "--from-json", "file://" + path])
+            return execute([*cmd, payload_argument, "file://" + path])
     except OSError:
         raise OCICommandError(
             "Could not create or remove private OCI command input", reason="input"

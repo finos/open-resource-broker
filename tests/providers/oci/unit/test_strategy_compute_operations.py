@@ -302,8 +302,8 @@ async def test_create_instances_live_cli_uses_preemptible_flag() -> None:
 
     observed_args = []
 
-    def _mock_run_oci(args, payload=None, region_override=None):
-        observed_args.append(list(args))
+    def _mock_run_oci(args, payload=None, region_override=None, **kwargs):
+        observed_args.append(payload)
         return {
             "data": {
                 "id": "ocid1.instance.oc1..realpreemptible",
@@ -332,7 +332,7 @@ async def test_create_instances_live_cli_uses_preemptible_flag() -> None:
 
     assert result.success is True
     launch_call = observed_args[0]
-    assert "--preemptible-instance-config" in launch_call
+    assert "preemptibleInstanceConfig" in launch_call
     assert result.data["capacity_type"] == "preemptible"
     assert result.data["effective_capacity_type"] == "preemptible"
     assert result.data["fallback_attempted"] is False
@@ -347,8 +347,8 @@ async def test_create_instances_preemptible_fallback_to_ondemand() -> None:
     call_count = {"n": 0}
     observed_args = []
 
-    def _mock_run_oci(args, payload=None, region_override=None):
-        observed_args.append(list(args))
+    def _mock_run_oci(args, payload=None, region_override=None, **kwargs):
+        observed_args.append(payload)
         call_count["n"] += 1
         if call_count["n"] == 1:
             raise OCICommandError("Insufficient capacity", code="OutOfHostCapacity", status=400)
@@ -381,8 +381,8 @@ async def test_create_instances_preemptible_fallback_to_ondemand() -> None:
 
     assert result.success is True
     assert len(observed_args) == 2
-    assert "--preemptible-instance-config" in observed_args[0]
-    assert "--preemptible-instance-config" not in observed_args[1]
+    assert "preemptibleInstanceConfig" in observed_args[0]
+    assert "preemptibleInstanceConfig" not in observed_args[1]
     assert result.data["effective_capacity_type"] == "ondemand"
     assert result.data["fallback_attempted"] is True
 

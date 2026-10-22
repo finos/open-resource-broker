@@ -151,14 +151,12 @@ async def test_two_nodes_use_one_verified_cluster(template):
                     "availability-domain": "AD-1",
                 }
             }
-        assert args[:3] == ["compute", "instance", "launch"]
-        assert args[args.index("--compute-cluster-id") + 1] == "cluster-1"
+        assert args[0] == "raw-request"
+        assert kwargs["payload"]["computeClusterId"] == "cluster-1"
         assert "--no-retry" in args
-        import json
-
-        assert json.loads(args[args.index("--agent-config") + 1]) == template["agent_config"]
+        assert kwargs["payload"]["agentConfig"] == template["agent_config"]
         assert args[args.index("--read-timeout") + 1] == "90"
-        assert "--shape-config" not in args
+        assert "shapeConfig" not in kwargs["payload"]
         return {"data": {"id": f"instance-{len(calls)}", "compute-cluster-id": "cluster-1"}}
 
     handler._run_oci = MagicMock(side_effect=run)
@@ -344,11 +342,7 @@ async def test_partial_launch_rolls_back_only_its_accepted_nodes(template, clust
             return {}
         launched += 1
         if cluster_mode:
-            import json
-
-            assert (
-                json.loads(args[args.index("--freeform-tags") + 1])["orb_request_id"] == "request-1"
-            )
+            assert kwargs["payload"]["freeformTags"]["orb_request_id"] == "request-1"
         if launched == 2:
             raise RuntimeError("Out of host capacity")
         return {"data": {"id": "accepted-node"}}

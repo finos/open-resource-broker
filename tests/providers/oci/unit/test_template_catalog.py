@@ -89,21 +89,21 @@ def test_catalog_roundtrip_to_launch_and_hostfactory(plugin, example):
         handler = OCIComputeHandler(MagicMock(), "us-phoenix-1")
         handler._run_oci = MagicMock(return_value={"data": {"id": "instance-test"}})
         handler._launch_with_cli(payload)
-        args = handler._run_oci.call_args.args[0]
-        assert args[args.index("--image-id") + 1] == source["image_id"]
+        body = handler._run_oci.call_args.kwargs["payload"]
+        assert body["sourceDetails"]["imageId"] == source["image_id"]
         if shape.startswith("VM."):
             assert payload["shape_config"] == example["shape_config"]
-            assert json.loads(args[args.index("--shape-config") + 1]) == example["shape_config"]
+            assert body["shapeConfig"] == example["shape_config"]
         else:
             assert "shape_config" not in payload
-            assert "--shape-config" not in args
+            assert "shapeConfig" not in body
         normalized = OCITemplateMapper.normalize_template_fields(template)
         assert normalized["cpu_vendor"] == example["cpu_vendor"]
         assert normalized["generation"] == example["generation"]
         if example["cpu_vendor"] == "Ampere":
             assert "replace-arm64-image-ocid" in payload["source_details"]["image_id"]
         if "compute_cluster_id" in example:
-            assert args[args.index("--compute-cluster-id") + 1] == example["compute_cluster_id"]
+            assert body["computeClusterId"] == example["compute_cluster_id"]
 
 
 @pytest.mark.parametrize("shape", ["VM.DenseIO.E5.Flex", "VM.DenseIO.E6.Ax.Flex"])

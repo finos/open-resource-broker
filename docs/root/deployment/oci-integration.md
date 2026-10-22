@@ -304,3 +304,15 @@ Symphony worker registration; verify those separately before production use.
   In live mode, OCI launch failures are returned as provider errors.
 - auth, region, subnet/AD, or policy mismatches can surface as
   `NotAuthorizedOrNotFound` during OCI CLI verification.
+
+### Compute launch transport
+
+Worker launches use OCI CLI `raw-request` to send the `opc-retry-token` header;
+the high-level `compute instance launch` command does not expose that header.
+The JSON launch body, including bootstrap metadata, is passed through a temporary
+file restricted to the current user and removed after the command finishes.
+Other lifecycle operations use the corresponding Compute CLI commands.
+
+The launch endpoint uses the configured region and `realm_domain_component`,
+which defaults to `oraclecloud.com` for the commercial realm. Set this provider
+configuration field to the realm DNS suffix when using another OCI realm.
