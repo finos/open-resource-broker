@@ -19,9 +19,6 @@ on:
   workflow_dispatch:
 
 # Cancel in-progress runs when a new push arrives on the same branch/ref.
-# The auto-format job is exempted via its own job-level concurrency block
-# (cancel-in-progress: false) because it pushes a commit back to the branch —
-# cancelling it mid-push could leave the branch in a partially formatted state.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -39,83 +36,22 @@ jobs:
     name: Configuration
     uses: ./.github/workflows/shared-config.yml
 
-  auto-format:
-    name: Auto-Format Code
-    # Same-repo PRs only. Fork PRs handled by auto-format-suggest below.
-    # Bot-actor guard prevents the job re-triggering on its own push.
-    # Dependabot PRs are skipped too: the push-back step needs the ORB CICD
-    # App token, which is unavailable on Dependabot-triggered runs (they only
-    # receive Dependabot-store secrets, not repo Actions secrets).
-    if: |
-      github.event_name == 'pull_request'
-      && github.event.pull_request.head.repo.full_name == github.repository
-      && github.actor != 'open-resource-broker-cicd[bot]'
-      && github.actor != 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [config]
-    # Override the workflow-level concurrency so this job is never cancelled
-    # mid-run.  If it were interrupted after `ruff` rewrites files but before
-    # `git push`, the PR branch would be left in a half-formatted state.
-    concurrency:
-      group: ci-auto-format-${{ github.ref }}
-      cancel-in-progress: false
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          ref: ${{ github.head_ref }}
-          # See semantic-release.yml for the rationale - the App-token URL
-          # set by the composite below must be the only credential source
-          # so the auto-format push lands as the ORB CICD App rather than
-          # falling back to github-actions[bot] via the persisted extraheader.
-          persist-credentials: false
-
-      - name: ORB CICD App token
-        id: cicd
-        uses: ./.github/actions/orb-cicd-app-token
-        with:
-          client-id: ${{ secrets.GH_APP_CLIENT_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-
-      - name: Setup UV with cache
-        uses: ./.github/actions/setup-uv-cached
-        with:
-          cache-key: deps-py3.12-lint-${{ hashFiles('.project.yml', 'pyproject.toml', 'uv.lock') }}
-          group: lint
-          fail-on-cache-miss: false
-
-      - name: Auto-format code
-        run: make format-fix
-
-      - name: Commit formatting changes
-        env:
-          GIT_AUTHOR_NAME: ${{ steps.cicd.outputs.committer-name }}
-          GIT_AUTHOR_EMAIL: ${{ steps.cicd.outputs.committer-email }}
-          GIT_COMMITTER_NAME: ${{ steps.cicd.outputs.committer-name }}
-          GIT_COMMITTER_EMAIL: ${{ steps.cicd.outputs.committer-email }}
-        run: |
-          git add .
-          if ! git diff --staged --quiet; then
-            git commit -m "style: auto-format code with ruff"
-            git push
-          fi
-
   auto-format-suggest:
     name: Auto-Format Suggestions
-    # Fork PRs: post formatted changes as PR review suggestions for the
-    # contributor to apply via the GitHub UI's "Commit suggestion" button.
-    # Runs under plain pull_request (not pull_request_target) — reviewdog
+    # Post formatted changes as PR review suggestions to apply via the GitHub
+    # UI's "Commit suggestion" button. Suggestions can only target lines that
+    # are part of the PR diff; anything else is caught by the required
+    # "Ruff (Code Quality)" check, which tells the author to run
+    # `make format-fix`.
+    # Runs under plain pull_request (not pull_request_target) - reviewdog
     # action-suggester posts review comments via the GITHUB_TOKEN scoped to
-    # pull-requests: write, which works for fork PRs without needing
-    # pull_request_target's elevated context.  pull_request_target is
-    # deliberately avoided here: it would execute fork code with a write token
-    # (pwn-request risk).
+    # pull-requests: write. pull_request_target is deliberately avoided: it
+    # would execute fork code with a write token (pwn-request risk).
+    # Dependabot PRs are skipped: its token is read-only and its changes are
+    # machine-generated.
     if: >-
       github.event_name == 'pull_request'
-      && github.event.pull_request.head.repo.full_name != github.repository
+      && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [config]
@@ -144,7 +80,7 @@ jobs:
         with:
           tool_name: ruff
           level: warning
-          fail_on_error: false
+          fail_level: none
 
   lint-ruff:
     name: Ruff (Code Quality)

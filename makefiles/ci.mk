@@ -12,7 +12,7 @@ ci-quality-ruff:  ## Run Ruff formatting and linting check (basic rules only)
 	@# per-file-ignore in pyproject.toml: assert, dummy-credential and
 	@# subprocess patterns are normal there. S311 is ignored repo-wide.
 	@uv run --no-sync ruff check --select S --ignore S311 --quiet src/
-	@uv run --no-sync ruff format --check --quiet .
+	@uv run --no-sync ruff format --check --quiet . || { echo "Formatting check failed: run 'make format-fix' and commit the result." >&2; exit 1; }
 
 ci-quality-ruff-optional:  ## Run Ruff extended linting (warnings only)
 	@echo "Running Ruff extended linting..."
