@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=80.9.0", "wheel"]
+requires = ["setuptools>=80.9.0", "wheel>=0.41.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -96,7 +96,7 @@ aws = [
 # Only the SDK client is required here; everything else (jinja2, watchdog,
 # alembic etc.) is legacy-plugin baggage and stays in the [k8s-legacy] extra.
 k8s = [
-    "kubernetes",
+    "kubernetes>=36.0.0",
 ]
 
 # Azure provider runtime dependencies. Install with:
@@ -132,19 +132,19 @@ all-providers = [
 # Legacy k8s HostFactory plugin — heavy deps gated behind optional extra.
 # Install with: pip install orb-py[k8s-legacy]
 k8s-legacy = [
-    "kubernetes",
+    "kubernetes>=36.0.0",
     "boto3>=1.42.21",
     "jinja2>=3.1.0",
-    "typing-extensions",
-    "watchdog",
+    "typing-extensions>=4.0.0",
+    "watchdog>=6.0.0",
     "rich>=13.3.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "tenacity",
+    "tenacity>=9.0.0",
     "prometheus-client>=0.17.0",
     "sqlalchemy>=2.0.0",
-    "pg8000",
-    "alembic",
+    "pg8000>=1.31.0",
+    "alembic>=1.13",
     "fastapi>=0.128.0",
     "uvicorn>=0.24.0",
 ]
@@ -306,9 +306,9 @@ dev = [
     # CVE-2026-78677, CVE-2026-78678, CVE-2026-78679, CVE-2026-87817,
     # CVE-2026-87819, GHSA-jm78-9fvv-mhgr (high), GHSA-59cr-6r3x-644w (medium)
     "gitpython>=3.1.62",
-    "watchdog",
-    "tenacity",
-    "pg8000",
+    "watchdog>=6.0.0",
+    "tenacity>=9.0.0",
+    "pg8000>=1.31.0",
     "kmock>=0.7",
     # --- toolchain from dependency-groups.docs ---
     "mkdocs>=1.5.0,<2.0.0",
@@ -433,10 +433,10 @@ test = [
     # CVE-2026-87819, GHSA-jm78-9fvv-mhgr (high), GHSA-59cr-6r3x-644w (medium)
     "gitpython>=3.1.62",
     # k8s-legacy extra deps — required for tests/integration/k8s_legacy/
-    "kubernetes",
-    "watchdog",
-    "tenacity",
-    "pg8000",
+    "kubernetes>=36.0.0",
+    "watchdog>=6.0.0",
+    "tenacity>=9.0.0",
+    "pg8000>=1.31.0",
     "uvicorn>=0.24.0",
     "prometheus-client>=0.17.0",
     "alembic>=1.13",
