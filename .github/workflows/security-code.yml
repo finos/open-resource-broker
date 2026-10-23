@@ -21,6 +21,16 @@ on:
       - '.trivyignore.yaml'
       - '.github/workflows/**'
       - '.github/codeql/**'
+      - '.github/actions/**'
+      - '.project.yml'
+      - 'Makefile'
+      - 'makefiles/**'
+      - 'tests/**'
+      - 'dev-tools/**'
+      - 'setup.py'
+      - 'rxconfig.py'
+      - 'hfmock.py'
+      - 'deployment/**'
   # No paths filter on pull_request: several jobs in this workflow are
   # becoming required status checks, which must report (even if skipped) on
   # every PR including docs-only ones — a missing check blocks merge forever,
@@ -94,11 +104,25 @@ jobs:
             - '.trivyignore.yaml'
             - '.github/workflows/**'
             - '.github/codeql/**'
+            - '.github/actions/**'
+            - '.project.yml'
+            - 'Makefile'
+            - 'makefiles/**'
+            - 'tests/**'
+            - 'dev-tools/**'
+            - 'setup.py'
+            - 'rxconfig.py'
+            - 'hfmock.py'
+            - 'deployment/**'
 
   security-pip-audit:
     name: pip-audit (Dependency Scan)
     needs: [config, changes]
-    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' && needs.config.result == 'success' }}
+    # Always expands so the required child check (`pip-audit (Dependency Scan) /
+    # pip-audit Security Scan`) reports on every PR. `enabled` turns the scan
+    # steps off only when the path filter proves nothing relevant changed, and
+    # fails closed (scan runs) if the filter job itself did not succeed.
+    if: ${{ !cancelled() && needs.config.result == 'success' }}
     permissions:
       contents: read
       actions: read
@@ -106,6 +130,7 @@ jobs:
     uses: ./.github/workflows/reusable-security.yml
     with:
       scan-type: pip-audit
+      enabled: ${{ needs.changes.result != 'success' || needs.changes.outputs.relevant == 'true' }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       python-version: ${{ needs.config.outputs.default-python-version }}
 
@@ -293,9 +318,12 @@ jobs:
   codeql-analysis:
     name: CodeQL Analysis
     needs: [config, changes]
-    # Also scan direct pushes to main so a fix merged outside a PR closes its
-    # own alerts on the next scan, instead of waiting for the weekly schedule.
-    if: ${{ !cancelled() && needs.config.result == 'success' && needs.changes.result == 'success' && ((github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true') || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || contains(github.event.head_commit.message, '[security]')) }}
+    # Always expands so the required child checks (`CodeQL Analysis / codeql
+    # Security Scan (python|actions)`) report on every PR; `enabled` decides
+    # whether the analysis steps run. Direct pushes to main are also scanned so
+    # a fix merged outside a PR closes its own alerts on the next scan, instead
+    # of waiting for the weekly schedule. Fails closed if the filter job failed.
+    if: ${{ !cancelled() && needs.config.result == 'success' }}
     permissions:
       contents: read
       actions: read
@@ -303,5 +331,6 @@ jobs:
     uses: ./.github/workflows/reusable-security.yml
     with:
       scan-type: codeql
+      enabled: ${{ (github.event_name == 'pull_request' && (needs.changes.result != 'success' || needs.changes.outputs.relevant == 'true')) || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || contains(github.event.head_commit.message, '[security]') }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       python-version: ${{ needs.config.outputs.default-python-version }}

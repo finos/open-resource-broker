@@ -153,6 +153,11 @@ updates:
     open-pull-requests-limit: 3
     cooldown:
       default-days: 7
+    ignore:
+      # Keep the Java build image on a deliberately chosen LTS; do not follow the
+      # latest (non-LTS) JDK major automatically.
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
     groups:
       docker-security:
         applies-to: security-updates
@@ -263,6 +268,9 @@ updates:
       - dependency-name: "org.jetbrains.kotlinx:kotlinx-coroutines-core"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
       - dependency-name: "org.jetbrains.kotlinx:kotlinx-coroutines-test"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # okio 3.10+ is built with Kotlin 2.x metadata; the build pins Kotlin 1.9.
+      - dependency-name: "com.squareup.okio:okio"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
       - dependency-name: "com.squareup.okhttp3:okhttp"
         update-types: ["version-update:semver-major"]

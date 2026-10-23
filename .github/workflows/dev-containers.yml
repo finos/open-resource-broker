@@ -69,7 +69,14 @@ jobs:
     name: Resolve Trusted Commit
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # Only trust runs that completed successfully from a push to this repository.
+    # Other origins (scheduled or manual Unit Tests runs, fork pull requests)
+    # skip the whole pipeline instead of failing it.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     permissions:
       contents: read
     outputs:
@@ -83,6 +90,8 @@ jobs:
         WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
         CURRENT_SHA: ${{ github.sha }}
       run: |
+        # Backstop for the job-level `if`, which already excludes untrusted
+        # origins; stays fatal if that condition is ever loosened.
         if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
           if [[ "$WORKFLOW_RUN_EVENT" != "push" || "$WORKFLOW_RUN_REPO" != "$GITHUB_REPOSITORY" ]]; then
             echo "::error::workflow_run did not originate from a push to this repository; refusing to build its commit" >&2
@@ -96,7 +105,14 @@ jobs:
   config:
     name: Configuration
     uses: ./.github/workflows/shared-config.yml
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # Only trust runs that completed successfully from a push to this repository.
+    # Other origins (scheduled or manual Unit Tests runs, fork pull requests)
+    # skip the whole pipeline instead of failing it.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
 
   calculate-tags:
     name: Calculate Container Tags
