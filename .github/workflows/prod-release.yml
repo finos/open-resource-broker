@@ -671,9 +671,9 @@ jobs:
   #   reusable-sdk-publish.yml creates and pushes this tag (make sdk-go-tag) on
   #   the release channel, pointing at the vX.Y.Z release commit, whose contents
   #   already include the bumped sdk/go/orb/version.go (stamped in the
-  #   semantic-release build hook).  It authenticates with the ORB CICD App token
-  #   because the tag push targets a possibly branch-protected ref.  This used to
-  #   be the "Tag Go SDK module" step in semantic-release.yml.
+  #   semantic-release build hook).  It pushes the tag with GITHUB_TOKEN
+  #   (contents: write); tag refs are not covered by the branch rulesets on main.
+  #   This used to be the "Tag Go SDK module" step in semantic-release.yml.
   # ---------------------------------------------------------------------------
 
   # Gate the SDK publish caller on a passing static spec-conformance check for

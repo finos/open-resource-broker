@@ -8,6 +8,10 @@ inputs:
   private-key:
     description: 'GitHub App private key (from secrets.GH_APP_PRIVATE_KEY)'
     required: true
+  configure-remote:
+    description: "Rewrite the 'origin' remote URL to embed the token. Set to 'false' to leave git config untouched."
+    required: false
+    default: 'true'
 
 outputs:
   token:
@@ -52,6 +56,7 @@ runs:
         echo "committer-email=${USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
 
     - name: Configure git remote with App token
+      if: inputs.configure-remote != 'false'
       shell: bash
       env:
         APP_TOKEN: ${{ steps.app-token.outputs.token }}
