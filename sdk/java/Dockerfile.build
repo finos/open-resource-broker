@@ -29,3 +29,5 @@ RUN chmod +x gradlew && \
 
 # Run unit tests
 CMD ["./gradlew", "--no-daemon", "test", "--info"]
+
+# test: dockerfile-only change
