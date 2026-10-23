@@ -94,6 +94,10 @@
   color: "4285f4"
   description: "Google Cloud provider"
 
+- name: "area: providers/oci"
+  color: "c74634"
+  description: "Oracle Cloud Infrastructure provider"
+
 - name: "area: providers/k8s"
   color: "326ce5"
   description: "Kubernetes provider"

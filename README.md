@@ -40,6 +40,7 @@ ORB includes provider backends for AWS, Azure, Google Cloud, and Kubernetes, plu
 - **Azure** — VM Scale Sets, single VMs, CycleCloud cluster nodes (`pip install "orb-py[azure]"`; see [Azure Provider Guide](docs/root/providers/azure/index.md))
 - **Google Cloud** — Managed Instance Groups, single Compute Engine VMs (`pip install "orb-py[gcp]"`; see [Google Cloud Provider Guide](docs/root/providers/gcp/index.md))
 - **Kubernetes** — Pod, Deployment, StatefulSet, Job (`pip install "orb-py[k8s]"`; see [Kubernetes provider docs](docs/root/providers/k8s/index.md))
+- **OCI** - Compute instances, Flex and bare-metal shapes, preemptible capacity, and instance-principal authentication ([setup guide](docs/root/deployment/oci-integration.md))
 - **Custom** — extensible via [provider registry](docs/root/developer_guide/architecture.md) and the [`orb.providers` entry-point group](docs/root/providers/k8s/plugin-authoring.md)
 
 **Scheduler support:**
