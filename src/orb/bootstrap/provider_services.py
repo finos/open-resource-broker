@@ -123,4 +123,9 @@ def _register_provider_utility_services(container: DIContainer) -> None:
                 logger.debug("%s auth strategies registered", name)
 
         except Exception as e:
-            logger.warning("Failed to register %s utility services: %s", name, str(e))
+            logger.warning(
+                "Failed to register %s utility services: %s",
+                name,
+                str(e),
+                exc_info=True,
+            )

@@ -550,6 +550,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             self.logger.info(f"Deprovisioning results for {provider_name}: {provisioning_result}")
 
             # Update request status based on result
+            successful_ids = list(provisioning_result.get("successful_instance_ids") or [])
             if provisioning_result.get("success", False):
                 self._update_machines_to_pending(machine_ids)
                 if skipped_ids:
@@ -577,6 +578,48 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 else:
                     await self._update_request_to_terminating(request)
                     self.logger.info("Termination accepted for request %s", request.request_id)
+            elif provisioning_result.get("partial", False):
+                from orb.application.dto.commands import UpdateRequestStatusCommand
+                from orb.application.ports.command_bus_port import CommandBusPort
+
+                failed_ids = list(provisioning_result.get("failed_instance_ids") or [])
+                if successful_ids:
+                    self._update_machines_to_pending(successful_ids)
+
+                unterminated_ids = list(dict.fromkeys([*failed_ids, *skipped_ids]))
+                if unterminated_ids:
+                    self._clear_return_request_id(unterminated_ids, str(request.request_id))
+
+                errors = provisioning_result.get("errors") or []
+                succeeded_str = ", ".join(successful_ids) if successful_ids else "none"
+                message = (
+                    f"Return request partially completed: "
+                    f"{len(successful_ids)} terminated [{succeeded_str}]"
+                )
+                if failed_ids:
+                    failed_str = ", ".join(failed_ids)
+                    message += f", {len(failed_ids)} failed [{failed_str}]"
+                else:
+                    failed_str = "none"
+                    message += ", termination errors occurred (no failed instance IDs reported)"
+                if skipped_ids:
+                    skipped_str = ", ".join(skipped_ids)
+                    message += f", {len(skipped_ids)} skipped [{skipped_str}]"
+
+                update_command = UpdateRequestStatusCommand(
+                    request_id=str(request.request_id),
+                    status=RequestStatus.PARTIAL,
+                    message=message,
+                )
+                command_bus = self._container.get(CommandBusPort)
+                await command_bus.execute(update_command)
+                self.logger.warning(
+                    "Request %s marked PARTIAL: terminated=%s, failed=%s, errors=%s",
+                    request.request_id,
+                    succeeded_str,
+                    failed_str,
+                    errors,
+                )
             else:
                 await self._update_request_to_failed(request, provisioning_result.get("errors", []))
 
@@ -601,6 +644,25 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     updated_machine = machine.update_status(
                         MachineStatus.SHUTTING_DOWN, "Termination in progress"
                     )
+                    uow.machines.save(updated_machine)
+
+    def _clear_return_request_id(
+        self, machine_ids: list[str], request_id: str | None = None
+    ) -> None:
+        """Clear return_request_id on machines whose termination did not succeed.
+
+        RequestStatus.PARTIAL is terminal, so any machines that failed to
+        terminate (or were skipped) must have their return_request_id cleared
+        so a subsequent retry return request is accepted without force_return.
+        """
+        with self.uow_factory.create_unit_of_work() as uow:
+            for machine_id in machine_ids:
+                machine = uow.machines.get_by_id(machine_id)
+                if machine and (
+                    request_id is None
+                    or getattr(machine, "return_request_id", None) in (None, request_id)
+                ):
+                    updated_machine = machine.model_copy(update={"return_request_id": None})
                     uow.machines.save(updated_machine)
 
     async def _update_request_status(

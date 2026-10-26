@@ -76,29 +76,56 @@ class DeprovisioningOrchestrator:
             success_count = 0
             error_count = 0
             errors = []
+            successful_instance_ids: list[str] = []
+            failed_instance_ids: list[str] = []
+            group_machines_list = list(resource_groups.values())
 
             for i, result in enumerate(results):
+                group_instance_ids = [m.machine_id.value for m in group_machines_list[i]]
                 if isinstance(result, Exception):
                     error_count += 1
                     errors.append(str(result))
+                    failed_instance_ids.extend(group_instance_ids)
                     self.logger.error("Task %s failed: %s", tasks[i].get_name(), result)
                 elif isinstance(result, dict) and result.get("success", False):
                     success_count += 1
+                    successful_instance_ids.extend(
+                        result.get("successful_instance_ids", group_instance_ids)
+                    )
                 else:
                     error_count += 1
                     if isinstance(result, dict):
                         errors.append(result.get("error_message", "Unknown error"))
+                        group_succeeded = list(result.get("successful_instance_ids") or [])
+                        successful_instance_ids.extend(group_succeeded)
+                        group_failed = result.get("failed_instance_ids")
+                        if group_failed is not None:
+                            failed_instance_ids.extend(group_failed)
+                        else:
+                            succeeded_set = set(group_succeeded)
+                            failed_instance_ids.extend(
+                                iid for iid in group_instance_ids if iid not in succeeded_set
+                            )
                     else:
                         errors.append("Unknown error")
+                        failed_instance_ids.extend(group_instance_ids)
+
+            partial = error_count > 0 and len(successful_instance_ids) > 0
 
             self.logger.info(
-                "Deprovisioning completed: %d successful, %d failed", success_count, error_count
+                "Deprovisioning completed: %d successful, %d failed (partial=%s)",
+                success_count,
+                error_count,
+                partial,
             )
 
             return {
                 "success": error_count == 0,
+                "partial": partial,
                 "successful_operations": success_count,
                 "failed_operations": error_count,
+                "successful_instance_ids": successful_instance_ids,
+                "failed_instance_ids": failed_instance_ids,
                 "errors": errors,
             }
 
@@ -199,13 +226,77 @@ class DeprovisioningOrchestrator:
                     len(instance_ids),
                     resource_id,
                 )
-                return {"success": True, "terminated_instances": len(instance_ids)}
+                return {
+                    "success": True,
+                    "partial": False,
+                    "terminated_instances": len(instance_ids),
+                    "successful_instance_ids": list(instance_ids),
+                    "failed_instance_ids": [],
+                }
             else:
+                metadata = getattr(result, "metadata", None)
+                provider_data: dict[str, Any] = {}
+                if isinstance(metadata, dict):
+                    raw_provider_data = metadata.get("provider_data")
+                    if isinstance(raw_provider_data, dict):
+                        provider_data = raw_provider_data
+
+                raw_successful = provider_data.get("successful_instance_ids")
+                raw_failed = provider_data.get("failed_instance_ids")
+                has_successful = isinstance(raw_successful, (list, tuple))
+                has_failed = isinstance(raw_failed, (list, tuple))
+
+                if has_successful:
+                    successful_ids = [str(iid) for iid in raw_successful]
+                else:
+                    successful_ids = []
+
+                if has_failed:
+                    failed_ids = [str(iid) for iid in raw_failed]
+                else:
+                    succeeded_set = set(successful_ids)
+                    failed_ids = [iid for iid in instance_ids if iid not in succeeded_set]
+
+                if not has_successful and failed_ids:
+                    failed_set = set(failed_ids)
+                    successful_ids = [iid for iid in instance_ids if iid not in failed_set]
+
+                if successful_ids and failed_ids:
+                    self.logger.warning(
+                        "Partial termination for resource %s: %d succeeded, %d failed: %s",
+                        resource_id,
+                        len(successful_ids),
+                        len(failed_ids),
+                        result.error_message,
+                    )
+                    return {
+                        "success": False,
+                        "partial": True,
+                        "terminated_instances": len(successful_ids),
+                        "successful_instance_ids": successful_ids,
+                        "failed_instance_ids": failed_ids,
+                        "error_message": result.error_message,
+                    }
+
                 self.logger.error(
                     "Termination failed for resource %s: %s", resource_id, result.error_message
                 )
-                return {"success": False, "error_message": result.error_message}
+                return {
+                    "success": False,
+                    "partial": False,
+                    "terminated_instances": 0,
+                    "successful_instance_ids": [],
+                    "failed_instance_ids": failed_ids,
+                    "error_message": result.error_message,
+                }
 
         except Exception as e:
             self.logger.error("Failed to process resource group %s: %s", resource_id, e)
-            return {"success": False, "error_message": str(e)}
+            return {
+                "success": False,
+                "partial": False,
+                "terminated_instances": 0,
+                "successful_instance_ids": [],
+                "failed_instance_ids": [machine.machine_id.value for machine in machines],
+                "error_message": str(e),
+            }

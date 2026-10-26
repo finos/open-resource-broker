@@ -186,3 +186,71 @@ def test_ensure_provider_instance_registered_from_config_supports_azure():
     assert result is True
     assert registry.is_provider_registered("azure") is True
     assert registry.is_provider_instance_registered("azure-default") is True
+
+
+def test_azure_auto_registration_not_fired_at_import():
+    """Importing orb.providers.azure.registration must not auto-register any provider satellites."""
+    from tests.utilities.provider_import_isolation import assert_no_auto_registration_on_import
+
+    assert_no_auto_registration_on_import("orb.providers.azure.registration", "azure")
+
+
+def test_bootstrap_provider_utility_services_logs_azure_init_failure_traceback():
+    """Bootstrap _register_provider_utility_services must log exc_info=True when initialize_azure_provider fails."""
+    from orb.bootstrap.provider_services import _register_provider_utility_services
+
+    container = MagicMock()
+    logger = MagicMock()
+    mock_registry = MagicMock()
+    mock_registry.get_registered_types.return_value = ["azure"]
+
+    with (
+        patch("orb.bootstrap.provider_services.get_logger", return_value=logger),
+        patch("orb.providers.registry.get_provider_registry", return_value=mock_registry),
+        patch(
+            "orb.providers.azure.registration.initialize_azure_provider",
+            side_effect=RuntimeError("azure init boom"),
+        ),
+    ):
+        _register_provider_utility_services(container)
+
+    logger.warning.assert_called_once_with(
+        "Failed to register %s utility services: %s",
+        "azure",
+        "azure init boom",
+        exc_info=True,
+    )
+
+
+def test_register_azure_provider_settings_logs_import_error_and_chains_runtime_error():
+    """register_azure_provider_settings must log ImportError and chain unexpected exceptions."""
+    import pytest
+
+    from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
+    from orb.providers.azure.registration import register_azure_provider_settings
+
+    logger = MagicMock()
+    with patch.object(
+        ProviderSettingsRegistry,
+        "get_or_none",
+        side_effect=ImportError("optional azure extra absent"),
+    ):
+        register_azure_provider_settings(logger=logger)
+    logger.debug.assert_called_once()
+
+    logger.reset_mock()
+    cause = ValueError("invalid azure settings schema")
+    with (
+        patch.object(ProviderSettingsRegistry, "get_or_none", return_value=None),
+        patch.object(
+            ProviderSettingsRegistry,
+            "register_provider_settings",
+            side_effect=cause,
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="Failed to register Azure provider settings") as ei:
+            register_azure_provider_settings(logger=logger)
+
+    assert ei.value.__cause__ is cause
+    logger.error.assert_called_once()
+    assert logger.error.call_args.kwargs.get("exc_info") is True
