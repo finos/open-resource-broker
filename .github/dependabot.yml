@@ -50,6 +50,14 @@ updates:
       # The MCP SDK's major versions change the protocol/API and need a planned migration.
       - dependency-name: "mcp"
         update-types: ["version-update:semver-major"]
+      # kubernetes 37 validates models strictly; adopting it is a separate change.
+      - dependency-name: "kubernetes"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "kubernetes-stubs-elephant-fork"
+        update-types: ["version-update:semver-major"]
+      # filelock 4.x is currently flagged by dependency review.
+      - dependency-name: "filelock"
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -100,7 +108,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "go"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -146,7 +153,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "docker"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -190,7 +196,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "java"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -232,7 +237,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "kotlin"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -272,6 +276,9 @@ updates:
       # okio 3.10+ is built with Kotlin 2.x metadata; the build pins Kotlin 1.9.
       - dependency-name: "com.squareup.okio:okio"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # mockk 1.14 requires Kotlin 2.2 metadata; the build pins Kotlin 1.9.
+      - dependency-name: "io.mockk:mockk"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
       - dependency-name: "com.squareup.okhttp3:okhttp"
         update-types: ["version-update:semver-major"]
       - dependency-name: "com.squareup.okhttp3:logging-interceptor"
@@ -299,7 +306,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "csharp"
     commit-message:
       prefix: "chore"
       include: "scope"
