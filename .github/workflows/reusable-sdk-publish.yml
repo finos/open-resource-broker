@@ -144,8 +144,11 @@ jobs:
       # The version may be a PEP 440 dev build (e.g. 1.8.3.dev850) on the test
       # channel; npm/SemVer requires a hyphenated prerelease (1.8.3-dev.850).
       # Release versions (X.Y.Z) pass through unchanged.
+      env:
+        SDK_VERSION: ${{ inputs.version }}
       run: |
-        VERSION=$(echo "${{ inputs.version }}" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
+        [[ $SDK_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.dev[0-9]+|-[0-9A-Za-z.]+)?$ ]] || { echo "::error::invalid version"; exit 1; }
+        VERSION=$(echo "$SDK_VERSION" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
         cd sdk/typescript && npm version "$VERSION" --no-git-tag-version
 
     - name: Build TypeScript SDK
@@ -225,6 +228,11 @@ jobs:
     # to null (no environment).
     environment: ${{ matrix.destination == 'central' && 'maven-central' || null }}
     if: inputs.maven-targets != '[]' && inputs.maven-targets != ''
+    env:
+      # Must match the namespace shown at https://central.sonatype.com/publishing/namespaces
+      # for the account that owns the MAVEN_CENTRAL_* token.
+      MAVEN_CENTRAL_NAMESPACE: org.finos
+      MAVEN_CENTRAL_PUBLISHING_TYPE: user_managed
     strategy:
       fail-fast: false
       matrix:
@@ -303,8 +311,11 @@ jobs:
     - name: Set SDK version
       # Normalize a PEP 440 dev build (1.8.3.dev850) to a SemVer prerelease
       # (1.8.3-dev.850) for Maven; release versions pass through unchanged.
+      env:
+        SDK_VERSION: ${{ inputs.version }}
       run: |
-        VERSION=$(echo "${{ inputs.version }}" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
+        [[ $SDK_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.dev[0-9]+|-[0-9A-Za-z.]+)?$ ]] || { echo "::error::invalid version"; exit 1; }
+        VERSION=$(echo "$SDK_VERSION" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
         sed -i "s/^version = .*/version = '$VERSION'/" sdk/java/build.gradle
 
     - name: Publish Java SDK to Maven (${{ matrix.destination }})
@@ -340,8 +351,36 @@ jobs:
             -PmavenCentralUsername="$MAVEN_CENTRAL_USERNAME" \
             -PmavenCentralPassword="$MAVEN_CENTRAL_PASSWORD" \
             -Psigning.gnupg.passphrase="$MAVEN_GPG_PASSPHRASE"
-          echo "java -> central: published"
+          echo "java -> central: staged"
         fi
+
+    - name: Hand Java upload to the Central Portal
+      # The OSSRH staging API only stages the files; this call hands the staged
+      # repository to the Central Portal.  Stale staging repositories left by
+      # failed runs are dropped manually in the Portal.
+      if: matrix.destination == 'central' && inputs.dry-run != true
+      env:
+        MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+        MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        SDK_VERSION: ${{ inputs.version }}
+      run: |
+        set +x
+        B64=$(printf '%s:%s' "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" | base64 | tr -d '\n')
+        echo "::add-mask::$B64"
+        URL="https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/${MAVEN_CENTRAL_NAMESPACE}?publishing_type=${MAVEN_CENTRAL_PUBLISHING_TYPE}"
+        OUT="$RUNNER_TEMP/central-upload.out"
+        # The header goes in via stdin config so it never appears in argv.
+        if ! CODE=$(printf 'header = "Authorization: Bearer %s"\n' "$B64" | curl -K - --fail-with-body --silent --show-error --max-time 60 -X POST -o "$OUT" -w '%{http_code}' "$URL"); then
+          echo "::error::open-resource-broker-java: Central Portal upload failed (HTTP ${CODE:-none})"
+          head -c 2048 "$OUT" 2>/dev/null || true
+          exit 1
+        fi
+        {
+          echo "Uploaded to Maven Central Portal, not released. Release it at https://central.sonatype.com/publishing/deployments"
+          echo ""
+          echo "- Artifact: org.finos.openresourcebroker:open-resource-broker-java"
+          echo "- Version: $SDK_VERSION"
+        } >> "$GITHUB_STEP_SUMMARY"
 
   sdk-publish-gradle-kotlin:
     name: Publish Kotlin SDK to Maven (${{ matrix.destination }})
@@ -351,6 +390,11 @@ jobs:
     # to null (no environment).
     environment: ${{ matrix.destination == 'central' && 'maven-central' || null }}
     if: inputs.maven-targets != '[]' && inputs.maven-targets != ''
+    env:
+      # Must match the namespace shown at https://central.sonatype.com/publishing/namespaces
+      # for the account that owns the MAVEN_CENTRAL_* token.
+      MAVEN_CENTRAL_NAMESPACE: org.finos
+      MAVEN_CENTRAL_PUBLISHING_TYPE: user_managed
     strategy:
       fail-fast: false
       matrix:
@@ -426,8 +470,11 @@ jobs:
     - name: Set SDK version
       # Normalize a PEP 440 dev build (1.8.3.dev850) to a SemVer prerelease
       # (1.8.3-dev.850) for Maven; release versions pass through unchanged.
+      env:
+        SDK_VERSION: ${{ inputs.version }}
       run: |
-        VERSION=$(echo "${{ inputs.version }}" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
+        [[ $SDK_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.dev[0-9]+|-[0-9A-Za-z.]+)?$ ]] || { echo "::error::invalid version"; exit 1; }
+        VERSION=$(echo "$SDK_VERSION" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
         sed -i "s/^version = .*/version = \"$VERSION\"/" sdk/kotlin/build.gradle.kts
 
     - name: Publish Kotlin SDK to Maven (${{ matrix.destination }})
@@ -462,8 +509,36 @@ jobs:
             -PmavenCentralUsername="$MAVEN_CENTRAL_USERNAME" \
             -PmavenCentralPassword="$MAVEN_CENTRAL_PASSWORD" \
             -Psigning.gnupg.passphrase="$MAVEN_GPG_PASSPHRASE"
-          echo "kotlin -> central: published"
+          echo "kotlin -> central: staged"
         fi
+
+    - name: Hand Kotlin upload to the Central Portal
+      # The OSSRH staging API only stages the files; this call hands the staged
+      # repository to the Central Portal.  Stale staging repositories left by
+      # failed runs are dropped manually in the Portal.
+      if: matrix.destination == 'central' && inputs.dry-run != true
+      env:
+        MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+        MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        SDK_VERSION: ${{ inputs.version }}
+      run: |
+        set +x
+        B64=$(printf '%s:%s' "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" | base64 | tr -d '\n')
+        echo "::add-mask::$B64"
+        URL="https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/${MAVEN_CENTRAL_NAMESPACE}?publishing_type=${MAVEN_CENTRAL_PUBLISHING_TYPE}"
+        OUT="$RUNNER_TEMP/central-upload.out"
+        # The header goes in via stdin config so it never appears in argv.
+        if ! CODE=$(printf 'header = "Authorization: Bearer %s"\n' "$B64" | curl -K - --fail-with-body --silent --show-error --max-time 60 -X POST -o "$OUT" -w '%{http_code}' "$URL"); then
+          echo "::error::open-resource-broker-kotlin: Central Portal upload failed (HTTP ${CODE:-none})"
+          head -c 2048 "$OUT" 2>/dev/null || true
+          exit 1
+        fi
+        {
+          echo "Uploaded to Maven Central Portal, not released. Release it at https://central.sonatype.com/publishing/deployments"
+          echo ""
+          echo "- Artifact: org.finos.openresourcebroker:open-resource-broker-kotlin"
+          echo "- Version: $SDK_VERSION"
+        } >> "$GITHUB_STEP_SUMMARY"
 
   sdk-publish-nuget:
     name: Publish .NET SDK to NuGet (${{ matrix.destination }})
@@ -516,8 +591,11 @@ jobs:
     - name: Set SDK version
       # Normalize a PEP 440 dev build (1.8.3.dev850) to a NuGet-valid prerelease
       # (1.8.3-dev.850); release versions pass through unchanged.
+      env:
+        SDK_VERSION: ${{ inputs.version }}
       run: |
-        VERSION=$(echo "${{ inputs.version }}" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
+        [[ $SDK_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.dev[0-9]+|-[0-9A-Za-z.]+)?$ ]] || { echo "::error::invalid version"; exit 1; }
+        VERSION=$(echo "$SDK_VERSION" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
         # Version the hand-written client package.
         sed -i "s|<Version>.*</Version>|<Version>$VERSION</Version>|" \
           sdk/csharp/src/FINOS.OpenResourceBroker/FINOS.OpenResourceBroker.csproj
@@ -644,4 +722,8 @@ jobs:
       # Tag-only: points sdk/go/vX.Y.Z at the checked-out release commit and
       # pushes it with the job's GITHUB_TOKEN (contents: write). Tag refs are
       # not covered by the branch rulesets on main.
-      run: make sdk-go-tag VERSION=${{ inputs.version }}
+      env:
+        SDK_VERSION: ${{ inputs.version }}
+      run: |
+        [[ $SDK_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.dev[0-9]+|-[0-9A-Za-z.]+)?$ ]] || { echo "::error::invalid version"; exit 1; }
+        make sdk-go-tag VERSION="$SDK_VERSION"
