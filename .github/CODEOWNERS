@@ -2,25 +2,25 @@
 # These users will be automatically requested for review when PRs are opened
 
 # Default owners for everything in the repo
-* @finos/open-resource-broker-maintainers
+* @finos/open-resource-broker-maintainers @canonicalname
 
 # Specific ownership for critical files
-/.github/ @finos/open-resource-broker-maintainers
-/pyproject.toml @finos/open-resource-broker-maintainers
-/Dockerfile @finos/open-resource-broker-maintainers
-/src/_version.py @finos/open-resource-broker-maintainers
-/src/_package.py @finos/open-resource-broker-maintainers
+/.github/ @finos/open-resource-broker-maintainers @canonicalname
+/pyproject.toml @finos/open-resource-broker-maintainers @canonicalname
+/Dockerfile @finos/open-resource-broker-maintainers @canonicalname
+/src/_version.py @finos/open-resource-broker-maintainers @canonicalname
+/src/_package.py @finos/open-resource-broker-maintainers @canonicalname
 
 # Documentation
-/docs/ @finos/open-resource-broker-maintainers
-/README.md @finos/open-resource-broker-maintainers
+/docs/ @finos/open-resource-broker-maintainers @canonicalname
+/README.md @finos/open-resource-broker-maintainers @canonicalname
 
 # Security and CI/CD
-/.github/workflows/ @finos/open-resource-broker-maintainers
-/.github/dependabot.yml @finos/open-resource-broker-maintainers
-/dev-tools/security/ @finos/open-resource-broker-maintainers
+/.github/workflows/ @finos/open-resource-broker-maintainers @canonicalname
+/.github/dependabot.yml @finos/open-resource-broker-maintainers @canonicalname
+/dev-tools/security/ @finos/open-resource-broker-maintainers @canonicalname
 
 # Container and deployment
-/Dockerfile @finos/open-resource-broker-maintainers
-/deployment/ @finos/open-resource-broker-maintainers
-/dev-tools/container/container_build.sh @finos/open-resource-broker-maintainers
+/Dockerfile @finos/open-resource-broker-maintainers @canonicalname
+/deployment/ @finos/open-resource-broker-maintainers @canonicalname
+/dev-tools/container/container_build.sh @finos/open-resource-broker-maintainers @canonicalname
