@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "2.2.21"
+    kotlin("jvm") version "2.4.21"
     `java-library`
     `maven-publish`
     signing
@@ -55,8 +55,8 @@ dependencies {
     // AWS SDK v2 auth — provides the native SigV4 signer (AwsV4HttpSigner / Aws4Signer)
     // and the standard credential provider chain. No AWS service stubs are pulled in;
     // only the auth/signer module and its minimal transitive dependencies are included.
-    implementation("software.amazon.awssdk:auth:2.57.0")
-    implementation("software.amazon.awssdk:regions:2.57.0")
+    implementation("software.amazon.awssdk:auth:2.57.3")
+    implementation("software.amazon.awssdk:regions:2.57.3")
 
     // Test
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
