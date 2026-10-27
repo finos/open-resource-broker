@@ -177,7 +177,7 @@ install gradle` or [sdkman](https://sdkman.io)):
 
 ```bash
 cd sdk/kotlin
-gradle wrapper --gradle-version 8.14.3 --distribution-type all
+gradle wrapper --gradle-version 8.14.6 --distribution-type all
 ```
 
 After that, use the wrapper as usual:

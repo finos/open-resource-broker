@@ -29,6 +29,7 @@ import org.finos.openresourcebroker.sdk.model.RequestMachinesRequest
 import org.finos.openresourcebroker.sdk.model.ReturnMachinesRequest
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertNotNull
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths

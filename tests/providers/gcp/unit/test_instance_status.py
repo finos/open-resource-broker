@@ -18,6 +18,7 @@ _EXPECTED_INSTANCE_STATUS = {
     "RUNNING": "running",
     "REPAIRING": "pending",
     "STOPPING": "stopping",
+    "PENDING_STOP": "stopping",
     "STOPPED": "stopped",
     "SUSPENDING": "stopping",
     "SUSPENDED": "stopped",

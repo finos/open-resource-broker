@@ -14,6 +14,8 @@ import org.finos.openresourcebroker.sdk.client.OrbUnavailableError
 import org.finos.openresourcebroker.sdk.client.Scheduler
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 
 /**
  * Unit tests for OrbClient against MockWebServer.

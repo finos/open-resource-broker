@@ -100,7 +100,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "go"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -146,7 +145,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "docker"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -190,7 +188,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "java"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -232,7 +229,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "kotlin"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -264,14 +260,6 @@ updates:
         update-types:
           - "major"
     ignore:
-      # coroutines 1.11 is built with Kotlin 2.2; the build pins Kotlin 1.9.
-      - dependency-name: "org.jetbrains.kotlinx:kotlinx-coroutines-core"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
-      - dependency-name: "org.jetbrains.kotlinx:kotlinx-coroutines-test"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
-      # okio 3.10+ is built with Kotlin 2.x metadata; the build pins Kotlin 1.9.
-      - dependency-name: "com.squareup.okio:okio"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
       - dependency-name: "com.squareup.okhttp3:okhttp"
         update-types: ["version-update:semver-major"]
       - dependency-name: "com.squareup.okhttp3:logging-interceptor"
@@ -299,7 +287,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "csharp"
     commit-message:
       prefix: "chore"
       include: "scope"

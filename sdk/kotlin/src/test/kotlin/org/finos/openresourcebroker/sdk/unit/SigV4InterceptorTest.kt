@@ -8,6 +8,8 @@ import org.finos.openresourcebroker.sdk.auth.AuthOption
 import org.finos.openresourcebroker.sdk.auth.buildAuthInterceptor
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 
 /**
  * Unit tests for the native AWS SDK v2 SigV4 interceptor.

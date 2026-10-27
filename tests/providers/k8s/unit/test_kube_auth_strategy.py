@@ -23,6 +23,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from kubernetes.client import V1TokenReviewSpec
 
 from orb.infrastructure.adapters.ports.auth import AuthContext, AuthResult, AuthStatus
 from orb.providers.k8s.auth.kube_auth_strategy import KubeAuthStrategy
@@ -332,17 +333,20 @@ def test_do_token_review_passes_audiences_when_set() -> None:
     mock_k8s_client.api_client = MagicMock()
     strategy._kubernetes_client = mock_k8s_client
 
+    # Wrap the real spec model: V1TokenReview validates its ``spec`` field, so a
+    # stand-in object would be rejected.
     with (
         patch("kubernetes.client.AuthenticationV1Api", return_value=mock_auth_api_instance),
-        patch("kubernetes.client.V1TokenReviewSpec") as mock_spec_cls,
+        patch("kubernetes.client.V1TokenReviewSpec", wraps=V1TokenReviewSpec) as mock_spec_cls,
     ):
-        mock_spec_cls.return_value = SimpleNamespace(
-            token="some-jwt", audiences=["https://orb.example.com"]
-        )
         strategy._do_token_review("some-jwt")
         mock_spec_cls.assert_called_once_with(
             token="some-jwt", audiences=["https://orb.example.com"]
         )
+
+    review = mock_auth_api_instance.create_token_review.call_args.args[0]
+    assert review.spec.token == "some-jwt"
+    assert review.spec.audiences == ["https://orb.example.com"]
 
 
 # ---------------------------------------------------------------------------

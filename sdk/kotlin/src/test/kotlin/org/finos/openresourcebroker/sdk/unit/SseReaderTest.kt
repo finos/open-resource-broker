@@ -5,6 +5,7 @@ import kotlinx.coroutines.test.runTest
 import org.finos.openresourcebroker.sdk.sse.*
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertNull
 import java.io.ByteArrayInputStream
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
