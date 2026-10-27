@@ -63,7 +63,7 @@ on:
         type: string
         default: 'trusted'
     # secrets: inherit is used by every caller, so NODE_AUTH_TOKEN / MAVEN_* /
-    # NUGET_API_KEY / GITHUB_TOKEN / GH_APP_* are all visible here without an
+    # NUGET_API_KEY / GITHUB_TOKEN are all visible here without an
     # explicit secrets: declaration.
 
 permissions:
@@ -639,23 +639,9 @@ jobs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         ref: ${{ github.sha }}
-        # The composite below mints the App token and resets the remote URL to
-        # authenticate as the ORB CICD App.  If actions/checkout also persists
-        # the default GITHUB_TOKEN as a git extraheader, that header beats the
-        # URL-embedded token at push time and the tag push lands as
-        # github-actions[bot] — not in the main branch protection bypass list —
-        # and is rejected.  Skip persistence so the composite's remote URL is
-        # the sole credential source.  (Mirrors semantic-release.yml.)
-        persist-credentials: false
-
-    - name: ORB CICD App token
-      id: cicd
-      uses: ./.github/actions/orb-cicd-app-token
-      with:
-        client-id: ${{ secrets.GH_APP_CLIENT_ID }}
-        private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
 
     - name: Tag Go SDK module (sdk/go/vX.Y.Z → release commit)
       # Tag-only: points sdk/go/vX.Y.Z at the checked-out release commit and
-      # pushes it via the App-authenticated remote configured above.
+      # pushes it with the job's GITHUB_TOKEN (contents: write). Tag refs are
+      # not covered by the branch rulesets on main.
       run: make sdk-go-tag VERSION=${{ inputs.version }}

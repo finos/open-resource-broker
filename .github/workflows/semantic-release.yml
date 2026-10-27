@@ -82,12 +82,28 @@ jobs:
             echo "Next version: **$NEXT**"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  approve:
+    name: Approve release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [preview]
+    # Manual approval gate only. It holds no credentials: the App secrets live
+    # in the orb-cicd environment, which only the release job uses.
+    if: github.ref == 'refs/heads/main'
+    environment: release-approval
+    permissions: {}
+    steps:
+      - name: Release approved
+        run: echo "Release approved"
+
   release:
     name: Semantic Release
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [preview]
-    environment: release-approval
+    needs: [preview, approve]
+    if: github.ref == 'refs/heads/main'
+    # Holds the ORB CICD App credentials; the environment only deploys from main.
+    environment: orb-cicd
     permissions:
       contents: write
       packages: write
@@ -98,22 +114,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
-          # The composite below mints the App token and resets the remote
-          # URL to authenticate as the ORB CICD App.  If actions/checkout
-          # also persists the default GITHUB_TOKEN as an extraheader git
-          # config entry, that header beats the URL-embedded token at push
-          # time and the request lands as github-actions[bot] - which is
-          # not in the main branch protection bypass list and is rejected
-          # with GH006.  Skip the persistence so the composite's remote
-          # URL is the sole credential source.
+          # No credentials are persisted in .git/config: the App token is
+          # minted only right before python-semantic-release and is handed to
+          # it directly, so the earlier build steps never see it.
           persist-credentials: false
-
-      - name: ORB CICD App token
-        id: cicd
-        uses: ./.github/actions/orb-cicd-app-token
-        with:
-          client-id: ${{ secrets.GH_APP_CLIENT_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
 
       - name: Setup UV
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
@@ -165,6 +169,19 @@ jobs:
           # would save under a key no future restore step would ever request.
           key: ${{ steps.spa-web-cache.outputs.cache-primary-key }}
 
+      # Mint the App token as late as possible: the steps above (bun install,
+      # frontend build) run third-party install scripts and must not have it.
+      # Only the two pinned python-semantic-release actions run after this.
+      # The git remote is left untouched (configure-remote: false) so the token
+      # is not written to .git/config where the build container could read it.
+      - name: ORB CICD App token
+        id: cicd
+        uses: ./.github/actions/orb-cicd-app-token
+        with:
+          client-id: ${{ secrets.GH_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          configure-remote: 'false'
+
       - name: Python Semantic Release
         id: release
         uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278  # v10.7.0
@@ -178,7 +195,7 @@ jobs:
         uses: python-semantic-release/publish-action@99d4062dd393b5a7a62c5fe9ed78fb364b5674f2  # v10.7.0
         if: steps.release.outputs.released == 'true'
         with:
-          github_token: ${{ steps.cicd.outputs.token }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.release.outputs.tag }}
 
       # Provenance attestation is intentionally NOT done here.  The single

@@ -247,6 +247,8 @@ make lint
 make lint-optional
 ```
 
+Pull requests with unformatted code fail the `Ruff (Code Quality)` check. Run `make format-fix` and commit the result; formatting suggestions may also be offered as review comments on changed lines.
+
 ### Pre-commit Hooks
 
 Git hooks live in `.githooks/` and are activated by:
