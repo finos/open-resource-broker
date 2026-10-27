@@ -100,7 +100,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "go"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -146,7 +145,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "docker"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -190,7 +188,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "java"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -232,7 +229,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "kotlin"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -291,7 +287,6 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "csharp"
     commit-message:
       prefix: "chore"
       include: "scope"
