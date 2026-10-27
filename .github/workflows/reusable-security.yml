@@ -24,6 +24,14 @@ on:
         required: false
         type: string
         default: ''
+      enabled:
+        description: >-
+          When false every step is skipped, so the job still reports success
+          under its own name without scanning.  Callers set this to false only
+          when no scanned path changed.
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -41,10 +49,11 @@ jobs:
 
     steps:
       - name: Checkout code
+        if: inputs.enabled
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Setup Python and UV
-        if: inputs.scan-type == 'pip-audit'
+        if: inputs.scan-type == 'pip-audit' && inputs.enabled
         uses: ./.github/actions/setup-uv-cached
         with:
           # Use the caller-supplied cache key when set; otherwise derive the
@@ -62,12 +71,12 @@ jobs:
 
       # pip-audit Dependency Scan
       - name: Run pip-audit dependency scan
-        if: inputs.scan-type == 'pip-audit'
+        if: inputs.scan-type == 'pip-audit' && inputs.enabled
         run: make ci-security-pip-audit
 
       # Semgrep Static Analysis
       - name: Install Semgrep
-        if: inputs.scan-type == 'semgrep'
+        if: inputs.scan-type == 'semgrep' && inputs.enabled
         run: pip install semgrep==1.127.0
 
       # || true on the semgrep command below is INTENTIONAL: semgrep is advisory-only
@@ -77,7 +86,7 @@ jobs:
       # TODO: remove || true once the finding backlog is triaged and semgrep is
       # promoted to a hard gate.
       - name: Run Semgrep security analysis
-        if: inputs.scan-type == 'semgrep'
+        if: inputs.scan-type == 'semgrep' && inputs.enabled
         run: |
           semgrep scan \
             --config p/security-audit \
@@ -89,7 +98,7 @@ jobs:
             . || true
 
       - name: Upload Semgrep SARIF results
-        if: inputs.scan-type == 'semgrep' && always()
+        if: inputs.scan-type == 'semgrep' && inputs.enabled && always()
         uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee  # v4.39.0
         with:
           sarif_file: semgrep.sarif
@@ -102,7 +111,7 @@ jobs:
       # TODO: add severity: CRITICAL (or HIGH,CRITICAL) once the finding backlog
       # has been triaged and Trivy is ready to act as a hard gate.
       - name: Run Trivy filesystem vulnerability scanner
-        if: inputs.scan-type == 'trivy-fs'
+        if: inputs.scan-type == 'trivy-fs' && inputs.enabled
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           scan-type: 'fs'
@@ -112,7 +121,7 @@ jobs:
           trivyignores: .trivyignore.yaml
 
       - name: Upload Trivy filesystem scan results
-        if: inputs.scan-type == 'trivy-fs' && always()
+        if: inputs.scan-type == 'trivy-fs' && inputs.enabled && always()
         uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee  # v4.39.0
         with:
           sarif_file: 'trivy-fs-results.sarif'
@@ -125,7 +134,7 @@ jobs:
       # TODO: remove no-fail: true once Dockerfile best-practice rules have been
       # reviewed and hadolint is ready to act as a hard gate.
       - name: Run Hadolint Dockerfile scan
-        if: inputs.scan-type == 'hadolint'
+        if: inputs.scan-type == 'hadolint' && inputs.enabled
         uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387  # v3.5.0
         with:
           dockerfile: Dockerfile
@@ -134,7 +143,7 @@ jobs:
           no-fail: true
 
       - name: Upload Hadolint SARIF results
-        if: inputs.scan-type == 'hadolint' && always()
+        if: inputs.scan-type == 'hadolint' && inputs.enabled && always()
         uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee  # v4.39.0
         with:
           sarif_file: hadolint-results.sarif
@@ -162,12 +171,13 @@ jobs:
 
     steps:
       - name: Checkout code
+        if: inputs.enabled
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup Python and UV
-        if: matrix.language == 'python'
+        if: matrix.language == 'python' && inputs.enabled
         uses: ./.github/actions/setup-uv-cached
         with:
           cache-key: >-
@@ -183,6 +193,7 @@ jobs:
       # A configuration or query-suite error fails the job rather than falling
       # back to a narrower scan.
       - name: Initialize CodeQL
+        if: inputs.enabled
         uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee  # v4.39.0
         with:
           languages: ${{ matrix.language }}
@@ -190,6 +201,7 @@ jobs:
           config-file: ./.github/codeql/codeql-config.yml
 
       - name: Perform CodeQL Analysis
+        if: inputs.enabled
         uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee  # v4.39.0
         with:
           category: "/language:${{ matrix.language }}"
