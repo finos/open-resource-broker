@@ -413,16 +413,16 @@ wheels = [
 
 [[package]]
 name = "azure-mgmt-network"
-version = "31.0.1"
+version = "33.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-mgmt-core" },
     { name = "isodate" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/07/10/0c6e043eaaa21574464cd36ee15f9acd71f81c647ad89f72bd3e938d071b/azure_mgmt_network-31.0.1.tar.gz", hash = "sha256:2112f720eedca76173be4d47acb8bc58af16a90debc7b601bf11b37faaaed137", size = 902532, upload-time = "2026-07-02T05:44:23.634Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/64/745a47ed48aa3c193d6941c6d9d314f61043cd777bfe4f380c04a8819329/azure_mgmt_network-33.1.0.tar.gz", hash = "sha256:ca44e95967e530bdac32ff7d7e6476c84e852225e5aae148eef2694f34f9710b", size = 1124214, upload-time = "2026-10-12T07:38:56.088Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/60/2e473151925f893b0629e3cb913bf4fce82edbc5da884607b9a5e636b8d2/azure_mgmt_network-31.0.1-py3-none-any.whl", hash = "sha256:cb36bff1a08237211093b0c3b900cadfd344d08d4a437d526c1239fee3331d0c", size = 725755, upload-time = "2026-07-02T05:44:25.803Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/d2/c0ba9d3515d10f943ac662d293d01a28145c0de605b37cb70b56997e644a/azure_mgmt_network-33.1.0-py3-none-any.whl", hash = "sha256:c768d065799db9751999bf041fa5130bff6ab7b2ac281207a2a3845c3c1cfe6f", size = 927178, upload-time = "2026-10-12T07:38:58.171Z" },
 ]
 
 [[package]]
@@ -1222,11 +1222,11 @@ wheels = [
 
 [[package]]
 name = "filelock"
-version = "3.32.2"
+version = "4.1.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f6/57/3ba6e6cb097f85b855b00163d169f35365f44277df044dcf96d55b8f62a3/filelock-3.32.2.tar.gz", hash = "sha256:c33351e1f49cae33414acbc6d56784e6ecee82514ec90795da1161fc4836b5b8", size = 217172, upload-time = "2026-07-29T22:46:04.895Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4c/58/6fd434bec86eff7c38a3168454cb132b762b2bea9b3ac094101a2f7bc32a/filelock-4.1.0.tar.gz", hash = "sha256:ad7f724afef953e731b1cc39bcd3a09166d72ed7fcdf29e6e88b1c3235c6715d", size = 561277, upload-time = "2026-10-09T19:57:20.34Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/e8/72f8cef9fdfeffe06213fe8508039396ee48daa0e3259457ed766173bfd6/filelock-3.32.2-py3-none-any.whl", hash = "sha256:87dd94cf281e586d135fa51132b8e3d9a598b316e90377a288663c9321036c82", size = 98830, upload-time = "2026-07-29T22:46:03.52Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/86/032133892a5de43b5a98200b01aadcad68cc255e274a762f08b8a76d2912/filelock-4.1.0-py3-none-any.whl", hash = "sha256:2ce9818e3e2d8f284c1a964414447ef148d42a5fd5e2a477a7118e574b293ec1", size = 133003, upload-time = "2026-10-09T19:57:18.716Z" },
 ]
 
 [[package]]
