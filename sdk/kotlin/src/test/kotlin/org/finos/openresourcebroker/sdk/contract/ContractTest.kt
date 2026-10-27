@@ -32,6 +32,7 @@ import org.finos.openresourcebroker.sdk.model.*
 import org.finos.openresourcebroker.sdk.client.OrbApiError
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertNotNull
 import java.io.File
 import java.nio.file.Files
 import kotlin.time.Duration.Companion.seconds

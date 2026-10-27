@@ -3,6 +3,7 @@ package org.finos.openresourcebroker.sdk.unit
 import org.finos.openresourcebroker.sdk.transport.UdsSocketFactory
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertNotNull
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UdsSocketFactoryTest {
