@@ -179,7 +179,7 @@ jobs:
         fetch-depth: 0
 
     - name: Check for secrets with TruffleHog
-      uses: trufflesecurity/trufflehog@e76dff8a7e57d6df0c60ad8cbf5d5cba505a8fc9  # v3.99.2
+      uses: trufflesecurity/trufflehog@e63326d6545de8f425d93ce24078c6e68d83f70e  # v3.99.3
       with:
         path: ./
         base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
