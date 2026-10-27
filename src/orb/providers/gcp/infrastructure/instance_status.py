@@ -32,6 +32,8 @@ def normalize_gcp_instance_status(status: str | None) -> str:
         "RUNNING": "running",
         "REPAIRING": "pending",
         "STOPPING": "stopping",
+        # Graceful shutdown in progress, before the instance reaches STOPPING.
+        "PENDING_STOP": "stopping",
         "STOPPED": "stopped",
         "SUSPENDING": "stopping",
         "SUSPENDED": "stopped",

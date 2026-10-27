@@ -13,6 +13,7 @@ requests and pods in a Kubernetes cluster.
 Test k8sutils helper functions.
 """
 
+import datetime
 from http import HTTPStatus
 from unittest import mock
 
@@ -503,7 +504,8 @@ class TestParseNodeEvent:
         return kubernetes.client.CoreV1Event(
             involved_object=kubernetes.client.V1ObjectReference(kind=kind, name=name, uid=uid),
             metadata=kubernetes.client.V1ObjectMeta(
-                name="evt-1", creation_timestamp=mock.Mock(timestamp=lambda: 123.0)
+                name="evt-1",
+                creation_timestamp=datetime.datetime.fromtimestamp(123, tz=datetime.timezone.utc),
             ),
             type="Warning",
             reason="NodeNotReady",

@@ -156,7 +156,7 @@ def _poll_events_bkp(workdir: Path, identifier: str) -> Path | None:
 
 def create_app(settings: Settings) -> FastAPI:
     """Create the FastAPI app with the given settings."""
-    app = FastAPI(settings=settings)
+    app = FastAPI()
 
     @app.get("/health")
     def health_check() -> dict:

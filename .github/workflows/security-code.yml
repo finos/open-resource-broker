@@ -244,7 +244,8 @@ jobs:
         #   chardet         LGPL-2.1-or-later -> transitive via cyclonedx-bom (SBOM generation tooling)
         #   python-gitlab   LGPL-3.0-or-later -> transitive via python-semantic-release (release tooling)
         #   regex           Apache-2.0 AND CNRI-Python -> transitive via nltk / cfn-lint (lint and test tooling)
-        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/semgrep, pkg:npm/bowser, pkg:pypi/chardet, pkg:pypi/python-gitlab, pkg:pypi/regex, pkg:pypi/pillow'
+        #   grimp           BSD-2-Clause AND BSD-2-Clause-Views AND BSD-3-Clause -> transitive via import-linter (architecture-check tooling; METADATA: License: BSD 2-Clause License; the extra identifiers come from bundled Rust crates and are all permissive)
+        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/semgrep, pkg:npm/bowser, pkg:pypi/chardet, pkg:pypi/python-gitlab, pkg:pypi/regex, pkg:pypi/pillow, pkg:pypi/grimp'
 
   license-gate:
     name: Runtime License Gate
