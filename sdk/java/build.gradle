@@ -41,10 +41,10 @@ ext {
     // with a single release line, which is what keeps Dependabot's bump of
     // this property resolvable.
     jackson_version = '2.22.4'
-    awssdk_version = '2.56.0'
+    awssdk_version = '2.57.0'
     // Drives the junit-bom platform below, never an individual coordinate.
     junit_version = '6.1.3'
-    mockwebserver_version = '5.5.0'
+    mockwebserver_version = '5.5.1'
 }
 
 // ─── Source sets ────────────────────────────────────────────────────────────
