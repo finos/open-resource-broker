@@ -73,6 +73,65 @@ vulnerabilities:
       No fixed package in Debian 13.
     expired_at: 2027-01-01
 
+  # ── filelock ───────────────────────────────────────────────────────────────
+  #
+  # Every filelock fix is in 4.2.1 or later, and those releases require
+  # Python >= 3.11, while orb-py supports Python 3.10 (the newest
+  # 3.10-compatible release, 4.1.0, is still affected). All advisories below
+  # concern ReadWriteLock or SoftFileLock and need a local user with write
+  # access to the lock directory. orb-py does not use either class; its own
+  # code only uses the plain FileLock (live test helpers), and the other
+  # dependents (cachecontrol, virtualenv, python-discovery) are dev tooling
+  # that also only use FileLock. Re-evaluate when Python 3.10 support ends.
+
+  - id: CVE-2026-112940
+    purls:
+      - pkg:pypi/filelock
+    statement: >-
+      filelock (GHSA-v4x8-3wr5-3wq8): ReadWriteLock reopens its SQLite lock database by name, so a local user who can write to the lock directory can plant a symlink or journal file. Fixed only in
+      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-112937
+    purls:
+      - pkg:pypi/filelock
+    statement: >-
+      filelock (GHSA-jqc4-5cvw-7w85): ReadWriteLock's hard-link route recursively deletes a path another local user can rename onto its link directory name. Fixed only in
+      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-112914
+    purls:
+      - pkg:pypi/filelock
+    statement: >-
+      filelock (GHSA-crv4-6mhj-j5jh): SoftFileLock stale-break restore follows a swapped-in symlink in a shared lock directory. Fixed only in
+      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-112906
+    purls:
+      - pkg:pypi/filelock
+    statement: >-
+      filelock (GHSA-2g95-wg33-c5x2): SoftFileLock can evict a fresh lock file through inode reuse by another local user. Fixed only in
+      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-112907
+    purls:
+      - pkg:pypi/filelock
+    statement: >-
+      filelock (GHSA-567q-5qvw-pf92): Windows-only SoftFileLock oplock hang. Fixed only in
+      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
+    expired_at: 2027-01-01
+
+  - id: CVE-2026-112913
+    purls:
+      - pkg:pypi/filelock
+    statement: >-
+      filelock (GHSA-9vhv-jxww-xfm5): Windows-only ReadWriteLock side-file issue. Fixed only in
+      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
+    expired_at: 2027-01-01
+
 secrets:
   # moto (AWS mocking library) ships fixed self-signed TLS certificates for
   # its local mock proxy server. They are test fixtures, not production
