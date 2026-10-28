@@ -30,8 +30,11 @@ if TYPE_CHECKING:
     from orb.providers.registry import ProviderRegistry
 
 from orb.domain.template.factory import TemplateFactory
+from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
+
+_module_logger = get_logger(__name__)
 
 T = TypeVar("T")
 
@@ -426,27 +429,33 @@ def _create_azure_strategy_with_di(
 def register_azure_extensions(logger: Optional["LoggingPort"] = None) -> None:
     """Register Azure template extensions with the global registry."""
     try:
+        if TemplateExtensionRegistry.has_extension("azure"):
+            return
         TemplateExtensionRegistry.register_extension("azure", AzureTemplateExtensionConfig)
         if logger:
             logger.debug("Azure template extensions registered successfully")
     except Exception as exc:
         error_msg = f"Failed to register Azure template extensions: {exc}"
         if logger:
-            logger.error(error_msg)
+            logger.error(error_msg, exc_info=True)
         raise
 
 
-def register_azure_provider_settings() -> None:
+def register_azure_provider_settings(logger: Optional[LoggingPort] = None) -> None:
     """Register AzureProviderConfig with the provider settings registry."""
+    log = logger or _module_logger
     try:
         from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
         from orb.providers.azure.configuration.config import AzureProviderConfig
 
+        if ProviderSettingsRegistry.get_or_none("azure") is not None:
+            return
         ProviderSettingsRegistry.register_provider_settings("azure", AzureProviderConfig)
-    except ImportError:
-        pass  # Azure SDK extra not installed; provider remains partially registered
+    except ImportError as exc:
+        log.debug("Skipping Azure provider settings registration: %s", exc)
     except Exception as exc:
-        raise RuntimeError(f"Failed to register Azure provider settings: {exc!s}")
+        log.error("Failed to register Azure provider settings: %s", exc, exc_info=True)
+        raise RuntimeError(f"Failed to register Azure provider settings: {exc!s}") from exc
 
 
 def register_azure_cli_spec() -> None:
@@ -456,10 +465,10 @@ def register_azure_cli_spec() -> None:
         from orb.providers.azure.cli.azure_cli_spec import AzureCLISpec
 
         CLISpecRegistry.register("azure", AzureCLISpec())
-    except ImportError:
-        pass  # Azure SDK extra not installed; provider remains partially registered
+    except ImportError as exc:
+        _module_logger.debug("Skipping Azure CLI spec registration: %s", exc)
     except Exception as exc:
-        raise RuntimeError(f"Failed to register Azure CLI spec: {exc!s}")
+        raise RuntimeError(f"Failed to register Azure CLI spec: {exc!s}") from exc
 
 
 def register_azure_hostfactory_field_mapping() -> None:
@@ -473,10 +482,10 @@ def register_azure_hostfactory_field_mapping() -> None:
         )
 
         FieldMappingRegistry.register("azure", AzureFieldMapping())
-    except ImportError:
-        pass  # Azure SDK extra not installed; provider remains partially registered
+    except ImportError as exc:
+        _module_logger.debug("Skipping Azure HostFactory field mapping registration: %s", exc)
     except Exception as exc:
-        raise RuntimeError(f"Failed to register Azure HostFactory field mapping: {exc!s}")
+        raise RuntimeError(f"Failed to register Azure HostFactory field mapping: {exc!s}") from exc
 
 
 def register_azure_template_factory(
@@ -613,18 +622,7 @@ def register_azure_services_with_di(container) -> None:
     )
 
 
-# ------------------------------------------------------------------
-# Auto-register extensions on import
-# ------------------------------------------------------------------
-
-try:
-    register_azure_extensions()
-    register_azure_provider_settings()
-    register_azure_cli_spec()
-    register_azure_hostfactory_field_mapping()
-except Exception:
-    import logging as _logging
-
-    _logging.getLogger(__name__).warning(
-        "Failed to auto-register Azure extensions on import", exc_info=True
-    )
+# Provider satellites (settings, template extensions, CLI spec, field mapping,
+# and defaults loader) are registered on demand via ``initialize_azure_provider``
+# (which delegates to ``register_provider_complete``) rather than as a
+# module-import side effect.

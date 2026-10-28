@@ -1,8 +1,6 @@
 """Tests for GCP provider registration."""
 
-import importlib
-import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
 
@@ -39,31 +37,6 @@ def test_create_gcp_strategy_builds_initialized_strategy() -> None:
     )
 
     assert strategy.is_initialized is True
-
-
-def test_gcp_auto_registration_failure_on_import_logs_warning_and_does_not_raise(
-    caplog,
-) -> None:
-    """An import-time registration failure must warn, not crash app startup."""
-    import orb.providers.gcp.registration as gcp_registration
-    from orb.infrastructure.registry.template_extension_registry import (
-        TemplateExtensionRegistry,
-    )
-
-    try:
-        with patch.object(
-            TemplateExtensionRegistry,
-            "register_extension",
-            side_effect=RuntimeError("boom"),
-        ):
-            with caplog.at_level(logging.WARNING, logger="orb.providers.gcp.registration"):
-                importlib.reload(gcp_registration)
-
-        assert "Failed to auto-register GCP extensions on import" in caplog.text
-    finally:
-        # Re-run the real (unpatched) auto-registration so later tests see
-        # GCP's extensions registered again.
-        importlib.reload(gcp_registration)
 
 
 def test_register_gcp_provider_registers_cli_spec() -> None:

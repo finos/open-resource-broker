@@ -715,6 +715,183 @@ class TestExecuteDeprovisioningForRequest:
 
         mock_failed.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_partial_termination_marks_only_succeeded_pending_and_clears_failed_return_request_id(
+        self,
+    ):
+        command_bus = AsyncMock()
+        handler = self._handler(
+            group_by_resource=([MagicMock()], []),
+            deprovision_result={
+                "success": False,
+                "partial": True,
+                "successful_instance_ids": ["vm-1"],
+                "failed_instance_ids": ["vm-2"],
+                "errors": ["raw sensitive provider error detail"],
+            },
+            command_bus=command_bus,
+        )
+        request = MagicMock()
+        request.request_id = "ret-partial-1"
+
+        with (
+            patch.object(handler, "_update_machines_to_pending") as mock_pending,
+            patch.object(handler, "_clear_return_request_id") as mock_clear_ret,
+            patch.object(handler, "_update_request_to_failed", new=AsyncMock()) as mock_failed,
+        ):
+            await handler._execute_deprovisioning_for_request(["vm-1", "vm-2"], request, "azure")
+
+        mock_pending.assert_called_once_with(["vm-1"])
+        mock_clear_ret.assert_called_once_with(["vm-2"], "ret-partial-1")
+        mock_failed.assert_not_awaited()
+
+        partial_calls = [
+            c
+            for c in command_bus.execute.await_args_list
+            if getattr(c.args[0], "status", None) == RequestStatus.PARTIAL
+        ]
+        assert len(partial_calls) == 1
+        cmd_arg = partial_calls[0].args[0]
+        assert "vm-1" in cmd_arg.message
+        assert "vm-2" in cmd_arg.message
+        # Raw provider error text must be logged, not persisted in the user-facing request message
+        assert "raw sensitive provider error detail" not in cmd_arg.message
+        handler.logger.warning.assert_called_once()  # type: ignore[attr-defined]
+
+    @pytest.mark.asyncio
+    async def test_partial_termination_with_skipped_ids_includes_skipped_and_clears_return_request_ids(
+        self,
+    ):
+        command_bus = AsyncMock()
+        handler = self._handler(
+            group_by_resource=([MagicMock()], ["vm-skipped"]),
+            deprovision_result={
+                "success": False,
+                "partial": True,
+                "successful_instance_ids": ["vm-1"],
+                "failed_instance_ids": ["vm-2"],
+                "errors": ["partial failure"],
+            },
+            command_bus=command_bus,
+        )
+        request = MagicMock()
+        request.request_id = "ret-partial-skip"
+
+        with (
+            patch.object(handler, "_update_machines_to_pending") as mock_pending,
+            patch.object(handler, "_clear_return_request_id") as mock_clear_ret,
+        ):
+            await handler._execute_deprovisioning_for_request(
+                ["vm-1", "vm-2", "vm-skipped"], request, "azure"
+            )
+
+        mock_pending.assert_called_once_with(["vm-1"])
+        mock_clear_ret.assert_called_once_with(["vm-2", "vm-skipped"], "ret-partial-skip")
+
+        partial_calls = [
+            c
+            for c in command_bus.execute.await_args_list
+            if getattr(c.args[0], "status", None) == RequestStatus.PARTIAL
+        ]
+        assert len(partial_calls) == 1
+        cmd_arg = partial_calls[0].args[0]
+        assert "1 terminated [vm-1]" in cmd_arg.message
+        assert "1 failed [vm-2]" in cmd_arg.message
+        assert "1 skipped [vm-skipped]" in cmd_arg.message
+
+    @pytest.mark.asyncio
+    async def test_partial_termination_without_failed_ids_does_not_render_failed_none(self):
+        command_bus = AsyncMock()
+        handler = self._handler(
+            group_by_resource=([MagicMock()], []),
+            deprovision_result={
+                "success": False,
+                "partial": True,
+                "successful_instance_ids": ["vm-1"],
+                "failed_instance_ids": [],
+                "errors": ["group level failure"],
+            },
+            command_bus=command_bus,
+        )
+        request = MagicMock()
+        request.request_id = "ret-partial-empty-failed"
+
+        with patch.object(handler, "_update_machines_to_pending"):
+            await handler._execute_deprovisioning_for_request(["vm-1"], request, "azure")
+
+        partial_calls = [
+            c
+            for c in command_bus.execute.await_args_list
+            if getattr(c.args[0], "status", None) == RequestStatus.PARTIAL
+        ]
+        assert len(partial_calls) == 1
+        cmd_arg = partial_calls[0].args[0]
+        assert "failed [none]" not in cmd_arg.message
+        assert "no failed instance IDs reported" in cmd_arg.message
+
+    @pytest.mark.asyncio
+    async def test_failed_machines_from_partial_return_request_are_eligible_for_followup_retry_without_force(
+        self,
+    ):
+        """After a PARTIAL return request, failed machines have return_request_id cleared and can be retried."""
+        machines_store: dict[str, MagicMock] = {}
+        for mid in ("vm-1", "vm-2"):
+            m = MagicMock()
+            m.machine_id.value = mid
+            m.return_request_id = "ret-partial-1"
+
+            def _make_copy(machine_obj: MagicMock):
+                def _copy(*, update: dict[str, Any] | None = None, **_kwargs):
+                    if update and "return_request_id" in update:
+                        machine_obj.return_request_id = update["return_request_id"]
+                    return machine_obj
+
+                return _copy
+
+            m.model_copy.side_effect = _make_copy(m)
+            m.update_status.return_value = m
+            machines_store[mid] = m
+
+        uow = MagicMock()
+        uow.machines.get_by_id.side_effect = machines_store.get
+        uow.machines.save = MagicMock()
+        uow.requests.save = MagicMock(return_value=[])
+
+        @contextmanager
+        def _create():
+            yield uow
+
+        factory = MagicMock()
+        factory.create_unit_of_work.side_effect = _create
+
+        handler = _make_return_handler(uow_factory=factory)
+        handler._machine_grouping_service.group_by_resource.return_value = ([MagicMock()], [])
+        handler._deprovisioning_orchestrator.execute_deprovisioning = AsyncMock(
+            return_value={
+                "success": False,
+                "partial": True,
+                "successful_instance_ids": ["vm-1"],
+                "failed_instance_ids": ["vm-2"],
+                "errors": ["transient provider failure on vm-2"],
+            }
+        )
+        command_bus = AsyncMock()
+        handler._container.get.return_value = command_bus
+
+        request = MagicMock()
+        request.request_id = "ret-partial-1"
+
+        await handler._execute_deprovisioning_for_request(["vm-1", "vm-2"], request, "azure")
+
+        # vm-2 failed to terminate so its return_request_id must now be cleared
+        assert machines_store["vm-2"].return_request_id is None
+        # Follow-up single-machine validation and multi-machine filtering both accept vm-2 without force_return
+        retry_cmd = CreateReturnRequestCommand(machine_ids=["vm-2"], force_return=False)
+        await handler.validate_command(retry_cmd)
+        valid_ids, skipped = handler._filter_machines(["vm-2"], force_return=False)
+        assert valid_ids == ["vm-2"]
+        assert skipped == []
+
 
 # ---------------------------------------------------------------------------
 # CreateReturnRequestHandler — _cancel_validate_and_persist

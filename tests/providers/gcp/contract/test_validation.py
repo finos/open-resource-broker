@@ -177,6 +177,9 @@ def test_validate_gcp_template_rejects_boot_disk_type_reference() -> None:
 
 
 def test_gcp_template_dto_roundtrip_preserves_provider_fields() -> None:
+    from orb.providers.gcp.registration import register_gcp_extensions
+
+    register_gcp_extensions()
     original = GCPTemplate(
         template_id="gcp-singlevm",
         provider_api="SingleVM",

@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from orb.providers.registry import ProviderRegistry
 
 from orb.domain.template.factory import TemplateFactory
+from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 from orb.providers.gcp.cli.gcp_cli_spec import GCPCLISpec
@@ -19,6 +20,8 @@ from orb.providers.gcp.factories import (
     create_gcp_strategy,
     create_gcp_validator,
 )
+
+_module_logger = get_logger(__name__)
 
 
 def register_gcp_provider(
@@ -96,18 +99,34 @@ def register_gcp_provider_instance(
 
 def register_gcp_extensions(logger: Optional[LoggingPort] = None) -> None:
     """Register GCP template extensions."""
-    TemplateExtensionRegistry.register_extension("gcp", GCPTemplateExtensionConfig)
-    CLISpecRegistry.register("gcp", GCPCLISpec())
-    if logger:
-        logger.debug("GCP template extensions registered successfully")
+    try:
+        if not TemplateExtensionRegistry.has_extension("gcp"):
+            TemplateExtensionRegistry.register_extension("gcp", GCPTemplateExtensionConfig)
+        if CLISpecRegistry.get_or_none("gcp") is None:
+            CLISpecRegistry.register("gcp", GCPCLISpec())
+        if logger:
+            logger.debug("GCP template extensions registered successfully")
+    except Exception as exc:
+        if logger:
+            logger.error("Failed to register GCP template extensions: %s", exc, exc_info=True)
+        raise
 
 
-def register_gcp_provider_settings() -> None:
+def register_gcp_provider_settings(logger: Optional[LoggingPort] = None) -> None:
     """Register GCPProviderConfig with the provider settings registry."""
-    from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
-    from orb.providers.gcp.configuration.config import GCPProviderConfig
+    log = logger or _module_logger
+    try:
+        from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
+        from orb.providers.gcp.configuration.config import GCPProviderConfig
 
-    ProviderSettingsRegistry.register_provider_settings("gcp", GCPProviderConfig)
+        if ProviderSettingsRegistry.get_or_none("gcp") is not None:
+            return
+        ProviderSettingsRegistry.register_provider_settings("gcp", GCPProviderConfig)
+    except ImportError as exc:
+        log.debug("Skipping GCP provider settings registration: %s", exc)
+    except Exception as exc:
+        log.error("Failed to register GCP provider settings: %s", exc, exc_info=True)
+        raise RuntimeError(f"Failed to register GCP provider settings: {exc!s}") from exc
 
 
 def register_gcp_template_factory(
@@ -148,16 +167,7 @@ def is_gcp_provider_registered() -> bool:
     return TemplateExtensionRegistry.has_extension("gcp")
 
 
-# ------------------------------------------------------------------
-# Auto-register extensions on import
-# ------------------------------------------------------------------
-
-try:
-    register_gcp_extensions()
-    register_gcp_provider_settings()
-except Exception:
-    import logging as _logging
-
-    _logging.getLogger(__name__).warning(
-        "Failed to auto-register GCP extensions on import", exc_info=True
-    )
+# Provider satellites (settings, template extensions, CLI spec, field mapping,
+# and defaults loader) are registered on demand via ``initialize_gcp_provider``
+# (which delegates to ``GCPPlugin().initialize_provider``) rather than as a
+# module-import side effect.
