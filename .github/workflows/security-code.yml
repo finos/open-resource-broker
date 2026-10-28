@@ -192,12 +192,22 @@ jobs:
     timeout-minutes: 20
     needs: [changes]
     if: ${{ !cancelled() && needs.changes.result == 'success' && github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true' }}
+    # Job-level only: pull-requests: write lets the optional Dependabot step
+    # below comment on or close a PR. No step in this job executes code from
+    # the PR except the analysis script, which runs without a token.
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
 
     - name: Dependency Review
+      id: depreview
+      continue-on-error: true
       uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294  # v4
       with:
         fail-on-severity: moderate
@@ -246,6 +256,95 @@ jobs:
         #   regex           Apache-2.0 AND CNRI-Python -> transitive via nltk / cfn-lint (lint and test tooling)
         #   grimp           BSD-2-Clause AND BSD-2-Clause-Views AND BSD-3-Clause -> transitive via import-linter (architecture-check tooling; METADATA: License: BSD 2-Clause License; the extra identifiers come from bundled Rust crates and are all permissive)
         allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/semgrep, pkg:npm/bowser, pkg:pypi/chardet, pkg:pypi/python-gitlab, pkg:pypi/regex, pkg:pypi/pillow, pkg:pypi/grimp'
+
+    # Dependabot PRs that add a vulnerable version.
+    #
+    # The analysis step has no token and never calls the GitHub API: it turns
+    # the action outputs into a decision plus pre-rendered comment text and
+    # reports the effective mode and gate results in the job summary. The
+    # acting step below holds the token and only posts or closes from those
+    # files.
+    #
+    # Repository variable DEPENDABOT_AUTOCLOSE (default dry when unset):
+    #   dry      summary only
+    #   comment  comment on the PR (one comment, edited in place)
+    #   close    comment, and close single-dependency PRs that add a new
+    #            vulnerability and fix none
+    # Runs triggered by Dependabot may not be able to read repository
+    # variables; the summary states whether the variable was seen.
+    - name: Analyse Dependency Review result
+      id: analyse
+      if: ${{ always() && steps.depreview.outcome == 'failure' }}
+      continue-on-error: true
+      env:
+        VULN: ${{ steps.depreview.outputs.vulnerable-changes }}
+        CHANGES: ${{ steps.depreview.outputs.dependency-changes }}
+        MODE_RAW: ${{ vars.DEPENDABOT_AUTOCLOSE }}
+        GATE_AUTHOR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+        GATE_ACTOR: ${{ github.actor_id == '49699333' }}
+        GATE_TRIGGERING_ACTOR: ${{ github.triggering_actor == 'dependabot[bot]' }}
+        GATE_SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        GATE_HEAD_REF: ${{ startsWith(github.event.pull_request.head.ref, 'dependabot/') }}
+        GATE_NO_KEEP_OPEN: ${{ !contains(github.event.pull_request.labels.*.name, 'keep-open') }}
+      run: |
+        out="$RUNNER_TEMP/orb-depreview"
+        bash .github/scripts/depreview-decision.sh "$out" >> "$GITHUB_STEP_SUMMARY"
+
+    # The actor check is an additional restriction on top of the PR author
+    # check (a human re-run or rebase changes the actor and disables the
+    # step); it is not what authorises the action.
+    - name: Comment on or close Dependabot PR
+      if: >-  # zizmor: ignore[bot-conditions]
+        ${{ always()
+        && steps.depreview.outcome == 'failure'
+        && steps.analyse.outcome == 'success'
+        && (vars.DEPENDABOT_AUTOCLOSE == 'comment' || vars.DEPENDABOT_AUTOCLOSE == 'close')
+        && github.event.pull_request.user.login == 'dependabot[bot]'
+        && github.actor_id == '49699333'
+        && github.triggering_actor == 'dependabot[bot]'
+        && github.event.pull_request.head.repo.full_name == github.repository
+        && startsWith(github.event.pull_request.head.ref, 'dependabot/')
+        && !contains(github.event.pull_request.labels.*.name, 'keep-open') }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        MODE: ${{ vars.DEPENDABOT_AUTOCLOSE }}
+        SECURITY_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'security') }}
+      run: |
+        dir="$RUNNER_TEMP/orb-depreview"
+        decision=$(cat "$dir/decision")
+        [ "$decision" = none ] && exit 0
+
+        # Close only in close mode, for a close decision, and never for a
+        # security-labelled PR; otherwise comment only.
+        body="$dir/comment.md"
+        if [ "$MODE" = close ] && [ "$decision" = close ] && [ "$SECURITY_LABEL" != true ]; then
+          body="$dir/close.md"
+        fi
+
+        # One comment per PR: edit the bot's existing marked comment in place.
+        id=$(gh api --paginate "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
+          --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- orb-depreview -->")))][0].id // empty' \
+          | head -n 1)
+        if [ -n "$id" ]; then
+          existing=$(gh api "repos/$GH_REPO/issues/comments/$id" --jq .body)
+          if [ "$existing" != "$(cat "$body")" ]; then
+            gh api -X PATCH "repos/$GH_REPO/issues/comments/$id" -F "body=@$body" > /dev/null
+          fi
+        else
+          gh pr comment "$PR_NUMBER" --body-file "$body"
+        fi
+
+        if [ "$body" = "$dir/close.md" ]; then
+          gh pr close "$PR_NUMBER"
+        fi
+
+    # Keep the required check red whenever Dependency Review failed, including
+    # when the analysis or acting step above errored.
+    - name: Fail when Dependency Review failed
+      if: ${{ always() && steps.depreview.outcome == 'failure' }}
+      run: exit 1
 
   license-gate:
     name: Runtime License Gate
