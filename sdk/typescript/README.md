@@ -1,7 +1,8 @@
-# orb-typescript
+# @finos/open-resource-broker
 
 TypeScript / Node.js client SDK for the
-[Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB).
+[Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB),
+published on npm as `@finos/open-resource-broker`.
 
 ## Prerequisites
 
@@ -30,6 +31,20 @@ npm install @finos/open-resource-broker
 ```
 
 Requires Node.js 22 or later.
+
+## Quick Start
+
+```typescript
+import { OrbClient } from "@finos/open-resource-broker";
+
+const client = await OrbClient.create({
+    process: { binary: "orb" },
+    auth: { type: "none" },
+});
+const { templates } = await client.listTemplates();
+console.log(templates.length);
+await client.close();
+```
 
 ## IPC Model
 
@@ -166,25 +181,25 @@ try {
 }
 ```
 
-## Testing
-
-Use the built-in mock server for unit tests (no real ORB required):
-
-```typescript
-import { OrbClient } from "@finos/open-resource-broker";
-// See sdk/typescript/tests/unit/ for mock-server patterns
-```
-
-## Integration Tests
-
-Requires `orb` in PATH and `orb init` completed:
-
-```bash
-npm run test:contract
-```
-
 ## Version Compatibility
 
-| TypeScript SDK | Requires Python service |
-|----------------|------------------------|
-| 0.1.x | >= 1.8.3 |
+The SDK requires the ORB Python service (`orb-py`) version 1.8.3 or later and
+earlier than 2.0.0.
+
+## Documentation
+
+Full documentation, including the SDK overview and the API reference, is at
+[https://finos.github.io/open-resource-broker/](https://finos.github.io/open-resource-broker/).
+The SDK overview covers all supported languages:
+[https://finos.github.io/open-resource-broker/sdk/](https://finos.github.io/open-resource-broker/sdk/).
+
+Instructions for building and testing the SDKs from source are in the
+[developer testing guide](https://finos.github.io/open-resource-broker/developer_guide/testing/#sdk-development).
+
+## License
+
+Licensed under the Apache License, Version 2.0. See the
+[LICENSE](https://github.com/finos/open-resource-broker/blob/main/LICENSE) file.
+
+Open Resource Broker is a project of the
+[Fintech Open Source Foundation (FINOS)](https://www.finos.org/).

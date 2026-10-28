@@ -163,6 +163,17 @@ jobs:
       if: matrix.destination != 'github' && inputs.auth-mode != 'token'
       run: npm install -g npm@^11.5.1
 
+    - name: Verify npm package contents
+      run: |
+        cd sdk/typescript
+        npm pack --dry-run --json > /tmp/npm-pack.json
+        for f in README.md LICENSE; do
+          if ! jq -e --arg f "$f" '.[0].files | any(.path == $f)' /tmp/npm-pack.json > /dev/null; then
+            echo "::error::npm package is missing $f"
+            exit 1
+          fi
+        done
+
     - name: Publish to npm (${{ matrix.destination }})
       # Branch on matrix.destination, then (for npmjs) on inputs.auth-mode:
       #   github — GitHub Packages (https://npm.pkg.github.com), auth via
@@ -317,6 +328,15 @@ jobs:
         [[ $SDK_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.dev[0-9]+|-[0-9A-Za-z.]+)?$ ]] || { echo "::error::invalid version"; exit 1; }
         VERSION=$(echo "$SDK_VERSION" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
         sed -i "s/^version = .*/version = '$VERSION'/" sdk/java/build.gradle
+
+    - name: Verify Java POM metadata
+      run: |
+        cd sdk/java
+        ./gradlew --no-daemon generatePomFileForMavenPublication
+        if ! grep -q '<description>.\+</description>' build/publications/maven/pom-default.xml; then
+          echo "::error::generated POM has no description"
+          exit 1
+        fi
 
     - name: Publish Java SDK to Maven (${{ matrix.destination }})
       # Branch on matrix.destination:
@@ -477,6 +497,15 @@ jobs:
         VERSION=$(echo "$SDK_VERSION" | sed -E 's/\.dev([0-9]+)$/-dev.\1/')
         sed -i "s/^version = .*/version = \"$VERSION\"/" sdk/kotlin/build.gradle.kts
 
+    - name: Verify Kotlin POM metadata
+      run: |
+        cd sdk/kotlin
+        ./gradlew --no-daemon generatePomFileForMavenPublication
+        if ! grep -q '<description>.\+</description>' build/publications/maven/pom-default.xml; then
+          echo "::error::generated POM has no description"
+          exit 1
+        fi
+
     - name: Publish Kotlin SDK to Maven (${{ matrix.destination }})
       # Branch on matrix.destination:
       #   github  — ./gradlew publishMavenPublicationToGitHubPackagesRepository,
@@ -613,6 +642,24 @@ jobs:
         dotnet pack sdk/csharp/src/FINOS.OpenResourceBroker/FINOS.OpenResourceBroker.csproj \
           --configuration Release \
           --output /tmp/nuget-packages
+
+    - name: Verify NuGet package contents
+      run: |
+        pkg=$(find /tmp/nuget-packages -name 'FINOS.OpenResourceBroker.*.nupkg' | head -n 1)
+        listing=$(unzip -Z1 "$pkg")
+        for f in README.md orb-icon.png; do
+          if ! grep -qx "$f" <<< "$listing"; then
+            echo "::error::nupkg is missing $f at the package root"
+            exit 1
+          fi
+        done
+        nuspec=$(unzip -p "$pkg" FINOS.OpenResourceBroker.nuspec)
+        for tag in '<readme>README.md</readme>' '<icon>orb-icon.png</icon>'; do
+          if ! grep -qF "$tag" <<< "$nuspec"; then
+            echo "::error::nuspec is missing $tag"
+            exit 1
+          fi
+        done
 
     - name: NuGet trusted-publishing login (OIDC)
       # nuget_org + trusted only (the default path; automatic releases). Exchanges

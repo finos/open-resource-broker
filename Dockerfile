@@ -22,14 +22,15 @@ RUN apt-get update && \
 ARG BUILD_DATE
 ARG VERSION=dev
 ARG VCS_REF
-ARG AUTHOR
-ARG LICENSE
-ARG REPO_URL
+ARG AUTHOR="FINOS"
+ARG LICENSE="Apache-2.0"
+ARG REPO_URL="https://github.com/finos/open-resource-broker"
 
 # Add metadata labels and set environment variables in single layer
 LABEL org.opencontainers.image.title="Open Resource Broker API" \
       org.opencontainers.image.description="REST API for Open Resource Broker - Dynamic cloud resource provisioning" \
       org.opencontainers.image.source="${REPO_URL}" \
+      org.opencontainers.image.documentation="https://finos.github.io/open-resource-broker/" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${VCS_REF}" \

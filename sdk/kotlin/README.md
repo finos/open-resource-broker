@@ -1,7 +1,8 @@
-# orb-kotlin
+# open-resource-broker-kotlin
 
 Kotlin client SDK for the
-[Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB).
+[Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB),
+published as `org.finos.openresourcebroker:open-resource-broker-kotlin`.
 
 ## Prerequisites
 
@@ -27,16 +28,30 @@ orb init
 
 ## Installation
 
+Replace `VERSION` with the latest release listed on the
+[releases page](https://github.com/finos/open-resource-broker/releases).
+
 Gradle (Kotlin DSL):
 
 ```kotlin
-implementation("org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0")
+implementation("org.finos.openresourcebroker:open-resource-broker-kotlin:VERSION")
 ```
 
 Gradle (Groovy DSL):
 
 ```groovy
-implementation 'org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0'
+implementation 'org.finos.openresourcebroker:open-resource-broker-kotlin:VERSION'
+```
+
+## Quick Start
+
+```kotlin
+import org.finos.openresourcebroker.sdk.client.*
+import org.finos.openresourcebroker.sdk.process.ProcessConfig
+
+val client = OrbClient.create(ClientConfig(process = ProcessConfig(binary = "orb")))
+println(client.listTemplates().templates.size)
+client.close()
 ```
 
 ## IPC Model
@@ -169,33 +184,25 @@ try {
 }
 ```
 
-## Building
-
-The Gradle wrapper launcher JAR is not committed to this repository, so on a
-fresh checkout generate it once with a local Gradle install (e.g. `brew
-install gradle` or [sdkman](https://sdkman.io)):
-
-```bash
-cd sdk/kotlin
-gradle wrapper --gradle-version 8.14.6 --distribution-type all
-```
-
-After that, use the wrapper as usual:
-
-```bash
-./gradlew build
-```
-
-## Integration Tests
-
-Requires `orb` in PATH:
-
-```bash
-./gradlew integrationTest
-```
-
 ## Version Compatibility
 
-| Kotlin SDK | Requires Python service |
-|------------|------------------------|
-| 0.1.x | >= 1.8.3 |
+The SDK requires the ORB Python service (`orb-py`) version 1.8.3 or later and
+earlier than 2.0.0.
+
+## Documentation
+
+Full documentation, including the SDK overview and the API reference, is at
+[https://finos.github.io/open-resource-broker/](https://finos.github.io/open-resource-broker/).
+The SDK overview covers all supported languages:
+[https://finos.github.io/open-resource-broker/sdk/](https://finos.github.io/open-resource-broker/sdk/).
+
+Instructions for building and testing the SDKs from source are in the
+[developer testing guide](https://finos.github.io/open-resource-broker/developer_guide/testing/#sdk-development).
+
+## License
+
+Licensed under the Apache License, Version 2.0. See the
+[LICENSE](https://github.com/finos/open-resource-broker/blob/main/LICENSE) file.
+
+Open Resource Broker is a project of the
+[Fintech Open Source Foundation (FINOS)](https://www.finos.org/).

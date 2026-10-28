@@ -166,7 +166,7 @@ publishing {
             from(components["java"])
             pom {
                 name.set("Open Resource Broker Kotlin SDK")
-                description.set("Kotlin client SDK for the FINOS Open Resource Broker API")
+                description.set("Kotlin client SDK for the FINOS Open Resource Broker API. Runs ORB as a managed local process over a Unix domain socket or connects to a remote endpoint, with SigV4 and bearer-token authentication, request retries and server-sent event streaming.")
                 url.set("https://github.com/finos/open-resource-broker")
                 licenses {
                     license {
