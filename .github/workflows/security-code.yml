@@ -256,6 +256,14 @@ jobs:
         #   regex           Apache-2.0 AND CNRI-Python -> transitive via nltk / cfn-lint (lint and test tooling)
         #   grimp           BSD-2-Clause AND BSD-2-Clause-Views AND BSD-3-Clause -> transitive via import-linter (architecture-check tooling; METADATA: License: BSD 2-Clause License; the extra identifiers come from bundled Rust crates and are all permissive)
         allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/semgrep, pkg:npm/bowser, pkg:pypi/chardet, pkg:pypi/python-gitlab, pkg:pypi/regex, pkg:pypi/pillow, pkg:pypi/grimp'
+        # Filelock advisories with no fix for Python 3.10: every fixed release
+        # requires Python >= 3.11, while orb-py still supports 3.10. ORB does not
+        # use the affected ReadWriteLock / SoftFileLock APIs. Same exception as
+        # the filelock entries in .trivyignore.yaml; review by 2027-01-01 or when
+        # Python 3.10 support ends.
+        allow-ghsas: >-
+          GHSA-v4x8-3wr5-3wq8, GHSA-jqc4-5cvw-7w85, GHSA-crv4-6mhj-j5jh,
+          GHSA-2g95-wg33-c5x2, GHSA-567q-5qvw-pf92, GHSA-9vhv-jxww-xfm5
 
     # Dependabot PRs that add a vulnerable version.
     #
