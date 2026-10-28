@@ -243,7 +243,7 @@ jobs:
       # Must match the namespace shown at https://central.sonatype.com/publishing/namespaces
       # for the account that owns the MAVEN_CENTRAL_* token.
       MAVEN_CENTRAL_NAMESPACE: org.finos.open-resource-broker
-      MAVEN_CENTRAL_PUBLISHING_TYPE: user_managed
+      MAVEN_CENTRAL_PUBLISHING_TYPE: automatic
     strategy:
       fail-fast: false
       matrix:
@@ -376,8 +376,10 @@ jobs:
 
     - name: Hand Java upload to the Central Portal
       # The OSSRH staging API only stages the files; this call hands the staged
-      # repository to the Central Portal.  Stale staging repositories left by
-      # failed runs are dropped manually in the Portal.
+      # repository to the Central Portal, which validates it and publishes it to
+      # Maven Central automatically (publishing_type=automatic).  Stale
+      # staging repositories left by failed runs are dropped manually in the
+      # Portal.
       if: matrix.destination == 'central' && inputs.dry-run != true
       env:
         MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
@@ -396,7 +398,7 @@ jobs:
           exit 1
         fi
         {
-          echo "Uploaded to Maven Central Portal, not released. Release it at https://central.sonatype.com/publishing/deployments"
+          echo "Handed to the Maven Central Portal; it publishes automatically once validation passes. Check status at https://central.sonatype.com/publishing/deployments"
           echo ""
           echo "- Artifact: org.finos.open-resource-broker:open-resource-broker-java"
           echo "- Version: $SDK_VERSION"
@@ -414,7 +416,7 @@ jobs:
       # Must match the namespace shown at https://central.sonatype.com/publishing/namespaces
       # for the account that owns the MAVEN_CENTRAL_* token.
       MAVEN_CENTRAL_NAMESPACE: org.finos.open-resource-broker
-      MAVEN_CENTRAL_PUBLISHING_TYPE: user_managed
+      MAVEN_CENTRAL_PUBLISHING_TYPE: automatic
     strategy:
       fail-fast: false
       matrix:
@@ -543,8 +545,10 @@ jobs:
 
     - name: Hand Kotlin upload to the Central Portal
       # The OSSRH staging API only stages the files; this call hands the staged
-      # repository to the Central Portal.  Stale staging repositories left by
-      # failed runs are dropped manually in the Portal.
+      # repository to the Central Portal, which validates it and publishes it to
+      # Maven Central automatically (publishing_type=automatic).  Stale
+      # staging repositories left by failed runs are dropped manually in the
+      # Portal.
       if: matrix.destination == 'central' && inputs.dry-run != true
       env:
         MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
@@ -563,7 +567,7 @@ jobs:
           exit 1
         fi
         {
-          echo "Uploaded to Maven Central Portal, not released. Release it at https://central.sonatype.com/publishing/deployments"
+          echo "Handed to the Maven Central Portal; it publishes automatically once validation passes. Check status at https://central.sonatype.com/publishing/deployments"
           echo ""
           echo "- Artifact: org.finos.open-resource-broker:open-resource-broker-kotlin"
           echo "- Version: $SDK_VERSION"
