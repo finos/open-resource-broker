@@ -16,8 +16,8 @@ Each SDK covers all 45 operations in the current API spec
 | [Python](#python) | `pip install orb-py` | `orb.ORBClient` | Python 3.11 |
 | [Go](#go) | `go get github.com/finos/open-resource-broker/sdk/go` | `orb.Client` | Go 1.24 |
 | [TypeScript / Node](#typescript--node) | `npm install @finos/open-resource-broker` | `OrbClient` | Node 22 |
-| [Java](#java) | `org.finos.openresourcebroker:open-resource-broker-java:0.1.0` | `OrbClient` | Java 17 |
-| [Kotlin](#kotlin) | `org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0` | `OrbClient` | JVM 17 |
+| [Java](#java) | `org.finos.open-resource-broker:open-resource-broker-java:0.1.0` | `OrbClient` | Java 17 |
+| [Kotlin](#kotlin) | `org.finos.open-resource-broker:open-resource-broker-kotlin:0.1.0` | `OrbClient` | JVM 17 |
 | [.NET / C#](#net--c) | `dotnet add package FINOS.OpenResourceBroker` | `OrbClient` | .NET 8 |
 
 For languages not listed here, see the
@@ -133,19 +133,19 @@ Full reference: [`sdk/typescript/README.md`](https://github.com/finos/open-resou
 
 ## Java
 
-**Coordinates:** `org.finos.openresourcebroker:open-resource-broker-java:0.1.0`
+**Coordinates:** `org.finos.open-resource-broker:open-resource-broker-java:0.1.0`
 
 Gradle:
 
 ```groovy
-implementation 'org.finos.openresourcebroker:open-resource-broker-java:0.1.0'
+implementation 'org.finos.open-resource-broker:open-resource-broker-java:0.1.0'
 ```
 
 Maven:
 
 ```xml
 <dependency>
-  <groupId>org.finos.openresourcebroker</groupId>
+  <groupId>org.finos.open-resource-broker</groupId>
   <artifactId>open-resource-broker-java</artifactId>
   <version>0.1.0</version>
 </dependency>
@@ -176,12 +176,12 @@ Full reference: [`sdk/java/README.md`](https://github.com/finos/open-resource-br
 
 ## Kotlin
 
-**Coordinates:** `org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0`
+**Coordinates:** `org.finos.open-resource-broker:open-resource-broker-kotlin:0.1.0`
 
 Gradle (Kotlin DSL):
 
 ```kotlin
-implementation("org.finos.openresourcebroker:open-resource-broker-kotlin:0.1.0")
+implementation("org.finos.open-resource-broker:open-resource-broker-kotlin:0.1.0")
 ```
 
 **Five-line usage example:**

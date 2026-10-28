@@ -262,6 +262,11 @@ jobs:
           --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT" \
           --provenance=true \
           --sbom=true \
+          --annotation "index:org.opencontainers.image.title=Open Resource Broker API" \
+          --annotation "index:org.opencontainers.image.description=REST API for Open Resource Broker - Dynamic cloud resource provisioning" \
+          --annotation "index:org.opencontainers.image.source=https://github.com/finos/open-resource-broker" \
+          --annotation "index:org.opencontainers.image.licenses=Apache-2.0" \
+          --annotation "index:org.opencontainers.image.documentation=https://finos.github.io/open-resource-broker/" \
           --metadata-file metadata.json \
           --cache-from type=gha \
           --cache-to type=gha,mode=max \

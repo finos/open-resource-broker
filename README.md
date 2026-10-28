@@ -332,8 +332,8 @@ Native client libraries for Python, Go, TypeScript, Java, Kotlin, and .NET. Pyth
 | Python | `pip install orb-py` | `orb.ORBClient` |
 | Go | `go get github.com/finos/open-resource-broker/sdk/go` | `orb.Client` |
 | TypeScript / Node | `npm install @finos/open-resource-broker` | `OrbClient` |
-| Java | `org.finos.openresourcebroker:open-resource-broker-java` | `OrbClient` |
-| Kotlin | `org.finos.openresourcebroker:open-resource-broker-kotlin` | `OrbClient` |
+| Java | `org.finos.open-resource-broker:open-resource-broker-java` | `OrbClient` |
+| Kotlin | `org.finos.open-resource-broker:open-resource-broker-kotlin` | `OrbClient` |
 | .NET / C# | `dotnet add package FINOS.OpenResourceBroker` | `OrbClient` |
 
 ```python

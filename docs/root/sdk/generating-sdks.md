@@ -11,8 +11,8 @@ but that ORB does not officially ship.
 | Python | Official | `pip install orb-py` |
 | Go | Official | `go get github.com/finos/open-resource-broker/sdk/go` |
 | TypeScript / Node | Official | `npm install @finos/open-resource-broker` |
-| Java (17+) | Official | Maven / Gradle: `org.finos.openresourcebroker:open-resource-broker-java` |
-| Kotlin | Official | Maven / Gradle: `org.finos.openresourcebroker:open-resource-broker-kotlin` |
+| Java (17+) | Official | Maven / Gradle: `org.finos.open-resource-broker:open-resource-broker-java` |
+| Kotlin | Official | Maven / Gradle: `org.finos.open-resource-broker:open-resource-broker-kotlin` |
 | .NET / C# | Official | NuGet: `FINOS.OpenResourceBroker` |
 | Scala, Rust, Ruby, PHP, C++, Swift, Dart, … | Self-serve | See this guide |
 

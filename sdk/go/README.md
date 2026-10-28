@@ -1,6 +1,6 @@
-# orb-go
+# github.com/finos/open-resource-broker/sdk/go
 
-Go client SDK for the [Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB) — a Python service for provisioning cloud compute resources.
+Go client SDK for the [Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB), a Python service for provisioning cloud compute resources.
 
 ## Prerequisites
 
@@ -30,7 +30,7 @@ This creates `~/.config/orb/config.json` with your AWS credentials and infrastru
 ## Installation
 
 ```bash
-go get github.com/finos/open-resource-broker/sdk/go@v1.8.3
+go get github.com/finos/open-resource-broker/sdk/go
 ```
 
 The Go SDK lives at `sdk/go/go.mod` as an independent Go module with the path
@@ -209,7 +209,7 @@ go run ./examples/managed_process/ --template <id>
 go run ./examples/scheduler/ --template <id>
 ```
 
-## Testing
+## Testing Your Application
 
 Use `mock.NewServer()` — no real ORB process needed:
 
@@ -226,14 +226,6 @@ c, _ := srv.Client()
 final, _ := c.WaitForCompletion(ctx, "req-1")
 ```
 
-## Integration Tests
-
-Requires `orb` binary in PATH and `orb init` completed:
-
-```bash
-go test -tags integration -timeout 120s ./orb/...
-```
-
 ## Troubleshooting
 
 **`orb: starting managed process: exec: "orb": executable file not found in $PATH`**
@@ -248,22 +240,32 @@ The socket path is not writable by the current user. Either use the default auto
 **Scheduler mismatch: empty machines or wrong field names**
 The `WithScheduler` option must match the `--scheduler` flag the ORB server was started with. If ORB is running with `--scheduler hostfactory`, set `orb.WithScheduler(orb.SchedulerHostFactory)` on the client.
 
-## Release / Distribution
+## Versioning
 
-The Go SDK is distributed as an independent Go submodule at
-`github.com/finos/open-resource-broker/sdk/go`. Each ORB release:
-
-1. Bumps `sdk/go/orb/version.go` via `make sdk-go-update-version VERSION=X.Y.Z`.
-2. Pushes a `sdk/go/vX.Y.Z` git tag, which the Go module proxy
-   (proxy.golang.org) uses to serve `go get github.com/finos/open-resource-broker/sdk/go@vX.Y.Z`.
-
-There is no separate CI publish job — Go distribution is entirely tag-based.
-The root module tag (`vX.Y.Z`) is NOT sufficient for the submodule path; only
-the `sdk/go/vX.Y.Z` tag is served by the proxy for this module path.
+The Go SDK is an independent Go submodule. Each release is published as a
+`sdk/go/vX.Y.Z` git tag, which the Go module proxy serves for the module path
+`github.com/finos/open-resource-broker/sdk/go`. The root module tag is not used
+for this path.
 
 ## Version Compatibility
 
-| Go SDK | Requires Python service |
-|---|---|
-| v1.8.3 | >= 1.8.3 |
-| v2.x | >= 2.0.0 |
+The SDK requires the ORB Python service (`orb-py`) version 1.8.3 or later and
+earlier than 2.0.0.
+
+## Documentation
+
+Full documentation, including the SDK overview and the API reference, is at
+[https://finos.github.io/open-resource-broker/](https://finos.github.io/open-resource-broker/).
+The SDK overview covers all supported languages:
+[https://finos.github.io/open-resource-broker/sdk/](https://finos.github.io/open-resource-broker/sdk/).
+
+Instructions for building and testing the SDKs from source are in the
+[developer testing guide](https://finos.github.io/open-resource-broker/developer_guide/testing/#sdk-development).
+
+## License
+
+Licensed under the Apache License, Version 2.0. See the
+[LICENSE](https://github.com/finos/open-resource-broker/blob/main/LICENSE) file.
+
+Open Resource Broker is a project of the
+[Fintech Open Source Foundation (FINOS)](https://www.finos.org/).

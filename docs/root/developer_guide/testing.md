@@ -189,6 +189,58 @@ def test_docker_compose_dev_service_configuration(self, project_root):
     assert "build" in compose_config["services"]["orb-api"]
 ```
 
+## SDK Development
+
+Each language SDK lives under `sdk/<language>/`. Generated models are produced
+from `sdk/spec/openapi.json` by the `make sdk-<language>-generate` targets; run
+the matching target before building. Integration tests need the `orb` binary on
+`PATH` and a completed `orb init`.
+
+### Java and Kotlin
+
+The Gradle wrapper launcher JAR is not committed. Generate it once with a local
+Gradle install (use `8.7` with `--distribution-type bin` for Java and `8.14.6`
+with `--distribution-type all` for Kotlin):
+
+```bash
+cd sdk/java   # or sdk/kotlin
+gradle wrapper --gradle-version 8.7 --distribution-type bin
+```
+
+Then build and run the tests:
+
+```bash
+./gradlew build
+./gradlew integrationTest
+```
+
+### C#
+
+```bash
+cd sdk/csharp
+dotnet build
+dotnet test
+dotnet test --filter Category=Integration
+```
+
+### Go
+
+```bash
+cd sdk/go
+go test ./...
+go test -tags integration -timeout 120s ./orb/...
+```
+
+### TypeScript
+
+```bash
+cd sdk/typescript
+npm ci
+npm run build
+npm test
+npm run test:contract
+```
+
 ## Test Utilities
 
 ### Fixtures

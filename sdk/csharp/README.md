@@ -1,7 +1,8 @@
-# orb-csharp
+# FINOS.OpenResourceBroker
 
 .NET / C# client SDK for the
-[Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB).
+[Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB),
+published on NuGet as `FINOS.OpenResourceBroker`.
 
 ## Prerequisites
 
@@ -31,10 +32,17 @@ orb init
 dotnet add package FINOS.OpenResourceBroker
 ```
 
-Or add to your `.csproj`:
+## Quick Start
 
-```xml
-<PackageReference Include="FINOS.OpenResourceBroker" Version="0.1.0" />
+```csharp
+using FINOS.OpenResourceBroker;
+
+await using var client = await OrbClient.CreateAsync(new ClientConfig
+{
+    Process = new ProcessConfig { Binary = "orb" },
+});
+var templates = await client.ListTemplatesAsync();
+Console.WriteLine(templates.Templates.Count);
 ```
 
 ## IPC Model
@@ -181,27 +189,25 @@ catch (OrbApiException ex)
 }
 ```
 
-## Building
-
-```bash
-cd sdk/csharp
-dotnet build
-```
-
-## Tests
-
-```bash
-dotnet test
-```
-
-Integration tests (require `orb` in PATH):
-
-```bash
-dotnet test --filter Category=Integration
-```
-
 ## Version Compatibility
 
-| .NET SDK | Requires Python service |
-|----------|------------------------|
-| 0.1.x | >= 1.8.3 |
+The SDK requires the ORB Python service (`orb-py`) version 1.8.3 or later and
+earlier than 2.0.0.
+
+## Documentation
+
+Full documentation, including the SDK overview and the API reference, is at
+[https://finos.github.io/open-resource-broker/](https://finos.github.io/open-resource-broker/).
+The SDK overview covers all supported languages:
+[https://finos.github.io/open-resource-broker/sdk/](https://finos.github.io/open-resource-broker/sdk/).
+
+Instructions for building and testing the SDKs from source are in the
+[developer testing guide](https://finos.github.io/open-resource-broker/developer_guide/testing/#sdk-development).
+
+## License
+
+Licensed under the Apache License, Version 2.0. See the
+[LICENSE](https://github.com/finos/open-resource-broker/blob/main/LICENSE) file.
+
+Open Resource Broker is a project of the
+[Fintech Open Source Foundation (FINOS)](https://www.finos.org/).

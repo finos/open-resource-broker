@@ -10,12 +10,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>12</LangVersion>
     <Authors>FINOS</Authors>
-    <Description>FINOS Open Resource Broker .NET SDK — covers all 44 API operations</Description>
+    <Description>.NET client SDK for the FINOS Open Resource Broker API. Supports a managed local server process or a remote ORB endpoint, with SigV4 and bearer-token authentication.</Description>
     <PackageTags>finos;orb;open-resource-broker;sdk</PackageTags>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/finos/open-resource-broker</RepositoryUrl>
     <PackageProjectUrl>https://github.com/finos/open-resource-broker</PackageProjectUrl>
-    <Copyright>Copyright 2024 FINOS</Copyright>
+    <Copyright>Copyright 2024-2026 FINOS</Copyright>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>orb-icon.png</PackageIcon>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <Optimize>false</Optimize>
@@ -26,6 +28,11 @@
          model types without a dangling reference to a non-existent package. -->
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeGeneratedModelsInPackage</TargetsForTfmSpecificBuildOutput>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="../../../../docs/assets/orb-icon.png" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- AWS SigV4: canonical request built from HttpRequestMessage; signing delegated to
