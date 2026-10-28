@@ -19,5 +19,8 @@ config/*
 !config/aws_templates.json
 !config/k8s_templates.json
 !config/sample_user_data_script.sh
+# Keep specs traversable without including arbitrary files beneath it.
 !config/specs/
-!config/specs/**
+config/specs/**
+!config/specs/**/*.json
+!config/specs/**/*.yaml

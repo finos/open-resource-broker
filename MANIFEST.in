@@ -1,4 +1,5 @@
-# Only reusable examples belong in release archives. Local deployment configs
+# Only reusable examples belong in release archives.
+# Local deployment configs and credentials are intentionally excluded.
 include config/*.example.json
 include config/default_config.json
 include config/aws_templates.json
