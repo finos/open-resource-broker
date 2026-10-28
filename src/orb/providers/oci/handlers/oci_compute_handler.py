@@ -630,7 +630,19 @@ class OCIComputeHandler:
             ],
             "provider_api": "OCICompute",
         }
-        metadata = {"operation": "terminate_instances", "provider": "oci", "results": outcomes}
+        metadata = {
+            "operation": "terminate_instances",
+            "provider": "oci",
+            "results": outcomes,
+            "provider_data": {
+                # Successful IDs mean OCI accepted termination; status polling
+                # must still confirm that the instances reach TERMINATED.
+                "successful_instance_ids": data["terminated_machine_ids"],
+                "failed_instance_ids": [
+                    item["machine_id"] for item in outcomes if item["status"] != "accepted"
+                ],
+            },
+        }
         if any(item["status"] == "failed" for item in outcomes):
             data["status"] = "failed"
             return ProviderResult(

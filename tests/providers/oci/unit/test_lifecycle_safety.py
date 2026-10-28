@@ -5,10 +5,11 @@ import os
 import stat
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from orb.application.services.deprovisioning_orchestrator import DeprovisioningOrchestrator
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from orb.providers.oci.cli_client import OCICommandError, run_oci
 from orb.providers.oci.configuration.config import OCIProviderConfig
@@ -232,6 +233,99 @@ def test_ambiguous_termination_is_not_reported_as_success(include_accepted):
     assert result.error_code == "OCI_TERMINATION_UNCONFIRMED"
     assert result.data["terminated_machine_ids"] == (["accessible"] if include_accepted else [])
     assert handler._run_oci.call_count == len(machine_ids)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "outcomes,accepted_ids,failed_ids,error_code",
+    [
+        pytest.param(
+            ["accepted", "unconfirmed"],
+            ["node-1"],
+            ["node-2"],
+            "OCI_TERMINATION_UNCONFIRMED",
+            id="mixed-unconfirmed",
+        ),
+        pytest.param(
+            ["accepted", "denied"],
+            ["node-1"],
+            ["node-2"],
+            "OCI_TERMINATE_FAILED",
+            id="mixed-denied",
+        ),
+        pytest.param(
+            ["unconfirmed", "unconfirmed"],
+            [],
+            ["node-1", "node-2"],
+            "OCI_TERMINATION_UNCONFIRMED",
+            id="all-unconfirmed",
+        ),
+        pytest.param(["accepted", "accepted"], ["node-1", "node-2"], [], None, id="all-accepted"),
+    ],
+)
+async def test_termination_outcomes_reach_deprovisioning_orchestrator(
+    outcomes, accepted_ids, failed_ids, error_code
+):
+    responses = {
+        "accepted": {},
+        "unconfirmed": OCICommandError(
+            "missing or inaccessible", status=404, code="NotAuthorizedOrNotFound"
+        ),
+        "denied": OCICommandError("forbidden", status=403, code="NotAuthorized"),
+    }
+    handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=MagicMock())
+    handler._run_oci = MagicMock(side_effect=[responses[outcome] for outcome in outcomes])
+    machine_ids = ["node-1", "node-2"]
+    provider_result = handler.terminate_instances(
+        ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={"machine_ids": machine_ids},
+        )
+    )
+
+    query_bus = MagicMock()
+    query_bus.execute = AsyncMock(return_value={"template_id": "oci-test-template"})
+    selection = MagicMock()
+    selection.execute_operation = AsyncMock(return_value=provider_result)
+    container = MagicMock()
+    container.get.return_value.format_template_for_provider.return_value = {}
+    uow_factory = MagicMock()
+    uow = uow_factory.create_unit_of_work.return_value.__enter__.return_value
+    uow.machines.find_by_ids.return_value = []
+    orchestrator = DeprovisioningOrchestrator(
+        uow_factory=uow_factory,
+        logger=MagicMock(),
+        container=container,
+        query_bus=query_bus,
+        provider_selection_port=selection,
+    )
+    machines = []
+    for machine_id in machine_ids:
+        machine = MagicMock(template_id="oci-test-template", request_id="acquire-request")
+        machine.machine_id.value = machine_id
+        machines.append(machine)
+
+    result = await orchestrator.execute_deprovisioning(
+        {("oci-test", "OCICompute", "test-resource"): machines},
+        MagicMock(request_id="return-request"),
+    )
+
+    assert result["successful_instance_ids"] == accepted_ids
+    assert result["failed_instance_ids"] == failed_ids
+    assert result["success"] is (not failed_ids)
+    assert result["partial"] is bool(accepted_ids and failed_ids)
+    assert provider_result.error_code == error_code
+    assert provider_result.data["terminated_machine_ids"] == accepted_ids
+    assert provider_result.metadata["provider_data"] == {
+        "successful_instance_ids": accepted_ids,
+        "failed_instance_ids": failed_ids,
+    }
+    assert handler._run_oci.call_count == len(machine_ids)
+    for outcome in provider_result.data["results"]:
+        if outcome["status"] == "accepted":
+            assert "verified_terminated" not in outcome
+        elif outcome["status"] == "not_found_or_not_authorized":
+            assert outcome["verified_terminated"] is False
 
 
 @pytest.mark.parametrize("dry_run", [False, True])
