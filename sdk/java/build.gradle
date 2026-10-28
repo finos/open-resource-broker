@@ -15,7 +15,7 @@ plugins {
     id 'signing'
 }
 
-group = 'org.finos.openresourcebroker'
+group = 'org.finos.open-resource-broker'
 version = '0.1.0'
 
 java {
@@ -175,7 +175,7 @@ tasks.withType(JavaCompile).configureEach {
 publishing {
     publications {
         maven(MavenPublication) {
-            groupId = 'org.finos.openresourcebroker'
+            groupId = 'org.finos.open-resource-broker'
             artifactId = 'open-resource-broker-java'
             // version intentionally omitted — inherits project.version (line 18),
             // which the CI sed patches to the release tag before ./gradlew publish
@@ -209,7 +209,7 @@ publishing {
         maven {
             name = 'MavenCentral'
             // Central Portal OSSRH-compatible staging bridge.  The legacy
-            // s01.oss.sonatype.org host was sunset by Sonatype; org.finos is
+            // s01.oss.sonatype.org host was sunset by Sonatype; org.finos.open-resource-broker is
             // registered on the Central Portal, which exposes this staging API
             // for Gradle's maven-publish plugin.
             // See: https://central.sonatype.org/publish/publish-portal-ossrh-staging-api/

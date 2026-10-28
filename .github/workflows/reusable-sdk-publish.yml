@@ -242,7 +242,7 @@ jobs:
     env:
       # Must match the namespace shown at https://central.sonatype.com/publishing/namespaces
       # for the account that owns the MAVEN_CENTRAL_* token.
-      MAVEN_CENTRAL_NAMESPACE: org.finos
+      MAVEN_CENTRAL_NAMESPACE: org.finos.open-resource-broker
       MAVEN_CENTRAL_PUBLISHING_TYPE: user_managed
     strategy:
       fail-fast: false
@@ -254,14 +254,14 @@ jobs:
 
     # Required secrets:
     #   github  destination — GITHUB_TOKEN (always present, never skips), no GPG.
-    #   central destination (all under org.finos on Maven Central / OSSRH):
+    #   central destination (all under org.finos.open-resource-broker on Maven Central / OSSRH):
     #     MAVEN_CENTRAL_USERNAME — Sonatype OSSRH / Central Portal username
     #     MAVEN_CENTRAL_PASSWORD — Sonatype OSSRH / Central Portal token
     #     MAVEN_GPG_PRIVATE_KEY  — ASCII-armored GPG private key for signing
     #     MAVEN_GPG_PASSPHRASE   — passphrase for the GPG key
     #
     # Register the component at: https://central.sonatype.com/publishing/namespaces
-    # Group ID: org.finos.openresourcebroker
+    # Group ID: org.finos.open-resource-broker
     # See: https://central.sonatype.org/publish/publish-portal-guide/
 
     steps:
@@ -398,7 +398,7 @@ jobs:
         {
           echo "Uploaded to Maven Central Portal, not released. Release it at https://central.sonatype.com/publishing/deployments"
           echo ""
-          echo "- Artifact: org.finos.openresourcebroker:open-resource-broker-java"
+          echo "- Artifact: org.finos.open-resource-broker:open-resource-broker-java"
           echo "- Version: $SDK_VERSION"
         } >> "$GITHUB_STEP_SUMMARY"
 
@@ -413,7 +413,7 @@ jobs:
     env:
       # Must match the namespace shown at https://central.sonatype.com/publishing/namespaces
       # for the account that owns the MAVEN_CENTRAL_* token.
-      MAVEN_CENTRAL_NAMESPACE: org.finos
+      MAVEN_CENTRAL_NAMESPACE: org.finos.open-resource-broker
       MAVEN_CENTRAL_PUBLISHING_TYPE: user_managed
     strategy:
       fail-fast: false
@@ -425,13 +425,13 @@ jobs:
 
     # Required secrets:
     #   github  destination — GITHUB_TOKEN (always present, never skips), no GPG.
-    #   central destination (same set as sdk-publish-maven; org.finos namespace):
+    #   central destination (same set as sdk-publish-maven; org.finos.open-resource-broker namespace):
     #     MAVEN_CENTRAL_USERNAME — Sonatype OSSRH / Central Portal username
     #     MAVEN_CENTRAL_PASSWORD — Sonatype OSSRH / Central Portal token
     #     MAVEN_GPG_PRIVATE_KEY  — ASCII-armored GPG private key for signing
     #     MAVEN_GPG_PASSPHRASE   — passphrase for the GPG key
     #
-    # Artifact coordinates: org.finos.openresourcebroker:open-resource-broker-kotlin
+    # Artifact coordinates: org.finos.open-resource-broker:open-resource-broker-kotlin
 
     steps:
     - name: Checkout code
@@ -565,7 +565,7 @@ jobs:
         {
           echo "Uploaded to Maven Central Portal, not released. Release it at https://central.sonatype.com/publishing/deployments"
           echo ""
-          echo "- Artifact: org.finos.openresourcebroker:open-resource-broker-kotlin"
+          echo "- Artifact: org.finos.open-resource-broker:open-resource-broker-kotlin"
           echo "- Version: $SDK_VERSION"
         } >> "$GITHUB_STEP_SUMMARY"
 

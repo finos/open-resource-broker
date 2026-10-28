@@ -369,7 +369,7 @@ class carrying the canonical field set (statusCode, code, message, requestId)
 and typed sentinel subclasses for 401/403/404/409/503/408.  The C# name keeps
 the `Exception` suffix per .NET convention; its unavailable sentinel is
 `OrbUnavailableException` (extends `OrbApiException`, status 503).  Both Java and
-Kotlin share the same Maven group (`org.finos.openresourcebroker`).
+Kotlin share the same Maven group (`org.finos.open-resource-broker`).
 
 ### Test Support Packages
 

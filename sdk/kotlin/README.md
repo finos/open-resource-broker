@@ -2,7 +2,7 @@
 
 Kotlin client SDK for the
 [Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB),
-published as `org.finos.openresourcebroker:open-resource-broker-kotlin`.
+published as `org.finos.open-resource-broker:open-resource-broker-kotlin`.
 
 ## Prerequisites
 
@@ -34,13 +34,13 @@ Replace `VERSION` with the latest release listed on the
 Gradle (Kotlin DSL):
 
 ```kotlin
-implementation("org.finos.openresourcebroker:open-resource-broker-kotlin:VERSION")
+implementation("org.finos.open-resource-broker:open-resource-broker-kotlin:VERSION")
 ```
 
 Gradle (Groovy DSL):
 
 ```groovy
-implementation 'org.finos.openresourcebroker:open-resource-broker-kotlin:VERSION'
+implementation 'org.finos.open-resource-broker:open-resource-broker-kotlin:VERSION'
 ```
 
 ## Quick Start

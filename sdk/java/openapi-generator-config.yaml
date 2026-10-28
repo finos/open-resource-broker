@@ -24,7 +24,7 @@ inputSpec: ../spec/openapi.json
 outputDir: generated
 
 additionalProperties:
-  groupId: org.finos.openresourcebroker
+  groupId: org.finos.open-resource-broker
   artifactId: open-resource-broker-java
   artifactVersion: 0.1.0
   packageName: org.finos.openresourcebroker.sdk

@@ -2,7 +2,7 @@
 
 Java client SDK for the
 [Open Resource Broker](https://github.com/finos/open-resource-broker) (ORB),
-published as `org.finos.openresourcebroker:open-resource-broker-java`.
+published as `org.finos.open-resource-broker:open-resource-broker-java`.
 
 ## Prerequisites
 
@@ -34,14 +34,14 @@ Replace `VERSION` with the latest release listed on the
 Gradle:
 
 ```groovy
-implementation 'org.finos.openresourcebroker:open-resource-broker-java:VERSION'
+implementation 'org.finos.open-resource-broker:open-resource-broker-java:VERSION'
 ```
 
 Maven:
 
 ```xml
 <dependency>
-  <groupId>org.finos.openresourcebroker</groupId>
+  <groupId>org.finos.open-resource-broker</groupId>
   <artifactId>open-resource-broker-java</artifactId>
   <version>VERSION</version>
 </dependency>

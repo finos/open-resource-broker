@@ -8,7 +8,7 @@ plugins {
     signing
 }
 
-group = "org.finos.openresourcebroker"
+group = "org.finos.open-resource-broker"
 version = "0.1.0"
 
 repositories {
@@ -156,7 +156,7 @@ java {
 publishing {
     publications {
         create<MavenPublication>("maven") {
-            groupId = "org.finos.openresourcebroker"
+            groupId = "org.finos.open-resource-broker"
             // Aligns with the sibling JVM artifact 'open-resource-broker-java' so a
             // user who found one can guess the other. Coordinates are permanent once
             // published, so converge before the first release.
@@ -193,7 +193,7 @@ publishing {
         maven {
             name = "MavenCentral"
             // Central Portal OSSRH-compatible staging bridge.  The legacy
-            // s01.oss.sonatype.org host was sunset by Sonatype; org.finos is
+            // s01.oss.sonatype.org host was sunset by Sonatype; org.finos.open-resource-broker is
             // registered on the Central Portal, which exposes this staging API
             // for Gradle's maven-publish plugin.
             // See: https://central.sonatype.org/publish/publish-portal-ossrh-staging-api/
