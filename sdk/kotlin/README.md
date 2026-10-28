@@ -46,12 +46,15 @@ implementation 'org.finos.openresourcebroker:open-resource-broker-kotlin:VERSION
 ## Quick Start
 
 ```kotlin
+import kotlinx.coroutines.runBlocking
 import org.finos.openresourcebroker.sdk.client.*
 import org.finos.openresourcebroker.sdk.process.ProcessConfig
 
-val client = OrbClient.create(ClientConfig(process = ProcessConfig(binary = "orb")))
-println(client.listTemplates().templates.size)
-client.close()
+runBlocking {
+    val client = OrbClient.create(ClientConfig(process = ProcessConfig(binary = "orb")))
+    println(client.listTemplates().templates.size)
+    client.close()
+}
 ```
 
 ## IPC Model
