@@ -17,7 +17,7 @@
   <a href="https://pypi.org/project/orb-py/"><img src="https://img.shields.io/pypi/v/orb-py" alt="PyPI Version"></a>
   <a href="https://github.com/finos/open-resource-broker/releases"><img src="https://img.shields.io/github/v/release/finos/open-resource-broker" alt="Latest Release"></a>
   <a href="https://pypi.org/project/orb-py/"><img src="https://img.shields.io/pypi/pyversions/orb-py" alt="Python Versions"></a>
-  <a href="https://deepwiki.com/finos/open-resource-broker"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+  <a href="https://deepwiki.com/finos/open-resource-broker"><img src="https://img.shields.io/badge/Ask-DeepWiki-blue" alt="Ask DeepWiki"></a>
   <br>
   <a href="https://github.com/finos/open-resource-broker/actions/workflows/ci-tests.yml"><img src="https://github.com/finos/open-resource-broker/actions/workflows/ci-tests.yml/badge.svg" alt="Unit Tests"></a>
   <a href="https://github.com/finos/open-resource-broker/actions/workflows/ci-quality.yml"><img src="https://github.com/finos/open-resource-broker/actions/workflows/ci-quality.yml/badge.svg" alt="Quality Checks"></a>
