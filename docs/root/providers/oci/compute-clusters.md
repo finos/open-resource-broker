@@ -83,13 +83,18 @@ Not every bare-metal shape supports RDMA; this guide targets `BM.Optimized3.36`.
 ORB leaves the price unknown unless an applicable reference rate is configured.
 
 `compute_cluster_id` persists through the provider extension, template create/update,
-and reload. HostFactory maps it to `computeClusterId`; only OCI opts into the
-provider output preparation hook, leaving other providers' mappings unchanged. Immediately before a live
-request, ORB reads the cluster and checks `ACTIVE`, compartment, and AD. A failed
-check stops the request before launching any nodes. The launch passes
-`--compute-cluster-id`. Cluster launches disable CLI retries and use bounded HTTP
-timeouts so placement errors surface within ORB's command deadline; other OCI
-launch modes retain their existing options.
+and reload. The OCI HostFactory adapter maps `computeClusterId` to
+`provider_config.compute_cluster_id` through the existing dotted field mappings.
+Immediately before a live request, ORB reads the cluster and checks `ACTIVE`,
+compartment, and AD. A failed check stops the request before launching any nodes.
+
+Worker launches use OCI CLI signing through `raw-request`, with `computeClusterId`
+in the JSON request body and a stable `opc-retry-token` header for each logical
+launch. After an ambiguous response, ORB attempts to reconcile the launch using
+its request-owned identity before reporting failure. All OCI worker launches,
+including cluster placement, use `--no-retry`, a 15-second connection timeout,
+and a 90-second read timeout. See the
+[launch transport details](../../deployment/oci-integration.md#compute-launch-transport).
 
 Cluster workers also carry the reserved `orb_request_id` tag. If a cluster batch
 fails after accepting some workers, ORB requests termination of those known workers
