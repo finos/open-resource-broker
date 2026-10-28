@@ -14,7 +14,7 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 5
     cooldown:
       default-days: 5
       semver-major-days: 14
@@ -35,12 +35,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      python-major:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "major"
     ignore:
       # Don't update major versions automatically for critical tools
       - dependency-name: "black"
@@ -83,12 +77,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      github-actions-major:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "major"
 
   # Go dependencies (SDK)
   - package-ecosystem: "gomod"
@@ -124,12 +112,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      go-major:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "major"
 
   # Docker dependencies
   - package-ecosystem: "docker"
@@ -171,12 +153,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      docker-major:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "major"
 
   # Java SDK dependencies (Gradle)
   - package-ecosystem: "gradle"
@@ -212,12 +188,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      java-major:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "major"
 
   # Kotlin SDK dependencies (Gradle)
   - package-ecosystem: "gradle"
@@ -253,12 +223,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      kotlin-major:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "major"
     ignore:
       - dependency-name: "com.squareup.okhttp3:okhttp"
         update-types: ["version-update:semver-major"]
@@ -290,7 +254,7 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 5
     cooldown:
       default-days: 5
       semver-major-days: 14
@@ -311,12 +275,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      csharp-major:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "major"
 
   # TypeScript SDK dependencies
   - package-ecosystem: "npm"
@@ -332,7 +290,7 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 5
     cooldown:
       default-days: 5
       semver-major-days: 14
@@ -353,12 +311,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      typescript-major:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types:
-          - "major"
     ignore:
       # ts-jest's peer range does not yet include TypeScript 7.
       - dependency-name: "typescript"
