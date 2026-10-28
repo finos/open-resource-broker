@@ -207,6 +207,61 @@ def test_terminate_attempts_all_and_reports_mixed_results():
         "accepted",
     ]
     assert result.data["results"][0]["verified_terminated"] is False
+    assert result.data["terminated_machine_ids"] == ["running"]
+    assert result.error_code == "OCI_TERMINATE_FAILED"
+
+
+@pytest.mark.parametrize("include_accepted", [False, True])
+def test_ambiguous_termination_is_not_reported_as_success(include_accepted):
+    handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=MagicMock())
+    responses = [
+        OCICommandError("missing or inaccessible", status=404, code="NotAuthorizedOrNotFound")
+    ]
+    machine_ids = ["inaccessible"]
+    if include_accepted:
+        responses.append({})
+        machine_ids.append("accessible")
+    handler._run_oci = MagicMock(side_effect=responses)
+    result = handler.terminate_instances(
+        ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={"machine_ids": machine_ids},
+        )
+    )
+    assert not result.success
+    assert result.error_code == "OCI_TERMINATION_UNCONFIRMED"
+    assert result.data["terminated_machine_ids"] == (["accessible"] if include_accepted else [])
+    assert handler._run_oci.call_count == len(machine_ids)
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.asyncio
+async def test_create_result_excludes_bootstrap_metadata(dry_run):
+    handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=MagicMock())
+    handler._launch_with_cli = MagicMock(return_value={"data": {"id": "instance"}})
+    operation = make_operation(context={"dry_run": dry_run})
+    operation.parameters.update(
+        user_data="private-bootstrap-marker", ssh_authorized_keys="private-key-marker"
+    )
+    result = await handler.create_instances(operation)
+    assert result.success, result.error_message
+    assert result.data["instances"]
+    assert result.data["resource_ids"] == result.data["instance_ids"]
+    assert "launch_requests" not in result.data
+    serialized = json.dumps({"data": result.data, "metadata": result.metadata})
+    for marker in (
+        "private-bootstrap-marker",
+        "private-key-marker",
+        "user_data",
+        "ssh_authorized_keys",
+    ):
+        assert marker not in serialized
+    if dry_run:
+        handler._launch_with_cli.assert_not_called()
+    else:
+        payload = handler._launch_with_cli.call_args.args[0]
+        assert payload["metadata"]["user_data"] == "private-bootstrap-marker"
+        assert payload["metadata"]["ssh_authorized_keys"] == "private-key-marker"
 
 
 @pytest.mark.parametrize("failure", [None, "timeout", "service"])
@@ -277,20 +332,26 @@ def test_string_boolean_options(value, expected):
 
 @pytest.mark.asyncio
 async def test_launch_tags_do_not_mutate_caller_or_other_instances():
-    handler = OCIComputeHandler(MagicMock(), "us-phoenix-1")
-    operation = make_operation(context={"dry_run": True})
+    handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=MagicMock())
+    handler._launch_with_cli = MagicMock(
+        side_effect=[{"data": {"id": "first"}}, {"data": {"id": "second"}}]
+    )
+    operation = make_operation()
     tags = {"environment": "test"}
     operation.parameters.update(count=2, tags=tags)
     result = await handler.create_instances(operation)
-    first, second = result.data["launch_requests"]
+    assert result.success, result.error_message
+    first, second = (call.args[0] for call in handler._launch_with_cli.call_args_list)
     assert tags == {"environment": "test"}
     assert first["freeform_tags"] is not second["freeform_tags"]
     assert first["freeform_tags"]["orb_launch_id"] != second["freeform_tags"]["orb_launch_id"]
 
 
 @pytest.mark.parametrize("is_return", [True, False])
-def test_not_found_status_is_only_idempotent_for_returns(is_return):
+def test_ambiguous_not_found_status_never_confirms_termination(is_return):
     from types import SimpleNamespace
+
+    from orb.application.services.request_status_service import RequestStatusService
 
     handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=MagicMock())
     handler._run_oci = MagicMock(
@@ -305,8 +366,18 @@ def test_not_found_status_is_only_idempotent_for_returns(is_return):
     result = handler.get_instance_status(operation)
     assert result.success is is_return
     if is_return:
+        assert result.data["instances"][0]["status"] == "unknown"
         assert result.data["instances"][0]["provider_data"]["termination_verified"] is False
-        assert result.metadata["provider_fulfilment"].state == "fulfilled"
+        fulfilment = result.metadata["provider_fulfilment"]
+        assert fulfilment.state == "in_progress"
+        assert fulfilment.fulfilled_units == 0
+        assert fulfilment.pending_count == 1
+        service = RequestStatusService(MagicMock(), MagicMock())
+        machine = SimpleNamespace(status=SimpleNamespace(value="unknown"))
+        status, _ = service._determine_return_status(
+            [machine], [machine], operation.parameters["request"], result.metadata
+        )
+        assert status == "in_progress"
 
 
 @pytest.mark.asyncio

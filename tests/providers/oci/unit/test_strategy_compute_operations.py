@@ -42,7 +42,7 @@ async def test_create_instances_success() -> None:
     assert result.success is True
     assert result.data["status"] == "accepted"
     assert len(result.data["instance_ids"]) == 2
-    assert len(result.data["launch_requests"]) == 2
+    assert len(result.data["instances"]) == 2
 
 
 @pytest.mark.asyncio
@@ -96,7 +96,7 @@ async def test_create_instances_supports_nested_template_payload() -> None:
 
     assert result.success is True
     assert result.data["status"] == "accepted"
-    assert result.data["launch_requests"][0]["source_details"]["image_id"] == "ocid1.image.oc1..img"
+    assert result.data["instances"][0]["image_id"] == "ocid1.image.oc1..img"
 
 
 @pytest.mark.asyncio
@@ -121,7 +121,7 @@ async def test_create_instances_supports_template_config_payload() -> None:
 
     assert result.success is True
     assert result.data["status"] == "accepted"
-    assert result.data["launch_requests"][0]["source_details"]["image_id"] == "ocid1.image.oc1..img"
+    assert result.data["instances"][0]["image_id"] == "ocid1.image.oc1..img"
 
 
 @pytest.mark.asyncio
@@ -145,7 +145,7 @@ async def test_create_uses_serialized_config_when_domain_template_is_also_provid
         )
     )
     assert result.success, result.error_message
-    assert result.data["launch_requests"][0]["source_details"]["image_id"] == "image-1"
+    assert result.data["instances"][0]["image_id"] == "image-1"
 
 
 @pytest.mark.asyncio
@@ -172,17 +172,20 @@ async def test_create_instances_supports_template_config_with_nested_configurati
 
     assert result.success is True
     assert result.data["status"] == "accepted"
-    assert result.data["launch_requests"][0]["shape"] == "VM.Standard.E4.Flex"
+    assert result.data["instances"][0]["instance_type"] == "VM.Standard.E4.Flex"
     assert (
-        result.data["launch_requests"][0]["compartment_id"] == "ocid1.compartment.oc1..compartment"
+        result.data["instances"][0]["provider_data"]["compartment_id"]
+        == "ocid1.compartment.oc1..compartment"
     )
 
 
 @pytest.mark.asyncio
 async def test_create_instances_supports_flex_runtime_inputs_and_pricing() -> None:
     strategy = _make_strategy()
+    handler = strategy._compute_handler
+    handler._oci_cli_available = True
+    handler._launch_with_cli = MagicMock(return_value={"data": {"id": "instance"}})
     operation = ProviderOperation(
-        context={"dry_run": True},
         operation_type=ProviderOperationType.CREATE_INSTANCES,
         parameters={
             "template_id": "tpl-oci-flex",
@@ -201,8 +204,9 @@ async def test_create_instances_supports_flex_runtime_inputs_and_pricing() -> No
     result = await strategy.execute_operation(operation)
 
     assert result.success is True
-    assert result.data["launch_requests"][0]["shape_config"]["ocpus"] == 2
-    assert result.data["launch_requests"][0]["shape_config"]["memoryInGBs"] == 16
+    payload = handler._launch_with_cli.call_args.args[0]
+    assert payload["shape_config"]["ocpus"] == 2
+    assert payload["shape_config"]["memoryInGBs"] == 16
     assert result.data["capacity_type"] == "preemptible"
     assert result.data["pricing_estimate"]["total_hourly"] > 0
 

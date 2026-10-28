@@ -234,7 +234,9 @@ async def test_rdma_dry_run_does_not_contact_oci(template):
         )
     )
     assert result.success
-    assert all(p["compute_cluster_id"] == "cluster-1" for p in result.data["launch_requests"])
+    assert all(
+        p["provider_data"]["compute_cluster_id"] == "cluster-1" for p in result.data["instances"]
+    )
     handler._run_oci.assert_not_called()
 
 

@@ -1,4 +1,4 @@
-"""Regression coverage for the remaining original OCI review comments."""
+"""OCI plugin registration, asynchronous dispatch, placement and status contracts."""
 
 import asyncio
 import threading
@@ -18,7 +18,7 @@ def make_operation(operation_type):
     return ProviderOperation(
         operation_type=operation_type,
         parameters={
-            "template_id": "review-test",
+            "template_id": "test-template",
             "image_id": "image",
             "instance_type": "VM.Standard.E5.Flex",
             "subnet_ids": ["subnet"],
@@ -172,12 +172,12 @@ def test_bootstrap_entry_points_populate_satellites_and_named_strategy(monkeypat
         register_oci_services_with_di(MagicMock())
         assert all(satellite.get_or_none("oci") is not None for satellite in satellites)
         instance = SimpleNamespace(
-            name="oci-review", config={"credential_source": "instance_principal"}
+            name="oci-test", config={"credential_source": "instance_principal"}
         )
         assert register_oci_provider_instance(instance)
         assert registry.is_provider_registered("oci")
-        assert registry.is_provider_instance_registered("oci-review")
-        strategy = registry.create_strategy_by_instance("oci-review", instance)
+        assert registry.is_provider_instance_registered("oci-test")
+        strategy = registry.create_strategy_by_instance("oci-test", instance)
         assert strategy.is_initialized
         assert strategy._compute_handler._credential_source == "instance_principal"
     finally:
@@ -205,7 +205,7 @@ async def test_status_contract_contains_upstream_fulfilment():
     assert isinstance(result.metadata["provider_fulfilment"], ProviderFulfilment)
     service = RequestStatusService(MagicMock(), MagicMock())
     status, _ = service._determine_acquire_status(
-        [], [], SimpleNamespace(provider_name="oci-review"), result.metadata
+        [], [], SimpleNamespace(provider_name="oci-test"), result.metadata
     )
     assert status == "complete"
 

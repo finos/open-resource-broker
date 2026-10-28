@@ -553,7 +553,6 @@ class OCIComputeHandler:
                 "instance_ids": instance_ids,
                 "resource_ids": instance_ids,
                 "instances": instances,
-                "launch_requests": launch_requests,
                 "pricing_estimate": pricing_estimate,
                 "capacity_type": normalized_template.get("capacity_type", "ondemand"),
                 "effective_capacity_type": effective_capacity_types[0]
@@ -597,7 +596,7 @@ class OCIComputeHandler:
                 except OCICommandError as exc:
                     if exc.status == 404 and exc.code == "NotAuthorizedOrNotFound":
                         # OCI intentionally cannot distinguish missing from inaccessible.
-                        # This is an idempotent no-op, not proof of physical deletion.
+                        # Do not report termination without confirmation.
                         outcomes.append(
                             {
                                 "machine_id": machine_id,
@@ -627,17 +626,27 @@ class OCIComputeHandler:
             "status": "accepted",
             "results": outcomes,
             "terminated_machine_ids": [
-                item["machine_id"] for item in outcomes if item["status"] != "failed"
+                item["machine_id"] for item in outcomes if item["status"] == "accepted"
             ],
             "provider_api": "OCICompute",
         }
         metadata = {"operation": "terminate_instances", "provider": "oci", "results": outcomes}
         if any(item["status"] == "failed" for item in outcomes):
+            data["status"] = "failed"
             return ProviderResult(
                 success=False,
                 data=data,
                 error_code="OCI_TERMINATE_FAILED",
                 error_message="One or more OCI instances could not be terminated",
+                metadata=metadata,
+            )
+        if any(item["status"] == "not_found_or_not_authorized" for item in outcomes):
+            data["status"] = "unconfirmed"
+            return ProviderResult(
+                success=False,
+                data=data,
+                error_code="OCI_TERMINATION_UNCONFIRMED",
+                error_message="OCI could not confirm termination; verify resource access and state",
                 metadata=metadata,
             )
         return ProviderResult.success_result(data, metadata)
@@ -698,7 +707,7 @@ class OCIComputeHandler:
                             raise
                         data = {
                             "id": machine_id,
-                            "lifecycle-state": "TERMINATED",
+                            "lifecycle-state": "UNKNOWN",
                             "orb_unverified_absence": True,
                         }
                     state = str(data.get("lifecycle-state", "unknown")).upper()

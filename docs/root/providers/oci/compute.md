@@ -188,12 +188,15 @@ All operations use the provider region; cross-region resource references are
 rejected. Configure another provider instance for a different region.
 
 Termination attempts every requested instance and reports per-instance outcomes.
-A `NotAuthorizedOrNotFound` response is an idempotent no-op, recorded as
-`not_found_or_not_authorized`; it is not independent proof of resource deletion.
-Verify OCI state and permissions when that outcome appears.
+A `NotAuthorizedOrNotFound` response is recorded as `not_found_or_not_authorized`
+and is excluded from confirmed termination results. If there are no other errors,
+the operation fails with `OCI_TERMINATION_UNCONFIRMED`. Return-status polling
+reports the instance as `unknown` and leaves the return in progress. Verify OCI
+state and permissions before retrying; an ambiguous 404 does not prove deletion.
 
 Launch metadata is read from a temporary JSON file, protected with 0600 permissions
 on POSIX or an owner-only ACL on Windows, and removed after execution.
+Launch payloads, including user data and SSH keys, are not included in create results.
 
 ## IAM permissions
 

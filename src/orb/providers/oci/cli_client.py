@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ctypes
 import json
 import os
 import re
@@ -64,7 +63,7 @@ def service_error_summary(stderr: str) -> str:
 
 def _restrict_windows_file(path: str) -> None:
     """Replace inherited permissions with a protected, owner-only DACL."""
-    from ctypes import wintypes
+    import ctypes.wintypes
 
     # getattr: WinDLL is exposed only on Windows; this helper is called only there.
     load_library = getattr(ctypes, "WinDLL")
@@ -72,15 +71,15 @@ def _restrict_windows_file(path: str) -> None:
     kernel = load_library("kernel32", use_last_error=True)
     convert = security.ConvertStringSecurityDescriptorToSecurityDescriptorW
     convert.argtypes = [
-        wintypes.LPCWSTR,
-        wintypes.DWORD,
+        ctypes.wintypes.LPCWSTR,
+        ctypes.wintypes.DWORD,
         ctypes.POINTER(ctypes.c_void_p),
         ctypes.c_void_p,
     ]
-    convert.restype = wintypes.BOOL
+    convert.restype = ctypes.wintypes.BOOL
     set_security = security.SetFileSecurityW
-    set_security.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.c_void_p]
-    set_security.restype = wintypes.BOOL
+    set_security.argtypes = [ctypes.wintypes.LPCWSTR, ctypes.wintypes.DWORD, ctypes.c_void_p]
+    set_security.restype = ctypes.wintypes.BOOL
     kernel.LocalFree.argtypes = [ctypes.c_void_p]
     kernel.LocalFree.restype = ctypes.c_void_p
     descriptor = ctypes.c_void_p()
