@@ -265,6 +265,43 @@ class TestProcessResourceGroup:
         assert group_result["failed_instance_ids"] == ["vm-2"]
 
     @pytest.mark.asyncio
+    async def test_partial_termination_treats_unlisted_instances_as_failed_when_both_lists_returned(
+        self,
+    ):
+        partial_provider_result = MagicMock(
+            success=False,
+            error_message="Azure VMSS partial delete with omitted instance",
+            metadata={
+                "provider_data": {
+                    "successful_instance_ids": ["vm-1"],
+                    "failed_instance_ids": ["vm-2"],
+                },
+            },
+        )
+        orchestrator, _ = _make_orchestrator(provider_selection_result=partial_provider_result)
+        request = MagicMock(request_id="req-correlation")
+        machines = [_make_machine("vm-1"), _make_machine("vm-2"), _make_machine("vm-3")]
+
+        group_result = await orchestrator._process_resource_group(
+            "azure", "VMSS", "vmss-1", machines, request
+        )
+
+        assert group_result["success"] is False
+        assert group_result["partial"] is True
+        assert group_result["terminated_instances"] == 1
+        assert group_result["successful_instance_ids"] == ["vm-1"]
+        assert group_result["failed_instance_ids"] == ["vm-2", "vm-3"]
+
+        overall = await orchestrator.execute_deprovisioning(
+            {("azure", "VMSS", "vmss-1"): machines}, request
+        )
+
+        assert overall["success"] is False
+        assert overall["partial"] is True
+        assert overall["successful_instance_ids"] == ["vm-1"]
+        assert overall["failed_instance_ids"] == ["vm-2", "vm-3"]
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "metadata_payload",
         [

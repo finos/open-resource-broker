@@ -98,14 +98,14 @@ class DeprovisioningOrchestrator:
                         errors.append(result.get("error_message", "Unknown error"))
                         group_succeeded = list(result.get("successful_instance_ids") or [])
                         successful_instance_ids.extend(group_succeeded)
-                        group_failed = result.get("failed_instance_ids")
-                        if group_failed is not None:
-                            failed_instance_ids.extend(group_failed)
-                        else:
-                            succeeded_set = set(group_succeeded)
-                            failed_instance_ids.extend(
-                                iid for iid in group_instance_ids if iid not in succeeded_set
-                            )
+                        succeeded_set = set(group_succeeded)
+                        group_failed = list(result.get("failed_instance_ids") or [])
+                        unreported_failed = [
+                            iid for iid in group_instance_ids if iid not in succeeded_set
+                        ]
+                        failed_instance_ids.extend(
+                            dict.fromkeys([*group_failed, *unreported_failed])
+                        )
                     else:
                         errors.append("Unknown error")
                         failed_instance_ids.extend(group_instance_ids)
@@ -248,18 +248,16 @@ class DeprovisioningOrchestrator:
 
                 if has_successful:
                     successful_ids = [str(iid) for iid in raw_successful]
+                elif has_failed and raw_failed:
+                    failed_seed = {str(iid) for iid in raw_failed}
+                    successful_ids = [iid for iid in instance_ids if iid not in failed_seed]
                 else:
                     successful_ids = []
 
-                if has_failed:
-                    failed_ids = [str(iid) for iid in raw_failed]
-                else:
-                    succeeded_set = set(successful_ids)
-                    failed_ids = [iid for iid in instance_ids if iid not in succeeded_set]
-
-                if not has_successful and failed_ids:
-                    failed_set = set(failed_ids)
-                    successful_ids = [iid for iid in instance_ids if iid not in failed_set]
+                succeeded_set = set(successful_ids)
+                reported_failed = [str(iid) for iid in raw_failed] if has_failed else []
+                unreported_failed = [iid for iid in instance_ids if iid not in succeeded_set]
+                failed_ids = list(dict.fromkeys([*reported_failed, *unreported_failed]))
 
                 if successful_ids and failed_ids:
                     self.logger.warning(
