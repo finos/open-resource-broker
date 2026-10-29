@@ -271,6 +271,24 @@ async def test_dispatch_raises_when_all_groups_fail():
 
 
 @pytest.mark.asyncio
+async def test_dispatch_raises_one_error_holding_every_cause_when_several_groups_fail():
+    from orb.providers.azure.services.termination_service import AzureTerminationDispatchError
+
+    handler = MagicMock()
+    handler.release_hosts_async = AsyncMock(side_effect=RuntimeError("delete failed"))
+
+    with pytest.raises(AzureTerminationDispatchError) as raised:
+        await _terminate_with_handler(
+            handler=handler,
+            instance_ids=["vm-1", "vm-2"],
+            resource_mapping={"vm-1": ("vmss-1", 1), "vm-2": ("vmss-2", 2)},
+        )
+
+    assert len(raised.value.exceptions) == 2
+    assert all(isinstance(exc, RuntimeError) for exc in raised.value.exceptions)
+
+
+@pytest.mark.asyncio
 async def test_execute_create_handler_async_normalizes_handler_result():
     service = AzureProvisioningService()
     handler = MagicMock()

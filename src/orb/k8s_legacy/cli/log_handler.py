@@ -37,7 +37,7 @@ LOG_LEVELS = {
 
 def _get_iso_timestamp(record: logging.LogRecord) -> str:
     """Convert the timestamp in ISO 8601 format."""
-    dt = datetime.datetime.fromtimestamp(record.created, tz=datetime.UTC).astimezone()
+    dt = datetime.datetime.fromtimestamp(record.created, tz=datetime.timezone.utc).astimezone()
     return dt.strftime(ISO_TIME_FORMAT)[:-3] + f" {dt.tzname()}"
 
 

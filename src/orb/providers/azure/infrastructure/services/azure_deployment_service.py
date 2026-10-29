@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from typing import Any, Literal, NotRequired, Optional, TypedDict
+from typing import Any, Literal, Optional, TypedDict
+
+from typing_extensions import NotRequired
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.azure.infrastructure.azure_client import AzureClient

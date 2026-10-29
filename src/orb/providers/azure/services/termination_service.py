@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import builtins
 from dataclasses import dataclass
 from typing import Optional
 
@@ -25,6 +24,18 @@ from orb.providers.azure.services.operation_parsing import (
     resolve_operation_resource_group,
 )
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
+
+
+class AzureTerminationDispatchError(Exception):
+    """Every Azure termination dispatch group failed; ``exceptions`` holds each cause.
+
+    A plain exception rather than ``ExceptionGroup``, which does not exist on
+    Python 3.10.
+    """
+
+    def __init__(self, message: str, exceptions: list[Exception]) -> None:
+        super().__init__(message)
+        self.exceptions = tuple(exceptions)
 
 
 @dataclass
@@ -125,7 +136,7 @@ async def _dispatch_release_groups_async(
 
     if dispatch_failures and not successful_instance_ids:
         if len(dispatch_failures) > 1:
-            raise builtins.ExceptionGroup(
+            raise AzureTerminationDispatchError(
                 "All Azure termination dispatch groups failed",
                 dispatch_failures,
             )
