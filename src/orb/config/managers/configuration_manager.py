@@ -100,6 +100,11 @@ class ConfigurationManager:
         return self._config_file
 
     @property
+    def has_in_memory_config(self) -> bool:
+        """Return True when the manager was constructed from an in-memory dict."""
+        return self._config_dict is not None
+
+    @property
     def loader(self) -> ConfigurationLoader:
         """Lazy load configuration loader."""
         if self._loader is None:

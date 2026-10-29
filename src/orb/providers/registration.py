@@ -66,7 +66,9 @@ def discover_provider_plugins(
     * Must not raise — plugins should log and swallow internal errors.
 
     Failure modes are tolerant by design: a broken plugin is logged at
-    ERROR and skipped so ORB still boots with its built-in providers.
+    ERROR and skipped so ORB still boots with its built-in providers. Unlike
+    the built-in providers, a plugin whose entry point fails is not escalated
+    to a startup error even when the configuration names it.
 
     Args:
         entry_point_group: Entry-point group to query.  Defaults to
@@ -119,12 +121,85 @@ def discover_provider_plugins(
     return loaded
 
 
-def register_all_providers(container: DIContainer | None = None) -> None:
+def _configured_provider_types(container: DIContainer | None) -> frozenset[str] | None:
+    """Return the provider types named in the active configuration.
+
+    Returns ``None`` when the configuration cannot be read; callers then treat
+    every provider as optional so a configuration problem is reported by the
+    configuration layer rather than masked here. When there is no configuration
+    at all (no config file and no in-memory config) nothing is configured, so no
+    provider is required: the built-in default provider block must not make a
+    fresh install fail for a provider whose extra it never asked for.
+    """
+    try:
+        from orb.config.managers.configuration_manager import ConfigurationManager
+
+        manager = (
+            container.get(ConfigurationManager)
+            if container is not None and container.has(ConfigurationManager)
+            else ConfigurationManager()
+        )
+        if manager.get_source_config_file() is None and not manager.has_in_memory_config:
+            return frozenset()
+        provider_config = manager.get_provider_config()
+        if not provider_config:
+            return frozenset()
+        return frozenset(str(p.type) for p in provider_config.get_active_providers())
+    except Exception as exc:
+        _logger.warning(
+            "Could not read configured provider types; treating all providers as optional: %s",
+            exc,
+            exc_info=True,
+        )
+        return None
+
+
+def _provider_load_failure(
+    name: str,
+    exc: Exception,
+    container: DIContainer | None,
+    configured: dict[str, frozenset[str] | None],
+    *,
+    optional_dependency: bool,
+) -> None:
+    """Fail startup for a configured provider; log and continue for any other.
+
+    ``configured`` memoises the configuration lookup so it runs at most once,
+    and only after a provider has actually failed to load.
+    """
+    if "types" not in configured:
+        configured["types"] = _configured_provider_types(container)
+    configured_types = configured["types"]
+    if configured_types is not None and name in configured_types:
+        hint = (
+            f" Install the matching extra: pip install 'orb-py[{name}]'."
+            if optional_dependency
+            else ""
+        )
+        raise RuntimeError(
+            f"Configured provider '{name}' could not be loaded: {exc}.{hint}"
+        ) from exc
+    if optional_dependency:
+        _logger.warning(
+            "Provider '%s' is not available (optional dependency missing?): %s",
+            name,
+            exc,
+            exc_info=True,
+        )
+    else:
+        _logger.error("Provider '%s' failed to register: %s", name, exc, exc_info=True)
+
+
+def register_all_providers(
+    container: DIContainer | None = None,
+    config_container: DIContainer | None = None,
+) -> None:
     """Register all providers listed in ``_REGISTERED_PROVIDERS``.
 
     For each provider name ``n`` this function:
-    1. Imports ``orb.providers.<n>.registration`` (skips silently on ImportError
-       so that optional provider extras are handled gracefully).
+    1. Imports ``orb.providers.<n>.registration`` (an ImportError for a
+       provider that is not configured is logged as a warning and skipped, so
+       optional provider extras are handled gracefully).
     2. Calls ``register_<n>_provider(registry)`` to register the strategy and
        supporting factories with the global provider registry.
     3. If *container* is given, resolves ``template_factory`` and ``logger``
@@ -145,8 +220,10 @@ def register_all_providers(container: DIContainer | None = None) -> None:
     from orb.providers.registry import get_provider_registry
 
     registry = get_provider_registry()
+    configured: dict[str, frozenset[str] | None] = {}
+    config_source = container if container is not None else config_container
 
-    for name in _REGISTERED_PROVIDERS:
+    for name in list(_REGISTERED_PROVIDERS):
         module_path = f"orb.providers.{name}.registration"
         try:
             spec = importlib.util.find_spec(module_path)
@@ -159,34 +236,51 @@ def register_all_providers(container: DIContainer | None = None) -> None:
             continue
         try:
             mod = importlib.import_module(module_path)
-        except ImportError:
+        except ImportError as exc:
+            _provider_load_failure(name, exc, config_source, configured, optional_dependency=True)
             continue
 
-        # Registry-level registration
-        register_fn = getattr(mod, f"register_{name}_provider", None)
-        if register_fn is not None:
-            register_fn(registry)
+        try:
+            # Registry-level registration
+            register_fn = getattr(mod, f"register_{name}_provider", None)
+            if register_fn is not None:
+                register_fn(registry)
 
-        # DI-level initialisation (only when a container is supplied)
-        if container is not None:
-            init_fn = getattr(mod, f"initialize_{name}_provider", None)
-            if init_fn is not None:
-                # Resolve template_factory and logger from the container so
-                # each provider's initialize function receives the correct
-                # typed arguments instead of the container object.
-                from orb.domain.base.ports.logging_port import LoggingPort
-                from orb.domain.template.factory import TemplateFactory
+            # DI-level initialisation (only when a container is supplied)
+            if container is not None:
+                _initialize_provider_module(mod, name, container)
+        except Exception as exc:
+            _provider_load_failure(
+                name,
+                exc,
+                config_source,
+                configured,
+                optional_dependency=isinstance(exc, ImportError),
+            )
 
-                try:
-                    template_factory = container.get(TemplateFactory)
-                except Exception:
-                    template_factory = None
-                try:
-                    logger_port = container.get(LoggingPort)
-                except Exception:
-                    logger_port = None
 
-                init_fn(template_factory=template_factory, logger=logger_port)
+def _initialize_provider_module(mod: object, name: str, container: DIContainer) -> None:
+    """Run a provider module's ``initialize_<name>_provider`` with DI-resolved arguments."""
+    init_fn = getattr(mod, f"initialize_{name}_provider", None)
+    if init_fn is None:
+        return
+
+    # Resolve template_factory and logger from the container so each provider's
+    # initialize function receives the correct typed arguments instead of the
+    # container object.
+    from orb.domain.base.ports.logging_port import LoggingPort
+    from orb.domain.template.factory import TemplateFactory
+
+    try:
+        template_factory = container.get(TemplateFactory)
+    except Exception:
+        template_factory = None
+    try:
+        logger_port = container.get(LoggingPort)
+    except Exception:
+        logger_port = None
+
+    init_fn(template_factory=template_factory, logger=logger_port)
 
 
 # ---------------------------------------------------------------------------
@@ -194,13 +288,19 @@ def register_all_providers(container: DIContainer | None = None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def register_all_provider_types() -> None:
+def register_all_provider_types(container: DIContainer | None = None) -> None:
     """Register all available provider types.
 
     Backward-compatible alias that delegates to ``register_all_providers()``
     so existing callers continue to work without modification.
+
+    *container* is used only to find the active configuration, so a configured
+    provider that cannot load fails startup; no per-provider DI wiring is done.
     """
-    register_all_providers(container=None)
+    if container is None:
+        register_all_providers(container=None)
+    else:
+        register_all_providers(container=None, config_container=container)
 
 
 def register_all_provider_cli_specs() -> None:

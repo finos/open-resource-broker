@@ -116,16 +116,21 @@ def register_provider_complete(
             spec.register_auth(logger)
 
         # 4. Template class (optional)
+        template_class_registered = True
         if spec.template_class is not None and spec.template_factory is not None:
             try:
                 spec.template_factory.register_provider_template_class(
                     provider_name, spec.template_class
                 )
             except Exception as exc:
-                _logger.debug(
+                # Leave the provider out of the initialised set so a later
+                # call retries the registration instead of skipping it.
+                template_class_registered = False
+                _logger.warning(
                     "Could not register template class for %r: %s",
                     provider_name,
                     exc,
+                    exc_info=True,
                 )
 
         # 5. CLI spec
@@ -175,9 +180,10 @@ def register_provider_complete(
         if spec.extra_init is not None:
             spec.extra_init(logger)
 
-        _initialized_providers.add(provider_name)
+        if template_class_registered:
+            _initialized_providers.add(provider_name)
 
-        if logger:
+        if logger and template_class_registered:
             logger.info(
                 "%s provider initialization completed successfully",
                 provider_name,
