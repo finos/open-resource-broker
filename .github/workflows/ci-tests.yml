@@ -89,6 +89,29 @@ jobs:
       environment: ${{ needs.config.outputs.environment }}
       testing-flag: ${{ needs.config.outputs.testing-flag }}
 
+  # The package supports Python 3.10 but the default interpreter is newer, so a
+  # 3.10-only break (a newer stdlib API, a mock target that resolves differently)
+  # would otherwise surface only in the nightly matrix.  One unit-test leg on 3.10
+  # keeps it out of main.  Provider suites stay in the nightly matrix.  Its
+  # coverage data is excluded from the combined gate (see coverage-combine).
+  unit-tests-py310:
+    name: Unit Tests (Python 3.10)
+    needs: [config]
+    uses: ./.github/workflows/reusable-test.yml
+    secrets: inherit
+    with:
+      test-type: unit
+      python-version: '3.10'
+      default-python-version: ${{ needs.config.outputs.default-python-version }}
+      continue-on-error: false
+      upload-coverage: false
+      artifact-prefix: ci-tests-py310
+      aws-region: ${{ needs.config.outputs.aws-region }}
+      aws-access-key: ${{ needs.config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
+      environment: ${{ needs.config.outputs.environment }}
+      testing-flag: ${{ needs.config.outputs.testing-flag }}
+
   # e2e-tests run against an in-process TestClient app — no live infrastructure
   # required — so they gate like every other leg.  (They previously ran with
   # continue-on-error: true, which silently masked 23 genuine failures.)
@@ -250,7 +273,7 @@ jobs:
     name: Generate Test Report
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [config, test-groups, e2e-tests, providers-tests, providers-tests-serial, ui-unit-tests, ui-smoke]
+    needs: [config, test-groups, unit-tests-py310, e2e-tests, providers-tests, providers-tests-serial, ui-unit-tests, ui-smoke]
     if: always()
     permissions:
       contents: read
@@ -320,7 +343,9 @@ jobs:
         # Each leg uploads a .coverage data file inside its test-results-* dir.
         # coverage combine expects them in CWD with unique .coverage.<suffix> names.
         i=0
-        find coverage-artifacts -name '.coverage*' -type f | while read -r f; do
+        # The Python 3.10 leg exists to catch compatibility breaks, not to
+        # contribute coverage, so its data is left out of the combined gate.
+        find coverage-artifacts -name '.coverage*' -type f -not -path '*-py3.10/*' | while read -r f; do
           cp "$f" ".coverage.leg${i}"
           i=$((i + 1))
         done
@@ -363,6 +388,7 @@ jobs:
     needs:
       - config
       - test-groups
+      - unit-tests-py310
       - e2e-tests
       - providers-tests
       - providers-tests-serial
