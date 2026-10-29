@@ -150,7 +150,14 @@ class AzureSpotPlacementScoreAdapter(SpotPlacementScoreAdapter):
             # Optional Azure transport is only needed when scoring is requested.
             # Provider discovery also runs in installations of other providers.
             import httpx
+        except ImportError:
+            self._logger.warning(
+                "Azure spot placement scoring needs the httpx package; "
+                "install it with: pip install 'orb-py[azure]'"
+            )
+            return SpotPlacementScoreLookup(entries={}, failure_reason="httpx_missing")
 
+        try:
             credential = await self._azure_client.get_async_credential()
             token = await credential.get_token("https://management.azure.com/.default")
             async with httpx.AsyncClient(timeout=30.0) as client:
