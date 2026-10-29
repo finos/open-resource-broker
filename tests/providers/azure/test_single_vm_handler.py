@@ -442,7 +442,7 @@ def test_status_still_returns_instance_when_network_identity_resolution_fails():
 
 
 @pytest.mark.asyncio
-async def test_status_best_effort_returns_partial_results_when_one_vm_lookup_fails():
+async def test_status_omits_vm_that_azure_reports_missing():
     azure_client = _make_azure_client()
     logger = MagicMock()
     handler = SingleVMHandler(azure_client=azure_client, logger=logger)
@@ -456,7 +456,9 @@ async def test_status_best_effort_returns_partial_results_when_one_vm_lookup_fai
     vm.zones = ["1"]
 
     async_compute = MagicMock()
-    async_compute.virtual_machines.get = AsyncMock(side_effect=[vm, RuntimeError("boom")])
+    async_compute.virtual_machines.get = AsyncMock(
+        side_effect=[vm, ResourceNotFoundError(message="ResourceNotFound")]
+    )
     azure_client.get_async_compute_client = AsyncMock(return_value=async_compute)
     handler._resolve_vm_names_async = AsyncMock(return_value=["vm-1", "vm-2"])
     azure_client.resolve_network_identity_from_vm_async = AsyncMock(
@@ -477,7 +479,7 @@ async def test_status_best_effort_returns_partial_results_when_one_vm_lookup_fai
     result = await handler.check_hosts_status_async(request)
 
     assert [entry["instance_id"] for entry in result] == ["vm-1"]
-    logger.error.assert_called_once()
+    logger.warning.assert_called()
 
 
 @pytest.mark.asyncio
