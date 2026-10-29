@@ -528,6 +528,94 @@ class TestProviderReportedIdsReconciled:
 
 
 @pytest.mark.unit
+class TestAggregationAndExceptionPaths:
+    @pytest.mark.asyncio
+    async def test_non_dict_result_is_unknown_error_and_fails_group_ids(self):
+        orchestrator, _ = _make_orchestrator()
+        request = MagicMock(request_id="req-correlation")
+
+        async def _fake(*_args):
+            return "not-a-dict"
+
+        orchestrator._process_resource_group = _fake  # type: ignore[method-assign]
+
+        overall = await orchestrator.execute_deprovisioning(
+            {("p", "api", "g"): [_make_machine("a"), _make_machine("b")]}, request
+        )
+
+        assert overall["success"] is False
+        assert overall["errors"] == ["Unknown error"]
+        assert overall["failed_instance_ids"] == ["a", "b"]
+        assert overall["successful_instance_ids"] == []
+
+    @pytest.mark.asyncio
+    async def test_failure_dict_without_id_keys_fails_all_group_ids(self):
+        orchestrator, _ = _make_orchestrator()
+        request = MagicMock(request_id="req-correlation")
+
+        async def _fake(*_args):
+            return {"success": False}
+
+        orchestrator._process_resource_group = _fake  # type: ignore[method-assign]
+
+        overall = await orchestrator.execute_deprovisioning(
+            {("p", "api", "g"): [_make_machine("a"), _make_machine("b")]}, request
+        )
+
+        assert overall["errors"] == ["Unknown error"]
+        assert overall["failed_instance_ids"] == ["a", "b"]
+        assert overall["successful_instance_ids"] == []
+
+    @pytest.mark.asyncio
+    async def test_exception_result_fails_group_ids_and_records_error(self):
+        orchestrator, _ = _make_orchestrator()
+        request = MagicMock(request_id="req-correlation")
+
+        async def _fake(*_args):
+            raise RuntimeError("group exploded")
+
+        orchestrator._process_resource_group = _fake  # type: ignore[method-assign]
+
+        overall = await orchestrator.execute_deprovisioning(
+            {("p", "api", "g"): [_make_machine("a")]}, request
+        )
+
+        assert overall["failed_instance_ids"] == ["a"]
+        assert overall["errors"] == ["group exploded"]
+        assert overall["failed_operations"] == 1
+
+    @pytest.mark.asyncio
+    async def test_outer_exception_returns_error_result(self):
+        orchestrator, _ = _make_orchestrator()
+        request = MagicMock(request_id="req-correlation")
+
+        with patch(
+            "orb.application.services.deprovisioning_orchestrator.asyncio.gather",
+            side_effect=RuntimeError("gather broke"),
+        ):
+            overall = await orchestrator.execute_deprovisioning(
+                {("p", "api", "g"): [_make_machine("a")]}, request
+            )
+
+        assert overall == {"success": False, "error_message": "gather broke"}
+
+    @pytest.mark.asyncio
+    async def test_provider_call_raising_inside_group_fails_group_ids(self):
+        orchestrator, provider_selection_port = _make_orchestrator()
+        provider_selection_port.execute_operation = AsyncMock(side_effect=RuntimeError("boom"))
+        request = MagicMock(request_id="req-correlation")
+
+        group = await orchestrator._process_resource_group(
+            "aws", "EC2Fleet", "r", [_make_machine("a"), _make_machine("b")], request
+        )
+
+        assert group["success"] is False
+        assert group["failed_instance_ids"] == ["a", "b"]
+        assert group["successful_instance_ids"] == []
+        assert group["error_message"] == "boom"
+
+
+@pytest.mark.unit
 class TestMachineCoordinatesForwarded:
     @pytest.mark.asyncio
     async def test_terminate_operation_includes_persisted_machine_coordinates(self):
