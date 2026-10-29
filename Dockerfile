@@ -96,8 +96,11 @@ COPY deployment/docker/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh \
     && chown -R "${PACKAGE_NAME_SHORT:-orb}":"${PACKAGE_NAME_SHORT:-orb}" /app
 
-# Set all environment variables in single layer
-ENV PYTHONPATH=/app \
+# Keep application data and UI runtime files in directories owned by the image user.
+ENV ORB_ROOT_DIR=/app \
+    REFLEX_STATES_WORKDIR=/app/data/.states \
+    REFLEX_WEB_WORKDIR=/app/tmp/.web \
+    PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8 \
