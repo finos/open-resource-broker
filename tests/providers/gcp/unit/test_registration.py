@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import BaseModel
 
 from tests.utilities.provider_import_isolation import assert_no_auto_registration_on_import
 
@@ -104,6 +105,35 @@ def test_register_gcp_extensions_populates_cli_spec_when_template_extension_alre
         register_gcp_extensions()
 
         assert CLISpecRegistry.get_or_none("gcp") is not None
+    finally:
+        TemplateExtensionRegistry._extensions.clear()
+        TemplateExtensionRegistry._extensions.update(ext_snapshot)
+        CLISpecRegistry.clear()
+        for key, spec in cli_snapshot.items():
+            CLISpecRegistry.register(key, spec)
+
+
+@pytest.mark.unit
+def test_register_gcp_extensions_keeps_existing_registrations() -> None:
+    """register_gcp_extensions must not replace an extension or CLI spec that is already registered."""
+    from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
+    from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
+    from orb.providers.gcp.registration import register_gcp_extensions
+
+    class _SentinelExtension(BaseModel):
+        pass
+
+    sentinel_spec = MagicMock()
+    ext_snapshot = dict(TemplateExtensionRegistry._extensions)
+    cli_snapshot = CLISpecRegistry.all()
+    try:
+        TemplateExtensionRegistry.register_extension("gcp", _SentinelExtension)
+        CLISpecRegistry.register("gcp", sentinel_spec)
+
+        register_gcp_extensions()
+
+        assert TemplateExtensionRegistry._extensions["gcp"] is _SentinelExtension
+        assert CLISpecRegistry.get_or_none("gcp") is sentinel_spec
     finally:
         TemplateExtensionRegistry._extensions.clear()
         TemplateExtensionRegistry._extensions.update(ext_snapshot)

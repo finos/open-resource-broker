@@ -506,6 +506,65 @@ class TestFilterMachines:
 
 
 # ---------------------------------------------------------------------------
+# CreateReturnRequestHandler — _clear_return_request_id
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestClearReturnRequestId:
+    def _setup(self, owners: dict[str, str | None]):
+        machines: dict[str, MagicMock] = {}
+        cleared: dict[str, MagicMock] = {}
+        for mid, owner in owners.items():
+            machine = MagicMock()
+            machine.return_request_id = owner
+            cleared[mid] = MagicMock(name=f"cleared-{mid}")
+            machine.model_copy.return_value = cleared[mid]
+            machines[mid] = machine
+
+        uow = MagicMock()
+        uow.machines.get_by_id.side_effect = machines.get
+
+        @contextmanager
+        def _create():
+            yield uow
+
+        factory = MagicMock()
+        factory.create_unit_of_work.side_effect = _create
+        return _make_return_handler(uow_factory=factory), uow, machines, cleared
+
+    def test_only_machines_owned_by_this_request_or_unowned_are_cleared(self):
+        handler, uow, machines, cleared = self._setup(
+            {"i-own": "ret-this", "i-other": "ret-other", "i-free": None}
+        )
+
+        handler._clear_return_request_id(["i-own", "i-other", "i-free"], "ret-this")
+
+        machines["i-own"].model_copy.assert_called_once_with(update={"return_request_id": None})
+        machines["i-free"].model_copy.assert_called_once_with(update={"return_request_id": None})
+        machines["i-other"].model_copy.assert_not_called()
+        saved = [c.args[0] for c in uow.machines.save.call_args_list]
+        assert saved == [cleared["i-own"], cleared["i-free"]]
+
+    def test_without_request_id_clears_every_machine(self):
+        handler, uow, _machines, cleared = self._setup(
+            {"i-own": "ret-this", "i-other": "ret-other"}
+        )
+
+        handler._clear_return_request_id(["i-own", "i-other"])
+
+        saved = [c.args[0] for c in uow.machines.save.call_args_list]
+        assert saved == [cleared["i-own"], cleared["i-other"]]
+
+    def test_missing_machine_is_ignored(self):
+        handler, uow, _machines, _cleared = self._setup({})
+
+        handler._clear_return_request_id(["i-gone"], "ret-this")
+
+        uow.machines.save.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # CreateReturnRequestHandler — execute_command: all-invalid machines
 # ---------------------------------------------------------------------------
 
