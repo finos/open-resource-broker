@@ -5,6 +5,7 @@ import os
 import stat
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -441,37 +442,27 @@ async def test_launch_tags_do_not_mutate_caller_or_other_instances():
     assert first["freeform_tags"]["orb_launch_id"] != second["freeform_tags"]["orb_launch_id"]
 
 
-@pytest.mark.parametrize("is_return", [True, False])
-def test_ambiguous_not_found_status_never_confirms_termination(is_return):
-    from types import SimpleNamespace
+@pytest.mark.parametrize("code", ["NotAuthorizedOrNotFound", "NotFound", None])
+def test_not_found_status_on_return_fails_the_call(code):
+    handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=MagicMock())
+    handler._run_oci = MagicMock(side_effect=OCICommandError("missing", code=code, status=404))
+    operation = make_operation(ProviderOperationType.GET_INSTANCE_STATUS)
+    operation.parameters["request"] = SimpleNamespace(request_type="return", requested_count=1)
+    result = handler.get_instance_status(operation)
+    assert not result.success
+    assert result.error_code == "OCI_STATUS_FAILED"
 
-    from orb.application.services.request_status_service import RequestStatusService
 
+def test_not_found_status_on_acquire_is_omitted():
     handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=MagicMock())
     handler._run_oci = MagicMock(
-        side_effect=OCICommandError(
-            "missing or inaccessible", code="NotAuthorizedOrNotFound", status=404
-        )
+        side_effect=OCICommandError("missing", code="NotAuthorizedOrNotFound", status=404)
     )
     operation = make_operation(ProviderOperationType.GET_INSTANCE_STATUS)
-    operation.parameters["request"] = SimpleNamespace(
-        request_type="return" if is_return else "acquire", requested_count=1
-    )
+    operation.parameters["request"] = SimpleNamespace(request_type="acquire", requested_count=1)
     result = handler.get_instance_status(operation)
-    assert result.success is is_return
-    if is_return:
-        assert result.data["instances"][0]["status"] == "unknown"
-        assert result.data["instances"][0]["provider_data"]["termination_verified"] is False
-        fulfilment = result.metadata["provider_fulfilment"]
-        assert fulfilment.state == "in_progress"
-        assert fulfilment.fulfilled_units == 0
-        assert fulfilment.pending_count == 1
-        service = RequestStatusService(MagicMock(), MagicMock())
-        machine = SimpleNamespace(status=SimpleNamespace(value="unknown"))
-        status, _ = service._determine_return_status(
-            [machine], [machine], operation.parameters["request"], result.metadata
-        )
-        assert status == "in_progress"
+    assert result.success
+    assert result.data["instances"] == []
 
 
 @pytest.mark.asyncio
