@@ -387,13 +387,11 @@ class GCPProviderStrategy(ProviderStrategy):
         )
         result = self._handle_terminate_instances(terminate_operation)
         metadata_result = {**result.metadata, "operation": "cleanup_machine_resources"}
-        if not result.success:
-            return result.model_copy(update={"metadata": metadata_result})
-        # General mutation calls permit partial success, but this command's
-        # caller terminalises the machine on result.success. A failed delete
-        # must therefore be a failed cleanup even if some targets succeeded.
-        if not result.data["success"]:
-            failures = result.data["failed_operations"]
+        # A terminate that reached the provider and recorded per-target failures
+        # must surface as a failed cleanup: the caller terminalises the machine
+        # on result.success.
+        failures = result.data.get("failed_operations") if isinstance(result.data, dict) else None
+        if failures:
             failure_reason = "; ".join(failure["error_message"] for failure in failures)
             return ProviderResult(
                 success=False,
