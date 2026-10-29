@@ -186,12 +186,22 @@ _PYPI_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _PYPI_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+!-]*$")
 
 
+_LOWER_BOUND_CLAUSE_RE = re.compile(r"^(?:>=|~=|===|==|>)\s*(\d+)(?:\.(\d+|\*))?")
+
+
 def python_lower_bound(specifier: str | None) -> tuple[int, int] | None:
-    """Return the highest `>=X[.Y]` lower bound in a requires-python specifier."""
-    bounds = [
-        (int(major), int(minor or 0))
-        for major, minor in re.findall(r">=\s*(\d+)(?:\.(\d+))?", specifier or "")
-    ]
+    """Return the highest lower bound implied by a requires-python specifier.
+
+    `>=`, `~=`, `==` (including `.*` wildcards), `===` and `>` clauses each imply
+    a minimum (major, minor); `<`, `<=` and `!=` clauses imply none. A missing
+    minor component counts as 0.
+    """
+    bounds: list[tuple[int, int]] = []
+    for clause in (specifier or "").split(","):
+        match = _LOWER_BOUND_CLAUSE_RE.match(clause.strip())
+        if match:
+            major, minor = match.groups()
+            bounds.append((int(major), 0 if minor in (None, "*") else int(minor)))
     return max(bounds) if bounds else None
 
 

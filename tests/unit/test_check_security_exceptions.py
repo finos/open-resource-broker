@@ -220,7 +220,25 @@ class TestPyPiFixesNeedingNewerPython:
 
     @pytest.mark.parametrize(
         ("specifier", "expected"),
-        [(">=3.11", (3, 11)), (">=3.9,<4", (3, 9)), (">=3", (3, 0)), ("<4", None), (None, None)],
+        [
+            (">=3.11", (3, 11)),
+            (">=3.9,<4", (3, 9)),
+            (">=3", (3, 0)),
+            ("<4", None),
+            (None, None),
+            ("~=3.11", (3, 11)),
+            ("~=3.9.2", (3, 9)),
+            ("==3.12.*", (3, 12)),
+            ("==3.11.4", (3, 11)),
+            ("==3.*", (3, 0)),
+            ("===3.11", (3, 11)),
+            (">= 3.10", (3, 10)),
+            (">3", (3, 0)),
+            (">3.10", (3, 10)),
+            (">=3.9,<4,!=3.9.1", (3, 9)),
+            (">=3.10,~=3.11", (3, 11)),
+            ("<=3.12,!=3.11", None),
+        ],
     )
     def test_lower_bound(self, specifier, expected):
         assert python_lower_bound(specifier) == expected
@@ -232,6 +250,11 @@ class TestPyPiFixesNeedingNewerPython:
 
     def test_fix_needing_newer_python_is_suppressed(self):
         with patch("check_security_exceptions.fetch_requires_python", return_value=">=3.11"):
+            assert find_fixes(_record("PyPI", "filelock", "4.2.1")) == []
+
+    def test_compatible_release_needing_newer_python_is_suppressed(self):
+        with patch("check_security_exceptions.fetch_requires_python", return_value="~=3.11"):
+            assert needs_newer_python("filelock", "4.2.2") is True
             assert find_fixes(_record("PyPI", "filelock", "4.2.1")) == []
 
     def test_fix_without_bound_is_reported(self):
