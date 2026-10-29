@@ -58,7 +58,7 @@ class TestSpotEvictionStateTransitions:
         eviction_sequence = [
             ("PowerState/running", "running"),
             ("PowerState/stopping", "stopping"),
-            ("PowerState/deallocating", "shutting-down"),
+            ("PowerState/deallocating", "stopping"),
             ("PowerState/deallocated", "stopped"),
         ]
 
