@@ -372,6 +372,9 @@ def _parse_since(since_str: Optional[str]) -> Optional[datetime]:
     """Parse ISO timestamp; return None on failure."""
     if not since_str:
         return None
+    # Python 3.10's fromisoformat rejects the "Z" UTC designator.
+    if since_str[-1] in "Zz":
+        since_str = since_str[:-1] + "+00:00"
     try:
         dt = datetime.fromisoformat(since_str)
         if dt.tzinfo is None:
