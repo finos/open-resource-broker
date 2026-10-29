@@ -2,62 +2,70 @@
 
 from pydantic import BaseModel, Field
 
+from orb.providers.aws.domain.template import naming_patterns as _np
+
 
 class AWSLimitsConfig(BaseModel):
     """AWS service limits and constraints."""
 
-    tag_key_length: int = Field(128, description="Maximum length for AWS tag keys")
-    tag_value_length: int = Field(256, description="Maximum length for AWS tag values")
-    max_tags_per_resource: int = Field(50, description="Maximum tags per AWS resource")
-    max_security_groups: int = Field(5, description="Maximum security groups per instance")
-    max_subnets: int = Field(16, description="Maximum subnets per request")
+    tag_key_length: int = Field(_np.TAG_KEY_LENGTH, description="Maximum length for AWS tag keys")
+    tag_value_length: int = Field(
+        _np.TAG_VALUE_LENGTH, description="Maximum length for AWS tag values"
+    )
+    max_tags_per_resource: int = Field(
+        _np.MAX_TAGS_PER_RESOURCE, description="Maximum tags per AWS resource"
+    )
+    max_security_groups: int = Field(
+        _np.MAX_SECURITY_GROUPS, description="Maximum security groups per instance"
+    )
+    max_subnets: int = Field(_np.MAX_SUBNETS, description="Maximum subnets per request")
 
 
 class AWSNamingConfig(BaseModel):
     """AWS naming patterns and validation rules."""
 
     subnet: str = Field(
-        r"^subnet-[0-9a-f]{8,17}$",
+        _np.PATTERNS["subnet"],
         description="Regex pattern for AWS subnet IDs",
     )
     security_group: str = Field(
-        r"^sg-[0-9a-f]{8,17}$",
+        _np.PATTERNS["security_group"],
         description="Regex pattern for AWS security group IDs",
     )
     ec2_instance: str = Field(
-        r"^i-[0-9a-f]{8,17}$",
+        _np.PATTERNS["ec2_instance"],
         description="Regex pattern for AWS EC2 instance IDs",
     )
     ami: str = Field(
-        r"^(ami-[0-9a-f]{8,17}|/aws/service/.+)$",
+        _np.PATTERNS["ami"],
         description="Regex pattern for AWS AMI IDs (including SSM paths)",
     )
     ec2_fleet: str = Field(
-        r"^fleet-[0-9a-f]{8,17}$",
+        _np.PATTERNS["ec2_fleet"],
         description="Regex pattern for AWS EC2 fleet IDs",
     )
     launch_template: str = Field(
-        r"^lt-[0-9a-f]{8,17}$",
+        _np.PATTERNS["launch_template"],
         description="Regex pattern for AWS launch template IDs",
     )
     instance_type: str = Field(
-        r"^[a-z][0-9]+[a-z]*\.[a-z0-9]+$",
+        _np.PATTERNS["instance_type"],
         description="Regex pattern for AWS instance types",
     )
     tag_key: str = Field(
-        r"^[a-zA-Z0-9\s\._:/=+\-@]{1,128}$",
+        _np.PATTERNS["tag_key"],
         description="Regex pattern for AWS tag keys",
     )
     arn: str = Field(
-        r"^arn:aws:[a-zA-Z0-9\-]+:[a-zA-Z0-9\-]*:[0-9]{12}:.+$",
+        _np.PATTERNS["arn"],
         description="Regex pattern for AWS ARNs",
     )
     account_id: str = Field(
-        r"^\d{12}$",
+        _np.PATTERNS["account_id"],
         description="Regex pattern for AWS account IDs",
     )
     region: str = Field(
-        r"^[a-z]{2}-[a-z]+-\d$",
+        _np.PATTERNS["region"],
         description="Regex pattern for AWS region names (e.g. us-east-1, eu-west-2)",
     )
     limits: AWSLimitsConfig = Field(
