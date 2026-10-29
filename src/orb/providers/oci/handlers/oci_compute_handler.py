@@ -17,6 +17,7 @@ from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 from orb.providers.oci.async_utils import run_blocking_operation
 from orb.providers.oci.cli_client import OCICommandError, run_oci, service_error_summary
+from orb.providers.oci.configuration.realms import is_allowed_realm_domain
 from orb.providers.oci.mapping import OCITemplateMapper
 from orb.providers.oci.services import OCIPricingService
 
@@ -212,8 +213,8 @@ class OCIComputeHandler:
         # raw-request retains CLI signing and lets us set the idempotency header.
         region = self._region_aliases.get(self._region.lower(), self._region.lower())
         domain = self._auth_config.get("realm_domain_component", "oraclecloud.com")
-        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)+", region) or not re.fullmatch(
-            r"[a-z0-9]+(?:[.-][a-z0-9]+)*", domain
+        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)+", region) or not is_allowed_realm_domain(
+            domain, self._auth_config.get("extra_realm_suffixes")
         ):
             raise ValueError("OCI launch requires a full region name and valid realm domain")
         body: dict[str, Any] = {

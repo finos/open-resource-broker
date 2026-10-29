@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Template-to-OCI launch payload mapping helpers."""
+
+from __future__ import annotations
 
 from math import isfinite
 from typing import Any
