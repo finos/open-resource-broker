@@ -1,0 +1,1 @@
+"""OCI template domain extensions."""

@@ -84,6 +84,7 @@ body:
         - Amazon Web Services (AWS)
         - Microsoft Azure
         - Google Cloud
+        - Oracle Cloud Infrastructure (OCI)
         - Kubernetes
         - Not provider-specific
         - Default

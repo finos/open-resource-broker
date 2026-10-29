@@ -86,4 +86,12 @@ spec:
 
 
 
+## OCI Compute
+
+For a broker running on OCI Compute, use the
+[OCI deployment and authentication guide](oci-integration.md). It covers
+Python/runtime setup, instance-principal IAM, local profile authentication, and
+the acquire/status/return canary. Worker provisioning is documented separately in
+the [OCICompute provider reference](../providers/oci/compute.md).
+
 For complete deployment examples and configuration, see the [main deployment guide](readme.md).
