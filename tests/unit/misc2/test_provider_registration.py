@@ -121,6 +121,146 @@ class TestRegisterAllProviders:
             mock_fn.assert_called_once_with(container=None)
 
 
+def _raises():
+    raise RuntimeError("plugin exploded")
+
+
+_BAD_PLUGINS = {
+    "load_import_error": lambda name: _FakeEP(name, load_raises=ImportError("missing dep")),
+    "load_error": lambda name: _FakeEP(name, load_raises=ValueError("bad target")),
+    "non_callable": lambda name: _FakeEP(name, not_callable=True),
+    "callable_raises": lambda name: _FakeEP(name, target=_raises),
+}
+
+
+@pytest.mark.unit
+class TestPluginFailureEscalation:
+    """A failing plugin fails startup only for a configured provider, and only in
+    ``register_all_providers``."""
+
+    @staticmethod
+    def _run_register(eps, configured, registered=()):
+        original = list(_REGISTERED_PROVIDERS)
+        _REGISTERED_PROVIDERS.clear()
+        _REGISTERED_PROVIDERS.extend(registered)
+        try:
+            with (
+                _stub_eps(eps),
+                patch.object(
+                    reg_module,
+                    "_configured_provider_types",
+                    return_value=frozenset(configured),
+                ),
+                patch("orb.providers.registry.get_provider_registry", return_value=MagicMock()),
+            ):
+                register_all_providers()
+        finally:
+            _REGISTERED_PROVIDERS.clear()
+            _REGISTERED_PROVIDERS.extend(original)
+
+    def test_discovery_records_failures_for_the_caller(self) -> None:
+        failures: dict[str, Exception] = {}
+        eps = [_BAD_PLUGINS[kind](kind) for kind in _BAD_PLUGINS]
+        with _stub_eps(eps):
+            assert discover_provider_plugins(failures=failures) == []
+        assert set(failures) == set(_BAD_PLUGINS)
+        assert isinstance(failures["load_import_error"], ImportError)
+        assert isinstance(failures["non_callable"], TypeError)
+
+    @pytest.mark.parametrize("kind", list(_BAD_PLUGINS))
+    def test_configured_plugin_failure_fails_startup(self, kind: str) -> None:
+        with pytest.raises(RuntimeError, match="Configured provider 'myprov' could not be loaded"):
+            self._run_register([_BAD_PLUGINS[kind]("myprov")], configured={"myprov"})
+
+    def test_missing_extra_hint_is_included(self) -> None:
+        with pytest.raises(RuntimeError, match=r"pip install 'orb-py\[myprov\]'"):
+            self._run_register([_BAD_PLUGINS["load_import_error"]("myprov")], configured={"myprov"})
+
+    @pytest.mark.parametrize("kind", list(_BAD_PLUGINS))
+    def test_unconfigured_plugin_failure_is_logged_and_good_plugin_loads(
+        self, kind: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        called: list[str] = []
+        eps = [
+            _BAD_PLUGINS[kind]("badprov"),
+            _FakeEP("goodprov", target=lambda: called.append("goodprov")),
+        ]
+        with caplog.at_level("WARNING", logger=reg_module.__name__):
+            self._run_register(eps, configured={"other"})
+        assert called == ["goodprov"]
+        assert any("badprov" in record.getMessage() for record in caplog.records)
+
+    @pytest.mark.parametrize("kind", list(_BAD_PLUGINS))
+    def test_bad_plugin_does_not_block_a_good_configured_one(self, kind: str) -> None:
+        called: list[str] = []
+        eps = [
+            _BAD_PLUGINS[kind]("badprov"),
+            _FakeEP("goodprov", target=lambda: called.append("goodprov")),
+        ]
+        self._run_register(eps, configured={"goodprov"})
+        assert called == ["goodprov"]
+
+    def test_unknown_configuration_treats_plugin_as_optional(self) -> None:
+        original = list(_REGISTERED_PROVIDERS)
+        try:
+            with (
+                _stub_eps([_BAD_PLUGINS["callable_raises"]("myprov")]),
+                patch.object(reg_module, "_configured_provider_types", return_value=None),
+                patch("orb.providers.registry.get_provider_registry", return_value=MagicMock()),
+            ):
+                register_all_providers()
+        finally:
+            _REGISTERED_PROVIDERS[:] = original
+
+    def test_in_tree_provider_with_failing_entry_point_fails_once(self) -> None:
+        with (
+            patch.object(
+                reg_module, "_provider_load_failure", wraps=reg_module._provider_load_failure
+            ) as spy,
+            patch.object(reg_module.importlib, "import_module") as import_module,
+            pytest.raises(RuntimeError, match="Configured provider 'alpha'"),
+        ):
+            self._run_register(
+                [_BAD_PLUGINS["load_import_error"]("alpha")],
+                configured={"alpha"},
+                registered=["alpha"],
+            )
+        assert spy.call_count == 1
+        assert all(
+            c.args != ("orb.providers.alpha.registration",) for c in import_module.call_args_list
+        )
+
+    def test_unconfigured_in_tree_provider_with_failing_entry_point_is_reported_once(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with (
+            patch.object(
+                reg_module, "_provider_load_failure", wraps=reg_module._provider_load_failure
+            ) as spy,
+            caplog.at_level("WARNING", logger=reg_module.__name__),
+        ):
+            self._run_register(
+                [_BAD_PLUGINS["load_import_error"]("alpha")],
+                configured=set(),
+                registered=["alpha"],
+            )
+        assert spy.call_count == 1
+
+    @pytest.mark.parametrize("kind", list(_BAD_PLUGINS))
+    def test_cli_spec_and_defaults_paths_never_raise_for_a_configured_plugin(
+        self, kind: str
+    ) -> None:
+        with (
+            _stub_eps([_BAD_PLUGINS[kind]("myprov")]),
+            patch.object(
+                reg_module, "_configured_provider_types", return_value=frozenset({"myprov"})
+            ),
+            patch.object(reg_module, "_REGISTERED_PROVIDERS", []),
+        ):
+            register_all_provider_cli_specs()
+            register_all_defaults_loaders()
+
+
 # ---------------------------------------------------------------------------
 # register_all_provider_cli_specs
 # ---------------------------------------------------------------------------

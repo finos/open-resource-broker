@@ -47,7 +47,9 @@ over.
 Third-party plugins use the same mechanism: declare an entry point in the
 plugin package's own `pyproject.toml` with no changes required to any file in
 ORB itself. See `docs/root/providers/k8s/plugin-authoring.md` for the plugin
-callable contract (zero-argument, returns `None`, must not raise).
+callable contract (zero-argument, returns `None`, should not raise) and for how
+a failing plugin is handled: it fails startup when its entry-point name is a
+configured provider type and is logged otherwise.
 
 Three bootstrap entry points consume the discovered provider list, each calling
 `discover_provider_plugins()` first so entry-point providers are present before

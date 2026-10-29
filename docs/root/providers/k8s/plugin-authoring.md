@@ -74,10 +74,30 @@ contract of the callable is:
 def register() -> None:
     """Register the plugin's provider strategy / handler with ORB.
 
-    Must not raise.  Plugins should log and swallow internal errors so a
-    broken plugin does not prevent ORB from starting.
+    Should not raise.  Plugins should log and swallow internal errors.
     """
 ```
+
+#### When a plugin fails to load
+
+If the entry point cannot be imported, resolves to something that is not
+callable, or the callable raises, the plugin is skipped and the other
+plugins still load.  What happens next depends on the configuration:
+
+* If the entry-point **name equals a provider `type` in the active
+  configuration**, ORB fails startup with
+  `Configured provider '<name>' could not be loaded`.  A provider you
+  configured but that cannot run should not be silently replaced by the
+  remaining providers.  Name the entry point after the provider type (for a
+  wholly new provider, the same string used as `type` in the provider
+  block) for this to apply.
+* Otherwise (an extension plugin whose name is not a provider type, or a
+  provider that is installed but not configured) the failure is logged and
+  ORB continues.
+
+The check happens during provider registration at startup.  Building the CLI
+parser and loading provider defaults discover plugins as well, but only log
+a failure.
 
 The callable is responsible for hitting whichever ORB registries the
 plugin needs:
@@ -305,8 +325,9 @@ log = logging.getLogger(__name__)
 def register() -> None:
     """Register the MPIJob handler with the Kubernetes provider strategy.
 
-    Must not raise.  Plugin authors should log and swallow internal
-    errors so a broken plugin cannot prevent ORB from booting.
+    Plugin authors should log and swallow internal errors.  An error that
+    escapes is logged and the plugin is skipped; it fails startup only when
+    the entry-point name is a configured provider type.
     """
     try:
         # The Kubernetes provider strategy exposes a class-level registry
