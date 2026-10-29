@@ -48,12 +48,7 @@ def setup_environment():
 
 
 # Import CLI modules
-try:
-    # Try wheel/installed package import first
-    from orb.cli.main import main
-except ImportError:
-    # Fallback to development mode import
-    from orb.cli.main import main
+from orb.cli.main import main
 
 # Import version for help text
 try:

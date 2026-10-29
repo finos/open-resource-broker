@@ -171,6 +171,8 @@ class HostFactoryMock:
                 / "infrastructure/scheduler/hostfactory/scripts"
             )
             hf_scripts_location = _init_scripts if _init_scripts.exists() else _source_scripts
+        else:
+            raise ValueError(f"Unsupported target: {target}")
 
         self.get_available_templates_script = os.path.join(
             hf_scripts_location, "getAvailableTemplates.sh"
