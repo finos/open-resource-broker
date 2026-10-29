@@ -1,4 +1,6 @@
 pandas>=2.2
 openpyxl>=3.1
-Pillow>=10.0
+# Pillow 13 requires Python >=3.11, which is outside orb-py's supported range
+# (>=3.10); these analysis scripts are not part of the installed package.
+Pillow>=13.0.0
 python-dateutil>=2.9

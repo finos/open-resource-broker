@@ -81,11 +81,18 @@ ENV PATH="/opt/venv/bin:$PATH"
 #         default UIConfig (enabled=True, mode="embedded") makes the entrypoint's
 #         `orb server start --foreground` import orb.ui.app, which needs reflex.
 # The ci/dev test tooling groups are not installed — this is a production image.
+#
+# uv is only needed to populate /opt/venv, so it is removed as the last step of
+# this layer (after both installs), together with its Python package, to keep
+# the build tool and its bundled dependencies out of the runtime image.
 COPY dist/*.whl /tmp/
 RUN WHEEL=$(ls /tmp/*.whl) \
     && uv pip install --no-cache "${WHEEL}[all]" \
     && uv pip install --no-cache --upgrade "setuptools>=78.1.1" \
-    && rm -f /tmp/*.whl
+    && rm -f /tmp/*.whl \
+    && rm -rf /usr/local/bin/uv /usr/local/bin/uvx \
+        /usr/local/lib/python*/site-packages/uv \
+        /usr/local/lib/python*/site-packages/uv-*.dist-info
 
 # Copy only runtime files needed
 COPY config/ ./config/
