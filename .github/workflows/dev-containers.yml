@@ -1,3 +1,12 @@
+# Container Build
+#
+# Images are published only for commits whose Unit Tests push run succeeded:
+# the tests-gate job polls ci-tests.yml for the pushed commit and fails closed
+# unless it finished green. Pull requests build and scan a single-platform
+# image with read-only permissions and never push or write the build cache.
+#
+# workflow_dispatch is maintainer-only. On main it is gated and may publish;
+# on any other branch it is a build-only dry run.
 name: Container Build
 
 env:
@@ -5,9 +14,7 @@ env:
 
 on:
   push:
-    # main builds via workflow_run below, only after Unit Tests pass.
-    # push is kept for develop, which has no workflow_run gate.
-    branches: [ develop ]
+    branches: [ main, develop ]
     paths:
       - 'Dockerfile*'
       - 'src/**'
@@ -20,10 +27,6 @@ on:
       - 'Makefile'
       - 'setup.py'
       - '.github/workflows/dev-containers.yml'
-  workflow_run:
-    workflows: ["Unit Tests"]
-    types: [completed]
-    branches: [main]
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -58,67 +61,67 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Resolves the commit to build without ever placing the workflow_run event's
-  # head_sha directly into a checkout `ref:`. workflow_run runs with this
-  # repository's permissions/secrets regardless of which repository or branch
-  # originally triggered the upstream "Unit Tests" run, so before trusting
-  # that commit we confirm the run that completed was itself a push to this
-  # repository (not a pull_request from a fork, which could otherwise smuggle
-  # a branch named "main" past the branches: [main] trigger filter above).
-  resolve-commit:
-    name: Resolve Trusted Commit
+  # Publishing is allowed only for a commit whose Unit Tests push run passed.
+  # The poll step is skipped on pull requests (no image is published there), so
+  # this job is green and plain `needs` is enough for downstream jobs.
+  tests-gate:
+    name: Wait for Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # Only trust runs that completed successfully from a push to this repository.
-    # Other origins (scheduled or manual Unit Tests runs, fork pull requests)
-    # skip the whole pipeline instead of failing it.
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
+    # Poll budget below is at most 150 x 30s = 75 min.
+    timeout-minutes: 90
     permissions:
+      actions: read
       contents: read
-    outputs:
-      sha: ${{ steps.resolve.outputs.sha }}
     steps:
-    - name: Resolve commit SHA
-      id: resolve
+    - name: Wait for Unit Tests on this commit
+      if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
       env:
-        WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event }}
-        WORKFLOW_RUN_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
-        WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
-        CURRENT_SHA: ${{ github.sha }}
+        GH_TOKEN: ${{ github.token }}
+        MAX_POLLS: "150"
+        POLL_INTERVAL: "30"
+        # A push run can take a moment to appear after the push event.
+        MAX_MISSING_POLLS: "10"
       run: |
-        # Backstop for the job-level `if`, which already excludes untrusted
-        # origins; stays fatal if that condition is ever loosened.
-        if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
-          if [[ "$WORKFLOW_RUN_EVENT" != "push" || "$WORKFLOW_RUN_REPO" != "$GITHUB_REPOSITORY" ]]; then
-            echo "::error::workflow_run did not originate from a push to this repository; refusing to build its commit" >&2
-            exit 1
+        missing=0
+        for ((i = 1; i <= MAX_POLLS; i++)); do
+          if ! run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci-tests.yml/runs?head_sha=${GITHUB_SHA}&event=push&per_page=100" \
+              --jq '.workflow_runs | sort_by(.created_at) | last // empty | "\(.status) \(.conclusion // "none") \(.html_url)"'); then
+            echo "API call failed (poll $i/$MAX_POLLS), retrying"
+            sleep "$POLL_INTERVAL"
+            continue
           fi
-          echo "sha=${WORKFLOW_RUN_SHA}" >> "$GITHUB_OUTPUT"
-        else
-          echo "sha=${CURRENT_SHA}" >> "$GITHUB_OUTPUT"
-        fi
+          if [[ -z "$run" ]]; then
+            missing=$((missing + 1))
+            if (( missing >= MAX_MISSING_POLLS )); then
+              echo "::error::no ci-tests run found for sha ${GITHUB_SHA}"
+              exit 1
+            fi
+            echo "No ci-tests run found yet (attempt $missing/$MAX_MISSING_POLLS)"
+          else
+            read -r status conclusion url <<< "$run"
+            echo "ci-tests run $url: status=$status conclusion=$conclusion"
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                exit 0
+              fi
+              echo "::error::ci-tests completed with conclusion $conclusion; not publishing"
+              exit 1
+            fi
+          fi
+          sleep "$POLL_INTERVAL"
+        done
+        echo "::error::timed out waiting for ci-tests on ${GITHUB_SHA}"
+        exit 1
 
   config:
     name: Configuration
     uses: ./.github/workflows/shared-config.yml
-    # Only trust runs that completed successfully from a push to this repository.
-    # Other origins (scheduled or manual Unit Tests runs, fork pull requests)
-    # skip the whole pipeline instead of failing it.
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
 
   calculate-tags:
     name: Calculate Container Tags
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [config, resolve-commit]
+    needs: [config, tests-gate]
     permissions:
       contents: read
     outputs:
@@ -128,9 +131,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
-        # Pin to the exact commit Unit Tests validated, resolved and
-        # trust-checked by the resolve-commit job above.
-        ref: ${{ needs.resolve-commit.outputs.sha }}
+        persist-credentials: false
 
     - name: Calculate container tags
       id: tags
@@ -140,14 +141,14 @@ jobs:
         make get-container-tags >> "$GITHUB_OUTPUT"
 
   # Build the wheel once and share it across every Python version in the
-  # container-pipeline matrix below. The wheel is pure-Python, so it is
+  # build and publish job matrices below. The wheel is pure-Python, so it is
   # identical regardless of which interpreter builds it — repeating the
   # Reflex SPA + package build per matrix leg only burned extra compute.
   build-wheel:
     name: Build Container Wheel
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [config, resolve-commit]
+    needs: [config, tests-gate]
     permissions:
       contents: read
 
@@ -155,9 +156,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
-        # Pin to the exact commit Unit Tests validated, resolved and
-        # trust-checked by the resolve-commit job above.
-        ref: ${{ needs.resolve-commit.outputs.sha }}
+        persist-credentials: false
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
@@ -218,19 +217,67 @@ jobs:
         path: dist/*.whl
         retention-days: 1
 
-  container-pipeline:
+  # Pull requests and non-main dispatches: build and scan only. Read-only permissions, no registry
+  # login, no push and no cache write.
+  container-build:
     name: Build and Scan Container Images
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: [config, calculate-tags, build-wheel, resolve-commit]
+    needs: [config, build-wheel]
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')
 
     strategy:
       matrix:
         python-version: ${{ fromJSON(needs.config.outputs.python-versions) }}
-      
-    env:
-      SCAN_LEVEL: ${{ matrix.python-version == needs.config.outputs.default-python-version && 'full' || 'basic' }}
-      PUSH_TO_REGISTRY: true
+
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4
+
+    - name: Download wheel artifact
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8
+      with:
+        name: container-wheel-${{ github.run_id }}
+        path: dist/
+
+    - name: Build and scan container image
+      uses: ./.github/actions/container-build
+      with:
+        python-version: ${{ matrix.python-version }}
+        push: 'false'
+        cache-to: 'false'
+        registry: ${{ needs.config.outputs.container-registry }}
+        image-name: ${{ needs.config.outputs.container-image }}
+        version: ${{ needs.config.outputs.package-version }}
+        build-platforms: ${{ needs.config.outputs.build-platforms }}
+        package-name-short: ${{ needs.config.outputs.short-name }}
+        scan-level: ${{ matrix.python-version == needs.config.outputs.default-python-version && 'full' || 'basic' }}
+        run-hadolint: ${{ matrix.python-version == needs.config.outputs.default-python-version && 'true' || 'false' }}
+
+  # Pushes and signs images. Runs only for a push to main or develop, or a
+  # manual dispatch on main, and never on pull_request.
+  container-publish:
+    name: Publish and Scan Container Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [config, calculate-tags, build-wheel, tests-gate]
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+
+    strategy:
+      matrix:
+        python-version: ${{ fromJSON(needs.config.outputs.python-versions) }}
 
     permissions:
       contents: read
@@ -245,9 +292,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
-        # Pin to the exact commit Unit Tests validated, resolved and
-        # trust-checked by the resolve-commit job above.
-        ref: ${{ needs.resolve-commit.outputs.sha }}
+        persist-credentials: false
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4
@@ -267,90 +312,23 @@ jobs:
         name: container-wheel-${{ github.run_id }}
         path: dist/
 
-    - name: Build and scan container image
+    - name: Build, push and scan container image
       id: build
-      shell: bash
-      env:
-        REGISTRY: ${{ needs.config.outputs.container-registry }}
-        IMAGE_NAME: ${{ needs.config.outputs.container-image }}
-        VERSION: ${{ needs.config.outputs.package-version }}
-        PYTHON_VERSION: ${{ matrix.python-version }}
-        BUILD_PLATFORMS: ${{ needs.config.outputs.build-platforms }}
-        PACKAGE_NAME_SHORT: ${{ needs.config.outputs.short-name }}
-      run: |
-        # Trivy cannot scan a multi-arch manifest — it needs one concrete,
-        # locally-loaded image.  We derive the scan arch from the first entry
-        # of build-platforms (single source of truth from .project.yml) so
-        # that if amd64 is ever dropped or reordered the scan follows suit.
-        SCAN_PLATFORM=$(echo "$BUILD_PLATFORMS" | cut -d, -f1)
-
-        # Determine whether to push.  On workflow_dispatch the push_images input
-        # controls it explicitly; for all other triggers push unless it is a PR.
-        # The original expression `(dispatch && inputs.push_images) || 'true'`
-        # evaluated to 'true' even when push_images was false because the string
-        # literal 'true' was always the fallback.  The corrected form only sets
-        # DISPATCH_PUSH=false when the caller explicitly opted out on a dispatch.
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.push_images }}" == "false" ]]; then
-          DISPATCH_PUSH="false"
-        else
-          DISPATCH_PUSH="true"
-        fi
-        if [[ "${{ env.PUSH_TO_REGISTRY }}" == "true" && "${{ github.event_name }}" != "pull_request" && "$DISPATCH_PUSH" == "true" ]]; then
-          # Build multi-platform image and push to registry
-          docker buildx build \
-            --platform "$BUILD_PLATFORMS" \
-            --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-            --build-arg "VERSION=$VERSION" \
-            --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
-            --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
-            --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT" \
-            --provenance=true \
-            --sbom=true \
-            --annotation "index:org.opencontainers.image.title=Open Resource Broker API" \
-            --annotation "index:org.opencontainers.image.description=REST API for Open Resource Broker - Dynamic cloud resource provisioning" \
-            --annotation "index:org.opencontainers.image.source=https://github.com/finos/open-resource-broker" \
-            --annotation "index:org.opencontainers.image.licenses=Apache-2.0" \
-            --annotation "index:org.opencontainers.image.documentation=https://finos.github.io/open-resource-broker/" \
-            --metadata-file metadata.json \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            --push \
-            -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
-            .
-
-          # Extract the immutable digest for the signing steps below.
-          DIGEST=$(jq -r '."containerimage.digest"' metadata.json)
-          {
-            echo "digest=${DIGEST}"
-            echo "image=${REGISTRY}/${IMAGE_NAME}"
-            echo "pushed=true"
-          } >> "$GITHUB_OUTPUT"
-
-          # Pull back a single-arch image for local Trivy scanning.
-          # Multi-arch manifests cannot be loaded/scanned; we use the first
-          # entry of build-platforms (SCAN_PLATFORM) rather than hardcoding amd64.
-          docker pull --platform "$SCAN_PLATFORM" "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION"
-        else
-          # Build single platform for scanning only (PR/test builds).
-          # Use the first entry of build-platforms (SCAN_PLATFORM) so the
-          # scan arch tracks .project.yml rather than a hardcoded value.
-          docker buildx build \
-            --platform "$SCAN_PLATFORM" \
-            --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-            --build-arg "VERSION=$VERSION" \
-            --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
-            --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
-            --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT" \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            --load \
-            -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
-            .
-          echo "pushed=false" >> "$GITHUB_OUTPUT"
-        fi
+      uses: ./.github/actions/container-build
+      with:
+        python-version: ${{ matrix.python-version }}
+        # Only a manual dispatch can opt out of pushing.
+        push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
+        cache-to: 'true'
+        registry: ${{ needs.config.outputs.container-registry }}
+        image-name: ${{ needs.config.outputs.container-image }}
+        version: ${{ needs.config.outputs.package-version }}
+        build-platforms: ${{ needs.config.outputs.build-platforms }}
+        package-name-short: ${{ needs.config.outputs.short-name }}
+        scan-level: ${{ matrix.python-version == needs.config.outputs.default-python-version && 'full' || 'basic' }}
+        run-hadolint: ${{ matrix.python-version == needs.config.outputs.default-python-version && 'true' || 'false' }}
 
     - name: Install cosign
-      # Only needed when an image was pushed; skip on PR / local-only builds.
       if: steps.build.outputs.pushed == 'true'
       uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2
 
@@ -369,45 +347,11 @@ jobs:
         subject-digest: ${{ steps.build.outputs.digest }}
         push-to-registry: true
 
-    - name: Run Trivy security scan
-      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
-      with:
-        image-ref: "${{ needs.config.outputs.container-registry }}/${{ needs.config.outputs.container-image }}:${{ needs.config.outputs.package-version }}-python${{ matrix.python-version }}"
-        format: 'sarif'
-        output: 'trivy-results-py${{ matrix.python-version }}.sarif'
-        exit-code: '0'
-        severity: ${{ env.SCAN_LEVEL == 'full' && 'CRITICAL,HIGH,MEDIUM' || 'CRITICAL,HIGH' }}
-        limit-severities-for-sarif: true
-        trivyignores: .trivyignore.yaml
-
-    - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
-      if: always()
-      with:
-        sarif_file: 'trivy-results-py${{ matrix.python-version }}.sarif'
-
-    - name: Run Hadolint Dockerfile scan
-      if: matrix.python-version == needs.config.outputs.default-python-version
-      uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387  # v3.5.0
-      with:
-        dockerfile: Dockerfile
-        format: sarif
-        output-file: hadolint-dockerfile.sarif
-        no-fail: true
-
-    - name: Upload Hadolint scan results
-      if: matrix.python-version == needs.config.outputs.default-python-version
-      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
-      with:
-        sarif_file: hadolint-dockerfile.sarif
-
-
-
   container-manifest:
     name: Create Multi-Architecture Manifests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [config, calculate-tags, container-pipeline]
+    needs: [config, calculate-tags, container-publish]
     # 'release' is not a trigger for this workflow so the disjunct was dead; keep only the main-branch guard.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
 
@@ -459,7 +403,7 @@ jobs:
     name: Validate Container Tags
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [config, calculate-tags, container-manifest]
+    needs: [config, calculate-tags, container-publish, container-manifest]
     # 'release' is not a trigger for this workflow so the disjunct was dead; keep only the main-branch guard.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
 
