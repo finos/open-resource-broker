@@ -259,11 +259,16 @@ jobs:
         # Filelock advisories with no fix for Python 3.10: every fixed release
         # requires Python >= 3.11, while orb-py still supports 3.10. ORB does not
         # use the affected ReadWriteLock / SoftFileLock APIs. Same exception as
-        # the filelock entries in .trivyignore.yaml; review by 2027-01-01 or when
-        # Python 3.10 support ends.
+        # the filelock entries in .trivyignore.yaml: Python 3.10 resolves
+        # filelock 4.1.0, which is affected, and every fix (4.2.1) requires
+        # Python >= 3.11. Review by 2027-01-27 or when Python 3.10 support ends.
         allow-ghsas: >-
           GHSA-v4x8-3wr5-3wq8, GHSA-jqc4-5cvw-7w85, GHSA-crv4-6mhj-j5jh,
-          GHSA-2g95-wg33-c5x2, GHSA-567q-5qvw-pf92, GHSA-9vhv-jxww-xfm5
+          GHSA-2g95-wg33-c5x2, GHSA-567q-5qvw-pf92, GHSA-9vhv-jxww-xfm5,
+          GHSA-6627-m3xw-93mp, GHSA-69hj-f68j-2879, GHSA-8mx5-7m5m-r77g,
+          GHSA-9c4x-gm8v-wgc4, GHSA-cwqr-hh33-gh44, GHSA-fj95-fr6c-h845,
+          GHSA-fq56-3cx3-fjxp, GHSA-m462-7rxw-wvpg, GHSA-rfpc-qcw5-3pc4,
+          GHSA-9j6q-wvj5-jgjg, GHSA-wfhq-q4j2-c37m
 
     # Dependabot PRs that add a vulnerable version.
     #

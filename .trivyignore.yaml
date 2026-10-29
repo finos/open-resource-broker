@@ -7,130 +7,573 @@
 vulnerabilities:
   # ── Debian 13 (trixie) OS-package CVEs with no upstream fix ────────────────
   #
-  # All findings below are in the python:3.X-slim base image (Debian 13.6 for
-  # 3.14, Debian 13.4 for older variants). The Dockerfile already runs
-  # `apt-get upgrade -y` so every Debian patch available at build time is
-  # applied. Each entry is suppressed only because Debian has not yet
-  # published a fixed package version for Debian 13 specifically (status
-  # "affected", no Fixed Version in the Trivy report). Re-evaluate on every
-  # release and drop the entry as soon as a fixed Debian 13 package is
-  # available.
+  # These findings are in the python:3.X-slim base image. The Dockerfile already
+  # runs `apt-get upgrade -y`, so every Debian patch available at build time is
+  # applied. Each entry is scoped to the affected Debian binary packages with
+  # purls and is suppressed only because the Debian security tracker
+  # (https://security-tracker.debian.org/tracker/<CVE>) lists the trixie source
+  # package as "vulnerable" with no fixed version for trixie. Each entry expires
+  # on its own: re-check the tracker, and drop the entry as soon as a fixed
+  # trixie package exists.
 
   - id: CVE-2025-69720
+    purls:
+      - pkg:deb/debian/libncursesw6
+      - pkg:deb/debian/libtinfo6
+      - pkg:deb/debian/ncurses-base
+      - pkg:deb/debian/ncurses-bin
     statement: >-
-      Buffer overflow in ncurses (libncursesw6 / libtinfo6 / ncurses-base /
-      ncurses-bin) that may lead to arbitrary code execution. No fixed
-      package in Debian 13.
-    expired_at: 2027-01-01
-
-  - id: CVE-2026-54369
-    statement: >-
-      Symlink traversal privilege escalation via libacl1 functions. No fixed
-      package in Debian 13.
-    expired_at: 2027-01-01
-
-  - id: CVE-2026-9538
-    statement: >-
-      perl-base (perl-IO-Compress): denial of service via a crafted tar
-      header. No fixed package in Debian 13; status "fix_deferred".
-    expired_at: 2027-01-01
-
-  - id: CVE-2026-76642
-    statement: >-
-      util-linux: a failed external mount helper still runs privileged
-      X-mount post-hooks (bsdutils, libblkid1, liblastlog2-2, libmount1,
-      libsmartcols1, libuuid1, login, mount, util-linux). No fixed package
-      in Debian 13.
-    expired_at: 2027-01-01
-
-  - id: CVE-2026-78408
-    statement: >-
-      util-linux: nsenter --join-cgroup leaks root cgroup migration
-      authority (bsdutils, libblkid1, liblastlog2-2, libmount1,
-      libsmartcols1, libuuid1, login, mount, util-linux). No fixed package
-      in Debian 13.
-    expired_at: 2027-01-01
-
-  - id: CVE-2026-78409
-    statement: >-
-      util-linux: X-mount.subdir detached-tree resolution can escape via
-      intermediate symlinks (bsdutils, libblkid1, liblastlog2-2, libmount1,
-      libsmartcols1, libuuid1, login, mount, util-linux). No fixed package
-      in Debian 13.
-    expired_at: 2027-01-01
-
-  - id: CVE-2026-78410
-    statement: >-
-      util-linux: restricted bind mounts do not pin the source, allowing
-      X-mount.owner/group/mode changes to escape the restriction (bsdutils,
-      libblkid1, liblastlog2-2, libmount1, libsmartcols1, libuuid1, login,
-      mount, util-linux). No fixed package in Debian 13.
-    expired_at: 2027-01-01
+      ncurses: ncurses: Buffer overflow vulnerability may lead to arbitrary code execution. Debian
+      security tracker lists no fixed version for trixie (source package ncurses, trixie
+      6.5+20250216-2: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
 
   - id: CVE-2026-16742
+    purls:
+      - pkg:deb/debian/libsystemd0
+      - pkg:deb/debian/libudev1
     statement: >-
-      systemd-homed: local privilege escalation (libsystemd0, libudev1).
-      No fixed package in Debian 13.
-    expired_at: 2027-01-01
+      systemd: systemd-homed: Local privilege escalation via missing home-record signature
+      verification. Debian security tracker lists no fixed version for trixie (source package
+      systemd, trixie 257.13-1~deb13u1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
 
-  # ── filelock ───────────────────────────────────────────────────────────────
+  - id: CVE-2026-54369
+    purls:
+      - pkg:deb/debian/libacl1
+    statement: >-
+      acl: Symlink traversal privilege escalation via libacl functions. Debian security tracker
+      lists no fixed version for trixie (source package acl, trixie 2.3.2-2: vulnerable; checked
+      2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-76642
+    purls:
+      - pkg:deb/debian/bsdutils
+      - pkg:deb/debian/libblkid1
+      - pkg:deb/debian/liblastlog2-2
+      - pkg:deb/debian/libmount1
+      - pkg:deb/debian/libsmartcols1
+      - pkg:deb/debian/libuuid1
+      - pkg:deb/debian/login
+      - pkg:deb/debian/mount
+      - pkg:deb/debian/util-linux
+    statement: >-
+      util-linux: util-linux: failed external mount helper still runs privileged X-mount post-hooks.
+      Debian security tracker lists no fixed version for trixie (source package util-linux, trixie
+      2.41.5-0+deb13u1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-78408
+    purls:
+      - pkg:deb/debian/bsdutils
+      - pkg:deb/debian/libblkid1
+      - pkg:deb/debian/liblastlog2-2
+      - pkg:deb/debian/libmount1
+      - pkg:deb/debian/libsmartcols1
+      - pkg:deb/debian/libuuid1
+      - pkg:deb/debian/login
+      - pkg:deb/debian/mount
+      - pkg:deb/debian/util-linux
+    statement: >-
+      util-linux: util-linux: nsenter --join-cgroup leaks root cgroup migration authority. Debian
+      security tracker lists no fixed version for trixie (source package util-linux, trixie
+      2.41.5-0+deb13u1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-78409
+    purls:
+      - pkg:deb/debian/bsdutils
+      - pkg:deb/debian/libblkid1
+      - pkg:deb/debian/liblastlog2-2
+      - pkg:deb/debian/libmount1
+      - pkg:deb/debian/libsmartcols1
+      - pkg:deb/debian/libuuid1
+      - pkg:deb/debian/login
+      - pkg:deb/debian/mount
+      - pkg:deb/debian/util-linux
+    statement: >-
+      util-linux: util-linux: X-mount.subdir detached-tree resolution can escape via intermediate
+      symlinks. Debian security tracker lists no fixed version for trixie (source package util-
+      linux, trixie 2.41.5-0+deb13u1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-78410
+    purls:
+      - pkg:deb/debian/bsdutils
+      - pkg:deb/debian/libblkid1
+      - pkg:deb/debian/liblastlog2-2
+      - pkg:deb/debian/libmount1
+      - pkg:deb/debian/libsmartcols1
+      - pkg:deb/debian/libuuid1
+      - pkg:deb/debian/login
+      - pkg:deb/debian/mount
+      - pkg:deb/debian/util-linux
+    statement: >-
+      util-linux: util-linux: restricted bind mounts do not pin the source, allowing
+      X-mount.owner/group/mode redirection. Debian security tracker lists no fixed version for
+      trixie (source package util-linux, trixie 2.41.5-0+deb13u1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-9538
+    purls:
+      - pkg:deb/debian/perl-base
+    statement: >-
+      perl-Archive-Tar: perl-Archive-Tar: Denial of Service via crafted tar header with large entry
+      size. Debian security tracker lists no fixed version for trixie (source package perl, trixie
+      5.40.1-6+deb13u1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-102010
+    purls:
+      - pkg:deb/debian/gcc-14-base
+      - pkg:deb/debian/libgcc-s1
+      - pkg:deb/debian/libstdc%2B%2B6
+    statement: >-
+      gcc-toolset-15-gcc: gcc: gcc-toolset-16: gcc: Denial of Service via use-after-free in binary
+      heap erase_if. Debian security tracker lists no fixed version for trixie (source package
+      gcc-14, trixie 14.2.0-19: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-15059
+    purls:
+      - pkg:deb/debian/libsystemd0
+      - pkg:deb/debian/libudev1
+    statement: >-
+      systemd: systemd-oomd: Unprivileged users can terminate arbitrary processes via IPC API.
+      Debian security tracker lists no fixed version for trixie (source package systemd, trixie
+      257.13-1~deb13u1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-15534
+    purls:
+      - pkg:deb/debian/perl-base
+    statement: >-
+      perl: Perl: Arbitrary code execution via out-of-bounds memory access in regular expression
+      engine. Debian security tracker lists no fixed version for trixie (source package perl, trixie
+      5.40.1-6+deb13u1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-18374
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: glibc: Heap buffer overflow via attacker-controlled fopen mode string. Debian security
+      tracker lists no fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4:
+      vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-18477
+    purls:
+      - pkg:deb/debian/tar
+    statement: >-
+      tar: tar: TOCTOU in incremental dumpdir 'X' rename handling allows restore path escape. Debian
+      security tracker lists no fixed version for trixie (source package tar, trixie 1.35+dfsg-3.1:
+      vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-18508
+    purls:
+      - pkg:deb/debian/tar
+    statement: >-
+      tar: tar: --one-top-level hardlink targets not confined to top-level directory enabling
+      arbitrary file overwrite. Debian security tracker lists no fixed version for trixie (source
+      package tar, trixie 1.35+dfsg-3.1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-19499
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: Buffer Overflow in strfmon right-justification padding. Debian security tracker lists
+      no fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked
+      2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-19542
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: Fix out-of-bounds array write in tdelete. Debian security tracker lists no fixed
+      version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked
+      2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-27171
+    purls:
+      - pkg:deb/debian/zlib1g
+    statement: >-
+      zlib: zlib: Denial of Service via infinite loop in CRC32 combine functions. Debian security
+      tracker lists no fixed version for trixie (source package zlib, trixie
+      1:1.3.dfsg+really1.3.1-1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-3184
+    purls:
+      - pkg:deb/debian/bsdutils
+      - pkg:deb/debian/libblkid1
+      - pkg:deb/debian/liblastlog2-2
+      - pkg:deb/debian/libmount1
+      - pkg:deb/debian/libsmartcols1
+      - pkg:deb/debian/libuuid1
+      - pkg:deb/debian/login
+      - pkg:deb/debian/mount
+      - pkg:deb/debian/util-linux
+    statement: >-
+      util-linux: util-linux: Access control bypass due to improper hostname canonicalization.
+      Debian security tracker lists no fixed version for trixie (source package util-linux, trixie
+      2.41.5-0+deb13u1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-42250
+    purls:
+      - pkg:deb/debian/libbz2-1.0
+    statement: >-
+      bzip2: bzip2: Denial of Service in bzip2recover via a specially crafted file. Debian security
+      tracker lists no fixed version for trixie (source package bzip2, trixie 1.0.8-6: vulnerable;
+      checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-50812
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: SQLite: Denial of Service via malformed changeset in Session Extension. Debian
+      security tracker lists no fixed version for trixie (source package sqlite3, trixie
+      3.46.1-7+deb13u2: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-50813
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: SQLite: Information disclosure via Session Extension changeset merge path. Debian
+      security tracker lists no fixed version for trixie (source package sqlite3, trixie
+      3.46.1-7+deb13u2: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-5435
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: glibc: Out-of-bounds write via TSIG record processing. Debian security tracker lists no
+      fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked
+      2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-54370
+    purls:
+      - pkg:deb/debian/libacl1
+    statement: >-
+      acl: TOCTOU Symlink Traversal via getfacl/setfacl. Debian security tracker lists no fixed
+      version for trixie (source package acl, trixie 2.3.2-2: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-54371
+    purls:
+      - pkg:deb/debian/libattr1
+    statement: >-
+      attr: attr: Symlink Traversal Privilege Escalation via getfattr and setfattr. Debian security
+      tracker lists no fixed version for trixie (source package attr, trixie 1:2.5.2-3: vulnerable;
+      checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-54411
+    purls:
+      - pkg:deb/debian/libpam-modules
+      - pkg:deb/debian/libpam-modules-bin
+      - pkg:deb/debian/libpam-runtime
+      - pkg:deb/debian/libpam0g
+    statement: >-
+      linux-pam: Plaintext password recovery via timing discrepancy in pam_userdb module. Debian
+      security tracker lists no fixed version for trixie (source package pam, trixie 1.7.0-5:
+      vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-5704
+    purls:
+      - pkg:deb/debian/tar
+    statement: >-
+      tar: tar: Hidden file injection via crafted archives. Debian security tracker lists no fixed
+      version for trixie (source package tar, trixie 1.35+dfsg-3.1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-6238
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: glibc: Application crash or uninitialized memory read via crafted DNS response. Debian
+      security tracker lists no fixed version for trixie (source package glibc, trixie
+      2.41-12+deb13u4: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-6368
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: glibc: Process abort due to invalid memory in wordexp. Debian security tracker lists no
+      fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked
+      2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-6791
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: Glibc: Denial of Service via stack exhaustion during tilde expansion. Debian security
+      tracker lists no fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4:
+      vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-77117
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: Non-progress DoS in SHIFT_JISX0213 -&gt. Debian security tracker lists no fixed version
+      for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-80489
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: Non-progress DoS in EUC_JISX0213 -> UCS-4 conversion state. Debian security tracker
+      lists no fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable;
+      checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-85091
+    purls:
+      - pkg:deb/debian/zlib1g
+    statement: >-
+      zlib versions 1.3.1.2 through 1.3.2 contain a heap buffer overflow vul . Debian security
+      tracker lists no fixed version for trixie (source package zlib, trixie
+      1:1.3.dfsg+really1.3.1-1: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-8674
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: glibc DNS stub resolver: Denial of Service via long search domain in configuration.
+      Debian security tracker lists no fixed version for trixie (source package glibc, trixie
+      2.41-12+deb13u4: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-86805
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: glibc: Privilege escalation and arbitrary code execution via TOCTOU race condition in
+      dynamic loader. Debian security tracker lists no fixed version for trixie (source package
+      glibc, trixie 2.41-12+deb13u4: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-89092
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: nscd stack overflow leads to degraded DNS resolution. Debian security tracker lists no
+      fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked
+      2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-95619
+    purls:
+      - pkg:deb/debian/gcc-14-base
+      - pkg:deb/debian/libgcc-s1
+      - pkg:deb/debian/libstdc%2B%2B6
+    statement: >-
+      gcc: libstdc++ integer overflow in `new` operator. Debian security tracker lists no fixed
+      version for trixie (source package gcc-14, trixie 14.2.0-19: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-95818
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: glibc: Local attacker can cause denial of service and information disclosure via stack-
+      based buffer overflow. Debian security tracker lists no fixed version for trixie (source
+      package glibc, trixie 2.41-12+deb13u4: vulnerable; checked 2026-10-29).
+    expired_at: 2027-01-27
+
+  # ── filelock on Python 3.10 ────────────────────────────────────────────────
   #
-  # Every filelock fix is in 4.2.1 or later, and those releases require
-  # Python >= 3.11, while orb-py supports Python 3.10 (the newest
-  # 3.10-compatible release, 4.1.0, is still affected). All advisories below
-  # concern ReadWriteLock or SoftFileLock and need a local user with write
-  # access to the lock directory. orb-py does not use either class; its own
-  # code only uses the plain FileLock (live test helpers), and the other
-  # dependents (cachecontrol, virtualenv, python-discovery) are dev tooling
-  # that also only use FileLock. Re-evaluate when Python 3.10 support ends.
+  # Python 3.10 resolves filelock to 4.1.0, the newest release that supports it;
+  # every fix is in 4.2.1, which requires Python >= 3.11. Python 3.11 and later
+  # resolve filelock 4.2.4, so these entries are scoped to the exact 4.1.0 purl
+  # and do not apply there. The advisories concern ReadWriteLock, SoftFileLock,
+  # StrictSoftFileLock, UnixFileLock and WindowsFileLock and need a local user
+  # with write access to the lock directory. No module under src/ imports
+  # filelock; the only direct use in the repository is the plain FileLock in the
+  # live k8s test helpers.
 
   - id: CVE-2026-112940
     purls:
-      - pkg:pypi/filelock
+      - pkg:pypi/filelock@4.1.0
     statement: >-
-      filelock (GHSA-v4x8-3wr5-3wq8): ReadWriteLock reopens its SQLite lock database by name, so a local user who can write to the lock directory can plant a symlink or journal file. Fixed only in
-      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
-    expired_at: 2027-01-01
-
-  - id: CVE-2026-112937
-    purls:
-      - pkg:pypi/filelock
-    statement: >-
-      filelock (GHSA-jqc4-5cvw-7w85): ReadWriteLock's hard-link route recursively deletes a path another local user can rename onto its link directory name. Fixed only in
-      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
-    expired_at: 2027-01-01
-
-  - id: CVE-2026-112914
-    purls:
-      - pkg:pypi/filelock
-    statement: >-
-      filelock (GHSA-crv4-6mhj-j5jh): SoftFileLock stale-break restore follows a swapped-in symlink in a shared lock directory. Fixed only in
-      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
-    expired_at: 2027-01-01
+      filelock (GHSA-v4x8-3wr5-3wq8): filelock ReadWriteLock: SQLite reopens the lock database by
+      name, so a planted symlink or journal file makes the lock user's process overwrite or unlink
+      its own files. Fixed only in filelock >= 4.2.1, which requires Python >= 3.11; Python 3.10
+      resolves 4.1.0.
+    expired_at: 2027-01-27
 
   - id: CVE-2026-112906
     purls:
-      - pkg:pypi/filelock
+      - pkg:pypi/filelock@4.1.0
     statement: >-
-      filelock (GHSA-2g95-wg33-c5x2): SoftFileLock can evict a fresh lock file through inode reuse by another local user. Fixed only in
-      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
-    expired_at: 2027-01-01
+      filelock (GHSA-2g95-wg33-c5x2): SoftFileLock evicts a fresh lock file whose watched age
+      another local user's pre-dated file passed on through inode reuse. Fixed only in filelock >=
+      4.2.1, which requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112908
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-6627-m3xw-93mp): StrictSoftFileLock creates its claim directories without the
+      lock mode, so another local user with a write bit on them can end a live hold. Fixed only in
+      filelock >= 4.2.1, which requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112909
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-69hj-f68j-2879): UnixFileLock truncates and chmods any regular file another
+      user renames or hard-links onto the lock path. Fixed only in filelock >= 4.2.1, which requires
+      Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112910
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-8mx5-7m5m-r77g): WindowsFileLock ignores mode: a 0o600 lock file and the
+      ReadWriteLock database inherit the directory ACL. Fixed only in filelock >= 4.2.1, which
+      requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112911
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-9c4x-gm8v-wgc4): StrictSoftFileLock and SoftReadWriteLock adopt a protocol
+      directory another user created first, losing mutual exclusion. Fixed only in filelock >=
+      4.2.1, which requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112914
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-crv4-6mhj-j5jh): SoftFileLock stale-break restore follows a swapped-in symbolic
+      link and hard-links a file of the user running the lock into the lock directory. Fixed only in
+      filelock >= 4.2.1, which requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112915
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-cwqr-hh33-gh44): filelock ReadWriteLock: a crafted lock database makes every
+      acquire stall or hang regardless of timeout. Fixed only in filelock >= 4.2.1, which requires
+      Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112934
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-fj95-fr6c-h845): SoftReadWriteLock holder refresh writes through a hard link
+      and hangs on a named pipe that another local user renames over its record. Fixed only in
+      filelock >= 4.2.1, which requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112935
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-fq56-3cx3-fjxp): SoftFileLock stale-lock break removes a live lock file on a
+      reused inode number and admits two holders. Fixed only in filelock >= 4.2.1, which requires
+      Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112937
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-jqc4-5cvw-7w85): ReadWriteLock on the hard-link route deletes any directory
+      another user renames onto its .filelock-* link directory name. Fixed only in filelock >=
+      4.2.1, which requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112938
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-m462-7rxw-wvpg): StrictSoftFileLock follows a symbolic link swapped in at
+      <path>.filelock and creates claim files in a directory another local user chooses. Fixed only
+      in filelock >= 4.2.1, which requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112939
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-rfpc-qcw5-3pc4): SoftFileLock removes a live holder's marker when another user
+      forges the PID in a writable marker. Fixed only in filelock >= 4.2.1, which requires Python >=
+      3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
 
   - id: CVE-2026-112907
     purls:
-      - pkg:pypi/filelock
+      - pkg:pypi/filelock@4.1.0
     statement: >-
-      filelock (GHSA-567q-5qvw-pf92): Windows-only SoftFileLock oplock hang. Fixed only in
-      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
-    expired_at: 2027-01-01
+      filelock (GHSA-567q-5qvw-pf92): On Windows an oplock on a soft lock's marker holds
+      SoftFileLock.acquire() past its timeout and blocks the stale break. Fixed only in filelock >=
+      4.2.1, which requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112912
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-9j6q-wvj5-jgjg): Symlink swap during SoftFileLock's writability check leaks
+      whether a path exists and is writable by the lock taker. Fixed only in filelock >= 4.2.1,
+      which requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
 
   - id: CVE-2026-112913
     purls:
-      - pkg:pypi/filelock
+      - pkg:pypi/filelock@4.1.0
     statement: >-
-      filelock (GHSA-9vhv-jxww-xfm5): Windows-only ReadWriteLock side-file issue. Fixed only in
-      filelock >= 4.2.1, which requires Python >= 3.11. Not used by orb-py.
-    expired_at: 2027-01-01
+      filelock (GHSA-9vhv-jxww-xfm5): ReadWriteLock on Windows acts on SQLite side files another
+      local user places beside its database. Fixed only in filelock >= 4.2.1, which requires Python
+      >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-112941
+    purls:
+      - pkg:pypi/filelock@4.1.0
+    statement: >-
+      filelock (GHSA-wfhq-q4j2-c37m): SoftReadWriteLock follows a lock tree swapped in after its
+      first acquire and writes lock records into directories of the user running the lock. Fixed
+      only in filelock >= 4.2.1, which requires Python >= 3.11; Python 3.10 resolves 4.1.0.
+    expired_at: 2027-01-27
 
 secrets:
   # moto (AWS mocking library) ships fixed self-signed TLS certificates for
