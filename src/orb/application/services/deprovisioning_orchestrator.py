@@ -15,6 +15,40 @@ from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports import ContainerPort, LoggingPort, ProviderSelectionPort
 
 
+def _reconcile_ids(
+    requested: list[str], reported_ok: list[str] | None, reported_failed: list[str] | None
+) -> tuple[list[str], list[str]]:
+    """Reconcile provider-reported instance IDs with the requested set.
+
+    Matching is exact string equality: ``machine_id.value`` is the contract and
+    providers must echo it verbatim. A provider that normalises IDs gets its
+    machines treated as failed, which is the safe direction.
+
+    Returns ``(succeeded, failed)`` where both are subsets of ``requested``,
+    de-duplicated, in requested order, and disjoint. An ID reported in both
+    lists is failed. Requested IDs that are reported in neither list are failed.
+    When only a failed list is reported, the remaining requested IDs are
+    inferred to have succeeded, provided the list names at least one requested ID.
+    """
+    requested_set = set(requested)
+    failed_reported = {iid for iid in (reported_failed or []) if iid in requested_set}
+
+    if reported_ok is not None:
+        ok_reported = {iid for iid in reported_ok if iid in requested_set}
+    elif failed_reported:
+        ok_reported = requested_set - failed_reported
+    else:
+        ok_reported = set()
+
+    unique_requested = list(dict.fromkeys(requested))
+    succeeded = [
+        iid for iid in unique_requested if iid in ok_reported and iid not in failed_reported
+    ]
+    succeeded_set = set(succeeded)
+    failed = [iid for iid in unique_requested if iid not in succeeded_set]
+    return succeeded, failed
+
+
 class DeprovisioningOrchestrator:
     """Orchestrates parallel deprovisioning operations across providers."""
 
@@ -103,12 +137,16 @@ class DeprovisioningOrchestrator:
                         unreported_failed = [
                             iid for iid in group_instance_ids if iid not in succeeded_set
                         ]
-                        failed_instance_ids.extend(
-                            dict.fromkeys([*group_failed, *unreported_failed])
-                        )
+                        failed_instance_ids.extend([*group_failed, *unreported_failed])
                     else:
                         errors.append("Unknown error")
                         failed_instance_ids.extend(group_instance_ids)
+
+            successful_instance_ids = list(dict.fromkeys(successful_instance_ids))
+            succeeded_all = set(successful_instance_ids)
+            failed_instance_ids = [
+                iid for iid in dict.fromkeys(failed_instance_ids) if iid not in succeeded_all
+            ]
 
             partial = error_count > 0 and len(successful_instance_ids) > 0
 
@@ -243,21 +281,33 @@ class DeprovisioningOrchestrator:
 
                 raw_successful = provider_data.get("successful_instance_ids")
                 raw_failed = provider_data.get("failed_instance_ids")
-                has_successful = isinstance(raw_successful, (list, tuple))
-                has_failed = isinstance(raw_failed, (list, tuple))
+                reported_ok = (
+                    [str(iid) for iid in raw_successful]
+                    if isinstance(raw_successful, (list, tuple))
+                    else None
+                )
+                reported_failed = (
+                    [str(iid) for iid in raw_failed]
+                    if isinstance(raw_failed, (list, tuple))
+                    else None
+                )
 
-                if has_successful:
-                    successful_ids = [str(iid) for iid in raw_successful]
-                elif has_failed and raw_failed:
-                    failed_seed = {str(iid) for iid in raw_failed}
-                    successful_ids = [iid for iid in instance_ids if iid not in failed_seed]
-                else:
-                    successful_ids = []
+                successful_ids, failed_ids = _reconcile_ids(
+                    instance_ids, reported_ok, reported_failed
+                )
 
-                succeeded_set = set(successful_ids)
-                reported_failed = [str(iid) for iid in raw_failed] if has_failed else []
-                unreported_failed = [iid for iid in instance_ids if iid not in succeeded_set]
-                failed_ids = list(dict.fromkeys([*reported_failed, *unreported_failed]))
+                requested_set = set(instance_ids)
+                foreign = {
+                    iid
+                    for iid in [*(reported_ok or []), *(reported_failed or [])]
+                    if iid not in requested_set
+                }
+                if foreign:
+                    self.logger.warning(
+                        "Provider reported %d instance ID(s) not in the request for resource %s; ignored",
+                        len(foreign),
+                        resource_id,
+                    )
 
                 if successful_ids and failed_ids:
                     self.logger.warning(
