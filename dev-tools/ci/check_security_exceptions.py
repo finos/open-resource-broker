@@ -83,13 +83,34 @@ def load_allow_ghsas(path: Path) -> list[str]:
     return [v.strip() for v in re.split(r"[,\s]+", value) if v.strip()]
 
 
+def _build_https_only_opener() -> urllib.request.OpenerDirector:
+    """Return an opener that only speaks HTTPS.
+
+    build_opener() would add the default file:// and ftp:// handlers; building
+    the director by hand means a non-HTTPS URL cannot be opened at all.
+    """
+    opener = urllib.request.OpenerDirector()
+    for handler in (
+        urllib.request.HTTPSHandler(),
+        urllib.request.UnknownHandler(),
+        urllib.request.HTTPDefaultErrorHandler(),
+        urllib.request.HTTPErrorProcessor(),
+    ):
+        opener.add_handler(handler)
+    return opener
+
+
+_OSV_OPENER = _build_https_only_opener()
+
+
 def query_osv(vuln_id: str) -> dict | None:
     """Fetch an OSV vulnerability record by ID, or None if it does not exist.
 
     The ID is validated against VULN_ID_RE and percent-encoded before being
-    appended to the fixed https:// OSV_API_BASE, so the final URL can never
-    resolve to a file:// path or another unexpected scheme even though it
-    is built from a value that ultimately comes from local config files.
+    appended to the fixed https:// OSV_API_BASE, and requests go through an
+    HTTPS-only opener, so the final URL can never resolve to a file:// path or
+    another unexpected scheme even though it is built from a value that
+    ultimately comes from local config files.
     """
     if not VULN_ID_RE.match(vuln_id):
         print(f"skipping {vuln_id!r}: not a recognised OSV vulnerability ID", file=sys.stderr)
@@ -99,17 +120,10 @@ def query_osv(vuln_id: str) -> dict | None:
     if not url.startswith(OSV_API_BASE):
         raise ValueError(f"refusing to request unexpected URL {url!r}")
 
-    request = urllib.request.Request(url)
     try:
-        # url is built from the fixed https:// OSV_API_BASE plus an ID that
-        # has already been validated against VULN_ID_RE and percent-encoded
-        # above, and is checked to still start with OSV_API_BASE immediately
-        # before this call, so it can never resolve to a file:// path.
-        with (
-            urllib.request.urlopen(  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-                request, timeout=REQUEST_TIMEOUT_SECONDS
-            ) as response
-        ):
+        with _OSV_OPENER.open(
+            urllib.request.Request(url), timeout=REQUEST_TIMEOUT_SECONDS
+        ) as response:
             return json.loads(response.read())
     except urllib.error.HTTPError as exc:
         if exc.code == 404:

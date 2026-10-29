@@ -10,8 +10,11 @@ ARG PYTHON_VERSION=3.13
 ARG PACKAGE_NAME_SHORT=orb
 
 # Apply all available security patches and upgrade Python toolchain
-# Unpinned: Debian drops superseded package versions, so exact pins break builds.
-# hadolint ignore=DL3008
+# DL3008: unpinned apt packages, because Debian drops superseded package versions
+# and exact pins break builds.
+# DL3013: pip is upgraded here to the latest release on purpose; it is removed
+# again below, so a pinned version would only go stale.
+# hadolint ignore=DL3008,DL3013
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \

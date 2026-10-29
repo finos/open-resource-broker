@@ -97,6 +97,10 @@ def handle_single():
     ]
 
     try:
+        # cmd is a list (no shell) and every environment-derived element is
+        # constrained by validate_python_version, validate_registry,
+        # validate_image_name and validate_version above.
+        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
         subprocess.run(cmd, check=True)
         return 0
     except subprocess.CalledProcessError as e:
