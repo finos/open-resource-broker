@@ -19,13 +19,12 @@ Resolution rules:
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
-if sys.version_info >= (3, 11):
+try:
     import tomllib
-else:
-    import tomllib  # available via backport in Python 3.10
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 
 _PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -19,6 +20,9 @@ from orb.application.services.orchestration.validate_template import ValidateTem
 from orb.domain.base.exceptions import DuplicateError, EntityNotFoundError
 from orb.domain.base.ports.console_port import ConsolePort
 from orb.interface.response_formatting_service import ResponseFormattingService
+
+_DRY_RUN_MODULE = importlib.import_module("orb.infrastructure.mocking.dry_run_context")
+
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -307,9 +311,7 @@ class TestHandleCreateTemplateErrors:
         args = _make_args(file=str(tmp_path / "ghost.json"))
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             result = await handle_create_template(args)
 
         assert isinstance(result, InterfaceResponse)
@@ -328,9 +330,7 @@ class TestHandleCreateTemplateErrors:
         args = _make_args(file=str(bad_file))
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             result = await handle_create_template(args)
 
         assert isinstance(result, InterfaceResponse)
@@ -350,9 +350,7 @@ class TestHandleCreateTemplateErrors:
         args = _make_args(file=str(f))
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             result = await handle_create_template(args)
 
         assert isinstance(result, InterfaceResponse)
@@ -372,9 +370,7 @@ class TestHandleCreateTemplateErrors:
         args = _make_args(file=str(f))
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             result = await handle_create_template(args)
 
         assert isinstance(result, InterfaceResponse)
@@ -390,9 +386,7 @@ class TestHandleCreateTemplateErrors:
         args = _make_args()
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             result = await handle_create_template(args)
 
         assert isinstance(result, InterfaceResponse)
@@ -413,9 +407,7 @@ class TestHandleCreateTemplateErrors:
         args = _make_args(file=str(f))
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             result = await handle_create_template(args)
 
         assert isinstance(result, InterfaceResponse)
@@ -442,9 +434,7 @@ class TestHandleCreateTemplateErrors:
         args = _make_args(file=str(f))
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             result = await handle_create_template(args)
 
         assert isinstance(result, InterfaceResponse)
@@ -460,9 +450,7 @@ class TestHandleCreateTemplateErrors:
         args = _make_args(file=str(tmp_path / "t.json"))
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=True
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=True):
             result = await handle_create_template(args)
 
         assert isinstance(result, dict)
@@ -486,9 +474,7 @@ class TestHandleDeleteTemplate:
         args = _make_args()
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             result = await handle_delete_template(args)
 
         assert isinstance(result, InterfaceResponse)
@@ -503,9 +489,7 @@ class TestHandleDeleteTemplate:
         args = _make_args(template_id="t1")
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=True
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=True):
             result = await handle_delete_template(args)
 
         assert isinstance(result, dict)
@@ -521,9 +505,7 @@ class TestHandleDeleteTemplate:
         args = _make_args(template_id="t1", force=False)
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             await handle_delete_template(args)
 
         mocks["formatter"].format_error.assert_called_once()
@@ -540,9 +522,7 @@ class TestHandleDeleteTemplate:
         args = _make_args(template_id="t1", force=True)
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             result = await handle_delete_template(args)
 
         assert isinstance(result, InterfaceResponse)
@@ -562,9 +542,7 @@ class TestHandleDeleteTemplate:
         args = _make_args(template_id="t1", force=True)
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active", return_value=False
-        ):
+        with patch.object(_DRY_RUN_MODULE, "is_dry_run_active", return_value=False):
             result = await handle_delete_template(args)
 
         assert isinstance(result, InterfaceResponse)
