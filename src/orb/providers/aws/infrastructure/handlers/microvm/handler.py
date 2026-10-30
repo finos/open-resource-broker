@@ -287,8 +287,16 @@ class MicroVMHandler(AWSHandler):
         """Compute fulfilment from MicroVM instance states."""
         running_count = sum(1 for i in instances if i.get("status") == "running")
         pending_count = sum(1 for i in instances if i.get("status") == "pending")
+        # A MicroVM that ended in the FAILED state is a launch failure; one that
+        # is terminating or terminated otherwise was taken away on purpose.
         failed_count = sum(
-            1 for i in instances if i.get("status") in ("shutting-down", "terminated")
+            1 for i in instances if (i.get("provider_data") or {}).get("microvm_state") == "FAILED"
+        )
+        torn_down_count = sum(
+            1
+            for i in instances
+            if i.get("status") in ("shutting-down", "terminated")
+            and (i.get("provider_data") or {}).get("microvm_state") != "FAILED"
         )
 
         if running_count >= requested_count:
@@ -311,15 +319,31 @@ class MicroVMHandler(AWSHandler):
                 pending_count=pending_count,
                 failed_count=failed_count,
             )
-        elif failed_count == len(instances) and len(instances) > 0:
+        elif (
+            failed_count == 0
+            and torn_down_count > 0
+            and running_count > 0
+            and running_count + torn_down_count >= requested_count
+        ):
+            return ProviderFulfilment(
+                state="fulfilled",
+                message=f"{running_count} MicroVM(s) running, {torn_down_count} terminated",
+                target_units=requested_count,
+                fulfilled_units=running_count,
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+            )
+        elif failed_count + torn_down_count == len(instances) and len(instances) > 0:
             return ProviderFulfilment(
                 state="failed",
-                message=f"All {failed_count} MicroVM(s) terminated",
+                message=f"All {failed_count + torn_down_count} MicroVM(s) terminated",
                 target_units=requested_count,
                 fulfilled_units=0,
                 running_count=running_count,
                 pending_count=pending_count,
                 failed_count=failed_count,
+                final=True,
             )
         elif running_count > 0:
             return ProviderFulfilment(
@@ -437,6 +461,7 @@ class MicroVMHandler(AWSHandler):
                 "endpoint": microvm_response.get("endpoint"),
                 "image_version": microvm_response.get("imageVersion"),
                 "state_reason": microvm_response.get("stateReason"),
+                "microvm_state": state,
                 "maximum_duration_in_seconds": microvm_response.get("maximumDurationInSeconds"),
             },
             "metadata": {},

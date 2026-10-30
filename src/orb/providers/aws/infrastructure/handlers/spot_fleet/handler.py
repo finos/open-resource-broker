@@ -498,8 +498,8 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         AND failed_count == 0 → fulfilled.
         """
         running_count = sum(1 for i in instances if i.get("status") == "running")
-        pending_count = sum(1 for i in instances if i.get("status") in ("pending", "starting"))
-        failed_count = sum(1 for i in instances if i.get("status") in ("failed", "error"))
+        pending_count = sum(1 for i in instances if i.get("status") == "pending")
+        failed_count = sum(1 for i in instances if i.get("status") == "failed")
         return compute_capacity_based_fulfilment(
             target_capacity=target_capacity,
             fulfilled_capacity=fulfilled_capacity,

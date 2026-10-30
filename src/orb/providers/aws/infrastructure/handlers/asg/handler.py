@@ -753,7 +753,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         sum(WeightedCapacity for InService) >= DesiredCapacity AND
         pending_count == 0 AND failed_count == 0 → fulfilled.
         """
-        failed_count = sum(1 for i in ec2_instances if i.get("status") in ("failed", "error"))
+        failed_count = sum(1 for i in ec2_instances if i.get("status") == "failed")
         running_count = sum(1 for i in ec2_instances if i.get("status") == "running")
 
         asg_fully_fulfilled = desired_capacity > 0 and in_service_weighted >= desired_capacity
