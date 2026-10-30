@@ -17,21 +17,18 @@ ROOT = Path(__file__).resolve().parents[2]
 GITHUB = ROOT / ".github"
 REQUIREMENTS = GITHUB / "requirements"
 
-# Installs that are unlocked by design: the wheel under test, the test runner
-# inside the wheel-test jobs, the wheel build front end, and the changelog tool.
+# Installs that are unlocked by design: the wheel under test.
 ALLOWED_UNLOCKED = (
     "${WHEEL}",
     "find dist",
-    "pip install build wheel",
-    "pip install pytest pytest-mock",
-    "git-changelog",
-    # setup-uv-fresh upgrades the runner's pip to a release that handles
-    # current wheel metadata before uv is bootstrapped; no lock exists yet at
-    # that point and the target is pip itself.
-    'python -m pip install --upgrade "pip>=25.3"',
 )
 INSTALL_COMMAND = re.compile(r"^((uv|python3?\s+-m)\s+)?pip\s+install\b")
 PIN = re.compile(r"^([A-Za-z0-9_.\-]+)==([^\s\;]+)", re.MULTILINE)
+REQUIREMENT = re.compile(r"^([A-Za-z0-9][A-Za-z0-9_.\-]*)", re.MULTILINE)
+
+
+def _normalise(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def _run_scripts() -> list[tuple[str, str]]:
@@ -118,11 +115,16 @@ def test_every_locked_requirement_has_hashes(lock: Path) -> None:
 def test_lock_agrees_with_source_pins(source: Path) -> None:
     lock = source.with_suffix(".txt")
     assert lock.exists(), f"missing lock for {source.name}; run dev-tools/ci/update_tool_locks.sh"
-    locked = dict(PIN.findall(lock.read_text()))
-    pins = PIN.findall(source.read_text())
-    assert pins
-    for package, version in pins:
-        assert locked.get(package) == version, f"{lock.name} does not pin {package}=={version}"
+    locked = {_normalise(k): v for k, v in PIN.findall(lock.read_text())}
+    lines = [line for line in source.read_text().splitlines() if not line.startswith("#")]
+    requirements = REQUIREMENT.findall("\n".join(lines))
+    assert requirements
+    for package in requirements:
+        assert _normalise(package) in locked, f"{lock.name} does not lock {package}"
+    for package, version in PIN.findall(source.read_text()):
+        assert locked.get(_normalise(package)) == version, (
+            f"{lock.name} does not pin {package}=={version}"
+        )
 
 
 @pytest.mark.unit
