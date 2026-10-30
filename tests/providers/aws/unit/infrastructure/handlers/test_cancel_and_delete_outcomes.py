@@ -668,3 +668,27 @@ class TestFleetDeleteAlertCarriesRequestId:
             if "extra" in c.kwargs and c.kwargs["extra"].get("event") == "aws.fleet_delete_failed"
         ]
         assert [a["request_id"] for a in alerts] == ["req-ec2-3"]
+
+
+class TestProviderCancelIsNotWired:
+    def test_application_layer_does_not_call_provider_cancel(self):
+        """Provider-side cancel has no production caller yet.
+
+        Request cancellation only returns known machines and flips state;
+        aborting in-flight fleets that have no machines yet is not wired. If
+        a caller is added, this guard must be revisited together with the
+        error contract of ``cancel_resource``.
+        """
+        from pathlib import Path
+
+        import orb
+
+        root = Path(orb.__file__).parent
+        offenders = [
+            str(path.relative_to(root))
+            for sub in ("application", "api", "interface")
+            for path in (root / sub).rglob("*.py")
+            if "cancel_fleet_request" in path.read_text(encoding="utf-8")
+            or ".cancel_resource(" in path.read_text(encoding="utf-8")
+        ]
+        assert offenders == []
