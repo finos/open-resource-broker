@@ -400,12 +400,8 @@ class AWSLaunchTemplateManager:
             request.request_id,
         )
 
-        self._tag_resource_safe(
-            template_id,
-            self._create_launch_template_tags(aws_template, request),
-            resource_description="launch-template-version",
-        )
-
+        # The launch template belongs to the user: it is deliberately not tagged
+        # as ORB-managed, so ORB cleanup can never delete it.
         return LaunchTemplateResult(
             template_id=template_id,
             version=new_version,

@@ -5,7 +5,7 @@ finding which fleet owns an instance, reducing maintain-fleet capacity,
 terminating instances, and deleting fleets when capacity reaches zero.
 """
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
@@ -50,7 +50,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         retry_fn: Callable[..., Any],
         paginate_fn: Callable[..., Any],
         collect_with_next_token_fn: Callable[..., Any],
-        cleanup_on_zero_capacity_fn: Callable[[str, str], None],
+        cleanup_on_zero_capacity_fn: Callable[..., None],
     ) -> None:
         super().__init__(
             aws_client=aws_client,
@@ -123,7 +123,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
                     f"EC2Fleet-{fleet_id} instances",
                 )
                 if request_id:
-                    self._cleanup_on_zero_capacity("ec2_fleet", request_id)
+                    self._cleanup_on_zero_capacity("ec2_fleet", request_id, instance_ids)
                 return
             fleet_details = fleet_list[0]
 
@@ -301,6 +301,18 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
             for f in fleets
         )
 
+    def _list_fleet_instance_ids(self, fleet_id: str) -> Optional[list[str]]:
+        try:
+            active = self._collect_with_next_token(
+                self._aws_client.ec2_client.describe_fleet_instances,
+                "ActiveInstances",
+                FleetId=fleet_id,
+            )
+            return [i["InstanceId"] for i in active if i.get("InstanceId")]
+        except Exception as exc:
+            self._logger.warning("Could not list instances of EC2 Fleet %s: %s", fleet_id, exc)
+            return None
+
     def _fleet_has_no_remaining_instances(self, fleet_id: str, excluded_ids: set[str]) -> bool:
         """Return True when the EC2 Fleet has no active instances outside *excluded_ids*.
 
@@ -348,6 +360,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         self,
         fleet_details: dict[str, Any],
         request_id: str = "",
+        released_instance_ids: Optional[Iterable[str]] = None,
     ) -> None:
         tags = {t["Key"]: t["Value"] for t in fleet_details.get("Tags", [])}
         resolved_request_id = tags.get("orb:request-id", "") or request_id
@@ -356,7 +369,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
                 "EC2 Fleet has no orb:request-id tag, skipping launch template cleanup"
             )
             return
-        self._cleanup_on_zero_capacity("ec2_fleet", resolved_request_id)
+        self._cleanup_on_zero_capacity("ec2_fleet", resolved_request_id, released_instance_ids)
 
     # ------------------------------------------------------------------
     # Private helpers

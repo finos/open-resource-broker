@@ -1005,87 +1005,63 @@ class TestFailureModeConfig:
         config_port.get_provider_config.return_value = provider_config
         return config_port
 
-    def test_on_tag_failure_fail_on_version_path(self, moto_aws, moto_vpc_resources):
-        """on_tag_failure='fail' must propagate a create_tags error on the version path."""
-        from botocore.exceptions import ClientError as BotoCE
-
+    def test_version_path_never_tags_user_launch_template_as_managed(
+        self, moto_aws, moto_vpc_resources
+    ):
+        """A user-owned launch template with overrides applied must not become ORB-managed."""
         aws_client = _make_aws_client()
-        logger = _make_logger()
         config_port = self._make_config_port_with_tag_config("fail")
-
         real_lt_id = _register_lt_in_moto(aws_client.ec2_client)
-
-        subnet_id = moto_vpc_resources["subnet_ids"][0]
-        sg_id = moto_vpc_resources["sg_id"]
-
         template = AWSTemplate(
-            template_id="tpl-tag-fail-version",
-            name="tag-fail-version",
+            template_id="tpl-user-lt",
+            name="user-lt",
             provider_api="EC2Fleet",
             machine_types={"r5.large": 1},
-            image_id="ami-tagfailver0",
+            image_id="ami-userlt0000",
             launch_template_id=real_lt_id,
             max_instances=5,
             price_type="spot",
-            subnet_ids=[subnet_id],
-            security_group_ids=[sg_id],
+            subnet_ids=[moto_vpc_resources["subnet_ids"][0]],
+            security_group_ids=[moto_vpc_resources["sg_id"]],
         )
-
         manager = AWSLaunchTemplateManager(
-            aws_client=aws_client,
-            logger=logger,
-            config_port=config_port,
-        )
-
-        # Patch create_tags to raise AccessDenied
-        error_response = {"Error": {"Code": "AccessDenied", "Message": "access denied"}}
-        aws_client.ec2_client.create_tags = MagicMock(
-            side_effect=BotoCE(error_response=error_response, operation_name="CreateTags")
-        )
-
-        with pytest.raises(Exception):
-            manager.create_or_update_launch_template(template, _make_request())
-
-    def test_on_tag_failure_warn_on_version_path(self, moto_aws, moto_vpc_resources):
-        """on_tag_failure='warn' must not raise on create_tags error; result is still returned."""
-        from botocore.exceptions import ClientError as BotoCE
-
-        aws_client = _make_aws_client()
-        logger = _make_logger()
-        config_port = self._make_config_port_with_tag_config("warn")
-
-        real_lt_id = _register_lt_in_moto(aws_client.ec2_client)
-
-        subnet_id = moto_vpc_resources["subnet_ids"][0]
-        sg_id = moto_vpc_resources["sg_id"]
-
-        template = AWSTemplate(
-            template_id="tpl-tag-warn-version",
-            name="tag-warn-version",
-            provider_api="EC2Fleet",
-            machine_types={"r5.large": 1},
-            image_id="ami-tagwarnver0",
-            launch_template_id=real_lt_id,
-            max_instances=5,
-            price_type="spot",
-            subnet_ids=[subnet_id],
-            security_group_ids=[sg_id],
-        )
-
-        manager = AWSLaunchTemplateManager(
-            aws_client=aws_client,
-            logger=logger,
-            config_port=config_port,
-        )
-
-        # Patch create_tags to raise AccessDenied
-        error_response = {"Error": {"Code": "AccessDenied", "Message": "access denied"}}
-        aws_client.ec2_client.create_tags = MagicMock(
-            side_effect=BotoCE(error_response=error_response, operation_name="CreateTags")
+            aws_client=aws_client, logger=_make_logger(), config_port=config_port
         )
 
         result = manager.create_or_update_launch_template(template, _make_request())
 
-        assert result is not None
         assert result.template_id == real_lt_id
-        logger.warning.assert_called()
+        assert result.is_new_version is True
+        described = aws_client.ec2_client.describe_launch_templates(LaunchTemplateIds=[real_lt_id])
+        tags = {t["Key"]: t["Value"] for t in described["LaunchTemplates"][0].get("Tags", [])}
+        assert "orb:managed-by" not in tags
+        assert "orb:request-id" not in tags
+
+    def test_orb_created_launch_template_is_still_tagged_as_managed(
+        self, moto_aws, moto_vpc_resources
+    ):
+        """Launch templates ORB creates keep the tags its cleanup relies on."""
+        aws_client = _make_aws_client()
+        template = AWSTemplate(
+            template_id="tpl-orb-lt",
+            name="orb-lt",
+            provider_api="EC2Fleet",
+            machine_types={"t3.micro": 1},
+            image_id="ami-12345678",
+            max_instances=5,
+            price_type="ondemand",
+            subnet_ids=[moto_vpc_resources["subnet_ids"][0]],
+            security_group_ids=[moto_vpc_resources["sg_id"]],
+        )
+        manager = AWSLaunchTemplateManager(
+            aws_client=aws_client, logger=_make_logger(), config_port=_make_config_port()
+        )
+
+        result = manager.create_or_update_launch_template(template, _make_request("req-orb-lt-1"))
+
+        described = aws_client.ec2_client.describe_launch_templates(
+            LaunchTemplateIds=[result.template_id]
+        )
+        tags = {t["Key"]: t["Value"] for t in described["LaunchTemplates"][0].get("Tags", [])}
+        assert tags["orb:managed-by"] == "open-resource-broker"
+        assert tags["orb:request-id"] == "req-orb-lt-1"

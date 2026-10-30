@@ -731,7 +731,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             self._logger.info("Terminated RunInstances instances: %s", machine_ids)
 
             if request_id:
-                self._cleanup_on_zero_capacity("run_instances", request_id)
+                self._cleanup_on_zero_capacity("run_instances", request_id, machine_ids)
 
         except ClientError as e:
             error = self._convert_client_error(e)
@@ -849,7 +849,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
         if request_id and instance_ids:
             try:
-                self._cleanup_on_zero_capacity("run_instances", request_id)
+                self._cleanup_on_zero_capacity("run_instances", request_id, instance_ids)
             except Exception as e:
                 self._logger.warning(
                     "RunInstances reservation %s cancelled but launch template cleanup failed: %s",
