@@ -14,6 +14,7 @@ and uses ``record_counter()``.  The three CB metric names are:
 - ``provider.fallback.total``       (labels: primary, fallback)
 """
 
+import asyncio
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -437,7 +438,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                             self._config.retry_delay_seconds,
                             attempt + 1,
                         )
-                        time.sleep(self._config.retry_delay_seconds)
+                        await asyncio.sleep(self._config.retry_delay_seconds)
 
             except Exception as e:
                 last_error = str(e)
@@ -447,7 +448,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                         self._config.retry_delay_seconds,
                         e,
                     )
-                    time.sleep(self._config.retry_delay_seconds)
+                    await asyncio.sleep(self._config.retry_delay_seconds)
 
         # Primary failed after retries, try fallback
         self._logger.warning(
