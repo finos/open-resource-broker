@@ -393,6 +393,7 @@ class TestMachineReferenceDTOBranches:
         m.return_request_id = None
         m.tags = tags
         m.status_reason = "ok"
+        m.vpc_id = None
         return m
 
     def _make_rt(self, value="acquire", has_value=True):

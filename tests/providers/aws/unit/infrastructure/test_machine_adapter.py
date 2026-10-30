@@ -471,3 +471,33 @@ class TestExtractStatusReason:
     def test_no_reason_returns_none(self):
         """Empty instance data → None."""
         assert AWSMachineAdapter._extract_status_reason({}) is None
+
+
+class TestVpcIdOnAllPaths:
+    """The VPC identifier is emitted consistently on every adapter path."""
+
+    def test_snake_case_path_keeps_vpc_id(self):
+        result = _call(_make_adapter(), dict(_SNAKE_BASE))
+        assert result["vpc_id"] == "vpc-111"
+
+    def test_pascal_case_running_path_emits_vpc_id(self):
+        result = _call(_make_adapter(), dict(_PASCAL_RUNNING))
+        assert result["vpc_id"] == "vpc-111"
+
+    def test_pascal_case_terminal_path_emits_vpc_id(self):
+        data = {
+            "InstanceId": "i-term",
+            "InstanceType": "t3.medium",
+            "State": {"Name": "terminated"},
+            "ImageId": "ami-0abc123",
+            "VpcId": "vpc-222",
+        }
+        assert _call(_make_adapter(), data)["vpc_id"] == "vpc-222"
+
+    def test_pascal_case_terminal_path_without_vpc_id_is_none(self):
+        data = {
+            "InstanceId": "i-term",
+            "InstanceType": "t3.medium",
+            "State": {"Name": "terminated"},
+        }
+        assert _call(_make_adapter(), data)["vpc_id"] is None

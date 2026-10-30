@@ -220,6 +220,7 @@ class MachineSyncService:
             public_dns_name=processed_data.get("public_dns_name"),
             launch_time=launch_time,
             subnet_id=processed_data.get("subnet_id"),
+            vpc_id=processed_data.get("vpc_id"),
             security_group_ids=processed_data.get("security_group_ids", []),
             tags=Tags(tags=processed_data.get("tags") or {}),
             metadata=processed_data.get("metadata", {}),

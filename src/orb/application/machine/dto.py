@@ -39,6 +39,7 @@ class MachineDTO(BaseDTO):
     template_id: Optional[str] = None
     image_id: Optional[str] = None
     subnet_id: Optional[str] = None
+    vpc_id: Optional[str] = None
     security_group_ids: Optional[list[str]] = Field(default_factory=list)
     status_reason: Optional[str] = None
     termination_time: Optional[int | str] = None
@@ -99,6 +100,7 @@ class MachineDTO(BaseDTO):
             provider_data=provider_data,
             version=machine.version,
             subnet_id=machine.subnet_id,
+            vpc_id=machine.vpc_id,
             security_group_ids=machine.security_group_ids or [],
             template_id=machine.template_id,
             image_id=machine.image_id,

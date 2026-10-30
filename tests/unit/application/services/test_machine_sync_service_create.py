@@ -102,3 +102,56 @@ class TestCreateMachineTagsPassthrough:
         machine = svc._create_machine_from_processed_data(data, _make_request())
 
         assert machine.status_reason is None
+
+
+class TestVpcIdIsCarriedEndToEnd:
+    """The VPC id must survive creation, storage round trip and every output shape."""
+
+    def _machine(self):
+        data = _base_processed_data()
+        data["vpc_id"] = "vpc-0abc"
+        data["subnet_id"] = "subnet-1"
+        return _make_service()._create_machine_from_processed_data(data, _make_request())
+
+    def test_created_machine_keeps_vpc_id(self):
+        assert self._machine().vpc_id == "vpc-0abc"
+
+    def test_storage_round_trip_keeps_vpc_id(self):
+        from orb.domain.machine.aggregate import Machine
+
+        restored = Machine.model_validate(self._machine().model_dump(mode="json"))
+        assert restored.vpc_id == "vpc-0abc"
+
+    def test_machine_dto_and_default_scheduler_output_include_vpc_id(self):
+        from orb.application.machine.dto import MachineDTO
+        from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
+        dto = MachineDTO.from_domain(self._machine())
+        assert dto.vpc_id == "vpc-0abc"
+
+        strategy = DefaultSchedulerStrategy.__new__(DefaultSchedulerStrategy)
+        out = strategy.format_machine_status_response([dto])
+        assert out["machines"][0]["vpc_id"] == "vpc-0abc"
+
+    def test_request_machine_reference_includes_vpc_id(self):
+        from orb.application.request.dto import MachineReferenceDTO
+
+        ref = MachineReferenceDTO.from_machine(self._machine(), RequestType.ACQUIRE)
+        assert ref.to_dict()["vpc_id"] == "vpc-0abc"
+
+    def test_rest_machine_item_exposes_vpc_id(self):
+        from orb.api.models.responses import MachineItem
+
+        item = MachineItem.model_validate({"machine_id": "i-1", "vpc_id": "vpc-0abc"})
+        assert item.model_dump()["vpc_id"] == "vpc-0abc"
+
+    def test_missing_vpc_id_is_omitted_from_default_output(self):
+        from orb.application.machine.dto import MachineDTO
+        from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
+        machine = _make_service()._create_machine_from_processed_data(
+            _base_processed_data(), _make_request()
+        )
+        strategy = DefaultSchedulerStrategy.__new__(DefaultSchedulerStrategy)
+        out = strategy.format_machine_status_response([MachineDTO.from_domain(machine)])
+        assert "vpc_id" not in out["machines"][0]

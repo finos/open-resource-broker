@@ -238,6 +238,7 @@ class MachineItem(BaseModel):
     region: Optional[str] = None
     availability_zone: Optional[str] = None
     subnet_id: Optional[str] = None
+    vpc_id: Optional[str] = None
     security_group_ids: Optional[list[str]] = None
 
     # --- Compute metadata ---
