@@ -1346,3 +1346,9 @@ def test_register_health_checks_builds_the_client_once_under_concurrent_checks()
         thread.join()
 
     assert len(built) == 1
+
+
+def test_template_listing_is_not_an_advertised_provider_operation():
+    strategy = _make_strategy()
+    capabilities = strategy.get_capabilities()
+    assert ProviderOperationType.GET_AVAILABLE_TEMPLATES not in capabilities.supported_operations

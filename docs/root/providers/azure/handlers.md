@@ -117,7 +117,7 @@ None of the four handlers support ORB's `start`/`stop` operations — the
 Azure provider strategy only advertises `create_instances`,
 `terminate_instances`, `get_instance_status`,
 `describe_resource_instances`, `validate_template`,
-`get_available_templates`, and `health_check` in its capabilities. To
+and `health_check` in its capabilities. To
 resize a pool, release machines and acquire new ones.
 
 ## Choosing a `provider_api` at template-generate time
