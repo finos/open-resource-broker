@@ -1,2 +1,3 @@
+# python-version: 3.10
 # uv installed into the container images.
 uv==0.13.6

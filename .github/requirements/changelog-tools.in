@@ -1,2 +1,3 @@
+# python-version: 3.10
 # Changelog generator installed by dev-tools/setup/setup_changelog.sh.
 git-changelog
