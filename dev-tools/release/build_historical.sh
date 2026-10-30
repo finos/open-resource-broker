@@ -8,6 +8,9 @@ COMMIT_HASH="$1"
 VERSION="$2"
 DRY_RUN="${DRY_RUN:-false}"
 
+# Resolved before the historical checkout, which does not contain this lock file.
+PACKAGE_BUILD_LOCK="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.github/requirements/package-build.txt"
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -91,7 +94,7 @@ fi
 
 # Build package
 log_info "Building package with overlay approach"
-python -m pip install build --quiet 2>/dev/null || true
+python -m pip install --quiet --require-hashes --no-deps -r "$PACKAGE_BUILD_LOCK" 2>/dev/null || true
 python -m build --wheel --outdir dist/ || {
     log_error "Package build failed"
     git checkout "$CURRENT_BRANCH" -q

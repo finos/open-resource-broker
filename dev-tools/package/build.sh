@@ -54,9 +54,9 @@ if ! $RUN_TOOL python -c "import build" 2>/dev/null; then
         echo "INFO: Installing build dependencies..."
     fi
     if command -v uv >/dev/null 2>&1; then
-        uv pip install build --quiet
+        uv pip install --quiet --require-hashes --no-deps -r .github/requirements/package-build.txt
     else
-        $RUN_TOOL pip install build
+        $RUN_TOOL pip install --require-hashes --no-deps -r .github/requirements/package-build.txt
     fi
 fi
 _phase_end
