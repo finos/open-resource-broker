@@ -13,6 +13,7 @@ Covers:
   remains idempotent.
 """
 
+import importlib
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -257,7 +258,11 @@ class TestRegisterServicesWithDI:
     def test_delegates_to_existing_function(self, plugin: AWSPlugin) -> None:
         mock_container = MagicMock()
 
-        with patch("orb.providers.aws.registration.register_aws_services_with_di") as mock_fn:
+        # Patch the module object from sys.modules (what the plugin's local import
+        # resolves) rather than a dotted string, which on Python 3.10 walks
+        # ``orb.providers.aws`` as an attribute and fails if not yet bound.
+        registration = importlib.import_module("orb.providers.aws.registration")
+        with patch.object(registration, "register_aws_services_with_di") as mock_fn:
             plugin.register_services_with_di(mock_container)
 
         mock_fn.assert_called_once_with(mock_container)

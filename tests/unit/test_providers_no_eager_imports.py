@@ -7,6 +7,10 @@ registry, which pull in heavy AWS dependencies at import time.
 import sys
 from contextlib import contextmanager
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("preserve_orb_module_identity")
+
 
 @contextmanager
 def _isolated_providers_import():
