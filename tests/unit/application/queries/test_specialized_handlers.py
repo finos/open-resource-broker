@@ -210,6 +210,19 @@ class TestGetRequestMetricsHandler:
         )
         assert result["metrics"] == {"total": 5}
 
+    async def test_z_suffixed_dates_define_the_queried_range(self):
+        factory = _make_uow_factory(request_metrics={"total": 1})
+        handler = GetRequestMetricsHandler(*_make_handler_deps(factory))
+        await handler.execute_query(
+            GetRequestMetricsQuery(
+                start_date="2024-01-01T00:00:00Z", end_date="2024-02-01T12:30:00.500Z"
+            )
+        )
+        uow = factory.create_unit_of_work.return_value
+        start_dt, end_dt = uow.requests.get_metrics_by_date_range.call_args[0]
+        assert start_dt == datetime(2024, 1, 1, tzinfo=timezone.utc)
+        assert end_dt == datetime(2024, 2, 1, 12, 30, 0, 500000, tzinfo=timezone.utc)
+
     async def test_group_by_forwarded_in_response(self):
         factory = _make_uow_factory(request_metrics={})
         handler = GetRequestMetricsHandler(*_make_handler_deps(factory))

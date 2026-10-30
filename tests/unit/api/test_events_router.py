@@ -217,6 +217,18 @@ class TestParseSince:
         result = _parse_since("2026-01-15")
         assert result is not None
 
+    @pytest.mark.parametrize("suffix", ["Z", "z"])
+    def test_z_designator_is_utc(self, suffix):
+        result = _parse_since(f"2026-01-15T12:00:00{suffix}")
+        assert result == datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc)
+
+    def test_z_designator_with_fractional_seconds(self):
+        result = _parse_since("2026-01-15T12:00:00.250Z")
+        assert result == datetime(2026, 1, 15, 12, 0, 0, 250000, tzinfo=timezone.utc)
+
+    def test_lone_z_is_rejected(self):
+        assert _parse_since("Z") is None
+
 
 @pytest.mark.unit
 class TestAllowed:
