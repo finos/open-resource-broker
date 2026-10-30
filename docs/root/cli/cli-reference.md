@@ -941,6 +941,12 @@ orb providers metrics [OPTIONS]
 | `--format` | Output format | `--format table` |
 | `--provider-name` | Show metrics for specific provider | `--provider-name aws_prod_us-east-1` |
 
+**Health fields:**
+
+- `health_status` is the result of a live health probe of the named provider: `healthy`, `unhealthy` (the provider reported a problem, the probe failed, or it timed out after 5 seconds) or `unknown` (no provider name given, or the provider could not be found). Results are reused for 30 seconds, so repeated calls do not each hit the provider API.
+- `health_sample_count` is the number of live probes run for that provider since the process started.
+- `uptime_percent` is `null`. ORB does not run continuous probes, so it does not report an uptime figure.
+
 ### Storage
 
 Storage management and operations.
