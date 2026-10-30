@@ -308,6 +308,16 @@ The plugin follows Clean Architecture principles:
 
 ## Pull Request Guidelines
 
+### Contribution Process
+
+These expectations help maintainers review contributions promptly and keep the project's licensing clear.
+
+1. **Good first issues: get assigned first.** Comment on the issue and wait for a maintainer to assign it to you before opening a pull request. Pull requests for unassigned `good first issue` items may be closed, and you are welcome to resubmit once the issue is assigned.
+2. **Follow this process.** Pull requests that do not follow the process in this guide, such as bulk or drive-by changes, may be closed without a detailed review.
+3. **AI assistance.** AI-assisted contributions are welcome. If AI tools produced a significant part of a change, say so in the pull request description. You remain responsible for the correctness of the change, for checking that the AI tool's terms allow its output to be contributed under the Apache License 2.0, and for any third-party material in the output, as described in the Linux Foundation [Generative AI Policy](https://www.linuxfoundation.org/legal/generative-ai).
+4. **File headers.** New files do not need a copyright or licence header; start them with a normal module docstring, as most files in this repository do. Please do not add headers from other projects to files you wrote. If a contribution includes code from another project under a compatible licence, keep that code's original notices, say so in the pull request description, and a maintainer will confirm how it is attributed. Existing headers in the repository are not affected. The project licence is stated in [LICENSE](LICENSE) and [NOTICE](NOTICE).
+5. **EasyCLA.** The [FINOS EasyCLA](https://community.finos.org/docs/governance/Software-Projects/easycla) check must pass before a pull request is reviewed. The linked page explains how to sign as an individual or through your company.
+
 ### Before Submitting
 
 1. **Run tests locally**: `make test`
@@ -322,6 +332,7 @@ Please include:
 - **Why**: Motivation and context
 - **How**: Implementation approach
 - **Testing**: How you tested the changes
+- **AI assistance**: Whether AI tools were used for a significant part of the change (see [Contribution Process](#contribution-process))
 
 ### Testing Your PR
 
