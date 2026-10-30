@@ -106,7 +106,7 @@ def _validate_odata_filter_name(value: str, *, field_name: str) -> str:
     so it validates again at the point of interpolation rather than trusting
     upstream validation to have run.
     """
-    if not value or not _ODATA_SAFE_NAME_RE.match(value):
+    if not value or not _ODATA_SAFE_NAME_RE.fullmatch(value):
         raise AzureValidationError(
             f"{field_name} '{value}' contains characters that are unsafe to interpolate "
             "into an Azure OData filter expression",

@@ -27,14 +27,14 @@ class SlurmNodeMapper:
 
     @staticmethod
     def _validate_node_name(node_name: str) -> None:
-        if not node_name or not _NODE_NAME_RE.match(node_name):
+        if not node_name or not _NODE_NAME_RE.fullmatch(node_name):
             raise ValueError(
                 f"Invalid node name '{node_name}': must contain only alphanumeric, hyphens, brackets, commas"
             )
 
     @staticmethod
     def _validate_machine_id(machine_id: str) -> None:
-        if not machine_id or not _MACHINE_ID_RE.match(machine_id):
+        if not machine_id or not _MACHINE_ID_RE.fullmatch(machine_id):
             raise ValueError(
                 f"Invalid machine ID '{machine_id}': must contain only alphanumeric and hyphens"
             )

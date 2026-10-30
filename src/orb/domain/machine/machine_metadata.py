@@ -207,7 +207,7 @@ class IPAddressRange(ValueObject):
         pattern = r"^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$"
 
         # First check the pattern
-        if not re.match(pattern, cidr):
+        if not re.fullmatch(pattern, cidr):
             return False
 
         # Validate IP part

@@ -70,7 +70,7 @@ class AWSResourceValidator:
             # For unknown resource types, just check it's not empty
             return bool(identifier.strip())
 
-        return bool(re.match(pattern, identifier))
+        return bool(re.fullmatch(pattern, identifier))
 
     def validate_tag(self, tag: ProviderResourceTag) -> bool:
         """Validate AWS-specific tag constraints."""

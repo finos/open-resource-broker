@@ -309,7 +309,7 @@ class Template(BaseModel):
             # Provider name should contain only alphanumeric, hyphens, and underscores
             import re
 
-            if not re.match(r"^[a-zA-Z0-9_-]+$", self.provider_name):
+            if not re.fullmatch(r"^[a-zA-Z0-9_-]+$", self.provider_name):
                 raise ValueError(
                     "provider_name must contain only alphanumeric characters, hyphens, and underscores"
                 )
@@ -319,7 +319,7 @@ class Template(BaseModel):
             # Provider type should be lowercase alphanumeric
             import re
 
-            if not re.match(r"^[a-z0-9]+$", self.provider_type):
+            if not re.fullmatch(r"^[a-z0-9]+$", self.provider_type):
                 raise ValueError("provider_type must be lowercase alphanumeric")
 
         return self

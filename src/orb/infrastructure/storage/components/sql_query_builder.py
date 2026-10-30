@@ -112,7 +112,7 @@ class SQLQueryBuilder(QueryManager):
         Raises:
             ValueError: If identifier contains invalid characters
         """
-        if not re.match(r"^[a-zA-Z0-9_]+$", identifier):
+        if not re.fullmatch(r"^[a-zA-Z0-9_]+$", identifier):
             raise ValueError(f"Invalid SQL identifier: {identifier}")
 
     def build_create_query(self, **kwargs) -> str:

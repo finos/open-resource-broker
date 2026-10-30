@@ -92,7 +92,7 @@ class InputValidator:
         """
         pattern = InputValidator.ALPHANUMERIC_DASH if allow_dash else InputValidator.ALPHANUMERIC
 
-        if not pattern.match(value):
+        if not pattern.fullmatch(value):
             allowed = (
                 "alphanumeric characters, dashes, and underscores"
                 if allow_dash
@@ -120,7 +120,7 @@ class InputValidator:
         Raises:
             ValidationError: If input is not a valid integer
         """
-        if not InputValidator.INTEGER.match(value):
+        if not InputValidator.INTEGER.fullmatch(value):
             raise ValidationError("Input must be a valid integer")
 
         try:

@@ -31,7 +31,7 @@ class SlurmCliAdapter:
 
     @staticmethod
     def _validate_name(value: str, label: str) -> None:
-        if not value or not _NAME_RE.match(value):
+        if not value or not _NAME_RE.fullmatch(value):
             raise ValueError(f"Invalid {label}: must be alphanumeric, hyphens, underscores only")
 
     def _run_command(self, cmd: list[str]) -> str:

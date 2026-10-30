@@ -73,7 +73,7 @@ def validate_dns_1123_label(value: str, *, field_name: str = "value") -> None:
             f"{field_name} {value!r} exceeds the DNS-1123 label maximum of "
             f"{DNS_1123_LABEL_MAX_LEN} characters (got {len(value)})"
         )
-    if not DNS_1123_LABEL_REGEX.match(value):
+    if not DNS_1123_LABEL_REGEX.fullmatch(value):
         raise ValueError(
             f"{field_name} {value!r} is not a valid DNS-1123 label.  "
             "Must consist of lowercase letters, digits, and hyphens; "
@@ -106,7 +106,7 @@ def validate_dns_1123_subdomain(value: str, *, field_name: str = "value") -> Non
             f"{field_name} {value!r} exceeds the DNS-1123 subdomain maximum of "
             f"{DNS_1123_SUBDOMAIN_MAX_LEN} characters (got {len(value)})"
         )
-    if not DNS_1123_SUBDOMAIN_REGEX.match(value):
+    if not DNS_1123_SUBDOMAIN_REGEX.fullmatch(value):
         raise ValueError(
             f"{field_name} {value!r} is not a valid DNS-1123 subdomain.  "
             "Must consist of lowercase letters, digits, hyphens, and dots; "

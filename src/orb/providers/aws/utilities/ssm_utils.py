@@ -33,7 +33,7 @@ def is_ssm_parameter_path(value: str) -> bool:
     if not value:
         return False
 
-    return bool(re.match(SSM_PARAMETER_PATTERN, value))
+    return bool(re.fullmatch(SSM_PARAMETER_PATTERN, value))
 
 
 def extract_ssm_parameter_path(value: str) -> Optional[str]:
@@ -49,7 +49,7 @@ def extract_ssm_parameter_path(value: str) -> Optional[str]:
     if not value:
         return None
 
-    match = re.match(SSM_PARAMETER_PATTERN, value)
+    match = re.fullmatch(SSM_PARAMETER_PATTERN, value)
     if match:
         return match.group(1)
 

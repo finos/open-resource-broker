@@ -184,7 +184,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             return True
 
         # Try to dynamically import and register
-        if not _VALID_PROVIDER_TYPE_RE.match(provider_type):
+        if not _VALID_PROVIDER_TYPE_RE.fullmatch(provider_type):
             raise ValueError(f"Invalid provider type: {provider_type!r}")
 
         module_name = f"orb.providers.{provider_type}.registration"
@@ -252,7 +252,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         try:
             provider_type = provider_instance.type
 
-            if not _VALID_PROVIDER_TYPE_RE.match(provider_type):
+            if not _VALID_PROVIDER_TYPE_RE.fullmatch(provider_type):
                 raise ValueError(f"Invalid provider type: {provider_type!r}")
 
             if self._logger:
