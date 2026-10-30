@@ -41,6 +41,10 @@ import tempfile
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+# Bun release installed by the generic installer; keep in step with the bun-version
+# used by the setup-bun steps in the CI workflows.
+BUN_VERSION = "1.4.0"
+
 
 class DevToolsInstaller:
     """Installs development tools based on the operating system."""
@@ -464,12 +468,14 @@ class DevToolsInstaller:
         return ok
 
     def _install_bun_generic(self):
-        """Install bun via the official install script (curl-to-tempfile, no shell=True).
+        """Install a pinned bun release via the official install script (curl-to-tempfile, no shell=True).
 
-        Trust model: script is downloaded from bun.sh over HTTPS.
+        Trust model: script is downloaded from bun.sh over HTTPS and asked for the
+        pinned release tag, so the installed bun version is fixed.
         Bun does not publish a standalone checksum for this installer URL.
         Residual risk: compromised distribution endpoint could serve a malicious script
-        (RCE-by-design of curl-to-sh installs).
+        (RCE-by-design of curl-to-sh installs).  Developer-machine path only; CI uses the
+        setup-bun action and the package build verifies the release archive checksum.
         """
         if self.dry_run:
             logger.info("[DRY RUN] Would download bun install script and run: bash <script>")
@@ -479,7 +485,7 @@ class DevToolsInstaller:
             os.close(fd)
             ok = self._run_command(
                 ["curl", "-fsSL", "-o", tmp_path, "https://bun.sh/install"]
-            ) and self._run_command(["bash", tmp_path])
+            ) and self._run_command(["bash", tmp_path, f"bun-v{BUN_VERSION}"])
         finally:
             try:
                 os.unlink(tmp_path)
