@@ -3026,6 +3026,17 @@
             ],
             "title": "Subnet Id"
           },
+          "vpc_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vpc Id"
+          },
           "security_group_ids": {
             "anyOf": [
               {
@@ -3349,6 +3360,17 @@
               }
             ],
             "title": "Cloud Host Id"
+          },
+          "vpc_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vpc Id"
           },
           "launch_time": {
             "anyOf": [
