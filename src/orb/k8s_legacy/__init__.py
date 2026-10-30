@@ -74,16 +74,16 @@ def handle_exceptions(
         """Returns decorator that wraps/handles exceptions."""
         exclist_copy = list(exclist)
 
-        def wrapped_f(*args, **kwargs) -> None:
+        def wrapped_f(*args, **kwargs):
             """Wrapped function."""
             if not exclist_copy:
-                f(*args, **kwargs)
+                return f(*args, **kwargs)
             else:
                 exc_handler: _ExceptionHandler = exclist_copy.pop(0)
                 exc, handler = exc_handler
 
                 try:
-                    wrapped_f(*args, **kwargs)
+                    return wrapped_f(*args, **kwargs)
                 except exc as err:
                     if isinstance(handler, str):
                         traceback.print_exc()
@@ -97,11 +97,10 @@ def handle_exceptions(
                     sys.exit(EXIT_CODE_DEFAULT)
 
         @functools.wraps(f)
-        def _handle_any(*args, **kwargs) -> None:
+        def _handle_any(*args, **kwargs):
             """Default exception handler."""
             try:
-                wrapped_f(*args, **kwargs)
-                return
+                return wrapped_f(*args, **kwargs)
 
             except click.UsageError as usage_err:
                 click.echo(f"Usage error: {usage_err!s}", err=True)
