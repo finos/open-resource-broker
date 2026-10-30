@@ -486,20 +486,20 @@ class AWSTemplateAdapter(TemplateAdapterPort):
 
     def _is_valid_ami_format(self, ami_id: str) -> bool:
         """Check if string matches AMI ID format."""
-        return bool(re.match(r"^ami-[0-9a-f]{8,17}$", ami_id))
+        return bool(re.fullmatch(r"^ami-[0-9a-f]{8,17}$", ami_id))
 
     def _is_valid_instance_type(self, instance_type: str) -> bool:
         """Validate instance type format."""
         # Basic validation - could be extended with actual AWS instance type list
-        return bool(re.match(r"^[a-z0-9]+\.[a-z0-9]+$", instance_type))
+        return bool(re.fullmatch(r"^[a-z0-9]+\.[a-z0-9]+$", instance_type))
 
     def _is_valid_subnet_format(self, subnet_id: str) -> bool:
         """Check if string matches subnet ID format."""
-        return bool(re.match(r"^subnet-[0-9a-f]{8,17}$", subnet_id))
+        return bool(re.fullmatch(r"^subnet-[0-9a-f]{8,17}$", subnet_id))
 
     def _is_valid_security_group_format(self, sg_id: str) -> bool:
         """Check if string matches security group ID format."""
-        return bool(re.match(r"^sg-[0-9a-f]{8,17}$", sg_id))
+        return bool(re.fullmatch(r"^sg-[0-9a-f]{8,17}$", sg_id))
 
 
 def create_aws_template_adapter(

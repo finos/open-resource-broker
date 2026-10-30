@@ -54,7 +54,7 @@ class MachineType(ValueObject):
 
         # Basic validation for common instance type patterns (family.size)
         # Supports flexible formats across different providers
-        if not re.match(r"^[a-zA-Z0-9]+\.[a-zA-Z0-9]+$", v):
+        if not re.fullmatch(r"^[a-zA-Z0-9]+\.[a-zA-Z0-9]+$", v):
             raise ValueError(f"Invalid instance type format: {v}")
 
         return v

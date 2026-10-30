@@ -460,3 +460,11 @@ class TestGetDisplayNameFallback:
             registry.get_display_name("another-unregistered-type")
         except ValueError:
             pytest.fail("get_display_name() must not propagate ValueError for unregistered types")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("provider_type", ["aws\n"])
+def test_ensure_provider_type_registered_rejects_trailing_newline(provider_type: str) -> None:
+    registry = ProviderRegistry()
+    with pytest.raises(ValueError, match="Invalid provider type"):
+        registry.ensure_provider_type_registered(provider_type)

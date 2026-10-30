@@ -167,12 +167,12 @@ class K8sTemplateAdapter(TemplateAdapterPort):
 
         # namespace: optional but must conform to DNS-1123 when set
         namespace = k8s_template.namespace
-        if namespace is not None and not _DNS_1123_LABEL.match(str(namespace)):
+        if namespace is not None and not _DNS_1123_LABEL.fullmatch(str(namespace)):
             errors["namespace"] = f"Invalid namespace: {namespace!r}.  Must be a DNS-1123 label."
 
         # runtime_class follows the same rules as namespace
         runtime_class = k8s_template.runtime_class
-        if runtime_class is not None and not _DNS_1123_LABEL.match(str(runtime_class)):
+        if runtime_class is not None and not _DNS_1123_LABEL.fullmatch(str(runtime_class)):
             errors["runtime_class"] = (
                 f"Invalid runtime_class: {runtime_class!r}.  Must be a DNS-1123 label."
             )
@@ -186,7 +186,7 @@ class K8sTemplateAdapter(TemplateAdapterPort):
             if not payload:
                 continue
             for resource, quantity in payload.items():
-                if not _QUANTITY.match(str(quantity)):
+                if not _QUANTITY.fullmatch(str(quantity)):
                     errors[field_name] = (
                         f"Invalid {field_name} entry for {resource!r}: "
                         f"{quantity!r} is not a valid kubernetes resource quantity."

@@ -327,7 +327,7 @@ class K8sTemplateValidator:
         if namespace is None:
             return []
         ns_str = str(namespace)
-        if len(ns_str) > 63 or not _DNS_1123_LABEL.match(ns_str):
+        if len(ns_str) > 63 or not _DNS_1123_LABEL.fullmatch(ns_str):
             return [
                 f"namespace {namespace!r} is not a valid DNS-1123 label "
                 "(must be lowercase alphanumeric, may contain hyphens, "
@@ -346,7 +346,7 @@ class K8sTemplateValidator:
         if sa is None:
             return []
         sa_str = str(sa)
-        if len(sa_str) > _DNS_1123_SUBDOMAIN_MAX_LEN or not _DNS_1123_SUBDOMAIN.match(sa_str):
+        if len(sa_str) > _DNS_1123_SUBDOMAIN_MAX_LEN or not _DNS_1123_SUBDOMAIN.fullmatch(sa_str):
             return [
                 f"service_account {sa!r} is not a valid DNS-1123 subdomain "
                 "(must be lowercase alphanumeric, may contain hyphens and dots, "
@@ -379,7 +379,7 @@ class K8sTemplateValidator:
             for resource, quantity in resource_map.items():
                 if not quantity:
                     continue
-                if not _QUANTITY.match(str(quantity)):
+                if not _QUANTITY.fullmatch(str(quantity)):
                     errors.append(
                         f"{attr}: invalid quantity {quantity!r} for resource "
                         f"{resource!r} — must be a valid Kubernetes resource quantity "

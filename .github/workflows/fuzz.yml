@@ -1,0 +1,102 @@
+name: Fuzz
+
+# Coverage-guided fuzzing of the pure parsing and validation code under
+# tests/fuzz.  Runs weekly and on demand only; it is not a required check and
+# is not triggered by pull requests.  Crashing inputs are uploaded as
+# short-lived artifacts.  Crashes with security impact are reported privately
+# through a repository security advisory rather than a public issue.
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # Weekly on Sunday at 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      seconds-per-harness:
+        description: 'Fuzzing time per harness, in seconds (10-900)'
+        required: false
+        default: '120'
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: Fuzz Harnesses
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          # atheris publishes prebuilt libFuzzer wheels for CPython 3.12 on
+          # Linux, so no clang toolchain is needed on the runner.
+          python-version: '3.12'
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa  # v10.3.1
+
+      - name: Install fuzz dependencies
+        run: uv sync --frozen --no-default-groups --group fuzz
+
+      - name: Check harness sandbox
+        run: uv run --frozen --no-sync python tests/fuzz/_common.py
+
+      - name: Run harnesses
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SECONDS: ${{ inputs.seconds-per-harness }}
+        run: |
+          set -uo pipefail
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            seconds="$INPUT_SECONDS"
+          else
+            seconds=600
+          fi
+          if ! [[ "$seconds" =~ ^[0-9]+$ ]] || [ "$seconds" -lt 10 ] || [ "$seconds" -gt 900 ]; then
+            echo "::error::seconds-per-harness must be an integer between 10 and 900"
+            exit 1
+          fi
+
+          crashes="$RUNNER_TEMP/fuzz-crashes"
+          work="$RUNNER_TEMP/fuzz-corpus"
+          mkdir -p "$crashes" "$work"
+
+          failed=0
+          for harness in config_parsing app_config validators; do
+            # libFuzzer writes newly found inputs into the corpus directory;
+            # work on a copy so the checkout stays untouched.
+            cp -R "tests/fuzz/corpus/$harness" "$work/$harness"
+            echo "::group::fuzz_${harness}"
+            if ! uv run --frozen --no-sync python "tests/fuzz/fuzz_${harness}.py" \
+                -max_total_time="$seconds" \
+                -max_len=65536 \
+                -artifact_prefix="$crashes/${harness}-" \
+                "$work/$harness"; then
+              echo "::error::fuzz_${harness} found a failing input"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$failed"
+
+      - name: Upload crashing inputs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
+        with:
+          name: fuzz-crashes
+          path: ${{ runner.temp }}/fuzz-crashes/
+          if-no-files-found: ignore
+          retention-days: 7

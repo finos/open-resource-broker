@@ -34,14 +34,14 @@ class SlurmNodeBootstrap:
 
     @staticmethod
     def _validate_node_name(value: str) -> None:
-        if not value or not _NAME_RE.match(value):
+        if not value or not _NAME_RE.fullmatch(value):
             raise ValueError(
                 f"Invalid node name '{value}': alphanumeric, hyphens, underscores only"
             )
 
     @staticmethod
     def _validate_ip(value: str) -> None:
-        if not value or not _IP_RE.match(value):
+        if not value or not _IP_RE.fullmatch(value):
             raise ValueError(f"Invalid IP address '{value}'")
 
     def register_node_address(
@@ -87,7 +87,7 @@ class SlurmNodeBootstrap:
         segments here would be a command-injection risk if a caller ever
         passes an untrusted path.
         """
-        if not value or not _SAFE_ABS_PATH_RE.match(value) or ".." in value.split("/"):
+        if not value or not _SAFE_ABS_PATH_RE.fullmatch(value) or ".." in value.split("/"):
             raise ValueError(
                 f"Invalid slurm_conf_path '{value}': must be a clean absolute path "
                 "(alphanumeric, '.', '/', '_', '-' only, no '..' segments)"
@@ -104,9 +104,9 @@ class SlurmNodeBootstrap:
         The provisioned AMI should have SLURM packages pre-installed.
         This script sets the node name, updates slurm.conf, and starts slurmd.
         """
-        if not node_name or not _NAME_RE.match(node_name):
+        if not node_name or not _NAME_RE.fullmatch(node_name):
             raise ValueError(f"Invalid node name '{node_name}'")
-        if not slurmctld_host or not _NAME_RE.match(slurmctld_host.split(".")[0]):
+        if not slurmctld_host or not _NAME_RE.fullmatch(slurmctld_host.split(".")[0]):
             raise ValueError(f"Invalid slurmctld host '{slurmctld_host}'")
         SlurmNodeBootstrap._validate_slurm_conf_path(slurm_conf_path)
 

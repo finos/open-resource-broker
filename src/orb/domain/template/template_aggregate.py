@@ -298,18 +298,19 @@ class Template(BaseModel):
         # If provider_name is specified, extract provider_type if not provided
         if self.provider_name and not self.provider_type:
             # Extract provider type from provider name (e.g., "aws-us-east-1" -> "aws")
-            if "-" in self.provider_name:
-                self.provider_type = self.provider_name.split("-")[0]
-            else:
-                # If no separator, assume the whole name is the provider type
-                self.provider_type = self.provider_name
+            # If no separator, assume the whole name is the provider type
+            derived_type = self.provider_name.split("-")[0]
+            # A name starting with "-" derives an empty type; assigning it would
+            # re-run this validator on an unchanged state and recurse forever.
+            if derived_type:
+                self.provider_type = derived_type
 
         # Validate provider_name format if provided
         if self.provider_name:
             # Provider name should contain only alphanumeric, hyphens, and underscores
             import re
 
-            if not re.match(r"^[a-zA-Z0-9_-]+$", self.provider_name):
+            if not re.fullmatch(r"^[a-zA-Z0-9_-]+$", self.provider_name):
                 raise ValueError(
                     "provider_name must contain only alphanumeric characters, hyphens, and underscores"
                 )
@@ -319,7 +320,7 @@ class Template(BaseModel):
             # Provider type should be lowercase alphanumeric
             import re
 
-            if not re.match(r"^[a-z0-9]+$", self.provider_type):
+            if not re.fullmatch(r"^[a-z0-9]+$", self.provider_type):
                 raise ValueError("provider_type must be lowercase alphanumeric")
 
         return self

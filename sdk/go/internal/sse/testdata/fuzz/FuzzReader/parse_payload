@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("data: {\"requests\":[{\"request_id\":\"req-1\",\"status\":\"in_progress\",\"requested_count\":3,\"successful_count\":1,\"failed_count\":0,\"machines\":[]}]}\n\n")

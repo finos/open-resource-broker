@@ -39,7 +39,7 @@ class GCPProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     @classmethod
     def validate_project_id(cls, value: str) -> str:
         """Validate a canonical GCP project ID."""
-        if not _PROJECT_RE.match(value):
+        if not _PROJECT_RE.fullmatch(value):
             raise ValueError("project_id must match the canonical GCP project ID format")
         return value
 
@@ -47,7 +47,7 @@ class GCPProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     @classmethod
     def validate_region(cls, value: str) -> str:
         """Validate GCP region format."""
-        if not _REGION_RE.match(value):
+        if not _REGION_RE.fullmatch(value):
             raise ValueError("region must look like 'us-central1' or 'europe-west4'")
         return value
 
@@ -56,7 +56,7 @@ class GCPProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     def validate_zones(cls, value: list[str]) -> list[str]:
         """Validate GCP zones."""
         for zone in value:
-            if not _ZONE_RE.match(zone):
+            if not _ZONE_RE.fullmatch(zone):
                 raise ValueError(
                     "zones must contain zone slugs like 'us-central1-a' or 'europe-west4-b'"
                 )

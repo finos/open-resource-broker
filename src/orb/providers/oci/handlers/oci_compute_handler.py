@@ -72,7 +72,7 @@ class OCIComputeHandler:
         if not ocid or not isinstance(ocid, str):
             return None
         # Example: ocid1.subnet.oc1.eu-frankfurt-1.xxxxx
-        match = re.match(r"^ocid1\.[^.]+\.[^.]+\.([a-z0-9-]+)\..+$", ocid)
+        match = re.fullmatch(r"^ocid1\.[^.]+\.[^.]+\.([a-z0-9-]+)\..+$", ocid)
         if match:
             return match.group(1)
         return None

@@ -120,7 +120,7 @@ class SpotFleetValidator:
             r"^arn:aws:iam::\d{12}:role/aws-service-role/"
             r"spotfleet\.amazonaws\.com/AWSServiceRoleForEC2SpotFleet$"
         )
-        if re.match(pattern, arn):
+        if re.fullmatch(pattern, arn):
             self._logger.debug("Valid Spot Fleet service-linked role: %s", arn)
             return True
         return False
@@ -128,7 +128,7 @@ class SpotFleetValidator:
     def _is_valid_tagging_role(self, arn: str) -> bool:
         """Return True if the ARN matches the EC2 Spot Fleet tagging role pattern."""
         pattern = r"^arn:aws:iam::\d{12}:role/aws-ec2-spot-fleet-tagging-role$"
-        if re.match(pattern, arn):
+        if re.fullmatch(pattern, arn):
             self._logger.debug("Valid Spot Fleet tagging role: %s", arn)
             return True
         return False

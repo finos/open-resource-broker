@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("data: {\"requests\":[{\"status\":\"in_progress\"}]}\n\n")

@@ -488,6 +488,13 @@ build = [
     "setuptools>=84.1.0",
 ]
 
+# Coverage-guided fuzzing harnesses under tests/fuzz (fuzz.yml workflow).
+# Kept out of ci/dev: atheris needs a libFuzzer-capable clang toolchain and
+# is only installed by the fuzz workflow.
+fuzz = [
+    "atheris>=3.0.0",
+]
+
 # --- umbrella groups (preserve --all-groups / local dev-install behaviour) ---
 
 # CI Dependencies: umbrella that includes all per-job sub-groups.
@@ -589,6 +596,9 @@ include-package-data = true
 [tool.pytest.ini_options]
 testpaths = ["tests", "src/orb/k8s_legacy/tests"]
 norecursedirs = [
+    # atheris fuzz harnesses (fuzz_*.py scripts run by the fuzz workflow, not
+    # pytest tests); atheris is only installed in the ``fuzz`` group.
+    "tests/fuzz",
     "tests/providers/aws/live",
     # k8s live tests require a real cluster; the parallel ci-tests-providers
     # target passes -m "not serial" which would deselect every test if

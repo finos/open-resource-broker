@@ -89,7 +89,7 @@ class AWSInstanceType(InstanceType):
         """Validate AWS instance type format."""
         pattern = PATTERNS["instance_type"]
 
-        if not re.match(pattern, v):
+        if not re.fullmatch(pattern, v):
             raise ValueError(f"Invalid AWS instance type format: {v}")
         return v
 
@@ -146,7 +146,7 @@ class AWSARN(ARN):
         """Validate AWS ARN format."""
         pattern = PATTERNS["arn"]
 
-        if not re.match(pattern, v):
+        if not re.fullmatch(pattern, v):
             raise ValueError(f"Invalid AWS ARN format: {v}")
         return v
 

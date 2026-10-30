@@ -83,7 +83,7 @@ class RequestId(ValueObject):
     @staticmethod
     def _is_valid_format(value: str) -> bool:
         """Check if value matches required format."""
-        return bool(re.match(REQUEST_ID_PATTERN, value))
+        return bool(re.fullmatch(REQUEST_ID_PATTERN, value))
 
     @classmethod
     def is_request_id(cls, value: str) -> bool:
@@ -203,7 +203,7 @@ class ResourceIdentifier(ValueObject):
         normalized = v.lower().replace("-", "_").replace(" ", "_")
 
         # Basic validation of allowed characters
-        if not re.match(r"^[a-z_][a-z0-9_]*$", normalized):
+        if not re.fullmatch(r"^[a-z_][a-z0-9_]*$", normalized):
             raise ValueError("Resource type must contain only letters, numbers, and underscores")
 
         return normalized

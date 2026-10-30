@@ -106,7 +106,7 @@ class K8sResourceValidator:
 
         if len(identifier) > 253:
             return False
-        return bool(re.match(r"^[a-z0-9]([a-z0-9\-\.]*[a-z0-9])?$", identifier))
+        return bool(re.fullmatch(r"^[a-z0-9]([a-z0-9\-\.]*[a-z0-9])?$", identifier))
 
     def validate_tag(self, tag: ProviderResourceTag) -> bool:
         """Return True when *tag* satisfies Kubernetes label key/value rules."""

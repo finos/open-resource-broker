@@ -1,0 +1,52 @@
+{
+  "version": "2.0.0",
+  "scheduler": {
+    "type": "hostfactory",
+    "config_root": "$HF_PROVIDER_CONFDIR",
+    "_comment_scheduler_alternatives": "Alternatives: type='default' (standalone), type='slurm' (SLURM power hooks)",
+    "_slurm_example": {
+      "type": "slurm",
+      "config_root": "/etc/orb",
+      "log_level": "INFO"
+    }
+  },
+  "provider": {
+    "providers": [
+      {
+        "name": "aws-us-east-1",
+        "type": "aws",
+        "enabled": true,
+        "config": {
+          "region": "us-east-1",
+          "profile": "your-profile-name"
+        }
+      }
+    ],
+    "provider_defaults": {
+      "aws": {
+        "template_defaults": {
+          "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64",
+          "machine_types": {"t3.micro": 1},
+          "subnet_ids": ["subnet-xxxxxxxxxxxxxxxxx"],
+          "security_group_ids": ["sg-xxxxxxxxxxxxxxxxx"],
+          "iam_fleet_role": "arn:aws:iam::123456789012:role/your-fleet-role",
+          "tags": {
+            "Environment": "development",
+            "Project": "open-resource-broker"
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "type": "json"
+  },
+  "logging": {
+    "level": "INFO",
+    "file_path": "logs/app.log"
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8000
+  }
+}

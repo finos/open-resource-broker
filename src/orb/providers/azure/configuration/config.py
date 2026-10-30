@@ -168,7 +168,7 @@ class AzureProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[mis
             return v
         if not (1 <= len(v) <= 90):
             raise ValueError("resource_group must be 1-90 characters")
-        if not re.match(r"^[a-zA-Z0-9_\-.()\[\]]+$", v):
+        if not re.fullmatch(r"^[a-zA-Z0-9_\-.()\[\]]+$", v):
             raise ValueError(
                 "resource_group contains invalid characters "
                 "(allowed: alphanumeric, _, -, ., (, ), [, ])"
@@ -181,7 +181,7 @@ class AzureProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[mis
         """Validate UUID-like subscription ID format."""
         if v is None:
             return v
-        if not re.match(
+        if not re.fullmatch(
             r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
             v,
         ):

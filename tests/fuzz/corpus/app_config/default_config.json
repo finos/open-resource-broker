@@ -1,0 +1,261 @@
+{
+  "version": "2.0.0",
+  "scheduler": {
+    "type": "default"
+  },
+  "provider": {
+    "providers": [],
+    "selection_policy": "FIRST_AVAILABLE",
+    "default_provider_type": "aws",
+    "health_check_interval": 60,
+    "circuit_breaker": {
+      "enabled": true,
+      "failure_threshold": 5,
+      "recovery_timeout": 60,
+      "half_open_max_calls": 3
+    },
+    "provider_defaults": {}
+  },
+  "native_spec": {
+    "enabled": true,
+    "merge_mode": "merge"
+  },
+  "naming": {
+    "collections": {
+      "requests": "requests",
+      "machines": "machines",
+      "templates": "templates"
+    },
+    "tables": {
+      "requests": "requests",
+      "machines": "machines",
+      "event_logs": "event_logs",
+      "audit_logs": "audit_logs",
+      "metrics_logs": "metrics_logs"
+    },
+    "statuses": {
+      "request": {
+        "pending": "pending",
+        "running": "running",
+        "complete": "complete",
+        "complete_with_error": "complete_with_error",
+        "failed": "failed"
+      },
+      "machine": {
+        "pending": "pending",
+        "running": "running",
+        "stopping": "stopping",
+        "stopped": "stopped",
+        "shutting_down": "shutting-down",
+        "terminated": "terminated",
+        "unknown": "unknown"
+      },
+      "machine_result": {
+        "executing": "executing",
+        "succeed": "succeed",
+        "fail": "fail"
+      },
+      "circuit_breaker": {
+        "closed": "closed",
+        "open": "open",
+        "half_open": "half_open"
+      }
+    },
+    "patterns": {
+      "request_id": "^(req|ret)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "tag_key": "^[\\w\\s+=.@-]+$",
+      "cidr_block": "^(\\d{1,3}\\.){3}\\d{1,3}/\\d{1,2}$"
+    },
+    "prefixes": {
+      "default": "",
+      "request": "req-",
+      "return_prefix": "ret-",
+      "tag": ""
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "file_path": "logs/orb.log",
+    "console_enabled": false,
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]"
+  },
+  "template": {
+    "max_number": 10,
+    "filename_patterns": {
+      "provider_specific": "{provider_name}_templates.json",
+      "provider_type": "{provider_type}_templates.json",
+      "generic": "templates.json"
+    },
+    "default_price_type": "ondemand"
+  },
+  "events": {
+    "enabled": true,
+    "max_events_per_request": 1000,
+    "event_retention_days": 30
+  },
+  "request": {
+    "default_timeout": 300,
+    "default_grace_period": 300,
+    "max_machines_per_request": 100
+  },
+  "environment": "development",
+  "debug": false,
+  "allow_destructive_admin": false,
+  "performance": {
+    "lazy_loading": {
+      "enabled": true,
+      "cache_instances": true,
+      "discovery_mode": "lazy",
+      "connection_mode": "lazy",
+      "preload_critical": []
+    },
+    "enable_batching": true,
+    "enable_parallel": true,
+    "max_workers": 10,
+    "enable_adaptive_batch_sizing": true,
+    "adaptive_batch_sizing": {
+      "initial_batch_size": 10,
+      "min_batch_size": 5,
+      "max_batch_size": 50,
+      "increase_factor": 1.5,
+      "decrease_factor": 0.5,
+      "success_threshold": 3,
+      "failure_threshold": 1,
+      "history_size": 10
+    },
+    "caching": {
+      "handler_discovery": {
+        "enabled": false,
+        "file": "handler_discovery.json"
+      },
+      "request_status": {
+        "enabled": false,
+        "ttl_seconds": 300
+      }
+    },
+    "sync_timeout_seconds": 30.0
+  },
+  "metrics": {
+    "metrics_enabled": true,
+    "provider_metrics": {
+      "provider_metrics_enabled": true,
+      "sample_rate": 1.0,
+      "monitored_services": [],
+      "monitored_operations": [],
+      "track_payload_sizes": true
+    },
+    "metrics_dir": "./metrics",
+    "metrics_interval": 20,
+    "trace_enabled": true,
+    "trace_buffer_size": 1000,
+    "trace_file_max_size_mb": 10
+  },
+  "observability": {
+    "enabled": false,
+    "service_name": "orb",
+    "metrics_exporters": [],
+    "traces_exporter": null,
+    "otlp_endpoint": null,
+    "traces_sample_rate": 0.1,
+    "telemetry_file_dir": null,
+    "instrument_fastapi": true,
+    "instrument_sqlalchemy": true,
+    "instrument_botocore": true,
+    "instrument_click": true,
+    "instrument_system_metrics": true,
+    "instrument_logging": true
+  },
+  "storage": {
+    "strategy": "json",
+    "json_strategy": {
+      "storage_type": "single_file",
+      "base_path": "data",
+      "filenames": {
+        "single_file": "request_database.json",
+        "split_files": {
+          "templates": "templates.json",
+          "requests": "requests.json",
+          "machines": "machines.json"
+        }
+      },
+      "backup_enabled": true,
+      "backup_count": 5
+    },
+    "sql_strategy": {
+      "type": "sqlite",
+      "host": "",
+      "port": 0,
+      "name": "database.db",
+      "pool_size": 5,
+      "max_overflow": 10,
+      "timeout": 30
+    },
+    "database": {
+      "connection_timeout": 30,
+      "query_timeout": 60,
+      "max_connections": 10
+    }
+  },
+  "server": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 8000,
+    "workers": 1,
+    "reload": false,
+    "docs_enabled": true,
+    "docs_url": "/docs",
+    "redoc_url": "/redoc",
+    "openapi_url": "/openapi.json",
+    "trusted_hosts": ["localhost", "127.0.0.1", "::1", "testserver"],
+    "auth": {
+      "enabled": false,
+      "strategy": "none",
+      "bearer_token": {
+        "secret_key": "your-secret-key-change-in-production",
+        "algorithm": "HS256",
+        "token_expiry": 3600
+      }
+    },
+    "cors": {
+      "enabled": true,
+      "origins": [
+        "http://localhost:8000"
+      ],
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "OPTIONS"
+      ],
+      "headers": [
+        "*"
+      ],
+      "credentials": false
+    },
+    "request_timeout": 30,
+    "max_request_size": 16777216,
+    "access_log": true,
+    "log_level": "info",
+    "rate_limiting": {
+      "enabled": true,
+      "requests_per_minute": 300,
+      "burst": 60,
+      "max_buckets": 10000
+    }
+  },
+  "circuit_breaker": {
+    "enabled": true,
+    "failure_threshold": 5,
+    "recovery_timeout": 60,
+    "half_open_max_calls": 3
+  },
+  "resource": {
+    "prefixes": {
+      "default": "",
+      "request": "req-",
+      "return_prefix": "ret-",
+      "tag": ""
+    }
+  }
+}

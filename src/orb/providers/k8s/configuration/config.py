@@ -162,7 +162,7 @@ class K8sNamingConfig(BaseModel):
                 f"naming.prefix {v!r} is too long ({len(v)} chars); max 20 to leave "
                 "room for the uuid segment within the tightest kind budget."
             )
-        if not _DNS_1123_LABEL_RE.match(v):
+        if not _DNS_1123_LABEL_RE.fullmatch(v):
             raise ValueError(
                 f"naming.prefix {v!r} is not a valid DNS-1123 label.  "
                 "Must consist of lowercase alphanumeric characters and hyphens, "
@@ -722,7 +722,7 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         """
         if v is None:
             return v
-        if not _DNS_SUBDOMAIN_RE.match(v):
+        if not _DNS_SUBDOMAIN_RE.fullmatch(v):
             raise ValueError(
                 f"namespace {v!r} is not a valid RFC 1123 DNS subdomain.  "
                 "Namespace names must consist of lowercase alphanumeric characters "
@@ -832,7 +832,7 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         prefix = self.label_prefix
         if not prefix:
             raise ValueError("label_prefix must be a non-empty string")
-        if not _DNS_SUBDOMAIN_RE.match(prefix):
+        if not _DNS_SUBDOMAIN_RE.fullmatch(prefix):
             raise ValueError(
                 f"label_prefix {prefix!r} is not a valid RFC 1123 DNS subdomain.  "
                 "The prefix must consist of lowercase alphanumeric characters or hyphens, "

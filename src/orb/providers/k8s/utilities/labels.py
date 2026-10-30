@@ -82,7 +82,7 @@ def _validate_prefix(prefix: str) -> None:
         raise K8sValidationError(
             f"label prefix {prefix!r} exceeds max length {_PREFIX_MAX_LEN} (got {len(prefix)})"
         )
-    if not _PREFIX_RE.match(prefix):
+    if not _PREFIX_RE.fullmatch(prefix):
         raise K8sValidationError(
             f"label prefix {prefix!r} contains characters not permitted in a DNS subdomain.  "
             "Allowed: letters, digits, hyphens, underscores, dots."
@@ -97,7 +97,7 @@ def _validate_key(key: str) -> None:
         raise K8sValidationError(
             f"label key {key!r} exceeds max length {_KEY_MAX_LEN} (got {len(key)})"
         )
-    if not _KEY_RE.match(key):
+    if not _KEY_RE.fullmatch(key):
         raise K8sValidationError(
             f"label key {key!r} contains characters not permitted in a Kubernetes label name.  "
             "Allowed: letters, digits, hyphens, underscores, dots."
@@ -116,7 +116,7 @@ def _validate_value(value: str) -> None:
         raise K8sValidationError(
             f"label value {value!r} exceeds max length {_VALUE_MAX_LEN} (got {len(value)})"
         )
-    if not _VALUE_RE.match(value):
+    if not _VALUE_RE.fullmatch(value):
         raise K8sValidationError(
             f"label value {value!r} contains characters not permitted in a Kubernetes label value.  "
             "Allowed: letters, digits, hyphens, underscores, dots."
@@ -143,7 +143,7 @@ def validate_namespace(namespace: str) -> None:
         raise K8sValidationError(
             f"namespace {namespace!r} exceeds max length {_NAMESPACE_MAX_LEN} (got {len(namespace)})"
         )
-    if not _NAMESPACE_RE.match(namespace):
+    if not _NAMESPACE_RE.fullmatch(namespace):
         raise K8sValidationError(
             f"namespace {namespace!r} is not a valid RFC 1123 DNS label.  "
             "Kubernetes namespaces must consist of lower-case letters, digits, and hyphens, "

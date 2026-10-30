@@ -462,7 +462,7 @@ class K8sTemplate(Template):
         """Reject image names that contain whitespace (causes kubelet InvalidImageName)."""
         if value is None or not str(value).strip():
             return value
-        if not _DOCKER_IMAGE_NAME_RE.match(str(value)):
+        if not _DOCKER_IMAGE_NAME_RE.fullmatch(str(value)):
             raise ValueError(
                 f"Invalid container image name: {value!r}. "
                 "Image names must start with an alphanumeric character and "
