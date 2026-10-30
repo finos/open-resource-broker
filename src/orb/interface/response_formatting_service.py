@@ -1,6 +1,6 @@
 """Response formatting service — wraps SchedulerPort with explicit per-operation methods."""
 
-from typing import Any, Final
+from typing import Any, Final, Optional
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.ports.scheduler_port import SchedulerPort
@@ -47,6 +47,10 @@ class ResponseFormattingService:
             data["total_count"] = total_count
         if not isinstance(next_cursor, _Unset):
             data["next_cursor"] = next_cursor
+
+    def status_poll_exit_code(self, status: Optional[str]) -> int:
+        """Return the exit code the scheduler assigns to a status-polling result."""
+        return self._scheduler.get_status_poll_exit_code(status)
 
     def format_request_operation(self, raw: dict[str, Any], status: str) -> InterfaceResponse:
         """Format a request creation/mutation result."""

@@ -15,7 +15,7 @@ existing code that depends on the full contract keeps working unchanged.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 
 class SchedulerFormattingPort(ABC):
@@ -65,6 +65,18 @@ class SchedulerFormattingPort(ABC):
     @abstractmethod
     def get_exit_code_for_status(self, status: str) -> int:
         """Get appropriate exit code for request status."""
+
+    def get_status_poll_exit_code(self, status: Optional[str]) -> int:
+        """Exit code for a status-polling command.
+
+        ``status`` is the request's status, or ``None`` when the request could
+        not be looked up. Defaults to the status-to-exit-code mapping, with a
+        failed lookup reported as an error. Schedulers whose callers read the
+        status from the output regardless of exit code override this.
+        """
+        if status is None:
+            return 1
+        return self.get_exit_code_for_status(status)
 
     @abstractmethod
     def format_template_mutation_response(self, raw: dict[str, Any]) -> dict[str, Any]:

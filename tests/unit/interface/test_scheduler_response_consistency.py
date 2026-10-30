@@ -57,6 +57,7 @@ def _mock_container(formatter_status_return: dict, status_orch_requests: list | 
     scheduler.parse_request_data.return_value = [{"request_id": "req-abc"}]
 
     formatter = MagicMock(spec=ResponseFormattingService)
+    formatter.status_poll_exit_code.return_value = 0
     formatter.format_request_status.return_value = InterfaceResponse(data=formatter_status_return)
     formatter.format_request_operation.return_value = InterfaceResponse(
         data={"requestId": "req-1", "message": "ok"}, exit_code=0
