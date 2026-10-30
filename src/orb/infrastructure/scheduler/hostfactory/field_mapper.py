@@ -59,7 +59,7 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
         return self._apply_input_transformations(mapped)
 
     def map_output_fields(
-        self, internal_template: Dict[str, Any], copy_unmapped: bool = False
+        self, internal_template: Dict[str, Any], copy_unmapped: bool = True
     ) -> Dict[str, Any]:
         """Map internal format → HostFactory format with transformations."""
         # Fold any original (pre-rename) internal names onto the canonical name

@@ -8,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
+from orb.infrastructure.scheduler.base.field_mapper import SchedulerFieldMapper
 from orb.infrastructure.scheduler.default.field_mapper import DefaultFieldMapper
 from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
 from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
@@ -519,4 +520,35 @@ def test_get_mappings_aws_static_matches_aws_field_mapping_class():
     assert static == canonical, (
         "HostFactoryFieldMappings.MAPPINGS['aws'] is out of sync with "
         "AWSFieldMapping._PROVIDER_MAPPINGS. Update field_mappings.py to match."
+    )
+
+
+def test_scheduler_mapper_copy_unmapped_defaults_match_base():
+    """Concrete mapper methods declare the same copy_unmapped defaults as the base."""
+    import inspect
+
+    from orb.infrastructure.scheduler.slurm.field_mapper import SlurmFieldMapper
+
+    mapper_classes = [DefaultFieldMapper, HostFactoryFieldMapper, SlurmFieldMapper]
+    for mapper_class in mapper_classes:
+        actual = inspect.signature(mapper_class.map_output_fields).parameters[
+            "copy_unmapped"
+        ].default
+        expected = inspect.signature(SchedulerFieldMapper.map_output_fields).parameters[
+            "copy_unmapped"
+        ].default
+        assert actual is expected, (
+            f"{mapper_class.__name__}.map_output_fields declares copy_unmapped={actual!r}; "
+            f"expected the base default {expected!r}"
+        )
+
+    actual = inspect.signature(DefaultFieldMapper.format_for_generation).parameters[
+        "copy_unmapped"
+    ].default
+    expected = inspect.signature(SchedulerFieldMapper.format_for_generation).parameters[
+        "copy_unmapped"
+    ].default
+    assert actual is expected, (
+        "DefaultFieldMapper.format_for_generation declares "
+        f"copy_unmapped={actual!r}; expected the base default {expected!r}"
     )
