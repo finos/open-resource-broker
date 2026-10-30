@@ -20,6 +20,7 @@ on:
       - 'dev-tools/ci/ci_security_dispatcher.py'
       - '.trivyignore.yaml'
       - '.github/workflows/**'
+      - '.github/requirements/**'
       - '.github/codeql/**'
       - '.github/actions/**'
       - '.project.yml'
@@ -103,6 +104,7 @@ jobs:
             - 'dev-tools/ci/ci_security_dispatcher.py'
             - '.trivyignore.yaml'
             - '.github/workflows/**'
+            - '.github/requirements/**'
             - '.github/codeql/**'
             - '.github/actions/**'
             - '.project.yml'
@@ -397,7 +399,7 @@ jobs:
     - name: Check Python runtime dependency licenses
       run: |
         set -o pipefail
-        uv pip install pip-licenses==5.5.5
+        uv pip install --no-config --require-hashes --no-deps -r .github/requirements/pip-licenses.txt
         uv run --no-sync pip-licenses --from=mixed --format=json \
           | python3 dev-tools/ci/check_runtime_licenses.py --ignore-package orb-py
 

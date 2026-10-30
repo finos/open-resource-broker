@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/**'
+      - '.github/requirements/**'
       - 'Makefile'
       - 'makefiles/**'
   # No paths filter on pull_request: Validate Workflow Files is becoming a
@@ -57,7 +58,7 @@ jobs:
     - name: Validate workflows with actionlint
       run: |
         echo "::add-matcher::.github/actionlint-matcher.json"
-        pip install actionlint-py
+        pip install --require-hashes --no-deps -r .github/requirements/actionlint.txt
         actionlint .github/workflows/*.yml
       shell: bash
 
