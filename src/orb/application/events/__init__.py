@@ -32,10 +32,8 @@ from .decorators import EventHandlerRegistry, event_handler
 
 # Import all handlers to ensure they're registered
 from .handlers import (
-    infrastructure_handlers,
     machine_handlers,
     request_handlers,
-    system_handlers,
     template_handlers,
 )
 
@@ -48,11 +46,9 @@ __all__: list[str] = [
     "EventHandlerRegistry",
     "LoggingEventHandler",
     "event_handler",
-    "infrastructure_handlers",
     # Handler modules (imported for registration)
     "machine_handlers",
     "request_handlers",
-    "system_handlers",
     "template_handlers",
 ]
 

@@ -74,6 +74,14 @@ def register_core_services(container: DIContainer) -> None:
         bus.register_handler("RequestCompletedEvent", handler)
         bus.register_handler("RequestFailedEvent", handler)
 
+        # Register the @event_handler logging handlers. Importing the package
+        # runs the decorators; auto-registration binds them to this bus.
+        import importlib
+
+        importlib.import_module("orb.application.events.handlers")
+
+        bus.auto_register_handlers(c.get(LoggingPort))
+
         # Wire SseEventHandler so domain events are pushed to active SSE
         # connections.  Guarded by a try/except so a missing [api] extra
         # or an import failure never prevents the application from starting.

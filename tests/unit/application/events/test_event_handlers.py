@@ -9,29 +9,18 @@ import pytest
 from orb.application.base.event_handlers import BaseEventHandler, BaseLoggingEventHandler
 from orb.application.events.base.event_handler import EventHandler
 from orb.application.events.base.logging_event_handler import LoggingEventHandler
-from orb.application.events.handlers.infrastructure_handlers import (
-    CacheOperationHandler,
-    DatabaseConnectionHandler,
-)
 from orb.application.events.handlers.machine_handlers import (
     MachineCreatedHandler,
-    MachineErrorHandler,
     MachineHealthCheckHandler,
-    MachineStatusUpdatedHandler,
+    MachineStatusChangedHandler,
     MachineTerminatedHandler,
 )
 from orb.application.events.handlers.request_handlers import (
-    RequestCancelledHandler,
     RequestCompletedHandler,
     RequestCreatedHandler,
     RequestFailedHandler,
-    RequestStatusUpdatedHandler,
+    RequestStatusChangedHandler,
     RequestTimeoutHandler,
-)
-from orb.application.events.handlers.system_handlers import (
-    ConfigurationUpdatedHandler,
-    SystemShutdownHandler,
-    SystemStartedHandler,
 )
 from orb.domain.base.events.base_events import DomainEvent
 from orb.domain.base.ports import LoggingPort
@@ -195,7 +184,7 @@ class TestLoggingEventHandlerBase:
         h.retry_count = 1
         h.retry_delay = 0.0
         await h.handle(_event())
-        logger.info.assert_called_with("formatted-msg")
+        logger.debug.assert_any_call("formatted-msg")
 
     def test_format_basic_message_structure(self):
         class _Concrete(LoggingEventHandler):
@@ -278,15 +267,15 @@ class TestMachineCreatedHandler:
 
 
 # ---------------------------------------------------------------------------
-# MachineStatusUpdatedHandler
+# MachineStatusChangedHandler
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-class TestMachineStatusUpdatedHandler:
+class TestMachineStatusChangedHandler:
     @pytest.mark.asyncio
     async def test_format_includes_old_and_new_status(self):
-        h = MachineStatusUpdatedHandler()
+        h = MachineStatusChangedHandler()
         ev = MagicMock()
         ev.aggregate_id = "m-3"
         ev.old_status = "pending"
@@ -372,30 +361,6 @@ class TestMachineHealthCheckHandler:
 
 
 # ---------------------------------------------------------------------------
-# MachineErrorHandler
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestMachineErrorHandler:
-    @pytest.mark.asyncio
-    async def test_format_includes_error_type_and_message(self):
-        h = MachineErrorHandler()
-        ev = MagicMock()
-        ev.aggregate_id = "m-6"
-        ev.error_type = "ProvisionError"
-        ev.error_message = "capacity exceeded"
-
-        msg = await h.format_log_message(ev)  # type: ignore[attr-defined]
-        assert "ProvisionError" in msg
-        assert "capacity exceeded" in msg
-
-    def test_log_level_is_error(self):
-        h = MachineErrorHandler()
-        assert h.get_log_level(MagicMock()) == "error"  # type: ignore[attr-defined]
-
-
-# ---------------------------------------------------------------------------
 # RequestCreatedHandler
 # ---------------------------------------------------------------------------
 
@@ -416,15 +381,15 @@ class TestRequestCreatedHandler:
 
 
 # ---------------------------------------------------------------------------
-# RequestStatusUpdatedHandler
+# RequestStatusChangedHandler
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-class TestRequestStatusUpdatedHandler:
+class TestRequestStatusChangedHandler:
     @pytest.mark.asyncio
     async def test_format_includes_old_and_new_status(self):
-        h = RequestStatusUpdatedHandler()
+        h = RequestStatusChangedHandler()
         ev = MagicMock()
         ev.aggregate_id = "req-2"
         ev.old_status = "pending"
@@ -478,28 +443,6 @@ class TestRequestFailedHandler:
 
 
 # ---------------------------------------------------------------------------
-# RequestCancelledHandler
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestRequestCancelledHandler:
-    @pytest.mark.asyncio
-    async def test_format_includes_cancellation_reason(self):
-        h = RequestCancelledHandler()
-        ev = MagicMock()
-        ev.aggregate_id = "req-5"
-        ev.cancellation_reason = "budget_exceeded"
-
-        msg = await h.format_log_message(ev)  # type: ignore[attr-defined]
-        assert "budget_exceeded" in msg
-
-    def test_log_level_is_warning(self):
-        h = RequestCancelledHandler()
-        assert h.get_log_level(MagicMock()) == "warning"  # type: ignore[attr-defined]
-
-
-# ---------------------------------------------------------------------------
 # RequestTimeoutHandler
 # ---------------------------------------------------------------------------
 
@@ -519,168 +462,6 @@ class TestRequestTimeoutHandler:
     def test_log_level_is_error(self):
         h = RequestTimeoutHandler()
         assert h.get_log_level(MagicMock()) == "error"  # type: ignore[attr-defined]
-
-
-# ---------------------------------------------------------------------------
-# SystemStartedHandler
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestSystemStartedHandler:
-    @pytest.mark.asyncio
-    async def test_format_includes_version_and_startup_time(self):
-        h = SystemStartedHandler()
-        ev = MagicMock()
-        ev.version = "1.2.3"
-        ev.startup_time = 0.5
-
-        msg = await h.format_log_message(ev)  # type: ignore[attr-defined]
-        assert "1.2.3" in msg
-        assert "0.5" in msg
-
-    def test_log_level_is_info(self):
-        h = SystemStartedHandler()
-        assert h.get_log_level(MagicMock()) == "info"  # type: ignore[attr-defined]
-
-
-# ---------------------------------------------------------------------------
-# SystemShutdownHandler
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestSystemShutdownHandler:
-    @pytest.mark.asyncio
-    async def test_format_includes_reason_and_graceful_flag(self):
-        h = SystemShutdownHandler()
-        ev = MagicMock()
-        ev.shutdown_reason = "sigterm"
-        ev.graceful_shutdown = True
-
-        msg = await h.format_log_message(ev)  # type: ignore[attr-defined]
-        assert "sigterm" in msg
-        assert "graceful" in msg.lower()
-
-    def test_log_level_info_for_graceful(self):
-        h = SystemShutdownHandler()
-        ev = MagicMock()
-        ev.graceful_shutdown = True
-        assert h.get_log_level(ev) == "info"  # type: ignore[attr-defined]
-
-    def test_log_level_warning_for_forced(self):
-        h = SystemShutdownHandler()
-        ev = MagicMock()
-        ev.graceful_shutdown = False
-        assert h.get_log_level(ev) == "warning"  # type: ignore[attr-defined]
-
-
-# ---------------------------------------------------------------------------
-# ConfigurationUpdatedHandler
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestConfigurationUpdatedHandler:
-    @pytest.mark.asyncio
-    async def test_format_includes_section_and_keys(self):
-        h = ConfigurationUpdatedHandler()
-        ev = MagicMock()
-        ev.config_section = "database"
-        ev.changed_keys = ["host", "port"]
-
-        msg = await h.format_log_message(ev)  # type: ignore[attr-defined]
-        assert "database" in msg
-        assert "host" in msg
-        assert "port" in msg
-
-    @pytest.mark.asyncio
-    async def test_format_with_empty_changed_keys(self):
-        h = ConfigurationUpdatedHandler()
-        ev = MagicMock()
-        ev.config_section = "cache"
-        ev.changed_keys = []
-
-        msg = await h.format_log_message(ev)  # type: ignore[attr-defined]
-        assert "cache" in msg
-
-    def test_log_level_is_info(self):
-        h = ConfigurationUpdatedHandler()
-        assert h.get_log_level(MagicMock()) == "info"  # type: ignore[attr-defined]
-
-
-# ---------------------------------------------------------------------------
-# DatabaseConnectionHandler (infrastructure)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestDatabaseConnectionHandler:
-    def test_format_message_includes_status_and_type(self):
-        h = DatabaseConnectionHandler()
-        ev = MagicMock()
-        ev.connection_status = "connected"
-        ev.database_type = "postgres"
-        ev.connection_time = None
-        ev.retry_count = 0
-
-        # format_message is called directly (sync)
-        msg = h.format_message(ev)  # type: ignore[attr-defined]
-        assert "connected" in msg
-        assert "postgres" in msg
-
-    def test_format_message_includes_retries_when_nonzero(self):
-        h = DatabaseConnectionHandler()
-        ev = MagicMock()
-        ev.connection_status = "reconnected"
-        ev.database_type = "dynamodb"
-        ev.connection_time = None
-        ev.retry_count = 3
-
-        msg = h.format_message(ev)  # type: ignore[attr-defined]
-        assert "3" in msg
-
-    def test_format_message_includes_duration_when_present(self):
-        h = DatabaseConnectionHandler()
-        ev = MagicMock()
-        ev.connection_status = "connected"
-        ev.database_type = "postgres"
-        ev.connection_time = 150.0
-        ev.retry_count = 0
-
-        msg = h.format_message(ev)  # type: ignore[attr-defined]
-        assert "ms" in msg or "s" in msg
-
-
-# ---------------------------------------------------------------------------
-# CacheOperationHandler (infrastructure)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestCacheOperationHandler:
-    def test_format_message_includes_operation_and_key(self):
-        h = CacheOperationHandler()
-        ev = MagicMock()
-        ev.operation = "get"
-        ev.cache_key = "session:abc"
-        ev.hit_rate = None
-        ev.operation_time = None
-
-        msg = h.format_message(ev)  # type: ignore[attr-defined]
-        assert "get" in msg
-        assert "session:abc" in msg
-
-    def test_format_message_includes_hit_rate_when_present(self):
-        h = CacheOperationHandler()
-        ev = MagicMock()
-        ev.operation = "get"
-        ev.cache_key = "k"
-        ev.hit_rate = 85.5
-        ev.operation_time = None
-
-        msg = h.format_message(ev)  # type: ignore[attr-defined]
-        assert "85.5" in msg
 
 
 # ---------------------------------------------------------------------------

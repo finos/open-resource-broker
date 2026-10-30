@@ -42,6 +42,24 @@ class EventHandlerRegistry:
 
         def decorator(handler_class: type["EventHandler"]):
             """Apply event handler registration to the class."""
+            existing = cls._handlers.get(event_type)
+            if existing is not None and (
+                existing.__module__,
+                existing.__qualname__,
+            ) != (handler_class.__module__, handler_class.__qualname__):
+                # The registry holds one handler class per event type, so the
+                # earlier registration is replaced. A reload re-registers the
+                # same qualified name and is not reported.
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "Event handler for %s replaced: %s.%s -> %s.%s",
+                    event_type,
+                    existing.__module__,
+                    existing.__qualname__,
+                    handler_class.__module__,
+                    handler_class.__qualname__,
+                )
             cls._handlers[event_type] = handler_class
             # Add event_type as class attribute for introspection
             handler_class._event_type = event_type  # type: ignore[attr-defined]

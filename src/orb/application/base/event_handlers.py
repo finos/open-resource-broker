@@ -69,7 +69,7 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
         try:
             # Log event processing start
             if self.logger:
-                self.logger.info("Processing event: %s", event_type)
+                self.logger.debug("Processing event: %s", event_type)
 
             # Validate event
             await self.validate_event(event)
@@ -82,7 +82,7 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
             self._record_success_metrics(event_type, duration)
 
             if self.logger:
-                self.logger.info("Event processed successfully: %s (%.3fs)", event_type, duration)
+                self.logger.debug("Event processed successfully: %s (%.3fs)", event_type, duration)
 
         except Exception as e:
             # Record failure metrics
@@ -261,7 +261,8 @@ class BaseLoggingEventHandler(BaseEventHandler[TEvent]):
         Get the appropriate log level for this event.
 
         Override this method to customize log levels for different events.
-        Default implementation returns 'info'.
+        Default implementation returns 'debug': the publisher already writes
+        an audit line per event at info level.
 
         Args:
             event: Event to determine log level for
@@ -269,4 +270,4 @@ class BaseLoggingEventHandler(BaseEventHandler[TEvent]):
         Returns:
             Log level ('debug', 'info', 'warning', 'error')
         """
-        return "info"
+        return "debug"
