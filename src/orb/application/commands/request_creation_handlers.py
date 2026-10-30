@@ -514,8 +514,9 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     )
                     uow.machines.save(updated_machine)
 
-            for event in events or []:
-                self.event_publisher.publish(event)  # type: ignore[union-attr]
+        # Publish only after the unit of work has committed.
+        for event in events or []:
+            self.event_publisher.publish(event)  # type: ignore[union-attr]
 
     async def _update_request_to_in_progress(self, request: Any) -> None:
         """Update return request status to in_progress."""
