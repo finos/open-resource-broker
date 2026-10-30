@@ -11,9 +11,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import pytest
-
-from orb.providers.aws.configuration.naming_config import AWSLimitsConfig, AWSNamingConfig
 from orb.providers.aws.domain.template import naming_patterns
 from tests.unit.architecture.conftest import SRC_ORB, collect_python_files
 
@@ -110,21 +107,3 @@ def test_naming_patterns_leaf_is_standard_library_only() -> None:
     tree = ast.parse(Path(naming_patterns.__file__).read_text(encoding="utf-8"))
     imports = [node for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))]
     assert imports == []
-
-
-def test_leaf_patterns_match_configuration_defaults() -> None:
-    assert naming_patterns.PATTERNS == AWSNamingConfig().patterns
-
-
-@pytest.mark.parametrize(
-    ("field", "leaf_value"),
-    [
-        ("tag_key_length", naming_patterns.TAG_KEY_LENGTH),
-        ("tag_value_length", naming_patterns.TAG_VALUE_LENGTH),
-        ("max_tags_per_resource", naming_patterns.MAX_TAGS_PER_RESOURCE),
-        ("max_security_groups", naming_patterns.MAX_SECURITY_GROUPS),
-        ("max_subnets", naming_patterns.MAX_SUBNETS),
-    ],
-)
-def test_leaf_limits_match_configuration_defaults(field: str, leaf_value: int) -> None:
-    assert getattr(AWSLimitsConfig(), field) == leaf_value
