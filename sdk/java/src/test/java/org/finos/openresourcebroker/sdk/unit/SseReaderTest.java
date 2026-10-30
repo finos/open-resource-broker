@@ -40,6 +40,32 @@ class SseReaderTest {
     }
 
     @Test
+    void namedOutcomeFramesCarryNoRequestsAndSentinelIsLast() throws Exception {
+        String[] outcomes = {
+            "event: complete\ndata: {\"status\": \"failed\"}\n\n",
+            "event: error\ndata: {\"error\": \"internal\"}\n\n",
+            "event: timeout\ndata: {\"status\": \"timeout\"}\n\n",
+        };
+        for (String outcome : outcomes) {
+            String wire = "data: {\"requests\":[{\"status\":\"in_progress\"}]}\n\n"
+                    + outcome + "data: {}\n\n";
+            try (SseReader r = new SseReader(bytes(wire))) {
+                SseFrame status = r.next();
+                assertNotNull(status);
+                assertTrue(status.data().contains("\"requests\""));
+                SseFrame named = r.next();
+                assertNotNull(named);
+                assertFalse(named.isSentinel());
+                assertFalse(named.data().contains("\"requests\""));
+                SseFrame last = r.next();
+                assertNotNull(last);
+                assertTrue(last.isSentinel());
+                assertNull(r.next());
+            }
+        }
+    }
+
+    @Test
     void boundsOversizedFrame() {
         // A single data line larger than the 4 MiB cap must terminate with an
         // IOException rather than growing the heap without bound.

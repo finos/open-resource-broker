@@ -76,6 +76,31 @@ OFFSET_QUERY = Query(0, ge=0, description="Number of results to skip")
 _MAX_WAIT_TIMEOUT_SECONDS = 600
 
 
+# Consecutive failed status polls after which the stream gives up.
+_MAX_UNAVAILABLE_POLLS = 3
+
+# Final frame of every request status stream.
+_END_OF_STREAM = "data: {}\n\n"
+
+
+def _named_frame(event: str, data: dict[str, str]) -> str:
+    """Format a named SSE frame whose payload has no ``requests`` list."""
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def _lookup_failure(entry: dict) -> Optional[str]:
+    """Classify a status entry that carries no request, or None for a real one.
+
+    ``not_found`` for a missing request, ``unavailable`` for any other lookup
+    failure (an entry with an error and no status), both generic.
+    """
+    if _is_not_found_marker(entry):
+        return "not_found"
+    if entry.get("error") and not entry.get("status"):
+        return "unavailable"
+    return None
+
+
 def _is_terminal_status(status: str) -> bool:
     """Return True when *status* is a terminal RequestStatus value.
 
@@ -314,7 +339,7 @@ async def batch_get_request_status(
     "/{request_id}/stream",
     operation_id="streamRequest",
     summary="Stream Request Status",
-    description="Stream request status updates as Server-Sent Events",
+    description="Stream request status updates as Server-Sent Events. Each poll emits a data frame with the current status. The stream ends with a named event (`complete` with the final status, `error`, or `timeout`) followed by an empty `data: {}` frame, which is always the last frame.",
 )
 async def stream_request_status(
     request_id: str,
@@ -327,26 +352,69 @@ async def stream_request_status(
     """Stream request status as SSE until terminal state or timeout."""
 
     async def event_generator():
+        # Every path ends with the ``data: {}`` sentinel as the final frame; SDK
+        # readers treat it as end-of-stream and reconnect if it is missing.
+        # Terminal, error and timeout outcomes are announced by a named event
+        # just before it. Their payloads deliberately carry no ``requests`` list
+        # so readers that only look at ``data`` never see them as status updates.
         elapsed = 0.0
+        unavailable_polls = 0
         while elapsed < timeout:
             try:
                 result = await orchestrator.execute(
                     GetRequestStatusInput(request_ids=[request_id], verbose=False)
                 )
-                entry = OPERATION_CATALOG["get_request_status"]
-                formatted = entry.renderer_for(Interface.REST)(formatter, result).data
-                yield f"data: {json.dumps(formatted)}\n\n"
-                requests_list = formatted.get("requests", [])
-                if requests_list:
-                    status = requests_list[0].get("status", "")
-                    if _is_terminal_status(status):
-                        yield "data: {}\n\n"
+                outcome = _lookup_failure(result.requests[0]) if len(result.requests) == 1 else None
+                if outcome == "not_found":
+                    # The request does not exist: end now rather than polling it
+                    # until the timeout.
+                    yield _named_frame("error", {"error": "not_found"})
+                    yield _END_OF_STREAM
+                    return
+                if outcome is not None:
+                    # A lookup failure with no status (a provider blip, or a
+                    # malformed ID). Emit nothing for this poll, never echo the
+                    # underlying text, and give up only after repeated failures.
+                    unavailable_polls += 1
+                    _logger.warning(
+                        "Request status unavailable for %s (poll failure %d of %d)",
+                        request_id.replace("\r", "").replace("\n", ""),
+                        unavailable_polls,
+                        _MAX_UNAVAILABLE_POLLS,
+                    )
+                    if unavailable_polls >= _MAX_UNAVAILABLE_POLLS:
+                        yield _named_frame("error", {"error": "unavailable"})
+                        yield _END_OF_STREAM
                         return
+                else:
+                    unavailable_polls = 0
+                    entry = OPERATION_CATALOG["get_request_status"]
+                    formatted = entry.renderer_for(Interface.REST)(formatter, result).data
+                    yield f"data: {json.dumps(formatted)}\n\n"
+                    requests_list = formatted.get("requests", [])
+                    if requests_list:
+                        status = requests_list[0].get("status", "")
+                        if _is_terminal_status(status):
+                            yield _named_frame("complete", {"status": status})
+                            yield _END_OF_STREAM
+                            return
             except Exception:
-                yield "data: {}\n\n"
+                _logger.warning(
+                    "Request status stream failed for %s",
+                    request_id.replace("\r", "").replace("\n", ""),
+                    exc_info=True,
+                )
+                yield _named_frame("error", {"error": "internal"})
+                yield _END_OF_STREAM
                 return
             await asyncio.sleep(interval)
             elapsed += interval
+        if unavailable_polls:
+            # The deadline passed while the most recent polls were failing.
+            yield _named_frame("error", {"error": "unavailable"})
+        else:
+            yield _named_frame("timeout", {"status": "timeout"})
+        yield _END_OF_STREAM
 
     return StreamingResponse(
         event_generator(),
