@@ -5,8 +5,10 @@
 # unless it finished green. Pull requests build and scan a single-platform
 # image with read-only permissions and never push or write the build cache.
 #
-# workflow_dispatch is maintainer-only. On main it is gated and may publish;
-# on any other branch it is a build-only dry run.
+# workflow_dispatch is maintainer-only. On main it is gated and may publish,
+# but only if ci-tests.yml ran successfully on a push of that exact commit; a
+# commit with no such run fails the gate. On any other branch it is a
+# build-only dry run.
 name: Container Build
 
 env:
@@ -63,7 +65,9 @@ concurrency:
 jobs:
   # Publishing is allowed only for a commit whose Unit Tests push run passed.
   # The poll step is skipped on pull requests (no image is published there), so
-  # this job is green and plain `needs` is enough for downstream jobs.
+  # this job is green and plain `needs` is enough for downstream jobs. A manual
+  # dispatch on main uses the same check: it looks up the push run of ci-tests.yml
+  # for the dispatched commit and fails closed when there is none.
   tests-gate:
     name: Wait for Unit Tests
     runs-on: ubuntu-latest
