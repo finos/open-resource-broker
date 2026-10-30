@@ -39,7 +39,7 @@
          Amazon.Runtime.Internal.Auth.AWS4Signer.ComputeSignature (AWSSDK.Core native) -->
     <PackageReference Include="AWSSDK.Core" Version="4.0.102.13" />
     <!-- JSON serialization -->
-    <PackageReference Include="System.Text.Json" Version="10.0.13" />
+    <PackageReference Include="System.Text.Json" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup>
