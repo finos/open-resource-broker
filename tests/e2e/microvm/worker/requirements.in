@@ -1,0 +1,3 @@
+# python-version: 3.11
+# Worker dependencies installed in the MicroVM image.
+boto3>=1.35,<2

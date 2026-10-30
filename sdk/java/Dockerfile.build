@@ -17,8 +17,9 @@ RUN pip3 install --break-system-packages /tmp/orb_py-*.whl 2>/dev/null || \
     pip3 install /tmp/orb_py-*.whl
 
 # Install server extras (fastapi, uvicorn) needed for orb server start
-RUN pip3 install --break-system-packages "fastapi>=0.115.0" "uvicorn>=0.24.0" "httptools>=0.6.0" 2>/dev/null || \
-    pip3 install "fastapi>=0.115.0" "uvicorn>=0.24.0" "httptools>=0.6.0"
+COPY .github/requirements/java-contract-server.txt /tmp/java-contract-server.txt
+RUN pip3 install --break-system-packages --require-hashes --no-deps -r /tmp/java-contract-server.txt 2>/dev/null || \
+    pip3 install --require-hashes --no-deps -r /tmp/java-contract-server.txt
 
 # Copy SDK files
 COPY sdk/java /sdk
