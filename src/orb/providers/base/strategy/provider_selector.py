@@ -10,7 +10,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Optional
+from typing import Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.di.injectable import injectable
@@ -18,6 +18,7 @@ from orb.providers.base.strategy.provider_strategy import (
     ProviderOperation,
     ProviderStrategy,
 )
+from orb.providers.base.strategy.selection_criteria import SelectionCriteria
 from orb.providers.base.strategy.selector_utils import is_strategy_suitable
 
 
@@ -35,28 +36,6 @@ class SelectionPolicy(str, Enum):
     HEALTH_BASED = "health_based"
     RANDOM = "random"
     CUSTOM = "custom"
-
-
-@dataclass
-class SelectionCriteria:
-    """Criteria for strategy selection."""
-
-    required_capabilities: Optional[list[str]] = None
-    min_success_rate: float = 0.0
-    max_response_time_ms: float = float("inf")
-    require_healthy: bool = True
-    exclude_strategies: Optional[list[str]] = None
-    prefer_strategies: Optional[list[str]] = None
-    custom_filter: Optional[Callable[[ProviderStrategy, dict], bool]] = None
-
-    def __post_init__(self) -> None:
-        """Initialize default values."""
-        if self.required_capabilities is None:
-            self.required_capabilities = []
-        if self.exclude_strategies is None:
-            self.exclude_strategies = []
-        if self.prefer_strategies is None:
-            self.prefer_strategies = []
 
 
 @dataclass
