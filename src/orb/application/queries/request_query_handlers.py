@@ -223,8 +223,10 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
             try:
                 with self.uow_factory.create_unit_of_work() as uow:
                     events = uow.requests.save(swept)
-                    for event in events or []:
-                        self.event_publisher.publish(event)
+                # Publish only after commit so an OCC retry never emits the
+                # same transition twice.
+                for event in events or []:
+                    self.event_publisher.publish(event)
                 return swept
             except ConcurrencyError:
                 if attempt >= _MAX_RETRIES:

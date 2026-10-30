@@ -154,8 +154,11 @@ class UpdateRequestStatusHandler(BaseCommandHandler[UpdateRequestStatusCommand, 
                     )
 
                     events = uow.requests.save(request)
-                    for event in events:
-                        self.event_publisher.publish(event)  # type: ignore[union-attr]
+
+                # Publish only after the unit of work has committed so a failed
+                # commit or an OCC retry never emits events for discarded state.
+                for event in events:
+                    self.event_publisher.publish(event)  # type: ignore[union-attr]
 
                 self.logger.info(
                     "Request status updated: %s -> %s", command.request_id, command.status
@@ -263,8 +266,10 @@ class CancelRequestHandler(BaseCommandHandler[CancelRequestCommand, None]):  # t
                         return
 
                     events = uow.requests.save(cancelled_request)
-                    for event in events or []:
-                        self.event_publisher.publish(event)  # type: ignore[union-attr]
+
+                # Publish only after the unit of work has committed.
+                for event in events or []:
+                    self.event_publisher.publish(event)  # type: ignore[union-attr]
 
                 self.logger.info("Request canceled: %s", command.request_id)
                 command.cancelled = True
