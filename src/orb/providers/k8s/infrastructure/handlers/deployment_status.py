@@ -23,13 +23,15 @@ from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, Provider
 from orb.domain.request.aggregate import Request
 
 if TYPE_CHECKING:
-    from orb.providers.k8s.infrastructure.handlers.deployment_handler import K8sDeploymentHandler
+    from orb.providers.k8s.infrastructure.handlers.shared.status_handler import (
+        DeploymentStatusHandler,
+    )
 
 
 class DeploymentStatusResolver:
     """Compute the per-request status verdict for a Deployment-managed pod set."""
 
-    def __init__(self, handler: K8sDeploymentHandler) -> None:
+    def __init__(self, handler: DeploymentStatusHandler) -> None:
         self._handler = handler
         # Per-workload TTL cache:
         #   (namespace, deployment_name) -> (view, fetch_monotonic_ts, stored_requested_count)

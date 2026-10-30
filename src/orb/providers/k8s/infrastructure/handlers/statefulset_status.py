@@ -23,13 +23,15 @@ from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, Provider
 from orb.domain.request.aggregate import Request
 
 if TYPE_CHECKING:
-    from orb.providers.k8s.infrastructure.handlers.statefulset_handler import K8sStatefulSetHandler
+    from orb.providers.k8s.infrastructure.handlers.shared.status_handler import (
+        StatefulSetStatusHandler,
+    )
 
 
 class StatefulSetStatusResolver:
     """Compute the per-request status verdict for a StatefulSet-managed pod set."""
 
-    def __init__(self, handler: K8sStatefulSetHandler) -> None:
+    def __init__(self, handler: StatefulSetStatusHandler) -> None:
         self._handler = handler
         # Per-workload TTL cache:
         #   (namespace, statefulset_name) -> (view, fetch_monotonic_ts, stored_requested_count)
