@@ -115,6 +115,7 @@ class _ConcreteFleetReleaseManager(BaseFleetReleaseManager):
         self,
         fleet_details: dict[str, Any],
         request_id: str = "",
+        released_instance_ids=None,
     ) -> None:
         self._cleanup_launch_template_mock(fleet_details, request_id)
 
@@ -247,7 +248,20 @@ class TestBaseFleetReleaseManagerSharedFlow:
         mgr._terminate_instances_mock.assert_not_called()
         # is_maintain defaults to False for the empty-instance_ids full-teardown path.
         mgr._cancel_or_delete_fleet_mock.assert_called_once_with("fleet-1", True, False)
-        mgr._cleanup_launch_template_mock.assert_called_once()
+        # The terminated instances are unknown, so the launch template is left
+        # for the cleanup on the later return.
+        mgr._cleanup_launch_template_mock.assert_not_called()
+
+    def test_full_fleet_cancel_excludes_known_members_from_template_cleanup(self):
+        mgr = _ConcreteFleetReleaseManager()
+        mgr._list_fleet_instance_ids = MagicMock(return_value=["i-1", "i-2"])
+        mgr._cleanup_launch_template = MagicMock()
+
+        mgr.release("fleet-1", [], {"Type": "maintain"}, request_id="req-1")
+
+        mgr._cleanup_launch_template.assert_called_once_with(
+            {"Type": "maintain"}, "req-1", ["i-1", "i-2"]
+        )
 
     def test_fetch_fleet_details_called_when_details_empty(self):
         """When fleet_details is empty, _fetch_fleet_details is called."""

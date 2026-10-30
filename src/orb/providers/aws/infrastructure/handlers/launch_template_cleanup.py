@@ -12,7 +12,7 @@ thin delegation wrappers (``_get_cleanup_config``, ``_cleanup_on_zero_capacity``
 are unaffected.
 """
 
-from typing import Optional
+from typing import Iterable, Optional
 
 from botocore.exceptions import ClientError
 
@@ -68,7 +68,12 @@ class LaunchTemplateCleanupService:
             self._logger.warning("Failed to read cleanup config, using defaults: %s", e)
         return CleanupConfig()
 
-    def cleanup_on_zero_capacity(self, resource_type: str, request_id: str) -> None:
+    def cleanup_on_zero_capacity(
+        self,
+        resource_type: str,
+        request_id: str,
+        exclude_instance_ids: Optional[Iterable[str]] = None,
+    ) -> None:
         """Delete the ORB-managed launch template when a resource reaches zero capacity.
 
         Reads the cleanup config, checks that cleanup is enabled and that the
@@ -80,6 +85,8 @@ class LaunchTemplateCleanupService:
             resource_type: Cleanup config resource key, e.g. ``"asg"``,
                 ``"ec2_fleet"``, or ``"spot_fleet"``.
             request_id: The ORB request ID used to locate the launch template.
+            exclude_instance_ids: Instances just submitted for termination;
+                they are treated as gone even if a describe still shows them.
         """
         if self._config_port is None:
             return
@@ -96,9 +103,77 @@ class LaunchTemplateCleanupService:
         if not getattr(cleanup.resources, resource_type, True):
             return
 
-        self.delete_orb_launch_template(request_id)
+        self.delete_orb_launch_template(request_id, exclude_instance_ids)
 
-    def delete_orb_launch_template(self, request_id: str) -> None:
+    # Instances in these states still belong to the request. ``shutting-down``
+    # is excluded: it is the in-flight tail of a return that already happened.
+    _LIVE_INSTANCE_STATES = ("pending", "running", "stopping", "stopped")
+
+    def _request_has_live_instances(
+        self, request_id: str, exclude_instance_ids: Optional[Iterable[str]] = None
+    ) -> bool:
+        """Return True when any instance of the request is still live.
+
+        A partial return must not delete the launch template while other
+        machines of the same request remain; the cleanup runs again on the
+        return that removes the last one. Instances in *exclude_instance_ids*
+        were just submitted for termination and are ignored, so describe lag
+        right after TerminateInstances cannot keep the template forever. If the
+        lookup fails the request is assumed to still have instances, so the
+        template is kept.
+        """
+        return self._has_live_instances("tag:orb:request-id", request_id, exclude_instance_ids)
+
+    def _launch_template_in_use(
+        self, launch_template_id: str, exclude_instance_ids: Optional[Iterable[str]] = None
+    ) -> bool:
+        """Return True when a live instance was launched from this launch template.
+
+        EC2 stamps every instance with ``aws:ec2launchtemplate:id``, so this
+        also covers custom or replace-mode specs that do not carry ORB's own
+        request tag.
+        """
+        return self._has_live_instances(
+            "tag:aws:ec2launchtemplate:id", launch_template_id, exclude_instance_ids
+        )
+
+    def _has_live_instances(
+        self,
+        filter_name: str,
+        filter_value: str,
+        exclude_instance_ids: Optional[Iterable[str]] = None,
+    ) -> bool:
+        excluded = set(exclude_instance_ids or ())
+        filters = [
+            {"Name": filter_name, "Values": [filter_value]},
+            {"Name": "instance-state-name", "Values": list(self._LIVE_INSTANCE_STATES)},
+        ]
+        next_token: Optional[str] = None
+        try:
+            while True:
+                kwargs: dict = {"Filters": filters}
+                if next_token:
+                    kwargs["NextToken"] = next_token
+                response = self._aws_client.ec2_client.describe_instances(**kwargs)
+                for reservation in response.get("Reservations", []):
+                    for instance in reservation.get("Instances", []):
+                        if instance.get("InstanceId") not in excluded:
+                            return True
+                next_token = response.get("NextToken")
+                if not isinstance(next_token, str) or not next_token:
+                    return False
+        except Exception as e:
+            self._logger.warning(
+                "Could not check for live instances (%s=%s); keeping launch template: %s",
+                filter_name,
+                filter_value,
+                e,
+            )
+            return True
+
+    def delete_orb_launch_template(
+        self, request_id: str, exclude_instance_ids: Optional[Iterable[str]] = None
+    ) -> None:
         """Delete the ORB-managed launch template for a request, if one exists.
 
         Reconstructs the launch template name from the request ID, verifies the
@@ -122,6 +197,13 @@ class LaunchTemplateCleanupService:
             return
 
         dry_run = cleanup.dry_run
+
+        if self._request_has_live_instances(request_id, exclude_instance_ids):
+            self._logger.info(
+                "Request %s still has live instances; keeping its launch template",
+                request_id,
+            )
+            return
 
         try:
             response = self._aws_client.ec2_client.describe_launch_templates(
@@ -149,6 +231,14 @@ class LaunchTemplateCleanupService:
                     self._logger.warning(
                         "Launch template %s (%s) is not ORB-managed (orb:managed-by tag absent"
                         " or wrong); skipping deletion",
+                        lt_name,
+                        lt_id,
+                    )
+                    continue
+
+                if self._launch_template_in_use(lt_id, exclude_instance_ids):
+                    self._logger.info(
+                        "Launch template %s (%s) still has live instances; keeping it",
                         lt_name,
                         lt_id,
                     )

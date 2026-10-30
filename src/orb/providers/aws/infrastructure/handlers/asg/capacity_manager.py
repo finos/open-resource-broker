@@ -33,7 +33,7 @@ class ASGCapacityManager:
         aws_client: AWSClient,
         aws_ops: AWSOperations,
         request_adapter: Optional[RequestAdapterPort],
-        cleanup_on_zero_capacity_fn: Callable[[str, str], None],
+        cleanup_on_zero_capacity_fn: Callable[..., None],
         logger: LoggingPort,
         retry_with_backoff: Callable,
         chunk_list: Callable,
@@ -181,7 +181,7 @@ class ASGCapacityManager:
                 instance_ids,
             )
             if self._call_delete_asg(asg_name):
-                self._cleanup_on_zero_capacity("asg", asg_name)
+                self._cleanup_on_zero_capacity("asg", asg_name, instance_ids)
             return
 
         # Guard against double-execution: only terminate instances that are currently
@@ -270,7 +270,7 @@ class ASGCapacityManager:
         if new_capacity == 0:
             self._logger.info("ASG %s is empty, deleting ASG", asg_name)
             if self._call_delete_asg(asg_name):
-                self._cleanup_on_zero_capacity("asg", asg_name)
+                self._cleanup_on_zero_capacity("asg", asg_name, instances_to_terminate)
 
     # ------------------------------------------------------------------
     # Private helpers

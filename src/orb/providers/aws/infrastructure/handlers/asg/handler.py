@@ -26,7 +26,7 @@ Note:
     based on demand and maintain high availability across multiple AZs.
 """
 
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from botocore.exceptions import ClientError
 
@@ -129,9 +129,16 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 return asg_name[len(prefix) :]
         return asg_name
 
-    def _cleanup_asg_on_zero_capacity(self, resource_type: str, asg_name: str) -> None:
+    def _cleanup_asg_on_zero_capacity(
+        self,
+        resource_type: str,
+        asg_name: str,
+        exclude_instance_ids: Optional[Iterable[str]] = None,
+    ) -> None:
         """Recover the request ID from the ASG name, then delegate to base cleanup."""
-        self._cleanup_on_zero_capacity(resource_type, self._request_id_for_asg(asg_name))
+        self._cleanup_on_zero_capacity(
+            resource_type, self._request_id_for_asg(asg_name), exclude_instance_ids
+        )
 
     @handle_infrastructure_exceptions(context="asg_creation")
     def _acquire_hosts_internal(
@@ -400,6 +407,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         Returns:
             Dictionary with ``status`` of ``"success"`` or ``"error"``.
         """
+        member_ids = self._asg_instance_ids(resource_id)
         try:
             self._delete_asg(resource_id)
         except Exception as e:
@@ -417,14 +425,37 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 "status": "error",
                 "message": f"Failed to cancel ASG {resource_id}; it may still be running: {e!s}",
             }
-        if request_id:
+        if request_id and member_ids is None:
+            # ForceDelete terminates the members asynchronously and their ids
+            # are unknown, so the in-use check could not tell them from live
+            # instances. Leave the template for the cleanup on the later return.
+            self._logger.warning(
+                "ASG %s deleted; skipping launch template cleanup (members unknown)", resource_id
+            )
+        elif request_id:
             try:
-                self._cleanup_on_zero_capacity("asg", request_id)
+                self._cleanup_on_zero_capacity("asg", request_id, member_ids)
             except Exception as e:
                 self._logger.warning(
                     "ASG %s deleted but launch template cleanup failed: %s", resource_id, e
                 )
         return {"status": "success", "message": f"Auto Scaling Group {resource_id} deleted"}
+
+    def _asg_instance_ids(self, asg_name: str) -> Optional[list[str]]:
+        """Return the ids of the ASG's current members, or None when they can't be read."""
+        try:
+            response = self._retry_with_backoff(
+                self.aws_client.autoscaling_client.describe_auto_scaling_groups,
+                operation_type="read_only",
+                AutoScalingGroupNames=[asg_name],
+            )
+            groups = response.get("AutoScalingGroups", [])
+            return [
+                i["InstanceId"] for g in groups for i in g.get("Instances", []) if "InstanceId" in i
+            ]
+        except Exception as e:
+            self._logger.warning("Could not read members of ASG %s: %s", asg_name, e)
+            return None
 
     def _release_hosts_for_single_asg(
         self, asg_name: str, asg_instance_ids: list[str], asg_details: dict

@@ -137,7 +137,9 @@ class TestRunInstancesCancel:
         assert ids == ["i-1", "i-2"]
         second_call = handler.aws_client.ec2_client.describe_instances.call_args_list[1]
         assert second_call.kwargs["NextToken"] == "tok"
-        handler._cleanup_on_zero_capacity.assert_called_once_with("run_instances", "req-1")
+        handler._cleanup_on_zero_capacity.assert_called_once_with(
+            "run_instances", "req-1", ["i-1", "i-2"]
+        )
 
     def test_termination_failure_is_error(self):
         handler = _run_instances_handler()
@@ -692,3 +694,14 @@ class TestProviderCancelIsNotWired:
             or ".cancel_resource(" in path.read_text(encoding="utf-8")
         ]
         assert offenders == []
+
+
+class TestReleaseExcludesTerminatedFromLaunchTemplateGuard:
+    def test_run_instances_release_passes_terminated_ids_to_cleanup(self):
+        handler = _run_instances_handler()
+
+        handler.release_hosts(["i-1", "i-2"], request_id="req-1")
+
+        handler._cleanup_on_zero_capacity.assert_called_once_with(
+            "run_instances", "req-1", ["i-1", "i-2"]
+        )
