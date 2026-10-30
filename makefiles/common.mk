@@ -40,6 +40,7 @@ PACKAGE := src
 PACKAGE_ROOT := $(shell yq '.build.package_root' $(PROJECT_CONFIG) 2>/dev/null || echo "src/orb")
 TESTS := tests
 TESTS_UNIT := $(TESTS)/unit
+TESTS_CONTRACT := $(TESTS)/contract
 TESTS_INTEGRATION := $(TESTS)/integration
 TESTS_E2E := $(TESTS)/e2e
 TESTS_PERFORMANCE := $(TESTS)/performance
