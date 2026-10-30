@@ -6633,7 +6633,15 @@ file restricted to the current user and removed after the command finishes.
 Other lifecycle operations use the corresponding Compute CLI commands.</p>
 <p>The launch endpoint uses the configured region and <code>realm_domain_component</code>,
 which defaults to <code>oraclecloud.com</code> for the commercial realm. Set this provider
-configuration field to the realm DNS suffix when using another OCI realm.</p>
+configuration field to the realm DNS suffix when using another OCI realm.
+The suffix must be one of the realms published in the OCI SDKs
+(<code>oraclecloud.com</code>, <code>oraclegovcloud.com</code>, <code>oraclegovcloud.uk</code>, <code>oraclecloud.eu</code>,
+and <code>oraclecloud&lt;N&gt;.com</code> for the other published realms) or an exact domain listed
+in the <code>extra_realm_suffixes</code> provider setting; any other value is rejected.
+Entries in <code>extra_realm_suffixes</code> must be lowercase domains with at least two labels
+and an alphabetic top-level label (a bare <code>com</code> is rejected). Only add domains that
+Oracle owns for an OCI realm, because signed launch requests are sent to
+<code>iaas.&lt;region&gt;.&lt;suffix&gt;</code>.</p>
 
 
 

@@ -3861,6 +3861,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What ORB calls">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-a-plugin-fails-to-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a plugin fails to load
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -6222,6 +6239,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What ORB calls">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-a-plugin-fails-to-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a plugin fails to load
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -6455,10 +6489,28 @@ contract of the callable is:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Register the plugin&#39;s provider strategy / handler with ORB.</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="sd">    Must not raise.  Plugins should log and swallow internal errors so a</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="sd">    broken plugin does not prevent ORB from starting.</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="sd">    Should not raise.  Plugins should log and swallow internal errors.</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="sd">    &quot;&quot;&quot;</span>
 </code></pre></div>
+<h4 id="when-a-plugin-fails-to-load">When a plugin fails to load<a class="headerlink" href="#when-a-plugin-fails-to-load" title="Permanent link">&para;</a></h4>
+<p>If the entry point cannot be imported, resolves to something that is not
+callable, or the callable raises, the plugin is skipped and the other
+plugins still load.  What happens next depends on the configuration:</p>
+<ul>
+<li>If the entry-point <strong>name equals a provider <code>type</code> in the active
+  configuration</strong>, ORB fails startup with
+  <code>Configured provider '&lt;name&gt;' could not be loaded</code>.  A provider you
+  configured but that cannot run should not be silently replaced by the
+  remaining providers.  Name the entry point after the provider type (for a
+  wholly new provider, the same string used as <code>type</code> in the provider
+  block) for this to apply.</li>
+<li>Otherwise (an extension plugin whose name is not a provider type, or a
+  provider that is installed but not configured) the failure is logged and
+  ORB continues.</li>
+</ul>
+<p>The check happens during provider registration at startup.  Building the CLI
+parser and loading provider defaults discover plugins as well, but only log
+a failure.</p>
 <p>The callable is responsible for hitting whichever ORB registries the
 plugin needs:</p>
 <ul>
@@ -6672,19 +6724,20 @@ training run.  We will extend the Kubernetes provider with a new
 <a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Register the MPIJob handler with the Kubernetes provider strategy.</span>
 <a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>
-<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="sd">    Must not raise.  Plugin authors should log and swallow internal</span>
-<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="sd">    errors so a broken plugin cannot prevent ORB from booting.</span>
-<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="sd">    &quot;&quot;&quot;</span>
-<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>        <span class="c1"># The Kubernetes provider strategy exposes a class-level registry</span>
-<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>        <span class="c1"># of handlers keyed by `provider_api`.  Adding to it is the entire</span>
-<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>        <span class="c1"># integration surface.</span>
-<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>        <span class="n">K8sProviderStrategy</span><span class="o">.</span><span class="n">register_handler</span><span class="p">(</span>
-<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>            <span class="n">provider_api</span><span class="o">=</span><span class="s2">&quot;KubernetesMPIJob&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>            <span class="n">handler_class</span><span class="o">=</span><span class="n">KubernetesMPIJobHandler</span><span class="p">,</span>
-<a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a>        <span class="p">)</span>
-<a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a>    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># pragma: no cover - defensive</span>
-<a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a>        <span class="n">log</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to register orb-mpi-job plugin&quot;</span><span class="p">)</span>
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="sd">    Plugin authors should log and swallow internal errors.  An error that</span>
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="sd">    escapes is logged and the plugin is skipped; it fails startup only when</span>
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="sd">    the entry-point name is a configured provider type.</span>
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>        <span class="c1"># The Kubernetes provider strategy exposes a class-level registry</span>
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>        <span class="c1"># of handlers keyed by `provider_api`.  Adding to it is the entire</span>
+<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>        <span class="c1"># integration surface.</span>
+<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>        <span class="n">K8sProviderStrategy</span><span class="o">.</span><span class="n">register_handler</span><span class="p">(</span>
+<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>            <span class="n">provider_api</span><span class="o">=</span><span class="s2">&quot;KubernetesMPIJob&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a>            <span class="n">handler_class</span><span class="o">=</span><span class="n">KubernetesMPIJobHandler</span><span class="p">,</span>
+<a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a>        <span class="p">)</span>
+<a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a>    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># pragma: no cover - defensive</span>
+<a id="__codelineno-5-36" name="__codelineno-5-36" href="#__codelineno-5-36"></a>        <span class="n">log</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to register orb-mpi-job plugin&quot;</span><span class="p">)</span>
 </code></pre></div>
 <blockquote>
 <p>Plugin authors who need a different API key than the
