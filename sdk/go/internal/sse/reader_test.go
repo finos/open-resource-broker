@@ -77,3 +77,37 @@ func TestParsePayload(t *testing.T) {
 		t.Fatalf("unexpected status: %s", req.Status)
 	}
 }
+
+// The request status stream announces its outcome with a named frame just
+// before the closing sentinel. Those frames must not surface as status updates.
+func TestNamedOutcomeFramesYieldNoRequestAndSentinelIsLast(t *testing.T) {
+	for _, outcome := range []string{
+		"event: complete\ndata: {\"status\": \"failed\"}\n\n",
+		"event: error\ndata: {\"error\": \"internal\"}\n\n",
+		"event: timeout\ndata: {\"status\": \"timeout\"}\n\n",
+	} {
+		input := "data: {\"requests\":[{\"status\":\"in_progress\"}]}\n\n" + outcome + "data: {}\n\n"
+		r := sse.NewReader(body(input))
+
+		requests := 0
+		sentinels := 0
+		for f := r.Next(); f != nil; f = r.Next() {
+			if sentinels > 0 {
+				t.Fatalf("frame after sentinel for %q", outcome)
+			}
+			if sse.IsSentinel(f) {
+				sentinels++
+				continue
+			}
+			if sse.FirstRequest(sse.ParsePayload(f)) != nil {
+				requests++
+			}
+		}
+		if requests != 1 {
+			t.Fatalf("expected exactly 1 status update for %q, got %d", outcome, requests)
+		}
+		if sentinels != 1 {
+			t.Fatalf("expected the stream to end with the sentinel for %q", outcome)
+		}
+	}
+}
