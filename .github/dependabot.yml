@@ -78,7 +78,7 @@ updates:
           - "minor"
           - "patch"
 
-  # Hash-locked CI tool requirements (semgrep, actionlint-py, pip-licenses).
+  # Hash-locked tool requirements (CI, packaging, container images).
   # Regenerate manually with dev-tools/ci/update_tool_locks.sh if an update
   # does not refresh the hashes.
   - package-ecosystem: "pip"
