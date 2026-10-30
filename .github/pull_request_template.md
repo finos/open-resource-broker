@@ -40,6 +40,8 @@ Fixes #
 - [ ] New and existing unit tests pass locally with my changes
 - [ ] Any dependent changes have been merged and published
 - [ ] I have updated the version number (if applicable)
+- [ ] If this is a `good first issue`, the issue is assigned to me (otherwise not applicable)
+- [ ] I have disclosed significant AI assistance in the description above, or none was used
 
 ## Additional Notes
 <!-- Add any additional information that would be helpful for reviewers -->
