@@ -12,6 +12,8 @@ src/orb/ui/_static/
 # Generated requirements files (generated on-demand from uv.lock)
 requirements.txt
 requirements-dev.txt
+# Hash-locked image requirements are committed.
+!tests/e2e/microvm/worker/requirements.txt
 
 # Keep the lock file (source of truth)
 !uv.lock
