@@ -1,6 +1,6 @@
 """Default scheduler field mapper - no transformations needed."""
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from orb.infrastructure.scheduler.base.field_mapper import SchedulerFieldMapper
 
@@ -23,6 +23,8 @@ class DefaultFieldMapper(SchedulerFieldMapper):
         """Identity mapping - no conversion needed."""
         return internal_template
 
-    def format_for_generation(self, internal_templates: list[dict]) -> list[dict]:
+    def format_for_generation(
+        self, internal_templates: List[Dict[str, Any]], copy_unmapped: bool = False
+    ) -> List[Dict[str, Any]]:
         """No conversion needed for default scheduler."""
         return internal_templates
