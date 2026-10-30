@@ -49,6 +49,12 @@ from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachine
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
+from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
+    emit_alert,
+    error_code_of,
+    region_of,
+    unwrap_aws_error,
+)
 from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
     LTNetworkingState,
@@ -711,12 +717,53 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             self._logger.error("Unexpected error releasing RunInstances resources: %s", str(e))
             raise AWSInfrastructureError(f"Failed to release RunInstances resources: {e!s}")
 
+    def _lookup_reservation_instance_ids(self, resource_id: str) -> list[str]:
+        """Return the non-terminated instance IDs of a reservation.
+
+        Walks every ``NextToken`` page. Any lookup failure propagates so the
+        caller can tell "lookup failed" apart from "no instances".
+        """
+        instance_ids: list[str] = []
+        next_token: Optional[str] = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "Filters": [{"Name": "reservation-id", "Values": [resource_id]}]
+            }
+            if next_token:
+                kwargs["NextToken"] = next_token
+            try:
+                response = self._retry_with_backoff(
+                    self.aws_client.ec2_client.describe_instances,
+                    operation_type="read_only",
+                    **kwargs,
+                )
+            except Exception as e:
+                if error_code_of(e) == "InvalidReservationID.NotFound":
+                    return instance_ids
+                raise
+            for reservation in response.get("Reservations", []):
+                for instance in reservation.get("Instances", []):
+                    iid = instance.get("InstanceId")
+                    state = (instance.get("State") or {}).get("Name")
+                    if iid and state != "terminated":
+                        instance_ids.append(iid)
+            next_token = response.get("NextToken")
+            if not next_token:
+                return instance_ids
+
     def cancel_resource(self, resource_id: str, request_id: str) -> dict[str, Any]:
         """Cancel a RunInstances reservation by terminating its instances.
 
-        RunInstances has no fleet-level cancel concept — instances are
-        terminated directly. If no instance IDs are available from the
-        resource_id, this is a no-op (instances may not have launched yet).
+        RunInstances has no fleet-level cancel concept: instances are
+        terminated directly. The result is ``success`` only when termination
+        was requested without error, or when no instances are visible for the
+        reservation. A failed lookup or failed termination is an ``error``,
+        because instances may still be running.
+
+        An empty lookup is reported as success but marked unverified:
+        DescribeInstances is eventually consistent and terminated instances
+        age out of it, so the authoritative teardown path is the stored
+        machine IDs handled by the return flow.
 
         Args:
             resource_id: The reservation ID (used to locate instances).
@@ -726,21 +773,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             Dictionary with ``status`` of ``"success"`` or ``"error"``.
         """
         try:
-            # Locate instances belonging to this reservation
-            instance_ids: list[str] = []
-            try:
-                response = self.aws_client.ec2_client.describe_instances(
-                    Filters=[{"Name": "reservation-id", "Values": [resource_id]}]
-                )
-                for reservation in response.get("Reservations", []):
-                    for instance in reservation.get("Instances", []):
-                        iid = instance.get("InstanceId")
-                        if iid:
-                            instance_ids.append(iid)
-            except Exception as e:
-                self._logger.warning(
-                    "Could not look up instances for reservation %s: %s", resource_id, e
-                )
+            instance_ids = self._lookup_reservation_instance_ids(resource_id)
 
             if instance_ids:
                 self.aws_ops.terminate_instances_with_fallback(
@@ -751,25 +784,55 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     resource_id,
                     instance_ids,
                 )
+                message = f"RunInstances reservation {resource_id} cancelled"
             else:
-                self._logger.info(
-                    "No instances found for RunInstances reservation %s — nothing to terminate",
-                    resource_id,
+                emit_alert(
+                    self._logger,
+                    "aws.cancel_unverified",
+                    f"No instances visible for RunInstances reservation {resource_id}; "
+                    "cancel is unverified",
+                    resource_type="run_instances",
+                    resource_id=resource_id,
+                    request_id=request_id,
+                    region=region_of(self.aws_client),
+                    reason="empty lookup",
+                    level="warning",
                 )
-
-            if request_id:
-                self._cleanup_on_zero_capacity("run_instances", request_id)
-
-            return {
-                "status": "success",
-                "message": f"RunInstances reservation {resource_id} cancelled",
-            }
+                message = (
+                    f"No instances visible for RunInstances reservation {resource_id} "
+                    "(unverified); nothing was terminated"
+                )
         except Exception as e:
-            self._logger.error("Failed to cancel RunInstances reservation %s: %s", resource_id, e)
+            reason = str(unwrap_aws_error(e))
+            emit_alert(
+                self._logger,
+                "aws.cancel_failed",
+                f"Failed to cancel RunInstances reservation {resource_id}; "
+                f"instances may still be running: {reason}",
+                resource_type="run_instances",
+                resource_id=resource_id,
+                request_id=request_id,
+                region=region_of(self.aws_client),
+                reason=reason,
+            )
             return {
                 "status": "error",
-                "message": f"Failed to cancel RunInstances reservation {resource_id}: {e!s}",
+                "message": (
+                    f"Failed to cancel RunInstances reservation {resource_id}; "
+                    f"instances may still be running: {reason}"
+                ),
             }
+
+        if request_id and instance_ids:
+            try:
+                self._cleanup_on_zero_capacity("run_instances", request_id)
+            except Exception as e:
+                self._logger.warning(
+                    "RunInstances reservation %s cancelled but launch template cleanup failed: %s",
+                    resource_id,
+                    e,
+                )
+        return {"status": "success", "message": message}
 
     @classmethod
     def get_example_templates(cls) -> list[Template]:

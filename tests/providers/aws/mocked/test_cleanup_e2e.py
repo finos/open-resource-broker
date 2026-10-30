@@ -29,7 +29,7 @@ Moto limitations accounted for:
 import sys
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import boto3
 import pytest
@@ -849,7 +849,10 @@ def test_external_lt_not_deleted_on_cancel(aws_client, subnet_id, sg_id, ec2):
         )
 
         # Cancel — _delete_orb_launch_template must not delete the external LT
-        cancel_result = handler.cancel_resource(result["resource_ids"][0], req_id)
+        # moto does not implement the reservation-id filter, so resolve the
+        # reservation without it.
+        with patch.object(handler, "_lookup_reservation_instance_ids", return_value=[]):
+            cancel_result = handler.cancel_resource(result["resource_ids"][0], req_id)
         assert cancel_result["status"] == "success"
 
         # Assert external LT still exists

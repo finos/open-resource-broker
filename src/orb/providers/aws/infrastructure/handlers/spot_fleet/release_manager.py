@@ -14,6 +14,9 @@ from orb.providers.aws.infrastructure.handlers.fleet_release_policy import (
     FleetCapacityInput,
     FleetReleaseDecision,
 )
+from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
+    check_unsuccessful_fleet_response,
+)
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 
@@ -190,11 +193,25 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         terminate_instances: bool,
         is_maintain: bool = False,
     ) -> None:
-        self._retry(
+        response = self._retry(
             self._aws_client.ec2_client.cancel_spot_fleet_requests,
             operation_type="critical",
             SpotFleetRequestIds=[fleet_id],
             TerminateInstances=terminate_instances,
+        )
+        check_unsuccessful_fleet_response(response, "spot_fleet", self._fleet_is_cancelled)
+
+    def _fleet_is_cancelled(self, fleet_id: str) -> bool:
+        """Return True when describe_spot_fleet_requests reports the request as cancelled."""
+        configs = self._retry(
+            self._aws_client.ec2_client.describe_spot_fleet_requests,
+            operation_type="read_only",
+            SpotFleetRequestIds=[fleet_id],
+        ).get("SpotFleetRequestConfigs", [])
+        return bool(configs) and all(
+            c.get("SpotFleetRequestState")
+            in ("cancelled", "cancelled_running", "cancelled_terminating")
+            for c in configs
         )
 
     def _fleet_has_no_remaining_instances(self, fleet_id: str, excluded_ids: set[str]) -> bool:

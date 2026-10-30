@@ -46,6 +46,10 @@ from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachine
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
+from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
+    emit_alert,
+    region_of,
+)
 from orb.providers.aws.infrastructure.handlers.shared.fleet_fulfilment import (
     aggregate_fleet_fulfilment,
     compute_capacity_based_fulfilment,
@@ -711,7 +715,16 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._release_manager.release(resource_id, [], {}, request_id=request_id)
             return {"status": "success", "message": f"Spot Fleet {resource_id} cancelled"}
         except Exception as e:
-            self._logger.error("Failed to cancel Spot Fleet %s: %s", resource_id, e)
+            emit_alert(
+                self._logger,
+                "aws.cancel_failed",
+                f"Failed to cancel Spot Fleet {resource_id}; it may still be running: {e}",
+                resource_type="spot_fleet",
+                resource_id=resource_id,
+                request_id=request_id,
+                region=region_of(self.aws_client),
+                reason=str(e),
+            )
             return {
                 "status": "error",
                 "message": f"Failed to cancel Spot Fleet {resource_id}: {e!s}",
