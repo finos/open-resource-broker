@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from orb.providers.base.strategy.provider_strategy import ProviderStrategy
 
 if TYPE_CHECKING:
-    from orb.providers.base.strategy.provider_selector import SelectionCriteria
+    from orb.providers.base.strategy.selection_criteria import SelectionCriteria
 
 
 def is_strategy_suitable(
