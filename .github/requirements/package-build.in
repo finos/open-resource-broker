@@ -1,2 +1,3 @@
-# Package build front end used by dev-tools/package/build.sh and dev-tools/release/build_historical.sh.
+# Package build front end and wheel support used by the package build scripts and package testing.
 build
+wheel

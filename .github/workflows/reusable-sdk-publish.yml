@@ -130,7 +130,7 @@ jobs:
         distribution: 'corretto'
 
     - name: Install openapi-generator-cli
-      run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
+      run: npx --yes @openapitools/openapi-generator-cli@2.42.0 version-manager set 7.23.0
 
     # REQUIRED: generated models are gitignored (0 committed files). Without this
     # step the published npm package would contain no model types and fail to build.
@@ -161,7 +161,7 @@ jobs:
       # the npmjs + token path uses the NODE_AUTH_TOKEN auth line, neither of
       # which needs the newer OIDC-capable npm).
       if: matrix.destination != 'github' && inputs.auth-mode != 'token'
-      run: npm install -g npm@^11.5.1
+      run: npm install -g npm@11.21.1
 
     - name: Verify npm package contents
       run: |
@@ -282,7 +282,7 @@ jobs:
         node-version: '24'
 
     - name: Install openapi-generator-cli
-      run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
+      run: npx --yes @openapitools/openapi-generator-cli@2.42.0 version-manager set 7.23.0
 
     # The Gradle wrapper launcher JAR is not committed to the repository (it
     # is a prebuilt binary). Provision Gradle directly and use it to
@@ -453,7 +453,7 @@ jobs:
         node-version: '24'
 
     - name: Install openapi-generator-cli
-      run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
+      run: npx --yes @openapitools/openapi-generator-cli@2.42.0 version-manager set 7.23.0
 
     # The Gradle wrapper launcher JAR is not committed to the repository (it
     # is a prebuilt binary). Provision Gradle directly and use it to

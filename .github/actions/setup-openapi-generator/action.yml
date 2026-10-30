@@ -49,4 +49,4 @@ runs:
 
     - name: Install openapi-generator-cli
       shell: bash
-      run: npx --yes @openapitools/openapi-generator-cli version-manager set ${{ inputs.openapi-generator-version }}
+      run: npx --yes @openapitools/openapi-generator-cli@2.42.0 version-manager set ${{ inputs.openapi-generator-version }}
