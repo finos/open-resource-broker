@@ -566,6 +566,8 @@ orb requests status --request-id req-123 --request-id req-456
 orb requests status req-123 --request-id req-456
 ```
 
+**Exit codes:** with the default scheduler the command exits 1 if any requested request is failed, cancelled, timed out or partial, or cannot be found, and 0 otherwise. With the HostFactory scheduler it always exits 0; read the outcome from the JSON output.
+
 ### System
 
 System operations and health checks.
@@ -1370,8 +1372,8 @@ Commands return appropriate exit codes for scripting:
 | `1` | Failure | Request failed, validation error, command error |
 
 **Scheduler-Aware Exit Codes:**
-- **HostFactory:** Returns 1 for failed/cancelled/timeout/partial requests
-- **Default:** Returns 1 for any problem status
+- **HostFactory:** Request creation and return commands return 1 for failed/cancelled/timeout/partial requests. `requests status` always returns 0 and reports the outcome in its JSON output, because HostFactory treats a non-zero exit from the status script as a script failure.
+- **Default:** `requests status` returns 1 if any requested request is failed, cancelled, timed out or partial, or cannot be found.
 
 ## Environment Variables
 
