@@ -233,3 +233,18 @@ def test_guard_detects_pep695_syntax(source: str) -> None:
 @pytest.mark.parametrize("root", sorted(_ROOTS))
 def test_no_module_uses_post_310_runtime_apis(root: str) -> None:
     assert _offenders(_ROOTS[root]) == []
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("root", "expected"),
+    [
+        ("src/orb", ["__init__.py", "domain/base/utils.py"]),
+        ("tests", ["unit/test_supported_python_typing_imports.py", "providers/__init__.py"]),
+    ],
+)
+def test_scanned_roots_are_not_empty(root: str, expected: list[str]) -> None:
+    base = _ROOTS[root]
+    assert any(base.rglob("*.py"))
+    for relative in expected:
+        assert (base / relative).is_file(), f"{root} scan would miss {relative}"
