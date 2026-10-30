@@ -200,11 +200,22 @@ scope and the instance is reported again on the next poll. For a return request,
 a 404 (with any error code) fails the whole status call instead, because leaving
 the instance out would make the return look complete. The stored machines are
 kept and the return request stays in progress until the policy or compartment
-scope is fixed. An instance that was deleted and has aged out of OCI cannot be
-confirmed automatically either: the return stays in progress until an operator
-resolves it. Any other error for an
-instance, including a failed VNIC lookup, fails the whole status call; stored
-machine state is kept and the call is retried on the next poll.
+scope is fixed.
+
+To resolve a return that stays in progress after a 404:
+
+1. Check that the broker's policy grants `read instances` on the compartment that
+   holds the instance, and that the instance is in a compartment the policy covers.
+2. Look the instance up in the OCI console. If it is listed, fix the policy or
+   compartment scope; the return completes on the next poll once the instance is
+   readable and reports a terminal state.
+3. If the instance is not listed at all, it was deleted and has aged out of OCI.
+   The broker cannot tell that apart from an unreadable instance, so it does not
+   complete the return on its own and the request stays in progress until the
+   machine state is reconciled by hand.
+
+Any other error for an instance, including a failed VNIC lookup, fails the whole
+status call; stored machine state is kept and the call is retried on the next poll.
 
 Termination attempts every requested instance and reports per-instance outcomes.
 A `NotAuthorizedOrNotFound` response is recorded as `not_found_or_not_authorized`
