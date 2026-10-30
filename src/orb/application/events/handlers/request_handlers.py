@@ -38,8 +38,8 @@ class RequestCreatedHandler(BaseLoggingEventHandler[DomainEvent]):
         )
 
 
-@event_handler("RequestStatusUpdatedEvent")  # type: ignore[arg-type]
-class RequestStatusUpdatedHandler(BaseLoggingEventHandler[DomainEvent]):
+@event_handler("RequestStatusChangedEvent")  # type: ignore[arg-type]
+class RequestStatusChangedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle request status update events using BaseEventHandler pattern."""
 
     def __init__(
@@ -112,33 +112,6 @@ class RequestFailedHandler(BaseLoggingEventHandler[DomainEvent]):
     def get_log_level(self, event: DomainEvent) -> str:
         """Get log level - error for request failures."""
         return "error"
-
-
-@event_handler("RequestCancelledEvent")  # type: ignore[arg-type]
-class RequestCancelledHandler(BaseLoggingEventHandler[DomainEvent]):
-    """Handle request cancellation events using BaseEventHandler pattern."""
-
-    def __init__(
-        self,
-        logger: Optional[LoggingPort] = None,
-        error_handler: Optional[ErrorHandlingPort] = None,
-        event_publisher: Optional[EventPublisherPort] = None,
-    ) -> None:
-        """Initialize request cancelled handler."""
-        super().__init__(logger, error_handler, event_publisher)
-
-    async def format_log_message(self, event: DomainEvent) -> str:
-        """Format request cancelled log message."""
-        cancellation_reason = getattr(event, "cancellation_reason", "user_requested")
-
-        return (
-            f"Request cancelled: {getattr(event, 'aggregate_id', 'unknown')} | "
-            f"Reason: {cancellation_reason}"
-        )
-
-    def get_log_level(self, event: DomainEvent) -> str:
-        """Get log level - warning for cancellations."""
-        return "warning"
 
 
 @event_handler("RequestTimeoutEvent")  # type: ignore[arg-type]
