@@ -25,7 +25,12 @@ ALLOWED_UNLOCKED = (
     "pip install build wheel",
     "pip install pytest pytest-mock",
     "git-changelog",
+    # setup-uv-fresh upgrades the runner's pip to a release that handles
+    # current wheel metadata before uv is bootstrapped; no lock exists yet at
+    # that point and the target is pip itself.
+    'python -m pip install --upgrade "pip>=25.3"',
 )
+INSTALL_COMMAND = re.compile(r"^((uv|python3?\s+-m)\s+)?pip\s+install\b")
 PIN = re.compile(r"^([A-Za-z0-9_.\-]+)==([^\s\;]+)", re.MULTILINE)
 
 
@@ -47,9 +52,24 @@ def _install_lines() -> list[tuple[str, str]]:
     for name, script in _run_scripts():
         for raw in script.splitlines():
             line = raw.strip()
-            if re.match(r"^(uv )?pip install\b", line):
+            if INSTALL_COMMAND.match(line):
                 lines.append((name, line))
     return lines
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "line",
+    ["pip install x", "uv pip install x", "python -m pip install x", "python3 -m pip install x"],
+)
+def test_install_detector_recognises_every_pip_form(line: str) -> None:
+    assert INSTALL_COMMAND.match(line)
+
+
+@pytest.mark.unit
+def test_python_dash_m_pip_installs_are_scanned() -> None:
+    commands = [line for _, line in _install_lines()]
+    assert any(line.startswith("python -m pip install") for line in commands)
 
 
 @pytest.mark.unit
