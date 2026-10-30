@@ -419,6 +419,12 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                         deprov_err,
                         exc_info=True,
                     )
+                    # The failure could not be recorded on the request, which may
+                    # still read IN_PROGRESS; tell the caller explicitly.
+                    command.unrecorded_failure_request_ids = [
+                        *command.unrecorded_failure_request_ids,
+                        str(request.request_id),
+                    ]
 
         except Exception as e:
             self.logger.error(
@@ -744,12 +750,21 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                             )
                             uow.requests.save(stuck_request)
                 except Exception as final_error:
-                    self.logger.critical(
-                        "CRITICAL: Failed to mark request %s as failed after double failure. "
-                        "Request is stuck in IN_PROGRESS. Manual intervention required. Error: %s",
+                    self.logger.error(
+                        "Failed to mark return request %s as failed after double failure; "
+                        "it may still read IN_PROGRESS. Manual intervention required: %s",
                         request.request_id,
                         final_error,
+                        extra={
+                            "event": "return.status_update_failed",
+                            "request_id": str(request.request_id),
+                            "reason": str(final_error),
+                        },
                     )
+                    raise ApplicationError(
+                        f"Return request {request.request_id} failed and its failed status "
+                        f"could not be recorded: {final_error}"
+                    ) from final_error
             else:
                 raise
 

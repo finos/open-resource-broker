@@ -145,6 +145,9 @@ class ReturnMachinesOutput:
     message: str = ""
     skipped_machines: list[str] = dataclasses.field(default_factory=list)
     machine_ids: list[str] = dataclasses.field(default_factory=list)
+    # Every return request created (one per provider group); ``request_id`` is
+    # the first of them.
+    request_ids: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)

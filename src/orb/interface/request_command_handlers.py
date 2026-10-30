@@ -1,5 +1,6 @@
 """Request-related command handlers for the interface layer."""
 
+import dataclasses
 from typing import TYPE_CHECKING, Any, Union
 
 from orb.application.ports.scheduler_port import SchedulerPort
@@ -322,7 +323,17 @@ async def handle_cancel_request(
         )
     )
 
-    return entry.renderer_for(Interface.CLI)(formatter, result)
+    response = entry.renderer_for(Interface.CLI)(formatter, result)
+    if (
+        getattr(result, "status", None) == "cancelled"
+        and hasattr(response, "exit_code")
+        and response.exit_code != 0
+    ):
+        # A cancel that succeeded must exit 0. The generic request-status mapping
+        # treats "cancelled" as a problem state, which is right when polling a
+        # request but wrong for the command that just cancelled it.
+        response = dataclasses.replace(response, exit_code=0)
+    return response
 
 
 @handle_interface_exceptions(context="watch_request_status", interface_type="cli")
