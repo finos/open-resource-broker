@@ -4,7 +4,6 @@ This module implements query handlers for retrieving provider strategy informati
 leveraging the Provider Registry for clean CQRS interfaces.
 """
 
-import time
 from typing import Any, cast
 
 from orb.application.base.handlers import BaseQueryHandler
@@ -75,30 +74,21 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, dict[str
                         ),
                     }
 
-            # Get health information from registry service
-            health_status = self._provider_registry_service.check_strategy_health(provider_name)
+            # Live (cached, time-bounded) probe through the registry service
+            snapshot = await self._provider_registry_service.probe_strategy_health(provider_name)
 
             health_info = {
                 "provider_name": provider_name,
-                "status": "active",
-                "health": "healthy" if health_status and health_status.is_healthy else "unhealthy",
+                "status": "active" if snapshot.status != "unknown" else "unknown",
+                "health": snapshot.status,
                 "last_check": self.timestamp_service.current_timestamp(),
-                "message": getattr(health_status, "message", None)
-                or getattr(health_status, "error_message", None)
-                or "No health data available",
+                "message": snapshot.message,
+                "details": {
+                    "response_time_ms": snapshot.response_time_ms,
+                    "probe_count": snapshot.sample_count,
+                },
+                "timestamp": self.timestamp_service.current_timestamp(),
             }
-
-            if health_status:
-                health_info.update(
-                    {
-                        "details": getattr(health_status, "details", {}),
-                        "timestamp": self.timestamp_service.format_for_display(
-                            getattr(health_status, "timestamp", time.time())
-                        ),
-                    }
-                )
-            else:
-                health_info["timestamp"] = self.timestamp_service.current_timestamp()
 
             self.logger.info("Provider %s health: %s", provider_name, health_info["health"])
             return health_info
@@ -109,7 +99,7 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, dict[str
                 "provider_name": query.provider_name,
                 "status": "error",
                 "health": "unhealthy",
-                "message": str(e),
+                "message": "Provider health could not be retrieved",
             }
 
 
@@ -271,6 +261,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
         error_handler: ErrorHandlingPort,
         uow_factory: UnitOfWorkFactory,
         config_port: ConfigurationPort,
+        provider_registry_service: ProviderRegistryService,
     ) -> None:
         """
         Initialize provider metrics handler.
@@ -280,10 +271,12 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
             error_handler: Error handling port for exception management
             uow_factory: Unit of work factory for data access
             config_port: Configuration port for provider information
+            provider_registry_service: Service used to probe provider health
         """
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._config_port = config_port
+        self._provider_registry_service = provider_registry_service
 
     async def execute_query(self, query: GetProviderMetricsQuery) -> ProviderMetricsDTO:
         """Execute provider metrics query."""
@@ -325,6 +318,15 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
                     "Could not enrich metrics with provider details: %s", enrich_error
                 )
 
+            health_status = "unknown"
+            health_sample_count = 0
+            if query.provider_name and query.provider_name != "all":
+                snapshot = await self._provider_registry_service.probe_strategy_health(
+                    query.provider_name
+                )
+                health_status = snapshot.status
+                health_sample_count = snapshot.sample_count
+
             self.logger.info("Retrieved metrics for provider: %s", query.provider_name)
             return ProviderMetricsDTO(
                 provider_name=query.provider_name or "all",
@@ -339,8 +341,9 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
                 ),
                 throughput_per_minute=0.0,
                 last_request_time=None,
-                uptime_percent=100.0,
-                health_status="healthy",
+                uptime_percent=None,
+                health_status=health_status,
+                health_sample_count=health_sample_count,
             )
 
         except Exception as e:

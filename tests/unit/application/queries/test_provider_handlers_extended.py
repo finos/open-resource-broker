@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -21,6 +21,7 @@ from orb.application.queries.provider_handlers import (
     GetProviderStrategyConfigHandler,
     ListAvailableProvidersHandler,
 )
+from orb.application.services.provider_registry_service import ProviderHealthSnapshot
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -56,17 +57,19 @@ def _make_uow_factory(requests=None):
     return factory
 
 
+def _snapshot(status="healthy", message="Provider is healthy", count=1):
+    return ProviderHealthSnapshot(
+        provider_name="aws",
+        status=status,
+        message=message,
+        response_time_ms=1.0,
+        sample_count=count,
+    )
+
+
 def _make_provider_registry_service(health=None, capabilities=None, select_result=None):
     svc = MagicMock()
-    if health is not None:
-        svc.check_strategy_health.return_value = health
-    else:
-        h = MagicMock()
-        h.is_healthy = True
-        h.message = "all good"
-        h.details = {}
-        h.timestamp = 0.0
-        svc.check_strategy_health.return_value = h
+    svc.probe_strategy_health = AsyncMock(return_value=health or _snapshot())
 
     if capabilities is not None:
         svc.get_strategy_capabilities.return_value = capabilities
@@ -111,17 +114,15 @@ class TestGetProviderHealthHandler:
         assert result["health"] == "healthy"
 
     @pytest.mark.asyncio
-    async def test_unhealthy_provider_reported(self):
-        health = MagicMock()
-        health.is_healthy = False
-        health.message = "degraded"
-        health.details = {}
-        health.timestamp = 0.0
-        svc = _make_provider_registry_service(health=health)
+    async def test_unhealthy_provider_reported_without_raw_detail(self):
+        svc = _make_provider_registry_service(
+            health=_snapshot("unhealthy", "Provider health check failed")
+        )
         h = self._handler(registry_svc=svc)
         q = GetProviderHealthQuery(provider_name="aws", provider_type=None)
         result = await h.execute_query(q)
         assert result["health"] == "unhealthy"
+        assert result["message"] == "Provider health check failed"
 
     @pytest.mark.asyncio
     async def test_no_provider_name_uses_active_provider(self):
@@ -141,26 +142,25 @@ class TestGetProviderHealthHandler:
         assert result["status"] == "not_found"
 
     @pytest.mark.asyncio
-    async def test_exception_returns_error_response(self):
+    async def test_exception_returns_generic_error_response(self):
         svc = _make_provider_registry_service()
-        svc.check_strategy_health.side_effect = RuntimeError("registry broken")
+        svc.probe_strategy_health.side_effect = RuntimeError("secret account 123456789012")
         h = self._handler(registry_svc=svc)
         q = GetProviderHealthQuery(provider_name="aws", provider_type=None)
         result = await h.execute_query(q)
         assert result["status"] == "error"
         assert result["health"] == "unhealthy"
+        assert "123456789012" not in result["message"]
 
     @pytest.mark.asyncio
-    async def test_health_status_none_still_returns_response(self):
-        svc = _make_provider_registry_service()
-        svc.check_strategy_health.return_value = None
+    async def test_unknown_provider_reports_unknown(self):
+        svc = _make_provider_registry_service(
+            health=_snapshot("unknown", "Provider not found", count=0)
+        )
         h = self._handler(registry_svc=svc)
-        q = GetProviderHealthQuery(provider_name="aws", provider_type=None)
+        q = GetProviderHealthQuery(provider_name="missing", provider_type=None)
         result = await h.execute_query(q)
-        # None health → health field is "unhealthy" and the fallback message applies.
-        assert result["provider_name"] == "aws"
-        assert result["health"] == "unhealthy"
-        assert result["message"] == "No health data available"
+        assert result["health"] == "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -312,7 +312,7 @@ class TestGetProviderCapabilitiesHandler:
 
 @pytest.mark.unit
 class TestGetProviderMetricsHandler:
-    def _handler(self, requests=None, config_enrichment_error=False):
+    def _handler(self, requests=None, config_enrichment_error=False, registry_svc=None):
         config_port = MagicMock()
         if config_enrichment_error:
             config_port.get_provider_config.side_effect = RuntimeError("cfg err")
@@ -324,6 +324,7 @@ class TestGetProviderMetricsHandler:
             error_handler=_make_error_handler(),
             uow_factory=_make_uow_factory(requests=requests),
             config_port=config_port,
+            provider_registry_service=registry_svc or _make_provider_registry_service(),
         )
 
     @pytest.mark.asyncio
@@ -335,6 +336,31 @@ class TestGetProviderMetricsHandler:
         result = await h.execute_query(q)
         assert isinstance(result, ProviderMetricsDTO)
         assert result.provider_name == "aws"
+
+    @pytest.mark.asyncio
+    async def test_health_reflects_live_probe_not_a_fixed_value(self):
+        for status in ("healthy", "unhealthy", "unknown"):
+            svc = _make_provider_registry_service(health=_snapshot(status, "m", count=4))
+            h = self._handler(registry_svc=svc)
+            result = await h.execute_query(
+                GetProviderMetricsQuery(provider_name="aws", timeframe="1h")
+            )
+            assert result.health_status == status
+            assert result.health_sample_count == 4
+
+    @pytest.mark.asyncio
+    async def test_uptime_is_not_fabricated(self):
+        h = self._handler()
+        result = await h.execute_query(GetProviderMetricsQuery(provider_name="aws", timeframe="1h"))
+        assert result.uptime_percent is None
+
+    @pytest.mark.asyncio
+    async def test_aggregate_query_is_unknown_and_does_not_probe(self):
+        svc = _make_provider_registry_service()
+        h = self._handler(registry_svc=svc)
+        result = await h.execute_query(GetProviderMetricsQuery(provider_name=None, timeframe="1h"))
+        assert result.health_status == "unknown"
+        svc.probe_strategy_health.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_no_provider_name_defaults_to_all(self):
@@ -374,6 +400,7 @@ class TestGetProviderMetricsHandler:
             error_handler=_make_error_handler(),
             uow_factory=_make_uow_factory(),
             config_port=config_port,
+            provider_registry_service=_make_provider_registry_service(),
         )
         q = GetProviderMetricsQuery(provider_name=None, timeframe="1h")
         result = await h.execute_query(q)
@@ -390,6 +417,7 @@ class TestGetProviderMetricsHandler:
             error_handler=_make_error_handler(),
             uow_factory=factory,
             config_port=MagicMock(),
+            provider_registry_service=_make_provider_registry_service(),
         )
         q = GetProviderMetricsQuery(provider_name=None, timeframe="1h")
         with pytest.raises(RuntimeError, match="db gone"):
