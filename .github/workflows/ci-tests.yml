@@ -99,7 +99,8 @@ jobs:
     name: Unit Tests (Python 3.10)
     needs: [config]
     uses: ./.github/workflows/reusable-test.yml
-    secrets: inherit
+    # No secrets: coverage upload is off, so the only optional secret the
+    # reusable workflow accepts (CODECOV_TOKEN) is never read.
     with:
       test-type: unit
       python-version: '3.10'
@@ -313,7 +314,9 @@ jobs:
   # Self-contained combined-coverage gate: merges the per-leg .coverage data
   # (uploaded by reusable-test) and enforces the threshold locally, so the hard
   # gate does not depend on Codecov's external service.  Codecov still receives
-  # each leg's upload for the PR-comment diff view.
+  # each leg's upload for the PR-comment diff view.  The Python 3.10 unit leg is
+  # deliberately not a dependency: it only checks compatibility, and its
+  # artifacts (any path ending in -py3.10) are skipped when gathering data.
   coverage-combine:
     name: Coverage Gate (Combined)
     runs-on: ubuntu-latest
