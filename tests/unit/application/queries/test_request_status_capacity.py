@@ -1,6 +1,6 @@
 """Unit tests for capacity-aware request status resolution."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
 import pytest
@@ -32,7 +32,7 @@ def _request(
         desired_capacity=requested_count,
         provider_type="aws",
         template_id="tpl-test",
-        created_at=created_at or datetime.now(UTC),
+        created_at=created_at or datetime.now(timezone.utc),
         metadata=metadata or {},
         error_details=error_details or {},
     )
@@ -211,7 +211,7 @@ def test_runinstances_completed_without_capacity_metadata():
 @pytest.mark.unit
 def test_runinstances_timeout_when_no_instances_after_long_time():
     service = _make_service()
-    old_time = datetime.now(UTC) - timedelta(minutes=31)
+    old_time = datetime.now(timezone.utc) - timedelta(minutes=31)
     request = _request(
         RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=1, created_at=old_time
     )

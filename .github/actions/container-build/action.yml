@@ -1,0 +1,160 @@
+name: 'Container build and scan'
+description: >-
+  Build the container image for one Python version, optionally push it and
+  write the shared build cache, then scan it with Trivy and Hadolint. Registry
+  login, signing and attestation stay in the calling job so that only the
+  publish job needs write permissions.
+
+inputs:
+  python-version:
+    description: 'Python version to build the image for'
+    required: true
+  push:
+    description: "'true' to build multi-platform and push; anything else builds a single-platform local image"
+    required: false
+    default: 'false'
+  cache-to:
+    description: "'true' to write the shared GitHub Actions build cache"
+    required: false
+    default: 'false'
+  registry:
+    description: 'Container registry host'
+    required: true
+  image-name:
+    description: 'Image name within the registry'
+    required: true
+  version:
+    description: 'Package version used for the image tag'
+    required: true
+  build-platforms:
+    description: 'Comma-separated list of target platforms'
+    required: true
+  package-name-short:
+    description: 'Short package name passed to the Dockerfile'
+    required: true
+  scan-level:
+    description: "'full' scans CRITICAL, HIGH and MEDIUM; anything else scans CRITICAL and HIGH"
+    required: false
+    default: 'basic'
+  run-hadolint:
+    description: "'true' to also lint the Dockerfile"
+    required: false
+    default: 'false'
+
+outputs:
+  digest:
+    description: 'Immutable digest of the pushed image (empty when not pushed)'
+    value: ${{ steps.build.outputs.digest }}
+  image:
+    description: 'Image reference without tag or digest (empty when not pushed)'
+    value: ${{ steps.build.outputs.image }}
+  pushed:
+    description: "'true' when the image was pushed"
+    value: ${{ steps.build.outputs.pushed }}
+
+runs:
+  using: composite
+  steps:
+    - name: Build container image
+      id: build
+      shell: bash
+      env:
+        PUSH: ${{ inputs.push }}
+        CACHE_TO: ${{ inputs.cache-to }}
+        REGISTRY: ${{ inputs.registry }}
+        IMAGE_NAME: ${{ inputs.image-name }}
+        VERSION: ${{ inputs.version }}
+        PYTHON_VERSION: ${{ inputs.python-version }}
+        BUILD_PLATFORMS: ${{ inputs.build-platforms }}
+        PACKAGE_NAME_SHORT: ${{ inputs.package-name-short }}
+      run: |
+        # Trivy cannot scan a multi-arch manifest, it needs one concrete,
+        # locally-loaded image. The scan arch is the first entry of
+        # build-platforms (single source of truth from .project.yml).
+        SCAN_PLATFORM=$(echo "$BUILD_PLATFORMS" | cut -d, -f1)
+        TAG="$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION"
+
+        cache_args=(--cache-from type=gha)
+        if [[ "$CACHE_TO" == "true" ]]; then
+          cache_args+=(--cache-to type=gha,mode=max)
+        fi
+
+        common_args=(
+          --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          --build-arg "VERSION=$VERSION"
+          --build-arg "VCS_REF=$(git rev-parse --short HEAD)"
+          --build-arg "PYTHON_VERSION=$PYTHON_VERSION"
+          --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT"
+        )
+
+        if [[ "$PUSH" == "true" ]]; then
+          docker buildx build \
+            --platform "$BUILD_PLATFORMS" \
+            "${common_args[@]}" \
+            --provenance=true \
+            --sbom=true \
+            --annotation "index:org.opencontainers.image.title=Open Resource Broker API" \
+            --annotation "index:org.opencontainers.image.description=REST API for Open Resource Broker - Dynamic cloud resource provisioning" \
+            --annotation "index:org.opencontainers.image.source=https://github.com/finos/open-resource-broker" \
+            --annotation "index:org.opencontainers.image.licenses=Apache-2.0" \
+            --annotation "index:org.opencontainers.image.documentation=https://finos.github.io/open-resource-broker/" \
+            --metadata-file metadata.json \
+            "${cache_args[@]}" \
+            --push \
+            -t "$TAG" \
+            .
+
+          # Extract the immutable digest for the signing steps in the caller.
+          DIGEST=$(jq -r '."containerimage.digest"' metadata.json)
+          {
+            echo "digest=${DIGEST}"
+            echo "image=${REGISTRY}/${IMAGE_NAME}"
+            echo "pushed=true"
+          } >> "$GITHUB_OUTPUT"
+
+          # Pull back a single-arch image for local Trivy scanning.
+          docker pull --platform "$SCAN_PLATFORM" "$TAG"
+        else
+          docker buildx build \
+            --platform "$SCAN_PLATFORM" \
+            "${common_args[@]}" \
+            "${cache_args[@]}" \
+            --load \
+            -t "$TAG" \
+            .
+          echo "pushed=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Run Trivy security scan
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+      with:
+        image-ref: "${{ inputs.registry }}/${{ inputs.image-name }}:${{ inputs.version }}-python${{ inputs.python-version }}"
+        format: 'sarif'
+        output: 'trivy-results-py${{ inputs.python-version }}.sarif'
+        exit-code: '0'
+        severity: ${{ inputs.scan-level == 'full' && 'CRITICAL,HIGH,MEDIUM' || 'CRITICAL,HIGH' }}
+        limit-severities-for-sarif: true
+        trivyignores: .trivyignore.yaml
+
+    - name: Upload Trivy scan results
+      # A fork pull request has a read-only token and cannot upload SARIF.
+      # The scan above still runs for those.
+      if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
+      with:
+        sarif_file: 'trivy-results-py${{ inputs.python-version }}.sarif'
+
+    - name: Run Hadolint Dockerfile scan
+      if: inputs.run-hadolint == 'true'
+      uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387  # v3.5.0
+      with:
+        dockerfile: Dockerfile
+        format: sarif
+        output-file: hadolint-dockerfile.sarif
+        no-fail: true
+
+    - name: Upload Hadolint scan results
+      if: inputs.run-hadolint == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
+      with:
+        sarif_file: hadolint-dockerfile.sarif

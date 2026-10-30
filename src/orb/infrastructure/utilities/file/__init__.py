@@ -63,7 +63,6 @@ from .file_operations import (
     normalize_path,
     rename_file,
     set_file_owner_and_group,
-    set_file_permissions,
     touch_file,
     with_temp_file,
 )
@@ -136,7 +135,6 @@ __all__: list[str] = [
     "read_yaml_file",
     "rename_file",
     "set_file_owner_and_group",
-    "set_file_permissions",
     "touch_file",
     "with_temp_file",
     "write_binary_file",

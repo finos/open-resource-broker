@@ -31,6 +31,16 @@ from orb.domain.request.request_identifiers import RequestId
 from orb.domain.request.request_types import RequestStatus
 from orb.domain.request.value_objects import RequestType
 
+_MAX_IDS_IN_MESSAGE = 10
+
+
+def _format_id_list(ids: list[str], cap: int = _MAX_IDS_IN_MESSAGE) -> str:
+    """Render IDs for a request message, listing at most ``cap`` of them."""
+    unique = list(dict.fromkeys(ids))
+    if len(unique) <= cap:
+        return ", ".join(unique)
+    return f"{', '.join(unique[:cap])}, +{len(unique) - cap} more"
+
 
 @command_handler(CreateRequestCommand)  # type: ignore[arg-type]
 class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]):
@@ -564,7 +574,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                         message=(
                             f"Return request partially completed: termination initiated, "
                             f"but {len(skipped_ids)} machine(s) were skipped "
-                            f"(missing provider context): {skipped_str}"
+                            f"(missing provider context): {_format_id_list(skipped_ids)}"
                         ),
                     )
                     command_bus = self._container.get(CommandBusPort)
@@ -594,17 +604,17 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 succeeded_str = ", ".join(successful_ids) if successful_ids else "none"
                 message = (
                     f"Return request partially completed: "
-                    f"{len(successful_ids)} terminated [{succeeded_str}]"
+                    f"{len(successful_ids)} terminated "
+                    f"[{_format_id_list(successful_ids) if successful_ids else 'none'}]"
                 )
                 if failed_ids:
                     failed_str = ", ".join(failed_ids)
-                    message += f", {len(failed_ids)} failed [{failed_str}]"
+                    message += f", {len(failed_ids)} failed [{_format_id_list(failed_ids)}]"
                 else:
                     failed_str = "none"
                     message += ", termination errors occurred (no failed instance IDs reported)"
                 if skipped_ids:
-                    skipped_str = ", ".join(skipped_ids)
-                    message += f", {len(skipped_ids)} skipped [{skipped_str}]"
+                    message += f", {len(skipped_ids)} skipped [{_format_id_list(skipped_ids)}]"
 
                 update_command = UpdateRequestStatusCommand(
                     request_id=str(request.request_id),
@@ -621,7 +631,14 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     errors,
                 )
             else:
-                await self._update_request_to_failed(request, provisioning_result.get("errors", []))
+                self.logger.error(
+                    "Deprovisioning failed for request %s: %s",
+                    request.request_id,
+                    provisioning_result.get("errors") or provisioning_result.get("error_message"),
+                )
+                failed_ids = list(provisioning_result.get("failed_instance_ids") or [])
+                self._release_machines_after_failure(failed_ids or machine_ids, request)
+                await self._update_request_to_failed(request, failed_ids or machine_ids)
 
         except Exception as e:
             self.logger.error(
@@ -631,7 +648,25 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 e,
                 exc_info=True,
             )
-            await self._update_request_to_failed(request, [str(e)])
+            self._release_machines_after_failure(machine_ids, request)
+            await self._update_request_to_failed(request, machine_ids)
+
+    def _release_machines_after_failure(self, machine_ids: list[str], request: Any) -> None:
+        """Release machines held by a return request that failed, so a retry is accepted.
+
+        A failed request is terminal, so nothing else would clear the
+        ``return_request_id`` that blocks a follow-up return without
+        ``force_return``. Only machines still owned by this request are released.
+        """
+        try:
+            self._clear_return_request_id(machine_ids, str(request.request_id))
+        except Exception as release_error:
+            self.logger.error(
+                "Failed to release machines held by failed return request %s: %s",
+                request.request_id,
+                release_error,
+                exc_info=True,
+            )
 
     def _update_machines_to_pending(self, machine_ids: list[str]) -> None:
         """Update machine statuses to shutting-down (termination in progress)."""
@@ -718,12 +753,24 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             else:
                 raise
 
-    async def _update_request_to_failed(self, request: Any, errors: list[str]) -> None:
-        """Update request status to failed."""
-        error_message = "; ".join(errors) if errors else "Deprovisioning failed"
-        await self._update_request_status(
-            request, RequestStatus.FAILED, f"Return request failed: {error_message}"
-        )
+    async def _update_request_to_failed(
+        self, request: Any, failed_ids: list[str] | None = None
+    ) -> None:
+        """Update request status to failed.
+
+        The stored message carries only a count and a bounded list of machine
+        IDs. Provider error text is never persisted on the request; callers log
+        it instead.
+        """
+        unique_ids = list(dict.fromkeys(failed_ids or []))
+        if unique_ids:
+            message = (
+                f"Return request failed: {len(unique_ids)} machine(s) could not be "
+                f"terminated [{_format_id_list(unique_ids)}]"
+            )
+        else:
+            message = "Return request failed: deprovisioning error"
+        await self._update_request_status(request, RequestStatus.FAILED, message)
 
     async def _update_request_to_terminating(self, request: Any) -> None:
         """Set return request to IN_PROGRESS after termination is accepted by provider.
@@ -748,6 +795,9 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             )
         except Exception as update_error:
             # Ensure the request reaches a terminal status so callers don't poll forever
-            await self._update_request_to_failed(
-                request, [f"Failed to mark completed: {update_error}"]
+            self.logger.error(
+                "Failed to mark request %s completed: %s",
+                request.request_id,
+                update_error,
             )
+            await self._update_request_to_failed(request)

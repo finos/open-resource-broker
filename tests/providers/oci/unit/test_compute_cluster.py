@@ -392,3 +392,40 @@ async def test_failed_cluster_rollback_retains_ids_for_recovery(template):
     assert result.metadata["rollback_errors"] == [
         {"instance_id": "accepted-node", "error": "Termination denied"}
     ]
+
+
+@pytest.mark.asyncio
+async def test_cross_region_template_resource_is_reported_as_region_mismatch(template):
+    handler = make_handler()
+    handler._run_oci = MagicMock()
+    foreign = "ocid1.subnet.oc1.eu-frankfurt-1.secretmarker"
+    result = await handler.create_instances(
+        ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"template_config": {**template, "subnet_ids": [foreign]}, "count": 1},
+        )
+    )
+    assert not result.success
+    assert result.error_code == "OCI_REGION_MISMATCH"
+    assert result.metadata == {"provider_region": "us-phoenix-1"}
+    assert "frankfurt" not in result.error_message and "secretmarker" not in result.error_message
+    handler._run_oci.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_region_lookup_failure_is_not_reported_as_cluster_invalid(template):
+    handler = make_handler()
+    handler._run_oci = MagicMock(side_effect=RuntimeError("iam region list failed"))
+    legacy_key_subnet = "ocid1.subnet.oc1.zzz.legacykey"
+    result = await handler.create_instances(
+        ProviderOperation(
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={
+                "template_config": {**template, "subnet_ids": [legacy_key_subnet]},
+                "count": 1,
+            },
+        )
+    )
+    assert not result.success
+    assert result.error_code == "OCI_REGION_VALIDATION_FAILED"
+    assert handler._run_oci.call_args.args[0][:3] == ["iam", "region", "list"]

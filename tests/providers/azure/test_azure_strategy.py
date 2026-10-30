@@ -1,6 +1,7 @@
 """Focused tests for Azure strategy core behavior."""
 
 import asyncio
+import sys
 import threading
 import time
 from types import SimpleNamespace
@@ -951,6 +952,27 @@ class TestSpotPlacementScoreAdapter:
         assert scores[0].metadata["raw_entry"] == {}
         assert scores[0].metadata["score_source"] == "lookup_failed"
         assert scores[0].metadata["score_lookup_failure"] == "score_lookup_failed"
+
+    @pytest.mark.asyncio
+    async def test_score_lookup_names_the_azure_extra_when_httpx_is_missing(
+        self, logger, monkeypatch
+    ):
+        monkeypatch.setitem(sys.modules, "httpx", None)
+        azure_client = MagicMock()
+        azure_client.get_async_credential = AsyncMock()
+        adapter = AzureSpotPlacementScoreAdapter(
+            azure_client=azure_client,
+            logger=logger,
+            subscription_id="sub-1",
+            base_location="westeurope",
+        )
+
+        lookup = await adapter._fetch_scores_async(1, ["westeurope"], ["Standard_D4s_v5"], [])
+
+        assert lookup.entries == {}
+        assert lookup.failure_reason == "httpx_missing"
+        assert "orb-py[azure]" in logger.warning.call_args.args[0]
+        azure_client.get_async_credential.assert_not_called()
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

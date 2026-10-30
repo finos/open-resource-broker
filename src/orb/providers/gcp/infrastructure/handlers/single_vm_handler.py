@@ -133,6 +133,7 @@ class GCPSingleVMHandler(GCPHandler):
                 zone=zone,
                 instance_name=instance_name,
             ),
+            absent_is_success=True,
         )
 
     def check_hosts_status(
@@ -231,8 +232,13 @@ class GCPSingleVMHandler(GCPHandler):
         target_ids: list[str],
         operation_name: str,
         mutation: Callable[[str], ExtendedOperation],
+        absent_is_success: bool = False,
     ) -> GCPMutationOutcome:
         """Dispatch one mutation call per target concurrently, bounded by a thread pool.
+
+        With ``absent_is_success`` a ``NotFound`` from the mutation counts as
+        success: deleting an instance that is already gone has reached the
+        desired end state, and GCP delete is not idempotent.
 
         Callers run this from a plain worker thread (no running event loop:
         the strategy layer dispatches the whole handler call via
@@ -247,27 +253,20 @@ class GCPSingleVMHandler(GCPHandler):
         if not target_ids:
             return result
 
-        def _run_one(instance_name: str) -> tuple[str, ExtendedOperation | GCPFailedOperation]:
+        def _run_one(
+            instance_name: str,
+        ) -> tuple[str, ExtendedOperation | GCPFailedOperation | None]:
             try:
                 return instance_name, mutation(instance_name)
+            except _not_found_gcp_operation_exceptions() as exc:
+                if absent_is_success:
+                    self._logger.info(
+                        "GCP %s: instance %s already absent", operation_name, instance_name
+                    )
+                    return instance_name, None
+                return instance_name, self._failed_operation(exc, operation_name, instance_name)
             except _recoverable_gcp_operation_exceptions() as exc:
-                translated = translate_gcp_exception(
-                    exc,
-                    operation=operation_name,
-                    details={"instance_id": instance_name},
-                )
-                self._logger.warning(
-                    "GCP %s failed for %s: %s",
-                    operation_name,
-                    instance_name,
-                    translated,
-                )
-                return instance_name, GCPFailedOperation(
-                    target_id=instance_name,
-                    error_code=translated.error_code,
-                    error_message=str(translated),
-                    operation=operation_name,
-                )
+                return instance_name, self._failed_operation(exc, operation_name, instance_name)
 
         max_workers = min(len(target_ids), _MAX_CONCURRENT_INSTANCE_OPERATIONS)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -282,12 +281,34 @@ class GCPSingleVMHandler(GCPHandler):
             result.operations.append(
                 {
                     "instance_id": instance_name,
-                    "operation_name": outcome.name,
+                    "operation_name": outcome.name if outcome is not None else None,
                 }
             )
             result.successful_ids.append(instance_name)
 
         return result
+
+    def _failed_operation(
+        self, exc: Exception, operation_name: str, instance_name: str
+    ) -> GCPFailedOperation:
+        """Translate a per-target exception into a structured failure record."""
+        translated = translate_gcp_exception(
+            exc,
+            operation=operation_name,
+            details={"instance_id": instance_name},
+        )
+        self._logger.warning(
+            "GCP %s failed for %s: %s",
+            operation_name,
+            instance_name,
+            translated,
+        )
+        return GCPFailedOperation(
+            target_id=instance_name,
+            error_code=translated.error_code,
+            error_message=str(translated),
+            operation=operation_name,
+        )
 
 
 def _recoverable_gcp_operation_exceptions() -> tuple[type[Exception], ...]:

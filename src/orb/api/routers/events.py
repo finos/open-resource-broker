@@ -73,6 +73,7 @@ except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
 from orb.api.dependencies import require_role
+from orb.domain.base.utils import parse_iso_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -373,10 +374,7 @@ def _parse_since(since_str: Optional[str]) -> Optional[datetime]:
     if not since_str:
         return None
     try:
-        dt = datetime.fromisoformat(since_str)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
+        return parse_iso_datetime(since_str)
     except ValueError:
         return None
 

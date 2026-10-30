@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from orb.interface.template_command_handlers import handle_update_template
+
+_DRY_RUN_MODULE = importlib.import_module("orb.infrastructure.mocking.dry_run_context")
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -60,8 +64,9 @@ def _make_container(bus: MagicMock) -> MagicMock:
 
 
 def _patch_dry_run(active: bool = False):
-    return patch(
-        "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+    return patch.object(
+        _DRY_RUN_MODULE,
+        "is_dry_run_active",
         return_value=active,
     )
 

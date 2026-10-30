@@ -24,6 +24,18 @@ __all__ = [
 ]
 
 
+def _to_domain_status(instance: Any) -> Any:
+    """Return ``instance`` with the internal ``starting`` status as ``pending``.
+
+    ``starting`` (a running pod that is not yet ready) is a k8s-internal state
+    the provider logic keys on; the domain ``MachineStatus`` has no such value,
+    so it is translated only here, where the ``ProviderResult`` is built.
+    """
+    if isinstance(instance, dict) and instance.get("status") == "starting":
+        return {**instance, "status": "pending"}
+    return instance
+
+
 def _build_provider_result_data(
     *,
     resource_ids: list[str],
@@ -57,7 +69,7 @@ def _build_provider_result_data(
     # handler) identifiers.  Both are propagated through ``provider_data``
     # so the application layer can reason about them independently.
     machine_ids = list(meta_dict.get("machine_ids") or [])
-    instances = list(meta_dict.get("instances") or [])
+    instances = [_to_domain_status(inst) for inst in meta_dict.get("instances") or []]
 
     data: dict[str, Any] = {
         "resource_ids": resource_ids,

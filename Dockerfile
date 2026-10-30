@@ -10,8 +10,11 @@ ARG PYTHON_VERSION=3.13
 ARG PACKAGE_NAME_SHORT=orb
 
 # Apply all available security patches and upgrade Python toolchain
-# Unpinned: Debian drops superseded package versions, so exact pins break builds.
-# hadolint ignore=DL3008
+# DL3008: unpinned apt packages, because Debian drops superseded package versions
+# and exact pins break builds.
+# DL3013: pip is upgraded here to the latest release on purpose; it is removed
+# again below, so a pinned version would only go stale.
+# hadolint ignore=DL3008,DL3013
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
@@ -78,11 +81,18 @@ ENV PATH="/opt/venv/bin:$PATH"
 #         default UIConfig (enabled=True, mode="embedded") makes the entrypoint's
 #         `orb server start --foreground` import orb.ui.app, which needs reflex.
 # The ci/dev test tooling groups are not installed — this is a production image.
+#
+# uv is only needed to populate /opt/venv, so it is removed as the last step of
+# this layer (after both installs), together with its Python package, to keep
+# the build tool and its bundled dependencies out of the runtime image.
 COPY dist/*.whl /tmp/
 RUN WHEEL=$(ls /tmp/*.whl) \
     && uv pip install --no-cache "${WHEEL}[all]" \
     && uv pip install --no-cache --upgrade "setuptools>=78.1.1" \
-    && rm -f /tmp/*.whl
+    && rm -f /tmp/*.whl \
+    && rm -rf /usr/local/bin/uv /usr/local/bin/uvx \
+        /usr/local/lib/python*/site-packages/uv \
+        /usr/local/lib/python*/site-packages/uv-*.dist-info
 
 # Copy only runtime files needed
 COPY config/ ./config/

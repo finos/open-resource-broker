@@ -4,7 +4,8 @@ include config/*.example.json
 include config/default_config.json
 include config/aws_templates.json
 include config/k8s_templates.json
-recursive-include config/specs *.json
+recursive-include config/specs *.json *.yaml
+include config/sample_user_data_script.sh
 recursive-include scripts *.sh *.bat
 include src/orb/ui/rxconfig.py
 graft src/orb/ui/assets

@@ -1,7 +1,6 @@
 """Tests for file/file_operations.py utilities."""
 
 import os
-import stat
 
 import pytest
 
@@ -26,7 +25,6 @@ from orb.infrastructure.utilities.file.file_operations import (
     move_file,
     normalize_path,
     rename_file,
-    set_file_permissions,
     touch_file,
     with_temp_file,
 )
@@ -341,14 +339,3 @@ class TestFilePermissions:
     def test_get_file_permissions_raises_for_missing(self, tmp_path):
         with pytest.raises(FileNotFoundError):
             get_file_permissions(str(tmp_path / "nope.txt"))
-
-    def test_set_file_permissions_changes_mode(self, tmp_path):
-        f = tmp_path / "chmod.txt"
-        f.write_text("x")
-        set_file_permissions(str(f), 0o600)
-        mode = stat.S_IMODE(os.stat(str(f)).st_mode)
-        assert mode == 0o600
-
-    def test_set_file_permissions_raises_for_missing(self, tmp_path):
-        with pytest.raises(FileNotFoundError):
-            set_file_permissions(str(tmp_path / "nope.txt"), 0o644)

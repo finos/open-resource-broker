@@ -106,7 +106,11 @@ class AWSConfigManager:
         return AWSNamingConfig()  # type: ignore[call-arg]
 
     def configure(self, provider_config: AWSProviderConfig) -> None:
-        """Update the provider config used to resolve naming patterns."""
+        """Update the provider config that ``get_typed`` serves.
+
+        Domain value objects validate against fixed patterns in ``naming_patterns``
+        and do not read this configuration.
+        """
         self._provider_config = provider_config
 
     def get_typed(self, config_type):
@@ -122,7 +126,7 @@ class AWSConfigManager:
         raise ValueError(f"Unknown AWS config type: {config_type}")
 
 
-# Global AWS config manager instance — can be reconfigured at startup via configure()
+# Global AWS config manager instance
 _aws_config_manager = AWSConfigManager()
 
 

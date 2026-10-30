@@ -185,13 +185,43 @@ ordinary instance batches and compute-cluster batches. Additional block
 volumes, networks, and application data are not managed by this handler.
 
 All operations use the provider region; cross-region resource references are
-rejected. Configure another provider instance for a different region.
+rejected. A template that references resources from another region fails with
+`OCI_REGION_MISMATCH`; the error details name the provider region. Configure another
+provider instance for a different region. If the region lookup itself fails (for example the
+`iam region list` call), the launch fails with `OCI_REGION_VALIDATION_FAILED`.
+
+During status polling, an instance that OCI answers with a 404 is left out of the
+result and the other instances are still reported. OCI uses the same 404 for an
+instance that no longer exists and for one the broker may not read, so a
+persistent 404 for an instance that should exist usually means the IAM policy
+does not grant `read instances` on the compartment that holds it, or the instance
+is in a different compartment than the policy covers. Fix the policy or compartment
+scope and the instance is reported again on the next poll. For a return request,
+a 404 (with any error code) fails the whole status call instead, because leaving
+the instance out would make the return look complete. The stored machines are
+kept and the return request stays in progress until the policy or compartment
+scope is fixed.
+
+To resolve a return that stays in progress after a 404:
+
+1. Check that the broker's policy grants `read instances` on the compartment that
+   holds the instance, and that the instance is in a compartment the policy covers.
+2. Look the instance up in the OCI console. If it is listed, fix the policy or
+   compartment scope; the return completes on the next poll once the instance is
+   readable and reports a terminal state.
+3. If the instance is not listed at all, it was deleted and has aged out of OCI.
+   The broker cannot tell that apart from an unreadable instance, so it does not
+   complete the return on its own and the request stays in progress until the
+   machine state is reconciled by hand.
+
+Any other error for an instance, including a failed VNIC lookup, fails the whole
+status call; stored machine state is kept and the call is retried on the next poll.
 
 Termination attempts every requested instance and reports per-instance outcomes.
 A `NotAuthorizedOrNotFound` response is recorded as `not_found_or_not_authorized`
 and is excluded from confirmed termination results. If there are no other errors,
 the operation fails with `OCI_TERMINATION_UNCONFIRMED`. Return-status polling
-reports the instance as `unknown` and leaves the return in progress. Verify OCI
+fails for such an instance and leaves the return in progress. Verify OCI
 state and permissions before retrying; an ambiguous 404 does not prove deletion.
 
 Launch metadata is read from a temporary JSON file, protected with 0600 permissions

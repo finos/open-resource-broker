@@ -16,6 +16,7 @@ from orb.application.request.queries import GetRequestMetricsQuery
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
+from orb.domain.base.utils import parse_iso_datetime
 from orb.domain.machine.value_objects import MachineStatus
 
 _ACTIVE_MACHINE_STATUSES = frozenset(
@@ -101,16 +102,14 @@ class GetRequestMetricsHandler(BaseQueryHandler[GetRequestMetricsQuery, dict[str
         end_dt: datetime = now
         if query.start_date:
             try:
-                parsed = datetime.fromisoformat(query.start_date)
-                start_dt = parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+                start_dt = parse_iso_datetime(query.start_date)
             except ValueError:
                 self.logger.warning(
                     "GetRequestMetricsHandler: invalid start_date %r; using epoch", query.start_date
                 )
         if query.end_date:
             try:
-                parsed = datetime.fromisoformat(query.end_date)
-                end_dt = parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+                end_dt = parse_iso_datetime(query.end_date)
             except ValueError:
                 self.logger.warning(
                     "GetRequestMetricsHandler: invalid end_date %r; using now", query.end_date

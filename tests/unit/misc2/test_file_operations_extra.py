@@ -20,7 +20,6 @@ from orb.infrastructure.utilities.file.file_operations import (
     move_file,
     rename_file,
     set_file_owner_and_group,
-    set_file_permissions,
     touch_file,
     with_temp_file,
 )
@@ -208,31 +207,6 @@ class TestGetFilePermissionsErrors:
         with patch("os.stat", side_effect=OSError("stat error")):
             with pytest.raises(OSError, match="Failed to get permissions"):
                 get_file_permissions(str(f))
-
-
-# ---------------------------------------------------------------------------
-# set_file_permissions — error paths
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestSetFilePermissionsErrors:
-    def test_raises_file_not_found(self, tmp_path) -> None:
-        with pytest.raises(FileNotFoundError):
-            set_file_permissions(str(tmp_path / "nope.txt"), 0o644)
-
-    def test_raises_os_error_on_chmod_failure(self, tmp_path) -> None:
-        f = tmp_path / "f.txt"
-        f.write_text("x")
-        with patch("os.chmod", side_effect=OSError("chmod error")):
-            with pytest.raises(OSError, match="Failed to set permissions"):
-                set_file_permissions(str(f), 0o600)
-
-    def test_raises_value_error_for_group_or_other_access(self, tmp_path) -> None:
-        f = tmp_path / "f.txt"
-        f.write_text("x")
-        with pytest.raises(ValueError, match="group/other"):
-            set_file_permissions(str(f), 0o644)
 
 
 # ---------------------------------------------------------------------------

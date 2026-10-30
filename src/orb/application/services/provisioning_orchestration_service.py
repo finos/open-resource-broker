@@ -3,7 +3,9 @@
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, Callable, assert_never
+from typing import TYPE_CHECKING, Any, Callable
+
+from typing_extensions import assert_never
 
 if TYPE_CHECKING:
     from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
@@ -592,10 +594,12 @@ class ProvisioningOrchestrationService:
 
             self._provider_config_port.get_provider_instance_config(selection_result.provider_name)
 
-            async with asyncio.timeout(dispatch_timeout_seconds):
-                result = await self._provider_selection_port.execute_operation(
+            result = await asyncio.wait_for(
+                self._provider_selection_port.execute_operation(
                     selection_result.provider_name, operation
-                )
+                ),
+                timeout=dispatch_timeout_seconds,
+            )
 
             if result.success:
                 self._logger.debug("Provider result.data: %s", result.data)
@@ -676,7 +680,7 @@ class ProvisioningOrchestrationService:
         except CircuitBreakerOpenError:
             raise  # do not swallow — let it propagate to execute_provisioning
 
-        except TimeoutError:
+        except (asyncio.TimeoutError, TimeoutError):
             timeout_msg = f"Dispatch timed out after {dispatch_timeout_seconds:.0f}s"
             self._logger.warning(
                 "Dispatch timed out after %.1fs for provider %s (request %s)",

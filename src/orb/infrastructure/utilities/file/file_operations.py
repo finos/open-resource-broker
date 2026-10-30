@@ -429,38 +429,6 @@ def get_file_permissions(file_path: str) -> int:
         raise OSError(f"Failed to get permissions for {file_path}: {e!s}")
 
 
-def set_file_permissions(file_path: str, permissions: int) -> None:
-    """
-    Set file permissions.
-
-    Only owner-level bits may be granted; any group or other
-    read/write/execute bit is rejected. This keeps the file inaccessible
-    to anyone but its owner, regardless of what mode a caller requests.
-
-    Args:
-        file_path: Path to file
-        permissions: Permissions as octal integer (e.g., 0o600, 0o700)
-
-    Raises:
-        FileNotFoundError: If file doesn't exist
-        ValueError: If permissions grant group or other access
-        OSError: If permissions cannot be set
-    """
-    if not file_exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
-
-    # This is a generic chmod wrapper, so the caller-supplied mode is
-    # validated here rather than trusted. Reject any group/other bit so the
-    # file can never end up readable or writable by anyone but its owner.
-    if permissions & 0o077:
-        raise ValueError(f"Refusing to set group/other-accessible permissions: {oct(permissions)}")
-
-    try:
-        os.chmod(file_path, permissions)
-    except OSError as e:
-        raise OSError(f"Failed to set permissions for {file_path}: {e!s}")
-
-
 def get_file_owner(file_path: str) -> int:
     """
     Get file owner UID.

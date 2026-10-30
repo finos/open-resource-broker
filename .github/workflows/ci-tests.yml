@@ -12,9 +12,10 @@ on:
       - 'assets/**'
       - 'rxconfig.py'
       - '.github/workflows/ci-tests.yml'
-      # Container-only paths: dev-containers.yml builds main via workflow_run
-      # after this workflow passes, not its own push trigger, so these paths
-      # must run here too or a container-only push to main builds nothing.
+      # Container-only paths: dev-containers.yml waits for this workflow's
+      # push run on the same commit before publishing images, so every path
+      # that triggers a container build must also trigger this workflow or
+      # that gate would never find a run.
       - 'Dockerfile*'
       - 'deployment/docker/**'
       - 'dev-tools/container/container_build.sh'
@@ -83,6 +84,30 @@ jobs:
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       continue-on-error: false
       artifact-prefix: ci-tests-group
+      aws-region: ${{ needs.config.outputs.aws-region }}
+      aws-access-key: ${{ needs.config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
+      environment: ${{ needs.config.outputs.environment }}
+      testing-flag: ${{ needs.config.outputs.testing-flag }}
+
+  # The package supports Python 3.10 but the default interpreter is newer, so a
+  # 3.10-only break (a newer stdlib API, a mock target that resolves differently)
+  # would otherwise surface only in the nightly matrix.  One unit-test leg on 3.10
+  # keeps it out of main.  Provider suites stay in the nightly matrix.  Its
+  # coverage data is excluded from the combined gate (see coverage-combine).
+  unit-tests-py310:
+    name: Unit Tests (Python 3.10)
+    needs: [config]
+    uses: ./.github/workflows/reusable-test.yml
+    # No secrets: coverage upload is off, so the only optional secret the
+    # reusable workflow accepts (CODECOV_TOKEN) is never read.
+    with:
+      test-type: unit
+      python-version: '3.10'
+      default-python-version: ${{ needs.config.outputs.default-python-version }}
+      continue-on-error: false
+      upload-coverage: false
+      artifact-prefix: ci-tests-py310
       aws-region: ${{ needs.config.outputs.aws-region }}
       aws-access-key: ${{ needs.config.outputs.aws-access-key }}
       aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
@@ -250,7 +275,7 @@ jobs:
     name: Generate Test Report
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [config, test-groups, e2e-tests, providers-tests, providers-tests-serial, ui-unit-tests, ui-smoke]
+    needs: [config, test-groups, unit-tests-py310, e2e-tests, providers-tests, providers-tests-serial, ui-unit-tests, ui-smoke]
     if: always()
     permissions:
       contents: read
@@ -289,7 +314,9 @@ jobs:
   # Self-contained combined-coverage gate: merges the per-leg .coverage data
   # (uploaded by reusable-test) and enforces the threshold locally, so the hard
   # gate does not depend on Codecov's external service.  Codecov still receives
-  # each leg's upload for the PR-comment diff view.
+  # each leg's upload for the PR-comment diff view.  The Python 3.10 unit leg is
+  # deliberately not a dependency: it only checks compatibility, and its
+  # artifacts (any path ending in -py3.10) are skipped when gathering data.
   coverage-combine:
     name: Coverage Gate (Combined)
     runs-on: ubuntu-latest
@@ -320,7 +347,9 @@ jobs:
         # Each leg uploads a .coverage data file inside its test-results-* dir.
         # coverage combine expects them in CWD with unique .coverage.<suffix> names.
         i=0
-        find coverage-artifacts -name '.coverage*' -type f | while read -r f; do
+        # The Python 3.10 leg exists to catch compatibility breaks, not to
+        # contribute coverage, so its data is left out of the combined gate.
+        find coverage-artifacts -name '.coverage*' -type f -not -path '*-py3.10/*' | while read -r f; do
           cp "$f" ".coverage.leg${i}"
           i=$((i + 1))
         done
@@ -363,6 +392,7 @@ jobs:
     needs:
       - config
       - test-groups
+      - unit-tests-py310
       - e2e-tests
       - providers-tests
       - providers-tests-serial

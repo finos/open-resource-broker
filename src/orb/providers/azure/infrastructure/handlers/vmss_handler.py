@@ -41,6 +41,7 @@ from orb.providers.azure.exceptions.azure_exceptions import (
 from orb.providers.azure.infrastructure.error_codes import ProviderErrorEntry
 from orb.providers.azure.infrastructure.error_utils import (
     classify_azure_error,
+    is_azure_not_found,
 )
 from orb.providers.azure.infrastructure.handlers._network_identity import (
     resolve_network_identity_or_empty_async,
@@ -369,8 +370,7 @@ class VMSSHandler(AzureHandler):
             return []
 
         all_instances: list[AzureHandlerStatusResult] = []
-        status_errors: list[str] = []
-        raise_on_status_error = azure_raise_on_status_error(request)
+        azure_raise_on_status_error(request)  # validates the metadata policy value
 
         resource_group = (request.metadata or {}).get(
             "resource_group"
@@ -379,8 +379,7 @@ class VMSSHandler(AzureHandler):
             if not resource_group:
                 error_message = f"Cannot resolve resource_group for VMSS '{vmss_name}'"
                 self._logger.error(error_message)
-                status_errors.append(error_message)
-                continue
+                raise RuntimeError(error_message)
 
             try:
                 instances = await self._list_vmss_instances_async(
@@ -388,13 +387,16 @@ class VMSSHandler(AzureHandler):
                 )
                 all_instances.extend(instances)
             except Exception as exc:
+                if is_azure_not_found(exc):
+                    # The scale set is gone; report no members for it so the
+                    # caller can record them as terminated.
+                    self._logger.warning("VMSS '%s' not found during status check", vmss_name)
+                    continue
+                # Any other failure says nothing about the members' state. Fail
+                # the whole call so stored state is kept and the poll retried.
                 error_message = f"Failed to list instances for VMSS '{vmss_name}': {exc}"
                 self._logger.error(error_message)
-                status_errors.append(error_message)
-
-        all_requested_vmss_failed = bool(resource_ids) and not all_instances
-        if status_errors and (raise_on_status_error or all_requested_vmss_failed):
-            raise RuntimeError("; ".join(status_errors))
+                raise RuntimeError(error_message) from exc
 
         return all_instances
 
@@ -1128,6 +1130,8 @@ class VMSSHandler(AzureHandler):
             )
             vms = [vm async for vm in pager]
         except Exception as exc:
+            if not is_azure_not_found(exc):
+                raise
             raise VMSSNotFoundError(
                 f"Could not list VMs in VMSS '{vmss_name}': {exc}",
                 vmss_name=vmss_name,
@@ -1220,6 +1224,8 @@ class VMSSHandler(AzureHandler):
             )
             vms = [vm async for vm in pager]
         except Exception as exc:
+            if not is_azure_not_found(exc):
+                raise
             raise VMSSNotFoundError(
                 f"Could not list flexible VMs for VMSS '{vmss_name}': {exc}",
                 vmss_name=vmss_name,

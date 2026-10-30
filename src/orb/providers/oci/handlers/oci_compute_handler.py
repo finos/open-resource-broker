@@ -17,6 +17,7 @@ from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 from orb.providers.oci.async_utils import run_blocking_operation
 from orb.providers.oci.cli_client import OCICommandError, run_oci, service_error_summary
+from orb.providers.oci.configuration.realms import is_allowed_realm_domain
 from orb.providers.oci.mapping import OCITemplateMapper
 from orb.providers.oci.services import OCIPricingService
 
@@ -212,8 +213,8 @@ class OCIComputeHandler:
         # raw-request retains CLI signing and lets us set the idempotency header.
         region = self._region_aliases.get(self._region.lower(), self._region.lower())
         domain = self._auth_config.get("realm_domain_component", "oraclecloud.com")
-        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)+", region) or not re.fullmatch(
-            r"[a-z0-9]+(?:[.-][a-z0-9]+)*", domain
+        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)+", region) or not is_allowed_realm_domain(
+            domain, self._auth_config.get("extra_realm_suffixes")
         ):
             raise ValueError("OCI launch requires a full region name and valid realm domain")
         body: dict[str, Any] = {
@@ -392,6 +393,21 @@ class OCIComputeHandler:
                         *(normalized_template.get("nsg_ids") or []),
                     ]
                 )
+            except ValueError:
+                return ProviderResult.error_result(
+                    "Template resources must be in the provider's configured OCI region",
+                    "OCI_REGION_MISMATCH",
+                    {"provider_region": self._region},
+                )
+            except Exception as exc:
+                # Region validation can call `iam region list`; a CLI failure there
+                # says nothing about the compute cluster.
+                return ProviderResult.error_result(
+                    f"OCI region validation failed: {exc}",
+                    "OCI_REGION_VALIDATION_FAILED",
+                    {"provider_region": self._region},
+                )
+            try:
                 self._validate_compute_cluster(launch_requests[0])
             except Exception as exc:
                 return ProviderResult.error_result(
@@ -711,17 +727,25 @@ class OCIComputeHandler:
                         )
                         data = response.get("data", {})
                     except OCICommandError as exc:
-                        if not (
-                            is_return
-                            and exc.status == 404
-                            and exc.code == "NotAuthorizedOrNotFound"
-                        ):
+                        if exc.status != 404:
+                            # Any other per-machine failure fails the whole call so
+                            # stored machine state is kept and retried on the next poll.
                             raise
-                        data = {
-                            "id": machine_id,
-                            "lifecycle-state": "UNKNOWN",
-                            "orb_unverified_absence": True,
-                        }
+                        if is_return:
+                            # Omitting the machine would let a return request treat it
+                            # as terminated, and OCI answers 404 both for a deleted
+                            # instance and for one this principal cannot read. Fail the
+                            # whole call so stored machine state is kept.
+                            raise
+                        # OCI answers 404 for an instance that no longer exists
+                        # (or is not visible to this principal); leave it out of
+                        # the result rather than failing the other machines.
+                        self._logger.warning(
+                            "OCI instance %s was not found during status check; "
+                            "omitting it from the result",
+                            machine_id,
+                        )
+                        continue
                     state = str(data.get("lifecycle-state", "unknown")).upper()
                     status = {
                         "RUNNING": "running",
@@ -773,11 +797,6 @@ class OCIComputeHandler:
                             "provider_data": {
                                 "lifecycle_state": state,
                                 "compute_cluster_id": cluster_id,
-                                **(
-                                    {"termination_verified": False}
-                                    if data.get("orb_unverified_absence")
-                                    else {}
-                                ),
                             },
                         }
                     )

@@ -112,7 +112,7 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
 
     register_all_scheduler_types()
     register_all_storage_types()
-    register_all_provider_types()
+    register_all_provider_types(container)
 
     # 1. Register ConfigurationManager FIRST (port adapters depend on it)
     from orb.config.managers.configuration_manager import ConfigurationManager
@@ -207,7 +207,7 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
 
     register_all_scheduler_types()
     register_all_storage_types()
-    register_all_provider_types()
+    register_all_provider_types(container)
 
     from orb.bootstrap.port_registrations import register_port_adapters
 

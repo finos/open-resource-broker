@@ -468,7 +468,7 @@ def register_k8s_provider(
 
     except Exception as exc:
         if logger:
-            logger.error("Failed to register Kubernetes provider: %s", exc)
+            logger.error("Failed to register Kubernetes provider: %s", exc, exc_info=True)
         raise
 
 

@@ -705,6 +705,10 @@ def test_vmss_status_raises_after_partial_success_when_status_errors_are_fatal()
     logger = MagicMock()
     handler = VMSSHandler(azure_client=azure_client, logger=logger)
 
+    vmss = MagicMock()
+    vmss.orchestration_mode = OrchestrationMode.UNIFORM
+    azure_client.compute_client.virtual_machine_scale_sets.get.return_value = vmss
+
     member_vm = MagicMock()
     member_vm.instance_id = "1"
     member_vm.vm_id = "vm-guid-1"

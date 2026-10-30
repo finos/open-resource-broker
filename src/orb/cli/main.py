@@ -94,7 +94,7 @@ async def main() -> None:
         # Setup environment after arg parse — skip for init (it calls get_config_location() directly)
         # and skip for k8s-legacy (handled entirely by the legacy package itself)
         if args.resource not in ("init", "k8s-legacy"):
-            from orb.run import setup_environment
+            from orb._environment import setup_environment
 
             setup_environment()
 

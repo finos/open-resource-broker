@@ -7,9 +7,8 @@ Covers:
 - AWSProviderStrategy implements acquire/return_machines/get_status
 """
 
-from typing import assert_never
-
 import pytest
+from typing_extensions import assert_never
 
 from orb.domain.base.operation_outcome import (
     Accepted,
