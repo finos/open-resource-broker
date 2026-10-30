@@ -23,6 +23,8 @@ try:
 except ImportError:
     pytest.skip("fastapi not installed", allow_module_level=True)
 
+from .conftest import make_test_server_config
+
 # ---------------------------------------------------------------------------
 # REST response schemas
 # ---------------------------------------------------------------------------
@@ -44,7 +46,14 @@ _ERROR_SCHEMA = {
     "type": "object",
     "properties": {
         "detail": {},
-        "error": {"type": "string"},
+        "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+                "code": {"type": "string"},
+                "message": {"type": "string"},
+            },
+        },
         "message": {"type": "string"},
     },
     "additionalProperties": True,
@@ -77,7 +86,7 @@ def rest_client(orb_config_dir_hf):
     except ImportError as exc:
         pytest.skip(f"Could not import REST app: {exc}")
 
-    app = create_fastapi_app(None)
+    app = create_fastapi_app(make_test_server_config())
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client
 
