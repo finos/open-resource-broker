@@ -25,3 +25,13 @@ class TestTemplateProviderFieldFormat:
     def test_derived_provider_type_with_trailing_newline_rejected(self) -> None:
         with pytest.raises(ValueError):
             Template(template_id="t1", provider_name="aws\n")
+
+    @pytest.mark.parametrize("name", ["-us-east-1", "-", "--a"])
+    def test_provider_name_starting_with_hyphen_does_not_recurse(self, name: str) -> None:
+        template = Template(template_id="t1", provider_name=name)
+        assert template.provider_name == name
+        assert template.provider_type is None
+
+    def test_provider_type_derived_from_name(self) -> None:
+        assert Template(template_id="t1", provider_name="aws-us-east-1").provider_type == "aws"
+        assert Template(template_id="t1", provider_name="aws").provider_type == "aws"

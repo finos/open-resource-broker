@@ -298,11 +298,12 @@ class Template(BaseModel):
         # If provider_name is specified, extract provider_type if not provided
         if self.provider_name and not self.provider_type:
             # Extract provider type from provider name (e.g., "aws-us-east-1" -> "aws")
-            if "-" in self.provider_name:
-                self.provider_type = self.provider_name.split("-")[0]
-            else:
-                # If no separator, assume the whole name is the provider type
-                self.provider_type = self.provider_name
+            # If no separator, assume the whole name is the provider type
+            derived_type = self.provider_name.split("-")[0]
+            # A name starting with "-" derives an empty type; assigning it would
+            # re-run this validator on an unchanged state and recurse forever.
+            if derived_type:
+                self.provider_type = derived_type
 
         # Validate provider_name format if provided
         if self.provider_name:
