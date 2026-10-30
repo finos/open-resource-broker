@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -245,6 +246,54 @@ class TestPluginFailureEscalation:
                 registered=["alpha"],
             )
         assert spy.call_count == 1
+
+    @pytest.mark.parametrize("kind", list(_BAD_PLUGINS))
+    def test_unconfigured_broken_plugin_is_logged_once_across_all_bootstrap_paths(
+        self, kind: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with (
+            _stub_eps([_BAD_PLUGINS[kind]("brokenprov")]),
+            patch.object(reg_module, "_configured_provider_types", return_value=frozenset()),
+            patch("orb.providers.registry.get_provider_registry", return_value=MagicMock()),
+            patch.object(reg_module, "_REGISTERED_PROVIDERS", []),
+            caplog.at_level("DEBUG", logger=reg_module.__name__),
+        ):
+            register_all_provider_cli_specs()
+            register_all_defaults_loaders()
+            register_all_providers()
+            register_all_providers()
+        reports = [
+            r
+            for r in caplog.records
+            if r.levelno >= logging.WARNING and "brokenprov" in r.getMessage()
+        ]
+        assert len(reports) == 1
+
+    def test_configured_broken_plugin_still_fails_after_it_was_logged(self) -> None:
+        with (
+            _stub_eps([_BAD_PLUGINS["load_error"]("myprov")]),
+            patch.object(
+                reg_module, "_configured_provider_types", return_value=frozenset({"myprov"})
+            ),
+            patch("orb.providers.registry.get_provider_registry", return_value=MagicMock()),
+            patch.object(reg_module, "_REGISTERED_PROVIDERS", []),
+        ):
+            register_all_provider_cli_specs()
+            with pytest.raises(RuntimeError, match="Configured provider 'myprov'"):
+                register_all_providers()
+
+    def test_failing_entry_point_named_like_a_builtin_does_not_suppress_it(self) -> None:
+        fake_module = MagicMock()
+        registry = MagicMock()
+        with (
+            _stub_eps([_BAD_PLUGINS["load_import_error"]("aws")]),
+            patch.object(reg_module, "_configured_provider_types", return_value=frozenset()),
+            patch("orb.providers.registry.get_provider_registry", return_value=registry),
+            patch.object(reg_module, "_REGISTERED_PROVIDERS", ["aws"]),
+            patch.object(reg_module.importlib, "import_module", return_value=fake_module),
+        ):
+            register_all_providers()
+        fake_module.register_aws_provider.assert_called_once_with(registry)
 
     @pytest.mark.parametrize("kind", list(_BAD_PLUGINS))
     def test_cli_spec_and_defaults_paths_never_raise_for_a_configured_plugin(

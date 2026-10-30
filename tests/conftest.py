@@ -304,6 +304,16 @@ def reset_singletons():
 
 
 @pytest.fixture(autouse=True)
+def _reset_reported_plugin_failures():
+    """Forget which broken provider plugins were already logged in this process."""
+    from orb.providers import registration
+
+    registration._reported_plugin_failures.clear()
+    yield
+    registration._reported_plugin_failures.clear()
+
+
+@pytest.fixture(autouse=True)
 def _reset_otel_state():
     """Reset OpenTelemetry global provider state before and after every test.
 

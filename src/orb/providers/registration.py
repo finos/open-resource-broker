@@ -50,6 +50,19 @@ _PROVIDER_ENTRY_POINT_GROUP = "orb.providers"
 
 _logger = logging.getLogger(__name__)
 
+# Names of unconfigured plugins whose failure has already been logged in this
+# process. Plugin discovery runs from several bootstrap paths (CLI specs,
+# defaults loaders, provider registration); a broken plugin is reported once.
+_reported_plugin_failures: set[str] = set()
+
+
+def _first_report(name: str) -> bool:
+    """Return True the first time the failure of plugin *name* is reported."""
+    if name in _reported_plugin_failures:
+        return False
+    _reported_plugin_failures.add(name)
+    return True
+
 
 def discover_provider_plugins(
     entry_point_group: str = _PROVIDER_ENTRY_POINT_GROUP,
@@ -101,7 +114,7 @@ def discover_provider_plugins(
     def _failed(name: str, exc: Exception, message: str) -> None:
         if failures is not None:
             failures[name] = exc
-        else:
+        elif _first_report(name):
             _logger.error(message, name, exc, exc_info=exc)
 
     for entry_point in entry_points:
@@ -168,11 +181,14 @@ def _provider_load_failure(
     configured: dict[str, frozenset[str] | None],
     *,
     optional_dependency: bool,
+    plugin: bool = False,
 ) -> None:
     """Fail startup for a configured provider; log and continue for any other.
 
     ``configured`` memoises the configuration lookup so it runs at most once,
-    and only after a provider has actually failed to load.
+    and only after a provider has actually failed to load. ``plugin`` marks an
+    entry-point failure, which is logged at most once per process even though
+    several bootstrap paths discover the same plugin.
     """
     if "types" not in configured:
         configured["types"] = _configured_provider_types(container)
@@ -186,6 +202,8 @@ def _provider_load_failure(
         raise RuntimeError(
             f"Configured provider '{name}' could not be loaded: {exc}.{hint}"
         ) from exc
+    if plugin and not _first_report(name):
+        return
     if optional_dependency:
         _logger.warning(
             "Provider '%s' is not available (optional dependency missing?): %s",
@@ -232,10 +250,11 @@ def register_all_providers(
     configured: dict[str, frozenset[str] | None] = {}
     config_source = container if container is not None else config_container
 
-    # A plugin whose entry point fails is reported once, here: it fails
-    # startup when the configuration names it (the entry-point name is the
-    # provider type) and is logged otherwise. Every failure is reported before
-    # any provider is registered, and one bad plugin never blocks another.
+    # A plugin whose entry point fails fails startup when the configuration
+    # names it (the entry-point name is the provider type) and is logged once
+    # otherwise. Failures are reported before any provider is registered. A
+    # failing entry point never suppresses the built-in provider of the same
+    # name: that provider is loaded below on its own merits.
     for name, exc in plugin_failures.items():
         _provider_load_failure(
             name,
@@ -243,11 +262,10 @@ def register_all_providers(
             config_source,
             configured,
             optional_dependency=isinstance(exc, ImportError),
+            plugin=True,
         )
 
     for name in list(_REGISTERED_PROVIDERS):
-        if name in plugin_failures:
-            continue
         module_path = f"orb.providers.{name}.registration"
         try:
             spec = importlib.util.find_spec(module_path)
