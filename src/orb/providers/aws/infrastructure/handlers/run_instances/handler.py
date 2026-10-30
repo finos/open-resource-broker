@@ -55,6 +55,11 @@ from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
     region_of,
     unwrap_aws_error,
 )
+from orb.providers.aws.infrastructure.handlers.shared.instance_lifecycle import (
+    is_intentional_teardown,
+    is_launch_failure,
+    is_unknown_ending,
+)
 from orb.providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
     LTNetworkingState,
@@ -485,7 +490,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             instances = self._format_instance_data(
                 instance_details, resource_id, self._resolve_provider_api(request)
             )
-            fulfilment = self._compute_run_instances_fulfilment(instances, request.requested_count)
+            fulfilment = self._compute_run_instances_fulfilment(
+                instances, request.requested_count, str(request.request_id)
+            )
             return CheckHostsStatusResult(instances=instances, fulfilment=fulfilment)
 
         except Exception as e:
@@ -493,73 +500,90 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             raise AWSInfrastructureError(f"Failed to check RunInstances status: {e!s}")
 
     def _compute_run_instances_fulfilment(
-        self, instances: list[dict[str, Any]], requested_count: int
+        self, instances: list[dict[str, Any]], requested_count: int, request_id: str = ""
     ) -> ProviderFulfilment:
         """Compute ProviderFulfilment for a RunInstances-style request.
 
         RunInstances is sync/simple: 1 instance == 1 capacity unit.
-        The request is fulfilled when running_count >= requested_count and
-        no failed instances exist.
+
+        Instances are classified as running, pending, failed (launch failure)
+        or torn down (shutting-down / terminated / stopping / stopped). An
+        ending instance whose state reason shows AWS ended it (launch error,
+        spot interruption) is a failure; one that was returned or stopped on
+        request is an intentional teardown. A request that met its target stays
+        fulfilled while some instances are returned, and a request whose
+        instances are all gone is settled instead of polling forever.
         """
         running_count = sum(1 for i in instances if i.get("status") == "running")
-        pending_count = sum(1 for i in instances if i.get("status") in ("pending", "starting"))
-        failed_count = sum(
-            1 for i in instances if i.get("status") in ("failed", "error", "shutting-down")
-        )
+        pending_count = sum(1 for i in instances if i.get("status") == "pending")
+        failed_count = sum(1 for i in instances if is_launch_failure(i))
+        torn_down_count = sum(1 for i in instances if is_intentional_teardown(i))
+        unknown_endings = sum(1 for i in instances if is_unknown_ending(i))
+        if len(instances) < requested_count:
+            # Fewer instances exist than were requested, so the target was never
+            # reached: an instance that ended without a state reason may be a
+            # launch failure, and the shortfall must not be reported as fulfilled.
+            # Once every requested instance exists, an ending without a reason
+            # is a later, intentional teardown.
+            failed_count += unknown_endings
+        else:
+            torn_down_count += unknown_endings
+            for inst in instances:
+                if is_unknown_ending(inst):
+                    self._logger.warning(
+                        "Instance %s of request %s ended without a state reason; "
+                        "treating it as an intentional teardown because every requested "
+                        "instance exists",
+                        inst.get("instance_id"),
+                        request_id,
+                    )
+
+        def verdict(state: Any, message: str, **extra: Any) -> ProviderFulfilment:
+            return ProviderFulfilment(
+                state=state,
+                message=message,
+                target_units=requested_count,
+                fulfilled_units=extra.pop("fulfilled_units", running_count),
+                running_count=running_count,
+                pending_count=pending_count,
+                failed_count=failed_count,
+                **extra,
+            )
 
         if running_count >= requested_count and failed_count == 0:
-            return ProviderFulfilment(
-                state="fulfilled",
-                message=f"All {running_count} instance(s) running",
-                target_units=requested_count,
-                fulfilled_units=running_count,
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
+            return verdict("fulfilled", f"All {running_count} instance(s) running")
+        if pending_count > 0:
+            return verdict(
+                "in_progress",
+                f"{running_count}/{requested_count} running, {pending_count} pending",
             )
-        elif pending_count > 0:
-            return ProviderFulfilment(
-                state="in_progress",
-                message=f"{running_count}/{requested_count} running, {pending_count} pending",
-                target_units=requested_count,
-                fulfilled_units=running_count,
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
+        if (
+            failed_count == 0
+            and torn_down_count > 0
+            and running_count + torn_down_count >= requested_count
+        ):
+            if running_count == 0:
+                return verdict(
+                    "failed",
+                    f"All {torn_down_count} instance(s) were terminated or stopped",
+                    fulfilled_units=0,
+                    final=True,
+                )
+            return verdict(
+                "fulfilled",
+                f"{running_count} instance(s) running, {torn_down_count} returned or stopped",
             )
-        elif failed_count == len(instances) and len(instances) > 0:
-            return ProviderFulfilment(
-                state="failed",
-                message=f"All {failed_count} instance(s) failed",
-                target_units=requested_count,
-                fulfilled_units=0,
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
+        if failed_count == len(instances) and len(instances) > 0:
+            return verdict(
+                "failed", f"All {failed_count} instance(s) failed", fulfilled_units=0, final=True
             )
-        elif running_count > 0:
-            return ProviderFulfilment(
-                state="partial",
-                message=f"{running_count}/{requested_count} instance(s) running",
-                target_units=requested_count,
-                fulfilled_units=running_count,
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
-                # Synchronous RunInstances settled: nothing pending, remaining
-                # capacity will never appear — terminalise immediately.
-                final=True,
+        if running_count > 0:
+            # Synchronous RunInstances settled: nothing pending, remaining
+            # capacity will never appear — terminalise immediately.
+            return verdict(
+                "partial", f"{running_count}/{requested_count} instance(s) running", final=True
             )
-        else:
-            return ProviderFulfilment(
-                state="in_progress",
-                message="Instances starting",
-                target_units=requested_count,
-                fulfilled_units=0,
-                running_count=running_count,
-                pending_count=pending_count,
-                failed_count=failed_count,
-            )
+        return verdict("in_progress", "Instances starting", fulfilled_units=0)
 
     def _find_instances_by_resource_ids(
         self, request: Request, resource_ids: list[str]
@@ -617,7 +641,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             )
 
             fulfilment = self._compute_run_instances_fulfilment(
-                all_instances, request.requested_count
+                all_instances, request.requested_count, str(request.request_id)
             )
             return CheckHostsStatusResult(instances=all_instances, fulfilment=fulfilment)
 
@@ -663,7 +687,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 )
 
             fulfilment = self._compute_run_instances_fulfilment(
-                formatted_instances, request.requested_count
+                formatted_instances, request.requested_count, str(request.request_id)
             )
             return CheckHostsStatusResult(instances=formatted_instances, fulfilment=fulfilment)
 

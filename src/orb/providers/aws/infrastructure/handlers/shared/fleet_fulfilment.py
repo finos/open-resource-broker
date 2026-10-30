@@ -146,8 +146,8 @@ def compute_capacity_based_fulfilment(
         target_capacity: The fleet's TargetCapacity, or None if unknown.
         fulfilled_capacity: The fleet's FulfilledCapacity as reported by AWS.
         running_count: Number of instances whose status is "running".
-        pending_count: Number of instances whose status is "pending" or "starting".
-        failed_count: Number of instances whose status is "failed" or "error".
+        pending_count: Number of instances whose status is "pending".
+        failed_count: Number of instances whose status is "failed".
         provider_label: Label used in messages, e.g. "Fleet" or "Spot Fleet".
     """
     target_units = target_capacity if target_capacity is not None else int(fulfilled_capacity)
@@ -236,8 +236,8 @@ def compute_ec2fleet_fulfilment(
     from orb.providers.aws.domain.template.value_objects import AWSFleetType
 
     running_count = sum(1 for i in instances if i.get("status") == "running")
-    pending_count = sum(1 for i in instances if i.get("status") in ("pending", "starting"))
-    failed_count = sum(1 for i in instances if i.get("status") in ("failed", "error"))
+    pending_count = sum(1 for i in instances if i.get("status") == "pending")
+    failed_count = sum(1 for i in instances if i.get("status") == "failed")
     target_units = target_capacity if target_capacity is not None else requested_count
 
     if fleet_type == AWSFleetType.INSTANT:

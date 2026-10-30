@@ -358,7 +358,7 @@ class TestMicroVMHandlerCheckStatusEdgeCases:
         assert result.fulfilment.final is True
 
     def test_check_status_partial_fulfilment(self, handler):
-        """When some MicroVMs are running and some terminated, report partial."""
+        """When some MicroVMs are running and some failed, report partial."""
         responses = [
             {
                 "microvmId": "microvm-1",
@@ -368,7 +368,7 @@ class TestMicroVMHandlerCheckStatusEdgeCases:
             },
             {
                 "microvmId": "microvm-2",
-                "state": "TERMINATED",
+                "state": "FAILED",
                 "imageArn": "arn:aws:lambda:us-east-1:123:microvm-image:test",
             },
         ]
@@ -384,6 +384,39 @@ class TestMicroVMHandlerCheckStatusEdgeCases:
         assert result.fulfilment.final is True
         assert result.fulfilment.running_count == 1
         assert result.fulfilment.failed_count == 1
+
+    @pytest.mark.parametrize("gone", ["TERMINATING", "TERMINATED"])
+    def test_target_met_then_teardown_stays_fulfilled(self, handler, gone):
+        """A MicroVM taken away on purpose is not a launch failure."""
+        base = {"imageArn": "arn:aws:lambda:us-east-1:123:microvm-image:test"}
+        handler.aws_client.microvm_client.get_microvm.side_effect = [
+            {**base, "microvmId": "microvm-1", "state": "RUNNING"},
+            {**base, "microvmId": "microvm-2", "state": gone},
+        ]
+        request = MagicMock()
+        request.resource_ids = ["microvm-1", "microvm-2"]
+        request.requested_count = 2
+
+        result = handler.check_hosts_status(request)
+
+        assert result.fulfilment.state == "fulfilled"
+        assert result.fulfilment.failed_count == 0
+
+    def test_all_gone_is_terminal(self, handler):
+        base = {"imageArn": "arn:aws:lambda:us-east-1:123:microvm-image:test"}
+        handler.aws_client.microvm_client.get_microvm.side_effect = [
+            {**base, "microvmId": "microvm-1", "state": "TERMINATED"},
+            {**base, "microvmId": "microvm-2", "state": "TERMINATING"},
+        ]
+        request = MagicMock()
+        request.resource_ids = ["microvm-1", "microvm-2"]
+        request.requested_count = 2
+
+        result = handler.check_hosts_status(request)
+
+        assert result.fulfilment.state == "failed"
+        assert result.fulfilment.final is True
+        assert result.fulfilment.failed_count == 0
 
     def test_check_status_all_starting_no_results(self, handler):
         """When all get_microvm calls fail, return in_progress with empty instances."""
