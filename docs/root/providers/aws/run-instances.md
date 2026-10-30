@@ -56,7 +56,7 @@ The handler uses `provider_api: "RunInstances"`. Every request creates (or reuse
 | Field | Required | Type | Description |
 |-------|----------|------|-------------|
 | `provider_api` | Yes | `string` | Must be `"RunInstances"` |
-| `image_id` | Yes | `string` | AMI id (`ami-*`) or an SSM parameter path (`/aws/service/...`). SSM paths are resolved at request time and need `ssm:GetParameters`. |
+| `image_id` | Yes | `string` | AMI id (`ami-*`) or an SSM parameter path (`/aws/service/...`). SSM paths are resolved at request time and need `ssm:GetParameter`. |
 | `machine_types` | No | `object` | Instance-type map. **Only the first key is used** — see [Single instance type](#single-instance-type). |
 | `subnet_ids` | No | `list[string]` | Target subnets. Only one subnet is used per request; see [Networking](#networking). |
 | `security_group_ids` | No | `list[string]` | Security groups to attach. |
@@ -191,7 +191,7 @@ Cancelling a request before instances are assigned looks up the reservation id, 
 }
 ```
 
-Launch template management (`ec2:CreateLaunchTemplate`, `ec2:CreateLaunchTemplateVersion`, `ec2:DescribeLaunchTemplates`, `ec2:DescribeLaunchTemplateVersions`, `ec2:DeleteLaunchTemplate`), tagging (`ec2:CreateTags`), and SSM AMI resolution (`ssm:GetParameters`) are shared across all AWS handlers. See the [IAM Permissions Guide](../../deployment/iam-permissions.md) for which of those are optional and how failures are handled.
+Launch template management (`ec2:CreateLaunchTemplate`, `ec2:CreateLaunchTemplateVersion`, `ec2:DescribeLaunchTemplates`, `ec2:DescribeLaunchTemplateVersions`, `ec2:DeleteLaunchTemplate`), tagging (`ec2:CreateTags`), and SSM AMI resolution (`ssm:GetParameter`) are shared across all AWS handlers. See the [IAM Permissions Guide](../../deployment/iam-permissions.md) for which of those are optional and how failures are handled.
 
 ## Limitations
 

@@ -13,6 +13,7 @@ Used when `provider_api` is `EC2Fleet`.
 ```
 ec2:CreateFleet
 ec2:DeleteFleets
+ec2:ModifyFleet
 ec2:DescribeFleets
 ec2:DescribeFleetInstances
 ec2:DescribeInstances
@@ -26,6 +27,7 @@ Used when `provider_api` is `SpotFleet`.
 ```
 ec2:RequestSpotFleet
 ec2:CancelSpotFleetRequests
+ec2:ModifySpotFleetRequest
 ec2:DescribeSpotFleetRequests
 ec2:DescribeSpotFleetInstances
 ec2:DescribeInstances
@@ -43,6 +45,7 @@ Used when `provider_api` is `ASG`.
 autoscaling:CreateAutoScalingGroup
 autoscaling:UpdateAutoScalingGroup
 autoscaling:DeleteAutoScalingGroup
+autoscaling:TerminateInstanceInAutoScalingGroup
 autoscaling:DescribeAutoScalingGroups
 autoscaling:DescribeAutoScalingInstances
 autoscaling:CreateOrUpdateTags
@@ -73,7 +76,7 @@ ec2:DescribeLaunchTemplateVersions
 ec2:DeleteLaunchTemplate
 ```
 
-`ec2:DeleteLaunchTemplate` is only exercised when cleanup is enabled (`cleanup.enabled: true` and `cleanup.delete_launch_template: true` in provider config). It can be omitted if you disable launch template cleanup.
+`ec2:DeleteLaunchTemplate` is only exercised when cleanup is enabled (`cleanup.enabled: true` and `cleanup.delete_launch_template: true` in provider config). It can be omitted if you disable launch template cleanup. Before deleting a template, cleanup also calls `ec2:DescribeInstances` to confirm no live instance still uses it; if that call fails the template is kept.
 
 ## Tagging (optional)
 
@@ -138,7 +141,7 @@ This makes `ec2:DescribeLaunchTemplates*` and `ec2:CreateLaunchTemplateVersion` 
 When a template's `image_id` is an SSM parameter path (e.g. `/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64`) rather than an `ami-*` id, ORB resolves it via SSM at request time:
 
 ```
-ssm:GetParameters
+ssm:GetParameter
 ```
 
 This is required when:
@@ -148,7 +151,7 @@ This is required when:
 
 It is **not** required when every template either pins a literal `ami-*` id, or pins a `launch_template_id` whose stored data already carries a resolved AMI.
 
-Without `ssm:GetParameters`, the AMI resolution step fails before any EC2 call, surfacing as an opaque resolution error rather than as a missing-IAM error. Either grant the permission or override `image_id` per template.
+Without `ssm:GetParameter`, the AMI resolution step fails before any EC2 call, surfacing as an opaque resolution error rather than as a missing-IAM error. Either grant the permission or override `image_id` per template.
 
 ## Failure behaviour
 
@@ -171,6 +174,7 @@ The policy below covers all four handler types with tagging and launch template 
       "Action": [
         "ec2:CreateFleet",
         "ec2:DeleteFleets",
+        "ec2:ModifyFleet",
         "ec2:DescribeFleets",
         "ec2:DescribeFleetInstances"
       ],
@@ -182,6 +186,7 @@ The policy below covers all four handler types with tagging and launch template 
       "Action": [
         "ec2:RequestSpotFleet",
         "ec2:CancelSpotFleetRequests",
+        "ec2:ModifySpotFleetRequest",
         "ec2:DescribeSpotFleetRequests",
         "ec2:DescribeSpotFleetInstances"
       ],
@@ -194,6 +199,7 @@ The policy below covers all four handler types with tagging and launch template 
         "autoscaling:CreateAutoScalingGroup",
         "autoscaling:UpdateAutoScalingGroup",
         "autoscaling:DeleteAutoScalingGroup",
+        "autoscaling:TerminateInstanceInAutoScalingGroup",
         "autoscaling:DescribeAutoScalingGroups",
         "autoscaling:DescribeAutoScalingInstances",
         "autoscaling:CreateOrUpdateTags",
@@ -250,15 +256,18 @@ The policy below covers all four handler types with tagging and launch template 
       "Sid": "SSMForAMIResolution",
       "Effect": "Allow",
       "Action": [
-        "ssm:GetParameters"
+        "ssm:GetParameter"
       ],
-      "Resource": "*"
+      "Resource": "arn:aws:ssm:*::parameter/aws/service/*"
     }
   ]
 }
 ```
 
-`SSMForAMIResolution` can be omitted if no template ever uses an SSM-style `image_id` (see [AMI resolution via SSM](#ami-resolution-via-ssm-conditional)).
+`SSMForAMIResolution` can be omitted if no template ever uses an SSM-style `image_id` (see [AMI resolution via SSM](#ami-resolution-via-ssm-conditional)). The resource scopes access to the AWS-published public parameters under `/aws/service/`.
+
+- **Partition:** the ARN uses the `aws` partition. In `aws-cn` and `aws-us-gov` use `arn:aws-cn:ssm:*::parameter/aws/service/*` or `arn:aws-us-gov:ssm:*::parameter/aws/service/*` (or `arn:${AWS::Partition}:...` in CloudFormation).
+- **Your own parameters:** ORB reads SSM parameters with decryption enabled. If a template's `image_id` points at a parameter in your own account, widen the resource to that parameter's ARN (`arn:aws:ssm:<region>:<account-id>:parameter/<path>`), and for a `SecureString` parameter also allow `kms:Decrypt` on its key.
 
 ### Minimal policy (EC2Fleet only, tagging optional)
 
@@ -274,6 +283,7 @@ If you only use EC2Fleet and are comfortable with the default `on_tag_failure: w
       "Action": [
         "ec2:CreateFleet",
         "ec2:DeleteFleets",
+        "ec2:ModifyFleet",
         "ec2:DescribeFleets",
         "ec2:DescribeFleetInstances",
         "ec2:DescribeInstances",
@@ -290,7 +300,7 @@ If you only use EC2Fleet and are comfortable with the default `on_tag_failure: w
 }
 ```
 
-Add `ssm:GetParameters` if any template uses an SSM-style `image_id` (including the default `image_id` shipped in `aws_defaults.json`).
+Add `ssm:GetParameter` if any template uses an SSM-style `image_id` (including the default `image_id` shipped in `aws_defaults.json`).
 
 ## IAM role for SpotFleet
 
