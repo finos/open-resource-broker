@@ -579,6 +579,44 @@ jobs:
         run: dotnet test sdk/csharp/tests/parity/ParityTests.csproj --no-build --configuration Release --verbosity normal
 
   # ---------------------------------------------------------------------------
+  # Non-blocking fuzz smoke run for the Go SSE parser.  Deliberately absent from
+  # sdk-ci-passed.needs: a finding here is triage input, not a merge gate.
+  # continue-on-error keeps the PR status green while the failing step is still
+  # visible in the run; the failing input is uploaded as a short-lived artifact.
+  # ---------------------------------------------------------------------------
+  fuzz-sse:
+    name: SDK Go SSE Fuzz (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [changes]
+    continue-on-error: true
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: sdk/go/go.mod
+
+      - name: Fuzz the SSE reader
+        working-directory: sdk/go
+        run: go test -run='^$' -fuzz=FuzzReader -fuzztime=30s ./internal/sse/
+
+      - name: Upload failing input
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
+        with:
+          name: fuzz-sse-crashers
+          path: sdk/go/internal/sse/testdata/fuzz/FuzzReader/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
   # Single stable required status check for branch protection.  Replaces
   # listing every matrix leg name (which drifts silently when the matrix
   # changes). Jobs skipped because change detection found nothing SDK-relevant
