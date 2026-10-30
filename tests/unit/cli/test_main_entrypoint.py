@@ -101,7 +101,7 @@ class TestMainCompletion:
     def test_prints_completion_script_and_returns(self, monkeypatch, capsys, shell):
         args = _base_args(completion=shell)
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         monkeypatch.setattr("orb.cli.completion.generate_bash_completion", lambda: "BASH_SCRIPT")
         monkeypatch.setattr("orb.cli.completion.generate_zsh_completion", lambda: "ZSH_SCRIPT")
         monkeypatch.setattr(sys, "argv", ["orb"])
@@ -114,7 +114,7 @@ class TestMainCompletion:
     def test_unknown_completion_shell_returns_without_printing(self, monkeypatch, capsys):
         args = _base_args(completion="fish")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         monkeypatch.setattr(sys, "argv", ["orb"])
 
         _run(cli_main.main())  # must return cleanly, no SystemExit
@@ -191,7 +191,7 @@ class TestMainEarlyHelpDisplay:
         args = _base_args(resource="machines", action=None, completion=None)
         fake_parser = MagicMock()
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {"machines": fake_parser}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
 
         with pytest.raises(SystemExit) as exc_info:
             _run(cli_main.main())
@@ -203,7 +203,7 @@ class TestMainEarlyHelpDisplay:
         must fall through to normal command processing instead of helping."""
         args = _base_args(resource="templates", action=None, completion=None)
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))  # no "templates" key
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         app_instance = MagicMock()
         app_instance.initialize = AsyncMock(return_value=True)
         monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
@@ -225,7 +225,7 @@ class TestMainSchedulerOverride:
             scheduler="hostfactory",
         )
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
 
         config = MagicMock()
         container = MagicMock()
@@ -245,7 +245,7 @@ class TestMainSchedulerOverride:
     def test_override_failure_is_logged_not_raised(self, monkeypatch):
         args = _base_args(resource="system", action="status", scheduler="hostfactory")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         monkeypatch.setattr(
             cli_main, "get_container", MagicMock(side_effect=RuntimeError("di boom"))
         )
@@ -260,7 +260,7 @@ class TestMainSchedulerOverride:
     def test_restore_failure_in_finally_is_logged_not_raised(self, monkeypatch):
         args = _base_args(resource="system", action="status", scheduler="hostfactory")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
 
         config = MagicMock()
         config.restore_scheduler_strategy.side_effect = RuntimeError("restore boom")
@@ -331,7 +331,7 @@ class TestMainMcpValidate:
     def test_mcp_validate_prints_formatted_output_and_exits(self, monkeypatch):
         args = _base_args(resource="mcp", action="validate", format="json")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
 
         response = MagicMock(data={"ok": True}, exit_code=0)
         monkeypatch.setattr(
@@ -356,7 +356,7 @@ class TestMainMcpValidate:
         data = {"items": [{"id": "abc"}]}
         args = _base_args(resource="mcp", action="validate", format="table")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
 
         response = MagicMock(data=data, exit_code=0)
         monkeypatch.setattr(
@@ -399,7 +399,7 @@ class TestMainTemplatesGenerateDispatch:
     def test_success_exits_zero(self, monkeypatch):
         args = _base_args(resource="templates", action="generate")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         monkeypatch.setattr(cli_main, "get_container", MagicMock)
         monkeypatch.setattr(
             "orb.interface.templates_generate_handler.handle_templates_generate",
@@ -413,7 +413,7 @@ class TestMainTemplatesGenerateDispatch:
     def test_failure_prints_error_and_exits_one(self, monkeypatch):
         args = _base_args(resource="templates", action="generate")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         monkeypatch.setattr(cli_main, "get_container", MagicMock)
         monkeypatch.setattr(
             "orb.interface.templates_generate_handler.handle_templates_generate",
@@ -427,7 +427,7 @@ class TestMainTemplatesGenerateDispatch:
     def test_exception_prints_traceback_and_exits_one(self, monkeypatch):
         args = _base_args(resource="templates", action="generate")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         monkeypatch.setattr(cli_main, "get_container", MagicMock)
         monkeypatch.setattr(
             "orb.interface.templates_generate_handler.handle_templates_generate",
@@ -442,7 +442,7 @@ class TestMainTemplatesGenerateDispatch:
         args = _base_args(resource="templates", action="generate")
         args._container = MagicMock()
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         get_container_mock = MagicMock()
         monkeypatch.setattr(cli_main, "get_container", get_container_mock)
         monkeypatch.setattr(
@@ -472,7 +472,7 @@ class TestMainLogLevelApplied:
         """The flag must take effect even on early-exit paths (before bootstrap)."""
         args = _base_args(log_level="debug")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         app_instance = MagicMock()
         app_instance.initialize = AsyncMock(return_value=True)
         monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
@@ -487,7 +487,7 @@ class TestMainLogLevelApplied:
         would reset the root logger level; --log-level must win regardless."""
         args = _base_args(log_level="debug")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
 
         async def _initialize_and_clobber_level(*_args, **_kwargs):
             # Simulate setup_logging() resetting the root logger to a
@@ -508,7 +508,7 @@ class TestMainLogLevelApplied:
         """Without --log-level, the level set by config/ORB_LOG_LEVEL is left alone."""
         args = _base_args(log_level=None)
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
 
         async def _initialize_with_config_level(*_args, **_kwargs):
             # setup_logging() applies the config/env-configured level.
@@ -528,7 +528,7 @@ class TestMainLogLevelApplied:
         """An explicit --log-level wins over the level applied during bootstrap."""
         args = _base_args(log_level="ERROR")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
 
         async def _initialize_with_config_level(*_args, **_kwargs):
             logging.getLogger().setLevel(logging.DEBUG)
@@ -561,7 +561,7 @@ class TestMainLogLevelApplied:
 class TestMainFullExecution:
     def _patch_common(self, monkeypatch, args, execute_command_result):
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         app_instance = MagicMock()
         app_instance.initialize = AsyncMock(return_value=True)
         monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
@@ -573,7 +573,7 @@ class TestMainFullExecution:
     def test_application_initialize_failure_exits_one(self, monkeypatch):
         args = _base_args()
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         app_instance = MagicMock()
         app_instance.initialize = AsyncMock(return_value=False)
         monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
@@ -587,7 +587,7 @@ class TestMainFullExecution:
     ):
         args = _base_args(verbose=True)
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         app_instance = MagicMock()
         app_instance.initialize = AsyncMock(return_value=False)
         monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
@@ -645,7 +645,7 @@ class TestMainFullExecution:
         args = _base_args(dry_run=True)
         execute_command_mock = AsyncMock(return_value=("dry-output", 0))
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         app_instance = MagicMock()
         app_instance.initialize = AsyncMock(return_value=True)
         monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
@@ -674,7 +674,7 @@ class TestMainFullExecution:
 class TestMainExecuteCommandErrorHandling:
     def _patch_bootstrap(self, monkeypatch, args, execute_command_side_effect):
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         app_instance = MagicMock()
         app_instance.initialize = AsyncMock(return_value=True)
         monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
@@ -759,7 +759,7 @@ class TestMainTopLevelHandlers:
         flush_mock = MagicMock()
         monkeypatch.setattr(cli_main, "_flush_telemetry", flush_mock)
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
-        monkeypatch.setattr("orb.run.setup_environment", MagicMock())
+        monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         app_instance = MagicMock()
         app_instance.initialize = AsyncMock(return_value=True)
         monkeypatch.setattr("orb.bootstrap.Application", MagicMock(return_value=app_instance))
