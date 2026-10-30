@@ -6,10 +6,10 @@ Covers:
 - assert_never exhaustiveness compiles (no missed union branches)
 """
 
-from typing import assert_never
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from typing_extensions import assert_never
 
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,

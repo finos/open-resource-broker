@@ -78,6 +78,30 @@ updates:
           - "minor"
           - "patch"
 
+  # Hash-locked CI tool requirements (semgrep, actionlint-py, pip-licenses).
+  # Regenerate manually with dev-tools/ci/update_tool_locks.sh if an update
+  # does not refresh the hashes.
+  - package-ecosystem: "pip"
+    directory: "/.github/requirements"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "06:00"
+      timezone: "America/New_York"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
+    groups:
+      ci-tools:
+        patterns:
+          - "*"
+
   # Go dependencies (SDK)
   - package-ecosystem: "gomod"
     directory: "/"

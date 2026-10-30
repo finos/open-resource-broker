@@ -71,11 +71,14 @@ class GCPMutationService:
         if isinstance(warning, str) and warning:
             response_data["warning"] = warning
 
+        failed_ids = [failure.target_id for failure in failed_operations]
         result_metadata: dict[str, object] = {
             "operation": operation_name,
             "provider_data": {
                 "attempted_ids": attempted_ids,
                 "successful_ids": successful_ids,
+                "successful_instance_ids": successful_ids,
+                "failed_instance_ids": failed_ids,
                 "operations": outcome.operations,
                 "failed_operations": [failure.__dict__ for failure in failed_operations],
                 **({"warning": warning} if warning else {}),
@@ -84,4 +87,17 @@ class GCPMutationService:
         }
         if metadata:
             result_metadata.update(metadata)
+        # Only terminate is reported as failed on partial failure: callers act on
+        # result.success to terminalise machines, so a failed delete must not
+        # read as success. Start/stop keep their partial-success contract.
+        if failed_operations and operation_name == "terminate_instances":
+            return ProviderResult(
+                success=False,
+                data=response_data,
+                error_message=(
+                    f"{len(failed_ids)} of {len(attempted_ids)} GCP instance terminations failed"
+                ),
+                error_code="GCP_TERMINATE_FAILED",
+                metadata=result_metadata,
+            )
         return ProviderResult.success_result(response_data, result_metadata)

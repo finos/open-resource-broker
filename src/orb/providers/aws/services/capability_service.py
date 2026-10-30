@@ -89,13 +89,11 @@ class AWSCapabilityService:
 
     def parse_provider_name(self, provider_name: str) -> dict[str, str]:
         """Parse AWS provider name back to components."""
-        parts = provider_name.split("_")
-        if len(parts) >= 3 and parts[0] == "aws":
-            return {
-                "type": "aws",
-                "profile": parts[1],
-                "region": "_".join(parts[2:]),  # Handle regions with underscores
-            }
+        # The region never contains an underscore, the profile may, so split from the right.
+        if provider_name.startswith("aws_"):
+            profile, separator, region = provider_name.removeprefix("aws_").rpartition("_")
+            if separator and profile and region:
+                return {"type": "aws", "profile": profile, "region": region}
         return {"type": "aws", "profile": "instance-profile", "region": "us-east-1"}
 
     def get_provider_name_pattern(self) -> str:

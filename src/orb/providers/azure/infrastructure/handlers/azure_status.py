@@ -19,7 +19,7 @@ AZURE_VM_STATE_MAP: dict[str, str] = {
     "PowerState/running": "running",
     "PowerState/stopping": "stopping",
     "PowerState/stopped": "stopped",
-    "PowerState/deallocating": "shutting-down",
+    "PowerState/deallocating": "stopping",
     "PowerState/deallocated": "stopped",
     # Provisioning states (fallback when no PowerState is present)
     "ProvisioningState/creating": "pending",

@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """OCI provider strategy - base implementation for registry integration."""
+
+from __future__ import annotations
 
 import json
 import re
@@ -100,13 +100,24 @@ class OCIProviderStrategy(ProviderStrategy):
             )
             if not isinstance(template_data, dict):
                 template_data = {}
-            missing = OCITemplateMapper.validate_required_fields(template_data)
+            try:
+                missing = OCITemplateMapper.validate_required_fields(template_data)
+                pricing_estimate = OCIPricingService.estimate_hourly_cost(template_data)
+            except ValueError as exc:
+                return ProviderResult.success_result(
+                    {
+                        "valid": False,
+                        "message": "OCI template validation complete",
+                        "errors": [str(exc)],
+                    },
+                    {"provider": "oci", "operation": "validate_template"},
+                )
             return ProviderResult.success_result(
                 {
                     "valid": len(missing) == 0,
                     "message": "OCI template validation complete",
                     "errors": missing,
-                    "pricing_estimate": OCIPricingService.estimate_hourly_cost(template_data),
+                    "pricing_estimate": pricing_estimate,
                 },
                 {"provider": "oci", "operation": "validate_template"},
             )
@@ -163,17 +174,15 @@ class OCIProviderStrategy(ProviderStrategy):
     def generate_provider_name(cls, config: dict[str, Any]) -> str:
         profile = config.get("profile") or "instance-profile"
         region = config.get("region", "us-phoenix-1")
-        sanitized_profile = re.sub(r"[^a-zA-Z0-9\\-_]", "-", profile)
+        sanitized_profile = re.sub(r"[^a-zA-Z0-9_-]", "-", profile)
         return f"oci_{sanitized_profile}_{region}"
 
     def parse_provider_name(self, provider_name: str) -> dict[str, str]:
-        parts = provider_name.split("_")
-        if len(parts) >= 3 and parts[0] == "oci":
-            return {
-                "type": "oci",
-                "profile": parts[1],
-                "region": "_".join(parts[2:]),
-            }
+        # The region never contains an underscore, the profile may, so split from the right.
+        if provider_name.startswith("oci_"):
+            profile, separator, region = provider_name.removeprefix("oci_").rpartition("_")
+            if separator and profile and region:
+                return {"type": "oci", "profile": profile, "region": region}
         return {"type": "oci", "profile": "instance-profile", "region": "us-phoenix-1"}
 
     def get_provider_name_pattern(self) -> str:

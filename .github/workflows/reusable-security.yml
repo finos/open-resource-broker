@@ -77,7 +77,7 @@ jobs:
       # Semgrep Static Analysis
       - name: Install Semgrep
         if: inputs.scan-type == 'semgrep' && inputs.enabled
-        run: pip install semgrep==1.127.0
+        run: pip install --require-hashes --no-deps -r .github/requirements/semgrep.txt
 
       # || true on the semgrep command below is INTENTIONAL: semgrep is advisory-only
       # for now.  --error requests a non-zero exit on findings, but || true absorbs it
@@ -104,12 +104,11 @@ jobs:
           sarif_file: semgrep.sarif
 
       # Trivy Filesystem Scan
-      # Trivy is configured to emit SARIF only (no severity-threshold / exit-code
-      # inputs set), so it never fails the step regardless of findings.  This is
-      # INTENTIONAL: results are surfaced in the GitHub Security tab via the
-      # upload-sarif step below, but do not block CI.
-      # TODO: add severity: CRITICAL (or HIGH,CRITICAL) once the finding backlog
-      # has been triaged and Trivy is ready to act as a hard gate.
+      # Trivy emits SARIF limited to CRITICAL and HIGH findings (severity plus
+      # limit-severities-for-sarif) and sets no exit-code input, so it never fails
+      # the step regardless of findings.  This is INTENTIONAL: results are surfaced
+      # in the GitHub Security tab via the upload-sarif step below, but do not block
+      # CI.  Making Trivy a hard gate would need an explicit exit-code input.
       - name: Run Trivy filesystem vulnerability scanner
         if: inputs.scan-type == 'trivy-fs' && inputs.enabled
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
@@ -118,6 +117,8 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-fs-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          limit-severities-for-sarif: true
           trivyignores: .trivyignore.yaml
 
       - name: Upload Trivy filesystem scan results

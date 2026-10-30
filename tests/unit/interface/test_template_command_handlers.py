@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 from unittest.mock import AsyncMock, MagicMock, patch
+
+_DRY_RUN_MODULE = importlib.import_module("orb.infrastructure.mocking.dry_run_context")
 
 
 def _make_args(**kwargs) -> argparse.Namespace:
@@ -70,8 +73,9 @@ class TestHandleCreateTemplateValidateOnly:
         )
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+        with patch.object(
+            _DRY_RUN_MODULE,
+            "is_dry_run_active",
             return_value=False,
         ):
             result = asyncio.run(handle_create_template(args))
@@ -104,8 +108,9 @@ class TestHandleCreateTemplateValidateOnly:
         )
         args._container = container
 
-        with patch(
-            "orb.infrastructure.mocking.dry_run_context.is_dry_run_active",
+        with patch.object(
+            _DRY_RUN_MODULE,
+            "is_dry_run_active",
             return_value=False,
         ):
             result = asyncio.run(handle_create_template(args))

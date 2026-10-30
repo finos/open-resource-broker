@@ -321,6 +321,31 @@ class K8sHandlerRegistry:
                 release_result if isinstance(release_result, dict) else {}
             )
             deleted = release_info.get("deleted", list(machine_ids))
+            failed_names = [
+                str(entry[0] if isinstance(entry, (tuple, list)) else entry)
+                for entry in (release_info.get("failed_deletes") or [])
+            ]
+            if failed_names:
+                # Some deletes failed. Report the per-ID split under
+                # ``provider_data`` so the deprovisioning orchestrator can mark
+                # only the deleted pods as terminated and retry the rest.
+                self._logger.warning(
+                    "Kubernetes return partially failed: request_id=%s deleted=%d failed=%s",
+                    request.request_id,
+                    len(deleted),
+                    failed_names,
+                )
+                return Failed(
+                    error=f"{len(failed_names)} of {len(machine_ids)} pod deletions failed",
+                    recoverable=True,
+                    metadata={
+                        "provider_api": provider_api,
+                        "provider_data": {
+                            "successful_instance_ids": list(deleted),
+                            "failed_instance_ids": failed_names,
+                        },
+                    },
+                )
             self._logger.info(
                 "Kubernetes return accepted: request_id=%s machine_ids=%s",
                 request.request_id,

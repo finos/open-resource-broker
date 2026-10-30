@@ -111,10 +111,10 @@ def create_aws_strategy(provider_config: Any) -> Any:
                 provider_name, provider_cfg
             ):
                 health_check = get_container().get(HealthCheckPort)
-                _storage_strategy = "json"
-                if config_port is not None:
-                    with suppress(Exception):
-                        _storage_strategy = config_port.get_storage_strategy()
+                try:
+                    _storage_strategy = config_port.get_storage_strategy()
+                except Exception:
+                    _storage_strategy = "json"
                 # When AWS is the sole enabled provider its connectivity gates
                 # readiness (kind="core"); with multiple providers it does not.
                 register_aws_health_checks(

@@ -579,7 +579,8 @@ wheels = [
 
 [package.optional-dependencies]
 filecache = [
-    { name = "filelock" },
+    { name = "filelock", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "filelock", version = "4.2.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [[package]]
@@ -1222,11 +1223,33 @@ wheels = [
 
 [[package]]
 name = "filelock"
-version = "3.32.2"
+version = "4.1.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f6/57/3ba6e6cb097f85b855b00163d169f35365f44277df044dcf96d55b8f62a3/filelock-3.32.2.tar.gz", hash = "sha256:c33351e1f49cae33414acbc6d56784e6ecee82514ec90795da1161fc4836b5b8", size = 217172, upload-time = "2026-07-29T22:46:04.895Z" }
+resolution-markers = [
+    "python_full_version < '3.11' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and sys_platform != 'win32'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4c/58/6fd434bec86eff7c38a3168454cb132b762b2bea9b3ac094101a2f7bc32a/filelock-4.1.0.tar.gz", hash = "sha256:ad7f724afef953e731b1cc39bcd3a09166d72ed7fcdf29e6e88b1c3235c6715d", size = 561277, upload-time = "2026-10-09T19:57:20.34Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/e8/72f8cef9fdfeffe06213fe8508039396ee48daa0e3259457ed766173bfd6/filelock-3.32.2-py3-none-any.whl", hash = "sha256:87dd94cf281e586d135fa51132b8e3d9a598b316e90377a288663c9321036c82", size = 98830, upload-time = "2026-07-29T22:46:03.52Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/86/032133892a5de43b5a98200b01aadcad68cc255e274a762f08b8a76d2912/filelock-4.1.0-py3-none-any.whl", hash = "sha256:2ce9818e3e2d8f284c1a964414447ef148d42a5fd5e2a477a7118e574b293ec1", size = 133003, upload-time = "2026-10-09T19:57:18.716Z" },
+]
+
+[[package]]
+name = "filelock"
+version = "4.2.4"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'win32'",
+    "python_full_version == '3.13.*' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
+    "python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform == 'win32'",
+    "(python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform != 'emscripten' and sys_platform != 'win32') or (python_full_version == '3.11.*' and sys_platform == 'emscripten')",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d8/28/3893324bcadf8f89b1616637468d766af3f625008c0735bf704fdfa86617/filelock-4.2.4.tar.gz", hash = "sha256:c6d8663535e1650ee430507b4ffbac7b464dd64b7647ea0112a9f406499d163d", size = 652444, upload-time = "2026-10-19T01:57:51.001Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e0/1b/5e74289a1878e666bb4b65fe5805a04cafcac2aa5f519ef1ead67ef91c56/filelock-4.2.4-py3-none-any.whl", hash = "sha256:301241438c57936ef93f4243a94f2559022268bfcf9b375a9a72eb0f8db8358e", size = 162475, upload-time = "2026-10-19T01:57:49.419Z" },
 ]
 
 [[package]]
@@ -3585,7 +3608,6 @@ dependencies = [
     { name = "boto3" },
     { name = "botocore" },
     { name = "cryptography" },
-    { name = "filelock" },
     { name = "jsonschema" },
     { name = "psutil" },
     { name = "pydantic" },
@@ -3686,6 +3708,8 @@ dev = [
     { name = "coverage" },
     { name = "cyclonedx-bom" },
     { name = "fastapi" },
+    { name = "filelock", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "filelock", version = "4.2.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "git-changelog" },
     { name = "gitpython" },
     { name = "google-api-core" },
@@ -3844,6 +3868,8 @@ test-gcp = [
     { name = "google-cloud-compute" },
 ]
 test-k8s = [
+    { name = "filelock", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "filelock", version = "4.2.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "kmock" },
     { name = "kubernetes" },
 ]
@@ -3866,6 +3892,8 @@ ci = [
     { name = "coverage" },
     { name = "cyclonedx-bom" },
     { name = "fastapi" },
+    { name = "filelock", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "filelock", version = "4.2.4", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "gitpython" },
     { name = "httpx" },
     { name = "httpx2" },
@@ -3929,6 +3957,8 @@ dev = [
     { name = "coverage" },
     { name = "cyclonedx-bom" },
     { name = "fastapi" },
+    { name = "filelock", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
+    { name = "filelock", version = "4.2.4", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra != 'extra-6-orb-py-ui') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-ci') or (extra == 'extra-6-orb-py-ui' and extra == 'group-6-orb-py-dev')" },
     { name = "git-changelog" },
     { name = "gitpython" },
     { name = "httpx" },
@@ -4021,6 +4051,8 @@ test = [
     { name = "alembic" },
     { name = "coverage" },
     { name = "fastapi" },
+    { name = "filelock", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "filelock", version = "4.2.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "gitpython" },
     { name = "httpx" },
     { name = "httpx2" },
@@ -4092,7 +4124,8 @@ requires-dist = [
     { name = "cyclonedx-bom", marker = "extra == 'dev'", specifier = ">=4.0.0,<8.0.0" },
     { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.128.0" },
     { name = "fastapi", marker = "extra == 'k8s-legacy'", specifier = ">=0.128.0" },
-    { name = "filelock", specifier = ">=3.20.1" },
+    { name = "filelock", marker = "extra == 'dev'", specifier = ">=4.1.0" },
+    { name = "filelock", marker = "extra == 'test-k8s'", specifier = ">=4.1.0" },
     { name = "git-changelog", marker = "extra == 'dev'", specifier = ">=2.6.0,<3.0.0" },
     { name = "gitpython", marker = "extra == 'dev'", specifier = ">=3.1.62" },
     { name = "google-api-core", marker = "extra == 'gcp'", specifier = ">=2.17.0" },
@@ -4222,6 +4255,7 @@ ci = [
     { name = "coverage", specifier = ">=7.3.2,<8.0.0" },
     { name = "cyclonedx-bom", specifier = ">=4.0.0,<8.0.0" },
     { name = "fastapi", specifier = ">=0.128.0" },
+    { name = "filelock", specifier = ">=4.1.0" },
     { name = "gitpython", specifier = ">=3.1.62" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "httpx2", specifier = ">=2.13,<3" },
@@ -4285,6 +4319,7 @@ dev = [
     { name = "coverage", specifier = ">=7.3.2,<8.0.0" },
     { name = "cyclonedx-bom", specifier = ">=4.0.0,<8.0.0" },
     { name = "fastapi", specifier = ">=0.128.0" },
+    { name = "filelock", specifier = ">=4.1.0" },
     { name = "git-changelog", specifier = ">=2.6.0,<3.0.0" },
     { name = "gitpython", specifier = ">=3.1.62" },
     { name = "httpx", specifier = ">=0.27.0" },
@@ -4377,6 +4412,7 @@ test = [
     { name = "alembic", specifier = ">=1.13" },
     { name = "coverage", specifier = ">=7.3.2,<8.0.0" },
     { name = "fastapi", specifier = ">=0.128.0" },
+    { name = "filelock", specifier = ">=4.1.0" },
     { name = "gitpython", specifier = ">=3.1.62" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "httpx2", specifier = ">=2.13,<3" },
@@ -5336,7 +5372,8 @@ name = "python-discovery"
 version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "filelock" },
+    { name = "filelock", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "filelock", version = "4.2.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0c/57/250bd238b966cece44328235eb85290045d059265fdaf7527a3a958123db/python_discovery-1.6.1.tar.gz", hash = "sha256:cf87d3627dfb4412437fdd5b13eae402607722998d21567993aedbc59b23c15e", size = 84338, upload-time = "2026-09-18T01:31:53.971Z" }
 wheels = [
@@ -6755,7 +6792,8 @@ version = "21.14.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "distlib" },
-    { name = "filelock" },
+    { name = "filelock", version = "4.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "filelock", version = "4.2.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "packaging" },
     { name = "platformdirs" },
     { name = "python-discovery" },

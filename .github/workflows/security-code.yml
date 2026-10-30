@@ -20,6 +20,7 @@ on:
       - 'dev-tools/ci/ci_security_dispatcher.py'
       - '.trivyignore.yaml'
       - '.github/workflows/**'
+      - '.github/requirements/**'
       - '.github/codeql/**'
       - '.github/actions/**'
       - '.project.yml'
@@ -103,6 +104,7 @@ jobs:
             - 'dev-tools/ci/ci_security_dispatcher.py'
             - '.trivyignore.yaml'
             - '.github/workflows/**'
+            - '.github/requirements/**'
             - '.github/codeql/**'
             - '.github/actions/**'
             - '.project.yml'
@@ -245,6 +247,7 @@ jobs:
         #   semgrep               LGPL-2.0-only AND LGPL-2.1 -> LGPL-2.1 (PyPI classifier: LGPLv2; CLI-only scanner, not imported or linked into orb-py; LGPL permits this use)
         #   bowser (npm)          MIT AND MITNFA -> MIT-family permissive (TypeScript SDK transitive; MITNFA = MIT No False Attribution)
         #   pillow                MIT-CMU -> MIT variant (METADATA: License-Expression: MIT-CMU; permissive. Used only by the standalone dev-tools/analysis/visualise script, not part of the orb-py runtime install)
+        #   typing-extensions     Python-2.0 AND GPL-1.0-or-later AND ... AND 0BSD -> PSF-2.0 (METADATA: License-Expression: PSF-2.0; the reported expression is assembled from the licence texts bundled in the package files)
         #
         # Dev/CI-only tooling with a FINOS Category X license, or a license not
         # recognised by name above, that would otherwise fail when bumped. None
@@ -255,15 +258,20 @@ jobs:
         #   python-gitlab   LGPL-3.0-or-later -> transitive via python-semantic-release (release tooling)
         #   regex           Apache-2.0 AND CNRI-Python -> transitive via nltk / cfn-lint (lint and test tooling)
         #   grimp           BSD-2-Clause AND BSD-2-Clause-Views AND BSD-3-Clause -> transitive via import-linter (architecture-check tooling; METADATA: License: BSD 2-Clause License; the extra identifiers come from bundled Rust crates and are all permissive)
-        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/semgrep, pkg:npm/bowser, pkg:pypi/chardet, pkg:pypi/python-gitlab, pkg:pypi/regex, pkg:pypi/pillow, pkg:pypi/grimp'
+        allow-dependencies-licenses: 'pkg:pypi/werkzeug, pkg:githubactions/trufflesecurity/trufflehog, pkg:pypi/rfc3987-syntax, pkg:pypi/wcwidth, pkg:pypi/lxml, pkg:pypi/protobuf, pkg:pypi/cyclonedx-python-lib, pkg:pypi/fastapi, pkg:pypi/aiohappyeyeballs, pkg:pypi/aiohttp, pkg:pypi/docutils, pkg:pypi/scramp, pkg:pypi/semgrep, pkg:npm/bowser, pkg:pypi/chardet, pkg:pypi/python-gitlab, pkg:pypi/regex, pkg:pypi/pillow, pkg:pypi/grimp, pkg:pypi/typing-extensions'
         # Filelock advisories with no fix for Python 3.10: every fixed release
-        # requires Python >= 3.11, while orb-py still supports 3.10. ORB does not
-        # use the affected ReadWriteLock / SoftFileLock APIs. Same exception as
-        # the filelock entries in .trivyignore.yaml; review by 2027-01-01 or when
-        # Python 3.10 support ends.
+        # requires Python >= 3.11, while orb-py still supports 3.10. filelock is
+        # not a runtime dependency; it is present only in dev and test tooling
+        # on Python 3.10, where it resolves to the affected 4.1.0. Same
+        # exception as the filelock entries in .trivyignore.yaml. Review by
+        # 2027-01-27 or when Python 3.10 support ends.
         allow-ghsas: >-
           GHSA-v4x8-3wr5-3wq8, GHSA-jqc4-5cvw-7w85, GHSA-crv4-6mhj-j5jh,
-          GHSA-2g95-wg33-c5x2, GHSA-567q-5qvw-pf92, GHSA-9vhv-jxww-xfm5
+          GHSA-2g95-wg33-c5x2, GHSA-567q-5qvw-pf92, GHSA-9vhv-jxww-xfm5,
+          GHSA-6627-m3xw-93mp, GHSA-69hj-f68j-2879, GHSA-8mx5-7m5m-r77g,
+          GHSA-9c4x-gm8v-wgc4, GHSA-cwqr-hh33-gh44, GHSA-fj95-fr6c-h845,
+          GHSA-fq56-3cx3-fjxp, GHSA-m462-7rxw-wvpg, GHSA-rfpc-qcw5-3pc4,
+          GHSA-9j6q-wvj5-jgjg, GHSA-wfhq-q4j2-c37m
 
     # Dependabot PRs that add a vulnerable version.
     #
@@ -392,7 +400,7 @@ jobs:
     - name: Check Python runtime dependency licenses
       run: |
         set -o pipefail
-        uv pip install pip-licenses==5.5.5
+        uv pip install --no-config --require-hashes --no-deps -r .github/requirements/pip-licenses.txt
         uv run --no-sync pip-licenses --from=mixed --format=json \
           | python3 dev-tools/ci/check_runtime_licenses.py --ignore-package orb-py
 

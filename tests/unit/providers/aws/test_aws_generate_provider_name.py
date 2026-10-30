@@ -42,3 +42,18 @@ class TestAWSGenerateProviderNamePreservesCurrentShape:
         svc = _make_capability_service()
         name = svc.generate_provider_name({"profile": "default"})
         assert name.endswith("_us-east-1")
+
+
+class TestAWSProviderNameRoundTrip:
+    """parse_provider_name must invert generate_provider_name, including underscores."""
+
+    def test_round_trip_with_underscore_profile(self) -> None:
+        svc = _make_capability_service()
+        for profile in ("default", "my_profile", "a_b_c", "with-dash"):
+            name = svc.generate_provider_name({"profile": profile, "region": "us-east-1"})
+            parsed = svc.parse_provider_name(name)
+            assert parsed == {"type": "aws", "profile": profile, "region": "us-east-1"}
+
+    def test_unparseable_name_falls_back_to_defaults(self) -> None:
+        svc = _make_capability_service()
+        assert svc.parse_provider_name("aws_noregion")["profile"] == "instance-profile"

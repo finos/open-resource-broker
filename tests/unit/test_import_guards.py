@@ -13,6 +13,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("preserve_orb_module_identity")
+
 
 class TestImportGuards:
     """Test that import guards work correctly for optional dependencies."""

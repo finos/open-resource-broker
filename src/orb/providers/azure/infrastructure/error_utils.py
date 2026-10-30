@@ -132,6 +132,31 @@ def canonical_azure_error_code(exc: Exception) -> str:
     return type(exc).__name__
 
 
+_NOT_FOUND_CODES = frozenset({"ResourceNotFound", "NotFound", "ParentResourceNotFound"})
+_NOT_FOUND_TYPE_NAMES = frozenset({"ResourceNotFoundError", "VMSSNotFoundError"})
+
+
+def is_azure_not_found(exc: BaseException) -> bool:
+    """Return True only when ``exc`` (or its cause) is a genuine Azure 404.
+
+    Matches an HTTP 404 status, a ``ResourceNotFound``-style error code, or the
+    SDK / provider not-found exception types. Throttling, timeouts, auth and
+    server errors never match, so callers can treat the resource as gone only
+    when Azure said so.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if _NOT_FOUND_TYPE_NAMES.intersection(cls.__name__ for cls in type(current).__mro__):
+            return True
+        details = extract_azure_error_details(current)  # type: ignore[arg-type]
+        if details["status_code"] == 404 or details["raw_error_code"] in _NOT_FOUND_CODES:
+            return True
+        current = current.__cause__
+    return False
+
+
 _QUOTA_CODES = frozenset({"QuotaExceeded", "OperationNotAllowed", "ResourceQuotaExceeded"})
 _VALIDATION_CODES = frozenset({"InvalidRequest", "InvalidParameter", "BadRequest"})
 

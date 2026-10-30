@@ -7,9 +7,12 @@ and the create_application()/main() entry points.
 from __future__ import annotations
 
 import asyncio
+import importlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+_DRY_RUN_MODULE = importlib.import_module("orb.infrastructure.mocking.dry_run_context")
 
 
 def _run(coro):
@@ -189,8 +192,9 @@ class TestInitializeFullSuccess:
         with (
             patch("orb.bootstrap.setup_logging"),
             patch("orb.domain.base.decorators.set_domain_container"),
-            patch(
-                "orb.infrastructure.mocking.dry_run_context.dry_run_context",
+            patch.object(
+                _DRY_RUN_MODULE,
+                "dry_run_context",
                 return_value=fake_ctx,
             ) as mock_dry_run,
         ):

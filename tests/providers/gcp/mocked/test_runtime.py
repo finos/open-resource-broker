@@ -940,6 +940,32 @@ async def test_mig_operation_polling_stops_when_cancelled() -> None:
     assert operation.poll_count == poll_count_after_cancellation
 
 
+@pytest.mark.asyncio
+async def test_mig_operation_wait_times_out_while_the_operation_stays_pending() -> None:
+    class _NeverDone:
+        name = "never-done"
+
+        def done(self) -> bool:
+            return False
+
+        def result(self, timeout: float | None = None) -> object:
+            raise AssertionError("result should not be called")
+
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    with pytest.raises(FutureTimeoutError):
+        # The outer limit only stops a broken wait from hanging the suite; on
+        # Python 3.11+ it raises the same error type, so elapsed time tells them apart.
+        await asyncio.wait_for(
+            GCPManagedInstanceGroupHandler._wait_for_operation(
+                _NeverDone(),
+                timeout_seconds=0.05,
+            ),
+            timeout=3,
+        )
+    assert loop.time() - started < 2
+
+
 def test_provisioning_service_projects_failed_operations_into_fleet_errors() -> None:
     template = GCPTemplate.model_validate(
         {

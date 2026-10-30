@@ -135,6 +135,14 @@ def _register_template_services(container: DIContainer):
                     _name,
                     exc,
                 )
+            except Exception as exc:
+                logger_port.warning(
+                    "Provider %s template factory registration failed; "
+                    "its templates will not be available: %s",
+                    _name,
+                    exc,
+                    exc_info=True,
+                )
         return factory
 
     from orb.domain.template.factory import TemplateFactory, TemplateFactoryPort

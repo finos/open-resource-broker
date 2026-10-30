@@ -506,6 +506,65 @@ class TestFilterMachines:
 
 
 # ---------------------------------------------------------------------------
+# CreateReturnRequestHandler — _clear_return_request_id
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestClearReturnRequestId:
+    def _setup(self, owners: dict[str, str | None]):
+        machines: dict[str, MagicMock] = {}
+        cleared: dict[str, MagicMock] = {}
+        for mid, owner in owners.items():
+            machine = MagicMock()
+            machine.return_request_id = owner
+            cleared[mid] = MagicMock(name=f"cleared-{mid}")
+            machine.model_copy.return_value = cleared[mid]
+            machines[mid] = machine
+
+        uow = MagicMock()
+        uow.machines.get_by_id.side_effect = machines.get
+
+        @contextmanager
+        def _create():
+            yield uow
+
+        factory = MagicMock()
+        factory.create_unit_of_work.side_effect = _create
+        return _make_return_handler(uow_factory=factory), uow, machines, cleared
+
+    def test_only_machines_owned_by_this_request_or_unowned_are_cleared(self):
+        handler, uow, machines, cleared = self._setup(
+            {"i-own": "ret-this", "i-other": "ret-other", "i-free": None}
+        )
+
+        handler._clear_return_request_id(["i-own", "i-other", "i-free"], "ret-this")
+
+        machines["i-own"].model_copy.assert_called_once_with(update={"return_request_id": None})
+        machines["i-free"].model_copy.assert_called_once_with(update={"return_request_id": None})
+        machines["i-other"].model_copy.assert_not_called()
+        saved = [c.args[0] for c in uow.machines.save.call_args_list]
+        assert saved == [cleared["i-own"], cleared["i-free"]]
+
+    def test_without_request_id_clears_every_machine(self):
+        handler, uow, _machines, cleared = self._setup(
+            {"i-own": "ret-this", "i-other": "ret-other"}
+        )
+
+        handler._clear_return_request_id(["i-own", "i-other"])
+
+        saved = [c.args[0] for c in uow.machines.save.call_args_list]
+        assert saved == [cleared["i-own"], cleared["i-other"]]
+
+    def test_missing_machine_is_ignored(self):
+        handler, uow, _machines, _cleared = self._setup({})
+
+        handler._clear_return_request_id(["i-gone"], "ret-this")
+
+        uow.machines.save.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # CreateReturnRequestHandler — execute_command: all-invalid machines
 # ---------------------------------------------------------------------------
 
@@ -699,7 +758,7 @@ class TestExecuteDeprovisioningForRequest:
         with patch.object(handler, "_update_request_to_failed", new=AsyncMock()) as mock_failed:
             await handler._execute_deprovisioning_for_request([_MACHINE_ID], request, "aws")
 
-        mock_failed.assert_awaited_once()
+        mock_failed.assert_awaited_once_with(request, [_MACHINE_ID])
 
     @pytest.mark.asyncio
     async def test_orchestrator_exception_marks_failed(self):
@@ -713,7 +772,7 @@ class TestExecuteDeprovisioningForRequest:
         with patch.object(handler, "_update_request_to_failed", new=AsyncMock()) as mock_failed:
             await handler._execute_deprovisioning_for_request([_MACHINE_ID], request, "aws")
 
-        mock_failed.assert_awaited_once()
+        mock_failed.assert_awaited_once_with(request, [_MACHINE_ID])
 
     @pytest.mark.asyncio
     async def test_partial_termination_marks_only_succeeded_pending_and_clears_failed_return_request_id(
@@ -893,6 +952,220 @@ class TestExecuteDeprovisioningForRequest:
         assert skipped == []
 
 
+_IAM_ERROR = (
+    "AccessDenied: User arn:aws:iam::123456789012:user/deployer is not authorized "
+    "to perform: ec2:TerminateInstances on resource arn:aws:ec2:eu-west-1:123456789012:instance/i-1"
+)
+
+
+def _status_commands(command_bus: AsyncMock, status: RequestStatus) -> list[Any]:
+    return [
+        c.args[0]
+        for c in command_bus.execute.await_args_list
+        if getattr(c.args[0], "status", None) == status
+    ]
+
+
+def _logged_errors(handler: CreateReturnRequestHandler) -> str:
+    return str(handler.logger.error.call_args_list)  # type: ignore[attr-defined]
+
+
+@pytest.mark.unit
+class TestFailedReturnRequestMessage:
+    @pytest.mark.asyncio
+    async def test_failure_result_message_has_count_and_ids_but_no_provider_text(self):
+        command_bus = AsyncMock()
+        handler = TestExecuteDeprovisioningForRequest()._handler(
+            group_by_resource=([MagicMock()], []),
+            deprovision_result={
+                "success": False,
+                "errors": [_IAM_ERROR],
+                "failed_instance_ids": ["i-1", "i-2"],
+            },
+            command_bus=command_bus,
+        )
+        request = MagicMock()
+        request.request_id = "ret-1"
+
+        await handler._execute_deprovisioning_for_request(["i-1", "i-2"], request, "aws")
+
+        (cmd,) = _status_commands(command_bus, RequestStatus.FAILED)
+        assert (
+            cmd.message == "Return request failed: 2 machine(s) could not be terminated [i-1, i-2]"
+        )
+        assert "arn:aws" not in cmd.message
+        assert "AccessDenied" not in cmd.message
+        assert "AccessDenied" in _logged_errors(handler)
+
+    @pytest.mark.asyncio
+    async def test_failure_result_without_reported_ids_falls_back_to_requested_ids(self):
+        command_bus = AsyncMock()
+        handler = TestExecuteDeprovisioningForRequest()._handler(
+            group_by_resource=([MagicMock()], []),
+            deprovision_result={"success": False, "errors": [_IAM_ERROR]},
+            command_bus=command_bus,
+        )
+        request = MagicMock()
+        request.request_id = "ret-1"
+
+        await handler._execute_deprovisioning_for_request(["i-9"], request, "aws")
+
+        (cmd,) = _status_commands(command_bus, RequestStatus.FAILED)
+        assert cmd.message == "Return request failed: 1 machine(s) could not be terminated [i-9]"
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_exception_message_has_no_exception_text(self):
+        command_bus = AsyncMock()
+        handler = TestExecuteDeprovisioningForRequest()._handler(
+            group_by_resource=([MagicMock()], []),
+            deprovision_side_effect=RuntimeError(_IAM_ERROR),
+            command_bus=command_bus,
+        )
+        request = MagicMock()
+        request.request_id = "ret-1"
+
+        await handler._execute_deprovisioning_for_request(["i-1"], request, "aws")
+
+        (cmd,) = _status_commands(command_bus, RequestStatus.FAILED)
+        assert cmd.message == "Return request failed: 1 machine(s) could not be terminated [i-1]"
+        assert "AccessDenied" in _logged_errors(handler)
+
+    @pytest.mark.asyncio
+    async def test_failed_message_caps_listed_ids(self):
+        command_bus = AsyncMock()
+        ids = [f"i-{n:02d}" for n in range(13)]
+        handler = TestExecuteDeprovisioningForRequest()._handler(
+            group_by_resource=([MagicMock()], []),
+            deprovision_result={"success": False, "failed_instance_ids": ids},
+            command_bus=command_bus,
+        )
+        request = MagicMock()
+        request.request_id = "ret-1"
+
+        await handler._execute_deprovisioning_for_request(ids, request, "aws")
+
+        (cmd,) = _status_commands(command_bus, RequestStatus.FAILED)
+        assert cmd.message.startswith("Return request failed: 13 machine(s) could not be")
+        assert "i-09" in cmd.message
+        assert "i-10" not in cmd.message
+        assert cmd.message.endswith(", +3 more]")
+
+    @pytest.mark.asyncio
+    async def test_completed_update_failure_uses_fixed_message_and_logs_detail(self):
+        command_bus = AsyncMock()
+        # First dispatch (COMPLETED) fails; second dispatch (FAILED fallback) succeeds.
+        command_bus.execute.side_effect = [RuntimeError(_IAM_ERROR), None]
+        handler = _make_return_handler()
+        handler._container.get.return_value = command_bus
+        request = MagicMock()
+        request.request_id = "ret-1"
+
+        await handler._update_request_to_completed(request)
+
+        (cmd,) = _status_commands(command_bus, RequestStatus.FAILED)
+        assert cmd.message == "Return request failed: deprovisioning error"
+        assert "AccessDenied" in _logged_errors(handler)
+
+    @pytest.mark.asyncio
+    async def test_partial_message_caps_listed_ids(self):
+        command_bus = AsyncMock()
+        ok_ids = [f"ok-{n:02d}" for n in range(12)]
+        failed_ids = [f"bad-{n:02d}" for n in range(11)]
+        skipped_ids = [f"skip-{n:02d}" for n in range(12)]
+        handler = TestExecuteDeprovisioningForRequest()._handler(
+            group_by_resource=([MagicMock()], skipped_ids),
+            deprovision_result={
+                "success": False,
+                "partial": True,
+                "successful_instance_ids": ok_ids,
+                "failed_instance_ids": failed_ids,
+                "errors": [_IAM_ERROR],
+            },
+            command_bus=command_bus,
+        )
+        request = MagicMock()
+        request.request_id = "ret-1"
+
+        with (
+            patch.object(handler, "_update_machines_to_pending"),
+            patch.object(handler, "_clear_return_request_id"),
+        ):
+            await handler._execute_deprovisioning_for_request(
+                [*ok_ids, *failed_ids], request, "aws"
+            )
+
+        (cmd,) = _status_commands(command_bus, RequestStatus.PARTIAL)
+        assert "12 terminated [ok-00" in cmd.message
+        assert "ok-09, +2 more]" in cmd.message
+        assert "ok-10" not in cmd.message
+        assert "11 failed [bad-00" in cmd.message
+        assert "bad-09, +1 more]" in cmd.message
+        assert "bad-10" not in cmd.message
+        assert "skip-09, +2 more]" in cmd.message
+        assert "skip-10" not in cmd.message
+        assert "AccessDenied" not in cmd.message
+
+    @pytest.mark.asyncio
+    async def test_id_reported_as_both_succeeded_and_failed_is_failed_and_released(self):
+        from orb.application.services.deprovisioning_orchestrator import (
+            DeprovisioningOrchestrator,
+        )
+
+        provider_port = MagicMock()
+        provider_port.execute_operation = AsyncMock(
+            return_value=MagicMock(
+                success=False,
+                error_message="partial",
+                metadata={
+                    "provider_data": {
+                        "successful_instance_ids": ["vm-1", "vm-2"],
+                        "failed_instance_ids": ["vm-2"],
+                    }
+                },
+            )
+        )
+        query_bus = MagicMock()
+        query_bus.execute = AsyncMock(return_value=MagicMock())
+        orchestrator = DeprovisioningOrchestrator(
+            uow_factory=MagicMock(),
+            logger=MagicMock(spec=LoggingPort),
+            container=MagicMock(),
+            query_bus=query_bus,
+            provider_selection_port=provider_port,
+        )
+        machines = []
+        for mid in ("vm-1", "vm-2"):
+            m = MagicMock()
+            m.machine_id.value = mid
+            m.template_id = "tmpl"
+            m.request_id = "orig"
+            machines.append(m)
+
+        command_bus = AsyncMock()
+        handler = _make_return_handler()
+        handler._machine_grouping_service.group_by_resource.return_value = (
+            {("azure", "VMSS", "vmss-1"): machines},
+            [],
+        )
+        handler._deprovisioning_orchestrator = orchestrator
+        handler._container.get.return_value = command_bus
+        request = MagicMock()
+        request.request_id = "ret-1"
+
+        with (
+            patch(
+                "orb.application.services.deprovisioning_orchestrator.load_machine_coordinates",
+                return_value={},
+            ),
+            patch.object(handler, "_update_machines_to_pending") as mock_pending,
+            patch.object(handler, "_clear_return_request_id") as mock_clear,
+        ):
+            await handler._execute_deprovisioning_for_request(["vm-1", "vm-2"], request, "azure")
+
+        mock_pending.assert_called_once_with(["vm-1"])
+        mock_clear.assert_called_once_with(["vm-2"], "ret-1")
+
+
 # ---------------------------------------------------------------------------
 # CreateReturnRequestHandler — _cancel_validate_and_persist
 # ---------------------------------------------------------------------------
@@ -956,3 +1229,83 @@ class TestCancelValidateAndPersist:
 
         stuck.cancel.assert_called_once()
         uow.requests.save.assert_any_call(cancelled)
+
+
+def _held_machines(owners: dict[str, str | None]) -> tuple[dict[str, MagicMock], MagicMock]:
+    """Machines keyed by ID, each held by the given return request, plus a UoW factory."""
+    store: dict[str, MagicMock] = {}
+    for machine_id, owner in owners.items():
+        machine = MagicMock()
+        machine.machine_id.value = machine_id
+        machine.return_request_id = owner
+
+        def _copy(*, update: dict[str, Any] | None = None, _m: MagicMock = machine, **_kw):
+            if update and "return_request_id" in update:
+                _m.return_request_id = update["return_request_id"]
+            return _m
+
+        machine.model_copy.side_effect = _copy
+        store[machine_id] = machine
+
+    uow = MagicMock()
+    uow.machines.get_by_id.side_effect = store.get
+    uow.requests.save = MagicMock(return_value=[])
+
+    @contextmanager
+    def _create():
+        yield uow
+
+    factory = MagicMock()
+    factory.create_unit_of_work.side_effect = _create
+    return store, factory
+
+
+@pytest.mark.unit
+class TestMachinesAreReleasedAfterFailedReturn:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("failure", ["failed-result", "orchestrator-raises"])
+    async def test_followup_return_is_accepted_after_total_failure(self, failure):
+        store, factory = _held_machines({"vm-1": "ret-1", "vm-2": "ret-1", "vm-3": "ret-other"})
+        handler = _make_return_handler(uow_factory=factory)
+        handler._machine_grouping_service.group_by_resource.return_value = ([MagicMock()], [])
+        if failure == "failed-result":
+            handler._deprovisioning_orchestrator.execute_deprovisioning = AsyncMock(
+                return_value={
+                    "success": False,
+                    "partial": False,
+                    "successful_instance_ids": [],
+                    "failed_instance_ids": ["vm-1", "vm-2"],
+                    "errors": ["provider refused"],
+                }
+            )
+        else:
+            handler._deprovisioning_orchestrator.execute_deprovisioning = AsyncMock(
+                side_effect=RuntimeError("provider blew up")
+            )
+        handler._container.get.return_value = AsyncMock()
+        request = MagicMock()
+        request.request_id = "ret-1"
+
+        await handler._execute_deprovisioning_for_request(["vm-1", "vm-2"], request, "aws")
+
+        assert store["vm-1"].return_request_id is None
+        assert store["vm-2"].return_request_id is None
+        valid_ids, skipped = handler._filter_machines(["vm-1", "vm-2"], force_return=False)
+        assert valid_ids == ["vm-1", "vm-2"]
+        assert skipped == []
+
+    @pytest.mark.asyncio
+    async def test_machine_held_by_another_return_request_is_not_released(self):
+        store, factory = _held_machines({"vm-3": "ret-other"})
+        handler = _make_return_handler(uow_factory=factory)
+        handler._machine_grouping_service.group_by_resource.return_value = ([MagicMock()], [])
+        handler._deprovisioning_orchestrator.execute_deprovisioning = AsyncMock(
+            return_value={"success": False, "failed_instance_ids": ["vm-3"], "errors": ["x"]}
+        )
+        handler._container.get.return_value = AsyncMock()
+        request = MagicMock()
+        request.request_id = "ret-1"
+
+        await handler._execute_deprovisioning_for_request(["vm-3"], request, "aws")
+
+        assert store["vm-3"].return_request_id == "ret-other"

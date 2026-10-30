@@ -15,8 +15,11 @@ from orb.domain.base.value_objects import (
     Tags,
     ValueObject,
 )
-
-# Import domain protocols
+from orb.providers.aws.domain.template.naming_patterns import (
+    PATTERNS,
+    TAG_KEY_LENGTH,
+    TAG_VALUE_LENGTH,
+)
 
 
 class ResourceId(_BaseResourceId):
@@ -28,16 +31,8 @@ class ResourceId(_BaseResourceId):
     @classmethod
     def validate_format(cls, v: str) -> str:
         """Validate AWS resource ID format."""
-        # Get pattern from AWS configuration
-        from orb.providers.aws.configuration.validator import (
-            AWSNamingConfig,
-            get_aws_config_manager,
-        )
+        pattern = PATTERNS.get(cls.pattern_key)
 
-        config: AWSNamingConfig = get_aws_config_manager().get_typed(AWSNamingConfig)  # type: ignore[assignment]
-        pattern = config.patterns.get(cls.pattern_key)
-
-        # Fall back to class pattern if not in config
         if not pattern:
             raise ValueError(f"Pattern for {cls.resource_type} not found in AWS configuration")
 
@@ -92,14 +87,7 @@ class AWSInstanceType(InstanceType):
     @classmethod
     def validate_instance_type(cls, v: str) -> str:
         """Validate AWS instance type format."""
-        # Get pattern from AWS configuration
-        from orb.providers.aws.configuration.validator import (
-            AWSNamingConfig,
-            get_aws_config_manager,
-        )
-
-        config: AWSNamingConfig = get_aws_config_manager().get_typed(AWSNamingConfig)  # type: ignore[assignment]
-        pattern = config.patterns["instance_type"]
+        pattern = PATTERNS["instance_type"]
 
         if not re.match(pattern, v):
             raise ValueError(f"Invalid AWS instance type format: {v}")
@@ -123,30 +111,18 @@ class AWSTags(Tags):
     @classmethod
     def validate_aws_tags(cls, v: dict[str, str]) -> dict[str, str]:
         """Validate AWS tags format and constraints."""
-        # Get AWS tag validation rules from configuration
-        from orb.providers.aws.configuration.validator import (
-            AWSNamingConfig,
-            get_aws_config_manager,
-        )
-
-        config: AWSNamingConfig = get_aws_config_manager().get_typed(AWSNamingConfig)  # type: ignore[assignment]
-
         for key, value in v.items():
             if not isinstance(key, str) or not isinstance(value, str):
                 raise ValueError("AWS tags must be strings")
 
             # Use AWS limits from configuration
-            if len(key) > config.limits.tag_key_length:
-                raise ValueError(
-                    f"AWS tag key length exceeds limit of {config.limits.tag_key_length}"
-                )
-            if len(value) > config.limits.tag_value_length:
-                raise ValueError(
-                    f"AWS tag value length exceeds limit of {config.limits.tag_value_length}"
-                )
+            if len(key) > TAG_KEY_LENGTH:
+                raise ValueError(f"AWS tag key length exceeds limit of {TAG_KEY_LENGTH}")
+            if len(value) > TAG_VALUE_LENGTH:
+                raise ValueError(f"AWS tag value length exceeds limit of {TAG_VALUE_LENGTH}")
 
             # Use AWS pattern from configuration
-            if not re.match(config.patterns["tag_key"], key):
+            if not re.match(PATTERNS["tag_key"], key):
                 raise ValueError(f"Invalid AWS tag key format: {key}")
         return v
 
@@ -168,14 +144,7 @@ class AWSARN(ARN):
     @classmethod
     def validate_arn(cls, v: str) -> str:
         """Validate AWS ARN format."""
-        # Get pattern from AWS configuration
-        from orb.providers.aws.configuration.validator import (
-            AWSNamingConfig,
-            get_aws_config_manager,
-        )
-
-        config: AWSNamingConfig = get_aws_config_manager().get_typed(AWSNamingConfig)  # type: ignore[assignment]
-        pattern = config.patterns["arn"]
+        pattern = PATTERNS["arn"]
 
         if not re.match(pattern, v):
             raise ValueError(f"Invalid AWS ARN format: {v}")

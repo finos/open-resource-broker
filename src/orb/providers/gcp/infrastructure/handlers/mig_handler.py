@@ -324,11 +324,14 @@ class GCPManagedInstanceGroupHandler(GCPHandler):
     ) -> None:
         """Poll one SDK refresh at a time so cancellation stops further work."""
         try:
-            async with asyncio.timeout(timeout_seconds):
+
+            async def _poll() -> None:
                 while not await asyncio.to_thread(operation.done):
                     await asyncio.sleep(1.0)
                 await asyncio.to_thread(operation.result, timeout=0)
-        except TimeoutError as exc:
+
+            await asyncio.wait_for(_poll(), timeout=timeout_seconds)
+        except (asyncio.TimeoutError, TimeoutError, FutureTimeoutError) as exc:
             raise FutureTimeoutError from exc
 
     def terminate_hosts(

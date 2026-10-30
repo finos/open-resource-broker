@@ -3,10 +3,15 @@
 import os
 from typing import Any, Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
+from orb.providers.oci.configuration.realms import (
+    REALM_DOMAIN_PATTERN,
+    is_allowed_realm_domain,
+    is_valid_extra_realm_suffix,
+)
 
 
 class OCIProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
@@ -24,8 +29,15 @@ class OCIProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     region: str = Field(default="us-phoenix-1", description="OCI region")  # type: ignore[assignment]
     realm_domain_component: str = Field(
         default="oraclecloud.com",
-        pattern=r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+        pattern=REALM_DOMAIN_PATTERN.pattern,
         description="OCI realm DNS suffix for signed Compute launch requests",
+    )
+    extra_realm_suffixes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Additional realm DNS suffixes (exact domains) allowed for realm_domain_component "
+            "beyond the realms published in the OCI SDKs"
+        ),
     )
     credential_source: Optional[str] = Field(
         default=None,
@@ -41,6 +53,27 @@ class OCIProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     private_key_path: Optional[str] = Field(
         default=None, description="OCI API key private key path"
     )
+
+    @field_validator("extra_realm_suffixes")
+    @classmethod
+    def validate_extra_realm_suffixes(cls, value: list[str]) -> list[str]:
+        """Each extra suffix must be a lowercase domain with an alphabetic top-level label."""
+        if not all(is_valid_extra_realm_suffix(suffix) for suffix in value):
+            raise ValueError(
+                "extra_realm_suffixes entries must be lowercase domains with at least "
+                "two labels and an alphabetic top-level label"
+            )
+        return value
+
+    @model_validator(mode="after")
+    def validate_realm_domain(self) -> "OCIProviderConfig":
+        """Reject realm suffixes that are neither known nor explicitly allowed."""
+        if not is_allowed_realm_domain(self.realm_domain_component, self.extra_realm_suffixes):
+            raise ValueError(
+                "realm_domain_component is not a known OCI realm; "
+                "add it to extra_realm_suffixes to allow it"
+            )
+        return self
 
     @field_validator("private_key_path", mode="before")
     @classmethod

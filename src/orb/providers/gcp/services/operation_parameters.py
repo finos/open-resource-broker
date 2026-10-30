@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Self
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
+from typing_extensions import Self
 
 from orb.domain.request.aggregate import Request
 from orb.providers.base.strategy import ProviderOperation

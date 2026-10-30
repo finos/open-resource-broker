@@ -219,3 +219,47 @@ async def test_missing_machine_is_skipped() -> None:
 
     registry.execute_operation.assert_not_awaited()
     repository.save.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_failure_error_is_bounded_and_detail_goes_to_the_log() -> None:
+    repository = MagicMock()
+    repository.find_by_id.side_effect = _make_machine
+
+    registry = MagicMock()
+
+    async def _execute(provider_name: str, operation: object) -> OperationResult:
+        if operation.parameters["machine"].machine_id == "i-bad":  # type: ignore[attr-defined]
+            return OperationResult.error_result(
+                "denied by arn:aws:iam::123:role/x", "CLEANUP_ERROR"
+            )
+        return OperationResult.success_result({})
+
+    registry.execute_operation = _execute
+    handler = _make_handler(repository, registry)
+
+    with pytest.raises(ApplicationError) as excinfo:
+        await handler.execute_command(CleanupMachineResourcesCommand(machine_ids=["i-ok", "i-bad"]))
+
+    error = excinfo.value
+    assert str(error) == "1 of 2 machines could not be cleaned up"
+    assert error.error_code == "MACHINE_CLEANUP_FAILED"
+    assert error.details == {"failed_count": 1, "requested_count": 2}
+    assert "i-bad" not in str(error.details) and "arn:" not in str(error.details)
+    logged = " ".join(str(call.args) for call in handler.logger.error.call_args_list)
+    assert "i-bad" in logged and "denied by arn:aws:iam::123:role/x" in logged
+
+
+@pytest.mark.asyncio
+async def test_dispatch_exception_text_stays_out_of_the_raised_error() -> None:
+    repository = MagicMock()
+    repository.find_by_id.return_value = _make_machine("i-1")
+    registry = MagicMock()
+    registry.execute_operation = AsyncMock(side_effect=RuntimeError("connect to 10.0.0.9 refused"))
+    handler = _make_handler(repository, registry)
+
+    with pytest.raises(ApplicationError) as excinfo:
+        await handler.execute_command(CleanupMachineResourcesCommand(machine_ids=["i-1"]))
+
+    assert "10.0.0.9" not in str(excinfo.value)
+    assert "10.0.0.9" not in str(excinfo.value.details)

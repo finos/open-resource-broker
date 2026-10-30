@@ -258,9 +258,9 @@ class TestPluginInitializeProvider:
         plugin = _make_plugin("tpl_err_plug", template_class=FakeTplClass)
         mock_factory = MagicMock()
         mock_factory.register_provider_template_class.side_effect = RuntimeError("tpl fail")
-        # Should NOT raise — the exception is swallowed
+        # Should NOT raise, but the provider stays uninitialised so a later call retries
         plugin.initialize_provider(template_factory=mock_factory)
-        assert "tpl_err_plug" in _plugin_mod._initialized_providers
+        assert "tpl_err_plug" not in _plugin_mod._initialized_providers
 
     def test_success_logs_info(self):
         plugin = _make_plugin("success_log_plug")

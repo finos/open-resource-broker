@@ -304,6 +304,16 @@ def reset_singletons():
 
 
 @pytest.fixture(autouse=True)
+def _reset_reported_plugin_failures():
+    """Forget which broken provider plugins were already logged in this process."""
+    from orb.providers import registration
+
+    registration._reported_plugin_failures.clear()
+    yield
+    registration._reported_plugin_failures.clear()
+
+
+@pytest.fixture(autouse=True)
 def _reset_otel_state():
     """Reset OpenTelemetry global provider state before and after every test.
 
@@ -743,3 +753,25 @@ class TestDataBuilder:
 def test_data_builder() -> TestDataBuilder:
     """Provide test data builder."""
     return TestDataBuilder()
+
+
+@pytest.fixture
+def preserve_orb_module_identity() -> Generator[None, None, None]:
+    """Keep ``orb.*`` module identity stable across tests that re-import modules.
+
+    Tests that evict ``orb.*`` entries from ``sys.modules`` and import them again
+    bind the fresh module objects as attributes of their parent packages.  After
+    ``sys.modules`` is restored, ``from orb.x import y`` resolves to the original
+    module while ``mock.patch("orb.x.y")`` (which walks parent attributes) resolves
+    to the fresh copy, so patches silently miss.  Restore both views on exit.
+    """
+    saved = {name: mod for name, mod in sys.modules.items() if name.startswith("orb.")}
+    try:
+        yield
+    finally:
+        for name, mod in saved.items():
+            sys.modules[name] = mod
+            parent_name, _, leaf = name.rpartition(".")
+            parent = sys.modules.get(parent_name)
+            if parent is not None:
+                setattr(parent, leaf, mod)

@@ -1,5 +1,6 @@
 """AWS Instance Operation Service - Handles instance creation and termination."""
 
+import re
 from typing import TYPE_CHECKING, Optional
 
 from orb.domain.base.ports import LoggingPort
@@ -206,10 +207,10 @@ class AWSInstanceOperationService:
                 )
 
             provider_api = operation.parameters.get("provider_api", "RunInstances")
-            response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
+            reservations = self._describe_existing_reservations(instance_ids)
 
             instances = []
-            for reservation in response["Reservations"]:
+            for reservation in reservations:
                 for aws_instance in reservation["Instances"]:
                     instances.append(
                         self._machine_adapter.create_machine_from_aws_instance(
@@ -229,6 +230,60 @@ class AWSInstanceOperationService:
             return ProviderResult.error_result(
                 f"Failed to get instance status: {e}", "GET_INSTANCE_STATUS_ERROR"
             )
+
+    # Instance IDs per Filters-based describe call; EC2 accepts far more, this keeps
+    # each request small.
+    _STATUS_FILTER_BATCH_SIZE = 25
+    _INSTANCE_ID_IN_MESSAGE = re.compile(r"\bi-[0-9A-Za-z]+")
+
+    def _describe_existing_reservations(self, instance_ids: list[str]) -> list[dict]:
+        """Describe the instances EC2 still knows about, skipping purged IDs.
+
+        EC2 answers a describe call that names an instance it has already
+        purged with ``InvalidInstanceID.NotFound`` and reports nothing for the
+        other IDs in the call. Such an ID is absent, not an error. The error
+        message lists the unknown IDs, so they are dropped and the call retried
+        once; if that does not settle it, the IDs are described through an
+        ``instance-id`` filter, which never raises NotFound. The number of calls
+        stays bounded regardless of how many IDs are purged.
+
+        An ID that EC2 does not know may also belong to another region or
+        account, or be an instance launched moments ago; callers treat an
+        absent ID on a return request as terminated, which is correct once the
+        terminate call has been accepted.
+        """
+        from botocore.exceptions import ClientError
+
+        ec2 = self._aws_client.ec2_client
+
+        def is_not_found(exc: ClientError) -> bool:
+            return exc.response.get("Error", {}).get("Code") == "InvalidInstanceID.NotFound"
+
+        try:
+            return list(ec2.describe_instances(InstanceIds=instance_ids)["Reservations"])
+        except ClientError as exc:
+            if not is_not_found(exc):
+                raise
+            message = exc.response.get("Error", {}).get("Message", "")
+
+        missing = set(self._INSTANCE_ID_IN_MESSAGE.findall(message)) & set(instance_ids)
+        remaining = [iid for iid in instance_ids if iid not in missing]
+        if missing:
+            if not remaining:
+                return []
+            try:
+                return list(ec2.describe_instances(InstanceIds=remaining)["Reservations"])
+            except ClientError as exc:
+                if not is_not_found(exc):
+                    raise
+
+        reservations: list[dict] = []
+        size = self._STATUS_FILTER_BATCH_SIZE
+        for start in range(0, len(instance_ids), size):
+            batch = instance_ids[start : start + size]
+            response = ec2.describe_instances(Filters=[{"Name": "instance-id", "Values": batch}])
+            reservations.extend(response["Reservations"])
+        return reservations
 
     def start_instances(self, operation: ProviderOperation) -> ProviderResult:
         """Handle instance start operation."""

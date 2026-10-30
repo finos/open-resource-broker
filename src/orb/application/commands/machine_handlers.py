@@ -92,7 +92,7 @@ class CleanupMachineResourcesHandler(BaseCommandHandler[CleanupMachineResourcesC
         and provider failures leave the machine untouched. Failures are collected
         and, when not forcing, surfaced after the batch completes.
         """
-        errors: list[str] = []
+        failure_count = 0
 
         for machine_id in command.machine_ids:
             machine = self._machine_repository.find_by_id(machine_id)
@@ -121,19 +121,21 @@ class CleanupMachineResourcesHandler(BaseCommandHandler[CleanupMachineResourcesC
                     machine.provider_name, operation
                 )
             except Exception as exc:  # provider unreachable / registry error
-                message = f"Cleanup dispatch failed for {machine_id}: {exc}"
+                # Machine IDs and provider text go to the log only; the raised
+                # error carries a bounded summary.
                 if self.logger:
-                    self.logger.error(message)
-                errors.append(message)
+                    self.logger.error("Cleanup dispatch failed for %s: %s", machine_id, exc)
+                failure_count += 1
                 if not command.force_cleanup:
                     continue
                 result = None
 
             if result is not None and not result.success:
-                message = f"Provider cleanup failed for {machine_id}: {result.error_message}"
                 if self.logger:
-                    self.logger.error(message)
-                errors.append(message)
+                    self.logger.error(
+                        "Provider cleanup failed for %s: %s", machine_id, result.error_message
+                    )
+                failure_count += 1
                 if not command.force_cleanup:
                     continue
 
@@ -145,11 +147,14 @@ class CleanupMachineResourcesHandler(BaseCommandHandler[CleanupMachineResourcesC
             )
             self._machine_repository.save(machine)
 
-        if errors and not command.force_cleanup:
+        if failure_count and not command.force_cleanup:
             raise ApplicationError(
-                "One or more machines could not be cleaned up: " + "; ".join(errors),
+                f"{failure_count} of {len(command.machine_ids)} machines could not be cleaned up",
                 error_code="MACHINE_CLEANUP_FAILED",
-                details={"errors": errors},
+                details={
+                    "failed_count": failure_count,
+                    "requested_count": len(command.machine_ids),
+                },
             )
 
 

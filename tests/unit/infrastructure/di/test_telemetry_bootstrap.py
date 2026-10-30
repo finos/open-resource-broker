@@ -257,26 +257,22 @@ class TestConfigureTelemetrySDKAbsent:
                     "configure_telemetry raised ImportError — the SDK-absent guard is broken"
                 )
 
-    def test_no_raise_when_top_level_otel_missing(self, monkeypatch):
+    def test_no_raise_when_top_level_otel_missing(self):
         """Simulate total opentelemetry absence via sys.modules manipulation."""
         container = _make_container_with_otel(OtelConfig(enabled=True))
 
-        # Remove opentelemetry from sys.modules so the import fails.
-        otel_keys = [k for k in sys.modules if k.startswith("opentelemetry")]
-        saved = {k: sys.modules.pop(k) for k in otel_keys}
+        # ``patch.dict`` snapshots and restores the whole module table, so the
+        # real opentelemetry package is back, intact, after the block.
+        with patch.dict(sys.modules):
+            for key in [k for k in sys.modules if k.startswith("opentelemetry")]:
+                del sys.modules[key]
+            # Make any opentelemetry import fail.
+            sys.modules["opentelemetry"] = None  # type: ignore[assignment]
 
-        # Make any opentelemetry import fail.
-        monkeypatch.setitem(sys.modules, "opentelemetry", None)  # type: ignore[arg-type]
-
-        try:
-            telemetry_module.configure_telemetry(container)
-        except Exception as exc:
-            pytest.fail(f"configure_telemetry raised unexpectedly: {exc}")
-        finally:
-            # Restore to avoid contaminating other tests.
-            for k, v in saved.items():
-                sys.modules[k] = v
-            monkeypatch.delitem(sys.modules, "opentelemetry", raising=False)
+            try:
+                telemetry_module.configure_telemetry(container)
+            except Exception as exc:
+                pytest.fail(f"configure_telemetry raised unexpectedly: {exc}")
 
 
 # ---------------------------------------------------------------------------

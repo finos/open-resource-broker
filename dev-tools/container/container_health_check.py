@@ -6,6 +6,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 # Configure logging
@@ -20,6 +21,9 @@ def check_health(url=None, timeout=None, interval=None):
     timeout = timeout or int(os.getenv("HEALTH_CHECK_TIMEOUT", "60"))
     interval = interval or int(os.getenv("HEALTH_CHECK_INTERVAL", "3"))
 
+    if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+        raise ValueError(f"Health check URL must use http or https: {url}")
+
     logger.info(f"Testing container health endpoint: {url}")
     logger.info(f"Timeout: {timeout}s, Retry interval: {interval}s")
 
@@ -30,6 +34,8 @@ def check_health(url=None, timeout=None, interval=None):
         attempt += 1
         try:
             logger.info(f"Health check attempt {attempt}...")
+            # Only http/https URLs are requested.
+            # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
             with urllib.request.urlopen(url, timeout=10) as response:
                 if response.status == 200:
                     logger.info("Container health check passed!")

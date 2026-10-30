@@ -22,6 +22,7 @@ from orb.providers.azure.exceptions.azure_exceptions import (
 from orb.providers.azure.infrastructure.error_utils import (
     canonical_azure_error_code,
     extract_azure_error_details,
+    is_azure_not_found,
 )
 from orb.providers.azure.infrastructure.handlers._network_identity import (
     resolve_network_identity_or_empty_async,
@@ -398,7 +399,7 @@ class SingleVMHandler(AzureHandler):
     async def check_hosts_status_async(self, request: Request) -> list[AzureHandlerStatusResult]:
         """Async status query for individual VM IDs using the Azure async Compute SDK."""
         resource_ids: list[str] = request.resource_ids or []
-        raise_on_status_error = azure_raise_on_status_error(request)
+        azure_raise_on_status_error(request)  # validates the metadata policy value
         resource_group = (request.metadata or {}).get(
             "resource_group"
         ) or self.azure_client.resource_group
@@ -410,7 +411,6 @@ class SingleVMHandler(AzureHandler):
             return []
 
         results: list[AzureHandlerStatusResult] = []
-        status_errors: list[str] = []
         compute = await self.azure_client.get_async_compute_client()
         resolved_vm_names = await self._resolve_vm_names_async(resource_group, resource_ids)
 
@@ -444,12 +444,18 @@ class SingleVMHandler(AzureHandler):
                     )
                 )
             except Exception as exc:
+                if is_azure_not_found(exc):
+                    # Azure reports the VM as gone; omit it so the caller can
+                    # record it as terminated.
+                    self._logger.warning("VM '%s' not found during status check", vm_name)
+                    continue
+                # Anything else (throttling, timeouts, auth) says nothing about
+                # whether the VM exists. Fail the whole status call so stored
+                # machine state is kept and the poll is retried, instead of
+                # omitting the VM or reporting a made-up status.
                 error_message = f"Failed to get status for VM '{vm_name}': {exc}"
                 self._logger.error(error_message)
-                status_errors.append(error_message)
-        all_requested_vms_failed = bool(resolved_vm_names) and not results
-        if status_errors and (raise_on_status_error or all_requested_vms_failed):
-            raise RuntimeError("; ".join(status_errors))
+                raise RuntimeError(error_message) from exc
         return results
 
     @staticmethod
