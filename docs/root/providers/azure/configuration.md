@@ -87,7 +87,7 @@ CycleCloud-specific flags: `--azure-cyclecloud-url`,
 
 The Azure provider strategy supports `create_instances`,
 `terminate_instances`, `get_instance_status`, `describe_resource_instances`,
-`validate_template`, `get_available_templates`, and `health_check`. It does
+`validate_template` and `health_check`. It does
 **not** support `start_instances` or `stop_instances` on any
 `provider_api` — there is no equivalent to AWS/Google Cloud start/stop in the current
 Azure provider; terminating and re-acquiring is the only way to resize a
