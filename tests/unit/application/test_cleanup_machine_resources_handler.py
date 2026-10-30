@@ -224,7 +224,7 @@ async def test_missing_machine_is_skipped() -> None:
 @pytest.mark.asyncio
 async def test_failure_error_is_bounded_and_detail_goes_to_the_log() -> None:
     repository = MagicMock()
-    repository.find_by_id.side_effect = lambda machine_id: _make_machine(machine_id)
+    repository.find_by_id.side_effect = _make_machine
 
     registry = MagicMock()
 

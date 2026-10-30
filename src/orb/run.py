@@ -47,9 +47,6 @@ def setup_environment():
         print(f"WARNING: Config directory detection failed: {e}", file=sys.stderr)
 
 
-# Import CLI modules
-from orb.cli.main import main
-
 # Import version for help text
 try:
     from ._package import __version__
@@ -60,8 +57,11 @@ except ImportError:
 
 def cli_main() -> None:
     """Entry point function for console scripts."""
+    # Imported lazily: orb.cli.main imports this module for setup_environment.
+    from orb.cli.main import main
+
     return asyncio.run(main())
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    cli_main()
