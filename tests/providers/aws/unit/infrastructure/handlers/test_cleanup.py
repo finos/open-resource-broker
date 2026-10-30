@@ -3,7 +3,6 @@
 from typing import cast
 from unittest.mock import MagicMock, patch
 
-import pytest
 from botocore.exceptions import ClientError
 
 from orb.config.schemas.cleanup_schema import CleanupConfig, CleanupResourcesConfig
@@ -784,13 +783,12 @@ class TestASGCancelResource:
         mock_cleanup.assert_not_called()
 
     def test_cancel_resource_returns_error_on_exception(self):
-        from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-
         config_port = _make_config_port()
         handler = _make_asg_handler(config_port=config_port)
         with patch.object(handler, "_delete_asg", side_effect=RuntimeError("fail")):
-            with pytest.raises(AWSInfrastructureError, match="Failed to cancel ASG asg-cancel-3"):
-                handler.cancel_resource("asg-cancel-3", "req-cancel-3")
+            result = handler.cancel_resource("asg-cancel-3", "req-cancel-3")
+        assert result["status"] == "error"
+        assert "asg-cancel-3" in result["message"]
 
 
 # ---------------------------------------------------------------------------

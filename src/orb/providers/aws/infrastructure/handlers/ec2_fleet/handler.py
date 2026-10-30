@@ -58,6 +58,10 @@ from orb.providers.aws.infrastructure.handlers.ec2_fleet.release_manager import 
     EC2FleetReleaseManager,
 )
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
+from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
+    emit_alert,
+    region_of,
+)
 from orb.providers.aws.infrastructure.handlers.shared.fleet_fulfilment import (
     aggregate_fleet_fulfilment,
     compute_ec2fleet_fulfilment,
@@ -901,7 +905,16 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._fleet_release_manager.release(resource_id, [], {}, request_id=request_id)
             return {"status": "success", "message": f"EC2 Fleet {resource_id} cancelled"}
         except Exception as e:
-            self._logger.error("Failed to cancel EC2 Fleet %s: %s", resource_id, e)
+            emit_alert(
+                self._logger,
+                "aws.cancel_failed",
+                f"Failed to cancel EC2 Fleet {resource_id}; it may still be running: {e}",
+                resource_type="ec2_fleet",
+                resource_id=resource_id,
+                request_id=request_id,
+                region=region_of(self.aws_client),
+                reason=str(e),
+            )
             return {
                 "status": "error",
                 "message": f"Failed to cancel EC2 Fleet {resource_id}: {e!s}",
