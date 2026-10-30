@@ -55,8 +55,8 @@ dependencies {
     // AWS SDK v2 auth — provides the native SigV4 signer (AwsV4HttpSigner / Aws4Signer)
     // and the standard credential provider chain. No AWS service stubs are pulled in;
     // only the auth/signer module and its minimal transitive dependencies are included.
-    implementation("software.amazon.awssdk:auth:2.57.3")
-    implementation("software.amazon.awssdk:regions:2.57.3")
+    implementation("software.amazon.awssdk:auth:2.57.4")
+    implementation("software.amazon.awssdk:regions:2.57.4")
 
     // Test
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
