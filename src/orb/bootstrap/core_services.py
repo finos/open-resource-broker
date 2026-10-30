@@ -121,10 +121,11 @@ def register_core_services(container: DIContainer) -> None:
                 "TemplateDeletedEvent",
             ):
                 bus.register_handler(_et, _sse_handler)
-        except Exception as _sse_err:
-            import logging as _logging
-
-            _logging.getLogger(__name__).debug(
+        except ImportError as _sse_err:
+            # The [api] extra is optional; without it there is no SSE endpoint to
+            # push to. Anything other than a missing module is a real failure and
+            # must surface rather than silently disabling live updates.
+            c.get(LoggingPort).warning(
                 "SseEventHandler not registered with EventBus (SSE push disabled): %s", _sse_err
             )
 
@@ -135,9 +136,15 @@ def register_core_services(container: DIContainer) -> None:
     # Register event publisher
     from orb.infrastructure.events.publisher import ConfigurableEventPublisher
 
-    container.register_factory(
+    # One shared instance: it owns the ordered delivery chain, backlog cap and
+    # drain state, and forwards every published event to the shared EventBus.
+    container.register_singleton(
         EventPublisherPort,
-        lambda c: ConfigurableEventPublisher(mode="logging"),  # Default to logging mode
+        lambda c: ConfigurableEventPublisher(mode="logging", event_bus=c.get(EventBus)),
+    )
+    container.register_singleton(
+        ConfigurableEventPublisher,
+        lambda c: c.get(EventPublisherPort),
     )
 
     # Register command and query buses conditionally based on lazy loading mode
