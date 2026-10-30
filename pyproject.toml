@@ -59,10 +59,6 @@ dependencies = [
     # GHSA-42vr-xj54-vc7v (medium)
     "PyJWT>=2.15.0",
     "cryptography>=46.0.5", # Security: Fix CVE-2026-26007
-    # Security: Fix CVE-2025-68146 race condition. filelock 4.1.1 and later require
-    # Python >= 3.11, so Python 3.10 resolves to the 4.1.x series.
-    "filelock>=4.2.1; python_version >= '3.11'",
-    "filelock>=4.1.0,<4.2; python_version < '3.11'",
     "requests>=2.31.0",
     "PyYAML>=6.0.0", # Exported API (lazy-loaded)
     "jsonschema>=4.17.0",
@@ -256,6 +252,7 @@ test-gcp = [
 test-k8s = [
     "orb-py[k8s]",
     "kmock>=0.7",
+    "filelock>=4.1.0",  # cross-worker lock in live Kubernetes tests
 ]
 
 # ---------------------------------------------------------------------------
@@ -316,6 +313,7 @@ dev = [
     "tenacity>=9.0.0",
     "pg8000>=1.31.0",
     "kmock>=0.7",
+    "filelock>=4.1.0",  # cross-worker lock in live Kubernetes tests
     # --- toolchain from dependency-groups.docs ---
     "mkdocs>=1.5.0,<2.0.0",
     "mkdocs-material>=9.1.0,<10.0.0",
@@ -458,6 +456,7 @@ test = [
     "opentelemetry-instrumentation-logging>=0.64b0,<1.0",
     # k8s HTTP-level mock server (test-only, not shipped with the package)
     "kmock>=0.7",
+    "filelock>=4.1.0",  # cross-worker lock in live Kubernetes tests
 ]
 
 docs = [

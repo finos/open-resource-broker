@@ -412,14 +412,15 @@ vulnerabilities:
 
   # ── filelock on Python 3.10 ────────────────────────────────────────────────
   #
-  # Python 3.10 resolves filelock to 4.1.0, the newest release that supports it;
-  # every fix is in 4.2.1, which requires Python >= 3.11. Python 3.11 and later
-  # resolve filelock 4.2.4, so these entries are scoped to the exact 4.1.0 purl
-  # and do not apply there. The advisories concern ReadWriteLock, SoftFileLock,
+  # filelock is not a runtime dependency of orb-py. It is pulled in only by dev
+  # and test tooling (the live k8s test helpers use the plain FileLock, and
+  # several lint and test tools depend on it transitively). Python 3.10
+  # resolves it to 4.1.0, the newest release that supports it; every fix is in
+  # 4.2.1, which requires Python >= 3.11. Python 3.11 and later resolve
+  # filelock 4.2.4, so these entries are scoped to the exact 4.1.0 purl and do
+  # not apply there. The advisories concern ReadWriteLock, SoftFileLock,
   # StrictSoftFileLock, UnixFileLock and WindowsFileLock and need a local user
-  # with write access to the lock directory. No module under src/ imports
-  # filelock; the only direct use in the repository is the plain FileLock in the
-  # live k8s test helpers.
+  # with write access to the lock directory.
 
   - id: CVE-2026-112940
     purls:
