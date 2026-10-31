@@ -21,6 +21,8 @@ export {
   OrbConflictError,
   OrbTimeoutError,
   OrbUnavailableError,
+  OrbStreamTimeoutError,
+  OrbStreamError,
   apiErrorForStatus,
 } from "./errors.js";
 export type { ApiErrorInit } from "./errors.js";

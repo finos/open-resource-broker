@@ -13,6 +13,14 @@ var (
 	ErrConflict       = errors.New("orb: conflict")
 	ErrORBUnavailable = errors.New("orb: service unavailable")
 	ErrTimeout        = errors.New("orb: request timeout")
+
+	// ErrStreamTimeout is reported by a request status stream when the server
+	// stopped streaming because its maximum stream duration elapsed before the
+	// request reached a terminal status. The last event received is not final.
+	ErrStreamTimeout = errors.New("orb: request status stream timed out before the request finished")
+	// ErrStreamFailed is reported when the server ended a request status stream
+	// with an error frame.
+	ErrStreamFailed = errors.New("orb: request status stream failed on the server")
 )
 
 // OrbError is the base type for every error the SDK returns. It mirrors the

@@ -645,6 +645,7 @@ public sealed class OrbClient : IAsyncDisposable
 
         await foreach (var frame in SseStream.StreamAsync(Connect, ct: ct).ConfigureAwait(false))
         {
+            SseOutcome.ThrowIfFailed(frame);
             if (frame.Data.Trim() == "{}") yield break;
 
             var payload = SseStream.ParsePayload(frame);

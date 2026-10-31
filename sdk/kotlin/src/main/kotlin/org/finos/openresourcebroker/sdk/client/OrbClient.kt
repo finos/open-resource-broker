@@ -632,7 +632,8 @@ class OrbClient private constructor(
                             "?interval=$intervalSeconds&timeout=$timeoutSeconds",
                     lastEventId,
                 )
-            }
+            },
+            failOnOutcomeFrames = true,
         )
             .takeWhile { frame -> !frame.isSentinel() }
             .map { frame -> parseStreamEvent(frame) }

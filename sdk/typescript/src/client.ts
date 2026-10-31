@@ -14,6 +14,7 @@ import type { Readable } from "stream";
 import { makeUdsAdapter } from "./transport/uds.js";
 import { attachRetry, disableRetry, type RetryConfig } from "./transport/retry.js";
 import { attachAuth, type AuthOption } from "./auth/index.js";
+import { throwOnStreamOutcome } from "./sse/outcome.js";
 import { SubprocessManager, tempSocketPath, type ProcessConfig } from "./process/manager.js";
 import {
   sseStream,
@@ -666,6 +667,7 @@ export class OrbClient {
     }
 
     for await (const frame of sseStream(connect, { signal })) {
+      throwOnStreamOutcome(frame);
       if (isSentinel(frame)) return;
 
       const payload = parseOrbPayload(frame);

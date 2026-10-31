@@ -152,3 +152,14 @@ class OrbUnavailableError(
     requestId: String? = null,
     body: String? = null,
 ) : OrbApiError(503, message, code, requestId, body)
+
+/**
+ * The server ended a request status stream because its maximum stream duration
+ * elapsed before the request reached a terminal status. The last event
+ * received is not a final status.
+ */
+class OrbStreamTimeoutError :
+    OrbError("orb: request status stream timed out before the request finished")
+
+/** The server ended a request status stream with an error frame. */
+class OrbStreamError : OrbError("orb: request status stream failed on the server")

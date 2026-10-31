@@ -116,4 +116,80 @@ class SseReaderTest {
         // sentinel causes termination so reconnect doesn't happen
         assertEquals(1, called, "connect() should be called exactly once")
     }
+
+    private val inProgress =
+        "data: {\"requests\":[{\"request_id\":\"r1\",\"status\":\"in_progress\"}]}\n\n"
+
+    private suspend fun collectStatusStream(wire: String): Pair<List<SseFrame>, Int> {
+        var called = 0
+        val frames = sseStream(
+            connect = { _ ->
+                called++
+                streamOf(wire)
+            },
+            failOnOutcomeFrames = true,
+        ).toList()
+        return frames to called
+    }
+
+    @Test
+    fun `timeout frame raises a distinct timeout error and does not reconnect`() = runTest {
+        var called = 0
+        val wire = inProgress + "event: timeout\ndata: {\"status\": \"timeout\"}\n\ndata: {}\n\n"
+        val e = assertThrows<org.finos.openresourcebroker.sdk.client.OrbStreamTimeoutError> {
+            sseStream(
+                connect = { _ -> called++; streamOf(wire) },
+                failOnOutcomeFrames = true,
+            ).toList()
+        }
+        assertTrue(e is org.finos.openresourcebroker.sdk.client.OrbError)
+        assertEquals(1, called)
+    }
+
+    @Test
+    fun `error frame raises an error and does not reconnect`() = runTest {
+        var called = 0
+        val wire = inProgress + "event: error\ndata: {\"error\": \"internal\"}\n\ndata: {}\n\n"
+        assertThrows<org.finos.openresourcebroker.sdk.client.OrbStreamError> {
+            sseStream(
+                connect = { _ -> called++; streamOf(wire) },
+                failOnOutcomeFrames = true,
+            ).toList()
+        }
+        assertEquals(1, called)
+    }
+
+    @Test
+    fun `complete frame is not an error`() = runTest {
+        val wire = inProgress + "event: complete\ndata: {\"status\": \"failed\"}\n\ndata: {}\n\n"
+        val (frames, called) = collectStatusStream(wire)
+        assertEquals(1, called)
+        assertEquals(listOf(null, "complete", null), frames.map { it.event })
+    }
+
+    @Test
+    fun `final status frame survives complete outcome and sentinel`() = runTest {
+        val wire = inProgress +
+            "data: {\"requests\":[{\"request_id\":\"r1\",\"status\":\"complete\"}]}\n\n" +
+            "event: complete\ndata: {\"status\": \"complete\"}\n\ndata: {}\n\n"
+        val (frames, _) = collectStatusStream(wire)
+        val lastStatusFrame = frames.last { it.data.contains("\"requests\"") }
+        assertTrue(lastStatusFrame.data.contains("\"complete\""))
+    }
+
+    @Test
+    fun `servers without named frames behave as before`() = runTest {
+        val wire = inProgress + "data: {}\n\n"
+        val (frames, called) = collectStatusStream(wire)
+        assertEquals(1, called)
+        assertEquals(2, frames.size)
+        assertTrue(frames.last().isSentinel())
+    }
+
+    @Test
+    fun `outcome frames are passed through when not requested`() = runTest {
+        val wire = "event: error\ndata: {\"error\": \"internal\"}\n\ndata: {}\n\n"
+        val frames = sseStream(connect = { _ -> streamOf(wire) }).toList()
+        assertEquals("error", frames.first().event)
+    }
 }

@@ -111,3 +111,16 @@ func TestNamedOutcomeFramesYieldNoRequestAndSentinelIsLast(t *testing.T) {
 		}
 	}
 }
+
+func TestFrameCarriesEventName(t *testing.T) {
+	r := sse.NewReader(body("event: timeout\ndata: {\"status\": \"timeout\"}\n\ndata: {}\n\n"))
+	f := r.Next()
+	if f == nil || f.Event != "timeout" {
+		t.Fatalf("expected event timeout, got %+v", f)
+	}
+	// The event name must not leak into the next frame.
+	f = r.Next()
+	if f == nil || f.Event != "" || !sse.IsSentinel(f) {
+		t.Fatalf("expected plain sentinel frame, got %+v", f)
+	}
+}
