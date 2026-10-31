@@ -264,6 +264,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             response = self._retry_with_backoff(
                 self.aws_client.ec2_client.create_fleet,
                 operation_type="critical",
+                operation_name="create_fleet",
                 **fleet_config,
             )
 

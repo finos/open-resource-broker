@@ -194,6 +194,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         self._retry_with_backoff(
             self.aws_client.autoscaling_client.create_auto_scaling_group,
             operation_type="critical",
+            operation_name="create_auto_scaling_group",
             **asg_config,
         )
 
@@ -238,6 +239,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._retry_with_backoff(
                 self.aws_client.autoscaling_client.create_or_update_tags,
                 operation_type="critical",
+                operation_name="create_or_update_tags",
                 Tags=asg_tags,
             )
 

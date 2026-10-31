@@ -11,7 +11,6 @@ from botocore.exceptions import ClientError
 
 from orb.domain.base.exceptions import InfrastructureError
 from orb.infrastructure.logging.logger import get_logger
-from orb.infrastructure.resilience import retry
 
 # Logger
 logger = get_logger(__name__)
@@ -56,9 +55,8 @@ def extract_ssm_parameter_path(value: str) -> Optional[str]:
     return None
 
 
-@retry(strategy="exponential", max_attempts=3, base_delay=1.0, service="ssm")
 def _get_ssm_parameter(ssm_client: Any, parameter_path: str) -> str:
-    """Get SSM parameter with retry."""
+    """Get an SSM parameter; throttling is retried by the SSM client itself."""
     response = ssm_client.get_parameter(Name=parameter_path, WithDecryption=True)
     return response["Parameter"]["Value"]
 

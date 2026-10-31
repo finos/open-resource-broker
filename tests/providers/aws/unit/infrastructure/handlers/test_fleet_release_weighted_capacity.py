@@ -35,7 +35,7 @@ def _make_ec2_release_manager(ec2_client_mock: Any = None) -> EC2FleetReleaseMan
     aws_ops = MagicMock()
     aws_ops.terminate_instances_with_fallback = MagicMock()
 
-    def identity_retry(fn, operation_type="standard", **kwargs):
+    def identity_retry(fn, operation_type="standard", operation_name=None, **kwargs):
         if callable(fn) and not kwargs:
             return fn()
         return fn(**kwargs)
@@ -67,7 +67,7 @@ def _make_spot_release_manager(ec2_client_mock: Any = None) -> SpotFleetReleaseM
     aws_ops = MagicMock()
     aws_ops.terminate_instances_with_fallback = MagicMock()
 
-    def identity_retry(fn, operation_type="standard", **kwargs):
+    def identity_retry(fn, operation_type="standard", operation_name=None, **kwargs):
         if callable(fn) and not kwargs:
             return fn()
         return fn(**kwargs)

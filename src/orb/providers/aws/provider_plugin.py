@@ -163,8 +163,12 @@ class AWSPlugin(ProviderPlugin):
 
         Runs after all standard satellite registrations complete.  Preserves the
         idempotency guards already present in
-        :func:`~orb.providers.aws.registration.initialize_aws_provider`.
+        :func:`~orb.providers.aws.registration.initialize_aws_provider`. Also
+        registers the AWS retry classifier so only transient failures are retried.
         """
+        from orb.providers.aws.resilience.retry_classifier import register_aws_retry_classifier
+
+        register_aws_retry_classifier()
         try:
             from orb.infrastructure.storage.registry import get_storage_registry
             from orb.providers.aws.storage.registration import (

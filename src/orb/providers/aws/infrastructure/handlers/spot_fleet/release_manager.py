@@ -177,6 +177,7 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         self._retry(
             self._aws_client.ec2_client.modify_spot_fleet_request,
             operation_type="critical",
+            operation_name="modify_spot_fleet_request",
             SpotFleetRequestId=fleet_id,
             TargetCapacity=new_target_capacity,
             OnDemandTargetCapacity=new_on_demand_capacity,
@@ -196,6 +197,7 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         response = self._retry(
             self._aws_client.ec2_client.cancel_spot_fleet_requests,
             operation_type="critical",
+            operation_name="cancel_spot_fleet_requests",
             SpotFleetRequestIds=[fleet_id],
             TerminateInstances=terminate_instances,
         )
@@ -261,6 +263,7 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         self._retry(
             self._aws_client.ec2_client.modify_spot_fleet_request,
             operation_type="critical",
+            operation_name="modify_spot_fleet_request",
             SpotFleetRequestId=fleet_id,
             TargetCapacity=0,
             OnDemandTargetCapacity=0,

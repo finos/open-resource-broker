@@ -258,6 +258,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         self._retry(
             self._aws_client.ec2_client.modify_fleet,
             operation_type="critical",
+            operation_name="modify_fleet",
             FleetId=fleet_id,
             TargetCapacitySpecification={"TotalTargetCapacity": new_capacity},
         )
@@ -284,6 +285,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
             response = self._retry(
                 self._aws_client.ec2_client.delete_fleets,
                 operation_type="critical",
+                operation_name="delete_fleets",
                 FleetIds=[fleet_id],
                 TerminateInstances=terminate_instances,
             )
@@ -352,6 +354,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         self._retry(
             self._aws_client.ec2_client.modify_fleet,
             operation_type="critical",
+            operation_name="modify_fleet",
             FleetId=fleet_id,
             TargetCapacitySpecification={"TotalTargetCapacity": 0},
         )
@@ -472,6 +475,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         response = self._retry(
             self._aws_client.ec2_client.delete_fleets,
             operation_type="critical",
+            operation_name="delete_fleets",
             FleetIds=[fleet_id],
             TerminateInstances=True,
         )

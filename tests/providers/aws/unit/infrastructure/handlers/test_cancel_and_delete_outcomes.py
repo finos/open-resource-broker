@@ -32,7 +32,7 @@ def _client_error(code: str, op: str = "Op") -> ClientError:
     return ClientError({"Error": {"Code": code, "Message": "m"}}, op)
 
 
-def _direct_retry(fn, *args, operation_type="standard", **kwargs):
+def _direct_retry(fn, *args, operation_type="standard", operation_name=None, **kwargs):
     return fn(*args, **kwargs)
 
 
@@ -371,7 +371,7 @@ class TestAsgDelete:
             if calls["n"] == 1:
                 raise _client_error("ScalingActivityInProgress")
 
-        def retry(fn, *a, operation_type="standard", **kw):
+        def retry(fn, *a, operation_type="standard", operation_name=None, **kw):
             try:
                 return fn(**kw)
             except ClientError:
@@ -467,7 +467,7 @@ class TestPostTerminateFleetTeardown:
         mgr = self._manager()
         attempts = {"n": 0}
 
-        def retry(fn, operation_type="standard", **kw):
+        def retry(fn, operation_type="standard", operation_name=None, **kw):
             attempts["n"] += 1
             if attempts["n"] == 1:
                 try:

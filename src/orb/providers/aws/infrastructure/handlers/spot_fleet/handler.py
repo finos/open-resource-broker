@@ -196,6 +196,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         response = self._retry_with_backoff(
             self.aws_client.ec2_client.request_spot_fleet,
             operation_type="critical",
+            operation_name="request_spot_fleet",
             SpotFleetRequestConfig=fleet_config,
         )
 

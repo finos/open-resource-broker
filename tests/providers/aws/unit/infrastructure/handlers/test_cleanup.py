@@ -530,7 +530,7 @@ def _make_ec2_fleet_release_manager(cleanup_fn=None):
     mgr._aws_ops = aws_ops
     mgr._logger = logger
     mgr._cleanup_on_zero_capacity = cleanup_fn
-    mgr._retry = lambda fn, operation_type="standard", **kw: fn(**kw)
+    mgr._retry = lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw)
     return mgr, aws_client, cleanup_fn
 
 
@@ -636,7 +636,7 @@ def _make_spot_fleet_release_manager(cleanup_fn=None):
         request_adapter=None,
         cleanup_on_zero_capacity_fn=cleanup_fn,
         logger=logger,
-        retry_fn=lambda fn, operation_type="standard", **kw: fn(**kw),
+        retry_fn=lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw),
     )
     return mgr, aws_client, cleanup_fn
 
@@ -774,7 +774,9 @@ class TestASGCancelResource:
 
     def test_cancel_resource_excludes_the_groups_members_from_the_in_use_check(self):
         handler = _make_asg_handler(config_port=_make_config_port())
-        handler._retry_with_backoff = lambda fn, operation_type="standard", **kw: fn(**kw)
+        handler._retry_with_backoff = (
+            lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw)
+        )
         handler.aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = {
             "AutoScalingGroups": [{"Instances": [{"InstanceId": "i-1"}, {"InstanceId": "i-2"}]}]
         }
@@ -787,7 +789,9 @@ class TestASGCancelResource:
 
     def test_cancel_resource_skips_lt_cleanup_when_members_unknown(self):
         handler = _make_asg_handler(config_port=_make_config_port())
-        handler._retry_with_backoff = lambda fn, operation_type="standard", **kw: fn(**kw)
+        handler._retry_with_backoff = (
+            lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw)
+        )
         handler.aws_client.autoscaling_client.describe_auto_scaling_groups.side_effect = (
             RuntimeError("throttled")
         )
@@ -836,7 +840,9 @@ def _make_asg_capacity_manager(cleanup_fn=None):
         request_adapter=None,
         cleanup_on_zero_capacity_fn=cleanup_fn,
         logger=logger,
-        retry_with_backoff=lambda fn, operation_type="standard", **kw: fn(**kw),
+        retry_with_backoff=lambda fn, operation_type="standard", operation_name=None, **kw: fn(
+            **kw
+        ),
         chunk_list=lambda lst, n: [lst[i : i + n] for i in range(0, len(lst), n)],
     )
     return mgr, aws_client, cleanup_fn
@@ -999,7 +1005,9 @@ class TestListFleetInstanceIds:
 class TestUnknownMembersSkipIsWarned:
     def test_asg_cancel_warns_when_members_unreadable(self):
         handler = _make_asg_handler(config_port=_make_config_port())
-        handler._retry_with_backoff = lambda fn, operation_type="standard", **kw: fn(**kw)
+        handler._retry_with_backoff = (
+            lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw)
+        )
         handler.aws_client.autoscaling_client.describe_auto_scaling_groups.side_effect = (
             RuntimeError("throttled")
         )

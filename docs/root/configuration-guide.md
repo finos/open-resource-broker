@@ -357,6 +357,22 @@ ORB_AWS_MAX_RETRIES=5                  # Maximum API retry attempts (integer, 0-
 ORB_AWS_TIMEOUT=120                    # AWS API timeout in seconds (integer, 1-300)
 ```
 
+##### AWS retries
+
+The provider settings `request_retry_attempts` (default 3) and
+`describe_request_retry_attempts` (default 2) set how many times ORB retries a
+failed EC2 or Auto Scaling call, so a failing call makes at most the setting plus
+one HTTP requests. The first applies to calls that change state and the second to
+read-only calls. botocore's own retries are disabled for those clients, so these
+settings are the complete retry budget.
+
+Only throttling, server-side (5xx) and connection errors, and clock-skew errors
+are retried. Validation, authorisation, quota and not-found errors fail on the
+first attempt. Failures of one operation do not open the circuit breaker of
+another: breakers are kept per provider, handler type and operation, and one
+failure is counted per call that exhausted its retries. Retries for health checks
+and launch-template cleanup are not governed by these settings.
+
 #### Nested Configuration Variables
 
 For complex configuration objects, use double underscores (`__`) to separate levels:

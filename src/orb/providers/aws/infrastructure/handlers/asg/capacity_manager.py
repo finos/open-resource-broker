@@ -117,6 +117,7 @@ class ASGCapacityManager:
                 self._retry_with_backoff(
                     self._aws_client.autoscaling_client.update_auto_scaling_group,
                     operation_type="critical",
+                    operation_name="update_auto_scaling_group",
                     AutoScalingGroupName=group_name,
                     DesiredCapacity=new_desired,
                     MinSize=new_min,
@@ -222,6 +223,7 @@ class ASGCapacityManager:
             self._retry_with_backoff(
                 self._aws_client.autoscaling_client.terminate_instance_in_auto_scaling_group,
                 operation_type="critical",
+                operation_name="terminate_instance_in_auto_scaling_group",
                 InstanceId=instance_id,
                 ShouldDecrementDesiredCapacity=True,
             )
@@ -262,6 +264,7 @@ class ASGCapacityManager:
             self._retry_with_backoff(
                 self._aws_client.autoscaling_client.update_auto_scaling_group,
                 operation_type="critical",
+                operation_name="update_auto_scaling_group",
                 AutoScalingGroupName=asg_name,
                 MinSize=new_capacity,
             )

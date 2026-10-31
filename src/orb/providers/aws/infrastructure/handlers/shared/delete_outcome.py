@@ -152,6 +152,7 @@ def delete_asg_or_confirm_gone(
         retry(
             autoscaling_client.delete_auto_scaling_group,
             operation_type="critical",
+            operation_name="delete_auto_scaling_group",
             AutoScalingGroupName=asg_name,
             ForceDelete=True,
         )

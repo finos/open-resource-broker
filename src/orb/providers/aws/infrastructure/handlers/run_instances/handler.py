@@ -188,6 +188,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         response = self._retry_with_backoff(
             self.aws_client.ec2_client.run_instances,
             operation_type="critical",
+            operation_name="run_instances",
             **run_params,
         )
 

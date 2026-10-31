@@ -215,8 +215,8 @@ class TestCountPerCall:
         assert CircuitBreakerStrategy._circuit_states[svc]["failure_count"] == 2
 
     def test_permanent_errors_are_not_counted(self) -> None:
+        from orb.infrastructure.resilience import retry_classifier_registry as registry
         from orb.infrastructure.resilience.retry_classifier_registry import (
-            clear_classifiers,
             register_retry_classifier,
         )
 
@@ -224,6 +224,7 @@ class TestCountPerCall:
             def is_non_retryable(self, exception: Exception) -> bool:
                 return isinstance(exception, ValueError)
 
+        saved = list(registry._classifiers)
         classifier = _Permanent()
         register_retry_classifier(classifier)  # type: ignore[arg-type]
         try:
@@ -245,4 +246,4 @@ class TestCountPerCall:
             assert CircuitBreakerStrategy._circuit_states[svc]["failure_count"] == 0
             assert _state(svc) == CircuitState.CLOSED
         finally:
-            clear_classifiers()
+            registry._classifiers[:] = saved
