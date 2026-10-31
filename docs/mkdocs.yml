@@ -113,6 +113,7 @@ nav:
       - Lazy Loading Design: architecture/lazy-loading-design.md
       - Machine Discovery Flow: architecture/machine-discovery-flow.md
       - Multi-Provider Design: architecture/multi-provider-design.md
+      - Daemon Mode Design: architecture/daemon-mode.md
       - Field Mapping Architecture: architecture/field_mapping_architecture.md
       - Metrics Report: architecture/metrics_report.md
     - Design Patterns:
