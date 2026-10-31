@@ -320,6 +320,34 @@ def resolve_aurora_connection(config: Any) -> tuple[Any, Any]:
     raise StorageError(_AURORA_NOT_CONFIGURED)
 
 
+def _aurora_engine(url: Any, settings: Any) -> Any:
+    """The process's engine for an Aurora database, built once per database.
+
+    The repositories, the unit of work and the health probe all reach the
+    database through this engine, so they share one connection pool.
+    """
+    from sqlalchemy import create_engine
+
+    from orb.infrastructure.storage.components.engine_registry import get_or_create_engine
+    from orb.infrastructure.storage.components.sql_connection_manager import shared_engine_for_url
+
+    if settings is None:
+        return shared_engine_for_url(url, pool_pre_ping=True)
+
+    return get_or_create_engine(
+        url,
+        lambda u: create_engine(
+            u,
+            pool_size=settings.pool_size,
+            max_overflow=settings.max_overflow,
+            pool_timeout=getattr(settings, "pool_timeout", 30),
+            pool_recycle=getattr(settings, "pool_recycle", 3600),
+            pool_pre_ping=True,
+            echo=getattr(settings, "echo", False),
+        ),
+    )
+
+
 def create_aurora_strategy(config: Any) -> Any:
     """Create the Aurora SQL strategy for callers that have no entity (health probes)."""
     from orb.infrastructure.storage.sql.entities import DEFAULT_ENTITY
@@ -342,9 +370,17 @@ def create_aurora_entity_strategy(config: Any, entity: str) -> Any:
     """
     from orb.infrastructure.storage.sql.entities import create_entity_strategy
 
-    url, _ = resolve_aurora_connection(config)
+    url, settings = resolve_aurora_connection(config)
+    engine = _aurora_engine(url, settings)
     return create_entity_strategy(
-        {"connection_string": url.render_as_string(hide_password=False)}, entity
+        {
+            "type": url.get_backend_name(),
+            "engine": engine,
+            # The registry owns shared engines; a private in-memory one is ours
+            "owns_engine": (url.database or ":memory:") == ":memory:"
+            and url.get_backend_name() == "sqlite",
+        },
+        entity,
     )
 
 
@@ -374,22 +410,10 @@ def create_aurora_unit_of_work(config: Any) -> Any:
     Raises:
         StorageError: If no Aurora connection can be derived from ``config``
     """
-    from sqlalchemy import create_engine
-
     from orb.infrastructure.storage.sql.unit_of_work import SQLUnitOfWork
 
     url, settings = resolve_aurora_connection(config)
-    if settings is None:
-        return SQLUnitOfWork(create_engine(url))
-    engine = create_engine(
-        url,
-        pool_size=settings.pool_size,
-        max_overflow=settings.max_overflow,
-        pool_timeout=getattr(settings, "pool_timeout", 30),
-        pool_recycle=getattr(settings, "pool_recycle", 3600),
-        echo=getattr(settings, "echo", False),
-    )
-    return SQLUnitOfWork(engine)
+    return SQLUnitOfWork(_aurora_engine(url, settings))
 
 
 def register_aurora_storage(

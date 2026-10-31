@@ -168,9 +168,21 @@ class TestMissingConfiguration:
         assert PASSWORD not in str(exc_info.value.error_code)
 
 
+@pytest.fixture
+def created_engines():
+    """Record the engines built for Aurora (the MySQL driver is not needed)."""
+    from orb.infrastructure.storage.components.engine_registry import dispose_engines
+
+    dispose_engines()
+    with patch("sqlalchemy.create_engine") as create_engine:
+        create_engine.side_effect = lambda *a, **k: MagicMock(name="engine")
+        yield create_engine
+    dispose_engines()
+
+
 @pytest.mark.unit
 class TestEveryPathUsesTheResolvedConnection:
-    def test_repository_path_with_the_dumped_application_config(self) -> None:
+    def test_repository_path_with_the_dumped_application_config(self, created_engines) -> None:
         from orb.infrastructure.utilities.factories.repository_factory import RepositoryFactory
 
         registry_cls = type(f"_Registry{uuid.uuid4().hex}", (StorageRegistry,), {})
@@ -193,28 +205,25 @@ class TestEveryPathUsesTheResolvedConnection:
         StorageRegistry._instances.pop(registry_cls.__name__, None)
 
         assert len(captured) == 3
-        for cfg in captured:
-            assert AURORA["cluster_endpoint"] in cfg["connection_string"]
-            assert "localhost" not in cfg["connection_string"]
+        url = created_engines.call_args.args[0]
+        assert url.host == AURORA["cluster_endpoint"]
+        assert created_engines.call_count == 1
+        assert all(cfg["engine"] is captured[0]["engine"] for cfg in captured)
 
-    def test_health_probe_path(self) -> None:
-        captured: list[dict[str, Any]] = []
+    def test_health_probe_path(self, created_engines) -> None:
         with patch(
             "orb.infrastructure.storage.sql.entities.create_entity_strategy",
-            side_effect=lambda cfg, table: captured.append(cfg) or MagicMock(),
+            side_effect=lambda cfg, table: MagicMock(),
         ):
             create_aurora_strategy(_dumped())
 
-        assert AURORA["cluster_endpoint"] in captured[0]["connection_string"]
+        assert created_engines.call_args.args[0].host == AURORA["cluster_endpoint"]
 
-    def test_unit_of_work_path_applies_the_pool_settings(self) -> None:
-        with (
-            patch("sqlalchemy.create_engine") as create_engine,
-            patch("orb.infrastructure.storage.sql.unit_of_work.SQLUnitOfWork") as uow,
-        ):
+    def test_unit_of_work_path_applies_the_pool_settings(self, created_engines) -> None:
+        with patch("orb.infrastructure.storage.sql.unit_of_work.SQLUnitOfWork") as uow:
             create_aurora_unit_of_work(_dumped())
 
-        args, kwargs = create_engine.call_args
+        args, kwargs = created_engines.call_args
         assert args[0].host == AURORA["cluster_endpoint"]
         assert kwargs["pool_size"] == 7
         assert kwargs["max_overflow"] == 3

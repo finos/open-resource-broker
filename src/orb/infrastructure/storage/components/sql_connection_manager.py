@@ -4,11 +4,28 @@ from contextlib import contextmanager
 from typing import Any, Generator, Optional
 
 from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.engine import URL
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
+from .engine_registry import get_or_create_engine
 from .resource_manager import StorageResourceManager as ResourceManager
+
+
+def _is_memory_url(url: URL) -> bool:
+    return url.get_backend_name() == "sqlite" and (url.database or ":memory:") == ":memory:"
+
+
+def shared_engine_for_url(connection_string: Any, **engine_args: Any) -> Engine:
+    """The process's engine for a database named by URL (one pool per database).
+
+    In-memory SQLite is private to the connection that created it, so it is
+    never shared this way.
+    """
+    url = make_url(connection_string)
+    if _is_memory_url(url):
+        return create_engine(url, **engine_args)
+    return get_or_create_engine(url, lambda u: create_engine(u, **engine_args))
 
 
 def build_sql_url(
@@ -118,6 +135,16 @@ class SQLConnectionManager(ResourceManager):
 
         return info
 
+    def _engine_for(self, connection_string: Any, **engine_args: Any) -> Engine:
+        """Engine for a database this manager was told to open.
+
+        A database shared with other consumers in the process uses the
+        process-wide engine and is never disposed here; a private in-memory
+        database belongs to this manager.
+        """
+        self._owns_engine = _is_memory_url(make_url(connection_string))
+        return shared_engine_for_url(connection_string, **engine_args)
+
     def _initialize_engine(self) -> None:
         """Initialize SQLAlchemy engine with connection pooling."""
         try:
@@ -135,7 +162,7 @@ class SQLConnectionManager(ResourceManager):
             # Fast-path: use connection_string directly when provided
             if "connection_string" in self.config:
                 connection_string = self.config["connection_string"]
-                self.engine = create_engine(connection_string, pool_pre_ping=True)
+                self.engine = self._engine_for(connection_string, pool_pre_ping=True)
                 self.session_factory = sessionmaker(bind=self.engine)
                 self.logger.info("Initialized connection manager from connection_string")
                 return
@@ -173,7 +200,7 @@ class SQLConnectionManager(ResourceManager):
                 # mode already serializes cross-process writes correctly, and
                 # the in-memory (":memory:") databases used in tests do not
                 # support a persistent WAL file.
-                self.engine = create_engine(
+                self.engine = self._engine_for(
                     connection_string,
                     echo=self.config.get("echo", False),
                     pool_pre_ping=True,
@@ -194,7 +221,7 @@ class SQLConnectionManager(ResourceManager):
                     "postgresql", database, host, port, username, password
                 )
 
-                self.engine = create_engine(
+                self.engine = self._engine_for(
                     connection_string,
                     echo=self.config.get("echo", False),
                     poolclass=QueuePool,
@@ -212,7 +239,7 @@ class SQLConnectionManager(ResourceManager):
 
                 connection_string = build_sql_url("mysql", database, host, port, username, password)
 
-                self.engine = create_engine(
+                self.engine = self._engine_for(
                     connection_string,
                     echo=self.config.get("echo", False),
                     poolclass=QueuePool,

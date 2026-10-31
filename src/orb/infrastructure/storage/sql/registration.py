@@ -6,7 +6,6 @@ enabling the storage registry pattern for SQL storage.
 CLEAN ARCHITECTURE: Only handles storage strategies, no repository knowledge.
 """
 
-import threading
 from typing import Any
 
 from orb.infrastructure.logging.logger import get_logger
@@ -103,9 +102,9 @@ def create_sql_entity_strategy(config: Any, entity: str) -> Any:
         {
             "type": sql_config.type,
             "engine": _create_engine_for(sql_config),
-            # An engine created here belongs to this strategy, so cleanup disposes
-            # it; the shared in-memory engine is never disposed by a strategy
-            "owns_engine": not _is_shared_memory(sql_config),
+            # The engine belongs to the process-wide registry, which disposes it
+            # at shutdown; a strategy's cleanup must not close it for the others
+            "owns_engine": False,
             "connection_timeout": connection_timeout,
         },
         entity,
@@ -197,49 +196,32 @@ def _build_connection_string(sql_config: Any) -> str:
     return _build_url(sql_config).render_as_string(hide_password=False)
 
 
-# In-memory SQLite databases exist only inside one connection, so every consumer of
-# ":memory:" in a process (unit of work, repositories, health probes) has to share
-# the engine to see the same data. The engine uses a single connection: this is for
-# development and tests, not for concurrent workloads.
-_SHARED_MEMORY_ENGINES: dict[str, Any] = {}
-_SHARED_MEMORY_LOCK = threading.Lock()
-
-
-def _is_shared_memory(sql_config: Any) -> bool:
-    return sql_config.type == "sqlite" and sql_config.name == ":memory:"
-
-
 def reset_shared_memory_engines() -> None:
-    """Dispose the shared in-memory engines (tests start from an empty database)."""
-    with _SHARED_MEMORY_LOCK:
-        engines = list(_SHARED_MEMORY_ENGINES.values())
-        _SHARED_MEMORY_ENGINES.clear()
-    for engine in engines:
-        engine.dispose()
+    """Dispose every shared engine, in-memory databases included (tests start empty)."""
+    from orb.infrastructure.storage.components.engine_registry import dispose_engines
+
+    dispose_engines()
 
 
-def _create_engine_for(sql_config: Any) -> Any:
-    """Create the engine for a SQL storage configuration."""
+def _new_engine(url: Any, sql_config: Any) -> Any:
+    """Build the engine for a SQL storage configuration."""
     from sqlalchemy import create_engine
     from sqlalchemy.pool import StaticPool
 
-    url = _build_url(sql_config)
     echo = getattr(sql_config, "echo", False) is True
 
     if url.get_backend_name() == "sqlite":
         database = url.database or ""
         if database == ":memory:":
-            with _SHARED_MEMORY_LOCK:
-                engine = _SHARED_MEMORY_ENGINES.get("sqlite:///:memory:")
-                if engine is None:
-                    engine = create_engine(
-                        url,
-                        echo=echo,
-                        poolclass=StaticPool,
-                        connect_args={"check_same_thread": False},
-                    )
-                    _SHARED_MEMORY_ENGINES["sqlite:///:memory:"] = engine
-                return engine
+            # An in-memory database exists only inside one connection, so every
+            # consumer of ":memory:" in the process shares this single-connection
+            # engine. It is for development and tests, not for concurrent workloads.
+            return create_engine(
+                url,
+                echo=echo,
+                poolclass=StaticPool,
+                connect_args={"check_same_thread": False},
+            )
         path = _sqlite_file_path(database)
         if path is not None:
             if not path.exists():
@@ -270,6 +252,13 @@ def _create_engine_for(sql_config: Any) -> Any:
     )
 
 
+def _create_engine_for(sql_config: Any) -> Any:
+    """The process's engine for a SQL storage configuration (one per database)."""
+    from orb.infrastructure.storage.components.engine_registry import get_or_create_engine
+
+    return get_or_create_engine(_build_url(sql_config), lambda url: _new_engine(url, sql_config))
+
+
 def create_sql_unit_of_work(config: Any) -> Any:
     """
     Create SQL unit of work with correct configuration extraction.
@@ -280,8 +269,6 @@ def create_sql_unit_of_work(config: Any) -> Any:
     Returns:
         SQLUnitOfWork instance with correctly configured engine
     """
-    from sqlalchemy import create_engine
-
     from orb.config.manager import ConfigurationManager
     from orb.config.schemas.storage_schema import StorageConfig
     from orb.infrastructure.storage.sql.unit_of_work import SQLUnitOfWork
@@ -301,8 +288,11 @@ def create_sql_unit_of_work(config: Any) -> Any:
                 "SQL unit of work needs a ConfigurationManager or a connection_string; "
                 "no database location can be derived from the configuration that was passed."
             )
-        engine = create_engine(connection_string)
-        return SQLUnitOfWork(engine)
+        from orb.infrastructure.storage.components.sql_connection_manager import (
+            shared_engine_for_url,
+        )
+
+        return SQLUnitOfWork(shared_engine_for_url(connection_string))
 
 
 def register_sql_storage() -> None:

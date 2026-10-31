@@ -473,14 +473,15 @@ class TestSqlUrlBuilding:
 
         engine.dispose.assert_called_once()
 
-    def test_engine_created_for_a_strategy_is_disposed_on_cleanup(self, tmp_path):
+    def test_engine_created_for_a_strategy_is_left_to_the_process_registry(self, tmp_path):
         strategy = create_sql_strategy(_app_config(str(tmp_path / "owned.db")))
         engine = strategy.connection_manager.engine
 
         with patch.object(engine, "dispose", wraps=engine.dispose) as dispose:
             strategy.connection_manager.cleanup()
 
-        dispose.assert_called_once()
+        # Other consumers of the same database share this engine
+        dispose.assert_not_called()
 
     def test_engine_shared_with_the_unit_of_work_is_not_disposed_by_a_strategy(self):
         engine = MagicMock()
