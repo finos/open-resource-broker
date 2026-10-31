@@ -21,6 +21,11 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <Optimize>false</Optimize>
+    <!-- Pin the resolved package graph in packages.lock.json. CI restores in
+         locked mode, so a change to the graph fails the build until the lock
+         file is regenerated (dotnet restore with the use-lock-file switch). -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
     <!-- The generated model assembly (OpenResourceBroker.Sdk) is not published to
          NuGet on its own — it is an implementation detail produced on build from
          the OpenAPI spec.  Embed its DLL directly into THIS package's lib/ folder
