@@ -124,20 +124,87 @@ type OrbSSERequest struct {
 	Machines        []OrbMachine `json:"machines"`
 }
 
-// OrbMachine represents a single machine entry in an ORB SSE request.
+// FlexString decodes a JSON string, number, boolean or null into a string.
+// The server sends machine launch_time as a Unix timestamp number (null while
+// unknown); a number is kept as its decimal text, e.g. "1793411323".
+type FlexString string
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (f *FlexString) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if bytes.Equal(trimmed, []byte("null")) {
+		*f = ""
+		return nil
+	}
+	if len(trimmed) > 0 && trimmed[0] == '"' {
+		var s string
+		if err := json.Unmarshal(trimmed, &s); err != nil {
+			return err
+		}
+		*f = FlexString(s)
+		return nil
+	}
+	*f = FlexString(trimmed)
+	return nil
+}
+
+// OrbMachine represents a single machine entry in an ORB SSE request. The JSON
+// keys match the server's machine reference serialisation.
 type OrbMachine struct {
-	MachineID  string `json:"machine_id"`
-	Name       string `json:"name"`
-	Status     string `json:"status"`
-	Result     string `json:"result"`
-	PrivateIP  string `json:"private_ip"`
-	PublicIP   string `json:"public_ip"`
-	LaunchTime string `json:"launch_time"`
-	Message    string `json:"message"`
+	MachineID  string     `json:"machine_id"`
+	Name       string     `json:"name"`
+	Status     string     `json:"status"`
+	Result     string     `json:"result"`
+	PrivateIP  string     `json:"private_ip_address"`
+	PublicIP   string     `json:"public_ip_address"`
+	LaunchTime FlexString `json:"launch_time"`
+	Message    string     `json:"message"`
+}
+
+// UnmarshalJSON decodes a request entry element by element, so a machine entry
+// that cannot be decoded is skipped instead of discarding the whole request.
+func (r *OrbSSERequest) UnmarshalJSON(data []byte) error {
+	type plain OrbSSERequest
+	aux := struct {
+		*plain
+		Machines []json.RawMessage `json:"machines"`
+	}{plain: (*plain)(r)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	r.Machines = nil
+	for _, raw := range aux.Machines {
+		var m OrbMachine
+		if err := json.Unmarshal(raw, &m); err == nil {
+			r.Machines = append(r.Machines, m)
+		}
+	}
+	return nil
+}
+
+// UnmarshalJSON decodes the payload request by request, so one malformed
+// request entry does not discard its siblings.
+func (p *OrbSSEPayload) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Requests []json.RawMessage `json:"requests"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	p.Requests = nil
+	for _, raw := range aux.Requests {
+		var r OrbSSERequest
+		if err := json.Unmarshal(raw, &r); err == nil {
+			p.Requests = append(p.Requests, r)
+		}
+	}
+	return nil
 }
 
 // ParsePayload parses an ORB SSE data frame into its structured fields.
-// Returns nil if the frame is the sentinel or cannot be parsed.
+// Returns nil if the frame is the sentinel or is not a JSON object. Individual
+// request and machine entries that cannot be decoded are skipped; they never
+// cause the rest of the frame to be dropped.
 func ParsePayload(f *Frame) *OrbSSEPayload {
 	if IsSentinel(f) {
 		return nil

@@ -192,4 +192,21 @@ class SseReaderTest {
         val frames = sseStream(connect = { _ -> streamOf(wire) }).toList()
         assertEquals("error", frames.first().event)
     }
+
+    // Output of the server's default scheduler formatter for a request status
+    // stream frame: numeric launch_time, *_ip_address keys, a null launch_time.
+    private val golden = """{"requests":[{"request_id":"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73","status":"complete","template_id":"t1","requested_count":2,"created_at":"2026-10-31T01:00:00Z","machine_ids":[],"message":"done","metadata":{},"request_type":"acquire","desired_capacity":1,"successful_count":2,"failed_count":0,"error_details":{},"provider_data":{},"version":0,"resource_ids":[],"machines":[{"machine_id":"i-0abc123def4567890","name":"ip-10-0-1-12","result":"succeed","status":"running","private_ip_address":"10.0.1.12","public_ip_address":"54.12.34.56","instance_type":"t3.micro","price_type":"ondemand","cloud_host_id":"ip-10-0-1-12.ec2.internal","launch_time":1793411323,"request_id":"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73","message":""},{"machine_id":"i-0def456abc7890123","name":"ip-10-0-1-13","result":"executing","status":"pending","request_id":"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73","message":"","launch_time":null,"cloud_host_id":null}]}],"message":"Request status retrieved successfully","count":1}"""
+
+    @Test
+    fun `golden server payload parses status launch time and IPs`() {
+        val payload = com.google.gson.Gson().fromJson(golden, OrbSsePayload::class.java)
+        val req = payload.requests!!.first()
+        assertEquals("complete", req.status)
+        assertEquals(2, req.machines!!.size)
+        val m = req.machines!![0]
+        assertEquals("10.0.1.12", m.private_ip_address)
+        assertEquals("54.12.34.56", m.public_ip_address)
+        assertEquals("1793411323", m.launch_time)
+        assertNull(req.machines!![1].launch_time)
+    }
 }

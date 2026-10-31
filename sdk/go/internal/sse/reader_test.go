@@ -124,3 +124,37 @@ func TestFrameCarriesEventName(t *testing.T) {
 		t.Fatalf("expected plain sentinel frame, got %+v", f)
 	}
 }
+
+func TestParsePayloadGoldenServerOutput(t *testing.T) {
+	golden := `{"requests":[{"request_id":"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73","status":"complete","template_id":"t1","requested_count":2,"created_at":"2026-10-31T01:00:00Z","machine_ids":[],"message":"done","metadata":{},"request_type":"acquire","desired_capacity":1,"successful_count":2,"failed_count":0,"error_details":{},"provider_data":{},"version":0,"resource_ids":[],"machines":[{"machine_id":"i-0abc123def4567890","name":"ip-10-0-1-12","result":"succeed","status":"running","private_ip_address":"10.0.1.12","public_ip_address":"54.12.34.56","instance_type":"t3.micro","price_type":"ondemand","cloud_host_id":"ip-10-0-1-12.ec2.internal","launch_time":1793411323,"request_id":"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73","message":""},{"machine_id":"i-0def456abc7890123","name":"ip-10-0-1-13","result":"executing","status":"pending","request_id":"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73","message":"","launch_time":null,"cloud_host_id":null}]}],"message":"Request status retrieved successfully","count":1}`
+	p := sse.ParsePayload(&sse.Frame{Data: []byte(golden)})
+	req := sse.FirstRequest(p)
+	if req == nil || req.Status != "complete" || len(req.Machines) != 2 {
+		t.Fatalf("golden payload not parsed: %+v", req)
+	}
+	m := req.Machines[0]
+	if m.PrivateIP != "10.0.1.12" || m.PublicIP != "54.12.34.56" || string(m.LaunchTime) != "1793411323" {
+		t.Fatalf("machine fields not parsed: %+v", m)
+	}
+}
+
+func TestParsePayloadAcceptsStringLaunchTime(t *testing.T) {
+	data := `{"requests":[{"status":"running","machines":[{"machine_id":"m","launch_time":"2026-01-02T03:04:05Z"}]}]}`
+	req := sse.FirstRequest(sse.ParsePayload(&sse.Frame{Data: []byte(data)}))
+	if req == nil || string(req.Machines[0].LaunchTime) != "2026-01-02T03:04:05Z" {
+		t.Fatalf("string launch_time not parsed: %+v", req)
+	}
+}
+
+// One undecodable machine must not drop the frame or its siblings.
+func TestParsePayloadSkipsOnlyTheBadMachine(t *testing.T) {
+	data := `{"requests":[{"status":"complete","machines":[{"machine_id":"ok","launch_time":1},{"machine_id":["bad"]}]},{"status":"complete","requested_count":"x"}]}`
+	p := sse.ParsePayload(&sse.Frame{Data: []byte(data)})
+	req := sse.FirstRequest(p)
+	if req == nil || req.Status != "complete" {
+		t.Fatalf("frame dropped: %+v", p)
+	}
+	if len(req.Machines) != 1 || req.Machines[0].MachineID != "ok" {
+		t.Fatalf("expected only the decodable machine, got %+v", req.Machines)
+	}
+}
