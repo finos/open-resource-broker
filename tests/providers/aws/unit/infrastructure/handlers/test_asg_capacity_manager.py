@@ -254,7 +254,7 @@ def test_release_instances_direct_termination_when_asg_details_unrecoverable():
     aws_client.autoscaling_client.delete_auto_scaling_group.assert_called_once_with(
         AutoScalingGroupName="asg-1", ForceDelete=True
     )
-    cleanup_fn.assert_called_once_with("asg", "asg-1")
+    cleanup_fn.assert_called_once_with("asg", "asg-1", ["i-1"])
 
 
 def test_release_instances_direct_termination_when_describe_returns_no_groups():
@@ -265,7 +265,7 @@ def test_release_instances_direct_termination_when_describe_returns_no_groups():
     manager.release_instances("asg-1", ["i-1"], {})
 
     aws_ops.terminate_instances_with_fallback.assert_called_once()
-    cleanup_fn.assert_called_once_with("asg", "asg-1")
+    cleanup_fn.assert_called_once_with("asg", "asg-1", ["i-1"])
 
 
 def test_release_instances_uses_registered_delete_asg_callback():
@@ -343,7 +343,7 @@ def test_release_instances_falls_back_to_computed_capacity_when_redescribe_fails
     aws_client.autoscaling_client.delete_auto_scaling_group.assert_called_once_with(
         AutoScalingGroupName="asg-1", ForceDelete=True
     )
-    cleanup_fn.assert_called_once_with("asg", "asg-1")
+    cleanup_fn.assert_called_once_with("asg", "asg-1", ["i-1"])
 
 
 def test_release_instances_reduces_min_size_when_above_new_capacity():

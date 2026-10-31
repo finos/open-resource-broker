@@ -96,3 +96,32 @@ async def test_pagination_limit_and_offset() -> None:
     assert result.items == dtos[1:3]
     assert result.total_count == 5
     assert result.total_unfiltered == 5
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_name", ["aws-prod", "azure-prod"])
+async def test_provider_template_listing_is_served_from_template_configuration(
+    provider_name: str,
+) -> None:
+    """Provider templates come from the template configuration, not provider samples."""
+    from orb.domain.base.ports import TemplateConfigurationPort
+
+    configured = MagicMock()
+    configured.is_active = True
+    configured.template_id = f"{provider_name}-configured"
+    template_manager = MagicMock()
+    template_manager.load_templates = AsyncMock(return_value=[configured])
+    container = MagicMock()
+    container.get = MagicMock(return_value=template_manager)
+    handler = ListTemplatesHandler(
+        logger=MagicMock(),
+        error_handler=MagicMock(),
+        container=container,
+        generic_filter_service=MagicMock(),
+    )
+
+    result = await handler.execute_query(ListTemplatesQuery(provider_name=provider_name))
+
+    container.get.assert_called_once_with(TemplateConfigurationPort)
+    template_manager.load_templates.assert_awaited_once_with(provider_override=provider_name)
+    assert [t.template_id for t in result.items] == [f"{provider_name}-configured"]

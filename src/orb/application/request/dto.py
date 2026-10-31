@@ -27,6 +27,7 @@ class MachineReferenceDTO(BaseDTO):
     price_type: Optional[str] = None
     tags: Optional[dict[str, str]] = None
     cloud_host_id: Optional[str] = None
+    vpc_id: Optional[str] = None
     launch_time: Optional[int] = None
     request_id: Optional[str] = None
     return_request_id: Optional[str] = None
@@ -62,6 +63,7 @@ class MachineReferenceDTO(BaseDTO):
             price_type=machine.price_type,
             launch_time=int(machine.launch_time.timestamp()) if machine.launch_time else None,
             cloud_host_id=machine.provider_data.get("cloud_host_id"),
+            vpc_id=machine.vpc_id,
             request_id=machine.request_id,
             return_request_id=machine.return_request_id,
             tags=machine.tags.tags if machine.tags and machine.tags.tags else None,

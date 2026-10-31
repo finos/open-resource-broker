@@ -445,3 +445,180 @@ class TestRunInstancesHandlerNetworkingInject:
             assert params["SubnetId"] == "subnet-1"
         if expect_sgs:
             assert params["SecurityGroupIds"] == ["sg-1"]
+
+
+class TestRunInstancesTeardownClassification:
+    """Intentional teardown is not a launch failure."""
+
+    def _run(self, statuses, requested_count):
+        handler = _make_handler()
+        instances = [{"instance_id": f"i-{n}", "status": s} for n, s in enumerate(statuses)]
+        return handler._compute_run_instances_fulfilment(instances, requested_count)
+
+    def _run_with_reason(self, statuses, requested_count, reason):
+        handler = _make_handler()
+        instances = [
+            {"instance_id": f"i-{n}", "status": s, "status_reason": reason}
+            for n, s in enumerate(statuses)
+        ]
+        return handler._compute_run_instances_fulfilment(instances, requested_count)
+
+    @pytest.mark.parametrize("gone", ["shutting-down", "terminated", "stopping", "stopped"])
+    def test_target_met_then_requested_teardown_stays_fulfilled(self, gone):
+        instances = [
+            {"instance_id": "i-0", "status": "running"},
+            {
+                "instance_id": "i-1",
+                "status": gone,
+                "status_reason": "Client.UserInitiatedShutdown: User initiated shutdown",
+            },
+        ]
+        f = _make_handler()._compute_run_instances_fulfilment(instances, 2)
+        assert f.state == "fulfilled"
+        assert f.failed_count == 0
+        assert f.running_count == 1
+
+    @pytest.mark.parametrize("gone", ["shutting-down", "terminated"])
+    def test_all_instances_gone_is_terminal(self, gone):
+        f = self._run_with_reason(
+            [gone, gone], 2, "Client.UserInitiatedShutdown: User initiated shutdown"
+        )
+        assert f.state == "failed"
+        assert f.final is True
+        assert f.failed_count == 0
+
+    @pytest.mark.parametrize("gone", ["shutting-down", "terminated"])
+    def test_ending_without_reason_after_target_reached_stays_fulfilled(self, gone):
+        """Every requested instance exists, so a reasonless ending is a later teardown."""
+        f = self._run(["running", gone], 2)
+        assert f.state == "fulfilled"
+        assert f.failed_count == 0
+
+    @pytest.mark.parametrize("gone", ["shutting-down", "terminated"])
+    def test_ending_without_reason_with_missing_instances_is_not_fulfilled(self, gone):
+        """Fewer instances than requested: the reasonless ending may be a launch failure."""
+        f = self._run(["running", gone], 3)
+        assert f.state == "partial"
+        assert f.final is True
+        assert f.failed_count == 1
+
+    @pytest.mark.parametrize("gone", ["shutting-down", "terminated"])
+    def test_ending_without_reason_above_target_is_intentional(self, gone):
+        f = self._run(["running", "running", gone], 2)
+        assert f.state == "fulfilled"
+        assert f.failed_count == 0
+
+    def test_all_ending_without_reason_is_failed_and_final(self):
+        f = self._run(["terminated", "terminated"], 2)
+        assert f.state == "failed"
+        assert f.final is True
+
+    def test_teardown_with_launch_shortfall_is_partial(self):
+        f = self._run(["running", "terminated"], 3)
+        assert f.state == "partial"
+        assert f.final is True
+
+    def test_launch_failure_still_counts_as_failed(self):
+        f = self._run(["failed", "failed"], 2)
+        assert f.state == "failed"
+        assert f.failed_count == 2
+
+    @pytest.mark.parametrize("status", ["error", "starting"])
+    def test_non_machine_statuses_are_not_classified(self, status):
+        f = self._run([status, status], 2)
+        assert f.state == "in_progress"
+        assert f.failed_count == 0
+        assert f.pending_count == 0
+
+    def test_pending_beats_teardown(self):
+        f = self._run(["running", "pending", "terminated"], 3)
+        assert f.state == "in_progress"
+
+
+class TestRunInstancesTeardownReasons:
+    """State reasons tell AWS-ended instances apart from requested teardown."""
+
+    def _run(self, instances, requested_count):
+        return _make_handler()._compute_run_instances_fulfilment(instances, requested_count)
+
+    @staticmethod
+    def _inst(status, reason=None):
+        return {"instance_id": "i-x", "status": status, "status_reason": reason}
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            "Client.InternalError: Client error on launch",
+            "Client.VolumeLimitExceeded: Volume limit exceeded",
+            "Server.InsufficientInstanceCapacity: Insufficient capacity",
+            "Server.SpotInstanceTermination: Spot instance termination",
+        ],
+    )
+    def test_one_running_two_terminated_at_launch_stays_partial(self, reason):
+        instances = [
+            self._inst("running"),
+            self._inst("terminated", reason),
+            self._inst("terminated", reason),
+        ]
+        f = self._run(instances, 3)
+        assert f.state == "partial"
+        assert f.final is True
+        assert f.failed_count == 2
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            "Client.UserInitiatedShutdown: User initiated shutdown",
+            "Client.InstanceInitiatedShutdown: Instance initiated shutdown",
+            "User initiated (2026-01-01 00:00:00 GMT)",
+        ],
+    )
+    def test_requested_teardown_after_target_met_stays_fulfilled(self, reason):
+        instances = [self._inst("running"), self._inst("terminated", reason)]
+        f = self._run(instances, 2)
+        assert f.state == "fulfilled"
+        assert f.failed_count == 0
+
+    def test_all_terminated_at_launch_is_failed(self):
+        reason = "Client.InternalError: Client error on launch"
+        f = self._run([self._inst("terminated", reason)] * 2, 2)
+        assert f.state == "failed"
+        assert f.failed_count == 2
+
+
+class TestReasonlessEndingIsWarned:
+    def test_intentional_treatment_of_a_reasonless_ending_is_logged(self):
+        handler = _make_handler()
+        instances = [
+            {"instance_id": "i-ok", "status": "running"},
+            {"instance_id": "i-gone", "status": "terminated"},
+        ]
+
+        handler._compute_run_instances_fulfilment(instances, 2, "req-77")
+
+        args = handler._logger.warning.call_args.args
+        assert "i-gone" in args
+        assert "req-77" in args
+
+    def test_no_warning_when_the_ending_has_a_reason(self):
+        handler = _make_handler()
+        instances = [
+            {"instance_id": "i-ok", "status": "running"},
+            {
+                "instance_id": "i-gone",
+                "status": "terminated",
+                "status_reason": "Client.UserInitiatedShutdown: User initiated shutdown",
+            },
+        ]
+
+        handler._compute_run_instances_fulfilment(instances, 2, "req-77")
+
+        handler._logger.warning.assert_not_called()
+
+    def test_no_warning_when_instances_are_missing(self):
+        handler = _make_handler()
+        instances = [{"instance_id": "i-gone", "status": "terminated"}]
+
+        handler._compute_run_instances_fulfilment(instances, 2, "req-77")
+
+        handler._logger.warning.assert_not_called()

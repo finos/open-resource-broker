@@ -5,7 +5,7 @@ finding which fleet owns an instance, reducing maintain-fleet capacity,
 terminating instances, and deleting fleets when capacity reaches zero.
 """
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
@@ -15,6 +15,9 @@ from orb.providers.aws.infrastructure.handlers.base_fleet_release import BaseFle
 from orb.providers.aws.infrastructure.handlers.fleet_release_policy import (
     FleetCapacityInput,
     FleetReleaseDecision,
+)
+from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
+    check_unsuccessful_fleet_response,
 )
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 
@@ -47,7 +50,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         retry_fn: Callable[..., Any],
         paginate_fn: Callable[..., Any],
         collect_with_next_token_fn: Callable[..., Any],
-        cleanup_on_zero_capacity_fn: Callable[[str, str], None],
+        cleanup_on_zero_capacity_fn: Callable[..., None],
     ) -> None:
         super().__init__(
             aws_client=aws_client,
@@ -120,7 +123,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
                     f"EC2Fleet-{fleet_id} instances",
                 )
                 if request_id:
-                    self._cleanup_on_zero_capacity("ec2_fleet", request_id)
+                    self._cleanup_on_zero_capacity("ec2_fleet", request_id, instance_ids)
                 return
             fleet_details = fleet_list[0]
 
@@ -278,12 +281,37 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
             # between the capacity-reduce call and this deletion.
             self._delete_fleet(fleet_id)
         else:
-            self._retry(
+            response = self._retry(
                 self._aws_client.ec2_client.delete_fleets,
                 operation_type="critical",
                 FleetIds=[fleet_id],
                 TerminateInstances=terminate_instances,
             )
+            check_unsuccessful_fleet_response(response, "ec2_fleet", self._fleet_is_deleted)
+
+    def _fleet_is_deleted(self, fleet_id: str) -> bool:
+        """Return True when describe_fleets reports the fleet as deleted."""
+        fleets = self._retry(
+            self._aws_client.ec2_client.describe_fleets,
+            operation_type="read_only",
+            FleetIds=[fleet_id],
+        ).get("Fleets", [])
+        return bool(fleets) and all(
+            f.get("FleetState") in ("deleted", "deleted_running", "deleted_terminating")
+            for f in fleets
+        )
+
+    def _list_fleet_instance_ids(self, fleet_id: str) -> Optional[list[str]]:
+        try:
+            active = self._collect_with_next_token(
+                self._aws_client.ec2_client.describe_fleet_instances,
+                "ActiveInstances",
+                FleetId=fleet_id,
+            )
+            return [i["InstanceId"] for i in active if i.get("InstanceId")]
+        except Exception as exc:
+            self._logger.warning("Could not list instances of EC2 Fleet %s: %s", fleet_id, exc)
+            return None
 
     def _fleet_has_no_remaining_instances(self, fleet_id: str, excluded_ids: set[str]) -> bool:
         """Return True when the EC2 Fleet has no active instances outside *excluded_ids*.
@@ -332,6 +360,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         self,
         fleet_details: dict[str, Any],
         request_id: str = "",
+        released_instance_ids: Optional[Iterable[str]] = None,
     ) -> None:
         tags = {t["Key"]: t["Value"] for t in fleet_details.get("Tags", [])}
         resolved_request_id = tags.get("orb:request-id", "") or request_id
@@ -340,7 +369,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
                 "EC2 Fleet has no orb:request-id tag, skipping launch template cleanup"
             )
             return
-        self._cleanup_on_zero_capacity("ec2_fleet", resolved_request_id)
+        self._cleanup_on_zero_capacity("ec2_fleet", resolved_request_id, released_instance_ids)
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -433,18 +462,18 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         return max(1, total)
 
     def _delete_fleet(self, fleet_id: str) -> None:
-        """Delete an EC2 Fleet, terminating its instances."""
-        try:
-            self._logger.info("Deleting EC2 Fleet %s", fleet_id)
-            self._retry(
-                self._aws_client.ec2_client.delete_fleets,
-                operation_type="critical",
-                FleetIds=[fleet_id],
-                TerminateInstances=True,
-            )
-            self._logger.info("Successfully deleted EC2 Fleet %s", fleet_id)
-        except Exception as e:
-            self._logger.warning("Failed to delete EC2 Fleet %s: %s", fleet_id, e)
-            self._logger.warning(
-                "EC2 Fleet deletion failed, but instance termination completed successfully"
-            )
+        """Delete an EC2 Fleet, terminating its instances.
+
+        Raises when AWS reports the deletion was unsuccessful so callers can
+        decide whether the failure is fatal (cancel) or only alertable (teardown
+        after instances were already terminated).
+        """
+        self._logger.info("Deleting EC2 Fleet %s", fleet_id)
+        response = self._retry(
+            self._aws_client.ec2_client.delete_fleets,
+            operation_type="critical",
+            FleetIds=[fleet_id],
+            TerminateInstances=True,
+        )
+        check_unsuccessful_fleet_response(response, "ec2_fleet", self._fleet_is_deleted)
+        self._logger.info("Successfully deleted EC2 Fleet %s", fleet_id)

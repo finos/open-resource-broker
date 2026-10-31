@@ -26,7 +26,7 @@ Note:
     based on demand and maintain high availability across multiple AZs.
 """
 
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from botocore.exceptions import ClientError
 
@@ -51,6 +51,11 @@ from orb.providers.aws.infrastructure.handlers.asg.capacity_manager import ASGCa
 from orb.providers.aws.infrastructure.handlers.asg.config_builder import ASGConfigBuilder
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
+from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
+    delete_asg_or_confirm_gone,
+    emit_alert,
+    region_of,
+)
 from orb.providers.aws.infrastructure.handlers.shared.fleet_grouping_mixin import FleetGroupingMixin
 from orb.providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
 from orb.providers.aws.utilities.aws_operations import AWSOperations
@@ -103,33 +108,37 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             logger=logger,
             retry_with_backoff=self._retry_with_backoff,
             chunk_list=self._chunk_list,
+            request_id_for_asg=self._request_id_for_asg,
         )
         self._capacity_manager.set_delete_asg_fn(lambda name: self._delete_asg(name))
 
     def _delete_asg(self, asg_name: str) -> None:
-        """Delete an Auto Scaling Group when it's no longer needed."""
-        try:
-            self._logger.info("Deleting ASG %s", asg_name)
-            self._retry_with_backoff(
-                self.aws_client.autoscaling_client.delete_auto_scaling_group,
-                operation_type="critical",
-                AutoScalingGroupName=asg_name,
-                ForceDelete=True,
-            )
-            self._logger.info("Successfully deleted ASG %s", asg_name)
-        except Exception as e:
-            self._logger.warning("Failed to delete ASG %s: %s", asg_name, e)
+        """Delete an Auto Scaling Group, raising unless it is confirmed gone."""
+        delete_asg_or_confirm_gone(
+            self.aws_client.autoscaling_client,
+            self._retry_with_backoff,
+            self._logger,
+            asg_name,
+        )
 
-    def _cleanup_asg_on_zero_capacity(self, resource_type: str, asg_name: str) -> None:
-        """Strip the ASG name prefix to recover the request ID, then delegate to base cleanup."""
+    def _request_id_for_asg(self, asg_name: str) -> str:
+        """Strip the ASG name prefix to recover the ORB request ID."""
         if self.config_port is not None:
             prefix = self.config_port.get_resource_prefix("asg")
-            request_id = (
-                asg_name[len(prefix) :] if prefix and asg_name.startswith(prefix) else asg_name
-            )
-        else:
-            request_id = asg_name
-        self._cleanup_on_zero_capacity(resource_type, request_id)
+            if prefix and asg_name.startswith(prefix):
+                return asg_name[len(prefix) :]
+        return asg_name
+
+    def _cleanup_asg_on_zero_capacity(
+        self,
+        resource_type: str,
+        asg_name: str,
+        exclude_instance_ids: Optional[Iterable[str]] = None,
+    ) -> None:
+        """Recover the request ID from the ASG name, then delegate to base cleanup."""
+        self._cleanup_on_zero_capacity(
+            resource_type, self._request_id_for_asg(asg_name), exclude_instance_ids
+        )
 
     @handle_infrastructure_exceptions(context="asg_creation")
     def _acquire_hosts_internal(
@@ -398,14 +407,55 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         Returns:
             Dictionary with ``status`` of ``"success"`` or ``"error"``.
         """
+        member_ids = self._asg_instance_ids(resource_id)
         try:
             self._delete_asg(resource_id)
-            if request_id:
-                self._cleanup_on_zero_capacity("asg", request_id)
-            return {"status": "success", "message": f"Auto Scaling Group {resource_id} deleted"}
         except Exception as e:
-            self._logger.error("Failed to cancel ASG %s: %s", resource_id, e)
-            raise AWSInfrastructureError(f"Failed to cancel ASG {resource_id}: {e!s}") from e
+            emit_alert(
+                self._logger,
+                "aws.cancel_failed",
+                f"Failed to cancel ASG {resource_id}; the group may still be running: {e}",
+                resource_type="asg",
+                resource_id=resource_id,
+                request_id=request_id,
+                region=region_of(self.aws_client),
+                reason=str(e),
+            )
+            return {
+                "status": "error",
+                "message": f"Failed to cancel ASG {resource_id}; it may still be running: {e!s}",
+            }
+        if request_id and member_ids is None:
+            # ForceDelete terminates the members asynchronously and their ids
+            # are unknown, so the in-use check could not tell them from live
+            # instances. Leave the template for the cleanup on the later return.
+            self._logger.warning(
+                "ASG %s deleted; skipping launch template cleanup (members unknown)", resource_id
+            )
+        elif request_id:
+            try:
+                self._cleanup_on_zero_capacity("asg", request_id, member_ids)
+            except Exception as e:
+                self._logger.warning(
+                    "ASG %s deleted but launch template cleanup failed: %s", resource_id, e
+                )
+        return {"status": "success", "message": f"Auto Scaling Group {resource_id} deleted"}
+
+    def _asg_instance_ids(self, asg_name: str) -> Optional[list[str]]:
+        """Return the ids of the ASG's current members, or None when they can't be read."""
+        try:
+            response = self._retry_with_backoff(
+                self.aws_client.autoscaling_client.describe_auto_scaling_groups,
+                operation_type="read_only",
+                AutoScalingGroupNames=[asg_name],
+            )
+            groups = response.get("AutoScalingGroups", [])
+            return [
+                i["InstanceId"] for g in groups for i in g.get("Instances", []) if "InstanceId" in i
+            ]
+        except Exception as e:
+            self._logger.warning("Could not read members of ASG %s: %s", asg_name, e)
+            return None
 
     def _release_hosts_for_single_asg(
         self, asg_name: str, asg_instance_ids: list[str], asg_details: dict
@@ -734,7 +784,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         sum(WeightedCapacity for InService) >= DesiredCapacity AND
         pending_count == 0 AND failed_count == 0 → fulfilled.
         """
-        failed_count = sum(1 for i in ec2_instances if i.get("status") in ("failed", "error"))
+        failed_count = sum(1 for i in ec2_instances if i.get("status") == "failed")
         running_count = sum(1 for i in ec2_instances if i.get("status") == "running")
 
         asg_fully_fulfilled = desired_capacity > 0 and in_service_weighted >= desired_capacity

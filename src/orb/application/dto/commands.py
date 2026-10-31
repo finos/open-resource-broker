@@ -44,6 +44,9 @@ class CreateReturnRequestCommand(BaseCommand):
     created_request_ids: Optional[list[str]] = None
     processed_machines: Optional[list[str]] = None
     skipped_machines: Optional[list[dict[str, Any]]] = None
+    # Return requests whose deprovisioning failed and whose failed status could
+    # not be recorded either; they would otherwise look like accepted terminations.
+    unrecorded_failure_request_ids: list[str] = []
 
 
 class UpdateRequestStatusCommand(Command, BaseModel):

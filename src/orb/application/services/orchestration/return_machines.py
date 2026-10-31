@@ -123,7 +123,15 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
         primary_request_id = command.created_request_ids[0]
         status = "pending"
 
-        if input.wait:
+        if command.unrecorded_failure_request_ids:
+            # Deprovisioning failed and the failure could not be stored, so the
+            # return requests may still read as accepted. Report the failure.
+            self._logger.error(
+                "Return requests %s failed without a recorded status",
+                command.unrecorded_failure_request_ids,
+            )
+            status = "failed"
+        elif input.wait:
             statuses = await asyncio.gather(
                 *[
                     self._poll_until_terminal(rid, input.timeout_seconds)
@@ -137,6 +145,7 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
             request_id=primary_request_id,
             status=status,
             machine_ids=machine_ids,
+            request_ids=list(command.created_request_ids),
         )
 
     async def _poll_until_terminal(self, request_id: str, timeout_seconds: int) -> str:

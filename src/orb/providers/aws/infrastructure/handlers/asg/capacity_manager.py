@@ -16,6 +16,12 @@ from typing import Any, Callable, Optional
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
+    delete_asg_or_confirm_gone,
+    emit_alert,
+    region_of,
+    unwrap_aws_error,
+)
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 
@@ -27,10 +33,11 @@ class ASGCapacityManager:
         aws_client: AWSClient,
         aws_ops: AWSOperations,
         request_adapter: Optional[RequestAdapterPort],
-        cleanup_on_zero_capacity_fn: Callable[[str, str], None],
+        cleanup_on_zero_capacity_fn: Callable[..., None],
         logger: LoggingPort,
         retry_with_backoff: Callable,
         chunk_list: Callable,
+        request_id_for_asg: Optional[Callable[[str], str]] = None,
     ) -> None:
         self._aws_client = aws_client
         self._aws_ops = aws_ops
@@ -39,6 +46,7 @@ class ASGCapacityManager:
         self._logger = logger
         self._retry_with_backoff = retry_with_backoff
         self._chunk_list = chunk_list
+        self._request_id_for_asg = request_id_for_asg
         self._delete_asg_fn: Optional[Callable[[str], None]] = None
 
     def set_delete_asg_fn(self, fn: Callable[[str], None]) -> None:
@@ -172,8 +180,8 @@ class ASGCapacityManager:
                 asg_name,
                 instance_ids,
             )
-            self._call_delete_asg(asg_name)
-            self._cleanup_on_zero_capacity("asg", asg_name)
+            if self._call_delete_asg(asg_name):
+                self._cleanup_on_zero_capacity("asg", asg_name, instance_ids)
             return
 
         # Guard against double-execution: only terminate instances that are currently
@@ -261,8 +269,8 @@ class ASGCapacityManager:
 
         if new_capacity == 0:
             self._logger.info("ASG %s is empty, deleting ASG", asg_name)
-            self._call_delete_asg(asg_name)
-            self._cleanup_on_zero_capacity("asg", asg_name)
+            if self._call_delete_asg(asg_name):
+                self._cleanup_on_zero_capacity("asg", asg_name, instances_to_terminate)
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -328,22 +336,37 @@ class ASGCapacityManager:
             # is better than skipping a needed capacity decrement.
             return list(instance_ids)
 
-    def _call_delete_asg(self, asg_name: str) -> None:
-        """Invoke the registered delete-ASG callback, or fall back to direct deletion."""
-        if self._delete_asg_fn is not None:
-            self._delete_asg_fn(asg_name)
-        else:
-            self._delete_asg_direct(asg_name)
+    def _call_delete_asg(self, asg_name: str) -> bool:
+        """Delete the ASG after its instances were terminated.
 
-    def _delete_asg_direct(self, asg_name: str) -> None:
+        The release has already succeeded at this point, so a failed delete is
+        surfaced as an alert instead of failing the release. Returns False when
+        the group may still exist, so callers keep its launch template.
+        """
         try:
-            self._logger.info("Deleting ASG %s", asg_name)
-            self._retry_with_backoff(
-                self._aws_client.autoscaling_client.delete_auto_scaling_group,
-                operation_type="critical",
-                AutoScalingGroupName=asg_name,
-                ForceDelete=True,
-            )
-            self._logger.info("Successfully deleted ASG %s", asg_name)
+            if self._delete_asg_fn is not None:
+                self._delete_asg_fn(asg_name)
+            else:
+                delete_asg_or_confirm_gone(
+                    self._aws_client.autoscaling_client,
+                    self._retry_with_backoff,
+                    self._logger,
+                    asg_name,
+                )
+            return True
         except Exception as exc:
-            self._logger.warning("Failed to delete ASG %s: %s", asg_name, exc)
+            reason = str(unwrap_aws_error(exc))
+            emit_alert(
+                self._logger,
+                "aws.fleet_delete_failed",
+                f"Could not delete ASG {asg_name}; the group is left behind and counts "
+                f"against account quotas: {reason}",
+                resource_type="asg",
+                resource_id=asg_name,
+                request_id=(
+                    self._request_id_for_asg(asg_name) if self._request_id_for_asg else asg_name
+                ),
+                region=region_of(self._aws_client),
+                reason=reason,
+            )
+            return False

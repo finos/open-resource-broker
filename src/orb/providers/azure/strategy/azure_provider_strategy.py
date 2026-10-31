@@ -61,7 +61,6 @@ from orb.providers.azure.services.spot_placement_execution import (
     SpotPlacementExecutionService,
 )
 from orb.providers.azure.services.spot_placement_planner import SpotPlacementPlanner
-from orb.providers.azure.services.template_catalog_service import AzureTemplateCatalogService
 from orb.providers.azure.services.termination_service import AzureTerminationService
 from orb.providers.base.strategy import (
     ProviderCapabilities,
@@ -163,7 +162,6 @@ class AzureProviderStrategy(ProviderStrategy):
             planner=self._spot_placement_planner,
             execution_service=self._spot_placement_execution,
         )
-        self._template_catalog_service = AzureTemplateCatalogService(logger=logger)
         self._runtime = AzureRuntimeDependencies(
             config=config,
             logger=logger,
@@ -410,7 +408,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 ProviderOperationType.GET_INSTANCE_STATUS,
                 ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
                 ProviderOperationType.VALIDATE_TEMPLATE,
-                ProviderOperationType.GET_AVAILABLE_TEMPLATES,
                 ProviderOperationType.HEALTH_CHECK,
                 ProviderOperationType.START_INSTANCES,
                 ProviderOperationType.STOP_INSTANCES,
@@ -673,8 +670,6 @@ class AzureProviderStrategy(ProviderStrategy):
             return await self._handle_describe_resource_instances(operation)
         elif operation.operation_type == ProviderOperationType.VALIDATE_TEMPLATE:
             return await self._handle_validate_template(operation)
-        elif operation.operation_type == ProviderOperationType.GET_AVAILABLE_TEMPLATES:
-            return await self._handle_get_available_templates()
         elif operation.operation_type == ProviderOperationType.HEALTH_CHECK:
             return await self._handle_health_check(operation)
         elif operation.operation_type == ProviderOperationType.START_INSTANCES:
@@ -989,24 +984,6 @@ class AzureProviderStrategy(ProviderStrategy):
             return self._error_result(
                 f"Failed to validate template: {exc!s}",
                 "VALIDATE_TEMPLATE_ERROR",
-                exc,
-            )
-
-    # ------------------------------------------------------------------
-    # GET_AVAILABLE_TEMPLATES
-    # ------------------------------------------------------------------
-
-    async def _handle_get_available_templates(self) -> ProviderResult:
-        try:
-            templates = self._template_catalog_service.get_available_templates()
-            return ProviderResult.success_result(
-                {"templates": templates, "count": len(templates)},
-                {"operation": "get_available_templates"},
-            )
-        except Exception as exc:
-            return self._error_result(
-                f"Failed to get available templates: {exc!s}",
-                "GET_TEMPLATES_ERROR",
                 exc,
             )
 
