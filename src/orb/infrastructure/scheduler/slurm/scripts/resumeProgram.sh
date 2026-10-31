@@ -12,7 +12,8 @@
 # SLURM Resume Lifecycle:
 # 1. SLURM calls this script with node names (single batch)
 # 2. ORB provisions cloud instances in ONE batch request
-# 3. This script reports back node addresses via scontrol update
+# 3. This script waits for the request to be fulfilled, then reports back
+#    node addresses via scontrol update
 # 4. slurmd starts on the provisioned nodes and registers with slurmctld
 # 5. SLURM clears POWERING_UP flag → nodes become IDLE → jobs can run
 #
@@ -36,6 +37,9 @@ LOG_FILE="${LOG_DIR}/resume_program.log"
 ORB_MODE="${SLURM_ORB_MODE:-cli}"  # "cli" or "api"
 ORB_API_URL="${SLURM_ORB_API_URL:-http://localhost:8000}"
 TEMPLATE_ID="${SLURM_ORB_TEMPLATE_ID:-default}"
+# Upper bound (seconds) on waiting for node addresses; keep below slurm.conf ResumeTimeout.
+ADDR_POLL_TIMEOUT="${SLURM_ORB_ADDR_POLL_TIMEOUT:-120}"
+ADDR_POLL_INTERVAL="${SLURM_ORB_ADDR_POLL_INTERVAL:-5}"
 
 mkdir -p "${LOG_DIR}"
 
@@ -122,17 +126,65 @@ else
 fi
 
 # --- Register node addresses with SLURM ---
-if command -v jq >/dev/null 2>&1 && [ -n "${BODY:-}" ]; then
-    echo "${BODY}" | jq -r '.machines[]? | "\(.node_name) \(.private_ip_address)"' 2>/dev/null | \
-    while read -r NODE_NAME NODE_IP; do
-        if [ -n "${NODE_NAME}" ] && [ -n "${NODE_IP}" ] && [ "${NODE_IP}" != "null" ]; then
-            if scontrol update "NodeName=${NODE_NAME}" "NodeAddr=${NODE_IP}" 2>>"${LOG_FILE}"; then
-                log "INFO: Registered NodeAddr=${NODE_IP} for ${NODE_NAME}"
-            else
-                log "WARN: scontrol update failed for ${NODE_NAME} (slurmd fallback)"
+# The request response only acknowledges the request; machine addresses exist
+# once the request is fulfilled. Poll the request status (bounded, below
+# ResumeTimeout) and register the addresses that have been assigned.
+if [ "${ORB_MODE}" = "api" ]; then
+    log "INFO: API mode — skipping request status polling and scontrol update (orb CLI status is not used in API mode; slurmd will self-register)"
+elif command -v jq >/dev/null 2>&1 && [ -n "${BODY:-}" ]; then
+    REQUEST_ID=$(echo "${BODY}" | jq -r '.request_id // .requests[0].request_id // empty' 2>/dev/null || true)
+    if [ -z "${REQUEST_ID}" ]; then
+        log "INFO: No request_id in response — skipping scontrol update (slurmd will self-register)"
+        exit 0
+    fi
+
+    DEADLINE=$(( $(date +%s) + ADDR_POLL_TIMEOUT ))
+    STATUS_BODY=""   # last non-empty status body; kept across failed polls
+    TIMED_OUT=1
+    while :; do
+        # `orb requests status` exits non-zero for failed/cancelled/timeout/partial
+        # requests, so decide from the JSON rather than the exit code.
+        POLL_BODY=$(orb requests status "${REQUEST_ID}" 2>>"${LOG_FILE}" || true)
+        if [ -n "${POLL_BODY}" ]; then
+            STATUS_BODY="${POLL_BODY}"
+            READY=$(echo "${STATUS_BODY}" | jq -r '[.requests[0].machines[]? | select(((.private_ip_address // "") | tostring | length) > 0)] | length' 2>/dev/null || echo 0)
+            REQ_STATE=$(echo "${STATUS_BODY}" | jq -r '.requests[0].status // empty' 2>/dev/null || true)
+            if [ "${READY:-0}" -ge "${NUM_NODES}" ]; then
+                TIMED_OUT=0
+                break
             fi
+            case "${REQ_STATE}" in
+                complete|partial|failed|cancelled|timeout)
+                    log "INFO: Request ${REQUEST_ID} reached terminal status ${REQ_STATE} with ${READY:-0}/${NUM_NODES} addresses"
+                    TIMED_OUT=0
+                    break
+                    ;;
+            esac
+        else
+            log "WARN: no status returned for request ${REQUEST_ID}; will retry"
         fi
+        if [ "$(date +%s)" -ge "${DEADLINE}" ]; then
+            break
+        fi
+        sleep "${ADDR_POLL_INTERVAL}"
     done
+
+    if [ "${TIMED_OUT}" -eq 1 ]; then
+        log "WARN: Timed out after ${ADDR_POLL_TIMEOUT}s waiting for request ${REQUEST_ID} addresses (slurmd will self-register)"
+    fi
+
+    if [ -n "${STATUS_BODY}" ]; then
+        echo "${STATUS_BODY}" | jq -r '.requests[0].machines[]? | "\(.name // .node_name // "") \(.private_ip_address // "")"' 2>/dev/null | \
+        while read -r NODE_NAME NODE_IP; do
+            if [ -n "${NODE_NAME}" ] && [ -n "${NODE_IP}" ] && [ "${NODE_IP}" != "null" ]; then
+                if scontrol update "NodeName=${NODE_NAME}" "NodeAddr=${NODE_IP}" 2>>"${LOG_FILE}"; then
+                    log "INFO: Registered NodeAddr=${NODE_IP} for ${NODE_NAME}"
+                else
+                    log "WARN: scontrol update failed for ${NODE_NAME} (slurmd fallback)"
+                fi
+            fi
+        done || true
+    fi
 else
     log "INFO: jq not available or no body — skipping scontrol update (slurmd will self-register)"
 fi
