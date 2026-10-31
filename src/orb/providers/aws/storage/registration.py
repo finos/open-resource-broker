@@ -166,27 +166,158 @@ def register_dynamodb_storage(
         raise
 
 
-def _build_aurora_connection_string(sql_config: Any) -> str:
-    """Build Aurora MySQL connection string from configuration.
+_AURORA_NOT_CONFIGURED = (
+    "Aurora storage needs the Aurora provider configuration "
+    "(provider config storage.aurora) or an explicit connection_string; "
+    "no connection could be derived from the configuration that was passed."
+)
 
-    Uses cluster_endpoint if available, falls back to host.
-    Appends SSL parameters when ssl_ca is configured.
 
-    Args:
-        sql_config: AuroraSqlStrategyConfig instance
+def _aurora_settings_from_mapping(config: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Find the Aurora settings in a mapping, or None.
 
-    Returns:
-        SQLAlchemy-compatible connection string
+    Accepts the AWS provider config (``storage.aurora``), a bare ``aurora``
+    section, and the dumped application config, where the settings sit in the
+    active (else first enabled) AWS provider instance's ``config.storage.aurora``.
     """
-    host = sql_config.cluster_endpoint if sql_config.cluster_endpoint else sql_config.host
-    base = (
-        f"mysql+pymysql://{sql_config.username}:{sql_config.password}"
-        f"@{host}:{sql_config.port}/{sql_config.name}"
+    storage = config.get("storage")
+    if isinstance(storage, dict) and isinstance(storage.get("aurora"), dict):
+        return storage["aurora"]
+    if isinstance(config.get("aurora"), dict):
+        return config["aurora"]
+
+    provider_section = config.get("provider")
+    providers = provider_section.get("providers") if isinstance(provider_section, dict) else None
+    if not isinstance(providers, list):
+        return None
+    active = provider_section.get("active_provider") if isinstance(provider_section, dict) else None
+    candidates = [p for p in providers if isinstance(p, dict) and p.get("type") == "aws"]
+    candidates = [p for p in candidates if p.get("enabled", True)]
+    candidates.sort(key=lambda p: p.get("name") != active)
+    if not candidates:
+        return None
+    # Only the active (else first enabled) instance counts: another instance's
+    # database must never be picked up because this one has none configured.
+    provider_config = candidates[0].get("config")
+    provider_storage = provider_config.get("storage") if isinstance(provider_config, dict) else None
+    if isinstance(provider_storage, dict) and isinstance(provider_storage.get("aurora"), dict):
+        return provider_storage["aurora"]
+    return None
+
+
+def _validated_aurora_settings(raw: Any) -> Any:
+    """Aurora settings as an ``AuroraSqlStrategyConfig`` that names a complete target.
+
+    A connection needs an endpoint, a database name, a user and a password; none
+    of them has a usable default. Errors name the fields only, never the values.
+    """
+    from pydantic import ValidationError
+
+    from orb.infrastructure.storage.exceptions import StorageError
+    from orb.providers.aws.storage.config import AuroraSqlStrategyConfig
+
+    if isinstance(raw, AuroraSqlStrategyConfig):
+        settings = raw
+    else:
+        try:
+            settings = AuroraSqlStrategyConfig.model_validate(raw)
+        except ValidationError as exc:
+            problems = "; ".join(
+                f"{'.'.join(str(part) for part in err['loc']) or 'aurora'}: {err['msg']}"
+                for err in exc.errors(include_input=False, include_url=False)
+            )
+            raise StorageError(f"Aurora storage configuration is invalid ({problems})") from None
+
+    missing = [
+        label
+        for label, present in (
+            ("cluster_endpoint or host", bool(settings.cluster_endpoint or settings.host)),
+            ("name", "name" in settings.model_fields_set and bool(settings.name)),
+            ("username", bool(settings.username)),
+            ("password", bool(settings.password)),
+        )
+        if not present
+    ]
+    if missing:
+        raise StorageError(
+            "Aurora storage configuration is incomplete: set " + ", ".join(missing) + "."
+        )
+    return settings
+
+
+def _aurora_url(settings: Any) -> Any:
+    """SQLAlchemy URL for validated Aurora settings (credentials need no escaping)."""
+    from sqlalchemy.engine import URL
+
+    query: dict[str, str] = {}
+    if settings.ssl_ca:
+        query = {
+            "ssl_ca": settings.ssl_ca,
+            "ssl_verify_cert": "true" if settings.ssl_verify else "false",
+        }
+    return URL.create(
+        "mysql+pymysql",
+        username=settings.username,
+        password=settings.password,
+        host=settings.cluster_endpoint or settings.host,
+        port=settings.port,
+        database=settings.name,
+        query=query,
     )
-    if sql_config.ssl_ca:
-        ssl_verify = "true" if sql_config.ssl_verify else "false"
-        base = f"{base}?ssl_ca={sql_config.ssl_ca}&ssl_verify_cert={ssl_verify}"
-    return base
+
+
+def resolve_aurora_connection(config: Any) -> tuple[Any, Any]:
+    """Resolve ``(url, settings)`` for Aurora from any configuration source.
+
+    Every Aurora entry point (repositories, unit of work, health probes) calls
+    this, so they all reach the same database. ``settings`` is None when the
+    caller supplied an explicit connection string.
+
+    Accepted sources: a mapping or object with ``connection_string``; an object
+    with ``get_typed`` (``ConfigurationManager`` or the configuration adapter),
+    read as the AWS provider config; the dumped application config; an
+    ``AuroraSqlStrategyConfig``.
+
+    Raises:
+        StorageError: If the configuration names no complete Aurora target.
+            There is no default endpoint.
+    """
+    from sqlalchemy.engine import make_url
+
+    from orb.infrastructure.storage.exceptions import StorageError
+    from orb.providers.aws.storage.config import AuroraSqlStrategyConfig
+
+    connection_string = (
+        config.get("connection_string")
+        if isinstance(config, dict)
+        else getattr(config, "connection_string", None)
+    )
+    if isinstance(connection_string, str) and connection_string:
+        return make_url(connection_string), None
+
+    if isinstance(config, AuroraSqlStrategyConfig):
+        settings = _validated_aurora_settings(config)
+        return _aurora_url(settings), settings
+
+    if isinstance(config, dict):
+        raw = _aurora_settings_from_mapping(config)
+        if raw is None:
+            raise StorageError(_AURORA_NOT_CONFIGURED)
+        settings = _validated_aurora_settings(raw)
+        return _aurora_url(settings), settings
+
+    if callable(getattr(config, "get_typed", None)):
+        from orb.providers.aws.configuration.config import AWSProviderConfig
+
+        aws_cfg = config.get_typed(AWSProviderConfig)
+        if aws_cfg.storage.aurora is None:
+            raise StorageError(
+                "Aurora storage selected but no aurora config found in provider config"
+            )
+        settings = _validated_aurora_settings(aws_cfg.storage.aurora)
+        return _aurora_url(settings), settings
+
+    raise StorageError(_AURORA_NOT_CONFIGURED)
 
 
 def create_aurora_strategy(config: Any) -> Any:
@@ -200,7 +331,7 @@ def create_aurora_entity_strategy(config: Any, entity: str) -> Any:
     """Create the typed-table SQLStorageStrategy for one entity on Aurora.
 
     Args:
-        config: ConfigurationManager, or an object exposing ``connection_string``
+        config: Any source ``resolve_aurora_connection`` accepts
         entity: "requests", "machines" or "templates"
 
     Returns:
@@ -209,32 +340,12 @@ def create_aurora_entity_strategy(config: Any, entity: str) -> Any:
     Raises:
         StorageError: If no Aurora connection can be derived from ``config``
     """
-    from orb.config.manager import ConfigurationManager
-    from orb.infrastructure.storage.exceptions import StorageError
     from orb.infrastructure.storage.sql.entities import create_entity_strategy
-    from orb.providers.aws.configuration.config import AWSProviderConfig
 
-    if isinstance(config, ConfigurationManager):
-        aws_cfg = config.get_typed(AWSProviderConfig)
-        if aws_cfg.storage.aurora is None:
-            raise StorageError(
-                "Aurora storage selected but no aurora config found in provider config"
-            )
-        connection_string = _build_aurora_connection_string(aws_cfg.storage.aurora)
-    else:
-        connection_string = (
-            config.get("connection_string")
-            if isinstance(config, dict)
-            else getattr(config, "connection_string", None)
-        )
-        if not isinstance(connection_string, str) or not connection_string:
-            raise StorageError(
-                "Aurora storage needs the Aurora provider configuration or an explicit "
-                "connection_string; no connection could be derived from the configuration "
-                "that was passed."
-            )
-
-    return create_entity_strategy({"connection_string": connection_string}, entity)
+    url, _ = resolve_aurora_connection(config)
+    return create_entity_strategy(
+        {"connection_string": url.render_as_string(hide_password=False)}, entity
+    )
 
 
 def create_aurora_config(data: dict[str, Any]) -> Any:
@@ -255,45 +366,29 @@ def create_aurora_unit_of_work(config: Any) -> Any:
     """Create SQLUnitOfWork with an Aurora-specific SQLAlchemy engine.
 
     Args:
-        config: ConfigurationManager or dict with connection info
+        config: Any source ``resolve_aurora_connection`` accepts
 
     Returns:
         SQLUnitOfWork instance
+
+    Raises:
+        StorageError: If no Aurora connection can be derived from ``config``
     """
     from sqlalchemy import create_engine
 
-    from orb.config.manager import ConfigurationManager
-    from orb.infrastructure.storage.exceptions import StorageError
     from orb.infrastructure.storage.sql.unit_of_work import SQLUnitOfWork
 
-    if isinstance(config, ConfigurationManager):
-        from orb.providers.aws.configuration.config import AWSProviderConfig
-
-        aws_cfg = config.get_typed(AWSProviderConfig)
-        if aws_cfg.storage.aurora is None:
-            raise StorageError(
-                "Aurora storage selected but no aurora config found in provider config"
-            )
-        aurora_cfg = aws_cfg.storage.aurora
-        connection_string = _build_aurora_connection_string(aurora_cfg)
-        engine = create_engine(
-            connection_string,
-            pool_size=aurora_cfg.pool_size,
-            max_overflow=aurora_cfg.max_overflow,
-            pool_timeout=getattr(aurora_cfg, "pool_timeout", 30),
-            pool_recycle=getattr(aurora_cfg, "pool_recycle", 3600),
-            echo=getattr(aurora_cfg, "echo", False),
-        )
-    else:
-        connection_string = config.get("connection_string") if isinstance(config, dict) else None
-        if not isinstance(connection_string, str) or not connection_string:
-            raise StorageError(
-                "Aurora storage needs the Aurora provider configuration or an explicit "
-                "connection_string; no connection could be derived from the configuration "
-                "that was passed."
-            )
-        engine = create_engine(connection_string)
-
+    url, settings = resolve_aurora_connection(config)
+    if settings is None:
+        return SQLUnitOfWork(create_engine(url))
+    engine = create_engine(
+        url,
+        pool_size=settings.pool_size,
+        max_overflow=settings.max_overflow,
+        pool_timeout=getattr(settings, "pool_timeout", 30),
+        pool_recycle=getattr(settings, "pool_recycle", 3600),
+        echo=getattr(settings, "echo", False),
+    )
     return SQLUnitOfWork(engine)
 
 
