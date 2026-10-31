@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from types import TracebackType
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Callable, Generic, Optional, TypeVar
 
 from orb.domain.base.ports.storage_port import StoragePort
 from orb.infrastructure.logging.logger import get_logger
@@ -183,6 +183,10 @@ class StorageStrategy(StoragePort[T], ABC, Generic[T]):
 class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
     """Base storage strategy implementation with common functionality."""
 
+    # Strategies that implement ``save_versioned`` / ``save_versioned_batch`` set
+    # this; repositories then save aggregates with their loaded version.
+    supports_versioned_save: bool = False
+
     def __init__(self) -> None:
         """Initialize base storage strategy."""
         super().__init__()
@@ -190,6 +194,15 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
         self._transaction_snapshot = None
         self.logger = get_logger(__name__)
         self._is_closed = False
+
+    def defer_until_commit(self, callback: Callable[[], None]) -> None:
+        """Run ``callback`` once the writes made so far are committed.
+
+        A strategy that stages writes in a transaction runs it after the commit
+        succeeds and drops it on rollback or failure; a strategy whose writes are
+        applied immediately runs it now.
+        """
+        callback()
 
     def is_healthy(self) -> tuple[bool, dict[str, Any]]:
         """Probe the backend with a cheap read-only call.

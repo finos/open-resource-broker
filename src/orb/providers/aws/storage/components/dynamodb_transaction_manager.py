@@ -11,6 +11,7 @@ from typing import Any, Callable, Optional
 from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 
+from orb.domain.base.exceptions import ConcurrencyError
 from orb.infrastructure.storage.components.transaction_manager import (
     TransactionManager,
     TransactionState,
@@ -93,6 +94,11 @@ class DynamoDBTransactionManager(TransactionManager):
         self._staged_keys: dict[tuple[str, str], int] = {}
         # id(action) -> plain key, used only to report unapplied rows on failure
         self._action_keys: dict[int, dict[str, Any]] = {}
+        # ids of staged actions guarded by a version condition; only a failed
+        # condition on one of these is a concurrency conflict
+        self._version_conditioned: set[int] = set()
+        # Run once the whole commit succeeded (never on rollback or failure)
+        self._after_commit: list[Callable[[], None]] = []
         # transact_write_items uses the low-level Client API, which requires
         # AttributeValue-tagged dicts (e.g. {"id": {"S": "abc"}}). The
         # higher-level Resource API (used elsewhere) accepts plain dicts;
@@ -118,6 +124,27 @@ class DynamoDBTransactionManager(TransactionManager):
             self.transaction_items.clear()
             self._staged_keys.clear()
             self._action_keys.clear()
+            self._version_conditioned.clear()
+            self._after_commit.clear()
+
+    def defer_until_commit(self, callback: Callable[[], None]) -> None:
+        """Run ``callback`` after the commit succeeds; at once when nothing is staged.
+
+        The manager is shared by the strategies of a unit of work and commits
+        once, so the queue lives here rather than on each strategy.
+        """
+        with self._lock:
+            if self.is_active:
+                self._after_commit.append(callback)
+                return
+        callback()
+
+    def _run_after_commit(self, callbacks: list[Callable[[], None]]) -> None:
+        for callback in callbacks:
+            try:
+                callback()
+            except Exception as exc:  # the commit itself succeeded
+                self.logger.error("Post-commit callback failed: %s", type(exc).__name__)
 
     def _serialize_key(self, key: dict[str, Any]) -> dict[str, Any]:
         return {k: self._serializer.serialize(v) for k, v in key.items()}
@@ -128,6 +155,7 @@ class DynamoDBTransactionManager(TransactionManager):
         request_type: str,
         request: dict[str, Any],
         key: Optional[dict[str, Any]],
+        version_conditioned: bool = False,
     ) -> None:
         """Stage one action, merging with an earlier action on the same item.
 
@@ -135,6 +163,11 @@ class DynamoDBTransactionManager(TransactionManager):
         same item is staged twice the later action's payload wins (equivalent
         to applying them in order) while the first action's condition is kept,
         since a condition guards the state the item had before the transaction.
+        The version-conditioned classification moves with the replacement action.
+        A condition only guards a put that is staged first: an unconditional put
+        followed by a version-checked one on the same item keeps no condition.
+        Two version-checked saves of one item that expect different versions are
+        a concurrency conflict.
         """
         if self.state != TransactionState.ACTIVE:
             raise RuntimeError("No active transaction")
@@ -148,19 +181,35 @@ class DynamoDBTransactionManager(TransactionManager):
                 )
                 position = self._staged_keys.get(ident)
                 if position is not None:
-                    first = next(iter(self.transaction_items[position].values()))
-                    self._inherit_condition(request, first)
-                    self._action_keys.pop(id(self.transaction_items[position]), None)
+                    previous = self.transaction_items[position]
+                    first = next(iter(previous.values()))
+                    was_conditioned = id(previous) in self._version_conditioned
+                    try:
+                        self._inherit_condition(request, first)
+                    except TransactionError:
+                        if version_conditioned and was_conditioned:
+                            raise ConcurrencyError(
+                                "The same record was saved twice in one unit of work from "
+                                "different stored versions. Re-read it, re-apply your change, "
+                                "and retry.",
+                                details={"key": key},
+                            ) from None
+                        raise
+                    self._action_keys.pop(id(previous), None)
+                    self._version_conditioned.discard(id(previous))
                     action = {request_type: request}
                     self.transaction_items[position] = action
-                    if key is not None:
-                        self._action_keys[id(action)] = key
+                    self._action_keys[id(action)] = key
+                    if was_conditioned:
+                        self._version_conditioned.add(id(action))
                     return
 
             action = {request_type: request}
             self.transaction_items.append(action)
             if key is not None:
                 self._action_keys[id(action)] = key
+            if version_conditioned:
+                self._version_conditioned.add(id(action))
             if ident is not None:
                 self._staged_keys[ident] = len(self.transaction_items) - 1
 
@@ -202,6 +251,9 @@ class DynamoDBTransactionManager(TransactionManager):
         item: dict[str, Any],
         condition_expression: Optional[str] = None,
         key: Optional[dict[str, Any]] = None,
+        expression_attribute_names: Optional[dict[str, str]] = None,
+        expression_attribute_values: Optional[dict[str, Any]] = None,
+        version_conditioned: bool = False,
     ) -> None:
         """
         Add put item operation to transaction.
@@ -212,13 +264,24 @@ class DynamoDBTransactionManager(TransactionManager):
             condition_expression: Optional condition expression
             key: Primary key of the item; enables merging with other staged
                 actions on the same item
+            expression_attribute_names: Names used by the condition (``#name``)
+            expression_attribute_values: Plain values used by the condition
+                (``:value``); they are tagged for the low-level client here
+            version_conditioned: The condition is an optimistic-locking version
+                check; its failure is reported as ``ConcurrencyError``
         """
         serialized_item = {k: self._serializer.serialize(v) for k, v in item.items()}
         put: dict[str, Any] = {"TableName": table_name, "Item": serialized_item}
         if condition_expression:
             put["ConditionExpression"] = condition_expression
+        if expression_attribute_names:
+            put["ExpressionAttributeNames"] = dict(expression_attribute_names)
+        if expression_attribute_values:
+            put["ExpressionAttributeValues"] = {
+                k: self._serializer.serialize(v) for k, v in expression_attribute_values.items()
+            }
 
-        self._stage(table_name, "Put", put, key)
+        self._stage(table_name, "Put", put, key, version_conditioned=version_conditioned)
         self.logger.debug("Added put item to transaction for table %s", table_name)
 
     def add_update_item(
@@ -376,17 +439,21 @@ class DynamoDBTransactionManager(TransactionManager):
             raise RuntimeError("No active transaction to commit")
 
         actions = self._ordered_actions()
+        callbacks = list(self._after_commit)
         if not actions:
             self.state = TransactionState.COMMITTED
+            self._reset_staged()
             self.logger.debug("Empty DynamoDB transaction committed")
+            self._run_after_commit(callbacks)
             return
 
         chunks = self._chunks(actions)
         applied = 0
+        current: list[dict[str, Any]] = []
         try:
             dynamodb_client = self.client_manager.get_client()
-            for chunk in chunks:
-                response = self._send(dynamodb_client, chunk)
+            for current in chunks:
+                response = self._send(dynamodb_client, current)
                 status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
                 if status != 200:
                     raise TransactionError(f"DynamoDB transaction returned HTTP status {status}")
@@ -401,6 +468,16 @@ class DynamoDBTransactionManager(TransactionManager):
 
         except Exception as e:
             self.state = TransactionState.FAILED
+            conflicts = self._version_conflicts(e, current) if isinstance(e, ClientError) else []
+            if conflicts and applied == 0:
+                # Nothing was written, so re-reading and redoing the work is correct
+                self.logger.warning("Concurrency conflict on commit for %s", conflicts)
+                raise ConcurrencyError(
+                    "Concurrent write detected: a record in this unit of work was changed or "
+                    "deleted by another writer since it was read. Re-read it, re-apply your "
+                    "change, and retry.",
+                    details={"keys": conflicts},
+                ) from e
             if isinstance(e, ClientError):
                 reason = self._describe(e)
             elif isinstance(e, TransactionError):
@@ -415,10 +492,37 @@ class DynamoDBTransactionManager(TransactionManager):
                     f"applied and are not rolled back; "
                     f"{self._unapplied_summary(chunks, applied)})"
                 )
+            if conflicts:
+                # Earlier calls were applied: a retry would redo work that already
+                # happened, so this is deliberately not a (retryable) conflict
+                message += f"; version conflict on {conflicts}"
             self.logger.error(message)
             raise TransactionError(message) from e
         finally:
-            self._reset_staged()
+            if self.state != TransactionState.COMMITTED:
+                self._reset_staged()
+        self._reset_staged()
+        self._run_after_commit(callbacks)
+
+    def _version_conflicts(self, error: ClientError, chunk: list[dict[str, Any]]) -> list[str]:
+        """Keys of staged version-checked actions whose condition failed in ``chunk``.
+
+        Only a ``ConditionalCheckFailed`` on an action registered as
+        version-conditioned counts; any other failed condition is not a
+        concurrency conflict.
+        """
+        if error.response.get("Error", {}).get("Code") != "TransactionCanceledException":
+            return []
+        reasons = error.response.get("CancellationReasons") or []
+        keys: list[str] = []
+        for index, reason in enumerate(reasons):
+            if reason.get("Code") != "ConditionalCheckFailed" or index >= len(chunk):
+                continue
+            action = chunk[index]
+            if id(action) in self._version_conditioned:
+                key = self._action_keys.get(id(action))
+                keys.append(json.dumps(key, sort_keys=True, default=str))
+        return keys
 
     def rollback_transaction(self) -> None:
         """Rollback the current DynamoDB transaction."""

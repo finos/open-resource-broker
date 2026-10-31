@@ -20,11 +20,25 @@ def _record_saved(aggregate: Any, written: int) -> None:
         aggregate.version = written
 
 
+def _record_when_committed(strategy: Any, aggregate: Any, written: int) -> None:
+    """Move the aggregate's baseline once the write is committed.
+
+    Inside a unit of work whose writes are staged, the commit can still fail or
+    be rolled back, and the baseline must not claim a version that was never
+    stored; the strategy runs the callback after the commit.
+    """
+    defer = getattr(strategy, "defer_until_commit", None)
+    if callable(defer):
+        defer(lambda: _record_saved(aggregate, written))
+    else:
+        _record_saved(aggregate, written)
+
+
 def save_one(strategy: Any, entity_id: str, data: dict[str, Any], aggregate: Any) -> None:
     """Save one aggregate; the baseline moves only after the write committed."""
     if supports_versioned_save(strategy):
         written = strategy.save_versioned(entity_id, data, aggregate.persisted_revision.value)
-        _record_saved(aggregate, written)
+        _record_when_committed(strategy, aggregate, written)
     else:
         strategy.save(entity_id, data)
 
@@ -41,5 +55,5 @@ def save_many(strategy: Any, entries: list[tuple[str, dict[str, Any], Any]]) -> 
         [(entity_id, data, agg.persisted_revision.value) for entity_id, data, agg in entries]
     )
     for (_, _, aggregate), version in zip(entries, written):
-        _record_saved(aggregate, version)
+        _record_when_committed(strategy, aggregate, version)
     return True
