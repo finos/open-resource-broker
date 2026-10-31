@@ -7,6 +7,8 @@ moving AWS-specific logic out of the base handler to maintain clean architecture
 
 import base64
 import hashlib
+import json
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
@@ -25,6 +27,7 @@ from orb.providers.aws.exceptions.aws_exceptions import (
 )
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.tags import build_system_tags, merge_tags
+from orb.providers.aws.resilience.call_executor import AWSCallExecutor
 
 _OVERRIDE_FIELDS = frozenset(
     {
@@ -86,6 +89,23 @@ class AWSLaunchTemplateManager:
         self._logger = logger
         self.config_port = config_port
         self.aws_native_spec_service = aws_native_spec_service
+        self._executor = AWSCallExecutor.for_client(aws_client, "launch_template", logger)
+
+    def _call(self, func, operation_name: str, operation_type: str = "standard", **kwargs):
+        """Run one EC2 call through the shared retry framework.
+
+        The original ``ClientError`` is preserved: callers below branch on AWS
+        error codes (for example the IAM-denial fallback) and on the operation
+        that raised.
+        """
+        return self._executor.execute(
+            func,
+            operation_type=operation_type,
+            operation_name=operation_name,
+            preserve_client_error=True,
+            log_response=False,
+            **kwargs,
+        )
 
     def create_or_update_launch_template(
         self, aws_template: AWSTemplate, request: Request
@@ -155,8 +175,11 @@ class AWSLaunchTemplateManager:
 
         # First try to describe the launch template to see if it exists
         try:
-            existing_template = self.aws_client.ec2_client.describe_launch_templates(
-                LaunchTemplateNames=[launch_template_name]
+            existing_template = self._call(
+                self.aws_client.ec2_client.describe_launch_templates,
+                "describe_launch_templates",
+                operation_type="read_only",
+                LaunchTemplateNames=[launch_template_name],
             )
 
             # Template exists — reuse the default version, no new version needed for same config.
@@ -247,8 +270,11 @@ class AWSLaunchTemplateManager:
         version = aws_template.launch_template_version or "$Latest"
 
         try:
-            response = self.aws_client.ec2_client.describe_launch_templates(
-                LaunchTemplateIds=[template_id]
+            response = self._call(
+                self.aws_client.ec2_client.describe_launch_templates,
+                "describe_launch_templates",
+                operation_type="read_only",
+                LaunchTemplateIds=[template_id],
             )
             template_name = response["LaunchTemplates"][0]["LaunchTemplateName"]
             self._logger.info("Using existing launch template %s version %s", template_id, version)
@@ -297,7 +323,10 @@ class AWSLaunchTemplateManager:
         IAM (caller must decide fallback).
         """
         try:
-            response = self.aws_client.ec2_client.describe_launch_template_versions(
+            response = self._call(
+                self.aws_client.ec2_client.describe_launch_template_versions,
+                "describe_launch_template_versions",
+                operation_type="read_only",
                 LaunchTemplateId=launch_template_id,
                 Versions=[version],
             )
@@ -383,10 +412,15 @@ class AWSLaunchTemplateManager:
                 ebs["Iops"] = iops
             lt_data["BlockDeviceMappings"] = [{"DeviceName": "/dev/xvda", "Ebs": ebs}]
 
-        response = self.aws_client.ec2_client.create_launch_template_version(
+        response = self._call(
+            self.aws_client.ec2_client.create_launch_template_version,
+            "create_launch_template_version",
             LaunchTemplateId=template_id,
             VersionDescription=f"Override for request {request.request_id}",
             LaunchTemplateData=lt_data,
+            ClientToken=self._generate_version_client_token(
+                request, aws_template, lt_data, uuid.uuid4().hex
+            ),
         )
 
         version_info = response["LaunchTemplateVersion"]
@@ -504,7 +538,12 @@ class AWSLaunchTemplateManager:
     ) -> None:
         """Apply tags to a resource; behaviour on failure is controlled by on_tag_failure config."""
         try:
-            self.aws_client.ec2_client.create_tags(Resources=[resource_id], Tags=tags)
+            self._call(
+                self.aws_client.ec2_client.create_tags,
+                "create_tags",
+                Resources=[resource_id],
+                Tags=tags,
+            )
         except Exception as e:
             if self._get_tag_failure_mode() == "fail":
                 raise
@@ -542,7 +581,9 @@ class AWSLaunchTemplateManager:
 
         lt_tags = self._create_launch_template_tags(aws_template, request)
 
-        response = self.aws_client.ec2_client.create_launch_template(
+        response = self._call(
+            self.aws_client.ec2_client.create_launch_template,
+            "create_launch_template",
             LaunchTemplateName=template_name,
             VersionDescription=f"Created for request {request.request_id}",
             LaunchTemplateData=template_data,
@@ -925,4 +966,30 @@ class AWSLaunchTemplateManager:
         image_or_lt = aws_template.machine_image or aws_template.launch_template_id or ""
         token_input = f"{request.request_id}:{aws_template.template_id}:{image_or_lt}"
         # Truncate to 32 chars
+        return hashlib.sha256(token_input.encode()).hexdigest()[:32]
+
+    def _generate_version_client_token(
+        self,
+        request: Request,
+        aws_template: AWSTemplate,
+        version_data: dict[str, Any],
+        call_nonce: str,
+    ) -> str:
+        """Idempotency token for one ``CreateLaunchTemplateVersion`` call.
+
+        The token is fixed for a logical call, so a retry after a lost response
+        creates no second version, and it carries a per-call nonce so a later call
+        for the same request never replays a version that has since been deleted.
+        The version data is part of the token: changed data for the same request
+        yields a different token instead of ``IdempotentParameterMismatch``. The
+        ``ltv:`` prefix keeps it distinct from the token used for
+        ``CreateLaunchTemplate``.
+        """
+        data_digest = hashlib.sha256(
+            json.dumps(version_data, sort_keys=True, default=str, separators=(",", ":")).encode()
+        ).hexdigest()
+        token_input = (
+            f"ltv:{request.request_id}:{aws_template.template_id}:"
+            f"{aws_template.launch_template_id or ''}:{data_digest}:{call_nonce}"
+        )
         return hashlib.sha256(token_input.encode()).hexdigest()[:32]

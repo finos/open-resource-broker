@@ -26,6 +26,7 @@ Note:
     that can benefit from significant cost savings through Spot pricing.
 """
 
+import uuid
 from typing import Any, Optional
 
 from orb.domain.base.ports import LoggingPort
@@ -191,6 +192,10 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             lt_id=launch_template_result.template_id,
             lt_version=launch_template_result.version,
         )
+
+        # One idempotency token per logical call, reused by every retry attempt. For
+        # Spot Fleet it belongs inside SpotFleetRequestConfig, not at the top level.
+        fleet_config.setdefault("ClientToken", uuid.uuid4().hex)
 
         # Request spot fleet with circuit breaker for critical operation
         response = self._retry_with_backoff(

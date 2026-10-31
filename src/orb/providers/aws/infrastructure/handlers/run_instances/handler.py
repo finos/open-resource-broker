@@ -27,6 +27,7 @@ Note:
     and workloads that require predictable instance provisioning.
 """
 
+import uuid
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
@@ -183,6 +184,10 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             launch_template_id=launch_template_result.template_id,
             launch_template_version=launch_template_result.version,
         )
+
+        # One idempotency token per logical call, reused by every retry attempt, so
+        # a retry after a lost response cannot launch a second set of instances.
+        run_params.setdefault("ClientToken", uuid.uuid4().hex)
 
         # Execute RunInstances API call with circuit breaker for critical operation
         response = self._retry_with_backoff(

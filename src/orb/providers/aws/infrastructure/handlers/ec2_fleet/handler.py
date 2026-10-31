@@ -26,6 +26,7 @@ Note:
     launches and is suitable for large-scale, complex deployments.
 """
 
+import uuid
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
@@ -258,6 +259,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             launch_template_id=launch_template_result.template_id,
             launch_template_version=launch_template_result.version,
         )
+
+        # One idempotency token per logical call, reused by every retry attempt, so
+        # a retry after a lost response cannot create a second fleet.
+        fleet_config.setdefault("ClientToken", uuid.uuid4().hex)
 
         # Create the fleet with circuit breaker for critical operation
         try:

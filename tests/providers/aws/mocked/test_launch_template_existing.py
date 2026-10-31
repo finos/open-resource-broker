@@ -14,7 +14,7 @@ Covers:
 import sys
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import boto3
 import pytest
@@ -626,7 +626,8 @@ class TestTagFailureResilience:
         aws_client.ec2_client.create_tags = MagicMock(side_effect=Exception("tags denied"))
 
         request = _make_request("req-tag-fail-001")
-        result = manager.create_or_update_launch_template(template, request)
+        with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
+            result = manager.create_or_update_launch_template(template, request)
 
         # LT was still created despite tag failure
         assert result.template_id.startswith("lt-")
