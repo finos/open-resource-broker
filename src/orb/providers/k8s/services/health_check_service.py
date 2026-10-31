@@ -20,6 +20,10 @@ if TYPE_CHECKING:
     from orb.monitoring.health import HealthCheck
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 
+# Client-side bound on the API-server probe so a hung server cannot hold the
+# probe's worker thread indefinitely.
+_PROBE_TIMEOUT_SECONDS = 5
+
 
 class K8sHealthCheckService:
     """Service for Kubernetes provider health monitoring.
@@ -57,7 +61,9 @@ class K8sHealthCheckService:
         """
         start = time.time()
         try:
-            resources = kubernetes_client.core_v1.get_api_resources()
+            resources = kubernetes_client.core_v1.get_api_resources(
+                _request_timeout=_PROBE_TIMEOUT_SECONDS
+            )
             response_time_ms = (time.time() - start) * 1000.0
             resource_count = len(getattr(resources, "resources", []) or [])
 
@@ -75,7 +81,9 @@ class K8sHealthCheckService:
             try:
                 from kubernetes.client import VersionApi
 
-                version_info = VersionApi(api_client=kubernetes_client.api_client).get_code()
+                version_info = VersionApi(api_client=kubernetes_client.api_client).get_code(
+                    _request_timeout=_PROBE_TIMEOUT_SECONDS
+                )
                 server_version = getattr(version_info, "git_version", None)
             except Exception as exc:
                 self._logger.debug("Could not read server version from VersionApi: %s", exc)

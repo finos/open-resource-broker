@@ -1,7 +1,9 @@
 """Health check monitoring for the application."""
 
+import concurrent.futures
 import logging
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +32,12 @@ from orb.domain.base.ports.logging_port import LoggingPort
 _logger = logging.getLogger(__name__)
 
 CHECK_FAILED_TEXT = "Check failed; see server logs for details"
+CHECK_TIMED_OUT_TEXT = "Check timed out; see server logs for details"
+
+# Checks of these kinds call out to providers or storage and can hang with the
+# remote API, so each run is time-limited.
+_BOUNDED_KINDS = frozenset({"core", "provider"})
+DEFAULT_CHECK_TIMEOUT_SECONDS = 5.0
 
 
 def failure_details(check_name: str, error: object) -> dict[str, Any]:
@@ -87,6 +95,9 @@ class HealthCheck(HealthCheckPort):
         self.check_kinds: dict[str, str] = {}
         self.status_history: dict[str, list[HealthStatus]] = {}
         self._lock = threading.Lock()
+        self.check_timeout_seconds = DEFAULT_CHECK_TIMEOUT_SECONDS
+        # The check call still running in its thread for each bounded check.
+        self._running_checks: dict[str, tuple[concurrent.futures.Future[HealthStatus], float]] = {}
 
         # Create health check directory with PermissionError fallbacks
         self.health_dir = config.health_dir
@@ -144,7 +155,27 @@ class HealthCheck(HealthCheckPort):
         """Run all registered health checks and return results as dicts."""
         with self._lock:
             names = list(self.checks)
-        return {name: self._run_check_internal(name).to_dict() for name in names}
+        if not names:
+            return {}
+        results = self._run_others([n for n in names if n != "application"])
+        if "application" in names:
+            # The application summary reads the results just gathered instead of
+            # running every other check a second time.
+            self._record("application", self._application_status(results))
+            results["application"] = self.status_history["application"][-1]
+        return {name: results[name].to_dict() for name in names}
+
+    def _run_others(self, names: list[str]) -> dict[str, HealthStatus]:
+        """Run the named checks side by side.
+
+        A slow provider then costs one time limit in total, not one per check.
+        """
+        if not names:
+            return {}
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=len(names), thread_name_prefix="orb-health"
+        ) as pool:
+            return dict(zip(names, pool.map(self._run_check_internal, names)))
 
     def get_status(self) -> dict[str, Any]:
         """Get the current health status summary."""
@@ -196,6 +227,64 @@ class HealthCheck(HealthCheckPort):
 
         return {"status": overall, "checks": checks_status}
 
+    def _record(self, name: str, status: HealthStatus) -> None:
+        with self._lock:
+            self.status_history[name].append(status)
+            # Keep only last 100 statuses
+            if len(self.status_history[name]) > 100:
+                self.status_history[name].pop(0)
+
+    def _call_check(self, name: str) -> HealthStatus:
+        """Call a check; provider and storage checks are time-limited.
+
+        A check that is still running when its limit passes cannot be
+        interrupted, so no second run is started while it is: thread use stays
+        at one per check however often a hung provider is polled. A caller that
+        arrives while a run is in flight waits for that run (up to the limit,
+        counted from when the run started) and gets its real result; the
+        timed-out status is only returned when a run actually exceeded the limit.
+        """
+        check_fn = self.checks[name]
+        kind = self.check_kinds.get(name, "system")
+        if kind not in _BOUNDED_KINDS:
+            return check_fn()
+
+        with self._lock:
+            entry = self._running_checks.get(name)
+            if entry is None or entry[0].done():
+                future: concurrent.futures.Future[HealthStatus] = concurrent.futures.Future()
+
+                def _run(fut: concurrent.futures.Future[HealthStatus] = future) -> None:
+                    if not fut.set_running_or_notify_cancel():
+                        return
+                    try:
+                        fut.set_result(check_fn())
+                    except BaseException as exc:  # delivered to the waiting callers
+                        fut.set_exception(exc)
+
+                entry = (future, time.monotonic())
+                self._running_checks[name] = entry
+                threading.Thread(target=_run, name=f"orb-health-{name}", daemon=True).start()
+
+        running, started_at = entry
+        remaining = self.check_timeout_seconds - (time.monotonic() - started_at)
+        done, _ = concurrent.futures.wait([running], timeout=max(0.0, remaining))
+        if not done:
+            _logger.warning(
+                "Health check %s did not finish within %.1fs", name, self.check_timeout_seconds
+            )
+            return self._timed_out_status(name, kind)
+        return running.result()
+
+    @staticmethod
+    def _timed_out_status(name: str, kind: str) -> HealthStatus:
+        return HealthStatus(
+            name=name,
+            status="degraded" if kind == "provider" else "unhealthy",
+            details={"error": CHECK_TIMED_OUT_TEXT},
+            dependencies=[],
+        )
+
     def _run_check_internal(self, name: str) -> HealthStatus:
         """Run a specific health check, returning a HealthStatus object.
 
@@ -206,12 +295,8 @@ class HealthCheck(HealthCheckPort):
             raise ValueError(f"Unknown health check: {name}")
 
         try:
-            status = self.checks[name]()
-            with self._lock:
-                self.status_history[name].append(status)
-                # Keep only last 100 statuses
-                if len(self.status_history[name]) > 100:
-                    self.status_history[name].pop(0)
+            status = self._call_check(name)
+            self._record(name, status)
             return status
         except Exception as e:
             if self._logger:
@@ -330,39 +415,11 @@ class HealthCheck(HealthCheckPort):
         )
 
     def _check_application_health(self) -> HealthStatus:
-        """Check overall application health."""
+        """Check overall application health (runs the other checks)."""
         try:
-            results = {
-                name: self._run_check_internal(name)
-                for name in self.checks
-                if name != "application"
-            }
-
-            status_counts: dict[str, int] = {
-                "healthy": 0,
-                "degraded": 0,
-                "unhealthy": 0,
-                "unknown": 0,
-            }
-            for result in results.values():
-                status_counts[result.status] = status_counts.get(result.status, 0) + 1
-
-            if status_counts["unhealthy"] > 0:
-                overall = "unhealthy"
-            elif status_counts["degraded"] > 0:
-                overall = "degraded"
-            else:
-                overall = "healthy"
-
-            return HealthStatus(
-                name="application",
-                status=overall,
-                details={
-                    "status_counts": status_counts,
-                    "checks": {name: result.status for name, result in results.items()},
-                },
-                dependencies=["system", "aws", "database"],
-            )
+            with self._lock:
+                names = [n for n in self.checks if n != "application"]
+            return self._application_status(self._run_others(names))
         except Exception as e:
             return HealthStatus(
                 name="application",
@@ -370,6 +427,30 @@ class HealthCheck(HealthCheckPort):
                 details=failure_details("application", e),
                 dependencies=["system", "aws", "database"],
             )
+
+    @staticmethod
+    def _application_status(results: dict[str, HealthStatus]) -> HealthStatus:
+        """Summarise the other checks' results into the application status."""
+        status_counts: dict[str, int] = {"healthy": 0, "degraded": 0, "unhealthy": 0, "unknown": 0}
+        for result in results.values():
+            status_counts[result.status] = status_counts.get(result.status, 0) + 1
+
+        if status_counts["unhealthy"] > 0:
+            overall = "unhealthy"
+        elif status_counts["degraded"] > 0:
+            overall = "degraded"
+        else:
+            overall = "healthy"
+
+        return HealthStatus(
+            name="application",
+            status=overall,
+            details={
+                "status_counts": status_counts,
+                "checks": {name: result.status for name, result in results.items()},
+            },
+            dependencies=["system", "aws", "database"],
+        )
 
 
 def register_deserialize_skip_counter_check(

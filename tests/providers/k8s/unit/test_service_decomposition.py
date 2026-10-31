@@ -291,3 +291,48 @@ class TestStrategyDelegation:
             f"k8s_provider_strategy.py has {line_count} lines; "
             "expected <= 1750 (well below the ~1755-line pre-decomposition monolith)."
         )
+
+
+class TestK8sHealthProbeIsTimeBounded:
+    def test_api_probe_sets_a_client_side_timeout(self) -> None:
+        config = K8sProviderConfig(namespace="test")  # type: ignore[call-arg]
+        svc = K8sHealthCheckService(config=config, logger=MagicMock())
+        client = MagicMock()
+        client.core_v1.get_api_resources.return_value = MagicMock(resources=[])
+        client.api_client.configuration.host = "https://k8s.local"
+
+        svc.check_health(client)
+
+        kwargs = client.core_v1.get_api_resources.call_args.kwargs
+        assert 0 < kwargs["_request_timeout"] <= 10
+
+
+class TestK8sVersionProbeIsTimeBounded:
+    def test_version_lookup_sets_a_client_side_timeout(self) -> None:
+        from unittest.mock import patch
+
+        config = K8sProviderConfig(namespace="test")  # type: ignore[call-arg]
+        svc = K8sHealthCheckService(config=config, logger=MagicMock())
+        client = MagicMock()
+        client.core_v1.get_api_resources.return_value = MagicMock(resources=[])
+        client.api_client.configuration.host = "https://k8s.local"
+
+        with patch("kubernetes.client.VersionApi") as version_api:
+            svc.check_health(client)
+
+        kwargs = version_api.return_value.get_code.call_args.kwargs
+        assert 0 < kwargs["_request_timeout"] <= 10
+
+    def test_registered_health_check_sets_a_client_side_timeout(self, tmp_path) -> None:
+        from orb.monitoring.health import HealthCheck, HealthCheckConfig
+        from orb.providers.k8s.health import register_k8s_health_checks
+
+        health = HealthCheck(config=HealthCheckConfig(health_dir=tmp_path / "health"))
+        client = MagicMock()
+        client.core_v1.get_api_resources.return_value = MagicMock(resources=[])
+        register_k8s_health_checks(health, client)
+
+        health.run_check("kubernetes_api")
+
+        kwargs = client.core_v1.get_api_resources.call_args.kwargs
+        assert 0 < kwargs["_request_timeout"] <= 10

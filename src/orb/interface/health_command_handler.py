@@ -1,5 +1,6 @@
 """Health check command handler."""
 
+import asyncio
 from pathlib import Path
 from typing import Any, cast
 
@@ -23,6 +24,12 @@ def _sanitize_details(details: Any) -> Any:
     if isinstance(details, dict) and "error" in details:
         return {**details, "error": _CHECK_FAILED}
     return details
+
+
+async def _probe_all(registry_service: Any, provider_names: list[str]) -> list[Any]:
+    return list(
+        await asyncio.gather(*(registry_service.probe_strategy_health(n) for n in provider_names))
+    )
 
 
 def handle_health_check(args) -> dict[str, Any]:
@@ -69,11 +76,16 @@ def handle_health_check(args) -> dict[str, Any]:
 
         # 1. Config file check
         config_path = config_port.get_config_file_path() or "./config/config.json"
+        config_exists = Path(config_path).exists()
+        if not config_exists:
+            logger.warning("Configuration file not found: %s", config_path)
         checks.append(
             {
                 "name": "config_file",
-                "status": "pass" if Path(config_path).exists() else "fail",
-                "details": config_path,
+                "status": "pass" if config_exists else "fail",
+                "details": "Configuration file found"
+                if config_exists
+                else "Configuration file not found",
             }
         )
 
@@ -90,15 +102,16 @@ def handle_health_check(args) -> dict[str, Any]:
                     {
                         "name": "templates_file",
                         "status": "pass",
-                        "details": f"{len(existing_paths)} template files found: {', '.join(existing_paths)}",
+                        "details": f"{len(existing_paths)} template files found",
                     }
                 )
             else:
+                logger.warning("No template files found. Checked: %s", ", ".join(template_paths))
                 checks.append(
                     {
                         "name": "templates_file",
                         "status": "fail",
-                        "details": f"No template files found. Checked: {', '.join(template_paths)}",
+                        "details": "No template files found",
                     }
                 )
         except Exception as e:
@@ -143,25 +156,20 @@ def handle_health_check(args) -> dict[str, Any]:
                 total_count = len(all_providers)
                 unhealthy: list[str] = []
 
-                for provider_name in all_providers:
-                    try:
-                        health_status = registry_service.check_strategy_health(provider_name)
-                        if health_status and health_status.is_healthy:
-                            healthy_count += 1
-                        elif health_status:
-                            logger.warning(
-                                "Provider %s reported unhealthy: %s",
-                                provider_name,
-                                health_status.status_message,
-                            )
-                            unhealthy.append(provider_name)
-                        else:
-                            logger.warning(
-                                "No health data available for provider %s", provider_name
-                            )
-                            unhealthy.append(provider_name)
-                    except Exception as e:
-                        logger.warning("Health check failed for provider %s: %s", provider_name, e)
+                # One bounded, cached probe per provider, all at once, the same
+                # probe the REST endpoint uses: a hung provider API costs one
+                # time limit in total, not one per provider or per check.
+                snapshots = asyncio.run(_probe_all(registry_service, list(all_providers)))
+                for provider_name, snapshot in zip(all_providers, snapshots):
+                    if snapshot.status == "healthy":
+                        healthy_count += 1
+                    else:
+                        logger.warning(
+                            "Provider %s is %s: %s",
+                            provider_name,
+                            snapshot.status,
+                            snapshot.message,
+                        )
                         unhealthy.append(provider_name)
 
                 if healthy_count == total_count:
@@ -185,11 +193,16 @@ def handle_health_check(args) -> dict[str, Any]:
         try:
             scheduler = container.get(SchedulerPort)
             work_dir = scheduler.get_working_directory()
+            work_dir_exists = Path(work_dir).exists()
+            if not work_dir_exists:
+                logger.warning("Work directory not found: %s", work_dir)
             checks.append(
                 {
                     "name": "work_directory",
-                    "status": "pass" if Path(work_dir).exists() else "fail",
-                    "details": work_dir,
+                    "status": "pass" if work_dir_exists else "fail",
+                    "details": "Work directory found"
+                    if work_dir_exists
+                    else "Work directory not found",
                 }
             )
         except Exception as e:
@@ -200,11 +213,16 @@ def handle_health_check(args) -> dict[str, Any]:
         try:
             scheduler = container.get(SchedulerPort)
             logs_dir = scheduler.get_logs_directory()
+            logs_dir_exists = Path(logs_dir).exists()
+            if not logs_dir_exists:
+                logger.warning("Logs directory not found: %s", logs_dir)
             checks.append(
                 {
                     "name": "logs_directory",
-                    "status": "pass" if Path(logs_dir).exists() else "fail",
-                    "details": logs_dir,
+                    "status": "pass" if logs_dir_exists else "fail",
+                    "details": "Logs directory found"
+                    if logs_dir_exists
+                    else "Logs directory not found",
                 }
             )
         except Exception as e:
