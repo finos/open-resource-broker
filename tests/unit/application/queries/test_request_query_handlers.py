@@ -259,3 +259,110 @@ def test_resolve_sync_timeout_falls_back_to_default_when_config_raises():
         )
 
     assert handler._sync_timeout == pytest.approx(30.0)
+
+
+# ---------------------------------------------------------------------------
+# Cache-first reads while the background reconcile loop runs
+# ---------------------------------------------------------------------------
+
+
+def _with_status_check(request, age_seconds: float | None):
+    from datetime import datetime, timedelta, timezone
+
+    request.last_status_check = (
+        None if age_seconds is None else datetime.now(timezone.utc) - timedelta(seconds=age_seconds)
+    )
+    return request
+
+
+def _config_with_cache_age(seconds: int = 30) -> MagicMock:
+    config = MagicMock()
+    config.get_request_config.return_value = {
+        "reconcile_enabled": True,
+        "list_cache_max_age_seconds": seconds,
+    }
+    return config
+
+
+@pytest.mark.asyncio
+async def test_list_serves_recently_synced_requests_from_storage_while_loop_runs(monkeypatch):
+    from orb.application.services import request_reconciler
+
+    monkeypatch.setattr(request_reconciler, "_loops_running", 1)
+    fresh = _with_status_check(_make_fake_request(_REQ_ID_A), 5)
+    stale = _with_status_check(_make_fake_request(_REQ_ID_B), 600)
+    never = _with_status_check(_make_fake_request(_REQ_ID_C), None)
+    handler, _ = _build_handler(requests=[fresh, stale, never])
+    handler._config = _config_with_cache_age(30)
+
+    await handler.execute_query(SyncAndListActiveRequestsQuery(all_resources=True))
+
+    synced = [
+        call.args[0].request_id.value
+        for call in handler._machine_sync_service.populate_missing_machine_ids.await_args_list
+    ]
+    assert sorted(synced) == sorted([_REQ_ID_B, _REQ_ID_C])
+
+
+@pytest.mark.asyncio
+async def test_list_always_refreshes_when_no_loop_runs_in_the_process(monkeypatch):
+    from orb.application.services import request_reconciler
+
+    monkeypatch.setattr(request_reconciler, "_loops_running", 0)
+    fresh = _with_status_check(_make_fake_request(_REQ_ID_A), 1)
+    handler, _ = _build_handler(requests=[fresh])
+    handler._config = _config_with_cache_age(30)
+
+    await handler.execute_query(SyncAndListActiveRequestsQuery(all_resources=True))
+
+    handler._machine_sync_service.populate_missing_machine_ids.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_return_list_skips_provider_for_recently_synced_requests(monkeypatch):
+    from orb.application.dto.queries import SyncAndListReturnRequestsQuery
+    from orb.application.queries.request_query_handlers import SyncAndListReturnRequestsHandler
+    from orb.application.services import request_reconciler
+
+    monkeypatch.setattr(request_reconciler, "_loops_running", 1)
+    fresh = _with_status_check(_make_fake_request(_REQ_ID_A), 5)
+    stale = _with_status_check(_make_fake_request(_REQ_ID_B), 600)
+    for r in (fresh, stale):
+        r.request_type = SimpleNamespace(value="return")
+
+    uow = MagicMock()
+    uow.requests.find_by_type.return_value = [fresh, stale]
+    uow.machines.find_by_ids.return_value = []
+    uow.__enter__ = lambda s: s
+    uow.__exit__ = MagicMock(return_value=False)
+    factory = MagicMock()
+    factory.create_unit_of_work.return_value = uow
+    filter_service = MagicMock()
+    filter_service.apply_filters.side_effect = lambda items, _: items
+    machine_sync = MagicMock()
+    machine_sync.fetch_provider_machines = AsyncMock(return_value=([], {}))
+    machine_sync.sync_machines_with_provider = AsyncMock(return_value=([], []))
+
+    handler = SyncAndListReturnRequestsHandler(
+        uow_factory=factory,
+        logger=Mock(),
+        error_handler=Mock(),
+        generic_filter_service=filter_service,
+        machine_sync_service=machine_sync,
+        config=_config_with_cache_age(30),
+    )
+    handler._query_service = AsyncMock()
+    handler._query_service.get_machines_for_request = AsyncMock(return_value=[])
+    handler._status_service = Mock()
+    handler._status_service.determine_status_from_machines = Mock(return_value=(None, None))
+    handler._dto_factory = MagicMock()
+    handler._dto_factory.create_from_domain.side_effect = lambda req, _m: SimpleNamespace(
+        request_id=str(req.request_id.value), provider_name=None
+    )
+
+    await handler.execute_query(SyncAndListReturnRequestsQuery())
+
+    fetched = [
+        c.args[0].request_id.value for c in machine_sync.fetch_provider_machines.await_args_list
+    ]
+    assert fetched == [_REQ_ID_B]

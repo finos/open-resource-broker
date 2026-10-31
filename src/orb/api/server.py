@@ -324,6 +324,19 @@ def _resolve_event_publisher() -> Any:
     return publisher
 
 
+def _resolve_request_reconciler() -> Any:
+    """Return the background request reconciler, or None when it is unavailable."""
+    try:
+        from orb.application.services.request_reconciler import RequestReconciler
+        from orb.infrastructure.di.container import get_container
+
+        reconciler = get_container().get_optional(RequestReconciler)
+        return reconciler if isinstance(reconciler, RequestReconciler) else None
+    except Exception as exc:
+        get_logger(__name__).debug("Request reconciler unavailable for lifespan hooks: %s", exc)
+        return None
+
+
 def create_fastapi_app(server_config: Any) -> Any:
     """
     Create and configure FastAPI application.
@@ -389,9 +402,25 @@ def create_fastapi_app(server_config: Any) -> Any:
             # Events raised from worker threads are handed to this loop, which
             # owns the SSE subscriber queues.
             publisher.bind_loop()
+        reconciler = _resolve_request_reconciler()
+        if reconciler is not None:
+            workers = getattr(server_config, "workers", 1) or 1
+            if workers > 1:
+                # Every worker would run its own loop against the same provider
+                # and storage, racing writes with each other.
+                get_logger(__name__).warning(
+                    "Background request reconciliation is not started: server.workers=%d "
+                    "(it runs only with a single worker)",
+                    workers,
+                )
+                reconciler = None
+            else:
+                reconciler.start()
         try:
             yield
         finally:
+            if reconciler is not None:
+                await reconciler.stop()
             if publisher is not None:
                 await publisher.drain()
 

@@ -21,6 +21,7 @@ from orb.application.services.orchestration.dtos import Paginated
 from orb.application.services.orchestration.page_cursor import KeysetPaginated
 from orb.application.services.provider_registry_service import ProviderRegistryService
 from orb.application.services.request_query_service import RequestQueryService
+from orb.application.services.request_reconciler import RequestSyncSettings, is_recently_synced
 from orb.application.services.request_status_service import RequestStatusService
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError, ProviderContractError
@@ -444,6 +445,8 @@ class SyncAndListReturnRequestsHandler(
     response is assembled. See ADR-0001.
     """
 
+    _config: ConfigurationPort | None = None
+
     def __init__(
         self,
         uow_factory: UnitOfWorkFactory,
@@ -451,6 +454,7 @@ class SyncAndListReturnRequestsHandler(
         error_handler: ErrorHandlingPort,
         generic_filter_service: GenericFilterService,
         machine_sync_service: MachineSyncService,
+        config: ConfigurationPort | None = None,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
@@ -459,6 +463,7 @@ class SyncAndListReturnRequestsHandler(
         self._status_service = RequestStatusService(uow_factory, logger)
         self._query_service = RequestQueryService(uow_factory, logger)
         self._dto_factory = RequestDTOFactory()
+        self._config = config
 
     async def execute_query(self, query: SyncAndListReturnRequestsQuery) -> Paginated[RequestDTO]:
         """Execute sync-and-list return requests query."""
@@ -476,8 +481,14 @@ class SyncAndListReturnRequestsHandler(
             # caller polling list_return_requests would see a request stuck in
             # IN_PROGRESS forever and may retry the return — triggering
             # provider-side double-decrement (e.g. ASG capacity off by one).
+            # List views read stored state first: a request the background
+            # reconcile loop (or an earlier read) refreshed recently is served
+            # as stored instead of calling the provider again.
+            staleness_window = RequestSyncSettings.from_config(self._config).list_staleness_window
             for request in return_requests:
                 if request.status.is_terminal():
+                    continue
+                if is_recently_synced(request, staleness_window):
                     continue
                 try:
                     db_machines = await self._query_service.get_machines_for_request(request)
@@ -640,6 +651,7 @@ class SyncAndListActiveRequestsHandler(
     """
 
     _DEFAULT_SYNC_TIMEOUT: float = 30.0
+    _config: ConfigurationPort | None = None
 
     def __init__(
         self,
@@ -658,6 +670,7 @@ class SyncAndListActiveRequestsHandler(
         self._query_service = RequestQueryService(uow_factory, logger)
         self._dto_factory = RequestDTOFactory()
         self._sync_timeout: float = self._resolve_sync_timeout(config)
+        self._config = config
 
     def _resolve_sync_timeout(self, config: ConfigurationPort | None) -> float:
         """Read sync_timeout_seconds from performance config, falling back to default."""
@@ -711,7 +724,14 @@ class SyncAndListActiveRequestsHandler(
             # headroom; raise if the provider permits more.
             _sync_concurrency = asyncio.Semaphore(8)
 
+            # List views read stored state first: a request the background
+            # reconcile loop (or an earlier read) refreshed recently is served
+            # as stored instead of calling the provider again.
+            _staleness_window = RequestSyncSettings.from_config(self._config).list_staleness_window
+
             async def _sync_one(request):
+                if is_recently_synced(request, _staleness_window):
+                    return
                 async with _sync_concurrency:
 
                     async def _do_sync():

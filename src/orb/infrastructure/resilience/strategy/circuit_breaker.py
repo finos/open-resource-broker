@@ -103,6 +103,10 @@ class CircuitBreakerStrategy(RetryStrategy):
         """Return True if a circuit state entry exists for service_name."""
         return service_name in cls._circuit_states
 
+    def is_open(self) -> bool:
+        """Return True while the circuit is open (half-open still admits a trial call)."""
+        return self._get_current_state(time.time()) == CircuitState.OPEN
+
     def _force_open(self, service_name: str) -> None:
         """Force the circuit to OPEN immediately, bypassing the failure threshold."""
         circuit_state = self._circuit_states[service_name]

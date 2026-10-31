@@ -40,6 +40,8 @@ def _make_request(
     req.resource_ids = resource_ids if resource_ids is not None else ["fleet-abc"]
     req.needs_machine_id_population.return_value = True
     req.update_machine_ids.return_value = req
+    req.status.is_terminal.return_value = False
+    req.version = 0
     return req
 
 

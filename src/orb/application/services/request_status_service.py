@@ -23,7 +23,7 @@ from typing import Optional, Tuple
 
 from orb.application.services.machine_sync_service import PROVIDER_FETCH_FAILED
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.exceptions import ProviderContractError
+from orb.domain.base.exceptions import ConcurrencyError, ProviderContractError
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.machine.aggregate import Machine
@@ -38,6 +38,9 @@ from orb.domain.request.request_types import RequestStatus, RequestType
 # (e.g. lightweight unit-test construction). Production always injects the
 # config-driven machine via DI.
 _DEFAULT_GRACE_PERIOD_SECONDS = 3600
+
+# One initial attempt plus one re-read-and-reapply after a concurrent write.
+_WRITE_ATTEMPTS = 2
 
 
 class RequestStatusService:
@@ -229,46 +232,109 @@ class RequestStatusService:
         fulfilment: Optional[ProviderFulfilment] = (
             provider_metadata.get("provider_fulfilment") if provider_metadata else None
         )
-
-        try:
-            if fulfilment is not None:
-                updated_request = self._state_machine.apply(
-                    request,
-                    FulfilmentEvent.PROVIDER_VERDICT,
-                    now=now,
-                    fulfilment=fulfilment,
-                    message=message,
-                )
-            else:
-                # No provider fulfilment (return path, or explicit status set):
-                # synthesise a verdict from the requested status string so the
-                # same state-machine policy applies uniformly.
-                synthetic = self._synthesise_fulfilment(status, message)
-                if synthetic is None:
-                    self.logger.debug(
-                        "Unknown status %r for request %s; leaving unchanged",
-                        status,
-                        request.request_id.value,
-                    )
-                    return request
-                updated_request = self._state_machine.apply(
-                    request,
-                    FulfilmentEvent.PROVIDER_VERDICT,
-                    now=now,
-                    fulfilment=synthetic,
-                    message=message,
-                )
-        except InvalidRequestStateError as exc:
-            # Illegal transition (e.g. terminal request, backward step). This is
-            # not an error — it is the state machine refusing an out-of-order
-            # write. Leave the request untouched, matching the previous
-            # "terminal requests stay put" behaviour.
+        if fulfilment is None and self._synthesise_fulfilment(status, message) is None:
             self.logger.debug(
-                "State machine rejected transition for request %s: %s",
+                "Unknown status %r for request %s; leaving unchanged",
+                status,
                 request.request_id.value,
-                exc,
             )
             return request
+
+        # The request passed in was loaded before the caller's provider call,
+        # which can take a long time. The new state is therefore always built
+        # from a fresh read taken inside the write, never from that copy, so a
+        # cancel (or any other change) made meanwhile is neither undone nor
+        # saved over with an older version.
+        updated_request: Request = request
+        for attempt in range(_WRITE_ATTEMPTS):
+            try:
+                with self.uow_factory.create_unit_of_work() as uow:
+                    current = uow.requests.get_by_id(request.request_id)
+                    if current is None:
+                        return request
+                    try:
+                        updated_request, changed = self._build_status_update(
+                            current, status, message, fulfilment, now
+                        )
+                    except InvalidRequestStateError as exc:
+                        # Illegal transition (e.g. terminal request, backward
+                        # step): the state machine refusing an out-of-order
+                        # write is not an error. Leave the request untouched.
+                        self.logger.debug(
+                            "State machine rejected transition for request %s: %s",
+                            request.request_id.value,
+                            exc,
+                        )
+                        return current
+                    if not changed:
+                        return current
+                    # One logical write is one version step: the mutators the
+                    # build above chains each bump the version, and a
+                    # version-checked store accepts only stored + 1.
+                    updated_request = updated_request.model_copy(
+                        update={"version": current.version + 1}
+                    )
+                    uow.requests.save(updated_request)
+                break
+            except ConcurrencyError as exc:
+                # Another writer saved between our read and our save. Re-read
+                # and re-apply once; never save the copy we already built.
+                if attempt + 1 >= _WRITE_ATTEMPTS:
+                    self.logger.error(
+                        "Request %s changed concurrently; status update not persisted: %s",
+                        request.request_id.value,
+                        exc,
+                    )
+                    raise
+                self.logger.debug(
+                    "Concurrent write on request %s; re-reading and re-applying",
+                    request.request_id.value,
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to persist request status update: {e}")
+                raise
+
+        self.logger.info(
+            "Updated request %s status to %s",
+            request.request_id.value,
+            updated_request.status.value,
+        )
+        return updated_request
+
+    def _build_status_update(
+        self,
+        request: Request,
+        status: str,
+        message: str,
+        fulfilment: Optional[ProviderFulfilment],
+        now: datetime,
+    ) -> Tuple[Request, bool]:
+        """Apply the state machine to ``request``; return (new request, changed).
+
+        Raises ``InvalidRequestStateError`` when the machine refuses the move.
+        """
+        if fulfilment is not None:
+            updated_request = self._state_machine.apply(
+                request,
+                FulfilmentEvent.PROVIDER_VERDICT,
+                now=now,
+                fulfilment=fulfilment,
+                message=message,
+            )
+        else:
+            # No provider fulfilment (return path, or explicit status set):
+            # synthesise a verdict from the requested status string so the
+            # same state-machine policy applies uniformly.
+            synthetic = self._synthesise_fulfilment(status, message)
+            if synthetic is None:  # callers screen out unknown statuses first
+                raise ValueError(f"Unknown request status: {status!r}")
+            updated_request = self._state_machine.apply(
+                request,
+                FulfilmentEvent.PROVIDER_VERDICT,
+                now=now,
+                fulfilment=synthetic,
+                message=message,
+            )
 
         # Reconcile the persisted ``successful_count`` against the authoritative
         # machine_ids count for still-progressing/terminal-success states. The
@@ -301,24 +367,7 @@ class RequestStatusService:
             updated_request = updated_request.with_last_fulfilment(snapshot)
             changed = True
 
-        # Nothing actually changed (idempotent re-application with no counter or
-        # snapshot delta) — skip the write.
-        if not changed:
-            return request
-
-        try:
-            with self.uow_factory.create_unit_of_work() as uow:
-                uow.requests.save(updated_request)
-        except Exception as e:
-            self.logger.error(f"Failed to persist request status update: {e}")
-            raise
-
-        self.logger.info(
-            "Updated request %s status to %s",
-            request.request_id.value,
-            updated_request.status.value,
-        )
-        return updated_request
+        return updated_request, changed
 
     @staticmethod
     def _synthesise_fulfilment(status: str, message: str) -> Optional[ProviderFulfilment]:

@@ -23,7 +23,7 @@ from orb.application.machine.commands import CleanupMachineResourcesCommand
 from orb.application.provider.commands import ExecuteProviderOperationCommand
 from orb.application.queries.machine_query_handlers import GetMachineHealthHandler
 from orb.application.services.deprovisioning_orchestrator import DeprovisioningOrchestrator
-from orb.application.services.machine_sync_service import MachineSyncService
+from orb.application.services.machine_sync_service import FailedProviderFetch, MachineSyncService
 from orb.domain.base.exceptions import (
     ApplicationError,
     OperationNotSupportedError,
@@ -305,7 +305,8 @@ async def test_machine_sync_keeps_stored_machines_on_gate_failure(kind: str) -> 
     request.request_type.value = "acquire"
     db_machines: list[Any] = [MagicMock()]
     machines, metadata = await service.fetch_provider_machines(request, db_machines)
-    assert machines is db_machines
+    assert machines == db_machines
+    assert isinstance(machines, FailedProviderFetch)
     assert metadata == {}
 
 

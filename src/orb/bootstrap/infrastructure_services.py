@@ -25,6 +25,9 @@ def register_infrastructure_services(container: DIContainer) -> None:
     # Register provisioning orchestration service
     _register_provisioning_orchestration_service(container)
 
+    # Register the background request reconciler
+    _register_request_reconciler(container)
+
     # Register caching services
     _register_caching_services(container)
 
@@ -260,6 +263,27 @@ def _register_provisioning_orchestration_service(container: DIContainer) -> None
     container.register_singleton(
         ProvisioningOrchestrationService, create_provisioning_orchestration_service
     )
+
+
+def _register_request_reconciler(container: DIContainer) -> None:
+    """Register the background request reconciler (started by long-running servers)."""
+    from orb.application.services.machine_sync_service import MachineSyncService
+    from orb.application.services.request_reconciler import RequestReconciler
+    from orb.application.services.request_status_service import RequestStatusService
+    from orb.domain.base import UnitOfWorkFactory
+    from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
+
+    def create_request_reconciler(c: DIContainer) -> RequestReconciler:
+        return RequestReconciler(
+            uow_factory=c.get(UnitOfWorkFactory),
+            machine_sync_service=c.get(MachineSyncService),
+            status_service=c.get(RequestStatusService),
+            config_port=c.get(ConfigurationPort),
+            circuit_breaker_factory=CircuitBreakerStrategy,
+            logger=c.get(LoggingPort),
+        )
+
+    container.register_singleton(RequestReconciler, create_request_reconciler)
 
 
 def _register_caching_services(container: DIContainer) -> None:

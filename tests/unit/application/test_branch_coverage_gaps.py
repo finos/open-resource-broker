@@ -177,6 +177,14 @@ class TestRequestStatusServiceBranchCoverage:
 
         svc = self._make_svc()
         request = self._real_request(RequestStatus.COMPLETED)
+        uow = MagicMock()
+        uow.requests.get_by_id.return_value = request
+
+        @contextmanager
+        def _cm():
+            yield uow
+
+        svc.uow_factory.create_unit_of_work.side_effect = _cm
 
         result = _sync(svc.update_request_status(request, RequestStatus.PARTIAL.value, "msg"))
         assert result is request  # blocked — returned unchanged
@@ -196,6 +204,7 @@ class TestRequestStatusServiceBranchCoverage:
         svc.uow_factory.create_unit_of_work.side_effect = _cm
 
         request = self._real_request(RequestStatus.PARTIAL, machine_ids=["m-1", "m-2"])
+        uow.requests.get_by_id.return_value = request
         result = _sync(svc.update_request_status(request, RequestStatus.COMPLETED.value, "done"))
         assert result.status == RequestStatus.COMPLETED
         uow.requests.save.assert_called_once()
@@ -220,6 +229,7 @@ class TestRequestStatusServiceBranchCoverage:
             successful_count=1,
             deadline_at=None,
         )
+        uow.requests.get_by_id.return_value = request
         result = _sync(svc.update_request_status(request, RequestStatus.IN_PROGRESS.value, "ok"))
         # Idempotent status but successful_count reconciled to machine_ids length.
         assert result.successful_count == 3
@@ -242,6 +252,7 @@ class TestRequestStatusServiceBranchCoverage:
         fulfilment = ProviderFulfilment(state="fulfilled", message="ok")
         request = self._real_request(RequestStatus.IN_PROGRESS)
 
+        uow.requests.get_by_id.return_value = request
         result = _sync(
             svc.update_request_status(
                 request,

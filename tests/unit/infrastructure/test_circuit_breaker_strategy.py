@@ -256,3 +256,27 @@ class TestCircuitBreakerDelayAndInfo:
         cb = CircuitBreakerStrategy(service_name=svc, failure_threshold=100)
         cb._force_open(svc)
         assert CircuitBreakerStrategy._circuit_states[svc]["state"] == CircuitState.OPEN
+
+
+class TestIsOpen:
+    """``is_open`` reports whether calls should currently fail fast."""
+
+    def test_closed_circuit_is_not_open(self):
+        breaker = CircuitBreakerStrategy("is-open-closed", failure_threshold=2)
+        assert breaker.is_open() is False
+
+    def test_circuit_opens_at_the_failure_threshold(self):
+        import time
+
+        breaker = CircuitBreakerStrategy("is-open-threshold", failure_threshold=2)
+        breaker.record_failure(time.time())
+        assert breaker.is_open() is False
+        breaker.record_failure(time.time())
+        assert breaker.is_open() is True
+
+    def test_circuit_admits_a_trial_call_after_the_reset_timeout(self):
+        import time
+
+        breaker = CircuitBreakerStrategy("is-open-reset", failure_threshold=1, reset_timeout=1)
+        breaker.record_failure(time.time() - 5)
+        assert breaker.is_open() is False  # half-open

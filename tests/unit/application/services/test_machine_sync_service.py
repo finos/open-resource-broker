@@ -249,6 +249,8 @@ class TestInstanceTypeRefreshOnSync:
         svc.uow_factory.create_unit_of_work = MagicMock(return_value=uow_cm)
 
         db_machine = self._make_full_machine("pod-abc", instance_type="k8s/Pod", price_type=None)
+        # The write re-reads the stored machine before applying the provider's state.
+        uow_cm.machines.get_by_id = lambda _mid: db_machine
 
         # Provider now knows the real node instance type.
         provider_machine = self._make_full_machine(

@@ -33,6 +33,10 @@ class CircuitBreakerPort(Protocol):
         """Return True if a circuit state entry exists for ``service_name``."""
         raise NotImplementedError
 
+    def is_open(self) -> bool:
+        """Return True while the circuit is open and calls should fail fast."""
+        raise NotImplementedError
+
     def record_success(self) -> None:
         """Record a successful operation, resetting failure state."""
 

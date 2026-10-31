@@ -346,6 +346,9 @@ class Request(AggregateRoot):
             update={
                 "first_status_check": self.first_status_check or now,
                 "last_status_check": now,
+                # Bumped like every other mutation so a version-checked store
+                # (SQL) accepts the save instead of rejecting it as stale.
+                "version": self.version + 1,
             }
         )
 

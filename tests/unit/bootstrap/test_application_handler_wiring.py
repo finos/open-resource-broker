@@ -37,7 +37,11 @@ from orb.application.queries.bulk_handlers import (
     GetMultipleTemplatesHandler,
 )
 from orb.application.queries.machine_query_handlers import ListMachinesHandler
-from orb.application.queries.request_query_handlers import SyncAndGetRequestHandler
+from orb.application.queries.request_query_handlers import (
+    SyncAndGetRequestHandler,
+    SyncAndListActiveRequestsHandler,
+    SyncAndListReturnRequestsHandler,
+)
 from orb.application.queries.storage_handlers import ListStorageStrategiesHandler
 from orb.application.queries.system_handlers import (
     GetConfigurationSectionHandler,
@@ -59,6 +63,7 @@ from orb.application.services.provider_validation_service import ProviderValidat
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
 )
+from orb.application.services.request_reconciler import RequestReconciler
 from orb.application.services.request_status_service import RequestStatusService
 from orb.domain.base.ports import ContainerPort
 from orb.infrastructure.di.container import DIContainer, create_container
@@ -79,6 +84,8 @@ _RESOLVED_FROM_CONTAINER = [
     GetMultipleTemplatesHandler,
     ListMachinesHandler,
     SyncAndGetRequestHandler,
+    SyncAndListActiveRequestsHandler,
+    SyncAndListReturnRequestsHandler,
     ListStorageStrategiesHandler,
     GetConfigurationSectionHandler,
     GetProviderConfigHandler,
@@ -95,6 +102,7 @@ _RESOLVED_FROM_CONTAINER = [
     ProvisioningOrchestrationService,
     ProviderValidationService,
     RequestStatusService,
+    RequestReconciler,
 ]
 
 
