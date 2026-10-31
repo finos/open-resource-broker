@@ -963,7 +963,9 @@ class TestCleanupOnZeroCapacity:
 
     def test_config_port_get_cleanup_config_raises_returns_without_action(self):
         handler = _make_asg_handler(config_port=_make_config_port())
-        with patch.object(handler, "_get_cleanup_config", side_effect=RuntimeError("config error")):
+        with patch.object(
+            handler._lt_cleanup, "get_cleanup_config", side_effect=RuntimeError("config error")
+        ):
             with patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
                 handler._cleanup_on_zero_capacity("asg", "req-config-err")
         mock_delete_lt.assert_not_called()

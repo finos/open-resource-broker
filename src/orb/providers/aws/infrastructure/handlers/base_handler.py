@@ -127,7 +127,9 @@ class AWSHandler(ProviderHandlerBase, ABC):
         )
 
         # Launch-template cleanup is its own concern — extracted to a service.
-        self._lt_cleanup = LaunchTemplateCleanupService(aws_client, config_port, logger)
+        self._lt_cleanup = LaunchTemplateCleanupService(
+            aws_client, config_port, logger, config_port_provider=lambda: self.config_port
+        )
 
         # Setup required dependencies
         self._setup_aws_operations(aws_ops)
@@ -479,7 +481,7 @@ class AWSHandler(ProviderHandlerBase, ABC):
             "ServiceQuotaExceededException",
             "ResourceCountExceeded",
         ]:
-            return QuotaExceededError(error_message, **aws_kwargs)
+            return QuotaExceededError(f"{error_code}: {error_message}", **aws_kwargs)
         elif error_code == "ResourceInUse":
             return ResourceInUseError(error_message, **aws_kwargs)
         elif error_code in ["UnauthorizedOperation", "AccessDenied"]:
@@ -855,10 +857,10 @@ class AWSHandler(ProviderHandlerBase, ABC):
     ) -> None:
         """Delete the ORB-managed launch template when a resource reaches zero capacity.
 
-        Reads the cleanup config via :class:`LaunchTemplateCleanupService`, checks
-        that cleanup is enabled and that the resource type is included in the
-        ``resources`` allow-list, then delegates to ``_delete_orb_launch_template``.
-        All failures are warning-only so that cleanup never blocks the main return flow.
+        Delegates to :class:`LaunchTemplateCleanupService`, which checks that cleanup
+        is enabled and that the resource type is in the ``resources`` allow-list, deletes
+        the ORB-managed template and removes the versions ORB added to a user-provided
+        one. All failures are warning-only so that cleanup never blocks the return flow.
 
         Args:
             resource_type: Cleanup config resource key, e.g. ``"asg"``,
@@ -867,22 +869,12 @@ class AWSHandler(ProviderHandlerBase, ABC):
             exclude_instance_ids: Instances just submitted for termination; ignored
                 when checking whether the request still has live instances.
         """
-        if self.config_port is None:
-            return
-
-        try:
-            cleanup = self._get_cleanup_config()
-        except Exception as e:
-            self._logger.warning("Failed to read cleanup config, skipping cleanup: %s", e)
-            return
-
-        if not cleanup.enabled:
-            return
-
-        if not getattr(cleanup.resources, resource_type, True):
-            return
-
-        self._delete_orb_launch_template(request_id, exclude_instance_ids)
+        self._lt_cleanup.cleanup_on_zero_capacity(
+            resource_type,
+            request_id,
+            exclude_instance_ids,
+            delete_template=self._delete_orb_launch_template,
+        )
 
     def _delete_orb_launch_template(
         self, request_id: str, exclude_instance_ids: Optional[Iterable[str]] = None

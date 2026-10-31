@@ -74,9 +74,37 @@ ec2:CreateLaunchTemplateVersion
 ec2:DescribeLaunchTemplates
 ec2:DescribeLaunchTemplateVersions
 ec2:DeleteLaunchTemplate
+ec2:DeleteLaunchTemplateVersions
 ```
 
-`ec2:DeleteLaunchTemplate` is only exercised when cleanup is enabled (`cleanup.enabled: true` and `cleanup.delete_launch_template: true` in provider config). It can be omitted if you disable launch template cleanup. Before deleting a template, cleanup also calls `ec2:DescribeInstances` to confirm no live instance still uses it; if that call fails the template is kept.
+`ec2:DeleteLaunchTemplate` and `ec2:DeleteLaunchTemplateVersions` are only exercised when cleanup is enabled (`cleanup.enabled: true` and `cleanup.delete_launch_template: true` in provider config). They can be omitted if you disable launch template cleanup. Before deleting a template, cleanup also calls `ec2:DescribeInstances` to confirm no live instance still uses it; if that call fails the template is kept.
+
+`ec2:DeleteLaunchTemplateVersions` removes the versions ORB adds to a launch template you provide when a template sets overrides. Once the last instance of the request is returned, ORB deletes only the version it created for that request: it must carry the description ORB wrote for the request and must not be the default version. Versions you created, and the template itself, are never touched. Without the permission the versions stay in place and a warning is logged.
+
+### Cleaning up unused ORB launch templates
+
+Whole-resource cancels that cannot read the resource's instances keep the ORB-created launch template so a template that is still in use is never deleted. `orb providers cleanup-launch-templates` is an explicit maintenance command that removes such leftovers. It deletes a template only when it carries the `orb:managed-by` tag, is older than `--min-age-hours` (default 24, minimum 1 unless `--force`), has no pending, running, stopping or stopped instance, and is not referenced by an Auto Scaling group, EC2 Fleet or Spot Fleet request that is still active. It is also gated by `cleanup.enabled` and `cleanup.delete_launch_template`. Use `--dry-run` to list what would be deleted.
+
+Every template is judged before any is deleted, so a failed lookup ends the command with nothing deleted. A delete that fails part-way is reported with the templates deleted and failed. The sweep covers the account and region of the selected provider instance, one region per provider instance; because `orb:managed-by` is the same for every ORB installation, it also covers unused templates of other installations in that account and region. It needs these read permissions in addition to the ones above:
+
+```
+autoscaling:DescribeAutoScalingGroups
+ec2:DescribeFleets
+ec2:DescribeSpotFleetRequests
+```
+
+To limit the delete permissions to what ORB creates, `ec2:DeleteLaunchTemplate` can carry a tag condition, which also bounds the sweep:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "ec2:DeleteLaunchTemplate",
+  "Resource": "*",
+  "Condition": {"StringEquals": {"aws:ResourceTag/orb:managed-by": "open-resource-broker"}}
+}
+```
+
+`ec2:DeleteLaunchTemplateVersions` cannot be limited this way for the versions ORB adds to a template you provide: that template is yours and is not tagged by ORB, so grant it on the templates you use with overrides, or accept the warning logged when it is denied.
 
 ## Tagging (optional)
 
@@ -232,7 +260,8 @@ The policy below covers all four handler types with tagging and launch template 
         "ec2:CreateLaunchTemplateVersion",
         "ec2:DescribeLaunchTemplates",
         "ec2:DescribeLaunchTemplateVersions",
-        "ec2:DeleteLaunchTemplate"
+        "ec2:DeleteLaunchTemplate",
+        "ec2:DeleteLaunchTemplateVersions"
       ],
       "Resource": "*"
     },
@@ -292,7 +321,8 @@ If you only use EC2Fleet and are comfortable with the default `on_tag_failure: w
         "ec2:CreateLaunchTemplateVersion",
         "ec2:DescribeLaunchTemplates",
         "ec2:DescribeLaunchTemplateVersions",
-        "ec2:DeleteLaunchTemplate"
+        "ec2:DeleteLaunchTemplate",
+        "ec2:DeleteLaunchTemplateVersions"
       ],
       "Resource": "*"
     }

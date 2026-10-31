@@ -950,6 +950,29 @@ orb providers exec OPERATION [OPTIONS]
 | `--provider-name` | Provider to execute operation on | `--provider-name aws_prod_us-east-1` |
 | `--params` | Operation parameters (JSON format) | `--params '{"count":5}'` |
 
+#### `providers cleanup-launch-templates`
+
+Delete the launch templates ORB created that nothing uses any more. This is an explicit maintenance command; ORB never runs it in the background.
+
+**Usage:**
+```bash
+orb providers cleanup-launch-templates [OPTIONS]
+```
+
+**Options:**
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--dry-run` | List what would be deleted without deleting anything | `--dry-run` |
+| `--min-age-hours` | Only consider templates at least this old (default 24, minimum 1) | `--min-age-hours 48` |
+| `--force` | Allow `--min-age-hours` below 1. A template created moments ago may belong to a request that has not launched anything yet, so this can delete a template that request still needs | `--force --min-age-hours 0` |
+| `--provider-name` | Provider to clean up | `--provider-name aws_prod_us-east-1` |
+
+A template is deleted only if it carries the `orb:managed-by` tag, is old enough, has no pending, running, stopping or stopped instance, and is not referenced by an active Auto Scaling group, EC2 Fleet or Spot Fleet request. The command does nothing when `cleanup.enabled` or `cleanup.delete_launch_template` is false in the provider configuration, and `cleanup.dry_run` makes it a dry run.
+
+The sweep covers the account and region of the selected provider instance, so other regions need a run per provider instance. The `orb:managed-by` tag has the same value for every ORB installation, so the sweep also sees templates created by other ORB installations that share the account and region; it deletes only the unused ones.
+
+Every template is judged before the first one is deleted. If a lookup fails, the command exits non-zero and nothing has been deleted. If a delete fails part-way, the command exits non-zero and the output lists the templates in `deleted`, `failed` (with the error) and `kept` (with the reason), so the result is never reported as all-or-nothing when it was not. The permissions it needs are listed in the [IAM permissions guide](../deployment/iam-permissions.md).
+
 #### `providers metrics`
 
 Show provider metrics.

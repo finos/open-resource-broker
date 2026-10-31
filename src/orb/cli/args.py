@@ -566,6 +566,29 @@ def add_provider_actions(subparsers, pp: "ParentParsers | None" = None):
         "--params", "--args", dest="params", help="Operation parameters (JSON format)"
     )
 
+    providers_cleanup = subparsers.add_parser(
+        "cleanup-launch-templates",
+        help="Delete unused ORB launch templates",
+        description=(
+            "Delete the launch templates ORB created that no instance, Auto Scaling group or "
+            "fleet uses any more. Nothing is removed that is younger than --min-age-hours, "
+            "that has live instances, or that an active resource still references. "
+            "Use --dry-run to list what would be deleted."
+        ),
+        parents=[pp.common, pp.provider_scope],
+    )
+    providers_cleanup.add_argument(
+        "--min-age-hours",
+        type=int,
+        default=24,
+        help="Only consider templates at least this many hours old (default: 24, minimum: 1)",
+    )
+    providers_cleanup.add_argument(
+        "--force",
+        action="store_true",
+        help="Allow --min-age-hours below 1; may delete a template a new request has just created",
+    )
+
     providers_metrics = subparsers.add_parser(
         "metrics",
         help="Show provider metrics",

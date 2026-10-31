@@ -101,6 +101,63 @@ async def handle_execute_provider_operation(args) -> dict[str, Any]:
     }
 
 
+@handle_interface_exceptions(context="cleanup_launch_templates", interface_type="cli")
+async def handle_cleanup_launch_templates(args) -> InterfaceResponse:
+    """Delete the launch templates ORB created that nothing uses any more.
+
+    An explicit maintenance operation: nothing runs it in the background. The
+    provider decides what is safe to delete; this handler only routes the request.
+    """
+    from orb.domain.base.operations import Operation, OperationType
+    from orb.domain.base.ports import ProviderSelectionPort
+
+    container = args._container
+    port = container.get(ProviderSelectionPort)
+    selection = port.select_active_provider(
+        provider_name=getattr(args, "provider_name", None),
+        provider_type=getattr(args, "provider_type", None),
+    )
+    provider_name = selection.provider_name
+
+    capabilities = port.get_strategy_capabilities(provider_name)
+    supports = getattr(capabilities, "supports_operation", None)  # getattr: port returns Any
+    if supports is None or not supports(OperationType.CLEANUP_ORPHANED_RESOURCES):
+        return InterfaceResponse(
+            data={
+                "success": False,
+                "provider": provider_name,
+                "message": f"Provider '{provider_name}' has no launch templates to clean up",
+            },
+            exit_code=1,
+        )
+
+    result = await port.execute_operation(
+        provider_name,
+        Operation(
+            operation_type=OperationType.CLEANUP_ORPHANED_RESOURCES,
+            parameters={
+                "dry_run": bool(getattr(args, "dry_run", False)),
+                "min_age_hours": getattr(args, "min_age_hours", 24),
+                "force": bool(getattr(args, "force", False)),
+            },
+        ),
+    )
+    if not result.success:
+        # A partly completed sweep carries its report: what was deleted, what failed.
+        return InterfaceResponse(
+            data={
+                "success": False,
+                "provider": provider_name,
+                "message": result.error_message,
+                **(result.data if isinstance(result.data, dict) else {}),
+            },
+            exit_code=1,
+        )
+    return InterfaceResponse(
+        data={"success": True, "provider": provider_name, **(result.data or {})}, exit_code=0
+    )
+
+
 @handle_interface_exceptions(context="provider_metrics", interface_type="cli")
 async def handle_provider_metrics(args) -> InterfaceResponse:
     """Retrieve provider usage metrics for a given timeframe, optionally filtered by provider."""
