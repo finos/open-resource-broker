@@ -24,6 +24,7 @@ from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
 from orb.infrastructure.storage.components.entity_serializer import BaseEntitySerializer
 from orb.infrastructure.storage.components.generic_serializer import GenericEntitySerializer
 from orb.infrastructure.storage.constants import LEGACY_DEFAULT_PROVIDER_TYPE
+from orb.infrastructure.storage.repositories.versioned_save import save_one
 
 # Module-level logger for static helpers that have no instance ``self.logger``.
 _module_logger = get_logger(__name__)
@@ -322,6 +323,8 @@ class RequestSerializer(BaseEntitySerializer):
 
             # Create request using model_validate to handle all fields correctly
             request = Request.model_validate(request_data)
+            # Baseline for optimistic locking: the version this row was read at
+            request.persisted_revision.mark_loaded(int(data.get("version") or 0))
 
             return request
 
@@ -412,7 +415,7 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
 
         try:
             request_data = self.serializer.to_dict(request)
-            self.storage_strategy.save(entity_id, request_data)  # type: ignore[call-arg]
+            save_one(self.storage_strategy, entity_id, request_data, request)
 
             duration_ms = (time.time() - start_time) * 1000
 

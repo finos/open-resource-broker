@@ -11,6 +11,7 @@ from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.storage.base.repository_mixin import StorageRepositoryMixin
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
 from orb.infrastructure.storage.components.entity_serializer import BaseEntitySerializer
+from orb.infrastructure.storage.repositories.versioned_save import save_many, save_one
 
 
 class MachineSerializer(BaseEntitySerializer):
@@ -55,7 +56,9 @@ class MachineSerializer(BaseEntitySerializer):
         """
         try:
             data = self._normalize_on_read(data)
-            return Machine.model_validate(data)
+            machine = Machine.model_validate(data)
+            machine.persisted_revision.mark_loaded(int(data.get("version") or 0))
+            return machine
         except Exception as e:
             machine_id = data.get("machine_id", "<unknown>")
             self.logger.error("Failed to deserialize machine %s: %s", machine_id, e)
@@ -251,7 +254,7 @@ class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
         """Save machine using storage strategy and return extracted events."""
         try:
             machine_data = self.serializer.to_dict(machine)
-            self.storage_strategy.save(str(machine.machine_id.value), machine_data)  # type: ignore[call-arg]
+            save_one(self.storage_strategy, str(machine.machine_id.value), machine_data, machine)
 
             events = machine.get_domain_events()
             machine.clear_domain_events()
@@ -275,14 +278,18 @@ class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
                 return []
 
             entity_batch: dict[str, dict[str, Any]] = {}
+            entries: list[tuple[str, dict[str, Any], Machine]] = []
             events: list[Any] = []
 
             for machine in machines:
                 entity_id = str(machine.machine_id.value)
                 entity_batch[entity_id] = self.serializer.to_dict(machine)
+                entries.append((entity_id, entity_batch[entity_id], machine))
                 events.extend(machine.get_domain_events())
 
-            if hasattr(self.storage_strategy, "save_batch"):
+            if save_many(self.storage_strategy, entries):
+                pass
+            elif hasattr(self.storage_strategy, "save_batch"):
                 self.storage_strategy.save_batch(entity_batch)  # type: ignore[attr-defined]
             else:
                 # Fallback for storage strategies without batch support.

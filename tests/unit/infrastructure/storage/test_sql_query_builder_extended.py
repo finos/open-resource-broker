@@ -156,7 +156,7 @@ class TestBuildUpdate:
         sql, params = _builder().build_update(
             {"name": "y", "version": 3}, "id", "e1", expected_version=2
         )
-        assert "AND version = :expected_version" in sql
+        assert "AND COALESCE(version, 0) = :expected_version" in sql
         assert params["expected_version"] == 2
 
     def test_without_expected_version_no_cas(self) -> None:

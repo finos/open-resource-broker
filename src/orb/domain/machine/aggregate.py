@@ -31,6 +31,8 @@ class Machine(AggregateRoot):
             # Inherited from Entity; used as an internal Pydantic/aggregate identity
             # key but machine_id is the canonical persisted identifier.
             "id",
+            # Bookkeeping for the repository, never part of a stored row
+            "persisted_revision",
         }
     )
 
