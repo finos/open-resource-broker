@@ -283,4 +283,5 @@ class TestSpotFleetMaintainEnumBug:
             SpotFleetRequestId="sfr-002",
             TargetCapacity=2,
             OnDemandTargetCapacity=0,
+            ExcessCapacityTerminationPolicy="NoTermination",
         )

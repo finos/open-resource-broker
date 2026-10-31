@@ -242,7 +242,11 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         decision: FleetReleaseDecision,
     ) -> None:
         fleet_type = extra["fleet_type"]
-        current_capacity = extra["current_capacity"]
+        # Re-read the target right before changing it: the details passed in may be
+        # seconds old, and a concurrent return would otherwise be overwritten with a
+        # value computed from the stale target. This narrows the window; the API has
+        # no compare-and-set, so concurrent returns on one fleet are not serialised.
+        current_capacity = self._read_target_capacity(fleet_id, extra["current_capacity"])
         weighted = extra["weighted_capacity_to_return"]
         new_capacity = max(0, current_capacity - weighted)
 
@@ -261,7 +265,33 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
             operation_name="modify_fleet",
             FleetId=fleet_id,
             TargetCapacitySpecification={"TotalTargetCapacity": new_capacity},
+            # The instances being returned are terminated explicitly afterwards.
+            # Without this, a fleet that still counts an instance that is already
+            # terminating picks an extra instance to terminate when the target
+            # drops, and the maintain fleet then launches a replacement.
+            ExcessCapacityTerminationPolicy="no-termination",
         )
+
+    def _read_target_capacity(self, fleet_id: str, fallback: int) -> int:
+        """Return the fleet's current total target capacity, or *fallback* if unreadable."""
+        try:
+            fleets = self._retry(
+                self._aws_client.ec2_client.describe_fleets,
+                operation_type="read_only",
+                FleetIds=[fleet_id],
+            ).get("Fleets", [])
+            value = fleets[0]["TargetCapacitySpecification"]["TotalTargetCapacity"]
+            if not isinstance(value, int):
+                raise TypeError(f"unexpected TotalTargetCapacity {value!r}")
+            return value
+        except Exception as exc:
+            self._logger.warning(
+                "Could not re-read target capacity of EC2 Fleet %s (%s); using %s",
+                fleet_id,
+                exc,
+                fallback,
+            )
+            return int(fallback)
 
     def _terminate_instances(self, fleet_id: str, instance_ids: list[str]) -> None:
         self._aws_ops.terminate_instances_with_fallback(

@@ -156,8 +156,13 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         extra: dict[str, Any],
         decision: FleetReleaseDecision,
     ) -> None:
-        target_capacity = extra["target_capacity"]
-        on_demand_capacity = extra["on_demand_capacity"]
+        # Re-read the targets right before changing them: the details passed in may
+        # be seconds old, and a concurrent return would otherwise be overwritten with
+        # a value computed from the stale target. This narrows the window; the API has
+        # no compare-and-set, so concurrent returns on one fleet are not serialised.
+        target_capacity, on_demand_capacity = self._read_target_capacities(
+            fleet_id, extra["target_capacity"], extra["on_demand_capacity"]
+        )
         weighted = extra["weighted_capacity_to_return"]
         fleet_type = extra["fleet_type"]
 
@@ -181,7 +186,32 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
             SpotFleetRequestId=fleet_id,
             TargetCapacity=new_target_capacity,
             OnDemandTargetCapacity=new_on_demand_capacity,
+            # The instances being returned are terminated explicitly afterwards.
+            # Without this, a fleet that still counts an instance that is already
+            # terminating picks an extra instance to terminate when the target
+            # drops, and the maintain fleet then launches a replacement.
+            ExcessCapacityTerminationPolicy="NoTermination",
         )
+
+    def _read_target_capacities(
+        self, fleet_id: str, fallback_target: int, fallback_on_demand: int
+    ) -> tuple[int, int]:
+        """Return the fleet's current ``(target, on-demand target)``, or the fallbacks."""
+        try:
+            config = self._fetch_fleet_details(fleet_id)["SpotFleetRequestConfig"]
+            target = config["TargetCapacity"]
+            on_demand = config.get("OnDemandTargetCapacity", 0) or 0
+            if not isinstance(target, int) or not isinstance(on_demand, int):
+                raise TypeError(f"unexpected capacities {target!r}/{on_demand!r}")
+            return target, on_demand
+        except Exception as exc:
+            self._logger.warning(
+                "Could not re-read target capacity of Spot Fleet %s (%s); using %s",
+                fleet_id,
+                exc,
+                fallback_target,
+            )
+            return int(fallback_target), int(fallback_on_demand)
 
     def _terminate_instances(self, fleet_id: str, instance_ids: list[str]) -> None:
         self._aws_ops.terminate_instances_with_fallback(
