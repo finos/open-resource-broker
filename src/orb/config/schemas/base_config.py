@@ -10,6 +10,13 @@ class BaseCircuitBreakerConfig(BaseModel):
     failure_threshold: int = Field(5, description="Number of failures before opening circuit")
     recovery_timeout: int = Field(60, description="Time to wait before attempting recovery")
     half_open_max_calls: int = Field(3, description="Max calls in half-open state")
+    half_open_timeout: int = Field(
+        30,
+        description=(
+            "Seconds a half-open circuit waits for its single probe call to finish "
+            "before returning to open and admitting a new probe"
+        ),
+    )
 
     @field_validator("failure_threshold")
     @classmethod
@@ -25,6 +32,14 @@ class BaseCircuitBreakerConfig(BaseModel):
         """Validate recovery timeout."""
         if v <= 0:
             raise ValueError("Recovery timeout must be positive")
+        return v
+
+    @field_validator("half_open_timeout")
+    @classmethod
+    def validate_half_open_timeout(cls, v: int) -> int:
+        """Validate half open timeout."""
+        if v <= 0:
+            raise ValueError("Half open timeout must be positive")
         return v
 
     @field_validator("half_open_max_calls")

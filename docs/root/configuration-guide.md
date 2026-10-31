@@ -90,7 +90,8 @@ The consolidated configuration format provides comprehensive provider management
       "enabled": true,
       "failure_threshold": 5,
       "recovery_timeout": 60,
-      "half_open_max_calls": 3
+      "half_open_max_calls": 3,
+      "half_open_timeout": 30
     },
     "providers": [
       {
@@ -366,6 +367,7 @@ ORB_CIRCUIT_BREAKER__ENABLED=true                    # Enable circuit breaker (b
 ORB_CIRCUIT_BREAKER__FAILURE_THRESHOLD=10            # Failures before opening circuit (integer)
 ORB_CIRCUIT_BREAKER__RECOVERY_TIMEOUT=120            # Recovery timeout in seconds (integer)
 ORB_CIRCUIT_BREAKER__HALF_OPEN_MAX_CALLS=3           # Max calls in half-open state (integer)
+ORB_CIRCUIT_BREAKER__HALF_OPEN_TIMEOUT=30            # Seconds a half-open probe may run before a new probe is admitted (integer)
 
 # Retry configuration
 ORB_RETRY__MAX_ATTEMPTS=5              # Maximum retry attempts (integer)

@@ -6,6 +6,7 @@ from typing import Any, Callable, TypeVar
 
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.resilience.exceptions import (
+    CircuitBreakerOpenError,
     InvalidRetryStrategyError,
     MaxRetriesExceededError,
 )
@@ -27,6 +28,7 @@ def retry(
     failure_threshold: int = 5,
     reset_timeout: int = 60,
     half_open_timeout: int = 30,
+    count_per_call: bool = False,
     **kwargs,
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
@@ -42,6 +44,8 @@ def retry(
         failure_threshold: Number of failures before opening circuit (circuit breaker only)
         reset_timeout: Seconds to wait before transitioning to half-open (circuit breaker only)
         half_open_timeout: Seconds to wait in half-open before closing (circuit breaker only)
+        count_per_call: Count one circuit failure per exhausted call rather than per
+            attempt (circuit breaker only)
         **kwargs: Additional strategy-specific parameters
 
     Returns:
@@ -71,6 +75,7 @@ def retry(
                 failure_threshold=failure_threshold,
                 reset_timeout=reset_timeout,
                 half_open_timeout=half_open_timeout,
+                count_per_call=count_per_call,
             )
         else:
             raise InvalidRetryStrategyError(
@@ -81,8 +86,22 @@ def retry(
         def wrapper(*args: Any, **kwargs: Any) -> T:
             """Execute function with retry logic."""
             attempt = 0
+            last_exception: Exception | None = None
+            gate = getattr(retry_strategy, "before_call", None)
 
             while True:
+                # Gate every attempt, not just the first: a circuit opened
+                # mid-retry (by this or another caller) stops the next attempt,
+                # and a half-open probe is exactly one attempt.
+                if gate is not None:
+                    try:
+                        gate()
+                    except CircuitBreakerOpenError as open_error:
+                        if last_exception is not None:
+                            # Keep the real failure visible behind the open circuit.
+                            raise open_error from last_exception
+                        raise
+
                 try:
                     result = func(*args, **kwargs)
 
@@ -101,8 +120,17 @@ def retry(
                     return result
 
                 except Exception as e:
+                    last_exception = e
                     # Check if we should retry
-                    if not retry_strategy.should_retry(attempt, e):
+                    try:
+                        retryable = retry_strategy.should_retry(attempt, e)
+                    except CircuitBreakerOpenError as open_error:
+                        # Keep the real failure visible behind the open circuit.
+                        raise open_error from e
+                    if not retryable:
+                        give_up = getattr(retry_strategy, "on_give_up", None)
+                        if give_up is not None:
+                            give_up(attempt, e)
                         if attempt >= max_attempts:
                             logger.error(
                                 "Max retry attempts (%s) exceeded for %s: %s",

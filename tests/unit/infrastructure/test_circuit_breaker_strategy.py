@@ -129,20 +129,19 @@ class TestCircuitBreakerTransitions:
         state = cb._get_current_state(future)
         assert state == CircuitState.HALF_OPEN
 
-    def test_half_open_allows_first_attempt(self) -> None:
+    def test_failure_while_half_open_reopens_without_retry(self) -> None:
         svc = _unique_service()
         cb = CircuitBreakerStrategy(
             service_name=svc, failure_threshold=1, max_attempts=10, reset_timeout=0
         )
-        # Force OPEN directly so we don't hit the raises path
         cb._force_open(svc)
         # Advance time so circuit transitions to HALF_OPEN (reset_timeout=0)
-        future_time = time.time() + 1
-        cb._get_current_state(future_time)
+        cb._get_current_state(time.time() + 1)
         assert CircuitBreakerStrategy._circuit_states[svc]["state"] == CircuitState.HALF_OPEN
-        # In HALF_OPEN, attempt 0 should be allowed (returns True)
-        result = cb.should_retry(0, IOError("test"))
-        assert result is True
+        # The half-open call is a single probe: its failure reopens the circuit
+        # and is not retried.
+        assert cb.should_retry(0, IOError("test")) is False
+        assert CircuitBreakerStrategy._circuit_states[svc]["state"] == CircuitState.OPEN
 
     def test_record_success_resets_failure_count(self) -> None:
         svc = _unique_service()
