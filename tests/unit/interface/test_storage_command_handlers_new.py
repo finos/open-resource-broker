@@ -297,6 +297,21 @@ class TestHandleStorageHealth:
         assert isinstance(result, InterfaceResponse)
 
 
+def _container_with_config(fmt):
+    """A container that resolves the formatter and a real SQL storage configuration."""
+    from orb.config.manager import ConfigurationManager
+    from orb.config.schemas.storage_schema import SqlStrategyConfig, StorageConfig
+
+    manager = MagicMock(spec=ConfigurationManager)
+    manager.get_typed.return_value = StorageConfig(
+        strategy="sql",
+        sql_strategy=SqlStrategyConfig(type="sqlite", name="/srv/orb/migrate.db"),  # type: ignore[arg-type]
+    )
+    container = MagicMock()
+    container.get.side_effect = lambda kind: fmt if kind is ResponseFormattingService else manager
+    return container
+
+
 @pytest.mark.unit
 class TestHandleStorageMigrate:
     """Tests for handle_storage_migrate."""
@@ -328,12 +343,38 @@ class TestHandleStorageMigrate:
         assert "Alembic is not installed" in fmt.format_error.call_args[0][0]
 
     @pytest.mark.asyncio
+    async def test_unresolvable_config_fails_instead_of_using_alembic_default(self):
+        fmt = _make_formatter()
+        container = MagicMock()
+
+        def _get(kind):
+            if kind is ResponseFormattingService:
+                return fmt
+            raise RuntimeError("bad url postgresql://orb:hunter2@db:5432/orb")
+
+        container.get.side_effect = _get
+        args = Namespace(_container=container, migrate_subcommand="up")
+        mock_exec = AsyncMock()
+
+        with (
+            patch("importlib.util.find_spec", return_value=MagicMock()),
+            patch("asyncio.create_subprocess_exec", mock_exec),
+        ):
+            await handle_storage_migrate(args)
+
+        mock_exec.assert_not_called()
+        message = fmt.format_error.call_args[0][0]
+        assert "Cannot determine the SQL database" in message
+        assert "RuntimeError" in message
+        # The original error text may carry a URL with credentials
+        assert "hunter2" not in message and "postgresql://" not in message
+
+    @pytest.mark.asyncio
     async def test_stamp_subcommand_uses_revision(self):
         """stamp subcommand must pass ['stamp', '<revision>'] through to alembic."""
         fmt = _make_formatter()
         fmt.format_success.return_value = InterfaceResponse(data={"message": "ok"})
-        container = MagicMock()
-        container.get.return_value = fmt
+        container = _container_with_config(fmt)
 
         args = Namespace(_container=container, migrate_subcommand="stamp", revision="abc123")
 
@@ -362,8 +403,7 @@ class TestHandleStorageMigrate:
     async def test_successful_migration_returns_success(self):
         fmt = _make_formatter()
         fmt.format_success.return_value = InterfaceResponse(data={"message": "Migration complete"})
-        container = MagicMock()
-        container.get.return_value = fmt
+        container = _container_with_config(fmt)
 
         args = Namespace(_container=container, migrate_subcommand="up")
 

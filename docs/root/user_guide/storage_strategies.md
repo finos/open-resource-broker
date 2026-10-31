@@ -216,7 +216,7 @@ For local development and small deployments:
     "strategy": "sql",
     "sql_strategy": {
       "type": "sqlite",
-      "name": "request_database.db",
+      "name": "/var/lib/orb/data/orb.db",
       "host": "",
       "port": 0,
       "pool_size": 5,
@@ -226,6 +226,23 @@ For local development and small deployments:
   }
 }
 ```
+
+The SQLite database is one file, used by every part of ORB that stores data in SQL.
+`name` is resolved as follows:
+
+| `name` | Database used |
+|--------|---------------|
+| Absolute path, for example `/var/lib/orb/data/orb.db` | That file. Missing parent directories are created. |
+| Relative path, for example `orb.db` or `sub/orb.db` | The same path under `<work directory>/data/`, like the JSON backend. The default is `database.db`. |
+| `:memory:` | A private in-memory database that lasts as long as the process. |
+| `file:` URI, for example `file:/var/lib/orb/orb.db?mode=rwc` | Opened as a SQLite URI. |
+
+When the resolved file does not exist, ORB logs a warning with the full path and creates a new
+empty database. If you already have a database, move or rename it to that path, or set `name` to
+its absolute path.
+
+SQLite storage uses the configured database location. Data previously written to `./database.db`
+or `./data.db` in the working directory is not migrated.
 
 ### PostgreSQL Configuration
 

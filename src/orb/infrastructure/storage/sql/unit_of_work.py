@@ -43,9 +43,10 @@ class SQLUnitOfWork(BaseUnitOfWork):
         self.engine = engine
         self.session: Optional[Session] = None
 
-        # Derive config from engine URL so SQLConnectionManager can initialise
+        # The strategies share the caller's engine, so they always operate on the
+        # database the engine points at (including a shared in-memory database).
         db_type = engine.url.get_dialect().name  # e.g. "sqlite", "postgresql"
-        db_config: dict[str, Any] = {"type": db_type, "url": str(engine.url)}
+        db_config: dict[str, Any] = {"type": db_type, "engine": engine}
 
         # Column dicts are derived from ORM models so SQLQueryBuilder has
         # enough column metadata for parameterised SELECT/INSERT/UPDATE/DELETE.
