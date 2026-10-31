@@ -21,6 +21,24 @@ public class OrbException : Exception
 }
 
 /// <summary>
+/// The server ended a request status stream because its maximum stream duration
+/// elapsed before the request reached a terminal status. The last event
+/// received is not a final status.
+/// </summary>
+public sealed class OrbStreamTimeoutException : OrbException
+{
+    public OrbStreamTimeoutException()
+        : base("orb: request status stream timed out before the request finished") { }
+}
+
+/// <summary>The server ended a request status stream with an error frame.</summary>
+public sealed class OrbStreamException : OrbException
+{
+    public OrbStreamException()
+        : base("orb: request status stream failed on the server") { }
+}
+
+/// <summary>
 /// An HTTP-level error returned by the ORB server.
 /// <para>
 /// Carries the canonical cross-SDK field set shared with Go/TypeScript/Java/Kotlin:

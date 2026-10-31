@@ -162,8 +162,124 @@ class TestStreamEndpoint:
             raw_lines = [l if isinstance(l, str) else l.decode() for l in resp.iter_lines()]
 
         data_lines = [l for l in raw_lines if l.startswith("data: ")]
-        # The error path yields exactly one sentinel "data: {}\n\n" then returns
-        assert len(data_lines) == 1
-        assert data_lines[0] == "data: {}"
+        # The error is announced by a named frame, then the stream ends with
+        # the empty sentinel that SDK readers treat as end-of-stream.
+        assert "event: error" in raw_lines
+        assert data_lines == ['data: {"error": "internal"}', "data: {}"]
+        assert "provider unavailable" not in "".join(raw_lines)
         # Orchestrator called exactly once before the error
         orchestrator.execute.assert_awaited_once()
+
+    def test_terminal_status_is_announced_then_sentinel_is_last(self, requests_app):
+        orchestrator = _make_orchestrator_returning("running", "failed")
+        client = self._make_client(requests_app, orchestrator)
+
+        with client.stream("GET", "/requests/req-stream-1/stream?interval=0.5&timeout=30") as resp:
+            raw_lines = [l if isinstance(l, str) else l.decode() for l in resp.iter_lines()]
+
+        non_blank = [l for l in raw_lines if l]
+        assert non_blank[-3:] == ["event: complete", 'data: {"status": "failed"}', "data: {}"]
+        assert "event: error" not in raw_lines
+
+    def test_named_frames_carry_no_requests_list(self, requests_app):
+        orchestrator = _make_orchestrator_returning("running", "complete")
+        client = self._make_client(requests_app, orchestrator)
+
+        with client.stream("GET", "/requests/req-stream-1/stream?interval=0.5&timeout=30") as resp:
+            raw_lines = [l if isinstance(l, str) else l.decode() for l in resp.iter_lines()]
+
+        for i, line in enumerate(raw_lines):
+            if line.startswith("event: "):
+                assert "requests" not in json.loads(raw_lines[i + 1][len("data: ") :])
+
+    def test_timeout_is_announced_then_sentinel_is_last(self, requests_app):
+        orchestrator = MagicMock()
+        output = GetRequestStatusOutput(
+            requests=[{"request_id": "req-stream-1", "status": "running"}]
+        )
+        orchestrator.execute = AsyncMock(return_value=output)
+        client = self._make_client(requests_app, orchestrator)
+
+        with client.stream("GET", "/requests/req-stream-1/stream?interval=0.5&timeout=1") as resp:
+            raw_lines = [l if isinstance(l, str) else l.decode() for l in resp.iter_lines()]
+
+        non_blank = [l for l in raw_lines if l]
+        assert non_blank[-3:] == ["event: timeout", 'data: {"status": "timeout"}', "data: {}"]
+
+    def _stream_lines(self, app, entry):
+        orchestrator = MagicMock()
+        orchestrator.execute = AsyncMock(return_value=GetRequestStatusOutput(requests=[entry]))
+        client = self._make_client(app, orchestrator)
+        with client.stream("GET", "/requests/req-x/stream?interval=0.5&timeout=30") as resp:
+            assert resp.status_code == 200
+            lines = [l if isinstance(l, str) else l.decode() for l in resp.iter_lines()]
+        return lines, orchestrator
+
+    def test_unknown_request_ends_promptly_with_not_found_error(self, requests_app):
+        lines, orchestrator = self._stream_lines(
+            requests_app,
+            {"request_id": "req-x", "not_found": True, "error": "Request req-x not found"},
+        )
+        non_blank = [l for l in lines if l]
+        assert non_blank == ["event: error", 'data: {"error": "not_found"}', "data: {}"]
+        orchestrator.execute.assert_awaited_once()  # no polling until the timeout
+
+    def _stream_sequence(self, app, outputs, query="interval=0.5&timeout=30"):
+        orchestrator = MagicMock()
+        orchestrator.execute = AsyncMock(side_effect=outputs)
+        client = self._make_client(app, orchestrator)
+        with client.stream("GET", f"/requests/req-x/stream?{query}") as resp:
+            assert resp.status_code == 200
+            lines = [l if isinstance(l, str) else l.decode() for l in resp.iter_lines()]
+        return lines, orchestrator
+
+    @staticmethod
+    def _blip(detail="1 validation error for RequestId"):
+        return GetRequestStatusOutput(requests=[{"request_id": "req-x", "error": detail}])
+
+    @staticmethod
+    def _status(status):
+        return GetRequestStatusOutput(requests=[{"request_id": "req-x", "status": status}])
+
+    def test_single_lookup_failure_does_not_end_the_stream(self, requests_app):
+        lines, orchestrator = self._stream_sequence(
+            requests_app, [self._blip(), self._status("running"), self._status("complete")]
+        )
+        non_blank = [l for l in lines if l]
+        assert "event: error" not in non_blank
+        assert non_blank[-3:] == ["event: complete", 'data: {"status": "complete"}', "data: {}"]
+        assert orchestrator.execute.await_count == 3
+        assert "validation" not in "".join(lines)
+
+    def test_three_consecutive_failures_end_with_generic_error(self, requests_app):
+        lines, orchestrator = self._stream_sequence(
+            requests_app, [self._blip(), self._blip(), self._blip(), self._status("complete")]
+        )
+        non_blank = [l for l in lines if l]
+        assert non_blank == ["event: error", 'data: {"error": "unavailable"}', "data: {}"]
+        assert orchestrator.execute.await_count == 3
+        assert "validation" not in "".join(lines)
+
+    def test_a_successful_poll_resets_the_failure_count(self, requests_app):
+        outputs = [
+            self._blip(),
+            self._blip(),
+            self._status("running"),
+            self._blip(),
+            self._blip(),
+            self._status("complete"),
+        ]
+        lines, orchestrator = self._stream_sequence(requests_app, outputs)
+        non_blank = [l for l in lines if l]
+        assert "event: error" not in non_blank
+        assert non_blank[-1] == "data: {}"
+        assert orchestrator.execute.await_count == 6
+
+    def test_failures_at_the_deadline_end_with_error_not_timeout(self, requests_app):
+        lines, _ = self._stream_sequence(
+            requests_app,
+            [self._status("running"), self._blip(), self._blip()],
+            query="interval=0.5&timeout=1.5",
+        )
+        non_blank = [l for l in lines if l]
+        assert non_blank[-3:] == ["event: error", 'data: {"error": "unavailable"}', "data: {}"]

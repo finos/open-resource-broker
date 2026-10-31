@@ -3,6 +3,8 @@
 import ipaddress
 import os
 import secrets
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
@@ -306,6 +308,21 @@ class _LoopbackAdminTokenMiddleware:
         return await call_next(request)
 
 
+def _resolve_event_publisher() -> Any:
+    """Return the shared event publisher, or None when it is unavailable."""
+    try:
+        from orb.domain.base.ports import EventPublisherPort
+        from orb.infrastructure.di.container import get_container
+
+        publisher = get_container().get_optional(EventPublisherPort)
+    except Exception as exc:
+        get_logger(__name__).debug("Event publisher unavailable for lifespan hooks: %s", exc)
+        return None
+    if publisher is None or not hasattr(publisher, "drain"):
+        return None
+    return publisher
+
+
 def create_fastapi_app(server_config: Any) -> Any:
     """
     Create and configure FastAPI application.
@@ -364,8 +381,22 @@ def create_fastapi_app(server_config: Any) -> Any:
     if _audit_log_file:
         logger.info("orb.audit logger writing to dedicated file: %s", _audit_log_file)
 
+    @asynccontextmanager
+    async def _lifespan(_app: Any) -> AsyncIterator[None]:
+        publisher = _resolve_event_publisher()
+        if publisher is not None:
+            # Events raised from worker threads are handed to this loop, which
+            # owns the SSE subscriber queues.
+            publisher.bind_loop()
+        try:
+            yield
+        finally:
+            if publisher is not None:
+                await publisher.drain()
+
     # Create FastAPI app with configuration
     app = FastAPI(  # type: ignore[operator]
+        lifespan=_lifespan,
         title="Open Resource Broker API",
         description="REST API for Open Resource Broker - Dynamic cloud resource provisioning",
         version=__version__,

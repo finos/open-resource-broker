@@ -32,6 +32,39 @@ public sealed class SseFrame
 // ORB-specific payload types
 // ---------------------------------------------------------------------------
 
+/// <summary>
+/// Reads a JSON string, number or null as a string. The server sends machine
+/// launch_time as a number, which the default string converter rejects.
+/// </summary>
+public sealed class FlexStringConverter : System.Text.Json.Serialization.JsonConverter<string?>
+{
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.Null:
+                return null;
+            case JsonTokenType.String:
+                return reader.GetString();
+            case JsonTokenType.Number:
+                return Encoding.UTF8.GetString(reader.ValueSpan);
+            case JsonTokenType.True:
+                return "true";
+            case JsonTokenType.False:
+                return "false";
+            default:
+                reader.Skip();
+                return null;
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options)
+    {
+        if (value is null) writer.WriteNullValue();
+        else writer.WriteStringValue(value);
+    }
+}
+
 /// <summary>Machine reference in an SSE payload.</summary>
 public sealed class SseMachine
 {
@@ -47,13 +80,18 @@ public sealed class SseMachine
     [System.Text.Json.Serialization.JsonPropertyName("result")]
     public string? Result { get; init; }
 
-    [System.Text.Json.Serialization.JsonPropertyName("private_ip")]
+    [System.Text.Json.Serialization.JsonPropertyName("private_ip_address")]
     public string? PrivateIp { get; init; }
 
-    [System.Text.Json.Serialization.JsonPropertyName("public_ip")]
+    [System.Text.Json.Serialization.JsonPropertyName("public_ip_address")]
     public string? PublicIp { get; init; }
 
+    /// <summary>
+    /// Launch time as sent by the server: a Unix timestamp in seconds as decimal
+    /// text, or null while unknown.
+    /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("launch_time")]
+    [System.Text.Json.Serialization.JsonConverter(typeof(FlexStringConverter))]
     public string? LaunchTime { get; init; }
 
     [System.Text.Json.Serialization.JsonPropertyName("message")]
@@ -320,6 +358,21 @@ public sealed class SseStreamOptions
     public int InitialDelayMs { get; init; } = 1_000;
     public int MaxDelayMs { get; init; } = 30_000;
     public string? LastEventId { get; init; }
+}
+
+/// <summary>
+/// Interprets the named outcome frames of a request status stream. A
+/// <c>timeout</c> or <c>error</c> frame ends the stream without the request being
+/// finished; <c>complete</c> frames, plain data frames and streams from servers
+/// that predate named frames are not errors.
+/// </summary>
+public static class SseOutcome
+{
+    public static void ThrowIfFailed(SseFrame frame)
+    {
+        if (frame.Event == "timeout") throw new OrbStreamTimeoutException();
+        if (frame.Event == "error") throw new OrbStreamException();
+    }
 }
 
 public static class SseStream

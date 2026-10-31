@@ -3,7 +3,7 @@
 import json
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 if TYPE_CHECKING:
     from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
@@ -696,6 +696,16 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         for key, value in promoted.pop("metadata", {}).items():
             promoted.setdefault(key, value)
         return self.field_mapper.format_for_generation([promoted], copy_unmapped=True)[0]
+
+    def get_status_poll_exit_code(self, status: Optional[str]) -> int:
+        """Always 0: HostFactory reads the request outcome from the JSON output.
+
+        A non-zero exit from the status script is treated by HostFactory as a
+        script failure, so failed, partial, timed-out, cancelled and unknown
+        requests are reported in the output (``complete_with_error`` / error
+        entries) rather than through the exit code.
+        """
+        return 0
 
     def format_request_status_response(self, requests: list[RequestDTO]) -> dict[str, Any]:
         """

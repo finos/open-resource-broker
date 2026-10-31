@@ -53,7 +53,7 @@ class LoggingEventHandler(EventHandler):
 
         # Log the message
         if self.logger and message:
-            self.logger.info(message)
+            self.logger.debug(message)
 
     @abstractmethod
     def format_message(self, event: DomainEvent) -> str:

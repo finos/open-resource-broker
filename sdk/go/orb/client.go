@@ -883,6 +883,13 @@ func (c *Client) consumeSSE(ctx context.Context, resp *http.Response, ch chan<- 
 			return false, gotEvents // clean EOF — reconnect
 		}
 
+		switch frame.Event {
+		case "timeout":
+			return c.failStream(ctx, ch, s, &OrbError{Message: ErrStreamTimeout.Error(), sentinel: ErrStreamTimeout}), gotEvents
+		case "error":
+			return c.failStream(ctx, ch, s, &OrbError{Message: ErrStreamFailed.Error(), sentinel: ErrStreamFailed}), gotEvents
+		}
+
 		if sse.IsSentinel(frame) {
 			return true, gotEvents // stream done normally
 		}
@@ -902,7 +909,7 @@ func (c *Client) consumeSSE(ctx context.Context, resp *http.Response, ch chan<- 
 				Result:     m.Result,
 				PrivateIP:  m.PrivateIP,
 				PublicIP:   m.PublicIP,
-				LaunchTime: m.LaunchTime,
+				LaunchTime: string(m.LaunchTime),
 				Message:    m.Message,
 			}
 		}
@@ -930,8 +937,22 @@ func (c *Client) consumeSSE(ctx context.Context, resp *http.Response, ch chan<- 
 	}
 }
 
+// failStream records a terminal stream error, delivers it to the consumer and
+// reports the stream as terminal (no reconnect).
+func (c *Client) failStream(ctx context.Context, ch chan<- StreamEvent, s *RequestStream, err error) bool {
+	s.setErr(err)
+	select {
+	case ch <- StreamEvent{Err: err}:
+	case <-ctx.Done():
+	}
+	return true
+}
+
 // WaitForCompletion streams a request until it reaches a terminal status.
-// Returns the final StreamEvent.
+// Returns the last event that carried request data, so the final status is
+// readable on success. Stream failures (including a server-side timeout, which
+// is reported as ErrStreamTimeout) are returned as the error and never replace
+// the last status event.
 func (c *Client) WaitForCompletion(ctx context.Context, id string, opts ...StreamOption) (StreamEvent, error) {
 	stream, err := c.StreamRequestStatus(ctx, id, opts...)
 	if err != nil {
@@ -944,6 +965,9 @@ func (c *Client) WaitForCompletion(ctx context.Context, id string, opts ...Strea
 		event, ok := stream.Next()
 		if !ok {
 			break
+		}
+		if event.Err != nil {
+			continue // surfaced through stream.Err()
 		}
 		last = event
 	}

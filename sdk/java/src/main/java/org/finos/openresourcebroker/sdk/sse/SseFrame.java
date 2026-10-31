@@ -1,9 +1,19 @@
 package org.finos.openresourcebroker.sdk.sse;
 
 /**
- * A single parsed SSE frame.  Only the {@code data:} field is used by ORB.
+ * A single parsed SSE frame: the {@code data:} payload plus the optional
+ * {@code event:} name ({@code null} when the frame has none).
+ *
+ * <p>The request status stream names its outcome frames {@code complete},
+ * {@code error} and {@code timeout}; servers that predate them send plain data
+ * frames only.
  */
-public record SseFrame(String data) {
+public record SseFrame(String data, String event) {
+
+    /** A frame without an event name. */
+    public SseFrame(String data) {
+        this(data, null);
+    }
 
     /**
      * Returns true if this frame is the ORB terminal sentinel ({@code data: {}}).

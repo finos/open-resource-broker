@@ -28,7 +28,7 @@ import * as os from "os";
 import * as path from "path";
 import { spawn, type ChildProcess } from "child_process";
 import { request as undiciRequest, Agent } from "undici";
-import { OrbClient, OrbApiError } from "../../src/index";
+import { OrbClient, OrbApiError, OrbStreamError } from "../../src/index";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -632,23 +632,21 @@ describe("Requests", () => {
   });
 
   it("streamRequestStatus — GET /api/v1/requests/{id}/stream (nonexistent)", async () => {
-    // A nonexistent request should return a 4xx error immediately (not hang)
+    // The stream route exists and answers 200; for an unknown request ID the
+    // server ends the stream promptly with an error frame, which the SDK raises
+    // as OrbStreamError (not a route-level HTTP error and not a wait until the
+    // stream timeout).
     const ac = new AbortController();
-    const timeoutHandle = setTimeout(() => ac.abort(), 5000);
+    const timeoutHandle = setTimeout(() => ac.abort(), 10_000);
 
-    let caught: unknown;
     let events = 0;
+    let caught: unknown;
     try {
-      for await (const event of fixture.client.streamRequestStatus(
+      for await (const _event of fixture.client.streamRequestStatus(
         "nonexistent-request-id-xyz",
-        {
-          signal: ac.signal,
-          intervalSeconds: 1,
-          timeoutSeconds: 2, // short timeout so stream closes quickly
-        }
+        { signal: ac.signal, intervalSeconds: 1, timeoutSeconds: 30 }
       )) {
         events++;
-        console.log(`  streamRequestStatus event: ${event.status}`);
       }
     } catch (err) {
       caught = err;
@@ -656,13 +654,9 @@ describe("Requests", () => {
       clearTimeout(timeoutHandle);
     }
 
-    if (caught) {
-      assertNotRouteLevelError(caught, "streamRequestStatus(nonexistent)");
-      console.log(`  streamRequestStatus(nonexistent) → error (route exists): ${caught}`);
-    } else {
-      // Returned events (synthetic "running" for unknown IDs) — route exists
-      console.log(`  streamRequestStatus(nonexistent) → ${events} events (route exists)`);
-    }
+    expect(caught).toBeInstanceOf(OrbStreamError);
+    expect(events).toBe(0);
+    console.log("  streamRequestStatus(nonexistent) → OrbStreamError (route exists)");
   }, 15_000);
 });
 

@@ -41,6 +41,23 @@ def _flush_telemetry() -> None:
         pass
 
 
+async def _drain_events() -> None:
+    """Wait for in-flight domain event deliveries before the command returns.
+
+    Event forwarding to the bus is scheduled on the running loop; without this
+    the loop closes first and the last (usually terminal) events are cancelled.
+    """
+    try:
+        from orb.domain.base.ports import EventPublisherPort
+
+        publisher = get_container().get_optional(EventPublisherPort)
+        drain = getattr(publisher, "drain", None)
+        if drain is not None:
+            await drain()
+    except Exception as e:
+        get_logger(__name__).debug("Event drain skipped: %s", e)
+
+
 async def _show_resource_help(resource):
     """Show help for a resource when no action is provided."""
     import subprocess
@@ -286,6 +303,7 @@ async def main() -> None:
                 print_error(error_output)
             sys.exit(exit_code)
         finally:
+            await _drain_events()
             if scheduler_override_active:
                 try:
                     from orb.domain.base.ports.configuration_port import ConfigurationPort

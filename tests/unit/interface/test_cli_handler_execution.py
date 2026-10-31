@@ -30,6 +30,7 @@ class TestCLIHandlerExecution:
         """Test that handle_list_templates executes correctly."""
         container = MagicMock(spec=DIContainer)
         formatter = MagicMock(spec=ResponseFormattingService)
+        formatter.status_poll_exit_code.return_value = 0
 
         templates = [
             {"id": "template1", "name": "Template 1"},
@@ -81,6 +82,7 @@ class TestCLIHandlerExecution:
             strategies=[{"id": "s1"}, {"id": "s2"}], current_strategy="s1", count=2
         )
         mock_formatter = MagicMock(spec=ResponseFormattingService)
+        mock_formatter.status_poll_exit_code.return_value = 0
         mock_formatter.format_scheduler_strategy_list.return_value = InterfaceResponse(
             data={"strategies": [{"id": "s1"}, {"id": "s2"}], "current_strategy": "s1", "count": 2}
         )
@@ -114,6 +116,7 @@ class TestCLIHandlerExecution:
             strategies=[{"name": "json"}, {"name": "sqlite"}], current_strategy="json", count=2
         )
         mock_formatter = MagicMock(spec=ResponseFormattingService)
+        mock_formatter.status_poll_exit_code.return_value = 0
         mock_formatter.format_storage_strategy_list.return_value = InterfaceResponse(
             data={"strategies": ["json", "sqlite"], "current_strategy": "json", "count": 2}
         )
@@ -155,6 +158,7 @@ class TestCLIHandlerExecution:
             requests=[{"request_id": "req-abc123", "status": "complete"}]
         )
         formatter = MagicMock(spec=ResponseFormattingService)
+        formatter.status_poll_exit_code.return_value = 0
         from orb.application.dto.interface_response import InterfaceResponse
 
         formatter.format_request_status.return_value = InterfaceResponse(
@@ -191,6 +195,7 @@ class TestFormatConversionConsistency:
         """Test that format conversion is done using ResponseFormattingService in template handlers."""
         container = MagicMock(spec=DIContainer)
         formatter = MagicMock(spec=ResponseFormattingService)
+        formatter.status_poll_exit_code.return_value = 0
 
         templates = [
             {"id": "template1", "name": "Template 1"},

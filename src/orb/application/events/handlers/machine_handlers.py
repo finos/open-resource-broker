@@ -44,8 +44,8 @@ class MachineCreatedHandler(BaseLoggingEventHandler[DomainEvent]):
         return message
 
 
-@event_handler("MachineStatusUpdatedEvent")  # type: ignore[arg-type]
-class MachineStatusUpdatedHandler(BaseLoggingEventHandler[DomainEvent]):
+@event_handler("MachineStatusChangedEvent")  # type: ignore[arg-type]
+class MachineStatusChangedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle machine status update events using BaseEventHandler pattern."""
 
     def __init__(
@@ -128,31 +128,3 @@ class MachineHealthCheckHandler(BaseLoggingEventHandler[DomainEvent]):
             return "warning"
         else:
             return "info"
-
-
-@event_handler("MachineErrorEvent")  # type: ignore[arg-type]
-class MachineErrorHandler(BaseLoggingEventHandler[DomainEvent]):
-    """Handle machine error events using BaseEventHandler pattern."""
-
-    def __init__(
-        self,
-        logger: Optional[LoggingPort] = None,
-        error_handler: Optional[ErrorHandlingPort] = None,
-        event_publisher: Optional[EventPublisherPort] = None,
-    ) -> None:
-        """Initialize machine error handler."""
-        super().__init__(logger, error_handler, event_publisher)
-
-    async def format_log_message(self, event: DomainEvent) -> str:
-        """Format machine error log message."""
-        error_type = getattr(event, "error_type", "unknown")
-        error_message = getattr(event, "error_message", "No details available")
-
-        return (
-            f"Machine error: {getattr(event, 'aggregate_id', 'unknown')} | "
-            f"Type: {error_type} | Message: {error_message}"
-        )
-
-    def get_log_level(self, event: DomainEvent) -> str:
-        """Get log level - errors for machine errors."""
-        return "error"

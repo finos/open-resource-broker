@@ -79,8 +79,8 @@ class TestTemplateValidatedHandler:
 
         await h.process_event(ev)
 
-        logger.info.assert_called_once()
-        assert "t1" in logger.info.call_args[0][0]
+        logger.debug.assert_called_once()
+        assert "t1" in logger.debug.call_args_list[-1][0][0]
 
 
 @pytest.mark.unit
@@ -141,5 +141,5 @@ class TestTemplateUpdatedHandler:
 
         await h.process_event(ev)
 
-        logger.info.assert_called_once()
-        assert "alice" in logger.info.call_args[0][0]
+        logger.debug.assert_called_once()
+        assert "alice" in logger.debug.call_args_list[-1][0][0]
