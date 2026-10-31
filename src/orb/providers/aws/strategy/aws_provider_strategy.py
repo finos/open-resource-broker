@@ -399,7 +399,9 @@ class AWSProviderStrategy(ProviderStrategy):
                 self._get_instance_service().terminate_instances, operation
             )
         elif operation.operation_type == ProviderOperationType.GET_INSTANCE_STATUS:
-            return self._get_instance_service().get_instance_status(operation)
+            return await asyncio.to_thread(
+                self._get_instance_service().get_instance_status, operation
+            )
         elif operation.operation_type == ProviderOperationType.VALIDATE_TEMPLATE:
             return self._get_template_service().validate_template(operation)
         elif operation.operation_type == ProviderOperationType.HEALTH_CHECK:
@@ -417,13 +419,17 @@ class AWSProviderStrategy(ProviderStrategy):
         elif operation.operation_type == ProviderOperationType.RESOLVE_IMAGE:
             return await self._handle_resolve_image(operation)
         elif operation.operation_type == ProviderOperationType.START_INSTANCES:
-            return self._get_instance_service().start_instances(operation)
+            return await asyncio.to_thread(self._get_instance_service().start_instances, operation)
         elif operation.operation_type == ProviderOperationType.STOP_INSTANCES:
-            return self._get_instance_service().stop_instances(operation)
+            return await asyncio.to_thread(self._get_instance_service().stop_instances, operation)
         elif operation.operation_type == ProviderOperationType.CLEANUP_MACHINE_RESOURCES:
-            return self._get_instance_service().cleanup_machine_resources(operation)
+            return await asyncio.to_thread(
+                self._get_instance_service().cleanup_machine_resources, operation
+            )
         elif operation.operation_type == ProviderOperationType.GET_MACHINE_HEALTH:
-            return self._get_instance_service().get_machine_health(operation)
+            return await asyncio.to_thread(
+                self._get_instance_service().get_machine_health, operation
+            )
         elif operation.operation_type == ProviderOperationType.TAG_INSTANCES:
             return await self._tag_instances(operation)
         else:

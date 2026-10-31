@@ -16,6 +16,7 @@ from orb.domain.request.value_objects import RequestType
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.resilience.call_executor import AWSCallExecutor
 from orb.providers.aws.utilities.terminate_instances import terminate_skipping_missing
 
 if TYPE_CHECKING:
@@ -43,6 +44,22 @@ class AWSRequestAdapter(RequestAdapterPort):
         self._aws_client = aws_client
         self._logger = logger
         self._handler_factory = handler_factory
+        self._executor = AWSCallExecutor.for_client(aws_client, "request_adapter", logger)
+
+    def _call(self, func, operation_name: str, operation_type: str = "read_only", **kwargs):
+        """Run one AWS call through the shared retry framework.
+
+        The original ``ClientError`` is preserved: this adapter reports failures
+        as result dicts built from the AWS error text.
+        """
+        return self._executor.execute(
+            func,
+            operation_type=operation_type,
+            operation_name=operation_name,
+            preserve_client_error=True,
+            log_response=False,
+            **kwargs,
+        )
 
     def get_request_status(self, request: Request) -> dict[str, Any]:
         """
@@ -110,7 +127,11 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with status information
         """
         try:
-            response = self._aws_client.ec2_client.describe_fleets(FleetIds=[request.resource_id])
+            response = self._call(
+                self._aws_client.ec2_client.describe_fleets,
+                "describe_fleets",
+                FleetIds=[request.resource_id],
+            )
 
             if not response["Fleets"]:
                 return {
@@ -121,8 +142,10 @@ class AWSRequestAdapter(RequestAdapterPort):
             fleet = response["Fleets"][0]
 
             # Get instance information
-            instances_response = self._aws_client.ec2_client.describe_fleet_instances(
-                FleetId=request.resource_id
+            instances_response = self._call(
+                self._aws_client.ec2_client.describe_fleet_instances,
+                "describe_fleet_instances",
+                FleetId=request.resource_id,
             )
 
             return {
@@ -161,8 +184,10 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with status information
         """
         try:
-            response = self._aws_client.ec2_client.describe_spot_fleet_requests(
-                SpotFleetRequestIds=[request.resource_id]
+            response = self._call(
+                self._aws_client.ec2_client.describe_spot_fleet_requests,
+                "describe_spot_fleet_requests",
+                SpotFleetRequestIds=[request.resource_id],
             )
 
             if not response["SpotFleetRequestConfigs"]:
@@ -174,8 +199,10 @@ class AWSRequestAdapter(RequestAdapterPort):
             fleet = response["SpotFleetRequestConfigs"][0]
 
             # Get instance information
-            instances_response = self._aws_client.ec2_client.describe_spot_fleet_instances(
-                SpotFleetRequestId=request.resource_id
+            instances_response = self._call(
+                self._aws_client.ec2_client.describe_spot_fleet_instances,
+                "describe_spot_fleet_instances",
+                SpotFleetRequestId=request.resource_id,
             )
 
             return {
@@ -212,8 +239,10 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with status information
         """
         try:
-            response = self._aws_client.autoscaling_client.describe_auto_scaling_groups(
-                AutoScalingGroupNames=[request.resource_id]
+            response = self._call(
+                self._aws_client.autoscaling_client.describe_auto_scaling_groups,
+                "describe_auto_scaling_groups",
+                AutoScalingGroupNames=[request.resource_id],
             )
 
             if not response["AutoScalingGroups"]:
@@ -261,7 +290,11 @@ class AWSRequestAdapter(RequestAdapterPort):
 
             instance_ids = request.resource_id.split(",")
 
-            response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
+            response = self._call(
+                self._aws_client.ec2_client.describe_instances,
+                "describe_instances",
+                InstanceIds=instance_ids,
+            )
 
             instances = []
             for reservation in response["Reservations"]:
@@ -306,7 +339,11 @@ class AWSRequestAdapter(RequestAdapterPort):
 
             instance_ids = request.resource_id.split(",")
 
-            response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
+            response = self._call(
+                self._aws_client.ec2_client.describe_instances,
+                "describe_instances",
+                InstanceIds=instance_ids,
+            )
 
             instances = []
             for reservation in response["Reservations"]:
@@ -346,7 +383,12 @@ class AWSRequestAdapter(RequestAdapterPort):
         """
         try:
             outcome = terminate_skipping_missing(
-                lambda ids: self._aws_client.ec2_client.terminate_instances(InstanceIds=ids),
+                lambda ids: self._call(
+                    self._aws_client.ec2_client.terminate_instances,
+                    "terminate_instances",
+                    operation_type="standard",
+                    InstanceIds=ids,
+                ),
                 instance_ids,
             )
             if outcome["already_terminated"]:
