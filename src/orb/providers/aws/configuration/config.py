@@ -7,6 +7,7 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from orb.config.utils.env_expansion import reject_unexpanded_placeholder
 from orb.infrastructure.interfaces.provider import BaseProviderConfig
 from orb.providers.aws.configuration.batch_sizes_config import AWSBatchSizesConfig
 from orb.providers.aws.configuration.naming_config import AWSNamingConfig
@@ -122,6 +123,7 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         populate_by_name=True,
         env_nested_delimiter="__",  # Enable nested environment variables
         extra="allow",
+        hide_input_in_errors=True,
     )
 
     # Provider identification (from BaseProviderConfig)
@@ -145,6 +147,20 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         ),
     )
     session_token: Optional[str] = Field(None, description="AWS session token")
+
+    @field_validator("secret_access_key", mode="after")
+    @classmethod
+    def _reject_unexpanded_secret_access_key(cls, v: Optional[SecretStr]) -> Optional[SecretStr]:
+        """Fail when the secret access key still holds a ``${VAR}`` placeholder."""
+        if v is not None:
+            reject_unexpanded_placeholder(v.get_secret_value(), "secret_access_key")
+        return v
+
+    @field_validator("session_token", mode="after")
+    @classmethod
+    def _reject_unexpanded_session_token(cls, v: Optional[str]) -> Optional[str]:
+        """Fail when the session token still holds a ``${VAR}`` placeholder."""
+        return reject_unexpanded_placeholder(v, "session_token")
 
     # AWS Settings
     region: str = Field("us-east-1", description="AWS region")
