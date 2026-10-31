@@ -39,6 +39,8 @@ class Request(AggregateRoot):
             # Inherited from Entity; not written by RequestSerializer — the serializer
             # only persists created_at, started_at, and completed_at.
             "updated_at",
+            # Repository bookkeeping, never part of a stored row
+            "persisted_revision",
         }
     )
 

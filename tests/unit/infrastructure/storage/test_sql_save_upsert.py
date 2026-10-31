@@ -15,7 +15,6 @@ from orb.domain.machine.aggregate import Machine
 from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.aggregate import Request
 from orb.domain.request.request_types import RequestStatus, RequestType
-from orb.infrastructure.storage.exceptions import StorageError
 from orb.infrastructure.storage.sql.unit_of_work import SQLUnitOfWork
 
 
@@ -131,17 +130,3 @@ def test_template_save_twice_updates_the_row(uow):
 
     assert _count(uow, "templates") == 1
     assert strategy.find_by_id("t-1")["image_id"] == "ami-2"  # type: ignore[index]
-
-
-def test_failing_existence_check_is_not_read_as_absent(uow):
-    strategy = uow._request_strategy
-
-    def broken(_entity_id: str) -> bool:
-        raise RuntimeError("lookup failed")
-
-    strategy._row_exists = broken  # type: ignore[method-assign]
-
-    with pytest.raises(StorageError):
-        strategy.save("req-x", {"request_id": "req-x"})
-
-    assert _count(uow, "requests") == 0

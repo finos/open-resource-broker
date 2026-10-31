@@ -284,7 +284,7 @@ class SQLQueryBuilder(QueryManager):
             # version is touched.  A zero rowcount signals a concurrent write won.
             query = (
                 f"UPDATE {self.table_name} SET {', '.join(set_clauses)} "  # noqa: S608  # table_name, id_column and set columns validated via _validate_identifier; values are parameterized
-                f"WHERE {id_column} = :entity_id AND version = :expected_version"
+                f"WHERE {id_column} = :entity_id AND COALESCE(version, 0) = :expected_version"
             )
         else:
             query = f"UPDATE {self.table_name} SET {', '.join(set_clauses)} WHERE {id_column} = :entity_id"  # noqa: S608  # table_name, id_column and set columns validated via _validate_identifier; values are parameterized
