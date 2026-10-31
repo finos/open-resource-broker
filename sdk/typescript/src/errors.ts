@@ -115,6 +115,26 @@ export class OrbTimeoutError extends OrbApiError {
   }
 }
 
+/**
+ * The server ended a request status stream because its maximum stream duration
+ * elapsed before the request reached a terminal status. The last event
+ * received is not a final status.
+ */
+export class OrbStreamTimeoutError extends OrbError {
+  constructor(message = "orb: request status stream timed out before the request finished") {
+    super(message);
+    this.name = "OrbStreamTimeoutError";
+  }
+}
+
+/** The server ended a request status stream with an error frame. */
+export class OrbStreamError extends OrbError {
+  constructor(message = "orb: request status stream failed on the server") {
+    super(message);
+    this.name = "OrbStreamError";
+  }
+}
+
 export class OrbUnavailableError extends OrbApiError {
   constructor(init: string | ApiErrorInit = "orb: service unavailable") {
     super({ ...normalizeInit(init, "orb: service unavailable"), statusCode: 503 });

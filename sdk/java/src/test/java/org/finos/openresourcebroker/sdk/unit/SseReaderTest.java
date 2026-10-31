@@ -1,5 +1,9 @@
 package org.finos.openresourcebroker.sdk.unit;
 
+import org.finos.openresourcebroker.sdk.client.OrbError;
+import org.finos.openresourcebroker.sdk.client.OrbStreamException;
+import org.finos.openresourcebroker.sdk.client.OrbStreamTimeoutException;
+import org.finos.openresourcebroker.sdk.client.StreamOutcome;
 import org.finos.openresourcebroker.sdk.sse.SseFrame;
 import org.finos.openresourcebroker.sdk.sse.SseReader;
 
@@ -63,6 +67,59 @@ class SseReaderTest {
                 assertNull(r.next());
             }
         }
+    }
+
+    @Test
+    void readerExposesEventNameAndDoesNotLeakItToNextFrame() throws Exception {
+        String wire = "event: timeout\ndata: {\"status\": \"timeout\"}\n\ndata: {}\n\n";
+        try (SseReader r = new SseReader(bytes(wire))) {
+            assertEquals("timeout", r.next().event());
+            SseFrame next = r.next();
+            assertNull(next.event());
+            assertTrue(next.isSentinel());
+        }
+    }
+
+    @Test
+    void timeoutFrameRaisesDistinctTimeoutError() {
+        SseFrame frame = new SseFrame("{\"status\": \"timeout\"}", "timeout");
+        OrbError e = assertThrows(OrbStreamTimeoutException.class,
+                () -> StreamOutcome.throwIfFailed(frame));
+        assertFalse(e instanceof OrbStreamException);
+    }
+
+    @Test
+    void errorFrameRaisesError() {
+        SseFrame frame = new SseFrame("{\"error\": \"internal\"}", "error");
+        OrbError e = assertThrows(OrbStreamException.class,
+                () -> StreamOutcome.throwIfFailed(frame));
+        assertFalse(e instanceof OrbStreamTimeoutException);
+    }
+
+    @Test
+    void finalStatusFrameSurvivesCompleteOutcomeAndSentinel() throws Exception {
+        String wire = "data: {\"requests\":[{\"status\":\"in_progress\"}]}\n\n"
+                + "data: {\"requests\":[{\"status\":\"complete\"}]}\n\n"
+                + "event: complete\ndata: {\"status\": \"complete\"}\n\ndata: {}\n\n";
+        String lastStatusFrame = null;
+        try (SseReader r = new SseReader(bytes(wire))) {
+            SseFrame f;
+            while ((f = r.next()) != null) {
+                StreamOutcome.throwIfFailed(f);
+                if (f.data().contains("\"requests\"")) lastStatusFrame = f.data();
+            }
+        }
+        assertNotNull(lastStatusFrame);
+        assertTrue(lastStatusFrame.contains("\"complete\""));
+    }
+
+    @Test
+    void completeAndPlainFramesAreNotErrors() {
+        assertDoesNotThrow(() -> StreamOutcome.throwIfFailed(
+                new SseFrame("{\"status\": \"failed\"}", "complete")));
+        assertDoesNotThrow(() -> StreamOutcome.throwIfFailed(
+                new SseFrame("{\"requests\":[]}")));
+        assertDoesNotThrow(() -> StreamOutcome.throwIfFailed(new SseFrame("{}")));
     }
 
     @Test

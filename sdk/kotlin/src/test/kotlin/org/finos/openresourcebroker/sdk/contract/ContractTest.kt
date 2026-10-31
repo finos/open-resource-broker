@@ -30,6 +30,7 @@ import org.finos.openresourcebroker.sdk.client.ClientConfig
 import org.finos.openresourcebroker.sdk.client.OrbClient
 import org.finos.openresourcebroker.sdk.model.*
 import org.finos.openresourcebroker.sdk.client.OrbApiError
+import org.finos.openresourcebroker.sdk.client.OrbStreamError
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -588,36 +589,22 @@ class ContractTest {
     @Order(47)
     @Timeout(20)
     fun `streamRequestStatus - GET api v1 requests id stream (nonexistent)`() {
-        val result = java.util.concurrent.atomic.AtomicReference<String>("pending")
-        val thread = Thread {
-            try {
-                runBlocking {
-                    withTimeout(8.seconds) {
-                        val event = client.streamRequestStatus(
-                            "nonexistent-request-kt-xyz",
-                            intervalSeconds = 1,
-                            timeoutSeconds = 2,
-                        ).firstOrNull()
-                        result.set("got_event_${event?.status}")
-                    }
+        // The stream route exists and answers 200; for an unknown request ID the
+        // server ends the stream promptly with an error frame, which the SDK
+        // raises as OrbStreamError (not a route-level HTTP error and not a wait
+        // until the stream timeout).
+        assertThrows<OrbStreamError> {
+            runBlocking {
+                withTimeout(10.seconds) {
+                    client.streamRequestStatus(
+                        "nonexistent-request-kt-xyz",
+                        intervalSeconds = 1,
+                        timeoutSeconds = 30,
+                    ).collect { }
                 }
-            } catch (e: OrbApiError) {
-                assertNotRouteLevelError(e, "streamRequestStatus(nonexistent)")
-                result.set("api_error_${e.statusCode}")
-            } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
-                result.set("timeout_no_events")
-            } catch (_: Exception) {
-                result.set("stream_error")
             }
         }
-        thread.isDaemon = true
-        thread.start()
-        thread.join(10000)
-        if (thread.isAlive) {
-            thread.interrupt()
-            result.set("interrupted")
-        }
-        println("  streamRequestStatus -> ${result.get()} (route exists)")
+        println("  streamRequestStatus(nonexistent) -> OrbStreamError (route exists)")
     }
 
     // ---------------------------------------------------------------------------

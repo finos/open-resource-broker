@@ -12,6 +12,10 @@ import (
 // Frame is a single parsed SSE event (the data field only — ORB only uses data:).
 type Frame struct {
 	Data []byte
+	// Event is the SSE event: field, or "" when the frame has none. The request
+	// status stream names its outcome frames "complete", "error" and "timeout";
+	// servers that predate them send plain data frames only.
+	Event string
 }
 
 // Reader parses SSE frames from an io.ReadCloser.
@@ -42,6 +46,7 @@ func NewReader(body io.ReadCloser) *Reader {
 // The caller should check Err() after Next() returns nil.
 func (r *Reader) Next() *Frame {
 	var dataLines [][]byte
+	var event string
 
 	for r.scanner.Scan() {
 		line := r.scanner.Text()
@@ -53,7 +58,12 @@ func (r *Reader) Next() *Frame {
 			}
 			data := bytes.Join(dataLines, []byte("\n"))
 			dataLines = dataLines[:0]
-			return &Frame{Data: data}
+			return &Frame{Data: data, Event: event}
+		}
+
+		if strings.HasPrefix(line, "event:") {
+			event = strings.TrimPrefix(strings.TrimPrefix(line, "event:"), " ")
+			continue
 		}
 
 		if strings.HasPrefix(line, "data:") {
@@ -61,7 +71,7 @@ func (r *Reader) Next() *Frame {
 			val = strings.TrimPrefix(val, " ")
 			dataLines = append(dataLines, []byte(val))
 		}
-		// Ignore event:, id:, retry: lines — ORB doesn't use them
+		// Ignore id: and retry: lines — ORB doesn't use them
 	}
 
 	r.err = r.scanner.Err()

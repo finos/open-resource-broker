@@ -17,8 +17,8 @@ import java.util.List;
  *   data: {}\n\n              — terminal sentinel (stream done)
  * </pre>
  *
- * <p>Only {@code data:} lines are processed; {@code event:}, {@code id:},
- * and {@code retry:} are accepted but ignored (ORB does not use them).
+ * <p>{@code data:} and {@code event:} lines are processed; {@code id:} and
+ * {@code retry:} are accepted but ignored (ORB does not use them).
  *
  * <p>The frame buffer is bounded at {@link #MAX_SSE_FRAME_BYTES} (4 MiB, matching
  * the Go/TS/Kotlin/C# SDKs).  A server that never emits a newline or emits an
@@ -46,6 +46,7 @@ public class SseReader implements Closeable {
      */
     public SseFrame next() throws IOException {
         List<String> dataLines = new ArrayList<>();
+        String event = null;
         long frameBytes = 0;
 
         String line;
@@ -57,7 +58,13 @@ public class SseReader implements Closeable {
                 }
                 String data = String.join("\n", dataLines);
                 dataLines.clear();
-                return new SseFrame(data);
+                return new SseFrame(data, event);
+            }
+
+            if (line.startsWith("event:")) {
+                String name = line.substring(6);
+                event = name.startsWith(" ") ? name.substring(1) : name;
+                continue;
             }
 
             if (line.startsWith("data:")) {
@@ -72,7 +79,7 @@ public class SseReader implements Closeable {
                 }
                 dataLines.add(val);
             }
-            // Ignore event:, id:, retry: lines
+            // Ignore id: and retry: lines
         }
 
         // EOF

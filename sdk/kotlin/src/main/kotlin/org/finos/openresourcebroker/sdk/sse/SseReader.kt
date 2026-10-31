@@ -17,6 +17,8 @@ package org.finos.openresourcebroker.sdk.sse
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.finos.openresourcebroker.sdk.client.OrbApiError
+import org.finos.openresourcebroker.sdk.client.OrbStreamError
+import org.finos.openresourcebroker.sdk.client.OrbStreamTimeoutError
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
@@ -76,6 +78,19 @@ data class OrbSsePayload(
 val TERMINAL_STATUSES = setOf(
     "complete", "completed", "failed", "error", "cancelled", "canceled", "partial", "timeout"
 )
+
+/**
+ * Raise the error announced by a named outcome frame of a request status stream:
+ * `timeout` and `error` end the stream without the request being finished.
+ * `complete` frames, plain data frames and streams from servers that predate
+ * named frames are not errors.
+ */
+internal fun SseFrame.throwIfStreamFailed() {
+    when (event) {
+        "timeout" -> throw OrbStreamTimeoutError()
+        "error" -> throw OrbStreamError()
+    }
+}
 
 /**
  * True if this frame is the ORB terminal sentinel (data: {}).
@@ -213,10 +228,15 @@ data class SseStreamOptions(
  *   event ID for the Last-Event-ID header. Must return an InputStream from
  *   which SSE bytes are read.
  * @param opts Reconnect policy configuration.
+ * @param failOnOutcomeFrames When true, a named `timeout` or `error` frame (as
+ *   sent by the request status stream) ends the flow with
+ *   [OrbStreamTimeoutError] / [OrbStreamError] instead of being emitted. Plain
+ *   data frames and `complete` frames are unaffected.
  */
 fun sseStream(
     connect: suspend (lastEventId: String?) -> InputStream,
     opts: SseStreamOptions = SseStreamOptions(),
+    failOnOutcomeFrames: Boolean = false,
 ): Flow<SseFrame> = flow {
     var delayMs = opts.initialDelayMs
     var lastEventId: String? = null
@@ -244,6 +264,7 @@ fun sseStream(
                 if (frame.id != null) lastEventId = frame.id
                 if (frame.retry != null) delayMs = frame.retry
                 gotEvents = true
+                if (failOnOutcomeFrames) frame.throwIfStreamFailed()
                 emit(frame)
                 if (frame.isSentinel()) {
                     // Terminal sentinel — stop the flow cleanly
@@ -253,6 +274,10 @@ fun sseStream(
         } catch (e: TerminalSentinelException) {
             return@flow
         } catch (e: CancellationException) {
+            throw e
+        } catch (e: OrbStreamTimeoutError) {
+            throw e
+        } catch (e: OrbStreamError) {
             throw e
         } catch (_: Exception) {
             // Stream error — reconnect below

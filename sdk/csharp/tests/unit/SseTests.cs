@@ -1,6 +1,7 @@
 // Unit tests for the SSE frame parser.
 
 using System.Text;
+using FINOS.OpenResourceBroker;
 using FINOS.OpenResourceBroker.Sse;
 using Xunit;
 
@@ -180,5 +181,71 @@ public class SseTests
         {
             await foreach (var _ in SseFrameParser.ParseAsync(stream)) { }
         });
+    }
+
+    private const string InProgress =
+        "data: {\"requests\":[{\"request_id\":\"r1\",\"status\":\"in_progress\"}]}\n\n";
+
+    // Consume a status stream the way OrbClient.StreamRequestStatusAsync does.
+    private static async Task<List<string>> ConsumeAsync(string wire)
+    {
+        var statuses = new List<string>();
+        var stream = new MemoryStream(Encoding.UTF8.GetBytes(wire));
+        await foreach (var frame in SseFrameParser.ParseAsync(stream))
+        {
+            SseOutcome.ThrowIfFailed(frame);
+            if (frame.Data.Trim() == "{}") break;
+            var payload = System.Text.Json.JsonSerializer.Deserialize<SsePayload>(frame.Data);
+            foreach (var req in payload?.Requests ?? new List<SseRequest>())
+            {
+                statuses.Add(req.Status);
+                if (TerminalStatuses.All.Contains(req.Status)) return statuses;
+            }
+        }
+        return statuses;
+    }
+
+    [Fact]
+    public async Task TimeoutFrame_RaisesDistinctTimeoutError()
+    {
+        var wire = InProgress + "event: timeout\ndata: {\"status\": \"timeout\"}\n\ndata: {}\n\n";
+        var ex = await Assert.ThrowsAsync<OrbStreamTimeoutException>(() => ConsumeAsync(wire));
+        Assert.IsAssignableFrom<OrbException>(ex);
+    }
+
+    [Fact]
+    public async Task ErrorFrame_RaisesError()
+    {
+        var wire = InProgress + "event: error\ndata: {\"error\": \"internal\"}\n\ndata: {}\n\n";
+        await Assert.ThrowsAsync<OrbStreamException>(() => ConsumeAsync(wire));
+    }
+
+    [Fact]
+    public async Task CompleteFrame_IsNotAnError()
+    {
+        var wire = InProgress + "event: complete\ndata: {\"status\": \"failed\"}\n\ndata: {}\n\n";
+        Assert.Equal(new List<string> { "in_progress" }, await ConsumeAsync(wire));
+    }
+
+    [Fact]
+    public async Task CompletedStream_KeepsFinalStatusReadable()
+    {
+        var complete = "data: {\"requests\":[{\"request_id\":\"r1\",\"status\":\"complete\"}]}\n\n";
+        var wire = InProgress + complete
+            + "event: complete\ndata: {\"status\": \"complete\"}\n\ndata: {}\n\n";
+        var statuses = await ConsumeAsync(wire);
+        Assert.Equal("complete", statuses[^1]);
+    }
+
+    [Fact]
+    public async Task OldServerWithoutNamedFrames_BehavesAsBefore()
+    {
+        var failed = "data: {\"requests\":[{\"request_id\":\"r1\",\"status\":\"failed\"}]}\n\n";
+        Assert.Equal(
+            new List<string> { "in_progress", "failed" },
+            await ConsumeAsync(InProgress + failed + "data: {}\n\n"));
+        Assert.Equal(
+            new List<string> { "in_progress" },
+            await ConsumeAsync(InProgress + "data: {}\n\n"));
     }
 }

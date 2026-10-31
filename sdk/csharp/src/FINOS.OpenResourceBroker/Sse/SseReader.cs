@@ -322,6 +322,21 @@ public sealed class SseStreamOptions
     public string? LastEventId { get; init; }
 }
 
+/// <summary>
+/// Interprets the named outcome frames of a request status stream. A
+/// <c>timeout</c> or <c>error</c> frame ends the stream without the request being
+/// finished; <c>complete</c> frames, plain data frames and streams from servers
+/// that predate named frames are not errors.
+/// </summary>
+public static class SseOutcome
+{
+    public static void ThrowIfFailed(SseFrame frame)
+    {
+        if (frame.Event == "timeout") throw new OrbStreamTimeoutException();
+        if (frame.Event == "error") throw new OrbStreamException();
+    }
+}
+
 public static class SseStream
 {
     /// <summary>

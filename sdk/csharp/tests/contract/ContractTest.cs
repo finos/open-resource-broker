@@ -611,42 +611,29 @@ public class ContractTest : IClassFixture<OrbFixture>
     }
 
     [Fact]
-    public async Task StreamRequestStatus_NonExistent_DoesNotReturn_RouteError()
+    public async Task StreamRequestStatus_NonExistent_RaisesStreamError()
     {
+        // The stream route exists and answers 200; for an unknown request ID the
+        // server ends the stream promptly with an error frame, which the SDK
+        // raises as OrbStreamException (not a route-level HTTP error, not a
+        // silent empty stream, and not a wait until the stream timeout).
         using var cts = new CancellationTokenSource(10_000);
-        var caughtEx = (OrbApiException?)null;
         var events = 0;
 
-        try
+        await Assert.ThrowsAsync<OrbStreamException>(async () =>
         {
             await foreach (var ev in _fixture.Client.StreamRequestStatusAsync(
                 "nonexistent-request-id-xyz",
                 intervalSeconds: 1,
-                timeoutSeconds: 2,
+                timeoutSeconds: 30,
                 ct: cts.Token))
             {
                 events++;
-                _out.WriteLine($"  streamRequestStatus event: {ev.Status}");
             }
-        }
-        catch (OrbApiException ex)
-        {
-            caughtEx = ex;
-        }
-        catch (OperationCanceledException)
-        {
-            // timeout — acceptable
-        }
+        });
 
-        if (caughtEx != null)
-        {
-            AssertNotRouteLevelError(caughtEx, "StreamRequestStatus(nonexistent)");
-            _out.WriteLine($"  streamRequestStatus(nonexistent) → error (route exists): {caughtEx.StatusCode}");
-        }
-        else
-        {
-            _out.WriteLine($"  streamRequestStatus(nonexistent) → {events} events (route exists)");
-        }
+        Assert.Equal(0, events);
+        _out.WriteLine("  streamRequestStatus(nonexistent) → OrbStreamException (route exists)");
     }
 
     // ---------------------------------------------------------------------------

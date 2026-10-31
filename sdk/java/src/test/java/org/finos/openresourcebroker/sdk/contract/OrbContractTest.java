@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.finos.openresourcebroker.sdk.client.OrbApiException;
 import org.finos.openresourcebroker.sdk.client.OrbClient;
+import org.finos.openresourcebroker.sdk.client.OrbStreamException;
 import org.finos.openresourcebroker.sdk.model.*;
 import org.finos.openresourcebroker.sdk.process.ProcessConfig;
 import org.finos.openresourcebroker.sdk.sse.SseFrame;
@@ -541,25 +542,23 @@ class OrbContractTest {
     @Test
     @Order(37)
     void streamRequestStatus_GET_api_v1_requests_id_stream_nonexistent() throws Exception {
-        // A nonexistent request should either error quickly or return nothing — NOT hang
+        // The stream route exists and answers 200; for an unknown request ID the
+        // server ends the stream promptly with an error frame, which the SDK
+        // raises as OrbStreamException (not a route-level HTTP error and not a
+        // wait until the stream timeout).
         AtomicInteger eventCount = new AtomicInteger(0);
         long start = System.currentTimeMillis();
 
-        try {
-            // Short timeout (3s) so we don't hang on tests
-            client.streamRequestStatus(
-                    "nonexistent-request-id-xyz-java",
-                    1.0,  // interval
-                    3.0,  // timeout
-                    event -> eventCount.incrementAndGet());
-        } catch (OrbApiException e) {
-            assertNotRouteLevelError(e, "streamRequestStatus(nonexistent)");
-        }
+        assertThrows(OrbStreamException.class, () -> client.streamRequestStatus(
+                "nonexistent-request-id-xyz-java",
+                1.0,   // interval
+                30.0,  // timeout: the error frame must arrive long before this
+                event -> eventCount.incrementAndGet()));
 
         long elapsed = System.currentTimeMillis() - start;
-        LOG.info("  streamRequestStatus(nonexistent): " + eventCount + " events, " + elapsed + "ms");
-        // Should complete within a reasonable time (not hang forever)
-        assertTrue(elapsed < 10_000, "stream should not hang: elapsed=" + elapsed + "ms");
+        LOG.info("  streamRequestStatus(nonexistent): OrbStreamException after " + elapsed + "ms");
+        assertEquals(0, eventCount.get());
+        assertTrue(elapsed < 10_000, "stream should end promptly: elapsed=" + elapsed + "ms");
     }
 
     @Test
