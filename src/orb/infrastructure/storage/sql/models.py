@@ -6,7 +6,7 @@ The column-dict helpers in unit_of_work.py have been removed in favour of
 these models.  Run ``alembic upgrade head`` to apply schema changes.
 """
 
-from sqlalchemy import BIGINT, Boolean, Integer, String, Text, text as sa_text
+from sqlalchemy import Boolean, Integer, String, Text, text as sa_text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -97,8 +97,8 @@ class MachineModel(Base):
     private_dns_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     public_dns_name: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Timing (BIGINT unix epoch for launch_time; ISO-8601 TEXT for others)
-    launch_time: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
+    # Timing (ISO-8601 TEXT)
+    launch_time: Mapped[str | None] = mapped_column(Text, nullable=True)
     termination_time: Mapped[str | None] = mapped_column(Text, nullable=True)
     provisioning_started_at: Mapped[str | None] = mapped_column(Text, nullable=True)
     uptime_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)

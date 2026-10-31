@@ -43,8 +43,9 @@ SORT_KEY_LABEL = "_orb_sort_key"
 
 # Columns a list may be ordered by in the database, per table. Each is text or
 # is normalised to text by COALESCE; their stored text sorts like the in-process
-# key. ``launch_time`` is declared BIGINT but holds ISO text, which only SQLite
-# accepts, so it is offered on SQLite alone.
+# key. ``launch_time`` is offered on SQLite only: databases created before the
+# column became TEXT still declare it BIGINT, which PostgreSQL and MySQL cannot
+# COALESCE with text, and a schema is not known to be migrated.
 _SORTS: dict[str, frozenset[str]] = {
     "requests": frozenset({"created_at", "status", "request_id"}),
     "machines": frozenset({"created_at", "status", "machine_id"}),

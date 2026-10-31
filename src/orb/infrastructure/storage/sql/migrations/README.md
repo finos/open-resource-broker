@@ -84,6 +84,17 @@ ORB_SQL_URL=sqlite:///./orb_data.db \
   `NotImplementedError` in the `downgrade()` function with a comment
   explaining why.
 
+## When migrations run
+
+- `orb storage migrate up` applies them. ORB never upgrades a database that
+  already has an `alembic_version` row on its own; at startup it logs a warning
+  with the database's revision and the expected one when they differ.
+- A database with tables but no `alembic_version` (created before schema
+  versioning) is stamped at the revision matching its layout on first start and
+  then upgraded to head. When you add a revision that changes an existing
+  column, keep that layout check in `SQLStorageStrategy._auto_stamp_head` in
+  step, otherwise such databases are stamped past the migration.
+
 ## Troubleshooting
 
 - "Target database is not up to date" — run `orb storage migrate up` first.

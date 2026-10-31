@@ -21,6 +21,22 @@ from orb.infrastructure.storage.components import (
 )
 from orb.infrastructure.storage.exceptions import StorageError
 
+# The last revision before machines.launch_time became TEXT
+_LAUNCH_TIME_BIGINT_REVISION = "55e3b5553d98"
+
+
+def _launch_time_is_integer(engine: Any) -> bool:
+    """Whether the machines table still declares launch_time as an integer column."""
+    from sqlalchemy import Integer, inspect
+
+    inspector = inspect(engine)
+    if not inspector.has_table("machines"):
+        return False
+    for column in inspector.get_columns("machines"):
+        if column["name"] == "launch_time":
+            return isinstance(column["type"], Integer)
+    return False
+
 
 def _is_duplicate_key(exc: IntegrityError) -> bool:
     """Whether an integrity error is a unique / primary-key violation."""
@@ -172,6 +188,8 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 # legitimate mid-migration state.
                 if tables_already_exist and not alembic_version_exists:
                     self._auto_stamp_head(engine)
+                elif tables_already_exist:
+                    self._warn_if_schema_behind(engine)
 
             # Fallback: build CREATE TABLE from the column dict (legacy path).
             elif not self.connection_manager.table_exists(self.table_name):
@@ -263,6 +281,13 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
             dialect = engine.dialect.name.lower()
 
+            # A database whose machines.launch_time is still the old BIGINT column
+            # was created before the column became TEXT: record the revision that
+            # matches that layout, and upgrade it below so the column is converted.
+            stamp_revision = head_revision
+            if _launch_time_is_integer(engine):
+                stamp_revision = _LAUNCH_TIME_BIGINT_REVISION
+
             # Use a fresh DBAPI connection for the stamp so we control the
             # transaction isolation level independently of the pooled
             # application connections.
@@ -315,7 +340,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
                     "INSERT INTO alembic_version (version_num) VALUES (?)"
                     if dialect == "sqlite"
                     else "INSERT INTO alembic_version (version_num) VALUES (%s)",
-                    (head_revision,),
+                    (stamp_revision,),
                 )
                 raw_conn.commit()
                 raw_cursor.close()
@@ -326,11 +351,13 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 raw_conn.close()
 
             self.logger.info(
-                "Auto-stamped Alembic revision %s at head for pre-existing install "
+                "Auto-stamped Alembic revision %s for pre-existing install "
                 "(tables existed without alembic_version row). "
                 "Run 'orb storage migrate current' to verify.",
-                head_revision,
+                stamp_revision,
             )
+            if stamp_revision != head_revision:
+                self._upgrade_to_head(engine, script_dir)
         except Exception as exc:
             # Stamping is best-effort: log the failure but do not abort startup.
             self.logger.warning(
@@ -339,6 +366,70 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 self.table_name,
                 exc,
             )
+
+    def _upgrade_to_head(self, engine: Any, script_dir: Any) -> None:
+        """Apply the migrations after the stamped revision, on the engine's own database.
+
+        Runs in this process on a connection of ``engine`` rather than through the
+        Alembic command line, so it always touches the database this strategy
+        opened, whatever ``ORB_SQL_URL`` says.
+        """
+        from alembic.operations import Operations
+        from alembic.runtime.migration import MigrationContext
+
+        def upgrade_steps(revision: Any, _context: Any) -> Any:
+            return script_dir._upgrade_revs("head", revision)
+
+        try:
+            with engine.begin() as connection:
+                context = MigrationContext.configure(connection, opts={"fn": upgrade_steps})
+                with Operations.context(context), context.begin_transaction():
+                    context.run_migrations()
+            self.logger.info("Upgraded the SQL schema to Alembic head.")
+        except Exception as exc:
+            self.logger.warning(
+                "Could not upgrade the SQL schema to Alembic head: %s. "
+                "Run 'orb storage migrate up' to apply the pending migrations.",
+                exc,
+            )
+
+    _behind_warned: set[str] = set()
+
+    def _warn_if_schema_behind(self, engine: Any) -> None:
+        """Warn when a versioned database is behind the migrations this release ships.
+
+        A database that already has an Alembic version is never upgraded
+        automatically; the operator decides when to run the migration.
+        """
+        try:
+            import os
+
+            import alembic.config
+            import alembic.script
+            from alembic.runtime.migration import MigrationContext
+
+            cfg = alembic.config.Config(
+                os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)), "migrations", "alembic.ini"
+                )
+            )
+            head = alembic.script.ScriptDirectory.from_config(cfg).get_current_head()
+            with engine.connect() as connection:
+                current = MigrationContext.configure(connection).get_current_revision()
+            if head is None or current == head:
+                return
+            database = engine.url.render_as_string(hide_password=True)
+            if database in self._behind_warned:
+                return
+            self._behind_warned.add(database)
+            self.logger.warning(
+                "The SQL schema is at revision %s but this release expects %s. "
+                "Run 'orb storage migrate up' to apply the pending migrations.",
+                current or "(none)",
+                head,
+            )
+        except Exception as exc:
+            self.logger.debug("Could not compare the SQL schema revision: %s", exc)
 
     # Repositories route aggregates through save_versioned when this is True
     supports_versioned_save = True
