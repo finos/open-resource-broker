@@ -88,7 +88,9 @@ class TestIsHealthy:
         strat.client_manager.table_exists.side_effect = RuntimeError("describe failed")
         healthy, details = strat.is_healthy()
         assert healthy is False
-        assert "error" in details
+        assert details["reason"] == "table existence check failed"
+        assert "describe failed" not in repr(details)
+        assert "table" not in details and "region" not in details
 
     def test_unhealthy_on_outer_exception(self):
         strat = _make_strategy()

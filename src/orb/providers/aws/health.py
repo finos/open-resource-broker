@@ -7,7 +7,10 @@ from typing import TYPE_CHECKING, Callable, Optional
 from botocore.exceptions import BotoCoreError, ClientError
 
 from orb.domain.base.ports.health_check_port import HealthCheckPort
-from orb.monitoring.health import HealthStatus
+from orb.infrastructure.logging.logger import get_logger
+from orb.monitoring.health import HealthStatus, failure_details
+
+_logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from orb.providers.aws.infrastructure.aws_client import AWSClient
@@ -73,7 +76,7 @@ def register_aws_health_checks(
         return HealthStatus(
             name=name,
             status="unknown",
-            details={"error": str(error)},
+            details=failure_details(name, error),
             dependencies=dependencies,
         )
 
@@ -90,14 +93,17 @@ def register_aws_health_checks(
             return _unavailable("aws", ["aws"], error)
         try:
             response = aws_client.sts_client.get_caller_identity()
+            # Identity is useful to operators but must not be served by the
+            # unauthenticated /health endpoint, so it is logged instead.
+            _logger.info(
+                "AWS identity verified: account %s, arn %s",
+                response.get("Account"),
+                response.get("Arn"),
+            )
             return HealthStatus(
                 name="aws",
                 status="healthy",
-                details={
-                    "account_id": response["Account"],
-                    "user_id": response["UserId"],
-                    "arn": response["Arn"],
-                },
+                details={"api_status": "available"},
                 dependencies=["aws"],
             )
         except Exception as e:
@@ -107,7 +113,7 @@ def register_aws_health_checks(
             return HealthStatus(
                 name="aws",
                 status="degraded",
-                details={"error": str(e)},
+                details=failure_details("aws", e),
                 dependencies=["aws"],
             )
 
@@ -134,7 +140,7 @@ def register_aws_health_checks(
             return HealthStatus(
                 name="ec2",
                 status="degraded",
-                details={"error": str(e)},
+                details=failure_details("ec2", e),
                 dependencies=["aws", "ec2"],
             )
 

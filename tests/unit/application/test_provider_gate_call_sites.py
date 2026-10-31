@@ -325,18 +325,20 @@ async def test_image_resolution_yields_nothing_on_gate_failure(kind: str) -> Non
 
 
 # ---------------------------------------------------------------------------
-# Site 10: provider health endpoint
+# Site 10: provider health endpoint (bounded probe; gate errors never escape)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind", _GATE_ERRORS)
-async def test_health_probe_reports_unknown_on_gate_failure(kind: str) -> None:
+async def test_health_probe_reports_unknown_when_the_probe_raises(kind: str) -> None:
     from orb.api.routers import providers as router
 
+    registry = MagicMock()
+    registry.probe_strategy_health = AsyncMock(side_effect=_error(kind))
     container = MagicMock()
-    container.get.return_value = _failing_registry(kind)
+    container.get.return_value = registry
     with patch.object(router, "get_di_container", return_value=container):
         status, details = await router._probe_provider_health("p1")
     assert status == "unknown"

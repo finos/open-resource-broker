@@ -1,5 +1,6 @@
 """FastAPI server factory and application setup."""
 
+import asyncio
 import ipaddress
 import os
 import secrets
@@ -669,12 +670,16 @@ def create_fastapi_app(server_config: Any) -> Any:
     # Add health check endpoint
     from orb.api.dependencies import get_health_check_port
 
+    def _run_checks_then(health_port: Any, summary: str) -> Any:
+        health_port.run_all_checks()
+        return getattr(health_port, summary)()
+
     @app.get("/health", tags=["System"], operation_id="healthCheck")
     async def health_check(health_port: Any = Depends(get_health_check_port)) -> Any:  # type: ignore[misc]
         """Health check endpoint."""
         try:
-            health_port.run_all_checks()
-            status = health_port.get_status()
+            # The checks make blocking provider/storage calls: keep them off the loop.
+            status = await asyncio.to_thread(_run_checks_then, health_port, "get_status")
         except Exception:
             status = {"status": "unknown"}
 
@@ -710,8 +715,7 @@ def create_fastapi_app(server_config: Any) -> Any:
         (core) provider that still means not-ready.
         """
         try:
-            health_port.run_all_checks()
-            status = health_port.get_readiness()
+            status = await asyncio.to_thread(_run_checks_then, health_port, "get_readiness")
         except Exception:
             status = {"status": "unknown"}
 

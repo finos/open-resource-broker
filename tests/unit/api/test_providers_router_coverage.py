@@ -89,6 +89,25 @@ def _config_mgr_with(*providers):
 # ---------------------------------------------------------------------------
 
 
+def _snapshot(status: str, message: str = "msg", response_time_ms: float | None = 12.5):
+    from orb.application.services.provider_registry_service import ProviderHealthSnapshot
+
+    return ProviderHealthSnapshot(
+        provider_name="prov",
+        status=status,
+        message=message,
+        response_time_ms=response_time_ms,
+    )
+
+
+def _patched_registry(snapshot=None, error: Exception | None = None):
+    registry = MagicMock()
+    registry.probe_strategy_health = AsyncMock(return_value=snapshot, side_effect=error)
+    container = MagicMock()
+    container.get.return_value = registry
+    return registry, patch("orb.api.routers.providers.get_di_container", return_value=container)
+
+
 @pytest.mark.unit
 @pytest.mark.api
 class TestProbeProviderHealth:
@@ -102,86 +121,44 @@ class TestProbeProviderHealth:
         assert status == "unknown"
         assert details == {}
 
-    def test_unhealthy_result_returns_degraded(self):
+    def test_unhealthy_snapshot_returns_degraded(self):
         from orb.api.routers.providers import _probe_provider_health
 
-        mock_result = MagicMock()
-        mock_result.success = False
-        mock_result.data = None
-        mock_result.error_message = "unhealthy"
-
-        mock_registry = MagicMock()
-        mock_registry.execute_operation = AsyncMock(return_value=mock_result)
-
-        mock_container = MagicMock()
-        mock_container.get.return_value = mock_registry
-
-        with patch("orb.api.routers.providers.get_di_container", return_value=mock_container):
+        _, ctx = _patched_registry(_snapshot("unhealthy"))
+        with ctx:
             status, details = asyncio.run(_probe_provider_health("prov"))
 
         assert status == "degraded"
-        assert details == {}
+        assert details == {"response_time_ms": 12.5}
 
-    def test_healthy_result_with_response_time_and_status_message(self):
+    def test_healthy_snapshot_reports_response_time_only(self):
         from orb.api.routers.providers import _probe_provider_health
 
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.data = {
-            "is_healthy": True,
-            "response_time_ms": 42,
-            "status_message": "OK",
-        }
-
-        mock_registry = MagicMock()
-        mock_registry.execute_operation = AsyncMock(return_value=mock_result)
-
-        mock_container = MagicMock()
-        mock_container.get.return_value = mock_registry
-
-        with patch("orb.api.routers.providers.get_di_container", return_value=mock_container):
+        _, ctx = _patched_registry(_snapshot("healthy", message="Provider is healthy"))
+        with ctx:
             status, details = asyncio.run(_probe_provider_health("prov"))
 
         assert status == "healthy"
-        assert details["response_time_ms"] == 42
-        assert details["status_message"] == "OK"
+        assert details == {"response_time_ms": 12.5}
 
-    def test_healthy_true_without_extras_returns_no_details(self):
+    def test_unknown_snapshot_returns_unknown_without_details(self):
         from orb.api.routers.providers import _probe_provider_health
 
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.data = {"is_healthy": True}
-
-        mock_registry = MagicMock()
-        mock_registry.execute_operation = AsyncMock(return_value=mock_result)
-
-        mock_container = MagicMock()
-        mock_container.get.return_value = mock_registry
-
-        with patch("orb.api.routers.providers.get_di_container", return_value=mock_container):
+        _, ctx = _patched_registry(_snapshot("unknown"))
+        with ctx:
             status, details = asyncio.run(_probe_provider_health("prov"))
 
-        assert status == "healthy"
-        assert "response_time_ms" not in details
+        assert (status, details) == ("unknown", {})
 
-    def test_is_healthy_false_returns_degraded(self):
+    def test_probe_goes_through_the_bounded_registry_probe(self):
         from orb.api.routers.providers import _probe_provider_health
 
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.data = {"is_healthy": False}
+        registry, ctx = _patched_registry(_snapshot("healthy"))
+        with ctx:
+            asyncio.run(_probe_provider_health("prov"))
 
-        mock_registry = MagicMock()
-        mock_registry.execute_operation = AsyncMock(return_value=mock_result)
-
-        mock_container = MagicMock()
-        mock_container.get.return_value = mock_registry
-
-        with patch("orb.api.routers.providers.get_di_container", return_value=mock_container):
-            status, details = asyncio.run(_probe_provider_health("prov"))
-
-        assert status == "degraded"
+        registry.probe_strategy_health.assert_awaited_once_with("prov")
+        registry.execute_operation.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -522,3 +499,49 @@ class TestProvidersHealthDefaultProviderRaises:
         active_providers = [p for p in providers if p["active"]]
         assert len(active_providers) == 1
         assert active_providers[0]["name"] == "p1"
+
+
+class TestProbeProviderHealthLeaksNothing:
+    """The provider's own text never reaches the response."""
+
+    def test_raised_error_text_is_logged_not_returned(self):
+        from orb.api.routers.providers import _probe_provider_health
+
+        _, ctx = _patched_registry(error=RuntimeError("Unable to locate credentials"))
+        with ctx, patch("orb.api.routers.providers.logger") as log:
+            status, details = asyncio.run(_probe_provider_health("prov"))
+
+        assert status == "unknown"
+        assert details == {}
+        assert "Unable to locate credentials" in repr(log.warning.call_args_list)
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestProvidersHealthEndpointLeaksNothing:
+    def test_response_body_has_no_account_id_or_raw_error(self):
+        import json
+
+        from orb.api.routers.providers import get_providers_health
+
+        provider = MagicMock()
+        provider.name = "aws-a"
+        provider.type = "aws"
+        provider.enabled = True
+        provider_config = MagicMock()
+        provider_config.default_provider = "aws-a"
+        provider_config.get_active_providers.return_value = [provider]
+        config_manager = MagicMock()
+        config_manager.get_provider_config.return_value = provider_config
+
+        _, ctx = _patched_registry(_snapshot("unhealthy", message="Provider health check failed"))
+
+        with ctx:
+            response = asyncio.run(
+                get_providers_health.__wrapped__(config_manager=config_manager, _user=None)  # type: ignore[attr-defined]
+            )
+
+        body = json.loads(response.body)
+        assert body["providers"][0]["status"] == "degraded"
+        assert "123456789012" not in response.body.decode()
+        assert "Unable to locate credentials" not in response.body.decode()

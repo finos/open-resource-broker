@@ -101,54 +101,38 @@ def _discovery_cache_put(key: tuple[str, str, str], value: list[dict[str, Any]])
 
 
 async def _probe_provider_health(provider_name: str) -> tuple[str, dict[str, Any]]:
-    """Run the ``HEALTH_CHECK`` operation through the registry.
+    """Probe a provider through the registry's bounded, cached health probe.
 
     Returns ``(status, details)`` where status is one of
-    ``healthy`` / ``degraded`` / ``unknown``. Failures are caught — a
-    read-only status endpoint must never throw.
+    ``healthy`` / ``degraded`` / ``unknown``. The probe runs the blocking
+    check off the event loop, is time-limited, reuses a recent result and
+    never starts a second probe while one is still running, so polling this
+    endpoint cannot hammer or pile threads onto a slow provider. Failures are
+    caught — a read-only status endpoint must never throw.
 
-    Error details are logged server-side; only a generic status is returned to
-    the client to prevent leaking provider credentials, account IDs, or ARNs.
+    Only a generic status and the response time are returned; the provider's
+    own text (which can carry account identifiers or credential hints) stays
+    in the server log.
     """
     try:
         from orb.application.services.provider_registry_service import (
             ProviderRegistryService,
         )
-        from orb.domain.base.operations import (
-            Operation as ProviderOperation,
-            OperationType as ProviderOperationType,
-        )
 
-        container = get_di_container()
-        registry = container.get(ProviderRegistryService)
-        operation = ProviderOperation(
-            operation_type=ProviderOperationType.HEALTH_CHECK,
-            parameters={},
-            context={"source": "providers_health_endpoint"},
-        )
-        result = await registry.execute_operation(provider_name, operation)
+        registry = get_di_container().get(ProviderRegistryService)
+        snapshot = await registry.probe_strategy_health(provider_name)
     except Exception as exc:
-        # Log full error server-side; never forward provider internals to client.
         logger.warning("Provider health probe failed for '%s': %s", provider_name, exc)
         return "unknown", {}
 
-    if not result.success or not result.data:
-        # Log the internal error; return only a generic status to the caller.
-        logger.warning(
-            "Provider health check unhealthy for '%s': %s",
-            provider_name,
-            result.error_message or "health check failed",
-        )
-        return "degraded", {}
-
-    data = result.data
-    is_healthy = bool(data.get("is_healthy", False))
     details: dict[str, Any] = {}
-    if "response_time_ms" in data:
-        details["response_time_ms"] = data["response_time_ms"]
-    if data.get("status_message"):
-        details["status_message"] = data["status_message"]
-    return ("healthy" if is_healthy else "degraded"), details
+    if snapshot.response_time_ms is not None:
+        details["response_time_ms"] = snapshot.response_time_ms
+    if snapshot.status == "healthy":
+        return "healthy", details
+    if snapshot.status == "unknown":
+        return "unknown", {}
+    return "degraded", details
 
 
 def _get_schema_for_provider_type(provider_type: str) -> list[dict[str, Any]]:

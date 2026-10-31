@@ -59,7 +59,8 @@ class TestSQLStrategyIsHealthy:
         strategy.connection_manager.table_exists = MagicMock(side_effect=RuntimeError("no conn"))
         healthy, details = strategy.is_healthy()
         assert healthy is False
-        assert "error" in details
+        assert details["reason"] == "table existence check failed"
+        assert "no conn" not in repr(details)
 
     def test_unhealthy_when_table_does_not_exist(self) -> None:
         strategy = _make_strategy()

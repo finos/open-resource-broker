@@ -82,13 +82,12 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         """Probe DynamoDB: confirm we can list tables AND the configured
         table exists with the expected key schema.
 
-        Returns ``(healthy, details)``. Details include table name, region,
-        whether the configured table is present, and the partition key.
+        Returns ``(healthy, details)``. Details are limited to the backend type and
+        whether the configured table is present; table name and region are not
+        included because the details are served by the health endpoint.
         """
         details: dict[str, Any] = {
             "type": "dynamodb",
-            "table": self.table_name,
-            "region": self.region,
         }
         try:
             if not self.client_manager.is_healthy():
@@ -98,7 +97,8 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
             try:
                 table_exists = self.client_manager.table_exists(self.table_name)
             except Exception as exc:
-                details["error"] = f"table_exists check failed: {exc}"
+                self._logger.warning("DynamoDB table_exists check failed: %s", exc)
+                details["reason"] = "table existence check failed"
                 return False, details
             details["table_exists"] = table_exists
             if not table_exists:
@@ -106,7 +106,8 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 return False, details
             return True, details
         except Exception as exc:
-            details["error"] = str(exc)
+            self._logger.warning("DynamoDB health probe failed: %s", exc)
+            details["reason"] = "health probe failed"
             return False, details
 
     def _initialize_table(self) -> None:

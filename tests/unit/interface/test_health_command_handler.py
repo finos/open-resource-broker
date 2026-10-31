@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -576,7 +576,7 @@ class TestProviderHealthCheck:
         checks_arg = mocks["scheduler"].format_health_response.call_args[0][0]
         ph = next(c for c in checks_arg if c["name"] == "provider_health")
         assert ph["status"] == "warn"
-        assert "provider crashed" in ph["details"]
+        assert "provider crashed" not in ph["details"]
 
     def test_provider_registry_exception_appended_as_warn(self):
         """If getting registry service itself raises → 'warn' appended."""
@@ -869,3 +869,90 @@ class TestHealthCheckOuterException:
 
         assert result["success"] is False
         assert "message" in result
+
+
+# ---------------------------------------------------------------------------
+# Responses carry generic text only; details go to the log
+# ---------------------------------------------------------------------------
+
+_ACCOUNT_ID = "123456789012"
+_RAW_ERROR = "Unable to locate credentials"
+
+
+def _all_text(value: Any) -> str:
+    """Flatten a response structure into one string for substring assertions."""
+    return repr(value)
+
+
+@pytest.mark.unit
+class TestNoProviderInternalsInResponses:
+    def test_provider_status_message_and_exception_text_stay_out_of_checks(self):
+        from orb.interface.health_command_handler import handle_health_check
+
+        container, mocks = _make_container()
+        mocks["registry_service"].get_available_strategies.return_value = ["aws-a", "aws-b"]
+        unhealthy = MagicMock()
+        unhealthy.is_healthy = False
+        unhealthy.status_message = f"AWS provider unhealthy - Account: {_ACCOUNT_ID}"
+        mocks["registry_service"].check_strategy_health.side_effect = [
+            unhealthy,
+            RuntimeError(_RAW_ERROR),
+        ]
+
+        args = _make_args()
+        args._container = container
+        with patch("orb.interface.health_command_handler.logger") as log:
+            result = handle_health_check(args)
+
+        checks = mocks["scheduler"].format_health_response.call_args[0][0]
+        console_calls = _all_text(mocks["console"].mock_calls)
+        for surface in (_all_text(checks), _all_text(result), console_calls):
+            assert _ACCOUNT_ID not in surface
+            assert _RAW_ERROR not in surface
+
+        logged = _all_text(log.warning.call_args_list)
+        assert _ACCOUNT_ID in logged
+        assert _RAW_ERROR in logged
+
+    def test_failing_checks_report_a_generic_error(self):
+        from orb.interface.health_command_handler import handle_health_check
+
+        container, mocks = _make_container()
+        mocks["scheduler"].get_template_paths.side_effect = RuntimeError(_RAW_ERROR)
+        mocks["scheduler"].get_working_directory.side_effect = RuntimeError(_RAW_ERROR)
+        mocks["scheduler"].get_logs_directory.side_effect = RuntimeError(_RAW_ERROR)
+        mocks["template_repo"].find_active_templates.side_effect = RuntimeError(_RAW_ERROR)
+        mocks["health_port"].run_all_checks.return_value = {
+            "database": {"status": "unhealthy", "details": {"error": _RAW_ERROR}}
+        }
+
+        args = _make_args()
+        args._container = container
+        handle_health_check(args)
+
+        checks = mocks["scheduler"].format_health_response.call_args[0][0]
+        assert _RAW_ERROR not in _all_text(checks)
+        assert _RAW_ERROR not in _all_text(mocks["console"].mock_calls)
+        assert any(c.get("error") for c in checks)
+
+    def test_unexpected_failure_returns_a_generic_error(self):
+        from orb.interface.health_command_handler import handle_health_check
+
+        mock_console = MagicMock(spec=ConsolePort)
+
+        def _get(t):
+            if t is ConsolePort:
+                return mock_console
+            raise RuntimeError(f"{_RAW_ERROR} for {_ACCOUNT_ID}")
+
+        container = MagicMock()
+        container.get.side_effect = _get
+        args = _make_args()
+        args._container = container
+
+        result = handle_health_check(args)
+
+        assert result["success"] is False
+        assert _RAW_ERROR not in _all_text(result)
+        assert _ACCOUNT_ID not in _all_text(result)
+        assert _RAW_ERROR not in _all_text(mock_console.mock_calls)

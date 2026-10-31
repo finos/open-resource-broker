@@ -112,7 +112,6 @@ class SQLStorageStrategy(BaseStorageStrategy):
         details: dict[str, Any] = {
             "type": "sql",
             "database_type": info.get("database_type", "unknown"),
-            "table": self.table_name,
         }
         if not info.get("healthy", False):
             details["reason"] = "connection manager reports unhealthy"
@@ -120,7 +119,8 @@ class SQLStorageStrategy(BaseStorageStrategy):
         try:
             table_present = self.connection_manager.table_exists(self.table_name)
         except Exception as exc:
-            details["error"] = f"table_exists check failed: {exc}"
+            self.logger.warning("SQL table_exists check failed: %s", exc)
+            details["reason"] = "table existence check failed"
             return False, details
         details["table_exists"] = table_present
         if not table_present:

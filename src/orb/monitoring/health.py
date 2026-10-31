@@ -1,5 +1,6 @@
 """Health check monitoring for the application."""
 
+import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -23,6 +24,22 @@ except ImportError:
 
 from orb.domain.base.ports.health_check_port import HealthCheckPort
 from orb.domain.base.ports.logging_port import LoggingPort
+
+# Standard logging: the monitoring package must not import infrastructure
+# (that would close an infrastructure -> providers -> monitoring cycle).
+_logger = logging.getLogger(__name__)
+
+CHECK_FAILED_TEXT = "Check failed; see server logs for details"
+
+
+def failure_details(check_name: str, error: object) -> dict[str, Any]:
+    """Details for a failed check: generic text out, the real error to the log.
+
+    Health details are served by unauthenticated endpoints, so exception text
+    (which can embed account identifiers, paths or hostnames) never goes in them.
+    """
+    _logger.warning("Health check %s failed: %s", check_name, error)
+    return {"error": CHECK_FAILED_TEXT}
 
 
 @dataclass
@@ -202,7 +219,7 @@ class HealthCheck(HealthCheckPort):
             return HealthStatus(
                 name=name,
                 status="unhealthy",
-                details={"error": str(e)},
+                details=failure_details(name, e),
                 dependencies=[],
             )
 
@@ -256,7 +273,7 @@ class HealthCheck(HealthCheckPort):
             return HealthStatus(
                 name="system",
                 status="unhealthy",
-                details={"error": str(e)},
+                details=failure_details("system", e),
                 dependencies=["os"],
             )
 
@@ -295,7 +312,7 @@ class HealthCheck(HealthCheckPort):
             return HealthStatus(
                 name="disk",
                 status="unhealthy",
-                details={"error": str(e)},
+                details=failure_details("disk", e),
                 dependencies=["os"],
             )
 
@@ -350,7 +367,7 @@ class HealthCheck(HealthCheckPort):
             return HealthStatus(
                 name="application",
                 status="unhealthy",
-                details={"error": str(e)},
+                details=failure_details("application", e),
                 dependencies=["system", "aws", "database"],
             )
 
@@ -384,7 +401,7 @@ def register_deserialize_skip_counter_check(
             return HealthStatus(
                 name="storage.deserialize",
                 status="unhealthy",
-                details={"error": str(exc)},
+                details=failure_details("storage.deserialize", exc),
                 dependencies=["database"],
             )
         total_skipped = sum(counters.values())
@@ -438,7 +455,7 @@ def register_storage_health_checks(
             return HealthStatus(
                 name="database",
                 status="unhealthy",
-                details={"error": str(exc)},
+                details=failure_details("database", exc),
                 dependencies=["database"],
             )
         # Normalise the return shape — strategies return (bool, dict),
@@ -450,6 +467,11 @@ def register_storage_health_checks(
         else:
             healthy = bool(result)
             details = {}
+        # Strategy details are served verbatim by /health: keep raw error text
+        # (and anything else free-form) out of them.
+        if "error" in details:
+            _logger.warning("Storage health probe reported: %s", details["error"])
+            details["error"] = CHECK_FAILED_TEXT
         return HealthStatus(
             name="database",
             status="healthy" if healthy else "unhealthy",
