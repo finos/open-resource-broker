@@ -53,8 +53,8 @@ data class OrbMachine(
     val name: String? = null,
     val status: String? = null,
     val result: String? = null,
-    val private_ip: String? = null,
-    val public_ip: String? = null,
+    val private_ip_address: String? = null,
+    val public_ip_address: String? = null,
     val launch_time: String? = null,
     val message: String? = null,
 )

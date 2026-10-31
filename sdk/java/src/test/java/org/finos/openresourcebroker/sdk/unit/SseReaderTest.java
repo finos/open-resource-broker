@@ -113,6 +113,26 @@ class SseReaderTest {
         assertTrue(lastStatusFrame.contains("\"complete\""));
     }
 
+    // Output of the server's default scheduler formatter for a request status
+    // stream frame: numeric launch_time, *_ip_address keys, a null launch_time.
+    private static final String GOLDEN = "{\"requests\":[{\"request_id\":\"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73\",\"status\":\"complete\",\"template_id\":\"t1\",\"requested_count\":2,\"created_at\":\"2026-10-31T01:00:00Z\",\"machine_ids\":[],\"message\":\"done\",\"metadata\":{},\"request_type\":\"acquire\",\"desired_capacity\":1,\"successful_count\":2,\"failed_count\":0,\"error_details\":{},\"provider_data\":{},\"version\":0,\"resource_ids\":[],\"machines\":[{\"machine_id\":\"i-0abc123def4567890\",\"name\":\"ip-10-0-1-12\",\"result\":\"succeed\",\"status\":\"running\",\"private_ip_address\":\"10.0.1.12\",\"public_ip_address\":\"54.12.34.56\",\"instance_type\":\"t3.micro\",\"price_type\":\"ondemand\",\"cloud_host_id\":\"ip-10-0-1-12.ec2.internal\",\"launch_time\":1793411323,\"request_id\":\"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73\",\"message\":\"\"},{\"machine_id\":\"i-0def456abc7890123\",\"name\":\"ip-10-0-1-13\",\"result\":\"executing\",\"status\":\"pending\",\"request_id\":\"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73\",\"message\":\"\",\"launch_time\":null,\"cloud_host_id\":null}]}],\"message\":\"Request status retrieved successfully\",\"count\":1}";
+
+    @Test
+    void goldenServerPayloadParsesStatusLaunchTimeAndIps() throws Exception {
+        org.finos.openresourcebroker.sdk.sse.OrbSsePayload payload =
+                new com.fasterxml.jackson.databind.ObjectMapper()
+                        .readValue(GOLDEN, org.finos.openresourcebroker.sdk.sse.OrbSsePayload.class);
+        var req = payload.firstRequest();
+        assertNotNull(req);
+        assertEquals("complete", req.getStatus());
+        assertEquals(2, req.getMachines().size());
+        var m = req.getMachines().get(0);
+        assertEquals("10.0.1.12", m.getPrivateIp());
+        assertEquals("54.12.34.56", m.getPublicIp());
+        assertEquals("1793411323", m.getLaunchTime());
+        assertNull(req.getMachines().get(1).getLaunchTime());
+    }
+
     @Test
     void completeAndPlainFramesAreNotErrors() {
         assertDoesNotThrow(() -> StreamOutcome.throwIfFailed(

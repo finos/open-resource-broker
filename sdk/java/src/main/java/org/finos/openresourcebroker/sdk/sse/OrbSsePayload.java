@@ -64,9 +64,11 @@ public class OrbSsePayload {
         @JsonProperty("name") private String name;
         @JsonProperty("status") private String status;
         @JsonProperty("result") private String result;
-        @JsonProperty("private_ip") private String privateIp;
-        @JsonProperty("public_ip") private String publicIp;
-        @JsonProperty("launch_time") private String launchTime;
+        @JsonProperty("private_ip_address") private String privateIp;
+        @JsonProperty("public_ip_address") private String publicIp;
+        // The server sends a Unix timestamp number (null until known); read it
+        // untyped so a number or a string both decode.
+        @JsonProperty("launch_time") private Object launchTime;
         @JsonProperty("message") private String message;
 
         public String getMachineId() { return machineId; }
@@ -75,7 +77,8 @@ public class OrbSsePayload {
         public String getResult() { return result; }
         public String getPrivateIp() { return privateIp; }
         public String getPublicIp() { return publicIp; }
-        public String getLaunchTime() { return launchTime; }
+        /** Launch time as sent by the server: Unix seconds as decimal text, or null. */
+        public String getLaunchTime() { return launchTime == null ? null : String.valueOf(launchTime); }
         public String getMessage() { return message; }
     }
 }

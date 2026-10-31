@@ -248,4 +248,29 @@ public class SseTests
             new List<string> { "in_progress" },
             await ConsumeAsync(InProgress + "data: {}\n\n"));
     }
+
+    // Output of the server's default scheduler formatter for a request status
+    // stream frame: numeric launch_time, *_ip_address keys, a null launch_time.
+    private const string Golden = "{\"requests\":[{\"request_id\":\"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73\",\"status\":\"complete\",\"template_id\":\"t1\",\"requested_count\":2,\"created_at\":\"2026-10-31T01:00:00Z\",\"machine_ids\":[],\"message\":\"done\",\"metadata\":{},\"request_type\":\"acquire\",\"desired_capacity\":1,\"successful_count\":2,\"failed_count\":0,\"error_details\":{},\"provider_data\":{},\"version\":0,\"resource_ids\":[],\"machines\":[{\"machine_id\":\"i-0abc123def4567890\",\"name\":\"ip-10-0-1-12\",\"result\":\"succeed\",\"status\":\"running\",\"private_ip_address\":\"10.0.1.12\",\"public_ip_address\":\"54.12.34.56\",\"instance_type\":\"t3.micro\",\"price_type\":\"ondemand\",\"cloud_host_id\":\"ip-10-0-1-12.ec2.internal\",\"launch_time\":1793411323,\"request_id\":\"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73\",\"message\":\"\"},{\"machine_id\":\"i-0def456abc7890123\",\"name\":\"ip-10-0-1-13\",\"result\":\"executing\",\"status\":\"pending\",\"request_id\":\"req-3f8a1c2e-5b7d-4e91-a0c6-9d2b8e4f1a73\",\"message\":\"\",\"launch_time\":null,\"cloud_host_id\":null}]}],\"message\":\"Request status retrieved successfully\",\"count\":1}";
+
+    [Fact]
+    public void GoldenServerPayload_ParsesStatusLaunchTimeAndIps()
+    {
+        var payload = System.Text.Json.JsonSerializer.Deserialize<SsePayload>(Golden);
+        var req = Assert.Single(payload!.Requests!);
+        Assert.Equal("complete", req.Status);
+        Assert.Equal(2, req.Machines!.Count);
+        Assert.Equal("10.0.1.12", req.Machines[0].PrivateIp);
+        Assert.Equal("54.12.34.56", req.Machines[0].PublicIp);
+        Assert.Equal("1793411323", req.Machines[0].LaunchTime);
+        Assert.Null(req.Machines[1].LaunchTime);
+    }
+
+    [Fact]
+    public async Task GoldenCompletedStream_KeepsFinalStatusReadable()
+    {
+        var wire = "data: " + Golden + "\n\nevent: complete\ndata: {\"status\": \"complete\"}\n\ndata: {}\n\n";
+        var statuses = await ConsumeAsync(wire);
+        Assert.Equal("complete", statuses[^1]);
+    }
 }

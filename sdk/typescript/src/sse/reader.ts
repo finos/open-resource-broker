@@ -53,9 +53,10 @@ export interface OrbMachine {
   name?: string;
   status?: string;
   result?: string;
-  private_ip?: string;
-  public_ip?: string;
-  launch_time?: string;
+  private_ip_address?: string | null;
+  public_ip_address?: string | null;
+  /** Unix timestamp in seconds as sent by the server; null until known. */
+  launch_time?: number | string | null;
   message?: string;
 }
 

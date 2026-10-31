@@ -909,7 +909,7 @@ func (c *Client) consumeSSE(ctx context.Context, resp *http.Response, ch chan<- 
 				Result:     m.Result,
 				PrivateIP:  m.PrivateIP,
 				PublicIP:   m.PublicIP,
-				LaunchTime: m.LaunchTime,
+				LaunchTime: string(m.LaunchTime),
 				Message:    m.Message,
 			}
 		}
