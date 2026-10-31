@@ -28,7 +28,6 @@ from orb.domain.request.value_objects import RequestType
 
 
 def _make_service() -> ProvisioningOrchestrationService:
-    container = MagicMock()
     logger = MagicMock()
     provider_selection_port = MagicMock()
     provider_config_port = MagicMock()
@@ -47,7 +46,8 @@ def _make_service() -> ProvisioningOrchestrationService:
     circuit_breaker_factory.return_value = cb
 
     return ProvisioningOrchestrationService(
-        container=container,
+        uow_factory=MagicMock(),
+        scheduler=MagicMock(),
         logger=logger,
         provider_selection_port=provider_selection_port,
         provider_config_port=provider_config_port,
@@ -115,7 +115,7 @@ class TestPersistResourceIdsCheckpoint:
 
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         updated, ok = svc._persist_resource_ids_checkpoint(request, ["pod-a", "pod-b"])
 
@@ -139,7 +139,7 @@ class TestPersistResourceIdsCheckpoint:
         uow.requests.save = MagicMock(side_effect=lambda r: saved_requests.append(r))
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         updated, ok = svc._persist_resource_ids_checkpoint(request, ["pod-x"])
 
@@ -161,7 +161,7 @@ class TestPersistResourceIdsCheckpoint:
         uow.requests.save = MagicMock(side_effect=lambda r: saved_requests.append(r))
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         updated, ok = svc._persist_resource_ids_checkpoint(request, ["pod-y"])
 
@@ -175,7 +175,7 @@ class TestPersistResourceIdsCheckpoint:
 
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.side_effect = RuntimeError("DB unavailable")
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         returned_request, ok = svc._persist_resource_ids_checkpoint(request, ["pod-z"])
 
@@ -193,7 +193,7 @@ class TestPersistResourceIdsCheckpoint:
         request = _make_real_request()
 
         uow_factory = MagicMock()
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         # Calling with empty list should still succeed without error
         updated, ok = svc._persist_resource_ids_checkpoint(request, [])
@@ -230,7 +230,7 @@ class TestExecuteProvisioningCrashWindow:
         uow.requests.save = MagicMock(side_effect=lambda r: saved_requests.append(r))
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         provider_result = _make_provider_result_success(
             resource_ids=["pod-aaa", "pod-bbb"],
@@ -248,14 +248,8 @@ class TestExecuteProvisioningCrashWindow:
         # uow_factory (UnitOfWorkFactory) from the container.  Return the
         # scheduler for the first get call and the uow_factory for subsequent
         # calls (used inside _persist_resource_ids_checkpoint).
-        def _container_get(cls):
-            from orb.application.ports.scheduler_port import SchedulerPort
-
-            if cls is SchedulerPort:
-                return scheduler
-            return uow_factory
-
-        svc._container.get = _container_get
+        svc._scheduler = scheduler
+        svc._uow_factory = uow_factory
 
         final_result = await svc.execute_provisioning(
             MagicMock(template_id="tpl-1"), request, selection_result
@@ -301,14 +295,8 @@ class TestExecuteProvisioningCrashWindow:
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
 
-        def _container_get(cls):
-            from orb.application.ports.scheduler_port import SchedulerPort
-
-            if cls is SchedulerPort:
-                return scheduler
-            return uow_factory
-
-        svc._container.get = _container_get
+        svc._scheduler = scheduler
+        svc._uow_factory = uow_factory
 
         # execute_provisioning must not re-raise generic exceptions from the
         # provider — it wraps them in a failed ProvisioningResult.
@@ -344,14 +332,8 @@ class TestExecuteProvisioningCrashWindow:
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.side_effect = RuntimeError("DB down")
 
-        def _container_get(cls):
-            from orb.application.ports.scheduler_port import SchedulerPort
-
-            if cls is SchedulerPort:
-                return scheduler
-            return uow_factory
-
-        svc._container.get = _container_get
+        svc._scheduler = scheduler
+        svc._uow_factory = uow_factory
 
         final_result = await svc.execute_provisioning(
             MagicMock(template_id="tpl-1"), request, selection_result

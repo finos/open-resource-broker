@@ -8,6 +8,7 @@ import pytest
 
 from orb.application.dto.queries import ListTemplatesQuery
 from orb.application.queries.template_query_handlers import ListTemplatesHandler
+from orb.domain.base.ports import TemplateConfigurationPort
 
 
 def _make_template_dto(is_active: bool) -> MagicMock:
@@ -34,7 +35,7 @@ def _make_handler() -> tuple[ListTemplatesHandler, MagicMock]:
     handler = ListTemplatesHandler(
         logger=logger,
         error_handler=error_handler,
-        container=container,
+        template_manager=container.get(TemplateConfigurationPort),
         generic_filter_service=generic_filter_service,
     )
     return handler, active_dto
@@ -85,7 +86,7 @@ async def test_pagination_limit_and_offset() -> None:
     handler = ListTemplatesHandler(
         logger=logger,
         error_handler=error_handler,
-        container=container,
+        template_manager=container.get(TemplateConfigurationPort),
         generic_filter_service=generic_filter_service,
     )
 

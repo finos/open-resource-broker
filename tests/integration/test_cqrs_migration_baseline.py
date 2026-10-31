@@ -217,13 +217,13 @@ class TestCQRSArchitectureIntegration:
         return CreateMachineRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
-            container=mock_container,
             event_publisher=mock_event_publisher,
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection_port,
             provisioning_service=mock_provisioning_service,
             provider_validation_service=mock_provider_validation_service,
+            state_machine=Mock(),
         )
 
     @pytest.fixture

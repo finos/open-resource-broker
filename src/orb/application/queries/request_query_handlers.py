@@ -14,6 +14,7 @@ from orb.application.dto.queries import (
 )
 from orb.application.dto.responses import RequestDTO
 from orb.application.factories.request_dto_factory import RequestDTOFactory
+from orb.application.ports.cache_service_port import CacheServicePort
 from orb.application.request.queries import ListRequestsQuery
 from orb.application.services.machine_sync_service import MachineSyncService
 from orb.application.services.orchestration.dtos import Paginated
@@ -29,25 +30,10 @@ from orb.domain.base.pagination import (
     StoragePage,
     paginate_in_memory,
 )
-from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from orb.domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
 from orb.domain.services.generic_filter_service import GenericFilterService
-
-
-def _resolve_state_machine(container: ContainerPort, logger: LoggingPort):
-    """Resolve the shared FulfilmentStateMachine from DI.
-
-    Falls back to a default-grace-period machine when DI does not provide one
-    (lightweight test wiring) so the read-path deadline sweep always has a
-    usable machine.
-    """
-    from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
-
-    try:
-        return container.get(FulfilmentStateMachine)
-    except Exception as exc:
-        logger.debug("FulfilmentStateMachine unavailable in DI: %s", exc)
-        return FulfilmentStateMachine(grace_period_seconds=3600)
 
 
 @query_handler(SyncAndGetRequestQuery)
@@ -63,21 +49,22 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-        container: ContainerPort,
         provider_registry_service: ProviderRegistryService,
         machine_sync_service: MachineSyncService,
+        cache_service: CacheServicePort,
+        event_publisher: EventPublisherPort,
+        state_machine: FulfilmentStateMachine,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
-        self._container = container
         self._provider_registry_service = provider_registry_service
         self._machine_sync_service = machine_sync_service
-        self._cache_service = self._get_cache_service()
-        self.event_publisher = self._get_event_publisher()
+        self._cache_service = cache_service
+        self.event_publisher = event_publisher
 
         self._query_service = RequestQueryService(uow_factory, logger)
-        self._state_machine = _resolve_state_machine(container, logger)
+        self._state_machine = state_machine
         self._status_service = RequestStatusService(
             uow_factory, logger, state_machine=self._state_machine
         )
@@ -253,31 +240,6 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
                 self.logger.warning("Deadline sweep persist failed: %s", exc)
                 return swept
         return swept
-
-    def _get_cache_service(self):
-        try:
-            from orb.application.ports.cache_service_port import CacheServicePort
-
-            return self._container.get(CacheServicePort)
-        except Exception as e:
-            self.logger.warning("Failed to initialize cache service: %s", e)
-            return None
-
-    def _get_event_publisher(self):
-        try:
-            from orb.domain.base.ports import EventPublisherPort
-
-            return self._container.get(EventPublisherPort)
-        except Exception as e:
-            self.logger.warning("Failed to initialize event publisher: %s", e)
-
-            class NoOpEventPublisher:
-                """No-operation event publisher that discards events."""
-
-                def publish(self, event) -> None:
-                    """Publish event (no-op implementation)."""
-
-            return NoOpEventPublisher()
 
 
 @query_handler(ListRequestsQuery)  # type: ignore[arg-type]

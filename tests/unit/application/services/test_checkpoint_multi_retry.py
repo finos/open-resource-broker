@@ -28,7 +28,6 @@ from orb.domain.request.value_objects import RequestType
 
 
 def _make_service(max_retries: int = 1) -> ProvisioningOrchestrationService:
-    container = MagicMock()
     logger = MagicMock()
     provider_selection_port = MagicMock()
     provider_config_port = MagicMock()
@@ -47,7 +46,8 @@ def _make_service(max_retries: int = 1) -> ProvisioningOrchestrationService:
     circuit_breaker_factory.return_value = cb
 
     return ProvisioningOrchestrationService(
-        container=container,
+        uow_factory=MagicMock(),
+        scheduler=MagicMock(),
         logger=logger,
         provider_selection_port=provider_selection_port,
         provider_config_port=provider_config_port,
@@ -122,7 +122,7 @@ class TestCheckpointMultiRetrySemantics:
 
         saved_requests: list[Any] = []
         uow_factory = _make_uow_factory(saved_requests)
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         attempt_counter = {"n": 0}
 
@@ -172,7 +172,7 @@ class TestCheckpointMultiRetrySemantics:
 
         saved_requests: list[Any] = []
         uow_factory = _make_uow_factory(saved_requests)
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         attempt_counter = {"n": 0}
 

@@ -9,6 +9,7 @@ violation_counts.json to the new (lower) count to lock in the improvement.
 
 from __future__ import annotations
 
+import ast
 import collections
 import json
 from pathlib import Path
@@ -186,6 +187,67 @@ def _count_cli_infrastructure() -> int:
     return count
 
 
+_LOCATOR_METHODS = frozenset({"get", "has", "get_optional"})
+_LOCATOR_FUNCTIONS = frozenset({"get_container", "get_event_bus", "get_logger_port"})
+
+
+def _is_container_expr(node: ast.expr) -> bool:
+    """True for ``container``, ``self.container``, ``self._container`` and similar."""
+    if isinstance(node, ast.Name):
+        return node.id.lower().endswith("container")
+    if isinstance(node, ast.Attribute):
+        return node.attr.lower().endswith("container")
+    return False
+
+
+def _mentions_container_port(annotation: ast.expr | None) -> bool:
+    if annotation is None:
+        return False
+    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
+        return "ContainerPort" in annotation.value
+    return any(
+        (isinstance(n, ast.Name) and n.id == "ContainerPort")
+        or (isinstance(n, ast.Attribute) and n.attr == "ContainerPort")
+        for n in ast.walk(annotation)
+    )
+
+
+def _locator_sites_in_source(source: str) -> int:
+    count = 0
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Call):
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr in _LOCATOR_METHODS
+                and _is_container_expr(func.value)
+            ):
+                count += 1
+            elif isinstance(func, ast.Name) and func.id in _LOCATOR_FUNCTIONS:
+                count += 1
+        elif isinstance(node, ast.arg) and _mentions_container_port(node.annotation):
+            count += 1
+    return count
+
+
+def _count_application_service_locators() -> int:
+    """Count service-locator uses under ``application/``.
+
+    Counted: ``<container>.get/has/get_optional(...)`` calls, calls to the
+    ``get_container``/``get_event_bus``/``get_logger_port`` helpers, and any
+    function parameter typed ``ContainerPort`` (constructor or module-level
+    helper), which would let a container be passed through and defeat the
+    call check.
+    """
+    count = 0
+    for f in collect_python_files(SRC_ORB / "application"):
+        try:
+            count += _locator_sites_in_source(f.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+    return count
+
+
 # ---------------------------------------------------------------------------
 # Ratchet tests
 # ---------------------------------------------------------------------------
@@ -200,6 +262,7 @@ _COUNTERS = {
     "interface_provider_direct_imports": _count_interface_provider,
     "circular_dependency_cycles": _count_cycles,
     "cli_infrastructure_direct_imports": _count_cli_infrastructure,
+    "application_service_locator_sites": _count_application_service_locators,
 }
 
 
@@ -216,3 +279,29 @@ def test_violation_count_has_not_increased(category: str) -> None:
         f"current={current} > ceiling={ceiling}. "
         f"Fix the new violations or update violation_counts.json if this is intentional."
     )
+
+
+@pytest.mark.unit
+@pytest.mark.architecture
+def test_service_locator_counter_detects_each_form() -> None:
+    """The locator counter must see every form it is meant to ratchet."""
+    source = """
+from orb.domain.base.ports import ContainerPort
+
+
+def _resolve(container: ContainerPort):
+    return container.get(object)
+
+
+class Handler:
+    def __init__(self, container: "ContainerPort"):
+        self._container = container
+
+    def run(self):
+        if self._container.has(int):
+            return self._container.get(int)
+        return get_container().get_optional(int)
+"""
+    # two ContainerPort params, get + has + get on containers, get_container call
+    assert _locator_sites_in_source(source) == 6
+    assert _locator_sites_in_source("def f(port):\n    return port.get(1)\n") == 0

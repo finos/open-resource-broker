@@ -9,5 +9,6 @@
   "circular_dependency_cycles": 5,
   "cli_infrastructure_direct_imports": 10,
   "getattr_justification_aws": 100,
-  "getattr_justification_k8s": 294
+  "getattr_justification_k8s": 294,
+  "application_service_locator_sites": 0
 }

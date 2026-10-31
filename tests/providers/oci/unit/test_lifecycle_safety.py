@@ -288,15 +288,16 @@ async def test_termination_outcomes_reach_deprovisioning_orchestrator(
     query_bus.execute = AsyncMock(return_value={"template_id": "oci-test-template"})
     selection = MagicMock()
     selection.execute_operation = AsyncMock(return_value=provider_result)
-    container = MagicMock()
-    container.get.return_value.format_template_for_provider.return_value = {}
+    scheduler = MagicMock()
+    scheduler.format_template_for_provider.return_value = {}
     uow_factory = MagicMock()
     uow = uow_factory.create_unit_of_work.return_value.__enter__.return_value
     uow.machines.find_by_ids.return_value = []
     orchestrator = DeprovisioningOrchestrator(
         uow_factory=uow_factory,
         logger=MagicMock(),
-        container=container,
+        scheduler=scheduler,
+        config_manager=MagicMock(),
         query_bus=query_bus,
         provider_selection_port=selection,
     )

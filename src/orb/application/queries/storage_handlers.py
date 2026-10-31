@@ -17,7 +17,7 @@ from orb.application.queries.storage import (
 )
 from orb.application.services.storage_registry_service import StorageRegistryService
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from orb.domain.base.ports import ConfigurationPort, ErrorHandlingPort, LoggingPort
 from orb.domain.services.generic_filter_service import GenericFilterService
 
 
@@ -33,12 +33,12 @@ class ListStorageStrategiesHandler(
         error_handler: ErrorHandlingPort,
         storage_service: StorageRegistryService,
         generic_filter_service: GenericFilterService,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
     ):
         super().__init__(logger, error_handler)
         self._storage_service = storage_service
         self._generic_filter_service = generic_filter_service
-        self._container = container
+        self._config_manager = config_manager
 
     async def execute_query(self, query: ListStorageStrategiesQuery) -> StorageStrategyListResponse:
         """
@@ -50,10 +50,7 @@ class ListStorageStrategiesHandler(
         Returns:
             Storage strategies list response
         """
-        # Access infrastructure through DI container
-        from orb.domain.base.ports import ConfigurationPort
-
-        config_manager = self._container.get(ConfigurationPort)
+        config_manager = self._config_manager
         storage_types = self._storage_service.get_available_storage_types()
 
         strategies = []

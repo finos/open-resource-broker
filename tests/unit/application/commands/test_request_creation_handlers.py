@@ -16,7 +16,6 @@ from orb.application.commands.request_creation_handlers import (
 from orb.application.dto.commands import CreateRequestCommand, CreateReturnRequestCommand
 from orb.domain.base.exceptions import ApplicationError, EntityNotFoundError
 from orb.domain.base.ports import (
-    ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
@@ -99,7 +98,6 @@ def _make_machine_handler(
     handler._metrics = {}
 
     handler.uow_factory = uow_factory
-    handler._container = MagicMock(spec=ContainerPort)
     handler._query_bus = query_bus
     handler._provider_selection_port = MagicMock(spec=ProviderSelectionPort)
     handler._provisioning_service = provisioning_service
@@ -125,7 +123,8 @@ def _make_return_handler(*, uow_factory: MagicMock | None = None) -> CreateRetur
     handler._metrics = {}
 
     handler.uow_factory = uow_factory
-    handler._container = MagicMock(spec=ContainerPort)
+    handler._command_bus = AsyncMock()
+    handler._domain_config = MagicMock()
     handler._query_bus = AsyncMock()
     handler._provider_selection_port = MagicMock(spec=ProviderSelectionPort)
     handler._machine_grouping_service = MagicMock()
@@ -631,8 +630,7 @@ class TestCreateReturnRequestHandlerExecute:
         # stub the container / command_bus calls
         command_bus = AsyncMock()
         command_bus.execute = AsyncMock()
-        handler._container = MagicMock()
-        handler._container.get.return_value = command_bus
+        handler._command_bus = command_bus
 
         cmd = CreateReturnRequestCommand(machine_ids=[_MACHINE_ID])
 
@@ -701,9 +699,7 @@ class TestExecuteDeprovisioningForRequest:
             return_value=deprovision_result, side_effect=deprovision_side_effect
         )
         handler._deprovisioning_orchestrator = orchestrator
-        container = MagicMock()
-        container.get.return_value = command_bus or AsyncMock()
-        handler._container = container
+        handler._command_bus = command_bus or AsyncMock()
         return handler
 
     @pytest.mark.asyncio
@@ -935,7 +931,7 @@ class TestExecuteDeprovisioningForRequest:
             }
         )
         command_bus = AsyncMock()
-        handler._container.get.return_value = command_bus
+        handler._command_bus = command_bus
 
         request = MagicMock()
         request.request_id = "ret-partial-1"
@@ -1056,7 +1052,7 @@ class TestFailedReturnRequestMessage:
         # First dispatch (COMPLETED) fails; second dispatch (FAILED fallback) succeeds.
         command_bus.execute.side_effect = [RuntimeError(_IAM_ERROR), None]
         handler = _make_return_handler()
-        handler._container.get.return_value = command_bus
+        handler._command_bus = command_bus
         request = MagicMock()
         request.request_id = "ret-1"
 
@@ -1129,9 +1125,10 @@ class TestFailedReturnRequestMessage:
         orchestrator = DeprovisioningOrchestrator(
             uow_factory=MagicMock(),
             logger=MagicMock(spec=LoggingPort),
-            container=MagicMock(),
             query_bus=query_bus,
             provider_selection_port=provider_port,
+            scheduler=MagicMock(),
+            config_manager=MagicMock(),
         )
         machines = []
         for mid in ("vm-1", "vm-2"):
@@ -1148,7 +1145,7 @@ class TestFailedReturnRequestMessage:
             [],
         )
         handler._deprovisioning_orchestrator = orchestrator
-        handler._container.get.return_value = command_bus
+        handler._command_bus = command_bus
         request = MagicMock()
         request.request_id = "ret-1"
 
@@ -1282,7 +1279,7 @@ class TestMachinesAreReleasedAfterFailedReturn:
             handler._deprovisioning_orchestrator.execute_deprovisioning = AsyncMock(
                 side_effect=RuntimeError("provider blew up")
             )
-        handler._container.get.return_value = AsyncMock()
+        handler._command_bus = AsyncMock()
         request = MagicMock()
         request.request_id = "ret-1"
 
@@ -1302,7 +1299,7 @@ class TestMachinesAreReleasedAfterFailedReturn:
         handler._deprovisioning_orchestrator.execute_deprovisioning = AsyncMock(
             return_value={"success": False, "failed_instance_ids": ["vm-3"], "errors": ["x"]}
         )
-        handler._container.get.return_value = AsyncMock()
+        handler._command_bus = AsyncMock()
         request = MagicMock()
         request.request_id = "ret-1"
 

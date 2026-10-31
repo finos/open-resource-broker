@@ -26,7 +26,7 @@ from orb.domain.base.pagination import (
     StoragePage,
     paginate_in_memory,
 )
-from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 from orb.domain.services.generic_filter_service import GenericFilterService
 
 # Sentinel used whenever a health dimension cannot be determined. Unknown health
@@ -225,14 +225,12 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, Paginated[MachineD
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-        container: ContainerPort,
         command_bus: CommandBusPort,
         generic_filter_service: GenericFilterService,
         machine_sync_service: MachineSyncService,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
-        self.container = container
         self.command_bus = command_bus
         self._generic_filter_service = generic_filter_service
         self._machine_sync_service = machine_sync_service

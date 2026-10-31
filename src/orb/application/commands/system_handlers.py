@@ -8,10 +8,11 @@ from orb.application.commands.system import (
 )
 from orb.application.decorators import command_handler
 from orb.domain.base.ports import (
-    ContainerPort,
+    ConfigurationPort,
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
+    TemplateConfigurationPort,
 )
 
 # ============================================================================
@@ -29,13 +30,13 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         """Initialize reload provider config handler."""
         super().__init__(logger, event_publisher, error_handler)
-        self.container = container
+        self._config_manager = config_manager
 
     async def validate_command(self, command: ReloadProviderConfigCommand) -> None:
         """Validate reload provider config command."""
@@ -49,10 +50,7 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
         )
 
         try:
-            # Get configuration manager from container
-            from orb.domain.base.ports import ConfigurationPort
-
-            config_manager = self.container.get(ConfigurationPort)
+            config_manager = self._config_manager
 
             # Reload configuration (implementation depends on ConfigurationManager
             # capabilities)
@@ -110,13 +108,13 @@ class RefreshTemplatesHandler(BaseCommandHandler[RefreshTemplatesCommand, None])
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        template_manager: TemplateConfigurationPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         """Initialize refresh templates handler."""
         super().__init__(logger, event_publisher, error_handler)
-        self.container = container
+        self._template_manager = template_manager
 
     async def validate_command(self, command: RefreshTemplatesCommand) -> None:
         """Validate refresh templates command."""
@@ -127,9 +125,7 @@ class RefreshTemplatesHandler(BaseCommandHandler[RefreshTemplatesCommand, None])
         self.logger.info("Refreshing templates from all sources")
 
         try:
-            from orb.domain.base.ports import TemplateConfigurationPort
-
-            template_manager = self.container.get(TemplateConfigurationPort)
+            template_manager = self._template_manager
 
             # Refresh templates
             templates = await template_manager.load_templates(command.provider_name)
@@ -167,13 +163,13 @@ class SetConfigurationHandler(BaseCommandHandler[SetConfigurationCommand, None])
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         """Initialize set configuration handler."""
         super().__init__(logger, event_publisher, error_handler)
-        self.container = container
+        self._config_manager = config_manager
 
     async def validate_command(self, command: SetConfigurationCommand) -> None:
         """Validate set configuration command."""
@@ -186,9 +182,7 @@ class SetConfigurationHandler(BaseCommandHandler[SetConfigurationCommand, None])
         self.logger.info("Setting configuration: %s = %s", command.key, command.value)
 
         try:
-            from orb.domain.base.ports import ConfigurationPort
-
-            config_manager = self.container.get(ConfigurationPort)
+            config_manager = self._config_manager
             config_manager.set_configuration_value(command.key, command.value)
 
             # Persist to disk so the change survives process exit. The CLI

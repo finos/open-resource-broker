@@ -16,7 +16,7 @@ from orb.domain.base.events.provider_events import (
     ProviderStrategyRegisteredEvent,
 )
 from orb.domain.base.exceptions import ConfigurationError
-from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, EventPublisherPort, LoggingPort
+from orb.domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
 
 
 @command_handler(ExecuteProviderOperationCommand)  # type: ignore[arg-type]
@@ -28,14 +28,12 @@ class ExecuteProviderOperationHandler(BaseCommandHandler[ExecuteProviderOperatio
 
     def __init__(
         self,
-        container: ContainerPort,
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
         provider_registry_service: ProviderRegistryService,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
-        self._container = container
         self._provider_registry_service = provider_registry_service
 
     async def validate_command(self, command: ExecuteProviderOperationCommand) -> None:
@@ -106,14 +104,12 @@ class RegisterProviderStrategyHandler(BaseCommandHandler[RegisterProviderStrateg
 
     def __init__(
         self,
-        container: ContainerPort,
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
         provider_registry_service: ProviderRegistryService,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
-        self._container = container
         self._provider_registry_service = provider_registry_service
 
     async def validate_command(self, command: RegisterProviderStrategyCommand) -> None:
@@ -164,14 +160,12 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
 
     def __init__(
         self,
-        container: ContainerPort,
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
         provider_registry_service: ProviderRegistryService,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
-        self._container = container
         self._provider_registry_service = provider_registry_service
 
     async def validate_command(self, command: UpdateProviderHealthCommand) -> None:

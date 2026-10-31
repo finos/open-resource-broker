@@ -146,7 +146,8 @@ async def test_partial_terminate_result_counts_each_id_once() -> None:
     orchestrator = DeprovisioningOrchestrator(
         uow_factory=MagicMock(),
         logger=MagicMock(),
-        container=MagicMock(),
+        scheduler=MagicMock(),
+        config_manager=MagicMock(),
         query_bus=query_bus,
         provider_selection_port=selection,
     )

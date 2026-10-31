@@ -15,7 +15,7 @@ from orb.application.dto.bulk_responses import (
 from orb.application.ports.query_bus_port import QueryBusPort
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError
-from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 
 
 @query_handler(GetMultipleRequestsQuery)
@@ -27,11 +27,9 @@ class GetMultipleRequestsHandler(BaseQueryHandler[GetMultipleRequestsQuery, Bulk
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-        container: ContainerPort,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
-        self._container = container
 
         from orb.application.factories.request_dto_factory import RequestDTOFactory
         from orb.application.services.request_query_service import RequestQueryService
@@ -75,12 +73,10 @@ class GetMultipleTemplatesHandler(
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-        container: ContainerPort,
         query_bus: QueryBusPort,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
-        self._container = container
         # Reuse the single-template read path (GetTemplateQuery) so bulk
         # retrieval stays consistent with defaults resolution and DTO shaping
         # rather than duplicating that logic here.
@@ -126,12 +122,10 @@ class GetMultipleMachinesHandler(BaseQueryHandler[GetMultipleMachinesQuery, Bulk
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-        container: ContainerPort,
         query_bus: QueryBusPort,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
-        self._container = container
         # Reuse the single-machine read path (GetMachineQuery) so bulk
         # retrieval returns the same MachineDTO shape as the single-fetch path.
         self._query_bus = query_bus

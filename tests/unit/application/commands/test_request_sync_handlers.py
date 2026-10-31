@@ -62,14 +62,9 @@ def _make_handler(
     request: MagicMock,
     provider_selection_port: MagicMock,
 ) -> PopulateMachineIdsHandler:
-    container = MagicMock()
-    # container.get(ConfigurationPort) is called inside _discover_machine_ids; just return a mock
-    container.get.return_value = MagicMock()
-
     return PopulateMachineIdsHandler(
         uow_factory=_make_uow_factory(request),
         logger=MagicMock(spec=LoggingPort),
-        container=container,
         event_publisher=MagicMock(spec=EventPublisherPort),
         error_handler=MagicMock(spec=ErrorHandlingPort),
         provider_selection_port=provider_selection_port,

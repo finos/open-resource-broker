@@ -10,13 +10,14 @@ import asyncio
 from typing import Any
 
 from orb.application.ports.query_bus_port import QueryBusPort
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.machine_coordinates import load_machine_coordinates
 from orb.application.services.template_snapshot import (
     SNAPSHOT_METADATA_KEY,
     restore_template_snapshot,
 )
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.ports import ContainerPort, LoggingPort, ProviderSelectionPort
+from orb.domain.base.ports import ConfigurationPort, LoggingPort, ProviderSelectionPort
 from orb.domain.request.value_objects import RequestId
 
 
@@ -61,22 +62,25 @@ class DeprovisioningOrchestrator:
         self,
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
-        container: ContainerPort,
         query_bus: QueryBusPort,
         provider_selection_port: ProviderSelectionPort,
+        scheduler: SchedulerPort,
+        config_manager: ConfigurationPort,
     ) -> None:
         """Initialize the orchestrator.
 
         Args:
             uow_factory: Factory for creating unit of work instances
             logger: Logging port for structured logging
-            container: DI container for service resolution
             query_bus: Query bus for CQRS queries
             provider_selection_port: Port for provider operations
+            scheduler: Scheduler port for formatting templates for providers
+            config_manager: Configuration port for provider instance config
         """
         self.uow_factory = uow_factory
         self.logger = logger
-        self._container = container
+        self._scheduler = scheduler
+        self._config_manager = config_manager
         self._query_bus = query_bus
         self._provider_selection_port = provider_selection_port
 
@@ -239,9 +243,7 @@ class DeprovisioningOrchestrator:
                 raise ValueError(f"Template not found: {template_id}")
 
             # Get scheduler for template formatting
-            from orb.application.ports.scheduler_port import SchedulerPort
-
-            scheduler = self._container.get(SchedulerPort)
+            scheduler = self._scheduler
             template_config = scheduler.format_template_for_provider(template)
 
             self.logger.info("Using %s handler for resource %s", provider_api, resource_id)
@@ -276,10 +278,7 @@ class DeprovisioningOrchestrator:
             )
 
             # Get provider configuration
-            from orb.domain.base.ports.configuration_port import ConfigurationPort
-
-            config_manager = self._container.get(ConfigurationPort)
-            config_manager.get_provider_instance_config(provider_name)
+            self._config_manager.get_provider_instance_config(provider_name)
 
             # Execute via provider selection port
             result = await self._provider_selection_port.execute_operation(provider_name, operation)

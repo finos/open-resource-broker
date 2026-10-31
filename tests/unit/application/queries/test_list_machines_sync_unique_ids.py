@@ -62,7 +62,6 @@ async def test_list_machines_sync_preserves_unique_ids():
         logger=MagicMock(),
         error_handler=MagicMock(),
         uow_factory=mock_uow_factory,
-        container=MagicMock(),
         command_bus=MagicMock(),
         generic_filter_service=MagicMock(),
         machine_sync_service=mock_sync,

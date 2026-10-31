@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 
 from orb.application.ports.resilience_port import CircuitBreakerOpenError, CircuitBreakerPort
+from orb.application.ports.scheduler_port import SchedulerPort
+from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import QuotaError
 from orb.domain.base.operation_outcome import (
     Accepted,
@@ -19,7 +21,7 @@ from orb.domain.base.operation_outcome import (
     OperationOutcome,
     RequiresFollowUp,
 )
-from orb.domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, ProviderConfigPort
+from orb.domain.base.ports import ConfigurationPort, LoggingPort, ProviderConfigPort
 from orb.domain.base.results import ProviderSelectionResult
 from orb.domain.request.aggregate import Request
 from orb.domain.request.fulfilment_state_machine import (
@@ -125,15 +127,17 @@ class ProvisioningOrchestrationService:
 
     def __init__(
         self,
-        container: ContainerPort,
         logger: LoggingPort,
+        uow_factory: UnitOfWorkFactory,
+        scheduler: SchedulerPort,
         provider_selection_port: "ProviderSelectionPort",
         provider_config_port: ProviderConfigPort,
         config_port: ConfigurationPort,
         circuit_breaker_factory: Callable[[str], CircuitBreakerPort],
         state_machine: "FulfilmentStateMachine | None" = None,
     ):
-        self._container = container
+        self._uow_factory = uow_factory
+        self._scheduler = scheduler
         self._logger = logger
         self._provider_selection_port = provider_selection_port
         self._provider_config_port = provider_config_port
@@ -340,7 +344,6 @@ class ProvisioningOrchestrationService:
             failed.  The caller continues with the in-memory request; the final
             persist in the handler will still carry the correct resource IDs.
         """
-        from orb.domain.base import UnitOfWorkFactory
 
         try:
             updated = request
@@ -356,7 +359,7 @@ class ProvisioningOrchestrationService:
                     FulfilmentEvent.RESOURCES_CREATED,
                     now=datetime.now(timezone.utc),
                 )
-            uow_factory = self._container.get(UnitOfWorkFactory)
+            uow_factory = self._uow_factory
             with uow_factory.create_unit_of_work() as uow:
                 uow.requests.save(updated)
             return updated, True
@@ -376,7 +379,6 @@ class ProvisioningOrchestrationService:
             failed.  The caller should log a warning but continue the retry loop
             because the in-memory request is still valid.
         """
-        from orb.domain.base import UnitOfWorkFactory
 
         try:
             if request.status == RequestStatus.PENDING:
@@ -390,7 +392,7 @@ class ProvisioningOrchestrationService:
                 # Already past PENDING (e.g. ACQUIRING) — re-persist as-is;
                 # the deadline sweep on the next state-machine touch governs it.
                 updated = request
-            uow_factory = self._container.get(UnitOfWorkFactory)
+            uow_factory = self._uow_factory
             with uow_factory.create_unit_of_work() as uow:
                 uow.requests.save(updated)
             return updated, True
@@ -445,7 +447,6 @@ class ProvisioningOrchestrationService:
         Returns:
             The number of requests that were transitioned to a terminal state.
         """
-        from orb.domain.base import UnitOfWorkFactory
         from orb.domain.request.repository import RequestRepository
 
         now: datetime = datetime.now(timezone.utc)
@@ -468,7 +469,7 @@ class ProvisioningOrchestrationService:
             return r.created_at is not None and r.created_at < cutoff
 
         try:
-            uow_factory = self._container.get(UnitOfWorkFactory)
+            uow_factory = self._uow_factory
             with uow_factory.create_unit_of_work() as uow:
                 repo: RequestRepository = uow.requests  # type: ignore[assignment]
                 active: list[Request] = []
@@ -518,7 +519,7 @@ class ProvisioningOrchestrationService:
                             "Request abandoned in active state (timeout exceeded)",
                             force=True,
                         )
-                    uow_factory2 = self._container.get(UnitOfWorkFactory)
+                    uow_factory2 = self._uow_factory
                     with uow_factory2.create_unit_of_work() as uow2:
                         uow2.requests.save(failed_request)
                     failed_count += 1
@@ -567,13 +568,12 @@ class ProvisioningOrchestrationService:
     ) -> ProvisioningResult:
         """Dispatch a single provisioning attempt for `count` instances."""
         try:
-            from orb.application.ports.scheduler_port import SchedulerPort
             from orb.domain.base.operations import (
                 Operation as ProviderOperation,
                 OperationType as ProviderOperationType,
             )
 
-            scheduler = self._container.get(SchedulerPort)
+            scheduler = self._scheduler
 
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.CREATE_INSTANCES,

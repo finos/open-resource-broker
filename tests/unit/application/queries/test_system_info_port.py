@@ -134,7 +134,7 @@ class TestGetProviderConfigHandlerUsesSystemInfoPort:
 
         return GetProviderConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
             timestamp_service=_make_timestamp_service("2023-11-14T00:00:00Z"),
             system_info=system_info or FakeSystemInfo(),
@@ -203,7 +203,7 @@ class TestGetSystemStatusHandlerUsesSystemInfoPort:
 
         return GetSystemStatusHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
             timestamp_service=_make_timestamp_service(),
             system_info=system_info or FakeSystemInfo(),
@@ -318,7 +318,8 @@ class TestGetSystemConfigHandlerUsesSystemInfoPort:
 
         return GetSystemConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
+            scheduler=container.get(SchedulerPort),
             error_handler=_make_error_handler(),
             system_info=system_info or FakeSystemInfo(),
         )

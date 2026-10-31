@@ -4,7 +4,6 @@ Verifies the full path:
   strategy returns routing_info → app layer stamps → ProvisioningResult.provider_data has the fields
 """
 
-from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -17,7 +16,6 @@ from orb.providers.base.strategy.provider_strategy import ProviderResult
 
 
 def _make_service() -> ProvisioningOrchestrationService:
-    container = MagicMock()
     logger = MagicMock()
     provider_selection_port = MagicMock()
     provider_config_port = MagicMock()
@@ -31,7 +29,8 @@ def _make_service() -> ProvisioningOrchestrationService:
     circuit_breaker_factory.return_value = cb
 
     return ProvisioningOrchestrationService(
-        container=container,
+        uow_factory=MagicMock(),
+        scheduler=MagicMock(),
         logger=logger,
         provider_selection_port=provider_selection_port,
         provider_config_port=provider_config_port,
@@ -87,7 +86,7 @@ async def test_routing_info_from_aws_strategy_reaches_provider_data():
     # Patch scheduler
     scheduler = MagicMock()
     scheduler.format_template_for_provider.return_value = {}
-    cast(MagicMock, svc._container).get.return_value = scheduler
+    svc._scheduler = scheduler
 
     result = await svc._dispatch_single_attempt(
         _make_template(), _make_request(), _make_selection_result(), 1
@@ -123,7 +122,7 @@ async def test_routing_info_from_fallback_strategy_reaches_provider_data():
 
     scheduler = MagicMock()
     scheduler.format_template_for_provider.return_value = {}
-    cast(MagicMock, svc._container).get.return_value = scheduler
+    svc._scheduler = scheduler
 
     result = await svc._dispatch_single_attempt(
         _make_template(), _make_request(), _make_selection_result(), 1
@@ -163,7 +162,7 @@ async def test_routing_info_from_composite_strategy_reaches_provider_data():
 
     scheduler = MagicMock()
     scheduler.format_template_for_provider.return_value = {}
-    cast(MagicMock, svc._container).get.return_value = scheduler
+    svc._scheduler = scheduler
 
     result = await svc._dispatch_single_attempt(
         _make_template(), _make_request(), _make_selection_result(), 1
@@ -194,7 +193,7 @@ async def test_no_routing_info_does_not_break_provider_data():
 
     scheduler = MagicMock()
     scheduler.format_template_for_provider.return_value = {}
-    cast(MagicMock, svc._container).get.return_value = scheduler
+    svc._scheduler = scheduler
 
     result = await svc._dispatch_single_attempt(
         _make_template(), _make_request(), _make_selection_result(), 1

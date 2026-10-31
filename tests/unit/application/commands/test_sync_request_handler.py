@@ -51,10 +51,13 @@ def _ports() -> dict:
 
 
 class TestSyncRequestHandler:
-    def _handler(self, request, container: MagicMock) -> SyncRequestHandler:
+    def _handler(
+        self, request, machine_sync_service: MagicMock, status_service: MagicMock
+    ) -> SyncRequestHandler:
         return SyncRequestHandler(
             uow_factory=_make_uow_factory(request),
-            container=container,
+            machine_sync_service=machine_sync_service,
+            status_service=status_service,
             **_ports(),
         )
 
@@ -68,19 +71,7 @@ class TestSyncRequestHandler:
         status_service.determine_status_from_machines.return_value = ("completed", "done")
         status_service.update_request_status = AsyncMock()
 
-        container = MagicMock()
-
-        def _get(cls):
-            name = getattr(cls, "__name__", "")
-            if name == "MachineSyncService":
-                return machine_sync_service
-            if name == "RequestStatusService":
-                return status_service
-            return MagicMock()
-
-        container.get.side_effect = _get
-
-        handler = self._handler(request, container)
+        handler = self._handler(request, machine_sync_service, status_service)
 
         with patch("orb.application.services.request_query_service.RequestQueryService") as MockQS:
             qs = MockQS.return_value
@@ -99,18 +90,7 @@ class TestSyncRequestHandler:
         status_service.determine_status_from_machines.return_value = (None, None)
         status_service.update_request_status = AsyncMock()
 
-        container = MagicMock()
-
-        def _get(cls):
-            name = getattr(cls, "__name__", "")
-            if name == "MachineSyncService":
-                return machine_sync_service
-            if name == "RequestStatusService":
-                return status_service
-            return MagicMock()
-
-        container.get.side_effect = _get
-        handler = self._handler(request, container)
+        handler = self._handler(request, machine_sync_service, status_service)
 
         with patch("orb.application.services.request_query_service.RequestQueryService") as MockQS:
             qs = MockQS.return_value
@@ -121,7 +101,7 @@ class TestSyncRequestHandler:
 
     @pytest.mark.asyncio
     async def test_not_found_raises_entity_not_found(self):
-        handler = self._handler(None, MagicMock())
+        handler = self._handler(None, MagicMock(), MagicMock())
 
         with pytest.raises(EntityNotFoundError):
             await handler.handle(SyncRequestCommand(request_id=_VALID_REQUEST_ID))
@@ -135,18 +115,7 @@ class TestSyncRequestHandler:
         )
         status_service = MagicMock()
 
-        container = MagicMock()
-
-        def _get(cls):
-            name = getattr(cls, "__name__", "")
-            if name == "MachineSyncService":
-                return machine_sync_service
-            if name == "RequestStatusService":
-                return status_service
-            return MagicMock()
-
-        container.get.side_effect = _get
-        handler = self._handler(request, container)
+        handler = self._handler(request, machine_sync_service, status_service)
 
         with patch("orb.application.services.request_query_service.RequestQueryService") as MockQS:
             qs = MockQS.return_value
@@ -162,11 +131,8 @@ class TestSyncRequestHandler:
 
 class TestPopulateMachineIdsEdges:
     def _handler(self, request, provider_selection_port) -> PopulateMachineIdsHandler:
-        container = MagicMock()
-        container.get.return_value = MagicMock()
         return PopulateMachineIdsHandler(
             uow_factory=_make_uow_factory(request),
-            container=container,
             provider_selection_port=provider_selection_port,
             **_ports(),
         )

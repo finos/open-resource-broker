@@ -1583,7 +1583,8 @@ def _make_return_cmd_handler(uow=None):
     handler.event_publisher = MagicMock(spec=EventPublisherPort)
     handler._metrics = {}
     handler.uow_factory = uow_factory
-    handler._container = MagicMock()
+    handler._command_bus = AsyncMock()
+    handler._domain_config = MagicMock()
     handler._query_bus = AsyncMock()
     handler._provider_selection_port = MagicMock()
     handler._machine_grouping_service = MagicMock()
@@ -1670,7 +1671,7 @@ class TestCreateReturnRequestHandlerBranches:
         handler, uow = _make_return_cmd_handler()
         command_bus = AsyncMock()
         command_bus.execute.side_effect = RuntimeError("bus down")
-        handler._container.get.return_value = command_bus
+        handler._command_bus = command_bus
 
         stuck_request = MagicMock()
         stuck_request.update_status.return_value = stuck_request
@@ -1693,7 +1694,7 @@ class TestCreateReturnRequestHandlerBranches:
         handler, uow = _make_return_cmd_handler()
         command_bus = AsyncMock()
         command_bus.execute.side_effect = RuntimeError("bus down")
-        handler._container.get.return_value = command_bus
+        handler._command_bus = command_bus
 
         request = MagicMock()
         request.request_id = "req-1"

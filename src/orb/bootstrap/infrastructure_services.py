@@ -75,9 +75,13 @@ def _register_template_services(container: DIContainer):
             extension_registry=TemplateExtensionRegistryAdapter(),
         )
 
+    from orb.application.services.template_defaults_service import TemplateDefaultsService
     from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
-    container.register_singleton(TemplateDefaultsPort, create_template_defaults_service)
+    # Register the concrete class and the port so either can be injected; the
+    # port resolves to the same singleton.
+    container.register_singleton(TemplateDefaultsService, create_template_defaults_service)
+    container.register_singleton(TemplateDefaultsPort, lambda c: c.get(TemplateDefaultsService))
 
     # Register template generation service.
     # The service depends on TemplateExampleGeneratorResolverPort; the
@@ -225,12 +229,13 @@ def _register_repository_services(container: DIContainer) -> None:
 
 def _register_provisioning_orchestration_service(container: DIContainer) -> None:
     """Register ProvisioningOrchestrationService with CircuitBreakerStrategy wired in."""
+    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.application.services.provisioning_orchestration_service import (
         ProvisioningOrchestrationService,
     )
+    from orb.domain.base import UnitOfWorkFactory
     from orb.domain.base.ports import (
         ConfigurationPort,
-        ContainerPort,
         LoggingPort,
         ProviderConfigPort,
         ProviderSelectionPort,
@@ -242,8 +247,9 @@ def _register_provisioning_orchestration_service(container: DIContainer) -> None
         c: DIContainer,
     ) -> ProvisioningOrchestrationService:
         return ProvisioningOrchestrationService(
-            container=c.get(ContainerPort),
             logger=c.get(LoggingPort),
+            uow_factory=c.get(UnitOfWorkFactory),
+            scheduler=c.get(SchedulerPort),
             provider_selection_port=c.get(ProviderSelectionPort),
             provider_config_port=c.get(ProviderConfigPort),
             config_port=c.get(ConfigurationPort),

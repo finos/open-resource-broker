@@ -22,7 +22,6 @@ from orb.domain.request.value_objects import RequestType
 
 
 def _make_service() -> ProvisioningOrchestrationService:
-    container = MagicMock()
     logger = MagicMock()
     provider_selection_port = MagicMock()
     provider_config_port = MagicMock()
@@ -37,7 +36,8 @@ def _make_service() -> ProvisioningOrchestrationService:
     }
 
     return ProvisioningOrchestrationService(
-        container=container,
+        uow_factory=MagicMock(),
+        scheduler=MagicMock(),
         logger=logger,
         provider_selection_port=provider_selection_port,
         provider_config_port=provider_config_port,
@@ -113,7 +113,7 @@ class TestAcquiringSupervisor:
 
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         result = svc.recover_stuck_acquiring_requests(timeout_seconds=3600)
 
@@ -141,7 +141,7 @@ class TestAcquiringSupervisor:
 
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         result = svc.recover_stuck_acquiring_requests(timeout_seconds=3600)
 
@@ -160,7 +160,7 @@ class TestAcquiringSupervisor:
 
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         result = svc.recover_stuck_acquiring_requests(timeout_seconds=3600)
 
@@ -188,7 +188,7 @@ class TestAcquiringSupervisor:
 
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
-        svc._container.get.return_value = uow_factory
+        svc._uow_factory = uow_factory
 
         svc.recover_stuck_acquiring_requests(timeout_seconds=3600)
 

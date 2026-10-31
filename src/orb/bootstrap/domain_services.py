@@ -1,12 +1,13 @@
 """Domain services registration for dependency injection container."""
 
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.deprovisioning_orchestrator import DeprovisioningOrchestrator
 from orb.application.services.machine_grouping_service import MachineGroupingService
 from orb.application.services.provider_validation_service import ProviderValidationService
+from orb.application.services.request_status_service import RequestStatusService
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.base.ports.configuration_port import ConfigurationPort
-from orb.domain.base.ports.container_port import ContainerPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 from orb.domain.services.filter_service import FilterService
@@ -60,12 +61,25 @@ def register_domain_services(container: DIContainer) -> None:
         return DeprovisioningOrchestrator(
             uow_factory=c.get(UnitOfWorkFactory),
             logger=c.get(LoggingPort),
-            container=c.get(ContainerPort),
             query_bus=c.get(QueryBus),
             provider_selection_port=c.get(ProviderSelectionPort),
+            scheduler=c.get(SchedulerPort),
+            config_manager=c.get(ConfigurationPort),
         )
 
     container.register_singleton(DeprovisioningOrchestrator, create_deprovisioning_orchestrator)
+
+    # Request status service (shared by the sync command handler)
+    def create_request_status_service(c):
+        from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
+
+        return RequestStatusService(
+            uow_factory=c.get(UnitOfWorkFactory),
+            logger=c.get(LoggingPort),
+            state_machine=c.get(FulfilmentStateMachine),
+        )
+
+    container.register_singleton(RequestStatusService, create_request_status_service)
 
     # Provider validation service
     # Per-request validation is delegated to ProviderSelectionPort.validate_template_requirements,
@@ -73,7 +87,6 @@ def register_domain_services(container: DIContainer) -> None:
     # any registered provider can supply its own validator when selected.
     def create_provider_validation_service(c):
         return ProviderValidationService(
-            container=c.get(ContainerPort),
             logger=c.get(LoggingPort),
             provider_selection_port=c.get(ProviderSelectionPort),
         )
