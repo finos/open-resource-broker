@@ -123,6 +123,19 @@ class TemplateSerializer(BaseEntitySerializer):
             self.logger.error("Failed to serialize template %s: %s", template.template_id, e)
             raise
 
+    @staticmethod
+    def _first_present(data: dict[str, Any], *keys: str) -> dict[str, Any]:
+        """Return the first non-empty value among ``keys`` (snake_case first), else ``{}``.
+
+        Nullable-default handling fills absent snake_case keys with ``{}``, so an
+        empty value is treated as absent.
+        """
+        for key in keys:
+            value = data.get(key)
+            if value:
+                return value
+        return {}
+
     @handle_infrastructure_exceptions(context="template_deserialization")
     def from_dict(self, data: dict[str, Any]) -> Template:
         """Convert dictionary to Template aggregate with complete field support."""
@@ -164,8 +177,12 @@ class TemplateSerializer(BaseEntitySerializer):
                     processed_data.get("maxNumber", processed_data.get("max_instances", 1)),
                 ),
                 "machine_types": self._normalize_machine_types(data),
-                "machine_types_ondemand": data.get("vmTypesOnDemand", {}),
-                "machine_types_priority": data.get("vmTypesPriority", {}),
+                "machine_types_ondemand": self._first_present(
+                    processed_data, "machine_types_ondemand", "vmTypesOnDemand"
+                ),
+                "machine_types_priority": self._first_present(
+                    processed_data, "machine_types_priority", "vmTypesPriority"
+                ),
                 "subnet_ids": (
                     [processed_data.get("subnetId")]
                     if processed_data.get("subnetId")

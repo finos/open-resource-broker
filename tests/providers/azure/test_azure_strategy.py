@@ -665,7 +665,9 @@ class TestCleanupAndHealthNotDeclared:
         assert operation_type not in strategy.get_capabilities().supported_operations
 
         result = run_operation(
-            strategy.execute_operation(ProviderOperation(operation_type=operation_type, parameters={}))
+            strategy.execute_operation(
+                ProviderOperation(operation_type=operation_type, parameters={})
+            )
         )
 
         assert not result.success

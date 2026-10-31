@@ -7,10 +7,9 @@ dropped silently on save. These tests load -> save -> load a template with all
 four populated through each storage backend and assert the values survive.
 
 The pool-split fields (``machine_types_ondemand`` / ``machine_types_priority``)
-do not survive today: ``TemplateSerializer.from_dict`` reads only the
-``vmTypesOnDemand`` / ``vmTypesPriority`` spellings while ``to_dict`` writes the
-snake_case names, so the stored values are lost on load. Those assertions are
-strict expected failures; whoever fixes the read path must remove the marker.
+are stored under their snake_case names; ``from_dict`` also accepts the
+``vmTypesOnDemand`` / ``vmTypesPriority`` spellings and prefers snake_case when
+both are present.
 """
 
 from __future__ import annotations
@@ -57,12 +56,6 @@ def _template() -> Template:
             **_AWS_ORIGIN,
         }
     )
-
-
-_POOL_SPLIT_DROPPED = pytest.mark.xfail(
-    strict=True,
-    reason="from_dict reads vmTypesOnDemand/vmTypesPriority, not the keys to_dict writes",
-)
 
 
 def _assert_scalar_fields(template: Template) -> None:
@@ -132,7 +125,6 @@ def test_serializer_round_trip_keeps_scalar_fields() -> None:
     _assert_scalar_fields(_serializer_round_trip())
 
 
-@_POOL_SPLIT_DROPPED
 @pytest.mark.unit
 def test_serializer_round_trip_keeps_pool_split() -> None:
     _assert_pool_split(_serializer_round_trip())
@@ -143,7 +135,6 @@ def test_json_file_backend_keeps_scalar_fields(tmp_path: Path) -> None:
     _assert_scalar_fields(_json_round_trip(tmp_path))
 
 
-@_POOL_SPLIT_DROPPED
 @pytest.mark.unit
 def test_json_file_backend_keeps_pool_split(tmp_path: Path) -> None:
     _assert_pool_split(_json_round_trip(tmp_path))
@@ -154,7 +145,85 @@ def test_sql_backend_keeps_scalar_fields(sqlite_db_path: str) -> None:
     _assert_scalar_fields(_sql_round_trip(sqlite_db_path))
 
 
-@_POOL_SPLIT_DROPPED
 @pytest.mark.unit
 def test_sql_backend_keeps_pool_split(sqlite_db_path: str) -> None:
     _assert_pool_split(_sql_round_trip(sqlite_db_path))
+
+
+@pytest.mark.unit
+def test_from_dict_accepts_camel_case_pool_keys() -> None:
+    loaded = TemplateSerializer().from_dict(
+        {
+            "template_id": "t",
+            "vmTypesOnDemand": {"m5.large": 2},
+            "vmTypesPriority": {"c5.large": 3},
+        }
+    )
+    assert loaded.machine_types_ondemand == {"m5.large": 2}
+    assert loaded.machine_types_priority == {"c5.large": 3}
+
+
+@pytest.mark.unit
+def test_from_dict_prefers_snake_case_pool_keys_when_both_present() -> None:
+    loaded = TemplateSerializer().from_dict(
+        {
+            "template_id": "t",
+            "machine_types_ondemand": {"m5.large": 1},
+            "vmTypesOnDemand": {"m5.large": 9},
+            "machine_types_priority": {"c5.large": 1},
+            "vmTypesPriority": {"c5.large": 9},
+        }
+    )
+    assert loaded.machine_types_ondemand == {"m5.large": 1}
+    assert loaded.machine_types_priority == {"c5.large": 1}
+
+
+@pytest.mark.unit
+def test_dynamodb_backend_round_trip() -> None:
+    pytest.importorskip("moto")
+    from moto import mock_aws
+
+    from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
+    from orb.providers.aws.storage.strategy import DynamoDBStorageStrategy
+
+    with mock_aws():
+        strategy = DynamoDBStorageStrategy(
+            logger=LoggingAdapter("test.dynamo"),
+            aws_client=None,
+            region="us-east-1",
+            table_name="templates-roundtrip",
+        )
+        TemplateRepositoryImpl(strategy).save(_template())
+        loaded = TemplateRepositoryImpl(strategy).find_by_template_id("tpl-aws-origin")
+    assert loaded is not None
+    _assert_scalar_fields(loaded)
+    _assert_pool_split(loaded)
+
+
+@pytest.mark.unit
+def test_pools_supplied_by_resolved_defaults_survive_load() -> None:
+    from unittest.mock import MagicMock
+
+    defaults = MagicMock()
+    defaults.resolve_template_defaults.side_effect = lambda data, **_: {
+        **data,
+        "machine_types_ondemand": {"m5.large": 2},
+        "machine_types_priority": {"c5.large": 3},
+    }
+    loaded = TemplateSerializer(defaults_service=defaults).from_dict({"template_id": "t"})
+    _assert_pool_split(loaded)
+
+
+@pytest.mark.unit
+def test_stored_pools_win_over_resolved_defaults() -> None:
+    from unittest.mock import MagicMock
+
+    defaults = MagicMock()
+    defaults.resolve_template_defaults.side_effect = lambda data, **_: {
+        "machine_types_ondemand": {"default.large": 9},
+        **data,
+    }
+    loaded = TemplateSerializer(defaults_service=defaults).from_dict(
+        {"template_id": "t", "machine_types_ondemand": {"m5.large": 2}}
+    )
+    assert loaded.machine_types_ondemand == {"m5.large": 2}
