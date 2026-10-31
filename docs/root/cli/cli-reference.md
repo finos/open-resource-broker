@@ -542,6 +542,20 @@ orb requests cancel REQUEST_ID [OPTIONS]
 |------|-------------|---------|
 | `--force` | Force cancellation | `--force` |
 
+Cancelling a request that has not settled stops its provisioning at the provider first, whether or not any machine has been recorded yet, and then returns the machines it already has. A fleet that is still fulfilling a partially filled request is stopped too, so it cannot keep launching capacity after the request reads cancelled. A `partial` or `timeout` request is aborted the same way and keeps reporting its true status; a completed, failed or cancelled request is left as it is.
+
+The output lists what happened to each resource in `provider_abort`:
+
+| Outcome | Meaning |
+|---------|---------|
+| `aborted` | The provider stopped the resource. |
+| `already_gone` | The resource was already deleted or never existed. Cancelling again is safe. |
+| `unsupported` | The provider cannot abort in-flight provisioning; the machines are still returned. |
+
+If any resource cannot be stopped the command fails with a non-zero exit code and the request keeps its current state, so the cancel can be repeated. Resources that were already stopped report `already_gone` on the retry. The command exits 0 whenever the cancel took effect, including for a `partial` or `timeout` request whose resources were aborted.
+
+How each provider API is stopped is described in the AWS provider pages: [EC2 Fleet](../providers/aws/ec2-fleet.md#cancelling-a-request), [Spot Fleet](../providers/aws/spot-fleet.md#cancelling-a-request), [Auto Scaling group](../providers/aws/asg.md#cancelling-a-request) and [RunInstances](../providers/aws/run-instances.md#release-behaviour).
+
 #### `requests status`
 
 Check request status.

@@ -908,8 +908,14 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             Dictionary with ``status`` of ``"success"`` or ``"error"``.
         """
         try:
-            self._fleet_release_manager.release(resource_id, [], {}, request_id=request_id)
-            return {"status": "success", "message": f"EC2 Fleet {resource_id} cancelled"}
+            already_gone = self._fleet_release_manager.release(
+                resource_id, [], {}, request_id=request_id
+            )
+            return {
+                "status": "success",
+                "already_gone": already_gone is True,
+                "message": f"EC2 Fleet {resource_id} cancelled",
+            }
         except Exception as e:
             emit_alert(
                 self._logger,

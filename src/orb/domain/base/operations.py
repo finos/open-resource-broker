@@ -25,6 +25,7 @@ class OperationType(str, Enum):
     CLEANUP_MACHINE_RESOURCES = "cleanup_machine_resources"
     GET_MACHINE_HEALTH = "get_machine_health"
     TAG_INSTANCES = "tag_instances"
+    CANCEL_PROVISIONING = "cancel_provisioning"
 
 
 @dataclass

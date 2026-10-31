@@ -19,6 +19,10 @@ from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
 )
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 
+_SPOT_FLEET_CANCELLED_STATES = frozenset(
+    {"cancelled", "cancelled_running", "cancelled_terminating"}
+)
+
 
 class SpotFleetReleaseManager(BaseFleetReleaseManager):
     """Handles release and teardown of Spot Fleet resources.
@@ -107,6 +111,12 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
 
     def _fleet_label(self) -> str:
         return "Spot Fleet"
+
+    def _is_fleet_terminal(self, fleet_details: dict[str, Any]) -> bool:
+        return fleet_details.get("SpotFleetRequestState") in _SPOT_FLEET_CANCELLED_STATES
+
+    def _fleet_instances_still_running(self, fleet_details: dict[str, Any]) -> bool:
+        return fleet_details.get("SpotFleetRequestState") == "cancelled_running"
 
     def _fetch_fleet_details(self, fleet_id: str) -> dict[str, Any]:
         fleet_response = self._retry(
@@ -229,7 +239,9 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
             operation_type="critical",
             operation_name="cancel_spot_fleet_requests",
             SpotFleetRequestIds=[fleet_id],
-            TerminateInstances=terminate_instances,
+            # A maintain fleet can launch an instance between the return and the
+            # cancel; terminating on cancel keeps it from being left running.
+            TerminateInstances=terminate_instances or is_maintain,
         )
         check_unsuccessful_fleet_response(response, "spot_fleet", self._fleet_is_cancelled)
 
@@ -241,9 +253,7 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
             SpotFleetRequestIds=[fleet_id],
         ).get("SpotFleetRequestConfigs", [])
         return bool(configs) and all(
-            c.get("SpotFleetRequestState")
-            in ("cancelled", "cancelled_running", "cancelled_terminating")
-            for c in configs
+            c.get("SpotFleetRequestState") in _SPOT_FLEET_CANCELLED_STATES for c in configs
         )
 
     def _list_fleet_instance_ids(self, fleet_id: str) -> Optional[list[str]]:

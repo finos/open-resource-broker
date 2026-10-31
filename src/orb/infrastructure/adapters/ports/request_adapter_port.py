@@ -26,18 +26,6 @@ class RequestAdapterPort(ABC):
         """
 
     @abstractmethod
-    def cancel_fleet_request(self, request: Request) -> dict[str, Any]:
-        """
-        Cancel fleet request.
-
-        Args:
-            request: Request domain entity
-
-        Returns:
-            Dictionary with cancellation results
-        """
-
-    @abstractmethod
     def terminate_instances(self, instance_ids: list[str]) -> dict[str, Any]:
         """
         Terminate instances.

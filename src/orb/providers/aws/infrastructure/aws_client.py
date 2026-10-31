@@ -577,7 +577,9 @@ class AWSClient:
         )
 
         config = self.get_selected_aws_provider_config()
+        # getattr: the selected config may be absent or a loosely typed stand-in
         request_retries = getattr(config, "request_retry_attempts", None)
+        # getattr: the selected config may be absent or a loosely typed stand-in
         describe_retries = getattr(config, "describe_request_retry_attempts", None)
         return (
             request_retries if isinstance(request_retries, int) else DEFAULT_REQUEST_RETRY_ATTEMPTS,

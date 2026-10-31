@@ -77,6 +77,7 @@ def call_overrides(
 
 def error_code(exception: BaseException) -> str:
     """Return the AWS error code carried by *exception* ("" when absent)."""
+    # getattr: only botocore errors carry a response; other exceptions do not
     response = getattr(exception, "response", None)
     if isinstance(response, dict):
         return str(response.get("Error", {}).get("Code", "") or "")

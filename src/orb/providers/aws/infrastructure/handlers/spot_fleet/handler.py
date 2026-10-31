@@ -718,8 +718,12 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             Dictionary with ``status`` of ``"success"`` or ``"error"``.
         """
         try:
-            self._release_manager.release(resource_id, [], {}, request_id=request_id)
-            return {"status": "success", "message": f"Spot Fleet {resource_id} cancelled"}
+            already_gone = self._release_manager.release(resource_id, [], {}, request_id=request_id)
+            return {
+                "status": "success",
+                "already_gone": already_gone is True,
+                "message": f"Spot Fleet {resource_id} cancelled",
+            }
         except Exception as e:
             emit_alert(
                 self._logger,

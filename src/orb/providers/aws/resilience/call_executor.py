@@ -60,6 +60,7 @@ _UNNAMED = ("<lambda>", "aws_operation")
 
 def usable_operation_name(func: Any) -> Optional[str]:
     """Return ``func.__name__`` when it identifies the operation, else None."""
+    # getattr: callables such as partials and mocks have no __name__
     name = getattr(func, "__name__", None)
     if isinstance(name, str) and name and name not in _UNNAMED and not name.startswith("<"):
         return name
@@ -106,13 +107,16 @@ class AWSCallExecutor:
         *aws_client* falls back to the defaults. Callers use
         ``preserve_client_error=True`` so they keep interpreting AWS error codes.
         """
+        # getattr: collaborators are built from partial clients in tests and adapters
         provider_name = getattr(aws_client, "_provider_name", None)
+        # getattr: collaborators are built from partial clients in tests and adapters
         config_port = getattr(aws_client, "_config_manager", None)
         return cls(
             logger,
             handler_type=service,
             provider_name=provider_name if isinstance(provider_name, str) else None,
             config_port=config_port,
+            # getattr: collaborators are built from partial clients in tests and adapters
             attempts_provider=getattr(aws_client, "retry_attempts", None),
         )
 
@@ -145,8 +149,11 @@ class AWSCallExecutor:
             cb_config = self._config_port.app_config.circuit_breaker
         except AttributeError:
             return config
+        # getattr: older configuration objects lack some circuit breaker fields
         threshold = getattr(cb_config, "failure_threshold", None)
+        # getattr: older configuration objects lack some circuit breaker fields
         recovery = getattr(cb_config, "recovery_timeout", None)
+        # getattr: older configuration objects lack some circuit breaker fields
         half_open = getattr(cb_config, "half_open_timeout", None)
         if isinstance(threshold, int):
             config["failure_threshold"] = threshold

@@ -185,6 +185,23 @@ class ASGCapacityManager:
                 self._cleanup_on_zero_capacity("asg", asg_name, instance_ids)
             return
 
+        if asg_details.get("Status") == "Delete in progress":
+            # The group is being deleted (for example after a cancel): it must not be
+            # scaled or have instances detached from it. The members are terminated
+            # by the delete; terminate the named ones directly and tidy the template.
+            self._logger.info(
+                "ASG %s is being deleted; terminating instances directly: %s",
+                asg_name,
+                instance_ids,
+            )
+            self._aws_ops.terminate_instances_with_fallback(
+                instance_ids,
+                self._request_adapter,
+                f"ASG {asg_name} instances (group being deleted)",
+            )
+            self._cleanup_on_zero_capacity("asg", asg_name, instance_ids)
+            return
+
         # Guard against double-execution: only terminate instances that are currently
         # members of this ASG.  If release_instances is called a second time for the
         # same set (e.g. due to an IN_PROGRESS status retry or a race), the instances

@@ -432,6 +432,8 @@ class AWSProviderStrategy(ProviderStrategy):
             )
         elif operation.operation_type == ProviderOperationType.TAG_INSTANCES:
             return await self._tag_instances(operation)
+        elif operation.operation_type == ProviderOperationType.CANCEL_PROVISIONING:
+            return await self._get_instance_service().cancel_provisioning(operation)
         else:
             return ProviderResult.error_result(
                 f"Unsupported operation: {operation.operation_type}", "UNSUPPORTED_OPERATION"

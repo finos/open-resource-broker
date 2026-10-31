@@ -672,14 +672,12 @@ class TestFleetDeleteAlertCarriesRequestId:
         assert [a["request_id"] for a in alerts] == ["req-ec2-3"]
 
 
-class TestProviderCancelIsNotWired:
-    def test_application_layer_does_not_call_provider_cancel(self):
-        """Provider-side cancel has no production caller yet.
+class TestProviderCancelIsReachedOnlyThroughTheProviderOperation:
+    def test_application_layer_does_not_call_a_handler_cancel_directly(self):
+        """The application layer aborts provisioning through the provider operation.
 
-        Request cancellation only returns known machines and flips state;
-        aborting in-flight fleets that have no machines yet is not wired. If
-        a caller is added, this guard must be revisited together with the
-        error contract of ``cancel_resource``.
+        Handlers' ``cancel_resource`` is provider-internal; the application layer
+        reaches it only through ``CANCEL_PROVISIONING`` so the layering stays intact.
         """
         from pathlib import Path
 
@@ -690,8 +688,22 @@ class TestProviderCancelIsNotWired:
             str(path.relative_to(root))
             for sub in ("application", "api", "interface")
             for path in (root / sub).rglob("*.py")
+            if ".cancel_resource(" in path.read_text(encoding="utf-8")
+        ]
+        assert offenders == []
+
+    def test_the_unchecked_request_adapter_cancel_path_is_gone(self):
+        """The adapter's own cancel indexed ``SuccessfulFleetDeletions`` unchecked and
+        ignored unsuccessful entries; the provider operation replaces it."""
+        from pathlib import Path
+
+        import orb
+
+        root = Path(orb.__file__).parent
+        offenders = [
+            str(path.relative_to(root))
+            for path in root.rglob("*.py")
             if "cancel_fleet_request" in path.read_text(encoding="utf-8")
-            or ".cancel_resource(" in path.read_text(encoding="utf-8")
         ]
         assert offenders == []
 

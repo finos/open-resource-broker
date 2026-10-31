@@ -21,6 +21,8 @@ from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
 )
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 
+_EC2_FLEET_DELETED_STATES = frozenset({"deleted", "deleted_running", "deleted_terminating"})
+
 
 class EC2FleetReleaseManager(BaseFleetReleaseManager):
     """Manages release and teardown of EC2 Fleet resources.
@@ -74,7 +76,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         instance_ids: list[str],
         fleet_details: dict[str, Any],
         request_id: str = "",
-    ) -> None:
+    ) -> bool:
         """Release hosts for a single EC2 Fleet.
 
         Delegates to BaseFleetReleaseManager.release after handling the
@@ -100,6 +102,9 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
                 or an empty dict to trigger a fresh lookup.
             request_id: ORB request ID used for launch template cleanup when
                 the fleet record is no longer available (instant fleet case).
+
+        Returns:
+            True when the fleet was already deleted or no longer exists.
         """
         # EC2 Fleet has a special fast-path when the fleet record cannot be
         # found at all (e.g. already deleted by another process).  Handle this
@@ -124,10 +129,10 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
                 )
                 if request_id:
                     self._cleanup_on_zero_capacity("ec2_fleet", request_id, instance_ids)
-                return
+                return True
             fleet_details = fleet_list[0]
 
-        super().release(fleet_id, instance_ids, fleet_details, request_id)
+        return super().release(fleet_id, instance_ids, fleet_details, request_id)
 
     def find_fleet_for_instance(self, instance_id: str) -> Optional[str]:
         """Find the EC2 Fleet ID that owns the given instance.
@@ -189,6 +194,12 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
 
     def _fleet_label(self) -> str:
         return "EC2 Fleet"
+
+    def _is_fleet_terminal(self, fleet_details: dict[str, Any]) -> bool:
+        return fleet_details.get("FleetState") in _EC2_FLEET_DELETED_STATES
+
+    def _fleet_instances_still_running(self, fleet_details: dict[str, Any]) -> bool:
+        return fleet_details.get("FleetState") == "deleted_running"
 
     def _fetch_fleet_details(self, fleet_id: str) -> dict[str, Any]:
         # The pre-flight lookup in release() has already fetched the fleet record
@@ -329,8 +340,7 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
             FleetIds=[fleet_id],
         ).get("Fleets", [])
         return bool(fleets) and all(
-            f.get("FleetState") in ("deleted", "deleted_running", "deleted_terminating")
-            for f in fleets
+            f.get("FleetState") in _EC2_FLEET_DELETED_STATES for f in fleets
         )
 
     def _list_fleet_instance_ids(self, fleet_id: str) -> Optional[list[str]]:

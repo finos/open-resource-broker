@@ -659,7 +659,7 @@ class TestSpotFleetReleaseManagerFleetTypes:
         mgr.release("sfr-1", ["i-1", "i-2"], self._fleet_details("maintain", 2))
         aws_client.ec2_client.cancel_spot_fleet_requests.assert_called_once_with(
             SpotFleetRequestIds=["sfr-1"],
-            TerminateInstances=False,
+            TerminateInstances=True,
         )
         cleanup_fn.assert_called_once_with("spot_fleet", "req-spot-xyz", ["i-1", "i-2"])
 

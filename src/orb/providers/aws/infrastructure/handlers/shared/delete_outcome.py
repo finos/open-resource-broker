@@ -63,7 +63,7 @@ def emit_alert(
     request_id: str = "",
     region: str = "",
     reason: str = "",
-    level: Literal["error", "warning"] = "error",
+    level: Literal["error", "warning", "info"] = "error",
 ) -> None:
     """Log one structured, alertable record with a stable event name.
 
@@ -84,6 +84,8 @@ def emit_alert(
     }
     if level == "warning":
         logger.warning("%s", text, extra=extra)
+    elif level == "info":
+        logger.info("%s", text, extra=extra)
     else:
         logger.error("%s", text, extra=extra)
 

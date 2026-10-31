@@ -801,7 +801,7 @@ class TestPrimaryCancelPathGating:
         # maintain fleet, is_full_return=True, requires_capacity_reduction=True → cancelled.
         ec2.cancel_spot_fleet_requests.assert_called_once_with(
             SpotFleetRequestIds=["sfr-maintain-full"],
-            TerminateInstances=False,
+            TerminateInstances=True,
         )
 
     # -- EC2Fleet --------------------------------------------------------
