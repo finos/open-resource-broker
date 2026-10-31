@@ -227,6 +227,55 @@ if aws_template.instance_type:  # Inherited from CoreTemplate
 - `instanceProfile` → `instance_profile`
 - `userDataScript` → `user_data`
 
+## Neutral Template Fields
+
+A few template fields look provider-specific but have a counterpart on every
+supported provider, so they stay on the shared template aggregate and each
+provider maps them to its own concept.
+
+| Field | AWS | Azure | GCP | OCI | Kubernetes |
+|-------|-----|-------|-----|-----|------------|
+| `subnet_ids` | VPC subnet | VNet subnet | Subnetwork | Subnet | Not used (empty) |
+| `security_group_ids` | Security group | Network security group | Network tags / firewall | Network security group | Not used (empty) |
+| `vpc_id` (machine) | VPC | VNet id | Network | VCN | Not used (`None`) |
+
+The `subnetIds` and `securityGroupIds` HostFactory keys map to `subnet_ids`
+and `security_group_ids` for every provider, so external HostFactory consumers
+see the same spelling whichever provider serves the template.
+
+### Fields that stay on the shared template, and why
+
+- **`machine_types_ondemand`, `machine_types_priority`, `iops`, `throughput`**
+  originate on AWS (EC2 Fleet pool split, EBS volume tuning). They remain
+  optional on the shared aggregate. Moving them out needs a mechanism that
+  round-trips provider-specific keys through the template repository, which
+  serialises through an explicit key list, the template DTO, the SQL columns,
+  the REST models and the UI. A move without that mechanism silently drops
+  stored values, and Azure and GCP aggregates reject unknown keys, so the
+  consumers below would all change together:
+  the application `TemplateDTO`, the DTO factories, the template repository,
+  the SQL template model, the REST template models, the UI template pages and
+  the template defaults service. Revisit only if a second provider needs a
+  conflicting meaning for the same key.
+- **`allocation_strategy` default.** The shared aggregate defaults an unset
+  value from the price type (`priceCapacityOptimized` for spot, `lowestPrice`
+  otherwise). Stored templates and HostFactory input supply their own
+  spelling before that default can apply, and the EC2 Fleet request builder
+  only emits `AllocationStrategy` when the value is set, so removing the
+  default would drop the parameter from fleet requests. AWS normalises every
+  spelling (`lowestPrice`, `lowest_price`, `lowest-price`) when it uses the
+  value. Azure does not use the field and holds an empty value.
+
+The behaviour above is pinned by the allocation-strategy golden tests, the
+template DTO field snapshot, the storage round-trip tests and the HostFactory
+network goldens, which are the acceptance gate for any future field move.
+
+### Adding a provider key
+
+A provider that needs template keys of its own defines its own field mapping
+(`FieldMappingPort`) and its own template aggregate; it should not add
+provider-named keys to the shared aggregate.
+
 ## Benefits
 
 1. **Single Source of Truth**: All field mappings are centralized in one registry

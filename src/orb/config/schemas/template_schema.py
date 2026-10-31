@@ -48,11 +48,12 @@ class TemplateConfig(BaseModel):
     # Note: All AWS-specific fields have been moved to AWS provider extensions:
     # - AMI resolution configuration -> AWS provider extensions
     # - Fleet roles, spot pricing, volume types -> AWS template extensions
-    # - Subnet IDs, security groups -> AWS provider defaults
     # - Instance types, allocation strategies -> AWS provider defaults
+    # Subnet IDs and security groups are neutral template fields: every provider
+    # maps them to its own network concept (see field_mapping_architecture.md).
 
     # Note: All deprecated optional fields have been removed:
     # - default_image_id, default_instance_type -> Use hierarchical provider defaults
-    # - subnet_ids, security_group_ids -> Use provider-specific configuration
+    # - subnet_ids, security_group_ids -> Set per template, not as global defaults
     # - default_max_number -> Use max_number
     # - SSM parameter prefix -> AWS-specific, moved to AWS extensions
