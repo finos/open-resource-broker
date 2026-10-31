@@ -1,10 +1,11 @@
 """SQL storage strategy implementation using componentized architecture."""
 
+import time
 from contextlib import contextmanager
 from typing import Any, Optional
 
 from sqlalchemy import MetaData, Table, column as sa_column, func, select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
 from orb.application.ports.exceptions import RepositoryQueryError
 from orb.domain.base.exceptions import ConcurrencyError
@@ -31,6 +32,23 @@ def _is_duplicate_key(exc: IntegrityError) -> bool:
         return True
     message = str(orig)
     return "UNIQUE constraint failed" in message or "PRIMARY KEY" in message
+
+
+def _is_already_exists(exc: Exception) -> bool:
+    """Whether a DDL error means the object was created by someone else first."""
+    orig = getattr(exc, "orig", None)
+    if getattr(orig, "pgcode", None) in ("42P07", "42710"):  # duplicate table / object
+        return True
+    args = getattr(orig, "args", ())
+    if args and args[0] in (1050, 1061):  # MySQL ER_TABLE_EXISTS_ERROR / ER_DUP_KEYNAME
+        return True
+    return "already exists" in str(orig or exc).lower()
+
+
+def _is_pg_type_race(exc: Exception) -> bool:
+    """Postgres: two sessions creating the same table collide on its row type in pg_type."""
+    message = str(getattr(exc, "orig", None) or exc)
+    return "pg_type" in message and "typname" in message
 
 
 class SQLStorageStrategy(BaseStorageStrategy):
@@ -143,7 +161,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 alembic_version_exists = self.connection_manager.table_exists("alembic_version")
                 tables_already_exist = self.connection_manager.table_exists(self.table_name)
 
-                Base.metadata.create_all(engine)
+                self._create_schema(engine, Base.metadata)
                 self.logger.debug(
                     "Applied Base.metadata.create_all for ORM table %s", self.table_name
                 )
@@ -163,6 +181,34 @@ class SQLStorageStrategy(BaseStorageStrategy):
         except Exception as e:
             self.logger.error("Failed to initialize table %s: %s", self.table_name, e)
             raise
+
+    _SCHEMA_ATTEMPTS = 5
+
+    def _create_schema(self, engine: Any, metadata: Any) -> None:
+        """Create the ORM tables one by one; tables a concurrent first start made are fine.
+
+        Each table is created with an existence check, and an "already exists"
+        failure (another process won the race for that table) is retried, which
+        then finds the table and does nothing. Only a bounded number of attempts
+        is made per table, and any other error is raised.
+        """
+        for table in metadata.sorted_tables:
+            for attempt in range(1, self._SCHEMA_ATTEMPTS + 1):
+                try:
+                    table.create(engine, checkfirst=True)
+                    break
+                except (OperationalError, ProgrammingError, IntegrityError) as exc:
+                    if not (_is_already_exists(exc) or _is_pg_type_race(exc)):
+                        raise
+                    if attempt == self._SCHEMA_ATTEMPTS:
+                        raise
+                    self.logger.debug(
+                        "Table %s was created concurrently (attempt %d): %s",
+                        table.name,
+                        attempt,
+                        exc,
+                    )
+                    time.sleep(0.05 * attempt)
 
     def _auto_stamp_head(self, engine: Any) -> None:
         """Stamp the Alembic revision table at head for pre-existing installs.

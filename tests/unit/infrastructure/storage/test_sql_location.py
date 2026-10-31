@@ -39,6 +39,16 @@ MACHINE = {
 }
 
 
+_REQUEST_ROW = {
+    "request_id": "req-1",
+    "request_type": "acquire",
+    "status": "pending",
+    "template_id": "tmpl-1",
+    "provider_type": "aws",
+    "provider_name": "aws-default",
+}
+
+
 def _config_manager(**sql: object) -> MagicMock:
     manager = MagicMock(spec=ConfigurationManager)
     manager.get_typed.return_value = StorageConfig(
@@ -71,12 +81,12 @@ class TestOneDatabaseForBothPaths:
 
         uow = _uow(type="sqlite", name=str(target))
         strategy = create_sql_strategy(_app_config(str(target)))
-        strategy.save("e-1", {"id": "e-1", "value": 1})
+        strategy.save("req-1", _REQUEST_ROW)
 
         assert Path(str(uow.engine.url.database)) == target
         assert Path(str(strategy.connection_manager.engine.url.database)) == target
         assert _db_files(tmp_path / "state") == {"orb.db"}
-        assert strategy.find_by_id("e-1") is not None
+        assert strategy.find_by_id("req-1") is not None
 
     def test_dumped_config_is_read_not_defaulted(self, tmp_path):
         target = tmp_path / "configured.db"
@@ -109,7 +119,7 @@ class TestOneDatabaseForBothPaths:
         target = tmp_path / "url.db"
 
         strategy = create_sql_strategy({"connection_string": f"sqlite:///{target}"})
-        strategy.save("e-1", {"id": "e-1"})
+        strategy.save("req-1", _REQUEST_ROW)
 
         assert target.exists()
         assert not (Path.cwd() / "data.db").exists()

@@ -6,10 +6,12 @@ enabling the storage registry pattern for SQL storage.
 CLEAN ARCHITECTURE: Only handles storage strategies, no repository knowledge.
 """
 
+import threading
 from typing import Any
 
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.storage.registry import get_storage_registry
+from orb.infrastructure.storage.sql.entities import DEFAULT_ENTITY, create_entity_strategy
 
 
 def _sql_settings(config: Any) -> tuple[Any, Any]:
@@ -61,22 +63,30 @@ def _sql_settings(config: Any) -> tuple[Any, Any]:
 
 
 def create_sql_strategy(config: Any) -> Any:
-    """
-    Create SQL storage strategy from configuration.
+    """Create the SQL storage strategy for callers that have no entity.
 
-    The strategy opens the same database as the SQL unit of work: the one named
-    by the configured ``sql_strategy``.
+    Health probes use this: it binds to the ``requests`` table, which holds the
+    real layout and is only read. Repositories use ``create_sql_entity_strategy``
+    through the registry.
+    """
+    return create_sql_entity_strategy(config, DEFAULT_ENTITY)
+
+
+def create_sql_entity_strategy(config: Any, entity: str) -> Any:
+    """
+    Create the SQL storage strategy for one entity table.
+
+    The strategy opens the same database as the SQL unit of work (the one named
+    by the configured ``sql_strategy``) and the same typed table, so every entry
+    point reads and writes the same rows.
 
     Args:
         config: Configuration object or dict containing SQL storage settings
+        entity: "requests", "machines" or "templates"
 
     Returns:
         SQLStorageStrategy instance
     """
-    from orb.infrastructure.storage.sql.strategy import SQLStorageStrategy
-
-    columns = {"id": "TEXT PRIMARY KEY", "data": "TEXT"}
-
     connection_string = (
         config.get("connection_string")
         if isinstance(config, dict)
@@ -84,25 +94,21 @@ def create_sql_strategy(config: Any) -> Any:
     )
     if isinstance(connection_string, str) and connection_string:
         # An explicit URL is used as given
-        return SQLStorageStrategy(
-            config={"connection_string": connection_string},
-            table_name="generic_storage",
-            columns=columns,
-        )
+        return create_entity_strategy({"connection_string": connection_string}, entity)
 
     sql_config, db_config = _sql_settings(config)
     connection_timeout = db_config.connection_timeout if db_config is not None else 30
 
-    return SQLStorageStrategy(
-        config={
+    return create_entity_strategy(
+        {
             "type": sql_config.type,
             "engine": _create_engine_for(sql_config),
-            # The engine is created here for this strategy alone, so cleanup disposes it
-            "owns_engine": True,
+            # An engine created here belongs to this strategy, so cleanup disposes
+            # it; the shared in-memory engine is never disposed by a strategy
+            "owns_engine": not _is_shared_memory(sql_config),
             "connection_timeout": connection_timeout,
         },
-        table_name="generic_storage",
-        columns=columns,
+        entity,
     )
 
 
@@ -191,6 +197,27 @@ def _build_connection_string(sql_config: Any) -> str:
     return _build_url(sql_config).render_as_string(hide_password=False)
 
 
+# In-memory SQLite databases exist only inside one connection, so every consumer of
+# ":memory:" in a process (unit of work, repositories, health probes) has to share
+# the engine to see the same data. The engine uses a single connection: this is for
+# development and tests, not for concurrent workloads.
+_SHARED_MEMORY_ENGINES: dict[str, Any] = {}
+_SHARED_MEMORY_LOCK = threading.Lock()
+
+
+def _is_shared_memory(sql_config: Any) -> bool:
+    return sql_config.type == "sqlite" and sql_config.name == ":memory:"
+
+
+def reset_shared_memory_engines() -> None:
+    """Dispose the shared in-memory engines (tests start from an empty database)."""
+    with _SHARED_MEMORY_LOCK:
+        engines = list(_SHARED_MEMORY_ENGINES.values())
+        _SHARED_MEMORY_ENGINES.clear()
+    for engine in engines:
+        engine.dispose()
+
+
 def _create_engine_for(sql_config: Any) -> Any:
     """Create the engine for a SQL storage configuration."""
     from sqlalchemy import create_engine
@@ -202,13 +229,17 @@ def _create_engine_for(sql_config: Any) -> Any:
     if url.get_backend_name() == "sqlite":
         database = url.database or ""
         if database == ":memory:":
-            # One connection shared by every consumer of this engine
-            return create_engine(
-                url,
-                echo=echo,
-                poolclass=StaticPool,
-                connect_args={"check_same_thread": False},
-            )
+            with _SHARED_MEMORY_LOCK:
+                engine = _SHARED_MEMORY_ENGINES.get("sqlite:///:memory:")
+                if engine is None:
+                    engine = create_engine(
+                        url,
+                        echo=echo,
+                        poolclass=StaticPool,
+                        connect_args={"check_same_thread": False},
+                    )
+                    _SHARED_MEMORY_ENGINES["sqlite:///:memory:"] = engine
+                return engine
         path = _sqlite_file_path(database)
         if path is not None:
             if not path.exists():
@@ -294,6 +325,7 @@ def register_sql_storage() -> None:
             config_factory=create_sql_config,
             unit_of_work_factory=create_sql_unit_of_work,
             display_name="SQL",
+            entity_strategy_factory=create_sql_entity_strategy,
         )
 
         logger.info("Successfully registered SQL storage type")

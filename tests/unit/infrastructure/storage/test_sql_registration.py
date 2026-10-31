@@ -86,7 +86,7 @@ class TestCreateSqlStrategy:
         cfg.connection_string = "sqlite:///:memory:"
         strategy = create_sql_strategy(cfg)
         assert strategy is not None
-        assert strategy.table_name == "generic_storage"
+        assert strategy.table_name == "requests"
 
     def test_creates_strategy_with_sql_strategy_config(self) -> None:
         from orb.infrastructure.storage.sql.registration import create_sql_strategy

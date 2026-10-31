@@ -49,21 +49,21 @@ class StorageStrategyFactory:
         if config is None and self.config_manager:
             config = self.config_manager.app_config.model_dump()
         storage_type = self._get_storage_type(config)
-        return get_storage_registry().create_strategy(storage_type, config)  # type: ignore[return-value]
+        return get_storage_registry().create_strategy(storage_type, config, entity="machines")  # type: ignore[return-value]
 
     def create_request_storage_strategy(self, config: Optional[Any] = None) -> BaseStorageStrategy:
         """Create a request storage strategy."""
         if config is None and self.config_manager:
             config = self.config_manager.app_config.model_dump()
         storage_type = self._get_storage_type(config)
-        return get_storage_registry().create_strategy(storage_type, config)  # type: ignore[return-value]
+        return get_storage_registry().create_strategy(storage_type, config, entity="requests")  # type: ignore[return-value]
 
     def create_template_storage_strategy(self, config: Optional[Any] = None) -> BaseStorageStrategy:
         """Create a template storage strategy."""
         if config is None and self.config_manager:
             config = self.config_manager.app_config.model_dump()
         storage_type = self._get_storage_type(config)
-        return get_storage_registry().create_strategy(storage_type, config)  # type: ignore[return-value]
+        return get_storage_registry().create_strategy(storage_type, config, entity="templates")  # type: ignore[return-value]
 
     def clear_cache(self) -> None:
         """No-op: caching is handled by the registry; kept for API compatibility."""

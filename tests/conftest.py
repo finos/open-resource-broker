@@ -775,3 +775,13 @@ def preserve_orb_module_identity() -> Generator[None, None, None]:
             parent = sys.modules.get(parent_name)
             if parent is not None:
                 setattr(parent, leaf, mod)
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_memory_engines():
+    """The shared in-memory SQL engine must not leak data between tests."""
+    from orb.infrastructure.storage.sql.registration import reset_shared_memory_engines
+
+    reset_shared_memory_engines()
+    yield
+    reset_shared_memory_engines()

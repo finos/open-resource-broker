@@ -36,6 +36,7 @@ class StorageRegistration(BaseRegistration):
         config_factory: Callable,
         unit_of_work_factory: Optional[Callable] = None,
         display_name: Optional[str] = None,
+        entity_strategy_factory: Optional[Callable] = None,
     ) -> None:
         """Initialize the instance."""
         super().__init__(
@@ -43,6 +44,7 @@ class StorageRegistration(BaseRegistration):
             strategy_factory,
             config_factory,
             unit_of_work_factory=unit_of_work_factory,
+            entity_strategy_factory=entity_strategy_factory,
         )
         self.unit_of_work_factory = unit_of_work_factory
         self.display_name = display_name
@@ -67,6 +69,7 @@ class StorageRegistry(BaseRegistry):
         config_factory: Callable,
         unit_of_work_factory: Optional[Callable] = None,
         display_name: Optional[str] = None,
+        entity_strategy_factory: Optional[Callable] = None,
     ) -> None:
         """Register storage strategy factory - implements abstract method."""
         self.register_type(
@@ -75,6 +78,7 @@ class StorageRegistry(BaseRegistry):
             config_factory,
             unit_of_work_factory=unit_of_work_factory,
             display_name=display_name,
+            entity_strategy_factory=entity_strategy_factory,
         )
 
     def register_storage(
@@ -84,6 +88,7 @@ class StorageRegistry(BaseRegistry):
         config_factory: Callable,
         unit_of_work_factory: Optional[Callable] = None,
         display_name: Optional[str] = None,
+        entity_strategy_factory: Optional[Callable] = None,
     ) -> None:
         """
         Register a storage type with its factories - backward compatibility method.
@@ -94,6 +99,9 @@ class StorageRegistry(BaseRegistry):
             config_factory: Factory function to create storage configuration
             unit_of_work_factory: Optional factory function to create unit of work
             display_name: Optional human-readable name for this storage backend
+            entity_strategy_factory: Optional ``(config, entity) -> strategy`` factory for
+                backends that store each entity in its own table. Backends without it
+                use ``strategy_factory`` for every entity.
 
         Raises:
             ConfigurationError: If storage type is already registered
@@ -111,17 +119,23 @@ class StorageRegistry(BaseRegistry):
                 config_factory,
                 unit_of_work_factory=unit_of_work_factory,
                 display_name=display_name,
+                entity_strategy_factory=entity_strategy_factory,
             )
         except ValueError as e:
             raise ConfigurationError(str(e))
 
-    def create_strategy(self, storage_type: str, config: Any) -> Any:  # type: ignore[override]
+    def create_strategy(  # type: ignore[override]
+        self, storage_type: str, config: Any, entity: Optional[str] = None
+    ) -> Any:
         """
         Create a storage strategy for the given type and configuration - implements abstract method.
 
         Args:
             storage_type: Type of storage to create
             config: Configuration for the storage strategy
+            entity: Entity the strategy will store ("requests", "machines", "templates").
+                Used only by backends that registered an ``entity_strategy_factory``;
+                every other backend ignores it.
 
         Returns:
             Storage strategy instance
@@ -132,6 +146,12 @@ class StorageRegistry(BaseRegistry):
         try:
             # Ensure type is registered before creating strategy
             self.ensure_type_registered(storage_type)
+            if entity is not None:
+                entity_factory = self._get_type_registration(storage_type).get_factory(
+                    "entity_strategy_factory"
+                )
+                if entity_factory is not None:
+                    return entity_factory(config, entity)
             return self.create_strategy_by_type(storage_type, config)
         except ValueError as e:
             raise UnsupportedStorageError(str(e))
@@ -223,6 +243,7 @@ class StorageRegistry(BaseRegistry):
             config_factory,
             additional_factories.get("unit_of_work_factory"),
             display_name=additional_factories.get("display_name"),
+            entity_strategy_factory=additional_factories.get("entity_strategy_factory"),
         )
 
 
