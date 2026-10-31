@@ -490,3 +490,23 @@ class TestSqlUrlBuilding:
         manager.cleanup()
 
         engine.dispose.assert_not_called()
+
+
+class TestPercentSignsInTheDatabaseUrl:
+    """The alembic config treats "%" as interpolation syntax; URLs must be escaped."""
+
+    def test_sqlite_path_with_a_percent_sign_stamps_without_a_warning(self, tmp_path, caplog):
+        directory = tmp_path / "100%done"
+        directory.mkdir()
+
+        with caplog.at_level(logging.WARNING):
+            uow = _uow(type="sqlite", name=str(directory / "orb.db"))
+
+        assert uow._machine_strategy.connection_manager.table_exists("machines")
+        assert [w for w in _warnings(caplog) if "auto-stamp" in w] == []
+
+    def test_percent_encoded_memory_url_is_escaped_too(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            _uow(type="sqlite", name=":memory:")
+
+        assert _warnings(caplog) == []

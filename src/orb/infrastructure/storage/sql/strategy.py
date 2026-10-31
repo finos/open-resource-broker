@@ -249,7 +249,9 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 "alembic.ini",
             )
             cfg = alembic.config.Config(alembic_ini)
-            cfg.set_main_option("sqlalchemy.url", str(engine.url))
+            # ConfigParser treats "%" as interpolation syntax: a percent-encoded or
+            # percent-containing URL (memory databases, paths, passwords) must be escaped
+            cfg.set_main_option("sqlalchemy.url", str(engine.url).replace("%", "%%"))
             script_dir = alembic.script.ScriptDirectory.from_config(cfg)
             head_revision = script_dir.get_current_head()
             if head_revision is None:
