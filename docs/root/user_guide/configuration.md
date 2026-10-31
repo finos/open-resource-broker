@@ -368,6 +368,8 @@ This will show:
 6. **System install** — `{sys.prefix}/orb/config/`
 7. **Fallback** — `{cwd}/config/`
 
+Steps 4 and 7 depend on the current working directory, so the same installation can resolve a different directory depending on where `orb` is launched. Set `ORB_ROOT_DIR` or `ORB_CONFIG_DIR` to make resolution independent of the working directory. The test suite sets `ORB_ROOT_DIR` to an empty temporary directory for this reason.
+
 ### Directory Layout and ORB_ROOT_DIR
 
 Set `ORB_ROOT_DIR` to anchor all subdirectories under a single root:

@@ -230,6 +230,21 @@ def setup_test_environment():
         }
     )
 
+    # Pin platform root discovery to an empty directory so resolution never
+    # falls through to a working-directory search and picks up a developer's
+    # local config.  Tests that need a specific root override this.
+    isolated_root = tempfile.mkdtemp(prefix="orb-test-root-")
+    previous_root_dir = os.environ.get("ORB_ROOT_DIR")
+    os.environ["ORB_ROOT_DIR"] = isolated_root
+    try:
+        yield
+    finally:
+        if previous_root_dir is None:
+            os.environ.pop("ORB_ROOT_DIR", None)
+        else:
+            os.environ["ORB_ROOT_DIR"] = previous_root_dir
+        shutil.rmtree(isolated_root, ignore_errors=True)
+
 
 def _reset_otel_globals() -> None:
     """Forcibly reset the OpenTelemetry global meter/tracer provider state.

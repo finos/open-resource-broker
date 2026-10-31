@@ -2,11 +2,11 @@
 
 import pathlib
 
+_SRC = pathlib.Path(__file__).resolve().parents[2] / "src"
+
 
 def _get_source():
-    return pathlib.Path(
-        "src/orb/application/services/provisioning_orchestration_service.py"
-    ).read_text()
+    return (_SRC / "orb/application/services/provisioning_orchestration_service.py").read_text()
 
 
 def test_no_aws_error_codes():

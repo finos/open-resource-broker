@@ -3,9 +3,11 @@
 import ast
 import pathlib
 
+_SRC = pathlib.Path(__file__).resolve().parents[2] / "src"
+
 
 def _get_source():
-    return pathlib.Path("src/orb/interface/init_command_handler.py").read_text()
+    return (_SRC / "orb/interface/init_command_handler.py").read_text()
 
 
 def _get_imports(filepath: pathlib.Path) -> set[str]:
@@ -19,7 +21,7 @@ def _get_imports(filepath: pathlib.Path) -> set[str]:
 
 def test_no_aws_provider_imports():
     """init_command_handler must not import from orb.providers.aws."""
-    imports = _get_imports(pathlib.Path("src/orb/interface/init_command_handler.py"))
+    imports = _get_imports(_SRC / "orb/interface/init_command_handler.py")
     aws_imports = [m for m in imports if "providers.aws" in m]
     assert not aws_imports, f"AWS imports found: {aws_imports}"
 
