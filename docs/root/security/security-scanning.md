@@ -197,6 +197,35 @@ Security checks integrated into pre-commit workflow:
 - id: dockerfile-security
 ```
 
+## Dependency Pinning
+
+Tooling installed by CI workflows, container images and packaging scripts comes from
+hash-locked requirements in `.github/requirements/` (installed with
+`--require-hashes --no-deps`) or from exact versions. Regenerate the locks with
+`dev-tools/ci/update_tool_locks.sh`; Dependabot tracks the directory. The Java and Kotlin
+SDKs use strict Gradle dependency locking and the C# SDK package uses a NuGet lock file
+that CI restores in locked mode.
+
+### Trusted-context exceptions
+
+These installs are intentionally not hash-pinned. Each runs the code under test, a
+reviewed repository file, or a tool on a developer machine that is already trusted:
+
+- **Wheel under test** (`package-testing.yml`, `sdk.yml`, `sdk/java/Dockerfile.build`,
+  `dev-tools/package/test_install.sh`): the wheel built in the same
+  workflow run is installed together with its dependency ranges. Pinning them would stop
+  the job from testing what users get from `pip install`.
+- **Project installs** (`dev-tools/package/install_dev.sh` editable install,
+  `dev-tools/ci/run_ui_smoke.sh` and `dev-tools/package/build_ui.sh` installing `.[ui]`):
+  these install the checked-out project, whose dependencies are locked in `uv.lock`.
+- **Developer-machine installers** (`dev-tools/setup/install_dev_tools.py`): the Windows
+  bun installer and the syft, actionlint and uv `curl` installers download from the
+  vendors' official endpoints, which publish no checksum for those scripts. They are
+  not used by CI workflows. CI uses version-pinned actions and the hash-locked requirements above,
+  and the UI package build verifies the SHA-256 of the pinned bun release archive.
+- **Base image tags selected by build argument** (`Dockerfile`, `Dockerfile.dev-tools`):
+  the Python version is a build argument, so one digest cannot be pinned.
+
 ## Local Development
 
 ### Running Security Scans

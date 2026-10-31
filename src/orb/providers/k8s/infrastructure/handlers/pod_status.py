@@ -20,13 +20,15 @@ from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, Provider
 from orb.domain.request.aggregate import Request
 
 if TYPE_CHECKING:
-    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
+    from orb.providers.k8s.infrastructure.handlers.shared.status_handler import (
+        StatusResolverHandler,
+    )
 
 
 class PodStatusResolver:
     """Compute the per-request status verdict for a bare Pod set."""
 
-    def __init__(self, handler: K8sPodHandler) -> None:
+    def __init__(self, handler: StatusResolverHandler) -> None:
         self._handler = handler
 
     def check_hosts_status(

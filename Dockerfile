@@ -9,19 +9,21 @@ FROM python:${PYTHON_VERSION}-slim
 ARG PYTHON_VERSION=3.13
 ARG PACKAGE_NAME_SHORT=orb
 
+COPY .github/requirements/build-tools.txt /tmp/build-tools.txt
+
 # Apply all available security patches and upgrade Python toolchain
 # DL3008: unpinned apt packages, because Debian drops superseded package versions
 # and exact pins break builds.
-# DL3013: pip is upgraded here to the latest release on purpose; it is removed
-# again below, so a pinned version would only go stale.
-# hadolint ignore=DL3008,DL3013
+# The pip, setuptools and wheel upgrade is hash-locked and removed again below.
+# hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1" wheel
+    pip install --no-cache-dir --require-hashes --no-deps -r /tmp/build-tools.txt && \
+    rm -f /tmp/build-tools.txt
 ARG BUILD_DATE
 ARG VERSION=dev
 ARG VCS_REF
@@ -62,7 +64,9 @@ RUN mkdir -p /app/logs /app/data /app/tmp
 # urllib3, msgpack); those copies are not reachable at runtime but still
 # show up as vulnerable packages in image scans, so dropping pip removes
 # them entirely instead of just patching the top-level entries.
-RUN pip install --no-cache-dir uv==0.13.6 \
+COPY .github/requirements/uv.txt /tmp/uv.txt
+RUN pip install --no-cache-dir --require-hashes --no-deps -r /tmp/uv.txt \
+    && rm -f /tmp/uv.txt \
     && uv venv /opt/venv \
     && rm -rf /usr/local/lib/python*/ensurepip \
         /usr/local/lib/python*/site-packages/pip \
@@ -86,10 +90,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 # this layer (after both installs), together with its Python package, to keep
 # the build tool and its bundled dependencies out of the runtime image.
 COPY dist/*.whl /tmp/
+COPY .github/requirements/runtime-setuptools.txt /tmp/runtime-setuptools.txt
 RUN WHEEL=$(ls /tmp/*.whl) \
     && uv pip install --no-cache "${WHEEL}[all]" \
-    && uv pip install --no-cache --upgrade "setuptools>=78.1.1" \
-    && rm -f /tmp/*.whl \
+    && uv pip install --no-cache --require-hashes --no-deps -r /tmp/runtime-setuptools.txt \
+    && rm -f /tmp/*.whl /tmp/runtime-setuptools.txt \
     && rm -rf /usr/local/bin/uv /usr/local/bin/uvx \
         /usr/local/lib/python*/site-packages/uv \
         /usr/local/lib/python*/site-packages/uv-*.dist-info

@@ -29,7 +29,7 @@ if command -v uv >/dev/null 2>&1; then
 
     # Upgrade pip and build tools first with uv
     echo "INFO: Upgrading pip and build tools with uv..."
-    uv pip install --upgrade pip setuptools wheel
+    uv pip install --require-hashes --no-deps -r .github/requirements/build-tools.txt
 
     # Install in editable mode using uv
     echo "INFO: Installing package in editable mode with uv..."
@@ -42,7 +42,7 @@ else
 
     # Upgrade pip and build tools first
     echo "INFO: Upgrading pip and build tools..."
-    python -m pip install --upgrade pip setuptools wheel
+    python -m pip install --require-hashes --no-deps -r .github/requirements/build-tools.txt
 
     # Install in editable mode using the venv's Python explicitly
     echo "INFO: Installing package in editable mode..."
@@ -71,11 +71,6 @@ echo "  • Run tests: make test"
 echo "  • Run linting: make lint"
 echo "  • Start API: python -m src.interface.api"
 echo "  • CLI help: python -m src.interface.cli --help"
-python -m pip install -e .
-
-# Install development dependencies
-echo "INFO Installing development dependencies..."
-python -m pip install -r requirements-dev.txt
 
 echo "SUCCESS Development installation complete!"
 echo ""

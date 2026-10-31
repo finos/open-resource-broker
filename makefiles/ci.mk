@@ -125,6 +125,10 @@ ci-tests-unit:  ## Run unit tests only (matches ci.yml unit-tests job)
 	@echo "Running unit tests (parallel)..."
 	$(call run-tool,pytest,$(TESTS_UNIT) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
 
+ci-tests-contract:  ## Run contract tests only (tests/contract: wire formats, REST and scheduler contracts)
+	@echo "Running contract tests (parallel)..."
+	$(call run-tool,pytest,$(TESTS_CONTRACT) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-contract.xml --junitxml=junit-contract.xml)
+
 ci-tests-ui-unit:  ## Run UI unit tests (tests/ui/) on every pull_request
 	@echo "Running UI unit tests..."
 	$(call run-tool,pytest,tests/ui/ $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-ui-unit.xml --junitxml=junit-ui-unit.xml)
@@ -252,7 +256,7 @@ ci-quick: ci-check-quick  ## Run quick CI pipeline (fast checks only)
 	@echo "Quick CI pipeline completed successfully!"
 
 # Workflow-specific targets (match GitHub Actions workflow names)
-workflow-ci: ci-check ci-tests-unit ci-tests-integration  ## Run complete CI workflow locally
+workflow-ci: ci-check ci-tests-unit ci-tests-contract ci-tests-integration  ## Run complete CI workflow locally
 	@echo "CI workflow completed successfully!"
 
 workflow-test-matrix: ci-tests-matrix  ## Run test matrix workflow locally

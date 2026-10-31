@@ -33,9 +33,9 @@ echo ""
 # Step 1: Install git-changelog
 log_step "1. Installing git-changelog"
 if command -v uv >/dev/null 2>&1; then
-    uv pip install git-changelog
+    uv pip install --require-hashes --no-deps -r .github/requirements/changelog-tools.txt
 else
-    pip install git-changelog
+    pip install --require-hashes --no-deps -r .github/requirements/changelog-tools.txt
 fi
 log_info "git-changelog installed"
 

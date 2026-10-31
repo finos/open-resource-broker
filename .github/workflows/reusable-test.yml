@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       test-type:
-        description: 'Type of tests to run (unit, integration, e2e, performance, providers, infrastructure)'
+        description: 'Type of tests to run (unit, contract, integration, e2e, performance, providers, infrastructure)'
         required: true
         type: string
       provider:

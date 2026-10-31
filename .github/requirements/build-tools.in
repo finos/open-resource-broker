@@ -1,0 +1,5 @@
+# python-version: 3.10
+# Python build tooling installed by the container image and the dev install script.
+pip
+setuptools>=78.1.1
+wheel

@@ -5,19 +5,20 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar
+from typing import Any, Dict, Optional, Protocol, TypeVar
 
 from orb.config.schemas import AppConfig, validate_config
 from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.utilities.json_utils import safe_json_dumps, safe_json_loads
 
-if TYPE_CHECKING:
-    # Type-only; combined with 'from __future__ import annotations' this never
-    # executes at runtime, so the cycle with configuration_manager cannot
-    # actually resolve ConfigurationManager out of order.
-    from orb.config.managers.configuration_manager import ConfigurationManager
-
 T = TypeVar("T")
+
+
+class SchedulerDirectorySource(Protocol):
+    """The part of the configuration manager the loader needs: scheduler directory lookup."""
+
+    def get_scheduler_directory(self, file_type: str) -> Optional[str]:
+        pass  # type: ignore[return]
 
 
 # Use lazy import to avoid circular dependency
@@ -64,7 +65,7 @@ class ConfigurationLoader:
     def load(
         cls,
         config_path: Optional[str] = None,
-        config_manager: Optional[ConfigurationManager] = None,
+        config_manager: Optional[SchedulerDirectorySource] = None,
     ) -> Dict[str, Any]:
         """
         Load configuration from multiple sources with correct precedence.
@@ -159,7 +160,7 @@ class ConfigurationLoader:
     def _build_raw_config_from_dict(
         cls,
         config_dict: dict[str, Any],
-        config_manager: Optional[ConfigurationManager] = None,
+        config_manager: Optional[SchedulerDirectorySource] = None,
     ) -> dict[str, Any]:
         """
         Apply the full normalisation pipeline to an in-memory dict.
@@ -315,7 +316,7 @@ class ConfigurationLoader:
         filename: str,
         explicit_path: Optional[str] = None,
         required: bool = False,
-        config_manager: Optional[ConfigurationManager] = None,
+        config_manager: Optional[SchedulerDirectorySource] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Centralized method for loading any configuration file with consistent priority:
@@ -362,7 +363,9 @@ class ConfigurationLoader:
             return None
 
     @classmethod
-    def _get_path_resolution_service(cls, config_manager: Optional[ConfigurationManager] = None):
+    def _get_path_resolution_service(
+        cls, config_manager: Optional[SchedulerDirectorySource] = None
+    ):
         """
         Create a PathResolutionService wired to the given config_manager.
 
@@ -383,7 +386,7 @@ class ConfigurationLoader:
     def _load_from_env(
         cls,
         config: dict[str, Any],
-        config_manager: Optional[ConfigurationManager] = None,
+        config_manager: Optional[SchedulerDirectorySource] = None,
         _sdk_keys: Optional[frozenset] = None,
     ) -> None:
         """
@@ -454,7 +457,7 @@ class ConfigurationLoader:
 
     @classmethod
     def _process_scheduler_directories(
-        cls, config: dict[str, Any], config_manager: Optional[ConfigurationManager] = None
+        cls, config: dict[str, Any], config_manager: Optional[SchedulerDirectorySource] = None
     ) -> None:
         """
         Process scheduler-provided directory overrides for logging and storage.

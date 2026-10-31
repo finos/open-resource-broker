@@ -12,6 +12,7 @@ on:
     paths:
       - 'src/**'
       - 'pyproject.toml'
+      - '.github/workflows/package-testing.yml'
   workflow_dispatch:
 
 permissions:
@@ -60,7 +61,7 @@ jobs:
 
       - name: Build wheel
         run: |
-          pip install build wheel
+          pip install --require-hashes --no-deps -r .github/requirements/package-build.txt
           python -m build
 
       - name: Upload wheel artifact
@@ -289,7 +290,6 @@ jobs:
 
       - name: Install minimal dependencies
         run: |
-          pip install pytest pytest-mock
           pip install "$(find dist -name '*.whl' | head -1)"
 
       - name: Test import guards
@@ -489,6 +489,42 @@ jobs:
           python -m orb --help
           python -m orb --version
           echo "PASS: CLI commands work"
+
+      - name: Test orb init
+        run: |
+          # Run the non-interactive init flow end to end for each scheduler and
+          # provider combination, then confirm the generated configuration is
+          # written, matches the requested options and is the file the CLI loads.
+          work="$(mktemp -d)"
+          export HOME="${work}/home"
+          mkdir -p "${HOME}"
+          cd "${work}"
+          for scheduler in default hostfactory; do
+            for provider in aws k8s; do
+              cfg_dir="${work}/${scheduler}-${provider}"
+              python -m orb init --non-interactive --force \
+                --scheduler "${scheduler}" \
+                --provider-type "${provider}" \
+                --aws-region us-east-1 \
+                --config-dir "${cfg_dir}"
+              python - "${cfg_dir}/config.json" "${scheduler}" "${provider}" <<'PY'
+          import json
+          import sys
+
+          path, scheduler, provider = sys.argv[1:4]
+          with open(path, encoding="utf-8") as fh:
+              config = json.load(fh)
+          assert config["scheduler"]["type"] == scheduler, config["scheduler"]
+          providers = config["provider"]["providers"]
+          assert providers and all(p["type"] == provider for p in providers), providers
+          assert config["provider"]["default_provider_instance"] in {p["name"] for p in providers}
+          print(f"PASS: init wrote a valid {scheduler}/{provider} configuration")
+          PY
+              ORB_CONFIG_DIR="${cfg_dir}" python -m orb config show > "${work}/show.json"
+              grep -q "\"loaded_config_file\": \"${cfg_dir}/config.json\"" "${work}/show.json"
+            done
+          done
+          rm -rf "${work:?}"
 
   summary:
     name: Package Testing Summary

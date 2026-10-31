@@ -808,7 +808,7 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Install openapi-generator-cli
-      run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
+      run: npx --yes @openapitools/openapi-generator-cli@2.42.0 version-manager set 7.23.0
 
     # The Gradle wrapper launcher JAR is not committed to the repository (it
     # is a prebuilt binary). Provision Gradle directly and use it to

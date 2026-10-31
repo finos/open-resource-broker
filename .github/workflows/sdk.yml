@@ -377,7 +377,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Install openapi-generator-cli
-        run: npx --yes @openapitools/openapi-generator-cli version-manager set 7.23.0
+        run: npx --yes @openapitools/openapi-generator-cli@2.42.0 version-manager set 7.23.0
 
       # -----------------------------------------------------------------------
       # orb Python wheel (all langs except Go)

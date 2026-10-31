@@ -24,7 +24,7 @@ fi
 # Install twine if needed
 if ! python -c "import twine" 2>/dev/null; then
     echo "Installing twine..."
-    pip install twine
+    pip install --require-hashes --no-deps -r .github/requirements/package-publish.txt
 fi
 
 # Build first

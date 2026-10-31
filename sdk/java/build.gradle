@@ -32,6 +32,12 @@ repositories {
     mavenCentral()
 }
 
+// Strict dependency locking: every resolvable configuration is pinned in
+// gradle.lockfile. Refresh with `./gradlew dependencies --write-locks`.
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 ext {
     // Drives the jackson-bom platform below, never an individual coordinate.
     // Since 2.20, jackson-annotations publishes minor-only tags (2.20, 2.21,

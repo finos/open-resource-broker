@@ -15,6 +15,23 @@ repositories {
     mavenCentral()
 }
 
+// The Kotlin Gradle plugin resolves Bouncy Castle 1.84 for its own klib signing
+// configuration; 1.84 has published critical and high advisories fixed in 1.85.
+configurations.matching { it.name == "kotlinBouncyCastleConfiguration" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.bouncycastle") {
+            useVersion("1.85")
+            because("1.84 is affected by CVE-2026-8763 and CVE-2026-13506")
+        }
+    }
+}
+
+// Strict dependency locking: every resolvable configuration is pinned in
+// gradle.lockfile. Refresh with `./gradlew dependencies --write-locks`.
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 // ---------------------------------------------------------------------------
 // Source sets: main = generated/src/main + src/main; test = src/test
 // ---------------------------------------------------------------------------
