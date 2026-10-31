@@ -713,6 +713,69 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 self.logger.error("Transaction failed: %s", e)
                 raise
 
+    def find_page(
+        self,
+        criteria: dict[str, Any],
+        sort_column: str,
+        descending: bool,
+        after: Optional[tuple[str, str]],
+        limit: int,
+    ) -> Optional[tuple[list[tuple[dict[str, Any], str]], bool, int]]:
+        """One page of rows after ``after``, ordered by ``(sort_column, id)``.
+
+        Returns ``(rows, has_more, total_count)`` where each row is the entity
+        data with the text it sorted by, or None when this table, sort column,
+        filter or dialect cannot be pushed down (the caller pages in process).
+        ``total_count`` counts every row ``criteria`` selects; it still scans
+        them, so the gain is memory rather than latency.
+        """
+        from orb.infrastructure.storage.sql.pagination import (
+            SORT_KEY_LABEL,
+            build_count_statement,
+            build_page_statement,
+        )
+
+        columns = list(self.columns)
+        dialect = self.connection_manager.get_engine().dialect.name
+        prepared = self.serializer.prepare_criteria(criteria) if criteria else {}
+        statement = build_page_statement(
+            table=self.table_name,
+            columns=columns,
+            id_column=self._get_id_column(),
+            sort_column=sort_column,
+            descending=descending,
+            criteria=prepared,
+            after=after,
+            limit=limit,
+            dialect=dialect,
+        )
+        count = build_count_statement(
+            table=self.table_name, columns=columns, criteria=prepared, dialect=dialect
+        )
+        if statement is None or count is None:
+            return None
+
+        with self.lock_manager.read_lock():
+            try:
+                with self.connection_manager.get_session() as session:
+                    result_rows = session.execute(statement).fetchall()
+                    total = int(session.execute(count).scalar_one())
+
+                rows: list[tuple[dict[str, Any], str]] = []
+                for row in result_rows[:limit]:
+                    row_dict = dict(row._mapping)
+                    sort_text = row_dict.pop(SORT_KEY_LABEL, "")
+                    rows.append(
+                        (
+                            self.serializer.deserialize_from_row(row_dict),
+                            "" if sort_text is None else str(sort_text),
+                        )
+                    )
+                return rows, len(result_rows) > limit, total
+            except Exception as e:
+                self.logger.error("Failed to page %s: %s", self.table_name, e)
+                raise StorageError(f"Failed to page entities: {e}")
+
     def count(self) -> int:
         """Count total entities in the table."""
         try:

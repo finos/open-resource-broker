@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Union
 
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.infrastructure.error.decorators import handle_interface_exceptions
+from orb.interface.pagination_hint import print_cursor_hint
 from orb.interface.response_formatting_service import ResponseFormattingService
 
 if TYPE_CHECKING:
@@ -168,11 +169,13 @@ async def handle_get_return_requests(
             status=getattr(args, "status", None),
             limit=getattr(args, "limit", 50),
             offset=getattr(args, "offset", None) or 0,
+            cursor=getattr(args, "cursor", None),
             provider_name=getattr(args, "provider_name", None),
             provider_type=getattr(args, "provider_type", None),
             filter_expressions=getattr(args, "filter", None) or [],
         )
     )
+    print_cursor_hint(args, result)
     return entry.renderer_for(Interface.CLI)(formatter, result)
 
 
@@ -289,6 +292,7 @@ async def handle_list_requests(
             limit=getattr(args, "limit", None) or 50,
             sync=getattr(args, "sync", False),
             offset=getattr(args, "offset", None) or 0,
+            cursor=getattr(args, "cursor", None),
             template_id=getattr(args, "template_id", None),
             request_type=getattr(args, "request_type", None),
             provider_name=getattr(args, "provider_name", None),
@@ -296,6 +300,7 @@ async def handle_list_requests(
             filter_expressions=getattr(args, "filter", None) or [],
         )
     )
+    print_cursor_hint(args, result)
     return entry.renderer_for(Interface.CLI)(formatter, result)
 
 

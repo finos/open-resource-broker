@@ -127,7 +127,13 @@ async def list_requests(
     limit: Optional[int] = LIMIT_QUERY,
     offset: int = OFFSET_QUERY,
     sync: bool = Query(False, description="Sync with provider before returning results"),
-    cursor: Optional[str] = Query(None, description="Opaque pagination cursor"),
+    cursor: Optional[str] = Query(
+        None,
+        description=(
+            "Opaque pagination cursor: the next_cursor of the previous page. Overrides offset. "
+            "A malformed cursor, or one issued for a different filter or sort, is rejected with 400."
+        ),
+    ),
     q: Optional[str] = Query(None, description="Substring search"),
     sort: Optional[str] = Query(None, description='Sort: "field" / "-field"'),
     provider_name: Optional[str] = Query(None, description="Filter by provider instance name"),
@@ -172,7 +178,13 @@ async def list_requests(
 async def list_return_requests(
     limit: int = LIMIT_QUERY,
     offset: int = OFFSET_QUERY,
-    cursor: Optional[str] = Query(None, description="Opaque pagination cursor"),
+    cursor: Optional[str] = Query(
+        None,
+        description=(
+            "Opaque pagination cursor: the next_cursor of the previous page. Overrides offset. "
+            "A malformed cursor, or one issued for a different filter or sort, is rejected with 400."
+        ),
+    ),
     q: Optional[str] = Query(None, description="Substring search"),
     sort: Optional[str] = Query(None, description='Sort: "field" / "-field"'),
     provider_name: Optional[str] = Query(None, description="Filter by provider instance name"),

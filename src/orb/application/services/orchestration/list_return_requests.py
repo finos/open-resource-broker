@@ -10,8 +10,12 @@ from orb.application.services.orchestration.dtos import (
     ListReturnRequestsInput,
     ListReturnRequestsOutput,
     Paginated,
-    decode_cursor,
     encode_cursor,
+)
+from orb.application.services.orchestration.page_cursor import (
+    decode_page_cursor,
+    next_cursor_for,
+    query_fingerprint,
 )
 from orb.domain.base.ports.logging_port import LoggingPort
 
@@ -47,8 +51,18 @@ class ListReturnRequestsOrchestrator(
             input.provider_type,
         )
 
-        offset = decode_cursor(input.cursor) if input.cursor else input.offset
         sort = input.sort if input.sort else _DEFAULT_SORT
+        fingerprint = query_fingerprint(
+            "return-requests",
+            status=input.status,
+            provider_name=input.provider_name,
+            provider_type=input.provider_type,
+            q=input.q,
+            filter_expressions=input.filter_expressions,
+            sort=sort,
+        )
+        decoded = decode_page_cursor(input.cursor, fingerprint, sort)
+        offset = decoded.offset if decoded else input.offset
 
         query = SyncAndListReturnRequestsQuery(
             status=input.status,
@@ -59,6 +73,7 @@ class ListReturnRequestsOrchestrator(
             provider_name=input.provider_name,
             provider_type=input.provider_type,
             filter_expressions=input.filter_expressions,
+            after=decoded.position if decoded else None,
         )
         result = await self._dispatch("ListReturnRequests", self._query_bus.execute(query))
 
@@ -69,10 +84,13 @@ class ListReturnRequestsOrchestrator(
             items = [self._enrich(self._to_dict(r)) for r in (result or [])]
             total_count = len(items)
 
-        next_cursor: str | None = None
-        effective_limit = input.limit if input.limit is not None else total_count
-        if effective_limit and total_count > offset + effective_limit:
-            next_cursor = encode_cursor(offset + effective_limit)
+        handled, next_cursor = next_cursor_for(
+            result, fingerprint=fingerprint, sort=sort, offset=offset, returned=len(items)
+        )
+        if not handled:
+            effective_limit = input.limit if input.limit is not None else total_count
+            if effective_limit and total_count > offset + effective_limit:
+                next_cursor = encode_cursor(offset + effective_limit)
 
         return ListReturnRequestsOutput(
             requests=items,

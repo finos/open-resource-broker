@@ -28,6 +28,14 @@ Available for all commands:
 | `--completion` | Generate shell completion script (`bash`, `zsh`) | `--completion bash` |
 | `--version` | Show version and exit | `--version` |
 
+### Paging through long lists
+
+`machines list`, `requests list` and `requests list-returns` (and the REST and SDK list calls) return a `next_cursor` when more results remain; in the `table` and `list` formats the CLI prints it on stderr as `next cursor: <token>`. Pass it back with `--cursor` (only these three commands accept it; it overrides `--offset`) to get the next page.
+
+A cursor continues after the last row of the previous page, ordered by the sort value and the id. Rows added or removed elsewhere in the list between pages therefore do not cause repeats or gaps, as long as the sort value of the rows already returned does not change (a row whose status or launch time changes between pages can still move). A cursor is only valid for the filters and sort it was issued for; a malformed cursor or one from a different query is rejected instead of silently starting over. Cursors from earlier releases keep working.
+
+With SQL storage the database filters, orders and cuts the page for plain equality filters (status, provider type, and for machines the request, for requests the template, request type and provider name) when sorting by a status, id or creation time column; sorting machines by `launch_time` (the default) is done in the database on SQLite only. With JSON or DynamoDB storage, with other dialects or sorts, and for `q` or `--filter` expressions, every page still loads and sorts the full result set, so paging there does not reduce memory or latency. The total count of a database page still scans the filtered rows, so the saving is memory rather than time.
+
 ### HostFactory Compatibility
 
 | Flag | Description | Example |

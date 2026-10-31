@@ -2,6 +2,7 @@
 
 from typing import Any, Optional
 
+from orb.domain.base.pagination import Position, SortSpec, StoragePage
 from orb.domain.machine.aggregate import Machine
 from orb.domain.machine.machine_identifiers import MachineId
 from orb.domain.machine.repository import MachineRepository as MachineRepositoryInterface
@@ -363,6 +364,21 @@ class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
         except Exception as e:
             self.logger.error("Failed to find machines by status %s: %s", status, e)
             raise
+
+    def find_page(
+        self,
+        criteria: dict[str, str],
+        sort: SortSpec,
+        after: Optional[Position],
+        limit: int,
+    ) -> Optional[StoragePage[Machine]]:
+        """One page of machines cut by the database, or None when the backend cannot.
+
+        ``criteria`` are equality filters on ``status``, ``provider_type`` and
+        ``request_id``. Backends that cannot sort in the database return None and
+        the caller loads and pages in process instead.
+        """
+        return self._load_page(criteria, sort, after, limit, "machine_id")
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_statuses")
     def find_by_statuses(self, statuses: list[MachineStatus]) -> list[Machine]:

@@ -221,3 +221,60 @@ class TestSyncAndListReturnRequests:
         )
         assert result.total_count == 1
         assert result.items[0].request_id == "ret-1"
+
+
+class TestKeysetPaging:
+    """Return requests page by (sort text, id) after a cursor position."""
+
+    @staticmethod
+    def _handler(ids):
+        reqs = [_make_return_request(i, terminal=True) for i in ids]
+        handler, _ = _build_handler(reqs, [_make_dto(i) for i in ids])
+        return handler
+
+    def test_walk_by_cursor_position_visits_each_row_once(self):
+        ids = ["ret-e", "ret-b", "ret-d", "ret-a", "ret-c"]
+        handler = self._handler(ids)
+        seen = []
+        after = None
+        for _ in range(5):
+            handler = self._handler(ids)
+            page = asyncio.run(
+                handler.execute_query(
+                    SyncAndListReturnRequestsQuery(limit=2, sort="request_id", after=after)
+                )
+            )
+            seen.extend(d.request_id for d in page.items)
+            after = page.next_position
+            if after is None:
+                break
+
+        assert seen == sorted(ids)
+        assert page.total_count == 5
+
+    def test_descending_and_last_page_has_no_position(self):
+        handler = self._handler(["ret-a", "ret-b", "ret-c"])
+
+        first = asyncio.run(
+            handler.execute_query(SyncAndListReturnRequestsQuery(limit=2, sort="-request_id"))
+        )
+        handler = self._handler(["ret-a", "ret-b", "ret-c"])
+        last = asyncio.run(
+            handler.execute_query(
+                SyncAndListReturnRequestsQuery(
+                    limit=2, sort="-request_id", after=first.next_position
+                )
+            )
+        )
+
+        assert [d.request_id for d in first.items] == ["ret-c", "ret-b"]
+        assert [d.request_id for d in last.items] == ["ret-a"]
+        assert last.next_position is None
+
+    def test_without_a_sort_the_old_offset_slice_applies(self):
+        handler = self._handler(["ret-a", "ret-b", "ret-c"])
+
+        page = asyncio.run(handler.execute_query(SyncAndListReturnRequestsQuery(limit=1, offset=1)))
+
+        assert [d.request_id for d in page.items] == ["ret-b"]
+        assert not hasattr(page, "next_position")

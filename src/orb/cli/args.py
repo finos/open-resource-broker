@@ -86,6 +86,15 @@ class _OrbArgumentParser(argparse.ArgumentParser):
 # without the spurious diamond conflict.
 
 
+def add_cursor_argument(parser: argparse.ArgumentParser) -> None:
+    """Add ``--cursor`` to a command that pages its results with a keyset cursor."""
+    parser.add_argument(
+        "--cursor",
+        default=None,
+        help="Continue after the page that returned this cursor (the next_cursor of the previous page); overrides --offset",
+    )
+
+
 class ParentParsers:
     """Container for the intent-grouped parent parsers.
 
@@ -192,6 +201,7 @@ def add_machine_actions(subparsers, pp: "ParentParsers | None" = None):
         choices=[s.value for s in MachineStatus],
         help="Filter by machine status (specific filter)",
     )
+    add_cursor_argument(machines_list)
     machines_list.add_argument("--request-id", dest="request_id", help="Filter by request ID")
     machines_list.add_argument(
         "--timestamp-format",
@@ -349,6 +359,7 @@ def add_request_actions(subparsers, pp: "ParentParsers | None" = None):
         choices=[s.value for s in RequestStatus],
         help="Filter by request status (specific filter)",
     )
+    add_cursor_argument(requests_list)
     requests_list.add_argument("--template-id", help="Filter by template ID (specific filter)")
     requests_list.add_argument(
         "--request-type",
@@ -418,6 +429,7 @@ def add_request_actions(subparsers, pp: "ParentParsers | None" = None):
         description="List return requests with filtering support.",
         parents=[pp.common, pp.list, pp.provider_scope, pp.hf_compat],
     )
+    add_cursor_argument(requests_list_returns)
     requests_list_returns.add_argument("--status", help="Filter by return request status")
 
 

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.infrastructure.error.decorators import handle_interface_exceptions
+from orb.interface.pagination_hint import print_cursor_hint
 from orb.interface.response_formatting_service import ResponseFormattingService
 
 if TYPE_CHECKING:
@@ -62,6 +63,7 @@ async def handle_get_machine_status(
                 request_id=getattr(args, "request_id", None),
                 limit=int(_limit) if _limit is not None else 100,
                 offset=int(_offset) if _offset is not None else 0,
+                cursor=getattr(args, "cursor", None),
                 timestamp_format=getattr(args, "timestamp_format", None),
                 filter_expressions=getattr(args, "filter", None) or [],
             )
@@ -123,10 +125,12 @@ async def handle_list_machines(
             request_id=getattr(args, "request_id", None),
             limit=limit,
             offset=offset,
+            cursor=getattr(args, "cursor", None),
             timestamp_format=getattr(args, "timestamp_format", None),
             filter_expressions=getattr(args, "filter", None) or [],
         )
     )
+    print_cursor_hint(args, result)
     return entry.renderer_for(Interface.CLI)(formatter, result)
 
 
