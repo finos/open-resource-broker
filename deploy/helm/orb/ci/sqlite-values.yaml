@@ -1,0 +1,5 @@
+storage:
+  type: sqlite
+  persistence:
+    size: 2Gi
+    storageClass: fast

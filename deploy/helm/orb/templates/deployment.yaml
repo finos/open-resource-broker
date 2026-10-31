@@ -1,3 +1,4 @@
+{{- include "orb.validate" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,6 +8,10 @@ metadata:
     {{- include "orb.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  # json and sqlite storage are single-writer on a ReadWriteOnce volume, so the old
+  # pod must stop before the new one starts.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "orb.selectorLabels" . | nindent 6 }}
@@ -32,6 +37,7 @@ spec:
       # Mount the SA token only when the k8s provider needs it to call the API server.
       # AWS mode gets no token, reducing the blast radius of a container escape.
       automountServiceAccountToken: {{ eq .Values.provider.type "k8s" }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -64,17 +70,13 @@ spec:
               value: {{ .Values.server.logLevel | quote }}
             # HF_CONFIG_FILE is set by docker-entrypoint.sh after it finds
             # /app/config/docker.json (highest-precedence scanned path). No override needed.
-            # Auth
-            - name: HF_AUTH_ENABLED
-              value: {{ .Values.auth.enabled | quote }}
-            - name: HF_AUTH_STRATEGY
-              value: {{ .Values.auth.strategy | quote }}
-            {{- if .Values.auth.existingSecret }}
-            - name: HF_AUTH_BEARER_TOKEN
+            {{- if eq .Values.auth.strategy "bearer_token" }}
+            # Referenced from the generated config as ${ORB_AUTH_BEARER_SECRET_KEY}.
+            - name: ORB_AUTH_BEARER_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.auth.existingSecret }}
-                  key: bearer-token
+                  key: {{ .Values.auth.existingSecretKey }}
             {{- end }}
             # Provider
             - name: HF_PROVIDER_TYPE
@@ -83,11 +85,9 @@ spec:
             - name: HF_PROVIDER_AWS_REGION
               value: {{ .Values.provider.aws.region | quote }}
             {{- end }}
-            # Storage
-            - name: HF_STORAGE_STRATEGY
-              value: {{ .Values.storage.type | quote }}
-            - name: HF_STORAGE_BASE_PATH
-              value: {{ .Values.storage.basePath | quote }}
+            # Read-only root filesystem: keep anything that resolves ~ on a writable path.
+            - name: HOME
+              value: /app/tmp
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -102,25 +102,44 @@ spec:
               mountPath: /app/logs
             - name: orb-tmp
               mountPath: /app/tmp
+            - name: orb-work
+              mountPath: /app/work
+            - name: orb-scratch
+              mountPath: /tmp
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- /* /livez never depends on a provider, so a slow or broken provider cannot restart the pod. */}}
+          startupProbe:
+            httpGet:
+              path: {{ include "orb.probePath" (dict "root" . "probe" .Values.probes.startup "default" "/livez") }}
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
           livenessProbe:
             httpGet:
-              path: {{ .Values.probes.path }}
+              path: {{ include "orb.probePath" (dict "root" . "probe" .Values.probes.liveness "default" "/livez") }}
               port: http
-            initialDelaySeconds: 15
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 3
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
           readinessProbe:
             httpGet:
-              path: {{ .Values.probes.path }}
+              path: {{ include "orb.probePath" (dict "root" . "probe" .Values.probes.readiness "default" "/readyz") }}
               port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
@@ -128,10 +147,19 @@ spec:
           configMap:
             name: {{ include "orb.fullname" . }}-config
         - name: orb-data
+          {{- if .Values.storage.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "orb.claimName" . }}
+          {{- else }}
           emptyDir: {}
+          {{- end }}
         - name: orb-logs
           emptyDir: {}
         - name: orb-tmp
+          emptyDir: {}
+        - name: orb-work
+          emptyDir: {}
+        - name: orb-scratch
           emptyDir: {}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}

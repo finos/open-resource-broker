@@ -58,3 +58,15 @@ jobs:
                 -kubernetes-version "$KUBERNETES_VERSION" -
           echo "::endgroup::"
         done
+    - name: Chart rejects unsupported combinations
+      run: |
+        set -euo pipefail
+        chart=deploy/helm/orb
+        if helm template orb "$chart" --set replicaCount=2 >/dev/null 2>&1; then
+          echo "replicaCount=2 with json storage must be rejected" >&2
+          exit 1
+        fi
+        if helm template orb "$chart" --set storage.type=sqlite --set replicaCount=2 >/dev/null 2>&1; then
+          echo "replicaCount=2 with sqlite storage must be rejected" >&2
+          exit 1
+        fi

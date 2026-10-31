@@ -25,9 +25,9 @@ data:
             "weight": 100,
             "config": {
               {{- if eq .Values.provider.type "k8s" }}
+              "in_cluster": true,
               "namespaces": {{ .Values.provider.k8s.namespaces | toJson }},
-              "node_watch_enabled": {{ .Values.provider.k8s.nodeWatchEnabled }},
-              "default_handler": {{ .Values.provider.k8s.defaultHandler | quote }}
+              "node_watch_enabled": {{ .Values.provider.k8s.nodeWatchEnabled }}
               {{- else if eq .Values.provider.type "aws" }}
               "region": {{ .Values.provider.aws.region | quote }}
               {{- if .Values.provider.aws.profile }},
@@ -41,8 +41,23 @@ data:
         "default_provider_type": {{ .Values.provider.type | quote }}
       },
       "storage": {
-        "type": {{ .Values.storage.type | quote }},
-        "base_path": {{ .Values.storage.basePath | quote }}
+        {{- if eq .Values.storage.type "sqlite" }}
+        "strategy": "sql",
+        "sql_strategy": {
+          "type": "sqlite",
+          "name": "/app/data/database.db"
+        }
+        {{- else }}
+        "strategy": "json",
+        "json_strategy": {
+          "storage_type": "single_file",
+          "base_path": "/app/data"
+        }
+        {{- end }}
+      },
+      "ui": {
+        "enabled": {{ ne .Values.ui.mode "disabled" }},
+        "mode": {{ if eq .Values.ui.mode "embedded" }}"embedded"{{ else }}"split"{{ end }}
       },
       "logging": {
         "level": {{ .Values.server.logLevel | quote }}
@@ -52,9 +67,20 @@ data:
         "host": {{ .Values.server.host | quote }},
         "port": {{ .Values.server.port }},
         "workers": {{ .Values.server.workers }},
+        {{- /* Probes and in-cluster clients address the pod by IP or Service name; ingress hosts and extra names come from values. */}}
+        {{- $fullname := include "orb.fullname" . }}
+        {{- $hosts := list "localhost" "127.0.0.1" "::1" $fullname (printf "%s.%s" $fullname .Release.Namespace) (printf "%s.%s.svc" $fullname .Release.Namespace) (printf "%s.%s.svc.cluster.local" $fullname .Release.Namespace) }}
+        {{- range .Values.ingress.hosts }}{{ $hosts = append $hosts .host }}{{ end }}
+        {{- range .Values.server.trustedHosts }}{{ $hosts = append $hosts . }}{{ end }}
+        "trusted_hosts": {{ $hosts | uniq | toJson }},
         "auth": {
           "enabled": {{ .Values.auth.enabled }},
           "strategy": {{ .Values.auth.strategy | quote }}
+          {{- if eq .Values.auth.strategy "bearer_token" }},
+          "bearer_token": {
+            "secret_key": "${ORB_AUTH_BEARER_SECRET_KEY}"
+          }
+          {{- end }}
         }
       }
     }
