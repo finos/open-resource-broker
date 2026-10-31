@@ -5,11 +5,15 @@ on:
     branches: [ main, develop ]
     paths:
       - 'deploy/helm/**'
+      - 'Dockerfile'
+      - 'deployment/docker/**'
       - '.github/workflows/helm-chart.yml'
   push:
     branches: [ main, develop ]
     paths:
       - 'deploy/helm/**'
+      - 'Dockerfile'
+      - 'deployment/docker/**'
       - '.github/workflows/helm-chart.yml'
   workflow_dispatch:
 
@@ -70,3 +74,93 @@ jobs:
           echo "replicaCount=2 with sqlite storage must be rejected" >&2
           exit 1
         fi
+
+  kind:
+    name: Install on kind
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: static
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Setup Python and UV
+      uses: ./.github/actions/setup-uv-cached
+      with:
+        cache-key: container-build-wheel-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        fail-on-cache-miss: false
+
+    - name: Setup Bun (for UI static bundle)
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
+      with:
+        bun-version: "1.4.0"
+
+    - name: Build package wheel
+      run: make build
+
+    - name: Build image
+      run: docker build --tag orb:ci .
+
+    - name: Image user matches the chart security context
+      run: |
+        set -euo pipefail
+        chart_uid=$(yq '.podSecurityContext.runAsUser' deploy/helm/orb/values.yaml)
+        chart_gid=$(yq '.podSecurityContext.runAsGroup' deploy/helm/orb/values.yaml)
+        image_uid=$(docker run --rm --entrypoint id orb:ci -u)
+        image_gid=$(docker run --rm --entrypoint id orb:ci -g)
+        echo "chart ${chart_uid}:${chart_gid}, image ${image_uid}:${image_gid}"
+        test "$chart_uid" = "$image_uid"
+        test "$chart_gid" = "$image_gid"
+
+    - name: Create kind cluster
+      uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa  # v1.15.1
+      with:
+        cluster_name: orb-ci
+
+    - name: Load image into kind
+      run: kind load docker-image orb:ci --name orb-ci
+
+    - name: Install chart
+      run: |
+        helm install orb deploy/helm/orb --namespace orb --create-namespace \
+          --set image.repository=orb --set image.tag=ci --set image.pullPolicy=Never \
+          --wait --timeout 5m
+
+    - name: Probe paths respond
+      run: |
+        set -euo pipefail
+        kubectl --namespace orb port-forward svc/orb 18000:8000 >/tmp/port-forward.log 2>&1 &
+        pf_pid=$!
+        trap 'kill "${pf_pid:?}"' EXIT
+        for _ in $(seq 1 30); do
+          curl -fsS http://127.0.0.1:18000/orb/livez && break
+          sleep 2
+        done
+        curl -fsS http://127.0.0.1:18000/orb/livez
+        curl -fsS http://127.0.0.1:18000/orb/readyz
+
+    - name: State survives a pod restart
+      run: |
+        set -euo pipefail
+        kubectl --namespace orb exec deploy/orb -- sh -c 'echo persisted > /app/data/restart-marker'
+        kubectl --namespace orb delete pod --selector app.kubernetes.io/instance=orb --wait=true
+        kubectl --namespace orb wait --for=condition=Ready pod --selector app.kubernetes.io/instance=orb --timeout=5m
+        test "$(kubectl --namespace orb exec deploy/orb -- cat /app/data/restart-marker)" = persisted
+
+    - name: State survives upgrade and rollback
+      run: |
+        set -euo pipefail
+        common=(--namespace orb --set image.repository=orb --set image.tag=ci --set image.pullPolicy=Never --wait --timeout 5m)
+        helm upgrade orb deploy/helm/orb "${common[@]}" --set server.logLevel=DEBUG
+        test "$(kubectl --namespace orb exec deploy/orb -- cat /app/data/restart-marker)" = persisted
+        helm rollback orb 1 --namespace orb --wait --timeout 5m
+        test "$(kubectl --namespace orb exec deploy/orb -- cat /app/data/restart-marker)" = persisted
+
+    - name: Show pod state on failure
+      if: failure()
+      run: |
+        kubectl --namespace orb get pods,pvc -o wide || true
+        kubectl --namespace orb describe pods || true
+        kubectl --namespace orb logs deploy/orb --tail=200 || true
