@@ -13,7 +13,11 @@ if TYPE_CHECKING:
 from orb.application.ports.resilience_port import CircuitBreakerOpenError, CircuitBreakerPort
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.exceptions import QuotaError
+from orb.domain.base.exceptions import (
+    OperationNotSupportedError,
+    ProviderNotReadyError,
+    QuotaError,
+)
 from orb.domain.base.operation_outcome import (
     Accepted,
     Completed,
@@ -71,6 +75,10 @@ class ProvisioningResult:
     provider_error_message: str | None = None
     provider_request_id: str | None = None
     error_source: str | None = None
+    # False when the failure says nothing about provider health (the provider
+    # was not ready, or was asked for an operation it does not support), so it
+    # must not count against the provider's circuit breaker.
+    counts_as_provider_failure: bool = True
 
     def __post_init__(self) -> None:
         """Derive ``is_final`` from ``outcome`` when an outcome is provided."""
@@ -255,7 +263,8 @@ class ProvisioningOrchestrationService:
                 self._logger.warning(
                     "Attempt %d failed: %s", attempt_number, last_result.error_message
                 )
-                self._record_provider_failure(selection_result.provider_name)
+                if last_result.counts_as_provider_failure:
+                    self._record_provider_failure(selection_result.provider_name)
                 break
 
             # Checkpoint: persist the resource IDs returned by this attempt before
@@ -696,6 +705,46 @@ class ProvisioningOrchestrationService:
                 provider_data={},
                 error_message=timeout_msg,
                 outcome=Failed(error=timeout_msg, recoverable=True),
+            )
+
+        except ProviderNotReadyError as e:
+            # Not a provider-health signal and not retried here: the provider
+            # may become ready later, so the failure is recoverable by a new
+            # request, but this attempt stops.
+            not_ready_msg = f"Provider not ready: {e.message}"
+            self._logger.warning(
+                "Provider %s not ready for request %s",
+                selection_result.provider_name if selection_result else "unknown",
+                str(request.request_id) if hasattr(request, "request_id") else "unknown",
+            )
+            return ProvisioningResult(
+                success=False,
+                resource_ids=[],
+                machine_ids=[],
+                instances=[],
+                provider_data={},
+                error_message=not_ready_msg,
+                outcome=Failed(error=not_ready_msg, recoverable=True),
+                counts_as_provider_failure=False,
+            )
+
+        except OperationNotSupportedError as e:
+            # Permanent template/provider mismatch: asking again cannot succeed.
+            unsupported_msg = f"Operation not supported: {e.message}"
+            self._logger.warning(
+                "Provider %s does not support provisioning for request %s",
+                selection_result.provider_name if selection_result else "unknown",
+                str(request.request_id) if hasattr(request, "request_id") else "unknown",
+            )
+            return ProvisioningResult(
+                success=False,
+                resource_ids=[],
+                machine_ids=[],
+                instances=[],
+                provider_data={},
+                error_message=unsupported_msg,
+                outcome=Failed(error=unsupported_msg, recoverable=False),
+                counts_as_provider_failure=False,
             )
 
         except QuotaError as e:

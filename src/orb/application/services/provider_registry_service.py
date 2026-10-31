@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from orb.domain.base.exceptions import OperationNotSupportedError, ProviderNotReadyError
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.domain.base.results import ProviderSelectionResult, ValidationResult
@@ -75,6 +76,13 @@ class ProviderRegistryService:
         strategy = self._registry.get_or_create_strategy(provider_id)
         if strategy is None:
             raise ValueError(f"No strategy found for provider: {provider_id}")
+        operation_type = getattr(operation, "operation_type", None)
+        # Read on every call: a cached strategy can lose readiness after it was
+        # first initialized (for example after a shutdown).
+        if not strategy.is_initialized:
+            raise ProviderNotReadyError(provider_id, operation_type)
+        if not strategy.get_capabilities().supports_operation(operation_type):
+            raise OperationNotSupportedError(provider_id, operation_type)
         return await strategy.execute_operation(operation)
 
     def get_strategy_capabilities(self, provider_id: str) -> Any:

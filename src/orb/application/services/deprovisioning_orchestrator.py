@@ -17,6 +17,7 @@ from orb.application.services.template_snapshot import (
     restore_template_snapshot,
 )
 from orb.domain.base import UnitOfWorkFactory
+from orb.domain.base.exceptions import OperationNotSupportedError, ProviderNotReadyError
 from orb.domain.base.ports import ConfigurationPort, LoggingPort, ProviderSelectionPort
 from orb.domain.request.value_objects import RequestId
 
@@ -362,6 +363,23 @@ class DeprovisioningOrchestrator:
                     "failed_instance_ids": failed_ids,
                     "error_message": result.error_message,
                 }
+
+        except (ProviderNotReadyError, OperationNotSupportedError) as e:
+            # Nothing was terminated: report every machine as failed so the
+            # callers leave them in their current state and the return request
+            # can be retried. ``retryable`` is informational.
+            self.logger.warning(
+                "Provider could not terminate resource group %s: %s", resource_id, e.message
+            )
+            return {
+                "success": False,
+                "partial": False,
+                "terminated_instances": 0,
+                "successful_instance_ids": [],
+                "failed_instance_ids": [machine.machine_id.value for machine in machines],
+                "error_message": e.message,
+                "retryable": isinstance(e, ProviderNotReadyError),
+            }
 
         except Exception as e:
             self.logger.error("Failed to process resource group %s: %s", resource_id, e)
