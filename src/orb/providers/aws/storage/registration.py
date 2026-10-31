@@ -190,17 +190,28 @@ def _build_aurora_connection_string(sql_config: Any) -> str:
 
 
 def create_aurora_strategy(config: Any) -> Any:
-    """Create SQLStorageStrategy configured for Aurora.
+    """Create the Aurora SQL strategy for callers that have no entity (health probes)."""
+    from orb.infrastructure.storage.sql.entities import DEFAULT_ENTITY
+
+    return create_aurora_entity_strategy(config, DEFAULT_ENTITY)
+
+
+def create_aurora_entity_strategy(config: Any, entity: str) -> Any:
+    """Create the typed-table SQLStorageStrategy for one entity on Aurora.
 
     Args:
-        config: Configuration object containing sql_strategy (AuroraSqlStrategyConfig)
+        config: ConfigurationManager, or an object exposing ``connection_string``
+        entity: "requests", "machines" or "templates"
 
     Returns:
         SQLStorageStrategy instance
+
+    Raises:
+        StorageError: If no Aurora connection can be derived from ``config``
     """
     from orb.config.manager import ConfigurationManager
     from orb.infrastructure.storage.exceptions import StorageError
-    from orb.infrastructure.storage.sql.strategy import SQLStorageStrategy
+    from orb.infrastructure.storage.sql.entities import create_entity_strategy
     from orb.providers.aws.configuration.config import AWSProviderConfig
 
     if isinstance(config, ConfigurationManager):
@@ -209,18 +220,21 @@ def create_aurora_strategy(config: Any) -> Any:
             raise StorageError(
                 "Aurora storage selected but no aurora config found in provider config"
             )
-        sql_config = aws_cfg.storage.aurora
-        connection_string = _build_aurora_connection_string(sql_config)
+        connection_string = _build_aurora_connection_string(aws_cfg.storage.aurora)
     else:
         connection_string = (
-            getattr(config, "connection_string", None) or "mysql+pymysql://localhost/orb"
+            config.get("connection_string")
+            if isinstance(config, dict)
+            else getattr(config, "connection_string", None)
         )
+        if not isinstance(connection_string, str) or not connection_string:
+            raise StorageError(
+                "Aurora storage needs the Aurora provider configuration or an explicit "
+                "connection_string; no connection could be derived from the configuration "
+                "that was passed."
+            )
 
-    return SQLStorageStrategy(
-        config={"connection_string": connection_string},
-        table_name="generic_storage",
-        columns={"id": "TEXT PRIMARY KEY", "data": "TEXT"},
-    )
+    return create_entity_strategy({"connection_string": connection_string}, entity)
 
 
 def create_aurora_config(data: dict[str, Any]) -> Any:
@@ -271,7 +285,13 @@ def create_aurora_unit_of_work(config: Any) -> Any:
             echo=getattr(aurora_cfg, "echo", False),
         )
     else:
-        connection_string = config.get("connection_string", "mysql+pymysql://localhost/orb")
+        connection_string = config.get("connection_string") if isinstance(config, dict) else None
+        if not isinstance(connection_string, str) or not connection_string:
+            raise StorageError(
+                "Aurora storage needs the Aurora provider configuration or an explicit "
+                "connection_string; no connection could be derived from the configuration "
+                "that was passed."
+            )
         engine = create_engine(connection_string)
 
     return SQLUnitOfWork(engine)
@@ -298,6 +318,7 @@ def register_aurora_storage(
             config_factory=create_aurora_config,
             unit_of_work_factory=create_aurora_unit_of_work,
             display_name="Aurora",
+            entity_strategy_factory=create_aurora_entity_strategy,
         )
 
         if logger:
