@@ -82,10 +82,24 @@ class SQLStorageStrategy(BaseStorageStrategy):
         return True, details
 
     def _get_id_column(self) -> str:
-        """Get the primary key column name."""
+        """Get the primary key column name.
+
+        A column declared ``PRIMARY KEY`` wins. Tables defined by the ORM models
+        (requests, machines, templates) declare their key on the model, and their
+        column dicts carry no key marker, so the model's primary key is used.
+        Anything else falls back to ``id``.
+        """
         for column_name, column_type in self.columns.items():
             if "PRIMARY KEY" in column_type.upper():
                 return column_name
+
+        from orb.infrastructure.storage.sql.models import Base
+
+        orm_table = Base.metadata.tables.get(self.table_name)
+        if orm_table is not None:
+            key_columns = [c.name for c in orm_table.primary_key.columns]
+            if len(key_columns) == 1:
+                return key_columns[0]
         return "id"  # Default fallback
 
     def _initialize_table(self) -> None:
@@ -299,8 +313,9 @@ class SQLStorageStrategy(BaseStorageStrategy):
         """
         with self.lock_manager.write_lock():
             try:
-                # Check if entity exists
-                if self.exists(entity_id):
+                # A failing existence check must surface, never read as "absent":
+                # that would turn an update into a duplicate INSERT.
+                if self._row_exists(entity_id):
                     # Update existing entity
                     serialized_data = self.serializer.serialize_for_update(data)
 
@@ -313,7 +328,13 @@ class SQLStorageStrategy(BaseStorageStrategy):
                     # DB is therefore version - 1.
                     raw_version = data.get("version")
                     expected_version: Optional[int] = None
-                    if isinstance(raw_version, int) and "version" in self.columns:
+                    # Version 0 is an aggregate that was never mutated (nothing to
+                    # compare against), so saving it again is a plain idempotent update.
+                    if (
+                        isinstance(raw_version, int)
+                        and raw_version > 0
+                        and "version" in self.columns
+                    ):
                         expected_version = raw_version - 1
 
                     query, params = self.query_builder.build_update(
@@ -454,6 +475,13 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 self.logger.error("Failed to delete entity %s: %s", entity_id, e)
                 raise StorageError(f"Failed to delete entity {entity_id}: {e}")
 
+    def _row_exists(self, entity_id: str) -> bool:
+        """Whether a row with this primary key exists; errors propagate."""
+        query, param_name = self.query_builder.build_exists(self._get_id_column())
+        with self.connection_manager.get_session() as session:
+            result = session.execute(text(query), {param_name: entity_id})
+            return result.fetchone() is not None
+
     def exists(self, entity_id: str) -> bool:
         """
         Check if entity exists.
@@ -465,13 +493,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
             True if entity exists, False otherwise
         """
         try:
-            query, param_name = self.query_builder.build_exists(self._get_id_column())
-            params = {param_name: entity_id}
-
-            with self.connection_manager.get_session() as session:
-                result = session.execute(text(query), params)
-                exists = result.fetchone() is not None
-
+            exists = self._row_exists(entity_id)
             self.logger.debug("Entity %s exists: %s", entity_id, exists)
             return exists
 
