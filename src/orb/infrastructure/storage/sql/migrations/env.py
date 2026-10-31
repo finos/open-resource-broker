@@ -44,7 +44,9 @@ target_metadata = Base.metadata
 # ---------------------------------------------------------------------------
 _env_url = os.environ.get("ORB_SQL_URL")
 if _env_url:
-    config.set_main_option("sqlalchemy.url", _env_url)
+    # Config values go through ConfigParser interpolation, where "%" is special
+    # (and appears in percent-encoded passwords), so it has to be doubled.
+    config.set_main_option("sqlalchemy.url", _env_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:

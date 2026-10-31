@@ -16,9 +16,9 @@ class TestBuildConnectionString:
 
         cfg = MagicMock()
         cfg.type = "sqlite"
-        cfg.name = "mydb.db"
+        cfg.name = "/srv/orb/mydb.db"
         result = _build_connection_string(cfg)
-        assert "sqlite:///mydb.db" == result
+        assert "sqlite:////srv/orb/mydb.db" == result
 
     def test_postgresql(self) -> None:
         from orb.infrastructure.storage.sql.registration import _build_connection_string
@@ -46,7 +46,7 @@ class TestBuildConnectionString:
         cfg.port = 3306
         cfg.name = "db"
         result = _build_connection_string(cfg)
-        assert result.startswith("mysql://")
+        assert result.startswith("mysql+pymysql://")
 
     def test_unsupported_type_raises(self) -> None:
         from orb.infrastructure.storage.sql.registration import _build_connection_string

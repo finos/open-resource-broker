@@ -6,9 +6,12 @@ from orb.domain.base.ports.logging_port import LoggingPort
 class StorageRegistryService:
     """Application service interface for storage registry operations."""
 
-    def __init__(self, registry: Any, logger: LoggingPort):
+    def __init__(self, registry: Any, logger: LoggingPort, config: Any = None):
         self._registry = registry
         self._logger = logger
+        # Configuration the health probe hands to the strategy factory, so it
+        # inspects the same storage the repositories use.
+        self._config = config
 
     def get_available_storage_types(self) -> list[str]:
         """Get list of available storage types."""
@@ -25,7 +28,9 @@ class StorageRegistryService:
     def get_storage_health(self, storage_type: str) -> dict[str, Any]:
         """Get storage health status."""
         try:
-            strategy = self._registry.create_strategy(storage_type, {})
+            strategy = self._registry.create_strategy(
+                storage_type, self._config if self._config is not None else {}
+            )
             return getattr(strategy, "check_health", lambda: {"status": "unknown"})()
         except Exception as e:
             return {"status": "error", "message": str(e)}
