@@ -1,0 +1,150 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "orb.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "orb.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "orb.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # Force pod rollout when ConfigMap content changes
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "orb.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "orb.serviceAccountName" . }}
+      # Mount the SA token only when the k8s provider needs it to call the API server.
+      # AWS mode gets no token, reducing the blast radius of a container escape.
+      automountServiceAccountToken: {{ eq .Values.provider.type "k8s" }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: orb
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "orb.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Entrypoint: docker-entrypoint.sh serve
+          # -> orb server start --foreground --host HOST --port PORT [--workers N]
+          # The entrypoint reads HF_* env vars and invokes `orb server start --foreground`.
+          command: ["./docker-entrypoint.sh", "serve"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.server.port }}
+              protocol: TCP
+          env:
+            # Server
+            - name: HF_SERVER_ENABLED
+              value: "true"
+            - name: HF_SERVER_HOST
+              value: {{ .Values.server.host | quote }}
+            - name: HF_SERVER_PORT
+              value: {{ .Values.server.port | quote }}
+            - name: HF_SERVER_WORKERS
+              value: {{ .Values.server.workers | quote }}
+            - name: HF_SERVER_LOG_LEVEL
+              value: {{ .Values.server.serverLogLevel | quote }}
+            - name: HF_LOGGING_LEVEL
+              value: {{ .Values.server.logLevel | quote }}
+            # HF_CONFIG_FILE is set by docker-entrypoint.sh after it finds
+            # /app/config/docker.json (highest-precedence scanned path). No override needed.
+            # Auth
+            - name: HF_AUTH_ENABLED
+              value: {{ .Values.auth.enabled | quote }}
+            - name: HF_AUTH_STRATEGY
+              value: {{ .Values.auth.strategy | quote }}
+            {{- if .Values.auth.existingSecret }}
+            - name: HF_AUTH_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.existingSecret }}
+                  key: bearer-token
+            {{- end }}
+            # Provider
+            - name: HF_PROVIDER_TYPE
+              value: {{ .Values.provider.type | quote }}
+            {{- if eq .Values.provider.type "aws" }}
+            - name: HF_PROVIDER_AWS_REGION
+              value: {{ .Values.provider.aws.region | quote }}
+            {{- end }}
+            # Storage
+            - name: HF_STORAGE_STRATEGY
+              value: {{ .Values.storage.type | quote }}
+            - name: HF_STORAGE_BASE_PATH
+              value: {{ .Values.storage.basePath | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: orb-config
+              mountPath: /app/config/docker.json
+              subPath: docker.json
+              readOnly: true
+            - name: orb-data
+              mountPath: /app/data
+            - name: orb-logs
+              mountPath: /app/logs
+            - name: orb-tmp
+              mountPath: /app/tmp
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.path }}
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.path }}
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: orb-config
+          configMap:
+            name: {{ include "orb.fullname" . }}-config
+        - name: orb-data
+          emptyDir: {}
+        - name: orb-logs
+          emptyDir: {}
+        - name: orb-tmp
+          emptyDir: {}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

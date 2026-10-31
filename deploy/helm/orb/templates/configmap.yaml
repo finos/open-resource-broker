@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "orb.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "orb.labels" . | nindent 4 }}
+data:
+  # Mounted at /app/config/docker.json — the highest-precedence path scanned by
+  # docker-entrypoint.sh setup_configuration() (docker.json > production.json > default_config.json).
+  # This ensures the entrypoint sets HF_CONFIG_FILE to this file and the app boots
+  # from the chart-generated config, not the baked-in default_config.json.
+  docker.json: |
+    {
+      "version": "2.0.0",
+      "scheduler": {
+        "type": "default"
+      },
+      "provider": {
+        "providers": [
+          {
+            "name": "{{ .Values.provider.type }}-default",
+            "type": {{ .Values.provider.type | quote }},
+            "enabled": true,
+            "weight": 100,
+            "config": {
+              {{- if eq .Values.provider.type "k8s" }}
+              "namespaces": {{ .Values.provider.k8s.namespaces | toJson }},
+              "node_watch_enabled": {{ .Values.provider.k8s.nodeWatchEnabled }},
+              "default_handler": {{ .Values.provider.k8s.defaultHandler | quote }}
+              {{- else if eq .Values.provider.type "aws" }}
+              "region": {{ .Values.provider.aws.region | quote }}
+              {{- if .Values.provider.aws.profile }},
+              "profile": {{ .Values.provider.aws.profile | quote }}
+              {{- end }}
+              {{- end }}
+            }
+          }
+        ],
+        "selection_policy": "FIRST_AVAILABLE",
+        "default_provider_type": {{ .Values.provider.type | quote }}
+      },
+      "storage": {
+        "type": {{ .Values.storage.type | quote }},
+        "base_path": {{ .Values.storage.basePath | quote }}
+      },
+      "logging": {
+        "level": {{ .Values.server.logLevel | quote }}
+      },
+      "server": {
+        "enabled": true,
+        "host": {{ .Values.server.host | quote }},
+        "port": {{ .Values.server.port }},
+        "workers": {{ .Values.server.workers }},
+        "auth": {
+          "enabled": {{ .Values.auth.enabled }},
+          "strategy": {{ .Values.auth.strategy | quote }}
+        }
+      }
+    }

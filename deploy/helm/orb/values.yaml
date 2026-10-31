@@ -1,0 +1,154 @@
+# Default values for orb.
+# Override with: helm install orb ./deploy/helm/orb -f my-values.yaml
+
+# -- Number of REST server replicas.
+# NOTE: >1 replicas means per-process /metrics — see README for details.
+replicaCount: 1
+
+image:
+  # -- Container image repository.
+  repository: ghcr.io/finos/open-resource-broker
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+  # -- Image tag. Defaults to chart appVersion.
+  tag: ""
+
+# -- Image pull secrets for private registries.
+imagePullSecrets: []
+
+# -- Override the chart name.
+nameOverride: ""
+# -- Override the fully-qualified app name.
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Create a dedicated ServiceAccount for the pod.
+  create: true
+  # -- Annotations to add to the ServiceAccount (e.g. EKS IRSA, GKE Workload Identity).
+  annotations: {}
+  # -- Override the generated SA name.
+  name: ""
+  # automountServiceAccountToken is intentionally absent from the ServiceAccount so that
+  # the pod-level setting (controlled by provider.type) takes effect. The SA token is
+  # mounted only when provider.type=k8s; AWS mode runs without a projected token.
+
+rbac:
+  # -- Create Role/RoleBinding (namespaced) for the k8s provider.
+  create: true
+  # -- Also create a ClusterRole/ClusterRoleBinding for cluster-scoped watch
+  # (required when provider.k8s.namespaces is ["*"] or node_watch_enabled is true).
+  clusterScoped: false
+
+service:
+  # -- Kubernetes Service type.
+  type: ClusterIP
+  # -- REST API port exposed by the Service.
+  port: 8000
+  # -- Annotations to add to the Service.
+  annotations: {}
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# -- Node selector for pod scheduling.
+nodeSelector: {}
+
+# -- Tolerations for pod scheduling.
+tolerations: []
+
+# -- Affinity rules for pod scheduling.
+affinity: {}
+
+# -- Additional pod annotations.
+podAnnotations: {}
+
+# -- Additional pod labels.
+podLabels: {}
+
+# -- Pod security context.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# -- Container security context.
+securityContext:
+  allowPrivilegeEscalation: false
+  # Root filesystem is read-only. The app writes only to /app/logs, /app/data, and
+  # /app/tmp, all of which are mounted as emptyDir volumes in the Deployment.
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ORB server configuration
+server:
+  # -- REST API listen host.
+  host: "0.0.0.0"
+  # -- REST API listen port (must match service.port).
+  port: 8000
+  # -- Number of uvicorn workers. >1 causes per-process /metrics; see README.
+  workers: 1
+  # -- Log level (DEBUG, INFO, WARNING, ERROR).
+  logLevel: "INFO"
+  # -- Uvicorn log level (debug, info, warning, error, critical).
+  serverLogLevel: "info"
+
+auth:
+  # -- Enable authentication. Set to true and configure strategy for production.
+  enabled: false
+  # -- Authentication strategy: none, bearer_token, bearer_token_enhanced, iam, cognito.
+  strategy: "none"
+  # -- Name of an existing Secret containing a bearer token at key "bearer-token".
+  # If set, auth.enabled is forced true and strategy is bearer_token.
+  existingSecret: ""
+
+provider:
+  # -- Active provider type: k8s or aws.
+  type: "k8s"
+
+  k8s:
+    # -- Kubernetes namespaces to watch. Use ["*"] for cluster-scoped watch
+    # (requires rbac.clusterScoped: true).
+    namespaces:
+      - default
+    # -- Enable per-node metadata cache (requires nodes get/list/watch —
+    # automatically included when rbac.clusterScoped is true).
+    nodeWatchEnabled: false
+    # -- Default handler for workload resources (pod, deployment, job, statefulset).
+    defaultHandler: "pod"
+
+  aws:
+    # -- AWS region (used when provider.type is aws).
+    region: "us-east-1"
+    # -- AWS profile name (optional; prefer IRSA/instance profiles in-cluster).
+    profile: ""
+
+storage:
+  # -- Storage backend: json or sqlite or dynamodb.
+  type: "json"
+  # -- Base path for json/sqlite storage (inside the container).
+  basePath: "/app/data"
+
+probes:
+  # -- HTTP path used for liveness and readiness probes.
+  # Default /health works for the standard ORB server. When ui.enabled=true with
+  # embedded mode, FastAPI mounts the app at /orb and the root /health route is
+  # no longer registered — set this to /orb/health (or the correct health path
+  # for your UI build) to avoid probe failures in that configuration.
+  path: /health
+
+# -- Extra environment variables injected into the container.
+# Useful for AWS_ROLE_ARN, KUBECONFIG overrides, etc.
+extraEnv: []
+# - name: AWS_ROLE_ARN
+#   value: "arn:aws:iam::123456789012:role/orb-role"
+
+# -- Mount extra volumes (e.g. AWS credentials, custom CA bundles).
+extraVolumes: []
+extraVolumeMounts: []

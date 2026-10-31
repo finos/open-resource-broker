@@ -1,0 +1,60 @@
+name: Helm Chart
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'deploy/helm/**'
+      - '.github/workflows/helm-chart.yml'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'deploy/helm/**'
+      - '.github/workflows/helm-chart.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: helm-chart-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  KUBECONFORM_VERSION: v0.8.0
+  KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+  KUBERNETES_VERSION: 1.31.0
+
+jobs:
+  static:
+    name: Lint and render
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Install Helm
+      uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
+
+    - name: Install kubeconform
+      run: |
+        curl -fsSLo /tmp/kubeconform.tgz \
+          "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+        echo "${KUBECONFORM_SHA256}  /tmp/kubeconform.tgz" | sha256sum --check -
+        sudo tar -xzf /tmp/kubeconform.tgz -C /usr/local/bin kubeconform
+
+    - name: Lint and render every values fixture
+      run: |
+        set -euo pipefail
+        chart=deploy/helm/orb
+        for values in "$chart"/ci/*-values.yaml; do
+          echo "::group::$values"
+          helm lint --strict "$chart" -f "$values"
+          helm template orb "$chart" -f "$values" --namespace orb \
+            | kubeconform -strict -summary -ignore-missing-schemas \
+                -kubernetes-version "$KUBERNETES_VERSION" -
+          echo "::endgroup::"
+        done

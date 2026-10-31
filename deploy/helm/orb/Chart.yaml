@@ -1,0 +1,17 @@
+apiVersion: v2
+name: orb
+description: Open Resource Broker (ORB) — dynamic cloud resource provisioning via REST API
+type: application
+version: 0.1.0
+appVersion: "1.9.2"
+keywords:
+  - resource-broker
+  - cloud
+  - kubernetes
+  - provisioning
+home: https://github.com/finos/open-resource-broker
+sources:
+  - https://github.com/finos/open-resource-broker
+maintainers:
+  - name: Open Resource Broker Maintainers
+    email: open-resource-broker-maintainers@lists.finos.org
