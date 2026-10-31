@@ -76,7 +76,7 @@ class TestCreateMachineStorageStrategy:
 
         factory.create_machine_storage_strategy(config)
 
-        mock_registry.create_strategy.assert_called_once_with("json", config)
+        mock_registry.create_strategy.assert_called_once_with("json", config, entity="machines")
 
     def test_derives_config_from_config_manager_when_none(self, mock_registry):
         config_manager = MagicMock()
@@ -87,7 +87,7 @@ class TestCreateMachineStorageStrategy:
 
         config_manager.app_config.model_dump.assert_called_once_with()
         mock_registry.create_strategy.assert_called_once_with(
-            "sql", {"storage": {"strategy": "sql"}}
+            "sql", {"storage": {"strategy": "sql"}}, entity="machines"
         )
 
 
@@ -98,7 +98,7 @@ class TestCreateRequestStorageStrategy:
 
         factory.create_request_storage_strategy(config)
 
-        mock_registry.create_strategy.assert_called_once_with("json", config)
+        mock_registry.create_strategy.assert_called_once_with("json", config, entity="requests")
 
     def test_derives_config_from_config_manager_when_none(self, mock_registry):
         config_manager = MagicMock()
@@ -108,7 +108,7 @@ class TestCreateRequestStorageStrategy:
         factory.create_request_storage_strategy()
 
         mock_registry.create_strategy.assert_called_once_with(
-            "sql", {"storage": {"strategy": "sql"}}
+            "sql", {"storage": {"strategy": "sql"}}, entity="requests"
         )
 
 
@@ -119,7 +119,7 @@ class TestCreateTemplateStorageStrategy:
 
         factory.create_template_storage_strategy(config)
 
-        mock_registry.create_strategy.assert_called_once_with("json", config)
+        mock_registry.create_strategy.assert_called_once_with("json", config, entity="templates")
 
     def test_derives_config_from_config_manager_when_none(self, mock_registry):
         config_manager = MagicMock()
@@ -129,7 +129,7 @@ class TestCreateTemplateStorageStrategy:
         factory.create_template_storage_strategy()
 
         mock_registry.create_strategy.assert_called_once_with(
-            "sql", {"storage": {"strategy": "sql"}}
+            "sql", {"storage": {"strategy": "sql"}}, entity="templates"
         )
 
 

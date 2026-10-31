@@ -23,9 +23,6 @@ from orb.infrastructure.storage.repositories.template_repository import (
     TemplateRepositoryImpl as TemplateRepository,
 )
 
-# Import SQL storage strategy
-from orb.infrastructure.storage.sql.strategy import SQLStorageStrategy
-
 
 class SQLUnitOfWork(BaseUnitOfWork):
     """SQL-based unit of work implementation using simplified repositories."""
@@ -43,42 +40,18 @@ class SQLUnitOfWork(BaseUnitOfWork):
         self.engine = engine
         self.session: Optional[Session] = None
 
-        # Derive config from engine URL so SQLConnectionManager can initialise
+        # The strategies share the caller's engine, so they always operate on the
+        # database the engine points at (including a shared in-memory database).
         db_type = engine.url.get_dialect().name  # e.g. "sqlite", "postgresql"
-        db_config: dict[str, Any] = {"type": db_type, "url": str(engine.url)}
+        db_config: dict[str, Any] = {"type": db_type, "engine": engine}
 
-        # Column dicts are derived from ORM models so SQLQueryBuilder has
-        # enough column metadata for parameterised SELECT/INSERT/UPDATE/DELETE.
-        # The actual DDL is handled by Base.metadata.create_all inside
-        # SQLStorageStrategy._initialize_table — these dicts are NOT the
-        # schema authority; models.py is.
-        from orb.infrastructure.storage.sql.models import MachineModel, RequestModel, TemplateModel
+        # The same entity -> table mapping every other SQL entry point uses; the
+        # ORM models (not these column dicts) remain the schema authority.
+        from orb.infrastructure.storage.sql.entities import create_entity_strategy
 
-        def _cols(model_cls):
-            """Extract {column_name: 'TEXT'} dict from an ORM model class."""
-            return {
-                col.key: "TEXT"
-                for col in model_cls.__table__.columns  # type: ignore[attr-defined]
-            }
-
-        # Create storage strategies for each repository
-        machine_strategy = SQLStorageStrategy(
-            config=db_config,
-            table_name="machines",
-            columns=_cols(MachineModel),
-        )
-
-        request_strategy = SQLStorageStrategy(
-            config=db_config,
-            table_name="requests",
-            columns=_cols(RequestModel),
-        )
-
-        template_strategy = SQLStorageStrategy(
-            config=db_config,
-            table_name="templates",
-            columns=_cols(TemplateModel),
-        )
+        machine_strategy = create_entity_strategy(db_config, "machines")
+        request_strategy = create_entity_strategy(db_config, "requests")
+        template_strategy = create_entity_strategy(db_config, "templates")
 
         # Create repositories using simplified implementations
         self.machine_repository = MachineRepository(machine_strategy)

@@ -116,16 +116,15 @@ class TestSQLStrategyConcurrency:
         strategy = _make_versioned_strategy()
         # Insert with version 0
         strategy.save("cv1", {"id": "cv1", "data": "first", "version": 0})
-        # Now simulate writing version 2 as if someone else already wrote version 1
-        # The CAS expects DB to have version=(2-1)=1 but it has 0
+        # A writer whose baseline (5) is not what is stored (0) must conflict
         with pytest.raises(ConcurrencyError):
-            strategy.save("cv1", {"id": "cv1", "data": "conflict", "version": 2})
+            strategy.save_versioned("cv1", {"id": "cv1", "data": "conflict", "version": 6}, 5)
 
     def test_concurrent_write_success_when_version_matches(self) -> None:
         strategy = _make_versioned_strategy()
         strategy.save("vc1", {"id": "vc1", "data": "v0", "version": 0})
-        # Update with version=1 — expects DB row with version 0, which is correct
-        strategy.save("vc1", {"id": "vc1", "data": "v1", "version": 1})
+        # Baseline 0 matches the stored version
+        strategy.save_versioned("vc1", {"id": "vc1", "data": "v1", "version": 1}, 0)
         result = strategy.find_by_id("vc1")
         assert result is not None
         assert result["data"] == "v1"

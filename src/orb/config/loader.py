@@ -464,6 +464,8 @@ class ConfigurationLoader:
             config_manager: Configuration manager with scheduler access (optional)
         """
         # Get directories from scheduler
+        scheduler_dir: Optional[str] = None
+        failure: Optional[Exception] = None
         try:
             svc = cls._get_path_resolution_service(config_manager)
             scheduler_dir = svc.resolve_directory("work")
@@ -494,15 +496,49 @@ class ConfigurationLoader:
                         "Set JSON storage base_path to %s", os.path.join(scheduler_dir, "data")
                     )
 
-                # Update SQL storage strategy database path from scheduler directory.
-                # Applied unconditionally — non-SQLite engines ignore the name field.
+                # A relative SQLite database name resolves under the scheduler data
+                # directory, like the JSON backend. Absolute paths, in-memory and
+                # file: URIs are used as configured, and for other engines the name
+                # is the database name and is left alone.
                 sql_strategy = storage.setdefault("sql_strategy", {})
-                sql_strategy["name"] = os.path.join(scheduler_dir, "data", "database.db")
-                get_config_logger().debug(
-                    "Set SQL storage name to %s", os.path.join(scheduler_dir, "data", "database.db")
-                )
+                if sql_strategy.get("type", "sqlite") == "sqlite":
+                    sql_name = sql_strategy.get("name") or "database.db"
+                    if (
+                        not os.path.isabs(sql_name)
+                        and sql_name != ":memory:"
+                        and not sql_name.startswith("file:")
+                    ):
+                        sql_strategy["name"] = os.path.join(scheduler_dir, "data", sql_name)
+                        get_config_logger().debug(
+                            "Set SQL storage name to %s", sql_strategy["name"]
+                        )
         except Exception as e:
             get_config_logger().debug("Could not get scheduler directories: %s", e)
+            failure = e
+
+        # A failed or empty resolution must not leave a working-directory-relative
+        # SQLite name behind
+        if not scheduler_dir:
+            cls._require_resolved_sql_location(config, failure)
+
+    @staticmethod
+    def _require_resolved_sql_location(config: dict[str, Any], cause: Optional[Exception]) -> None:
+        """Refuse to leave a working-directory-relative SQLite name in a SQL setup."""
+        storage = config.get("storage") or {}
+        if storage.get("strategy") != "sql":
+            return
+        sql_strategy = storage.get("sql_strategy") or {}
+        if sql_strategy.get("type", "sqlite") != "sqlite":
+            return
+        name = sql_strategy.get("name") or "database.db"
+        if os.path.isabs(name) or name == ":memory:" or name.startswith("file:"):
+            return
+        reason = type(cause).__name__ if cause is not None else "empty directory"
+        raise ConfigurationError(
+            "Cannot resolve the scheduler directory, so the SQLite database "
+            f"'{name}' has no location ({reason}). Set "
+            "storage.sql_strategy.name to an absolute path or fix the scheduler configuration."
+        ) from cause
 
     @classmethod
     def _convert_value(cls, value: str) -> Any:

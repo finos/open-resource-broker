@@ -185,22 +185,24 @@ async def handle_storage_migrate(
         # alembic env.py can pick it up without touching alembic.ini at runtime.
         import os
 
-        db_url: str | None = None
-        try:
-            from orb.config.manager import ConfigurationManager
-            from orb.config.schemas.storage_schema import StorageConfig
-            from orb.infrastructure.storage.sql.registration import _build_connection_string
+        from orb.config.manager import ConfigurationManager
+        from orb.config.schemas.storage_schema import StorageConfig
+        from orb.domain.base.exceptions import ConfigurationError
+        from orb.infrastructure.storage.sql.registration import _build_connection_string
 
+        try:
             cfg = container.get(ConfigurationManager)
             storage_cfg = cfg.get_typed(StorageConfig)
-            sql_cfg = storage_cfg.sql_strategy
-            db_url = _build_connection_string(sql_cfg)
-        except Exception:  # noqa: S110  # Fall back to alembic.ini default
-            pass
+            db_url = _build_connection_string(storage_cfg.sql_strategy)
+        except Exception as exc:
+            # Never fall back to a default database: migrating the wrong one is worse than failing
+            raise ConfigurationError(
+                "Cannot determine the SQL database to migrate from the configuration "
+                f"({type(exc).__name__}). Check storage.sql_strategy."
+            ) from None
 
         env = os.environ.copy()
-        if db_url:
-            env["ORB_SQL_URL"] = db_url
+        env["ORB_SQL_URL"] = db_url
 
         # alembic.ini ships inside the package at
         # src/orb/infrastructure/storage/sql/migrations/alembic.ini so it

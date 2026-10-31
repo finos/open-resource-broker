@@ -1,9 +1,11 @@
 """SQL storage strategy implementation using componentized architecture."""
 
+import time
 from contextlib import contextmanager
 from typing import Any, Optional
 
 from sqlalchemy import MetaData, Table, column as sa_column, func, select, text
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
 from orb.application.ports.exceptions import RepositoryQueryError
 from orb.domain.base.exceptions import ConcurrencyError
@@ -18,6 +20,35 @@ from orb.infrastructure.storage.components import (
     SQLSerializer,
 )
 from orb.infrastructure.storage.exceptions import StorageError
+
+
+def _is_duplicate_key(exc: IntegrityError) -> bool:
+    """Whether an integrity error is a unique / primary-key violation."""
+    orig = exc.orig
+    if getattr(orig, "pgcode", None) == "23505" or type(orig).__name__ == "UniqueViolation":
+        return True
+    args = getattr(orig, "args", ())
+    if args and args[0] == 1062:  # MySQL ER_DUP_ENTRY
+        return True
+    message = str(orig)
+    return "UNIQUE constraint failed" in message or "PRIMARY KEY" in message
+
+
+def _is_already_exists(exc: Exception) -> bool:
+    """Whether a DDL error means the object was created by someone else first."""
+    orig = getattr(exc, "orig", None)
+    if getattr(orig, "pgcode", None) in ("42P07", "42710"):  # duplicate table / object
+        return True
+    args = getattr(orig, "args", ())
+    if args and args[0] in (1050, 1061):  # MySQL ER_TABLE_EXISTS_ERROR / ER_DUP_KEYNAME
+        return True
+    return "already exists" in str(orig or exc).lower()
+
+
+def _is_pg_type_race(exc: Exception) -> bool:
+    """Postgres: two sessions creating the same table collide on its row type in pg_type."""
+    message = str(getattr(exc, "orig", None) or exc)
+    return "pg_type" in message and "typname" in message
 
 
 class SQLStorageStrategy(BaseStorageStrategy):
@@ -82,10 +113,24 @@ class SQLStorageStrategy(BaseStorageStrategy):
         return True, details
 
     def _get_id_column(self) -> str:
-        """Get the primary key column name."""
+        """Get the primary key column name.
+
+        A column declared ``PRIMARY KEY`` wins. Tables defined by the ORM models
+        (requests, machines, templates) declare their key on the model, and their
+        column dicts carry no key marker, so the model's primary key is used.
+        Anything else falls back to ``id``.
+        """
         for column_name, column_type in self.columns.items():
             if "PRIMARY KEY" in column_type.upper():
                 return column_name
+
+        from orb.infrastructure.storage.sql.models import Base
+
+        orm_table = Base.metadata.tables.get(self.table_name)
+        if orm_table is not None:
+            key_columns = [c.name for c in orm_table.primary_key.columns]
+            if len(key_columns) == 1:
+                return key_columns[0]
         return "id"  # Default fallback
 
     def _initialize_table(self) -> None:
@@ -116,7 +161,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 alembic_version_exists = self.connection_manager.table_exists("alembic_version")
                 tables_already_exist = self.connection_manager.table_exists(self.table_name)
 
-                Base.metadata.create_all(engine)
+                self._create_schema(engine, Base.metadata)
                 self.logger.debug(
                     "Applied Base.metadata.create_all for ORM table %s", self.table_name
                 )
@@ -136,6 +181,34 @@ class SQLStorageStrategy(BaseStorageStrategy):
         except Exception as e:
             self.logger.error("Failed to initialize table %s: %s", self.table_name, e)
             raise
+
+    _SCHEMA_ATTEMPTS = 5
+
+    def _create_schema(self, engine: Any, metadata: Any) -> None:
+        """Create the ORM tables one by one; tables a concurrent first start made are fine.
+
+        Each table is created with an existence check, and an "already exists"
+        failure (another process won the race for that table) is retried, which
+        then finds the table and does nothing. Only a bounded number of attempts
+        is made per table, and any other error is raised.
+        """
+        for table in metadata.sorted_tables:
+            for attempt in range(1, self._SCHEMA_ATTEMPTS + 1):
+                try:
+                    table.create(engine, checkfirst=True)
+                    break
+                except (OperationalError, ProgrammingError, IntegrityError) as exc:
+                    if not (_is_already_exists(exc) or _is_pg_type_race(exc)):
+                        raise
+                    if attempt == self._SCHEMA_ATTEMPTS:
+                        raise
+                    self.logger.debug(
+                        "Table %s was created concurrently (attempt %d): %s",
+                        table.name,
+                        attempt,
+                        exc,
+                    )
+                    time.sleep(0.05 * attempt)
 
     def _auto_stamp_head(self, engine: Any) -> None:
         """Stamp the Alembic revision table at head for pre-existing installs.
@@ -265,104 +338,133 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 exc,
             )
 
+    # Repositories route aggregates through save_versioned when this is True
+    supports_versioned_save = True
+
     def save(self, entity_id: str, data: dict[str, Any]) -> None:
+        """Insert or update one entity unconditionally (last writer wins)."""
+        self.save_versioned(entity_id, data, None)
+
+    def save_versioned(
+        self, entity_id: str, data: dict[str, Any], expected_version: Optional[int]
+    ) -> int:
+        """Save one entity and return the version written.
+
+        With ``expected_version`` the row is updated only while its stored version
+        still equals it (compare-and-swap in a single UPDATE); a row that changed
+        or disappeared raises ``ConcurrencyError``. Without it (the entity was
+        never loaded or saved) the write is an unconditional insert-or-update.
         """
-        Save entity data to SQL database.
+        return self.save_versioned_batch([(entity_id, data, expected_version)])[0]
 
-        For entities that carry a ``version`` field (Request, Machine) the
-        UPDATE path uses an optimistic compare-and-swap predicate::
+    def save_versioned_batch(
+        self, items: list[tuple[str, dict[str, Any], Optional[int]]]
+    ) -> list[int]:
+        """Save several entities in one transaction; returns the versions written.
 
-            UPDATE … SET …, version = :version
-            WHERE id = :entity_id AND version = :expected_version
-
-        where ``expected_version = data["version"] - 1`` (the version
-        currently stored in the DB before this mutation).
-
-        If the rowcount comes back as 0 it means another writer changed the
-        row between the caller's read and this save.  A ``ConcurrencyError``
-        is raised so the caller can decide how to handle it.  The INSERT path
-        (new entities) is never affected — CAS only activates on UPDATE.
-
-        Callers are responsible for retry logic.  A blind re-save of the same
-        aggregate would be incorrect (the stale in-memory state would
-        overwrite the concurrent writer's changes); instead, callers must
-        re-read the current state, re-apply their mutation, and call save()
-        again.
-
-        Args:
-            entity_id: Unique identifier for the entity
-            data: Entity data to save
-
-        Raises:
-            ConcurrencyError: If a versioned UPDATE matches 0 rows (concurrent write detected).
-            StorageError: On other storage failures.
+        Nothing is written when any item conflicts. A concurrent insert of the
+        same new key is retried once as an update.
         """
+        if not items:
+            return []
         with self.lock_manager.write_lock():
             try:
-                # Check if entity exists
-                if self.exists(entity_id):
-                    # Update existing entity
-                    serialized_data = self.serializer.serialize_for_update(data)
-
-                    # Optimistic concurrency: if the entity carries a version,
-                    # attach a CAS predicate to the UPDATE so that a concurrent
-                    # write to the same row is detected via rowcount == 0.
-                    # ``data["version"]`` is already the NEW (post-mutation) value
-                    # because domain aggregates increment version on every mutation
-                    # before the repository is called; the value currently in the
-                    # DB is therefore version - 1.
-                    raw_version = data.get("version")
-                    expected_version: Optional[int] = None
-                    if isinstance(raw_version, int) and "version" in self.columns:
-                        expected_version = raw_version - 1
-
-                    query, params = self.query_builder.build_update(
-                        serialized_data,
-                        self._get_id_column(),
-                        entity_id,
-                        expected_version=expected_version,
-                    )
-
-                    affected_rows: int = -1
-                    with self.connection_manager.get_session() as session:
-                        result = session.execute(text(query), params)
-                        # Capture rowcount INSIDE the session block: SQLAlchemy 2.0
-                        # does not guarantee cursor.rowcount survives a commit on
-                        # all backends (e.g. asyncpg, psycopg3 in autocommit mode).
-                        affected_rows = result.rowcount
-                        session.commit()
-
-                    if expected_version is not None and affected_rows == 0:
-                        raise ConcurrencyError(
-                            f"Concurrent write detected for entity '{entity_id}': "
-                            f"expected version {expected_version} in DB but row was "
-                            f"not found at that version (another writer updated it first). "
-                            f"Re-read the entity, re-apply your change, and retry.",
-                            details={
-                                "entity_id": entity_id,
-                                "expected_version": expected_version,
-                                "new_version": raw_version,
-                            },
-                        )
-                else:
-                    # Insert new entity
-                    serialized_data = self.serializer.serialize_for_insert(entity_id, data)
-                    query, params = self.query_builder.build_insert(serialized_data)
-
-                    with self.connection_manager.get_session() as session:
-                        session.execute(text(query), params)
-                        session.commit()
-
-                self.logger.debug("Saved entity: %s", entity_id)
-
+                for attempt in (1, 2):
+                    try:
+                        with self.connection_manager.get_session() as session:
+                            versions = [
+                                self._write_one(session, entity_id, data, expected)
+                                for entity_id, data, expected in items
+                            ]
+                            session.commit()
+                        break
+                    except IntegrityError as exc:
+                        # Another writer inserted the same new key between our
+                        # UPDATE (0 rows) and INSERT: redo as an update. Any other
+                        # integrity failure (NOT NULL, foreign key) is a real error.
+                        if attempt == 2 or not _is_duplicate_key(exc):
+                            raise
+                self.logger.debug("Saved %s entities", len(items))
+                return versions
             except ConcurrencyError:
-                # Re-raise ConcurrencyError directly — it is a domain signal,
-                # not an infrastructure failure.
-                self.logger.warning("Concurrency conflict on save for entity %s", entity_id)
+                self.logger.warning(
+                    "Concurrency conflict on save for entities %s", [i[0] for i in items]
+                )
                 raise
             except Exception as e:
-                self.logger.error("Failed to save entity %s: %s", entity_id, e)
-                raise StorageError(f"Failed to save entity {entity_id}: {e}")
+                self.logger.error("Failed to save %s entities: %s", len(items), e)
+                raise StorageError(f"Failed to save entity {items[0][0]}: {e}")
+
+    def _write_one(
+        self, session: Any, entity_id: str, data: dict[str, Any], expected: Optional[int]
+    ) -> int:
+        """Write one entity in the caller's transaction; returns the version written."""
+        id_column = self._get_id_column()
+        has_version = "version" in self.columns
+        local_version = data.get("version")
+        if not isinstance(local_version, int):
+            local_version = 0
+
+        if expected is not None and has_version:
+            # Every write strictly increases the stored version, even when this
+            # copy's own counter is behind the baseline
+            written = max(local_version, expected + 1)
+            row = {**data, "version": written}
+            query, params = self.query_builder.build_update(
+                self.serializer.serialize_for_update(row),
+                id_column,
+                entity_id,
+                expected_version=expected,
+            )
+            if session.execute(text(query), params).rowcount == 0:
+                raise ConcurrencyError(
+                    f"Concurrent write detected for entity '{entity_id}': the stored row "
+                    f"is no longer at version {expected} (it was changed or deleted by "
+                    f"another writer). Re-read the entity, re-apply your change, and retry.",
+                    details={"entity_id": entity_id, "expected_version": expected},
+                )
+            return written
+
+        # No baseline: insert-or-update without a version check
+        written = local_version
+        try:
+            query, params = self.query_builder.build_update(
+                self.serializer.serialize_for_update(data), id_column, entity_id
+            )
+            if has_version and "version = :version" in query:
+                # Stored versions never go down: a freshly built aggregate (local
+                # counter behind the row) still moves the row forward
+                query = query.replace(
+                    "version = :version",
+                    "version = CASE WHEN COALESCE(version, 0) + 1 > :version "
+                    "THEN COALESCE(version, 0) + 1 ELSE :version END",
+                    1,
+                )
+            updated = session.execute(text(query), params).rowcount
+            if updated and has_version:
+                written = self._stored_version(session, id_column, entity_id, local_version)
+        except ValueError:
+            # Only the key was given, so there is nothing to update: just ensure the row exists
+            exists_query, id_param = self.query_builder.build_exists(id_column)
+            updated = int(
+                session.execute(text(exists_query), {id_param: entity_id}).first() is not None
+            )
+        if updated == 0:
+            query, params = self.query_builder.build_insert(
+                self.serializer.serialize_for_insert(entity_id, data)
+            )
+            session.execute(text(query), params)
+        return written
+
+    def _stored_version(self, session: Any, id_column: str, entity_id: str, default: int) -> int:
+        """Version currently stored for a row, read in the caller's transaction."""
+        query, param_name = self.query_builder.build_select_by_id(id_column)
+        row = session.execute(text(query), {param_name: entity_id}).first()
+        if row is None:
+            return default
+        row_dict = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
+        version = row_dict.get("version")
+        return int(version) if version is not None else default
 
     def find_by_id(self, entity_id: str) -> Optional[dict[str, Any]]:
         """
@@ -454,6 +556,13 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 self.logger.error("Failed to delete entity %s: %s", entity_id, e)
                 raise StorageError(f"Failed to delete entity {entity_id}: {e}")
 
+    def _row_exists(self, entity_id: str) -> bool:
+        """Whether a row with this primary key exists; errors propagate."""
+        query, param_name = self.query_builder.build_exists(self._get_id_column())
+        with self.connection_manager.get_session() as session:
+            result = session.execute(text(query), {param_name: entity_id})
+            return result.fetchone() is not None
+
     def exists(self, entity_id: str) -> bool:
         """
         Check if entity exists.
@@ -465,13 +574,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
             True if entity exists, False otherwise
         """
         try:
-            query, param_name = self.query_builder.build_exists(self._get_id_column())
-            params = {param_name: entity_id}
-
-            with self.connection_manager.get_session() as session:
-                result = session.execute(text(query), params)
-                exists = result.fetchone() is not None
-
+            exists = self._row_exists(entity_id)
             self.logger.debug("Entity %s exists: %s", entity_id, exists)
             return exists
 
@@ -512,27 +615,8 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 raise StorageError(f"Failed to search entities: {e}")
 
     def save_batch(self, entities: dict[str, dict[str, Any]]) -> None:
-        """
-        Save multiple entities in batch.
-
-        Args:
-            entities: Dictionary of entities to save
-        """
-        with self.lock_manager.write_lock():
-            try:
-                serialized_list = self.serializer.serialize_batch(entities)
-                query, _ = self.query_builder.build_batch_insert(serialized_list)
-
-                with self.connection_manager.get_session() as session:
-                    for serialized_data in serialized_list:
-                        session.execute(text(query), serialized_data)
-                    session.commit()
-
-                self.logger.debug("Saved batch of %s entities", len(entities))
-
-            except Exception as e:
-                self.logger.error("Failed to save batch: %s", e)
-                raise StorageError(f"Failed to save batch: {e}")
+        """Insert or update several entities unconditionally in one transaction."""
+        self.save_versioned_batch([(eid, data, None) for eid, data in entities.items()])
 
     def delete_batch(self, entity_ids: list[str]) -> None:
         """

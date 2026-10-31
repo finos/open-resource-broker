@@ -34,6 +34,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         region: Optional[str],
         table_name: str,
         profile: Optional[str] = None,
+        transaction_manager: Optional[DynamoDBTransactionManager] = None,
     ) -> None:
         """
         Initialize DynamoDB storage strategy with components.
@@ -43,6 +44,10 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
             region: AWS region
             table_name: DynamoDB table name
             profile: AWS profile name
+            transaction_manager: Transaction manager shared with other strategies so
+                that writes to several tables commit atomically. While it has an
+                active transaction, writes are staged instead of applied and are
+                not visible to reads (of this or any strategy) until it commits.
         """
         super().__init__()
 
@@ -54,7 +59,9 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         # Initialize components
         self.client_manager = DynamoDBClientManager(aws_client, region, profile)
         self.converter = DynamoDBConverter(partition_key="id")
-        self.transaction_manager = DynamoDBTransactionManager(self.client_manager)
+        self.transaction_manager = transaction_manager or DynamoDBTransactionManager(
+            self.client_manager
+        )
         self.lock_manager = LockManager("simple")  # Simple lock for DynamoDB
 
         # Initialize table
@@ -128,6 +135,12 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
             try:
                 # Convert to DynamoDB item
                 item = self.converter.to_dynamodb_item(entity_id, data)
+
+                if self.transaction_manager.is_active:
+                    self.transaction_manager.add_put_item(
+                        self.table_name, item, key=self.converter.get_key(entity_id)
+                    )
+                    return
 
                 # Save to DynamoDB
                 success = self.client_manager.put_item(self.table_name, item)
@@ -218,6 +231,10 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 # Get key for DynamoDB
                 key = self.converter.get_key(entity_id)
 
+                if self.transaction_manager.is_active:
+                    self.transaction_manager.add_delete_item(self.table_name, key)
+                    return
+
                 # Delete from DynamoDB
                 success = self.client_manager.delete_item(self.table_name, key)
 
@@ -302,6 +319,15 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         """
         with self.lock_manager.write_lock():
             try:
+                if self.transaction_manager.is_active:
+                    for entity_id, data in entities.items():
+                        self.transaction_manager.add_put_item(
+                            self.table_name,
+                            self.converter.to_dynamodb_item(entity_id, data),
+                            key=self.converter.get_key(entity_id),
+                        )
+                    return
+
                 # Convert entities to DynamoDB items
                 items = self.converter.prepare_batch_items(entities)
 
@@ -329,7 +355,14 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         """
         with self.lock_manager.write_lock():
             try:
-                # Use transaction manager for batch delete
+                if self.transaction_manager.is_active:
+                    for entity_id in entity_ids:
+                        self.transaction_manager.add_delete_item(
+                            self.table_name, self.converter.get_key(entity_id)
+                        )
+                    return
+
+                # Outside a unit of work the batch is its own atomic transaction
                 with self.transaction_manager.atomic_operation():
                     for entity_id in entity_ids:
                         key = self.converter.get_key(entity_id)
