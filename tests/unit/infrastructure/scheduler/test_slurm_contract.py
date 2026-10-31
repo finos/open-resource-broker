@@ -16,7 +16,7 @@ from orb.domain.request.request_types import RequestStatus
 from orb.infrastructure.scheduler.slurm.field_mappings import (
     SLURM_NODE_STATE_TO_ORB_MACHINE_STATUS,
 )
-from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
+from orb.infrastructure.scheduler.slurm.hostlist import expand_node_range
 from orb.infrastructure.scheduler.slurm.slurm_strategy import SlurmSchedulerStrategy
 from orb.infrastructure.template.dtos import TemplateDTO
 
@@ -187,78 +187,25 @@ def test_slurm_templates_response_required_fields(slurm_strategy):
 # ---------------------------------------------------------------------------
 
 
-def test_node_mapper_expand_range():
+def test_expand_node_range_range():
     """Range expansion: compute-[001-003] → 3 nodes."""
-    result = SlurmNodeMapper.expand_node_range("compute-[001-003]")
+    result = expand_node_range("compute-[001-003]")
     assert result == ["compute-001", "compute-002", "compute-003"]
 
 
-def test_node_mapper_expand_comma_range():
+def test_expand_node_range_comma_range():
     """Comma ranges: node-[1,3,5-7] → 5 nodes."""
-    result = SlurmNodeMapper.expand_node_range("node-[1,3,5-7]")
+    result = expand_node_range("node-[1,3,5-7]")
     assert result == ["node-1", "node-3", "node-5", "node-6", "node-7"]
 
 
-def test_node_mapper_single_node():
+def test_expand_node_range_single_node():
     """Single node passthrough."""
-    result = SlurmNodeMapper.expand_node_range("compute-001")
+    result = expand_node_range("compute-001")
     assert result == ["compute-001"]
 
 
-def test_node_mapper_space_separated():
+def test_expand_node_range_space_separated():
     """Space-separated nodes."""
-    result = SlurmNodeMapper.expand_node_range("compute-001 compute-002")
+    result = expand_node_range("compute-001 compute-002")
     assert result == ["compute-001", "compute-002"]
-
-
-def test_node_mapper_invalid_name_raises():
-    """Invalid node names raise ValueError on register."""
-    mapper = SlurmNodeMapper()
-    with pytest.raises(ValueError):
-        mapper.register_mapping("node;rm -rf /", "i-abc")
-
-
-def test_node_mapper_invalid_machine_id_raises():
-    """Invalid machine IDs raise ValueError on register."""
-    mapper = SlurmNodeMapper()
-    with pytest.raises(ValueError):
-        mapper.register_mapping("node-1", "i-abc;DROP TABLE")
-
-
-def test_node_mapper_round_trip():
-    """Register and retrieve mappings in both directions."""
-    mapper = SlurmNodeMapper()
-    mapper.register_mapping("compute-001", "i-abc123")
-    assert mapper.get_machine_id("compute-001") == "i-abc123"
-    assert mapper.get_node_name("i-abc123") == "compute-001"
-
-
-def test_node_mapper_register_replaces_existing():
-    """register_mapping overwrites existing entries (dynamic slots are fungible)."""
-    mapper = SlurmNodeMapper()
-    mapper.register_mapping("compute-001", "i-old111")
-    mapper.register_mapping("compute-001", "i-new222")
-    assert mapper.get_machine_id("compute-001") == "i-new222"
-    assert mapper.get_node_name("i-new222") == "compute-001"
-    assert mapper.get_node_name("i-old111") is None
-
-
-def test_node_mapper_clear_mappings():
-    """clear_mappings removes specified nodes."""
-    mapper = SlurmNodeMapper()
-    mapper.register_mapping("node-1", "i-aaa")
-    mapper.register_mapping("node-2", "i-bbb")
-    mapper.register_mapping("node-3", "i-ccc")
-    mapper.clear_mappings(["node-1", "node-3"])
-    assert mapper.get_machine_id("node-1") is None
-    assert mapper.get_machine_id("node-2") == "i-bbb"
-    assert mapper.get_machine_id("node-3") is None
-
-
-def test_node_mapper_clear_all():
-    """clear_all resets everything."""
-    mapper = SlurmNodeMapper()
-    mapper.register_mapping("node-1", "i-aaa")
-    mapper.register_mapping("node-2", "i-bbb")
-    mapper.clear_all()
-    assert mapper.get_all_mappings() == {}

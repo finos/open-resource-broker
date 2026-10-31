@@ -17,8 +17,6 @@ from orb.domain.machine.machine_identifiers import MachineType
 from orb.domain.machine.machine_metadata import IPAddressRange
 from orb.domain.request.request_identifiers import RequestId, ResourceIdentifier
 from orb.infrastructure.scheduler.slurm.cli_adapter import SlurmCliAdapter
-from orb.infrastructure.scheduler.slurm.node_bootstrap import SlurmNodeBootstrap
-from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
 from orb.infrastructure.scheduler.slurm.rest_client import SlurmRestClient
 from orb.infrastructure.storage.components.sql_query_builder import SQLQueryBuilder
 from orb.infrastructure.validation.input_validator import InputValidator
@@ -109,31 +107,6 @@ _CASES: list[tuple[str, Callable[[str], bool], str]] = [
         "spot_tagging_role",
         _spot_logger_validator()._is_valid_tagging_role,
         "arn:aws:iam::123456789012:role/aws-ec2-spot-fleet-tagging-role",
-    ),
-    (
-        "slurm_mapper_node",
-        lambda v: not _raises(lambda: SlurmNodeMapper._validate_node_name(v)),
-        "node[1-2],node3",
-    ),
-    (
-        "slurm_mapper_machine",
-        lambda v: not _raises(lambda: SlurmNodeMapper._validate_machine_id(v)),
-        "i-0abc",
-    ),
-    (
-        "slurm_bootstrap_node",
-        lambda v: not _raises(lambda: SlurmNodeBootstrap._validate_node_name(v)),
-        "node_1",
-    ),
-    (
-        "slurm_bootstrap_ip",
-        lambda v: not _raises(lambda: SlurmNodeBootstrap._validate_ip(v)),
-        "10.0.0.1",
-    ),
-    (
-        "slurm_bootstrap_conf_path",
-        lambda v: not _raises(lambda: SlurmNodeBootstrap._validate_slurm_conf_path(v)),
-        "/etc/slurm/slurm.conf",
     ),
     (
         "slurm_cli_name",

@@ -125,18 +125,6 @@ def test_format_request_response_matches_slurm_schema(strategy):
     validate_json_schema(instance=response, schema=expected_request_machines_schema_slurm)
 
 
-def test_handle_resume_request_response_matches_slurm_schema(strategy):
-    class _FakeClient:
-        def get_node(self, node_name):
-            return {"Partitions": "gpu"}
-
-    strategy._slurm_client = _FakeClient()
-
-    response = strategy.handle_resume_request(["gpu-001", "gpu-002"])
-
-    validate_json_schema(instance=response, schema=expected_request_machines_schema_slurm)
-
-
 def test_format_request_status_response_matches_slurm_schema(strategy):
     machine_ref = MachineReferenceDTO(
         machine_id="i-0abc123",
