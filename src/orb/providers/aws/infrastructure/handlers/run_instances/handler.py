@@ -255,6 +255,12 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             "instance_name": f"{self.config_port.get_resource_prefix('instance')}{request.request_id}",
             # Pricing configuration
             "default_capacity_type": self._get_default_capacity_type(template.price_type),
+            # A spot launch also creates a spot-instances-request that carries the tags.
+            "tag_resource_types": (
+                ["instance", "spot-instances-request"]
+                if template.price_type == "spot"
+                else ["instance"]
+            ),
             "has_spot_options": bool(template.allocation_strategy or template.max_price),
             "max_spot_price": (str(template.max_price) if template.max_price is not None else None),
             "spot_instance_type": (

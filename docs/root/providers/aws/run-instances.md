@@ -117,7 +117,7 @@ Setting `price_type: "spot"` adds `InstanceMarketOptions: {"MarketType": "spot"}
 
 `allocation_strategy` is accepted but has little effect: RunInstances has no allocation-strategy parameter, so every strategy maps to the `one-time` spot request type. Use a fleet handler if you need real allocation strategies.
 
-Note that the shipped handler defaults in `aws_defaults.json` declare `RunInstances` with `supports_spot: false`. Spot works when configured on a template as above, but on-demand is the intended path for this handler.
+The shipped handler defaults in `aws_defaults.json` declare `RunInstances` with `supports_spot: true`, so spot templates are accepted without extra configuration. Set `supports_spot: false` under the handler in the provider configuration to reject them.
 
 ### Native spec
 
