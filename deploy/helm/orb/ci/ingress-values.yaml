@@ -1,0 +1,20 @@
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+  hosts:
+    - host: orb.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: orb-ui.example.com
+      paths:
+        - path: /
+          serviceName: orb-ui
+          servicePort: 80
+  tls:
+    - secretName: orb-tls
+      hosts:
+        - orb.example.com
+        - orb-ui.example.com

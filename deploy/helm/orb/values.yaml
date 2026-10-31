@@ -192,6 +192,28 @@ probes:
     # Allows up to periodSeconds * failureThreshold for the first start.
     failureThreshold: 60
 
+ingress:
+  # -- Create an Ingress for the Service.
+  enabled: false
+  # -- IngressClass name.
+  className: ""
+  # -- Ingress annotations (cert-manager issuers, controller options).
+  annotations: {}
+  # -- Hosts and paths. Paths default to "/" routed to the ORB Service. In embedded
+  # mode the API is served at /orb/api/v1 and the UI at /orb. A path may carry
+  # `serviceName` and `servicePort` to route it to a different Service, for
+  # example an externally hosted UI in split mode.
+  hosts: []
+  # - host: orb.example.com
+  #   paths:
+  #     - path: /
+  #       pathType: Prefix
+  # -- TLS termination at the ingress. The pod itself serves plain HTTP.
+  tls: []
+  # - secretName: orb-tls
+  #   hosts:
+  #     - orb.example.com
+
 # -- Extra environment variables injected into the container.
 # Useful for AWS_ROLE_ARN, KUBECONFIG overrides, etc.
 extraEnv: []
