@@ -117,7 +117,7 @@ def test_cancelled_transaction_leaves_every_table_unchanged(uow):
             )
 
     assert isinstance(exc_info.value.__cause__, ClientError)
-    assert "ConditionalCheckFailed" in exc_info.value.error_code
+    assert "ConditionalCheckFailed" in exc_info.value.message
     assert _all_ids(uow._machine_strategy) == set()
     assert _all_ids(uow._template_strategy) == set()
     assert uow._request_strategy.find_by_id("r-1")["status"] == "original"
@@ -195,7 +195,7 @@ def test_failure_of_a_later_call_on_writes_leaves_request_and_a_machine_prefix(u
         with uow:
             _stage_claim(uow, 150)
 
-    message = exc_info.value.error_code
+    message = exc_info.value.message
     assert "call 2 of 2" in message and "1 earlier call(s) were applied" in message
     assert "r-1" not in _all_ids(uow._machine_strategy)
     assert _all_ids(uow._request_strategy) == {"r-1"}

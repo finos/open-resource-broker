@@ -22,6 +22,8 @@ def shared_engine_for_url(connection_string: Any, **engine_args: Any) -> Engine:
     In-memory SQLite is private to the connection that created it, so it is
     never shared this way.
     """
+    # Bound values never appear in error text or logs
+    engine_args.setdefault("hide_parameters", True)
     url = make_url(connection_string)
     if _is_memory_url(url):
         return create_engine(url, **engine_args)

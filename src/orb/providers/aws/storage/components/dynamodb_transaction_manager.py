@@ -481,7 +481,7 @@ class DynamoDBTransactionManager(TransactionManager):
             if isinstance(e, ClientError):
                 reason = self._describe(e)
             elif isinstance(e, TransactionError):
-                reason = e.error_code
+                reason = e.message
             else:
                 # The class name only: botocore validation text can echo parameter values
                 reason = type(e).__name__

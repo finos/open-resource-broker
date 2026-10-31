@@ -344,6 +344,7 @@ def _aurora_engine(url: Any, settings: Any) -> Any:
             pool_recycle=getattr(settings, "pool_recycle", 3600),
             pool_pre_ping=True,
             echo=getattr(settings, "echo", False),
+            hide_parameters=True,
         ),
     )
 

@@ -154,8 +154,8 @@ class TestMissingConfiguration:
         with pytest.raises(StorageError) as exc_info:
             resolve_aurora_connection(_dumped(aurora))
 
-        assert field in exc_info.value.error_code
-        assert PASSWORD not in str(exc_info.value.error_code)
+        assert field in exc_info.value.message
+        assert PASSWORD not in str(exc_info.value.message)
 
     def test_invalid_settings_do_not_echo_the_password(self) -> None:
         aurora = AURORA | {"port": "not-a-port"}
@@ -163,9 +163,9 @@ class TestMissingConfiguration:
         with pytest.raises(StorageError) as exc_info:
             resolve_aurora_connection(_dumped(aurora))
 
-        assert "port" in exc_info.value.error_code
+        assert "port" in exc_info.value.message
         assert PASSWORD not in repr(exc_info.value.__dict__)
-        assert PASSWORD not in str(exc_info.value.error_code)
+        assert PASSWORD not in str(exc_info.value.message)
 
 
 @pytest.fixture
@@ -242,4 +242,4 @@ class TestEveryPathUsesTheResolvedConnection:
         with pytest.raises(StorageError) as exc_info:
             build(_dumped(None))
 
-        assert "no connection could be derived" in exc_info.value.error_code
+        assert "no connection could be derived" in exc_info.value.message

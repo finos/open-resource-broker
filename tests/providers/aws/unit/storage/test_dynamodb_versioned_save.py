@@ -386,8 +386,8 @@ class TestChunkedCommit:
 
         error = exc_info.value
         assert not isinstance(error, ConcurrencyError)
-        assert "earlier call(s) were applied" in error.error_code
-        assert "version conflict" in error.error_code
+        assert "earlier call(s) were applied" in error.message
+        assert "version conflict" in error.message
         # the request row was already advanced by the first call
         assert uow._request_strategy.find_by_id("r-1")["version"] == 2  # type: ignore[index]
 

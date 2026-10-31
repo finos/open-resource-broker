@@ -16,7 +16,7 @@ class StorageError(InfrastructureError):
             message: Error message
             cause: Cause of the error
         """
-        super().__init__("Storage", message)
+        super().__init__(message, error_code="StorageError")
         self.cause = cause
 
     def to_dict(self) -> dict[str, Any]:
@@ -140,11 +140,6 @@ class TransactionError(StorageError):
         """
         super().__init__(message)
         self.transaction_id = transaction_id
-
-    def __str__(self) -> str:
-        # StorageError keeps the detail in ``error_code`` and "Storage" as the
-        # message; for transaction failures the detail is what operators need.
-        return self.error_code
 
     def to_dict(self) -> dict[str, Any]:
         """

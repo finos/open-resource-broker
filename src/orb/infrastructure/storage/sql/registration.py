@@ -219,6 +219,7 @@ def _new_engine(url: Any, sql_config: Any) -> Any:
             return create_engine(
                 url,
                 echo=echo,
+                hide_parameters=True,
                 poolclass=StaticPool,
                 connect_args={"check_same_thread": False},
             )
@@ -239,6 +240,7 @@ def _new_engine(url: Any, sql_config: Any) -> Any:
             pool_timeout=getattr(sql_config, "pool_timeout", 30),
             pool_recycle=getattr(sql_config, "pool_recycle", 3600),
             echo=echo,
+            hide_parameters=True,
             connect_args={"timeout": getattr(sql_config, "timeout", 30)},
         )
 
@@ -249,6 +251,7 @@ def _new_engine(url: Any, sql_config: Any) -> Any:
         pool_timeout=getattr(sql_config, "pool_timeout", 30),
         pool_recycle=getattr(sql_config, "pool_recycle", 3600),
         echo=echo,
+        hide_parameters=True,
     )
 
 

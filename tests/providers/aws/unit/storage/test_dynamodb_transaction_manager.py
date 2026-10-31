@@ -173,7 +173,7 @@ class TestCommitTransaction:
         txn.add_put_item("table", {"id": "1"})
         with pytest.raises(TransactionError) as exc_info:
             txn.commit_transaction()
-        assert "500" in exc_info.value.error_code
+        assert "500" in exc_info.value.message
         assert txn.state == TransactionState.FAILED
 
     def test_client_error_transaction_cancelled_raises_transaction_error_and_marks_failed(
@@ -219,8 +219,8 @@ class TestCommitTransaction:
             txn.commit_transaction()
         # Only the exception class is reported: the text of non-service errors
         # (e.g. botocore validation) can echo parameter values
-        assert "RuntimeError" in exc_info.value.error_code
-        assert "boom" not in exc_info.value.error_code
+        assert "RuntimeError" in exc_info.value.message
+        assert "boom" not in exc_info.value.message
         assert txn.state == TransactionState.FAILED
 
     def test_commit_clears_items_even_on_failure(self, txn, client_manager):
@@ -562,8 +562,8 @@ class TestCommitRetry:
         with pytest.raises(TransactionError) as exc_info:
             manager.commit_transaction()
 
-        assert "ConditionalCheckFailed" in exc_info.value.error_code
-        assert "s3cr3t" not in exc_info.value.error_code
+        assert "ConditionalCheckFailed" in exc_info.value.message
+        assert "s3cr3t" not in exc_info.value.message
 
 
 # ---------------------------------------------------------------------------
@@ -665,7 +665,7 @@ class TestChunkedCommit:
             with pytest.raises(TransactionError) as exc_info:
                 txn.commit_transaction()
 
-        message = exc_info.value.error_code
+        message = exc_info.value.message
         assert "call 2 of 2" in message and "1 earlier call(s) were applied" in message
         assert "'machines': 51" in message and "'requests': 1" in message
         assert "r-old" in message

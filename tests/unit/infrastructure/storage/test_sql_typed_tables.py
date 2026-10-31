@@ -629,5 +629,5 @@ class TestAurora:
         ):
             with pytest.raises(StorageError) as exc_info:
                 build(config)
-            # StorageError keeps its detail in error_code
-            assert "no connection could be derived" in exc_info.value.error_code
+            # StorageError carries its detail in message
+            assert "no connection could be derived" in exc_info.value.message
