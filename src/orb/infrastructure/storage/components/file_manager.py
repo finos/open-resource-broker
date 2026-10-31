@@ -33,6 +33,17 @@ except ImportError:  # pragma: no cover — Windows-only path
     )
 
 
+def _signature_of(stat: os.stat_result) -> tuple[int, int, int, int]:
+    """Identity of a file version: inode, modification and change time, size.
+
+    Every atomic replace installs a new inode and a new change time, so two
+    versions only alias when the filesystem reuses an inode and its timestamp
+    granularity hides two same-size rewrites. The signature therefore only
+    decides whether a cached read may be reused; writes never rely on it.
+    """
+    return (stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size)
+
+
 class FileManager:
     """
     File operations manager for atomic file operations, backups, and integrity checking.
@@ -133,6 +144,29 @@ class FileManager:
         except Exception as e:
             self.logger.error("Failed to read file %s: %s", self.file_path, e)
             raise
+
+    def read_file_with_signature(self) -> tuple[str, Optional[tuple[int, int, int, int]]]:
+        """Read the file and describe the exact version that was read.
+
+        The signature comes from ``fstat`` on the descriptor the content is read
+        from, so it always describes those bytes (a ``stat`` taken before or after
+        the read could pair old content with a newer signature). A missing file
+        reads as empty with a ``None`` signature.
+        """
+        try:
+            with open(self.file_path, encoding="utf-8") as f:
+                stat = os.fstat(f.fileno())
+                content = f.read()
+        except FileNotFoundError:
+            return "", None
+        return content, _signature_of(stat)
+
+    def current_signature(self) -> Optional[tuple[int, int, int, int]]:
+        """Signature of the file as it is now, ``None`` when it does not exist."""
+        try:
+            return _signature_of(os.stat(self.file_path))
+        except FileNotFoundError:
+            return None
 
     def write_file(self, content: str) -> None:
         """

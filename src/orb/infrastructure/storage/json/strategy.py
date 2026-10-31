@@ -2,8 +2,9 @@
 
 import json
 import os
-from typing import Any, Optional, cast
+from typing import Any, Callable, Optional, TypeVar, cast
 
+from orb.domain.base.exceptions import ConcurrencyError
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
 
@@ -16,6 +17,8 @@ from orb.infrastructure.storage.components import (
 )
 from orb.infrastructure.storage.exceptions import StorageError
 from orb.infrastructure.storage.metrics_decorators import instrument_storage
+
+_R = TypeVar("_R")
 
 
 class JSONStorageStrategy(BaseStorageStrategy):
@@ -58,9 +61,11 @@ class JSONStorageStrategy(BaseStorageStrategy):
         self.serializer = JSONSerializer()
         self.transaction_manager = MemoryTransactionManager()
 
-        # Cache for loaded data
+        # Read cache. It only serves reads: it is reused while the file still has
+        # the signature it was read with, and writes never consult it.
         self._data_cache: Optional[dict[str, dict[str, Any]]] = None
         self._cache_valid = False
+        self._cache_signature: Optional[tuple[int, int, int, int]] = None
 
         self.logger.debug("Initialized JSON storage strategy for %s at %s", entity_type, file_path)
 
@@ -143,25 +148,13 @@ class JSONStorageStrategy(BaseStorageStrategy):
             entity_id: Unique identifier for the entity
             data: Entity data to save
         """
-        with self.lock_manager.write_lock():
-            try:
-                # Load current data
-                all_data = self._load_data()
 
-                # Update with new data
-                all_data[entity_id] = data
+        def apply(section: dict[str, dict[str, Any]]) -> tuple[bool, None]:
+            section[entity_id] = data
+            return True, None
 
-                # Save atomically
-                self._save_data(all_data)
-
-                # Invalidate cache
-                self._cache_valid = False
-
-                self.logger.debug("Saved %s entity: %s", self.entity_type, entity_id)
-
-            except Exception as e:
-                self.logger.error("Failed to save %s entity %s: %s", self.entity_type, entity_id, e)
-                raise StorageError(f"Failed to save entity {entity_id}: {e}")
+        self._mutate(apply, f"save entity {entity_id}")
+        self.logger.debug("Saved %s entity: %s", self.entity_type, entity_id)
 
     @instrument_storage(lambda self: cast("JSONStorageStrategy", self)._metrics, "find_by_id")
     def find_by_id(self, entity_id: str) -> Optional[dict[str, Any]]:
@@ -216,34 +209,16 @@ class JSONStorageStrategy(BaseStorageStrategy):
         Args:
             entity_id: Entity identifier
         """
-        with self.lock_manager.write_lock():
-            try:
-                all_data = self._load_data()
 
-                if entity_id not in all_data:
-                    self.logger.warning(
-                        "%s entity not found for deletion: %s",
-                        self.entity_type,
-                        entity_id,
-                    )
-                    return
+        def apply(section: dict[str, dict[str, Any]]) -> tuple[bool, bool]:
+            existed = section.pop(entity_id, None) is not None
+            return existed, existed
 
-                # Remove entity
-                del all_data[entity_id]
-
-                # Save updated data
-                self._save_data(all_data)
-
-                # Invalidate cache
-                self._cache_valid = False
-
-                self.logger.debug("Deleted %s entity: %s", self.entity_type, entity_id)
-
-            except Exception as e:
-                self.logger.error(
-                    "Failed to delete %s entity %s: %s", self.entity_type, entity_id, e
-                )
-                raise StorageError(f"Failed to delete entity {entity_id}: {e}")
+        existed = self._mutate(apply, f"delete entity {entity_id}")
+        if existed:
+            self.logger.debug("Deleted %s entity: %s", self.entity_type, entity_id)
+        else:
+            self.logger.warning("%s entity not found for deletion: %s", self.entity_type, entity_id)
 
     @instrument_storage(lambda self: cast("JSONStorageStrategy", self)._metrics, "exists")
     def exists(self, entity_id: str) -> bool:
@@ -311,18 +286,13 @@ class JSONStorageStrategy(BaseStorageStrategy):
         Args:
             entities: Dictionary of entities to save
         """
-        with self.lock_manager.write_lock():
-            try:
-                all_data = self._load_data()
-                all_data.update(entities)
-                self._save_data(all_data)
-                self._cache_valid = False
 
-                self.logger.debug("Saved batch of %s %s entities", len(entities), self.entity_type)
+        def apply(section: dict[str, dict[str, Any]]) -> tuple[bool, None]:
+            section.update(entities)
+            return True, None
 
-            except Exception as e:
-                self.logger.error("Failed to save batch of %s entities: %s", self.entity_type, e)
-                raise StorageError(f"Failed to save batch: {e}")
+        self._mutate(apply, "save batch")
+        self.logger.debug("Saved batch of %s %s entities", len(entities), self.entity_type)
 
     @instrument_storage(lambda self: cast("JSONStorageStrategy", self)._metrics, "delete_batch")
     def delete_batch(self, entity_ids: list[str]) -> None:
@@ -332,23 +302,14 @@ class JSONStorageStrategy(BaseStorageStrategy):
         Args:
             entity_ids: List of entity IDs to delete
         """
-        with self.lock_manager.write_lock():
-            try:
-                all_data = self._load_data()
 
-                for entity_id in entity_ids:
-                    all_data.pop(entity_id, None)
+        def apply(section: dict[str, dict[str, Any]]) -> tuple[bool, None]:
+            for entity_id in entity_ids:
+                section.pop(entity_id, None)
+            return True, None
 
-                self._save_data(all_data)
-                self._cache_valid = False
-
-                self.logger.debug(
-                    "Deleted batch of %s %s entities", len(entity_ids), self.entity_type
-                )
-
-            except Exception as e:
-                self.logger.error("Failed to delete batch of %s entities: %s", self.entity_type, e)
-                raise StorageError(f"Failed to delete batch: {e}")
+        self._mutate(apply, "delete batch")
+        self.logger.debug("Deleted batch of %s %s entities", len(entity_ids), self.entity_type)
 
     def begin_transaction(self) -> None:
         """Begin transaction."""
@@ -364,8 +325,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
 
     def cleanup(self) -> None:
         """Clean up resources."""
-        self._data_cache = None
-        self._cache_valid = False
+        self._invalidate_cache()
         self.logger.debug("Cleaned up JSON storage strategy for %s", self.entity_type)
 
     @instrument_storage(lambda self: cast("JSONStorageStrategy", self)._metrics, "count")
@@ -383,27 +343,41 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self.logger.error(f"Failed to count {self.entity_type} entities: {e}")
                 return 0
 
+    def _invalidate_cache(self) -> None:
+        self._data_cache = None
+        self._cache_valid = False
+        self._cache_signature = None
+
+    def _section_from(self, content: str) -> dict[str, dict[str, Any]]:
+        """The entity-type section of the file content (empty when absent)."""
+        if not content.strip():
+            return {}
+        full_data = self.serializer.deserialize(content)
+        if not isinstance(full_data, dict):
+            self.logger.warning("Invalid data format in file, initializing empty data")
+            return {}
+        section = full_data.get(self.entity_type, {})
+        return section if isinstance(section, dict) else {}
+
     def _load_data(self) -> dict[str, dict[str, Any]]:
-        """Load data from file with hierarchical structure support."""
-        if self._cache_valid and self._data_cache is not None:
+        """Load this entity type's records for reading.
+
+        The cached copy is reused only while the file still has the signature it
+        was read with, so a write by another strategy or process is picked up.
+        """
+        if (
+            self._cache_valid
+            and self._data_cache is not None
+            and self.file_manager.current_signature() == self._cache_signature
+        ):
             return self._data_cache
 
         try:
-            content = self.file_manager.read_file()
+            content, signature = self.file_manager.read_file_with_signature()
+            entity_data = self._section_from(content)
 
-            if not content.strip():
-                entity_data = {}
-            else:
-                full_data = self.serializer.deserialize(content)
-                if not isinstance(full_data, dict):
-                    self.logger.warning("Invalid data format in file, initializing empty data")
-                    entity_data = {}
-                else:
-                    # Extract only the entity type section from hierarchical structure
-                    entity_data = full_data.get(self.entity_type, {})
-
-            # Cache the entity-specific data
             self._data_cache = entity_data
+            self._cache_signature = signature
             self._cache_valid = True
 
             return entity_data
@@ -418,73 +392,61 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self.logger.warning("No backup available, starting with empty data")
                 return {}
 
-    def _save_data(self, entity_data: dict[str, dict[str, Any]]) -> None:
-        """Save data to file with hierarchical structure support.
+    def _mutate(
+        self, apply: Callable[[dict[str, dict[str, Any]]], tuple[bool, _R]], what: str
+    ) -> _R:
+        """Read, change and write this entity type's section under the locks.
 
-        Cross-process write serialization
-        ----------------------------------
-        The read-modify-write cycle (read full file → merge entity section →
-        atomic write) is wrapped in an ``exclusive_write_lock`` that uses
-        ``fcntl.flock(LOCK_EX)`` on a sibling ``.lock`` file.  This serializes
-        concurrent CLI invocations on the *same host* so neither process clobbers
-        the other's record.
+        ``apply`` receives a copy of the freshly read section and returns
+        ``(changed, result)``; nothing is written when ``changed`` is false.
+        The read happens inside the cross-process lock and never uses the cache,
+        so a record written by another strategy instance or process since the
+        last read cannot be overwritten with an older copy. The cache is replaced
+        only after the file was replaced and dropped on any failure.
 
-        IMPORTANT: the file re-read MUST happen *inside* the lock.  Reading
-        before acquiring the lock would preserve the stale-snapshot race even
-        though the subsequent write is protected.
-
-        LIMITATION: flock is unreliable on NFS / networked filesystems.
-        For multi-host deployments use PostgreSQL storage (strategy: sql).
+        LIMITATION: ``flock`` is unreliable on NFS and other network filesystems;
+        use SQL storage for multi-host deployments.
         """
-        try:
-            # Create backup before entering the critical section (safe to do
-            # outside the lock — worst case we back up a slightly stale copy,
-            # which is acceptable for a best-effort backup).
-            self.file_manager.create_backup()
+        with self.lock_manager.write_lock():
+            try:
+                # Best effort and outside the critical section: at worst it backs
+                # up a slightly stale copy.
+                self.file_manager.create_backup()
 
-            # --- cross-process critical section ----------------------------
-            # Sequence inside the lock:
-            #   1. Re-read the current file contents (fresh, not a cached snapshot)
-            #   2. Merge our entity section into the full hierarchical structure
-            #   3. Atomic write (os.replace via tempfile)
-            # Step 1 MUST be inside the lock; moving it outside reintroduces
-            # the stale-snapshot lost-update race.
-            with self.file_manager.exclusive_write_lock():
-                # Step 1: read current file contents under the exclusive lock
-                try:
-                    content = self.file_manager.read_file()
+                with self.file_manager.exclusive_write_lock():
+                    content, _ = self.file_manager.read_file_with_signature()
                     if content.strip():
                         full_data = self.serializer.deserialize(content)
                     else:
                         full_data = {}
-                except Exception as e:
-                    self.logger.error(
-                        "Cannot read existing storage file before save, "
-                        "aborting to prevent data loss: %s",
-                        e,
-                    )
-                    raise
+                    if not isinstance(full_data, dict):
+                        full_data = {}
+                    section = full_data.get(self.entity_type)
+                    current = section if isinstance(section, dict) else {}
 
-                # Ensure full_data is a dictionary
-                if not isinstance(full_data, dict):
-                    full_data = {}
+                    working = dict(current)
+                    changed, result = apply(working)
+                    if not changed:
+                        return result
 
-                # Step 2: merge — update only our entity type section in the
-                # hierarchical structure, preserving all other entity types.
-                full_data[self.entity_type] = entity_data
+                    full_data[self.entity_type] = working
+                    self.file_manager.write_file(self.serializer.serialize(full_data))
+                    signature = self.file_manager.current_signature()
 
-                # Step 3: serialize and atomic-write the complete structure
-                serialized = self.serializer.serialize(full_data)
-                self.file_manager.write_file(serialized)
-            # --- end critical section --------------------------------------
+                # The lock was held from the read to the replace, so the file now
+                # carries exactly what was written.
+                self._data_cache = working
+                self._cache_signature = signature
+                self._cache_valid = True
+                return result
 
-            # Update in-memory cache with entity-specific data
-            self._data_cache = entity_data
-            self._cache_valid = True
-
-        except Exception as e:
-            self.logger.error("Failed to save data: %s", e)
-            raise
+            except ConcurrencyError:
+                self._invalidate_cache()
+                raise
+            except Exception as e:
+                self._invalidate_cache()
+                self.logger.error("Failed to %s in %s storage: %s", what, self.entity_type, e)
+                raise StorageError(f"Failed to {what}: {e}") from e
 
     def _matches_criteria(self, entity_data: dict[str, Any], criteria: dict[str, Any]) -> bool:
         """Check if entity matches search criteria."""

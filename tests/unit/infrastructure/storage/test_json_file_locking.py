@@ -233,10 +233,10 @@ class TestReReadUnderLock:
         strategy._cache_valid = False
 
         event_log: list[str] = []
-        original_read = strategy.file_manager.read_file
+        original_read = strategy.file_manager.read_file_with_signature
         original_flock = strategy.file_manager.exclusive_write_lock
 
-        def logging_read() -> str:
+        def logging_read() -> Any:
             event_log.append("read")
             return original_read()
 
@@ -249,7 +249,9 @@ class TestReReadUnderLock:
                 yield
             event_log.append("lock_released")
 
-        with patch.object(strategy.file_manager, "read_file", side_effect=logging_read):
+        with patch.object(
+            strategy.file_manager, "read_file_with_signature", side_effect=logging_read
+        ):
             with patch.object(strategy.file_manager, "exclusive_write_lock", logging_lock):
                 strategy.save("new-rec", {"v": 1})
 
