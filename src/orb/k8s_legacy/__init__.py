@@ -75,29 +75,37 @@ def handle_exceptions(
 
     def wrap(f: _DecoratedFuncT) -> _DecoratedFuncT:
         """Returns decorator that wraps/handles exceptions."""
-        exclist_copy = list(exclist)
 
         def wrapped_f(*args, **kwargs) -> None:
             """Wrapped function."""
-            if not exclist_copy:
-                f(*args, **kwargs)
-            else:
-                exc_handler: _ExceptionHandler = exclist_copy.pop(0)
-                exc, handler = exc_handler
+            # A fresh copy per call: the recursion below pops from it, so a
+            # decoration-time copy would be consumed on the first call and
+            # leave every later call without its specific handlers.
+            exclist_copy = list(exclist)
 
-                try:
-                    wrapped_f(*args, **kwargs)
-                except exc as err:
-                    if isinstance(handler, str):
-                        traceback.print_exc()
-                        click.echo(handler, err=True)
-                    elif handler is None:
-                        traceback.print_exc()
-                        click.echo(str(err), err=True)
-                    else:
-                        click.echo(handler(err), err=True)
+            def apply_handlers() -> None:
+                """Run the wrapped function under the remaining handlers."""
+                if not exclist_copy:
+                    f(*args, **kwargs)
+                else:
+                    exc_handler: _ExceptionHandler = exclist_copy.pop(0)
+                    exc, handler = exc_handler
 
-                    sys.exit(EXIT_CODE_DEFAULT)
+                    try:
+                        apply_handlers()
+                    except exc as err:
+                        if isinstance(handler, str):
+                            traceback.print_exc()
+                            click.echo(handler, err=True)
+                        elif handler is None:
+                            traceback.print_exc()
+                            click.echo(str(err), err=True)
+                        else:
+                            click.echo(handler(err), err=True)
+
+                        sys.exit(EXIT_CODE_DEFAULT)
+
+            apply_handlers()
 
         @functools.wraps(f)
         def _handle_any(*args, **kwargs) -> None:
