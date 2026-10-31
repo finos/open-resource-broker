@@ -17,12 +17,36 @@ from orb.infrastructure.storage.repositories.template_repository import (
 )
 
 # Import DynamoDB storage strategy
+from orb.providers.aws.storage.components import (
+    DynamoDBClientManager,
+    DynamoDBTransactionManager,
+)
 from orb.providers.aws.storage.strategy import DynamoDBStorageStrategy
 
 
 @injectable
 class DynamoDBUnitOfWork(BaseUnitOfWork):
-    """DynamoDB-based unit of work implementation using simplified repositories."""
+    """DynamoDB-based unit of work implementation using simplified repositories.
+
+    All three repositories share one transaction manager. Writes made between
+    ``begin`` and ``commit`` are staged and sent as a single
+    ``TransactWriteItems`` call, so they are applied to every table or to none.
+
+    Behaviour to be aware of:
+
+    * Staged writes are not visible to reads (``get_by_id``, ``find_*``,
+      ``exists``) until the unit of work commits.
+    * Save failures surface when the unit of work commits, not at ``save``.
+    * A commit of up to 100 writes (and within the request size limit) is one
+      atomic transaction. Larger commits are sent as several transactions in a
+      fixed order (request-table puts first, other tables next, request-table
+      deletes last) and are not atomic as a whole: a failure part-way raises
+      ``TransactionError`` stating how many calls were already applied, which
+      are not rolled back. Repeating the same writes or deletes is safe.
+    * Domain events published inside the ``with`` block are published before
+      the commit happens.
+    * A unit of work is not reusable after a failed commit; create a new one.
+    """
 
     def __init__(
         self,
@@ -53,6 +77,11 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
         self.region = region
         self.profile = profile
 
+        shared_transactions = DynamoDBTransactionManager(
+            DynamoDBClientManager(aws_client, region, profile)
+        )
+        shared_transactions.anchor_table = request_table
+
         # Create storage strategies for each repository
         machine_strategy = DynamoDBStorageStrategy(
             logger=logger,
@@ -60,6 +89,7 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
             region=region,
             table_name=machine_table,
             profile=profile,
+            transaction_manager=shared_transactions,
         )
 
         request_strategy = DynamoDBStorageStrategy(
@@ -68,6 +98,7 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
             region=region,
             table_name=request_table,
             profile=profile,
+            transaction_manager=shared_transactions,
         )
 
         template_strategy = DynamoDBStorageStrategy(
@@ -76,6 +107,7 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
             region=region,
             table_name=template_table,
             profile=profile,
+            transaction_manager=shared_transactions,
         )
 
         # Create repositories using simplified implementations
@@ -87,6 +119,7 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
         self._machine_strategy = machine_strategy
         self._request_strategy = request_strategy
         self._template_strategy = template_strategy
+        self._transactions = shared_transactions
 
         self._logger.debug(
             "Initialized DynamoDBUnitOfWork with simplified repositories in region: %s",
@@ -109,36 +142,27 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
         return self.template_repository
 
     def _begin_transaction(self) -> None:
-        """Begin DynamoDB transaction."""
+        """Begin the shared DynamoDB transaction."""
         try:
-            self._machine_strategy.begin_transaction()
-            self._request_strategy.begin_transaction()
-            self._template_strategy.begin_transaction()
-
+            self._transactions.begin_transaction()
             self._logger.debug("DynamoDB transaction begun on all repositories")
         except Exception as e:
             self._logger.error("Failed to begin DynamoDB transaction: %s", e)
             raise
 
     def _commit_transaction(self) -> None:
-        """Commit DynamoDB transaction."""
+        """Commit every staged write in one DynamoDB transaction."""
         try:
-            self._machine_strategy.commit_transaction()
-            self._request_strategy.commit_transaction()
-            self._template_strategy.commit_transaction()
-
+            self._transactions.commit_transaction()
             self._logger.debug("DynamoDB transaction committed on all repositories")
         except Exception as e:
             self._logger.error("Failed to commit DynamoDB transaction: %s", e)
             raise
 
     def _rollback_transaction(self) -> None:
-        """Rollback DynamoDB transaction."""
+        """Discard all staged writes."""
         try:
-            self._machine_strategy.rollback_transaction()
-            self._request_strategy.rollback_transaction()
-            self._template_strategy.rollback_transaction()
-
+            self._transactions.rollback_transaction()
             self._logger.debug("DynamoDB transaction rolled back on all repositories")
         except Exception as e:
             self._logger.error("Failed to rollback DynamoDB transaction: %s", e)
