@@ -651,28 +651,25 @@ class TestStartStopInstances:
         assert result.data["results"] == {"vm-1": True, "cc-1": False}
 
 
-class TestCleanupAndHealthUnsupported:
-    def test_cleanup_machine_resources_is_documented_unsupported(self, strategy):
-        op = ProviderOperation(
-            operation_type=ProviderOperationType.CLEANUP_MACHINE_RESOURCES,
-            parameters={},
+class TestCleanupAndHealthNotDeclared:
+    """Azure has no per-machine cleanup or health step, so it neither routes nor declares them."""
+
+    @pytest.mark.parametrize(
+        "operation_type",
+        [
+            ProviderOperationType.CLEANUP_MACHINE_RESOURCES,
+            ProviderOperationType.GET_MACHINE_HEALTH,
+        ],
+    )
+    def test_not_declared_and_not_routed(self, strategy, operation_type):
+        assert operation_type not in strategy.get_capabilities().supported_operations
+
+        result = run_operation(
+            strategy.execute_operation(ProviderOperation(operation_type=operation_type, parameters={}))
         )
 
-        result = run_operation(strategy.execute_operation(op))
-
         assert not result.success
-        assert result.error_code == "CLEANUP_MACHINE_RESOURCES_NOT_SUPPORTED"
-
-    def test_get_machine_health_is_documented_unsupported(self, strategy):
-        op = ProviderOperation(
-            operation_type=ProviderOperationType.GET_MACHINE_HEALTH,
-            parameters={},
-        )
-
-        result = run_operation(strategy.execute_operation(op))
-
-        assert not result.success
-        assert result.error_code == "GET_MACHINE_HEALTH_NOT_SUPPORTED"
+        assert result.error_code == "UNSUPPORTED_OPERATION"
 
 
 class TestSpotPlacementScoreAdapter:
