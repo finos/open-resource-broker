@@ -141,6 +141,11 @@ class TransactionError(StorageError):
         super().__init__(message)
         self.transaction_id = transaction_id
 
+    def __str__(self) -> str:
+        # StorageError keeps the detail in ``error_code`` and "Storage" as the
+        # message; for transaction failures the detail is what operators need.
+        return self.error_code
+
     def to_dict(self) -> dict[str, Any]:
         """
         Convert exception to dictionary.
