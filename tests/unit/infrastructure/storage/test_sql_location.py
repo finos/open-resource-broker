@@ -413,7 +413,9 @@ class TestSqlUrlBuilding:
 
         assert parsed.password == password
         assert parsed.host == "db.example"
-        assert parsed.drivername == ("postgresql" if db_type == "postgresql" else "mysql+pymysql")
+        assert parsed.drivername == (
+            "postgresql+pg8000" if db_type == "postgresql" else "mysql+pymysql"
+        )
 
     @pytest.mark.parametrize("password", ["p@ss", "p/ss", "p%rd", "a@b:c/d%e"])
     def test_migration_config_round_trips_the_escaped_url(self, password):

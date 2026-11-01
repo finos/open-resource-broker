@@ -31,7 +31,7 @@ class TestBuildConnectionString:
         cfg.port = 5432
         cfg.name = "testdb"
         result = _build_connection_string(cfg)
-        assert result.startswith("postgresql://")
+        assert result.startswith("postgresql+pg8000://")
         assert "localhost" in result
         assert "testdb" in result
 

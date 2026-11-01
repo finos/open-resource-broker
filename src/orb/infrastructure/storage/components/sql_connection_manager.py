@@ -1,14 +1,16 @@
 """SQL connection management components for SQL storage operations."""
 
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any, Generator, Optional, Union
 
+from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
 from .engine_registry import get_or_create_engine
+from .postgres_tls import postgres_connect_args
 from .resource_manager import StorageResourceManager as ResourceManager
 
 
@@ -36,7 +38,7 @@ def build_sql_url(
     host: str = "localhost",
     port: Optional[int] = None,
     username: Optional[str] = None,
-    password: Optional[str] = None,
+    password: Optional[Union[str, SecretStr]] = None,
 ) -> URL:
     """Build the SQLAlchemy URL for a database described by its parts.
 
@@ -46,8 +48,11 @@ def build_sql_url(
     """
     if db_type == "sqlite":
         return URL.create("sqlite", database=name)
+    if isinstance(password, SecretStr):
+        password = password.get_secret_value()
     if db_type == "postgresql":
-        drivername = "postgresql"
+        # pg8000 is the PostgreSQL driver ORB installs
+        drivername = "postgresql+pg8000"
     elif db_type == "mysql":
         drivername = "mysql+pymysql"
     else:
@@ -230,6 +235,9 @@ class SQLConnectionManager(ResourceManager):
                     pool_size=self.config.get("pool_size", 10),
                     max_overflow=self.config.get("max_overflow", 20),
                     pool_pre_ping=True,
+                    connect_args=postgres_connect_args(
+                        self.config.get("sslmode"), self.config.get("sslrootcert")
+                    ),
                 )
 
             elif db_type == "mysql":

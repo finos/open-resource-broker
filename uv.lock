@@ -3725,6 +3725,7 @@ all = [
     { name = "opentelemetry-sdk" },
     { name = "prometheus-client" },
     { name = "psutil" },
+    { name = "pymysql" },
     { name = "reflex" },
     { name = "rich" },
     { name = "rich-argparse" },
@@ -3832,6 +3833,7 @@ dev = [
     { name = "psutil" },
     { name = "py-cpuinfo" },
     { name = "py-spy" },
+    { name = "pymysql" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -3923,6 +3925,7 @@ otel = [
 ]
 sql = [
     { name = "alembic" },
+    { name = "pymysql" },
 ]
 test-aws = [
     { name = "boto3" },
@@ -4077,6 +4080,7 @@ dev = [
     { name = "prometheus-client" },
     { name = "py-cpuinfo" },
     { name = "py-spy" },
+    { name = "pymysql" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -4277,6 +4281,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pydantic-settings", marker = "extra == 'k8s-legacy'", specifier = ">=2.0.0" },
     { name = "pyjwt", specifier = ">=2.15.0" },
+    { name = "pymysql", marker = "extra == 'sql'", specifier = ">=1.1" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.408,<2.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.3,<10.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.1,<2.0.0" },
@@ -5267,6 +5272,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/21/a9/5f0c535ba3b08fe09270c16808e053a968868242ecbd5676d4e3a488bf28/pymdown_extensions-11.0.1.tar.gz", hash = "sha256:dd2905ae6fc5b75582fafb139a1266ffc754705efa902aa50067fa7ff4f94ec0", size = 857113, upload-time = "2026-07-02T17:59:22.955Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d6/54/da572c98c0b77626a91b5d3b89f0231d8bff5125c225420908632f8b342d/pymdown_extensions-11.0.1-py3-none-any.whl", hash = "sha256:db3943a62bab7e03af1364f0c4083e64b91fb097675a4b6cceccfbe9a77e5eb2", size = 269455, upload-time = "2026-07-02T17:59:21.271Z" },
+]
+
+[[package]]
+name = "pymysql"
+version = "1.2.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b1/d4/c15b459e25a23767d2f4065ef40968920320f04e302889574310c21c96a3/pymysql-1.2.3.tar.gz", hash = "sha256:d5b288529782e536ae171866df3ca9dc4f6cbfb3cc2f18e6f837fbb90dbc262b", size = 50629, upload-time = "2026-09-17T12:22:49.146Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a9/4b/0a906d8184f011ff8dbd4722743783867589b33269d2c5fff238d636fdcb/pymysql-1.2.3-py3-none-any.whl", hash = "sha256:14f1c68e2ed859243ae5ca41ffbe677027fc46bc136a9f0be8a4e928e5e7415a", size = 46740, upload-time = "2026-09-17T12:22:47.826Z" },
 ]
 
 [[package]]

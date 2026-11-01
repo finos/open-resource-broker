@@ -78,6 +78,7 @@ dependencies = [
 # Install with: pip install orb-py[sql]
 sql = [
     "alembic>=1.13",
+    "PyMySQL>=1.1",  # MySQL / Aurora driver (PostgreSQL uses pg8000, a core dependency)
 ]
 
 # ── Provider extras ────────────────────────────────────────────────────────

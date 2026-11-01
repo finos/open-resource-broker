@@ -28,6 +28,7 @@ _SRC_DIR = os.path.abspath(
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
+from orb.infrastructure.storage.components.postgres_tls import postgres_connect_args
 from orb.infrastructure.storage.sql.migration_lock import migration_lock
 from orb.infrastructure.storage.sql.models import Base
 
@@ -66,11 +67,17 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode (live DB connection)."""
+    connect_args = {}
+    if (config.get_main_option("sqlalchemy.url") or "").startswith("postgresql"):
+        connect_args = postgres_connect_args(
+            os.environ.get("ORB_SQL_SSLMODE"), os.environ.get("ORB_SQL_SSLROOTCERT")
+        )
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
         hide_parameters=True,
+        connect_args=connect_args,
     )
     with connectable.connect() as connection:
         context.configure(

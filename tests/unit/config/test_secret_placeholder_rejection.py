@@ -246,7 +246,7 @@ class TestLoaderPath:
     def test_set_variable_is_expanded_in_the_application_config(self) -> None:
         manager = self._manager(**{"storage.sql_strategy.password": f"${{{SET}}}"})
 
-        assert manager.app_config.storage.sql_strategy.password == SECRET
+        assert manager.app_config.storage.sql_strategy.password.get_secret_value() == SECRET
 
     def test_unset_variable_fails_loading_without_echoing_the_secret(
         self, caplog: pytest.LogCaptureFixture
@@ -291,7 +291,9 @@ class TestPasswordsStayOutOfReprs:
         config = SqlStrategyConfig(password=SECRET)
 
         assert SECRET not in repr(config) and SECRET not in str(config)
-        assert config.password == SECRET  # still readable by the code that connects
+        assert (
+            config.password.get_secret_value() == SECRET
+        )  # still readable by the code that connects
 
     def test_aurora_password_is_not_in_repr(self) -> None:
         from orb.providers.aws.storage.config import AuroraSqlStrategyConfig

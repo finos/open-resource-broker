@@ -203,6 +203,10 @@ async def handle_storage_migrate(
 
         env = os.environ.copy()
         env["ORB_SQL_URL"] = db_url
+        sql_cfg = storage_cfg.sql_strategy
+        env["ORB_SQL_SSLMODE"] = sql_cfg.sslmode
+        if sql_cfg.sslrootcert:
+            env["ORB_SQL_SSLROOTCERT"] = sql_cfg.sslrootcert
 
         # alembic.ini ships inside the package at
         # src/orb/infrastructure/storage/sql/migrations/alembic.ini so it

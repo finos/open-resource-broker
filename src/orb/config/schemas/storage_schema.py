@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from orb.config.utils.env_expansion import reject_unexpanded_placeholder
 
@@ -49,16 +49,35 @@ class SqlStrategyConfig(BaseModel):
     port: int = Field(0, description="Database port")
     name: str = Field("database.db", description="Database name")
     username: Optional[str] = Field(None, description="Database username")
-    password: Optional[str] = Field(None, description="Database password", repr=False)
+    password: Optional[SecretStr] = Field(None, description="Database password")
+    sslmode: str = Field(
+        "require",
+        description=(
+            "PostgreSQL TLS mode: disable, require (encrypted, certificate not checked), "
+            "verify-ca, verify-full"
+        ),
+    )
+    sslrootcert: Optional[str] = Field(
+        None, description="CA bundle used by sslmode verify-ca / verify-full"
+    )
     pool_size: int = Field(5, description="Connection pool size")
     max_overflow: int = Field(10, description="Maximum connection overflow")
     timeout: int = Field(30, description="Connection timeout in seconds")
 
     @field_validator("password", mode="after")
     @classmethod
-    def _reject_unexpanded_password(cls, v: Optional[str]) -> Optional[str]:
+    def _reject_unexpanded_password(cls, v: Optional[SecretStr]) -> Optional[SecretStr]:
         """Fail when the password still holds a ``${VAR}`` placeholder for an unset variable."""
-        return reject_unexpanded_placeholder(v, "storage.sql_strategy.password")
+        if v is not None:
+            reject_unexpanded_placeholder(v.get_secret_value(), "storage.sql_strategy.password")
+        return v
+
+    @field_validator("sslmode")
+    @classmethod
+    def _validate_sslmode(cls, v: str) -> str:
+        from orb.infrastructure.storage.components.postgres_tls import validate_sslmode
+
+        return validate_sslmode(v)
 
     @field_validator("type")
     @classmethod

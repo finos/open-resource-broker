@@ -259,6 +259,8 @@ For production deployments:
       "name": "hostfactory",
       "username": "hostfactory_user",
       "password": "${DB_PASSWORD}",
+      "sslmode": "verify-full",
+      "sslrootcert": "/etc/ssl/certs/rds-global-bundle.pem",
       "pool_size": 20,
       "max_overflow": 30,
       "timeout": 60
@@ -266,6 +268,20 @@ For production deployments:
   }
 }
 ```
+
+PostgreSQL connections use TLS. `sslmode` accepts:
+
+| `sslmode` | Behaviour |
+|-----------|-----------|
+| `require` (default) | Encrypted; the server certificate is not checked |
+| `verify-ca` | Encrypted; the certificate chain is checked against `sslrootcert` |
+| `verify-full` | Encrypted; the chain and the host name are checked against `sslrootcert` |
+| `disable` | No TLS |
+
+Use `verify-full` with `sslrootcert` pointing at the provider's CA bundle for RDS and
+Aurora. A PostgreSQL server without TLS needs `"sslmode": "disable"`. `orb storage
+migrate` uses the same settings. The password is held as a secret and does not appear
+in configuration dumps or logs.
 
 ### Database Schema
 

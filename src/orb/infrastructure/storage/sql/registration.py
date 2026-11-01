@@ -244,6 +244,14 @@ def _new_engine(url: Any, sql_config: Any) -> Any:
             connect_args={"timeout": getattr(sql_config, "timeout", 30)},
         )
 
+    connect_args: dict[str, Any] = {}
+    if url.get_backend_name() == "postgresql":
+        from orb.infrastructure.storage.components.postgres_tls import postgres_connect_args
+
+        connect_args = postgres_connect_args(
+            getattr(sql_config, "sslmode", None), getattr(sql_config, "sslrootcert", None)
+        )
+
     return create_engine(
         url,
         pool_size=sql_config.pool_size,
@@ -252,6 +260,7 @@ def _new_engine(url: Any, sql_config: Any) -> Any:
         pool_recycle=getattr(sql_config, "pool_recycle", 3600),
         echo=echo,
         hide_parameters=True,
+        connect_args=connect_args,
     )
 
 

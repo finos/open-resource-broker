@@ -255,10 +255,13 @@ def _aurora_url(settings: Any) -> Any:
             "ssl_ca": settings.ssl_ca,
             "ssl_verify_cert": "true" if settings.ssl_verify else "false",
         }
+    password = settings.password
+    if hasattr(password, "get_secret_value"):
+        password = password.get_secret_value()
     return URL.create(
         "mysql+pymysql",
         username=settings.username,
-        password=settings.password,
+        password=password,
         host=settings.cluster_endpoint or settings.host,
         port=settings.port,
         database=settings.name,
