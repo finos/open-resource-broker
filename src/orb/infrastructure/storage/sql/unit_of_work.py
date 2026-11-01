@@ -55,9 +55,19 @@ class SQLUnitOfWork(BaseUnitOfWork):
         from orb.infrastructure.storage.sql.models import MachineModel, RequestModel, TemplateModel
 
         def _cols(model_cls):
-            """Extract {column_name: 'TEXT'} dict from an ORM model class."""
+            """Extract {column_name: type} dict from an ORM model class.
+
+            Primary-key columns are marked "TEXT PRIMARY KEY" so that
+            ``SQLStorageStrategy._get_id_column()`` can resolve the real id
+            column (``request_id`` / ``machine_id`` / ``template_id``) instead
+            of falling back to the non-existent ``id`` column.  Without this
+            marker ``exists()`` queried ``WHERE id = ?`` (a column that does
+            not exist), swallowed the error, returned False, and every
+            ``save()`` took the INSERT path — saving the same request twice
+            raised ``UNIQUE constraint failed: requests.request_id``.
+            """
             return {
-                col.key: "TEXT"
+                col.key: "TEXT PRIMARY KEY" if col.primary_key else "TEXT"
                 for col in model_cls.__table__.columns  # type: ignore[attr-defined]
             }
 
