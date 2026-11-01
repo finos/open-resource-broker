@@ -13,8 +13,10 @@ except ImportError:
 import logging as _logging
 
 from orb.api.dependencies import (
+    CurrentUser,
     check_destructive_admin_allowed as _check_destructive_admin_allowed,
     get_cancel_request_orchestrator,
+    get_confirm_terminated_orchestrator,
     get_di_container,
     get_list_requests_orchestrator,
     get_list_return_requests_orchestrator,
@@ -23,20 +25,26 @@ from orb.api.dependencies import (
     require_role,
 )
 from orb.api.models.base import APIRequest
-from orb.api.models.responses import RequestOperationResponse, RequestStatusResponse
+from orb.api.models.responses import (
+    ConfirmTerminatedResponse,
+    RequestOperationResponse,
+    RequestStatusResponse,
+)
 from orb.application.services.admin.cleanup_database import (
     CleanupDatabaseService,
     NonTerminalStatusError,
 )
 from orb.application.services.orchestration.dtos import (
     CancelRequestInput,
+    ConfirmTerminatedInput,
     GetRequestStatusInput,
     ListRequestsInput,
     ListReturnRequestsInput,
 )
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.exceptions import EntityNotFoundError
+from orb.domain.base.exceptions import EntityNotFoundError, ValidationError
 from orb.domain.request.request_types import RequestStatus
+from orb.domain.request.termination_confirmation import InstanceStillVisibleError
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 from orb.interface.catalog import OPERATION_CATALOG, Interface
 
@@ -65,6 +73,7 @@ STATUS_ORCHESTRATOR = Depends(get_request_status_orchestrator)
 LIST_ORCHESTRATOR = Depends(get_list_requests_orchestrator)
 RETURN_LIST_ORCHESTRATOR = Depends(get_list_return_requests_orchestrator)
 CANCEL_ORCHESTRATOR = Depends(get_cancel_request_orchestrator)
+CONFIRM_TERMINATED_ORCHESTRATOR = Depends(get_confirm_terminated_orchestrator)
 FORMATTER = Depends(get_request_formatter)
 STATUS_QUERY = Query(None, description="Filter by request status")
 LIMIT_QUERY = Query(50, ge=1, le=1000, description="Limit number of results")
@@ -458,6 +467,75 @@ async def cancel_request(
         )
     )
     entry = OPERATION_CATALOG["cancel_request"]
+    return JSONResponse(content=entry.renderer_for(Interface.REST)(formatter, result).data)
+
+
+class ConfirmTerminatedBody(APIRequest):
+    """Body for ``POST /api/v1/requests/{request_id}/confirm-terminated``."""
+
+    machine_ids: list[str]
+    reason: str
+
+
+@router.post(
+    "/{request_id}/confirm-terminated",
+    operation_id="confirmTerminated",
+    summary="Confirm Machines Terminated",
+    description=(
+        "Record that an operator has verified the named machines of an OCI return "
+        "request are terminated, for instances OCI reports as not found. The caller "
+        "takes responsibility for the claim: OCI answers not found both for deleted "
+        "instances and for ones it will not show this principal. Rejected with 409 "
+        "when OCI still shows an instance that is not terminated. Repeating a "
+        "confirmation changes nothing."
+    ),
+    response_model=ConfirmTerminatedResponse,
+)
+@handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}/confirm-terminated", method="POST")
+async def confirm_terminated(
+    request_id: str,
+    body: ConfirmTerminatedBody,
+    user: CurrentUser = Depends(require_role("operator")),
+    orchestrator=CONFIRM_TERMINATED_ORCHESTRATOR,
+    formatter=FORMATTER,
+) -> JSONResponse:
+    try:
+        result = await orchestrator.execute(
+            ConfirmTerminatedInput(
+                request_id=request_id,
+                machine_ids=body.machine_ids,
+                reason=body.reason,
+                operator=user.username,
+                role=user.role,
+            )
+        )
+    except (ValidationError, EntityNotFoundError) as exc:
+        # Answered here rather than re-raised: with bearer authentication the
+        # auth middleware turns an exception escaping a route into a 500.
+        missing = isinstance(exc, EntityNotFoundError)
+        return JSONResponse(
+            status_code=404 if missing else 400,
+            content={
+                "success": False,
+                "error": {
+                    "code": "NOT_FOUND" if missing else "INVALID_INPUT",
+                    "message": "Request not found" if missing else exc.message,
+                },
+            },
+        )
+    except InstanceStillVisibleError as exc:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "success": False,
+                "error": {
+                    "code": "INSTANCE_STILL_VISIBLE",
+                    "message": exc.message,
+                    "machine_ids": exc.details.get("machine_ids", []),
+                },
+            },
+        )
+    entry = OPERATION_CATALOG["confirm_terminated"]
     return JSONResponse(content=entry.renderer_for(Interface.REST)(formatter, result).data)
 
 

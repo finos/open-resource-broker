@@ -542,6 +542,28 @@ orb requests cancel REQUEST_ID [OPTIONS]
 |------|-------------|---------|
 | `--force` | Force cancellation | `--force` |
 
+#### `requests confirm-terminated`
+
+Record that you have verified machines of an OCI return request are terminated,
+for instances OCI reports as not found. See
+[Confirm termination](../providers/oci/compute.md#confirm-termination).
+
+**Usage:**
+```bash
+orb requests confirm-terminated REQUEST_ID --machine-id ID [--machine-id ID...] --reason TEXT
+```
+
+**Options:**
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--machine-id`, `-m` | Machine verified terminated (required, repeatable, at most 100) | `-m ocid1.instance.oc1...` |
+| `--reason` | Why the machines are known to be terminated (required, up to 500 characters) | `--reason "deleted in console"` |
+
+The operator is recorded as `cli:<user>@<host>`; this comes from the local
+environment and is advisory only. Exits 1 when a machine is not part of the
+request, the request is not an OCI return request in progress, or OCI still shows
+an instance that is not terminated.
+
 #### `requests status`
 
 Check request status.

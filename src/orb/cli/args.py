@@ -392,6 +392,35 @@ def add_request_actions(subparsers, pp: "ParentParsers | None" = None):
         "--request-id", "-r", dest="flag_request_id", help="Request ID to cancel"
     )
 
+    requests_confirm = subparsers.add_parser(
+        "confirm-terminated",
+        help="Confirm return-request machines are terminated (OCI)",
+        description=(
+            "Record that you have verified machines of an OCI return request are "
+            "terminated, for instances OCI reports as not found. OCI answers not "
+            "found both for deleted instances and for ones it will not show this "
+            "principal, so the claim is yours. The operator is recorded as "
+            "cli:<user>@<host>, which is advisory only."
+        ),
+        parents=[pp.common, pp.provider_scope],
+    )
+    requests_confirm.add_argument("request_id", nargs="?", help="Return request ID")
+    requests_confirm.add_argument(
+        "--request-id", "-r", dest="flag_request_id", help="Return request ID"
+    )
+    requests_confirm.add_argument(
+        "--machine-id",
+        "-m",
+        dest="machine_ids",
+        action="append",
+        required=True,
+        metavar="ID",
+        help="Machine ID verified terminated (repeat for several)",
+    )
+    requests_confirm.add_argument(
+        "--reason", required=True, help="Why the machines are known to be terminated"
+    )
+
     requests_status = subparsers.add_parser(
         "status",
         help="Check request status",

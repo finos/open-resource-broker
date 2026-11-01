@@ -28,6 +28,7 @@ from orb.application.machine.dto import MachineDTO
 from orb.application.services.orchestration.dtos import (
     AcquireMachinesOutput,
     CancelRequestOutput,
+    ConfirmTerminatedOutput,
     CreateTemplateOutput,
     DeleteTemplateOutput,
     GetMachineOutput,
@@ -103,6 +104,9 @@ _OUTPUT_BUILDERS: dict[str, Callable[[], Any]] = {
     ),
     "list_return_requests": lambda: ListReturnRequestsOutput(requests=[]),
     "cancel_request": lambda: CancelRequestOutput(request_id="req-001", status="cancelled"),
+    "confirm_terminated": lambda: ConfirmTerminatedOutput(
+        request_id="req-001", confirmed=["m-1"], already_confirmed=[], records=[], warnings=[]
+    ),
     "list_machines": lambda: ListMachinesOutput(
         machines=[], count=0, next_cursor=None, total_count=0
     ),

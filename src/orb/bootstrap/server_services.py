@@ -137,6 +137,26 @@ def _register_orchestrators(container: DIContainer) -> None:
         logger.debug("CancelRequestOrchestrator not available for registration")
 
     try:
+        from orb.application.services.orchestration.confirm_terminated import (
+            ConfirmTerminatedOrchestrator,
+        )
+        from orb.application.services.provider_registry_service import ProviderRegistryService
+        from orb.domain.base import UnitOfWorkFactory
+
+        if not container.is_registered(ConfirmTerminatedOrchestrator):
+            container.register_singleton(
+                ConfirmTerminatedOrchestrator,
+                lambda c: ConfirmTerminatedOrchestrator(
+                    command_bus=c.get(CommandBus),
+                    uow_factory=c.get(UnitOfWorkFactory),
+                    provider_registry_service=c.get(ProviderRegistryService),
+                    logger=c.get(LoggingPort),
+                ),
+            )
+    except ImportError:
+        logger.debug("ConfirmTerminatedOrchestrator not available for registration")
+
+    try:
         from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
 
         if not container.is_registered(ListMachinesOrchestrator):
