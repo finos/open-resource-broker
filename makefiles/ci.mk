@@ -121,9 +121,9 @@ PYTEST_PARALLEL_CI := -n $(PYTEST_N_WORKERS) --dist=loadscope -m "not serial"
 PYTEST_PARALLEL := $(PYTEST_PARALLEL_CI)
 PYTEST_SERIAL := -m serial
 
-ci-tests-unit:  ## Run unit tests only (matches ci.yml unit-tests job)
+ci-tests-unit:  ## Run unit tests plus the cross-provider contract suites (matches ci.yml unit-tests job)
 	@echo "Running unit tests (parallel)..."
-	$(call run-tool,pytest,$(TESTS_UNIT) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
+	$(call run-tool,pytest,$(TESTS_UNIT) $(TESTS_PROVIDERS_SHARED) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
 
 ci-tests-contract:  ## Run contract tests only (tests/contract: wire formats, REST and scheduler contracts)
 	@echo "Running contract tests (parallel)..."
