@@ -15,7 +15,9 @@ from typing import Any
 import pytest
 
 from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
+from orb.domain.base.exceptions import ConfigurationError
 from orb.providers.base.strategy.provider_strategy import ProviderStrategy
+from orb.providers.registry.types import UnsupportedProviderError
 
 PROVIDERS = ("aws", "azure", "gcp", "k8s", "oci")
 
@@ -40,10 +42,24 @@ REALISTIC_CONFIG: dict[str, dict[str, Any]] = {
 }
 
 
-def _tracked(provider: str, deviating: set[str], issue: str, reason: str) -> Any:
+def _tracked(
+    provider: str,
+    deviating: set[str],
+    issue: str,
+    reason: str,
+    raises: type[BaseException] | None = None,
+) -> Any:
+    """Parametrize one provider, as a strict xfail when it is a known deviation.
+
+    ``raises`` pins the exception the deviation produces, so an unrelated
+    breakage (an ImportError, a different config error) fails the case
+    instead of being reported as the expected xfail.
+    """
     marks = []
     if provider in deviating:
-        marks.append(pytest.mark.xfail(strict=True, reason=f"{issue}: {reason}"))
+        if raises is None:
+            raise ValueError(f"{provider}: a tracked deviation must name the exception it raises")
+        marks.append(pytest.mark.xfail(strict=True, raises=raises, reason=f"{issue}: {reason}"))
     return pytest.param(provider, id=provider, marks=marks)
 
 
@@ -58,16 +74,56 @@ def test_extra_policy_is_as_declared(registry, provider) -> None:
 
 
 # The type discriminator selects which provider to build; it is not a config field.
-@pytest.mark.parametrize(
-    "provider",
-    [
-        _tracked("aws", {"aws"}, "#729", "aws config retains the discriminator as an extra field"),
-        _tracked("azure", {"azure"}, "#729", "azure config rejects the discriminator"),
-        _tracked("gcp", {"gcp"}, "#729", "gcp config rejects the discriminator"),
-        _tracked("k8s", set(), "", ""),
-        _tracked("oci", {"oci"}, "#729", "oci config retains the discriminator as an extra field"),
-    ],
-)
+DISCRIMINATOR_CASES = [
+    _tracked(
+        "aws",
+        {"aws"},
+        "#729",
+        "aws config retains the discriminator as an extra field",
+        AssertionError,
+    ),
+    _tracked(
+        "azure", {"azure"}, "#729", "azure config rejects the discriminator", ConfigurationError
+    ),
+    _tracked(
+        "gcp", {"gcp"}, "#729", "gcp config rejects the discriminator", UnsupportedProviderError
+    ),
+    _tracked("k8s", set(), "", ""),
+    _tracked(
+        "oci",
+        {"oci"},
+        "#729",
+        "oci config retains the discriminator as an extra field",
+        AssertionError,
+    ),
+]
+
+FACTORY_CASES = [
+    _tracked(
+        "aws", {"aws"}, "#730", "aws factory cannot take a ProviderInstanceConfig", RuntimeError
+    ),
+    _tracked("azure", set(), "", ""),
+    _tracked("gcp", set(), "", ""),
+    _tracked(
+        "k8s", {"k8s"}, "#730", "k8s factory cannot take a ProviderInstanceConfig", RuntimeError
+    ),
+    _tracked("oci", set(), "", ""),
+]
+
+
+def test_tracked_deviations_pin_their_exception() -> None:
+    xfails = [
+        (case.id, mark)
+        for case in DISCRIMINATOR_CASES + FACTORY_CASES
+        for mark in case.marks
+        if mark.name == "xfail"
+    ]
+    assert xfails
+    unpinned = [case_id for case_id, mark in xfails if mark.kwargs.get("raises") is None]
+    assert not unpinned, f"strict xfails without raises=: {unpinned}"
+
+
+@pytest.mark.parametrize("provider", DISCRIMINATOR_CASES)
 def test_discriminator_is_accepted_and_not_retained(registry, provider) -> None:
     data = {**REALISTIC_CONFIG[provider], "type": provider}
     config = registry.create_config(provider, data)
@@ -76,16 +132,7 @@ def test_discriminator_is_accepted_and_not_retained(registry, provider) -> None:
     assert not hasattr(config, "type")
 
 
-@pytest.mark.parametrize(
-    "provider",
-    [
-        _tracked("aws", {"aws"}, "#730", "aws factory cannot take a ProviderInstanceConfig"),
-        _tracked("azure", set(), "", ""),
-        _tracked("gcp", set(), "", ""),
-        _tracked("k8s", {"k8s"}, "#730", "k8s factory cannot take a ProviderInstanceConfig"),
-        _tracked("oci", set(), "", ""),
-    ],
-)
+@pytest.mark.parametrize("provider", FACTORY_CASES)
 def test_factory_accepts_provider_instance_config(registry, provider) -> None:
     """ProviderConfigBuilder hands the whole instance config to the factory."""
     instance = ProviderInstanceConfig.model_validate(
