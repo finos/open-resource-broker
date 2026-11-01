@@ -28,7 +28,7 @@ _SRC_DIR = os.path.abspath(
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
-from orb.infrastructure.storage.sql.migration_lock import acquire_migration_lock
+from orb.infrastructure.storage.sql.migration_lock import migration_lock
 from orb.infrastructure.storage.sql.models import Base
 
 # Alembic Config object
@@ -78,9 +78,8 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             compare_type=True,
         )
-        with context.begin_transaction():
-            # Held until the migration transaction ends; concurrent runners wait here.
-            acquire_migration_lock(connection)
+        # Concurrent runners wait here until the holder finishes.
+        with context.begin_transaction(), migration_lock(connection):
             context.run_migrations()
 
 

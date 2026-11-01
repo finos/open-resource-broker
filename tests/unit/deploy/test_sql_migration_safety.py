@@ -12,7 +12,7 @@ import pytest
 from orb.config.schemas.storage_schema import SqlStrategyConfig
 from orb.infrastructure.storage.sql.migration_lock import (
     MIGRATION_LOCK_KEY,
-    acquire_migration_lock,
+    migration_lock,
 )
 
 pytestmark = pytest.mark.unit
@@ -21,26 +21,53 @@ pytestmark = pytest.mark.unit
 def test_postgres_takes_a_transaction_scoped_advisory_lock():
     connection = MagicMock()
     connection.dialect.name = "postgresql"
-    assert acquire_migration_lock(connection) is True
+    with migration_lock(connection) as taken:
+        assert taken is True
     statement, params = connection.execute.call_args.args
     assert "pg_advisory_xact_lock" in str(statement)
     assert params == {"key": MIGRATION_LOCK_KEY}
 
 
+def test_mysql_holds_and_releases_a_named_lock():
+    connection = MagicMock()
+    connection.dialect.name = "mysql"
+    connection.execute.return_value.scalar.return_value = 1
+    with migration_lock(connection) as taken:
+        assert taken is True
+    statements = [str(c.args[0]) for c in connection.execute.call_args_list]
+    assert "GET_LOCK" in statements[0]
+    assert "RELEASE_LOCK" in statements[-1]
+
+
+def test_mysql_releases_the_lock_when_the_migration_fails():
+    connection = MagicMock()
+    connection.dialect.name = "mysql"
+    connection.execute.return_value.scalar.return_value = 1
+    with pytest.raises(ValueError), migration_lock(connection):
+        raise ValueError("boom")
+    assert "RELEASE_LOCK" in str(connection.execute.call_args.args[0])
+
+
+def test_mysql_lock_timeout_aborts_the_migration():
+    connection = MagicMock()
+    connection.dialect.name = "mysql"
+    connection.execute.return_value.scalar.return_value = 0
+    with pytest.raises(RuntimeError), migration_lock(connection):
+        pytest.fail("body must not run without the lock")
+
+
 def test_sqlite_takes_no_lock():
     connection = MagicMock()
     connection.dialect.name = "sqlite"
-    assert acquire_migration_lock(connection) is False
+    with migration_lock(connection) as taken:
+        assert taken is False
     connection.execute.assert_not_called()
 
 
 def test_env_py_takes_the_lock_inside_the_migration_transaction():
     root = Path(__file__).resolve().parents[3]
     env = (root / "src/orb/infrastructure/storage/sql/migrations/env.py").read_text()
-    begin = env.index("with context.begin_transaction():\n            # Held")
-    assert env.index("acquire_migration_lock(connection)", begin) < env.index(
-        "context.run_migrations()", begin
-    )
+    assert "with context.begin_transaction(), migration_lock(connection):" in env
 
 
 def test_upgrade_head_is_idempotent_and_safe_to_repeat(tmp_path):

@@ -377,13 +377,21 @@ class SQLStorageStrategy(BaseStorageStrategy):
         from alembic.operations import Operations
         from alembic.runtime.migration import MigrationContext
 
+        from orb.infrastructure.storage.sql.migration_lock import migration_lock
+
         def upgrade_steps(revision: Any, _context: Any) -> Any:
             return script_dir._upgrade_revs("head", revision)
 
         try:
             with engine.begin() as connection:
                 context = MigrationContext.configure(connection, opts={"fn": upgrade_steps})
-                with Operations.context(context), context.begin_transaction():
+                # Another process starting on the same old database waits here, then
+                # finds the schema at head and changes nothing.
+                with (
+                    Operations.context(context),
+                    context.begin_transaction(),
+                    migration_lock(connection),
+                ):
                     context.run_migrations()
             self.logger.info("Upgraded the SQL schema to Alembic head.")
         except Exception as exc:
