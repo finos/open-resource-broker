@@ -72,6 +72,7 @@ class AcquireMachinesInput:
     wait: bool = False
     timeout_seconds: int = 300
     additional_data: dict[str, Any] = dataclasses.field(default_factory=dict)
+    template_overrides: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)

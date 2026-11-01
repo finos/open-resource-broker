@@ -543,10 +543,31 @@ class ORBClient:
         result = await orchestrator.execute(dto)
         return entry.renderer_for(Interface.SDK)(formatter, result).data
 
-    async def request_machines(self, template_id: str, count: int, **kwargs) -> dict:
+    async def request_machines(
+        self,
+        template_id: str,
+        count: int,
+        *,
+        overrides: "dict[str, Any] | None" = None,
+        **kwargs,
+    ) -> dict:
         """Request machines via AcquireMachinesOrchestrator.
 
         Equivalent to: orb machines request <template_id> <count>
+
+        Args:
+            template_id: Template to provision from.
+            count: Number of machines to request.
+            overrides: Per-request adjustments to the template, applied for this
+                request only; the stored template is not modified. Allowed keys:
+                ``subnet_ids``, ``security_group_ids``, ``machine_types``,
+                ``machine_types_ondemand``, ``machine_types_priority``,
+                ``price_type``, ``max_price``, ``network_zones``,
+                ``public_ip_assignment`` and ``tags`` (merged over the template
+                tags). Identity, credential and bootstrap fields (for example
+                ``machine_role``, ``machine_ssh_key``, ``machine_bootstrap``)
+                cannot be overridden, and unknown keys are rejected.
+            **kwargs: ``wait``, ``timeout_seconds``, ``additional_data``.
         """
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
@@ -562,6 +583,7 @@ class ORBClient:
                 wait=kwargs.get("wait", False),
                 timeout_seconds=kwargs.get("timeout_seconds", 300),
                 additional_data=kwargs.get("additional_data", {}),
+                template_overrides=dict(overrides or {}),
             ),
         )
 

@@ -11,8 +11,13 @@ from typing import Any
 
 from orb.application.ports.query_bus_port import QueryBusPort
 from orb.application.services.machine_coordinates import load_machine_coordinates
+from orb.application.services.template_snapshot import (
+    SNAPSHOT_METADATA_KEY,
+    restore_template_snapshot,
+)
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports import ContainerPort, LoggingPort, ProviderSelectionPort
+from orb.domain.request.value_objects import RequestId
 
 
 def _reconcile_ids(
@@ -171,6 +176,25 @@ class DeprovisioningOrchestrator:
             self.logger.error("Parallel deprovisioning execution failed: %s", e, exc_info=True)
             return {"success": False, "error_message": str(e)}
 
+    def _load_snapshot_template(self, origin_request_id: Any, template_id: str) -> Any:
+        """Return the template as provisioned, from the originating request.
+
+        Returns ``None`` when the request carries no usable snapshot, in which
+        case the caller falls back to resolving the stored template.
+        """
+        if not origin_request_id:
+            return None
+        try:
+            with self.uow_factory.create_unit_of_work() as uow:
+                origin = uow.requests.get_by_id(RequestId(value=str(origin_request_id)))
+                metadata = dict(origin.metadata or {}) if origin else {}
+        except Exception as exc:
+            self.logger.warning(
+                "Could not load template snapshot for request %s: %s", origin_request_id, exc
+            )
+            return None
+        return restore_template_snapshot(metadata.get(SNAPSHOT_METADATA_KEY), template_id)
+
     async def _process_resource_group(
         self,
         provider_name: str,
@@ -204,10 +228,12 @@ class DeprovisioningOrchestrator:
             )
 
             # Get template for configuration
-            from orb.application.dto.queries import GetTemplateQuery
+            template = self._load_snapshot_template(machines[0].request_id, template_id)
+            if template is None:
+                from orb.application.dto.queries import GetTemplateQuery
 
-            template_query = GetTemplateQuery(template_id=template_id)
-            template = await self._query_bus.execute(template_query)
+                template_query = GetTemplateQuery(template_id=template_id)
+                template = await self._query_bus.execute(template_query)
 
             if not template:
                 raise ValueError(f"Template not found: {template_id}")

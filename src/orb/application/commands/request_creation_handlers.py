@@ -16,6 +16,7 @@ from orb.application.services.provider_validation_service import ProviderValidat
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
 )
+from orb.application.services.template_overrides import apply_template_overrides
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.base.exceptions import ApplicationError, EntityNotFoundError
@@ -110,6 +111,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
 
         # Load template and select provider
         template = await self._load_template(command.template_id)
+        if command.template_overrides:
+            template = apply_template_overrides(template, command.template_overrides)
         selection_result = await self._provider_validation_service.select_and_validate_provider(
             template
         )
