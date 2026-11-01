@@ -60,9 +60,29 @@ def test_override_request_is_returnable_from_a_fresh_process_without_the_templat
     from orb.bootstrap import Application
 
     config_data = json.loads((orb_config_dir / "config.json").read_text())
+    # The template lists both subnets and launches into the first by default.
     override_subnet = moto_vpc_resources["subnet_ids"][1]
 
     request_id, status = asyncio.run(_sdk_request(config_data, {"subnet_ids": [override_subnet]}))
+
+    # The override reached AWS: the request's launch template targets the
+    # override subnet. Moto does not apply launch template networking to
+    # RunInstances, so the launch template data is what records the subnet.
+    ec2 = boto3.client("ec2", region_name="eu-west-2")
+    (launch_template,) = [
+        lt
+        for lt in ec2.describe_launch_templates()["LaunchTemplates"]
+        if request_id in lt["LaunchTemplateName"]
+    ]
+    versions = ec2.describe_launch_template_versions(
+        LaunchTemplateId=launch_template["LaunchTemplateId"]
+    )["LaunchTemplateVersions"]
+    lt_subnets = {
+        ni.get("SubnetId")
+        for v in versions
+        for ni in v["LaunchTemplateData"].get("NetworkInterfaces", [])
+    }
+    assert lt_subnets == {override_subnet}, lt_subnets
 
     # The status output does not expose the recorded template.
     assert "template_snapshot" not in json.dumps(status, default=str)
@@ -98,7 +118,6 @@ def test_override_request_is_returnable_from_a_fresh_process_without_the_templat
             time.sleep(0.5)
     assert final == "complete", final
 
-    ec2 = boto3.client("ec2", region_name="eu-west-2")
     states = {
         i["State"]["Name"]
         for r in ec2.describe_instances(InstanceIds=machine_ids)["Reservations"]
