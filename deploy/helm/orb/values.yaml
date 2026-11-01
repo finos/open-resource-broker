@@ -33,10 +33,11 @@ serviceAccount:
   # mounted only when provider.type=k8s.
 
 rbac:
-  # -- Create Role/RoleBinding (namespaced) for the k8s provider.
+  # -- Create a Role/RoleBinding for the k8s provider in each namespace it
+  # manages. Nothing is created when provider.type is aws.
   create: true
   # -- Also create a ClusterRole/ClusterRoleBinding for cluster-scoped watch
-  # (required when provider.k8s.namespaces is ["*"] or node_watch_enabled is true).
+  # (required when provider.k8s.namespaces is ["*"] or nodeWatchEnabled is true).
   clusterScoped: false
 
 service:
@@ -128,10 +129,12 @@ provider:
   type: "k8s"
 
   k8s:
-    # -- Kubernetes namespaces to watch. Use ["*"] for cluster-scoped watch
-    # (requires rbac.clusterScoped: true).
-    namespaces:
-      - default
+    # -- Kubernetes namespaces the provider creates workloads in and watches.
+    # Empty means the release namespace. The first entry is the default for
+    # templates that do not name a namespace, unless the list includes the
+    # release namespace. Use ["*"] for cluster-scoped watch (requires
+    # rbac.clusterScoped: true).
+    namespaces: []
     # -- Enable per-node metadata cache (requires nodes get/list/watch —
     # automatically included when rbac.clusterScoped is true).
     nodeWatchEnabled: false

@@ -82,6 +82,43 @@ Fail the render for unsupported storage and replica combinations.
 {{- if not (has .Values.ui.mode (list "embedded" "split" "disabled")) }}
 {{- fail (printf "ui.mode must be embedded, split or disabled, got %q" (toString .Values.ui.mode)) }}
 {{- end }}
+{{- if and (eq .Values.provider.type "k8s") .Values.rbac.create (not .Values.rbac.clusterScoped) }}
+{{- if has "*" .Values.provider.k8s.namespaces }}
+{{- fail "provider.k8s.namespaces [\"*\"] watches every namespace and needs rbac.clusterScoped: true" }}
+{{- end }}
+{{- if .Values.provider.k8s.nodeWatchEnabled }}
+{{- fail "provider.k8s.nodeWatchEnabled needs rbac.clusterScoped: true: nodes are cluster-scoped" }}
+{{- end }}
+{{- end }}
+{{- if and (has "*" .Values.provider.k8s.namespaces) (gt (len .Values.provider.k8s.namespaces) 1) }}
+{{- fail "provider.k8s.namespaces: \"*\" cannot be combined with other namespaces" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Namespaces the k8s provider manages: provider.k8s.namespaces, or the release
+namespace when that list is empty. Returned as a JSON list.
+*/}}
+{{- define "orb.k8sNamespaces" -}}
+{{- if .Values.provider.k8s.namespaces }}
+{{- toJson .Values.provider.k8s.namespaces }}
+{{- else }}
+{{- toJson (list .Release.Namespace) }}
+{{- end }}
+{{- end }}
+
+{{/*
+Namespace the k8s provider uses when a template names none: the release
+namespace when it is managed (or the watch is cluster-scoped), otherwise the
+first managed namespace.
+*/}}
+{{- define "orb.k8sDefaultNamespace" -}}
+{{- $namespaces := include "orb.k8sNamespaces" . | fromJsonArray }}
+{{- if or (has .Release.Namespace $namespaces) (has "*" $namespaces) }}
+{{- .Release.Namespace }}
+{{- else }}
+{{- first $namespaces }}
+{{- end }}
 {{- end }}
 
 {{/*

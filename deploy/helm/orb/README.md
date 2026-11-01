@@ -31,12 +31,13 @@ helm upgrade orb ./deploy/helm/orb --namespace orb -f my-values.yaml
 | `ui.mode` | `embedded` | `embedded`, `split` or `disabled`; selects probe paths |
 | `ingress.enabled` | `false` | Create an Ingress |
 | `provider.type` | `k8s` | Active provider (`k8s` or `aws`) |
+| `provider.k8s.namespaces` | `[]` | Namespaces the k8s provider manages; empty means the release namespace |
 | `server.port` | `8000` | REST API port |
 | `server.workers` | `1` | uvicorn worker count |
 | `auth.enabled` | `false` | Enable authentication |
 | `auth.strategy` | `none` | `none` or `bearer_token` |
 | `auth.existingSecret` | `""` | Secret holding the JWT signing key (`bearer_token`) |
-| `rbac.create` | `true` | Create namespaced Role/RoleBinding |
+| `rbac.create` | `true` | Create a Role/RoleBinding in each managed namespace |
 | `rbac.clusterScoped` | `false` | Also create ClusterRole/ClusterRoleBinding |
 
 ## Authentication
@@ -67,7 +68,19 @@ specific settings that the chart does not render yet.
 
 ## RBAC
 
-By default a namespaced `Role` + `RoleBinding` is created granting the k8s provider access to pods, deployments, statefulsets, jobs, and events within the release namespace.
+With the k8s provider, the chart creates a `Role` and `RoleBinding` in each namespace the provider
+manages, granting access to pods, deployments, statefulsets, jobs and events. By default
+`provider.k8s.namespaces` is empty and the provider manages the release namespace only. To run
+workloads in other namespaces, list them; the first entry becomes the default for templates that
+name no namespace, unless the release namespace is in the list:
+
+```yaml
+provider:
+  k8s:
+    namespaces: [hpc-jobs, batch]
+```
+
+No Kubernetes RBAC is created when `provider.type` is `aws`.
 
 For **cluster-scoped watch** (`provider.k8s.namespaces: ["*"]`) or **node watch** (`provider.k8s.nodeWatchEnabled: true`), enable the ClusterRole:
 
@@ -81,6 +94,8 @@ provider:
 ```
 
 This grants nodes `get/list/watch` cluster-wide. Review with your security team before applying in shared clusters.
+The chart refuses to render `namespaces: ["*"]` or `nodeWatchEnabled: true` without
+`rbac.clusterScoped: true`, unless `rbac.create` is false and you manage RBAC yourself.
 
 ## Storage
 
@@ -170,7 +185,14 @@ ids follow the base image; if you build your own image with different ids, set
 `podSecurityContext.runAsUser`, `runAsGroup` and `fsGroup` to match. `fsGroup` lets that user
 write to the volume.
 
-Writable paths are `/app/data` (volume), `/app/logs`, `/app/tmp` and `/tmp` (`emptyDir`).
+Writable paths are `/app/data` (volume), `/app/logs`, `/app/tmp`, `/app/work` and `/tmp` (`emptyDir`).
+
+## Trusted Hosts
+
+The server rejects requests whose `Host` header is not trusted with a 400. Loopback addresses,
+the Service DNS names and the `ingress.hosts` entries are always trusted. Requests that address
+the pod or a node by IP, such as Prometheus scraping pods by IP or `NodePort` and `LoadBalancer`
+access, need those addresses or names added to `server.trustedHosts`.
 
 ## /metrics Caveat (Multi-Worker)
 

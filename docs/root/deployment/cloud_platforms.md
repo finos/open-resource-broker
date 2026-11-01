@@ -15,7 +15,7 @@ helm install orb ./deploy/helm/orb --namespace orb --create-namespace
 ```
 
 By default it runs a single replica with JSON storage on a PersistentVolumeClaim, uses the
-`k8s` provider and serves the API and embedded UI under `/orb`. See
+`k8s` provider in the release namespace and serves the API and embedded UI under `/orb`. See
 [deploy/helm/orb/README.md](https://github.com/finos/open-resource-broker/blob/main/deploy/helm/orb/README.md)
 for all values.
 

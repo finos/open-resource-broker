@@ -190,9 +190,9 @@
             "namespaces": {
               "type": "array",
               "items": {
-                "type": "string"
-              },
-              "minItems": 1
+                "type": "string",
+                "minLength": 1
+              }
             },
             "nodeWatchEnabled": {
               "type": "boolean"

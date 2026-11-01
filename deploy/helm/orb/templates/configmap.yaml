@@ -26,7 +26,8 @@ data:
             "config": {
               {{- if eq .Values.provider.type "k8s" }}
               "in_cluster": true,
-              "namespaces": {{ .Values.provider.k8s.namespaces | toJson }},
+              "namespace": {{ include "orb.k8sDefaultNamespace" . | quote }},
+              "namespaces": {{ include "orb.k8sNamespaces" . }},
               "node_watch_enabled": {{ .Values.provider.k8s.nodeWatchEnabled }}
               {{- else if eq .Values.provider.type "aws" }}
               "region": {{ .Values.provider.aws.region | quote }}
