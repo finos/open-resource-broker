@@ -228,3 +228,91 @@ class TestVersionedDatabaseBehindHead:
             _open(database)
 
         assert "pending migrations" not in caplog.text
+
+
+class _RecordingConnection:
+    """A SQLAlchemy-like connection that records the statements run on it."""
+
+    def __init__(self, dialect: object, existing: object = None) -> None:
+        self.dialect = dialect
+        self.statements: list[tuple[str, object]] = []
+        self.committed = False
+        self._existing = existing
+
+    def __enter__(self) -> _RecordingConnection:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+    def execute(self, statement: object, params: object = None) -> object:
+        from unittest.mock import MagicMock
+
+        self.statements.append((str(statement), params))
+        result = MagicMock()
+        result.first.return_value = self._existing
+        return result
+
+    def commit(self) -> None:
+        self.committed = True
+
+    def rollback(self) -> None:
+        return None
+
+
+@pytest.mark.unit
+class TestPostgresStampWithPg8000:
+    """The stamp works on the pg8000 driver, which has no psycopg2-only calls."""
+
+    def _engine(self, existing: object = None) -> tuple[object, _RecordingConnection]:
+        from unittest.mock import MagicMock
+
+        import pg8000.dbapi
+        from sqlalchemy.dialects.postgresql.pg8000 import PGDialect_pg8000
+
+        connection = _RecordingConnection(PGDialect_pg8000(), existing)
+        engine = MagicMock()
+        engine.dialect = connection.dialect
+        engine.url = "postgresql+pg8000://orb@db.example/orb"
+        # A pg8000 DBAPI connection: no set_isolation_level
+        engine.raw_connection.return_value = MagicMock(spec=pg8000.dbapi.Connection)
+        engine.connect.return_value = connection
+        return engine, connection
+
+    def _strategy(self) -> SQLStorageStrategy:
+        from unittest.mock import MagicMock
+
+        strategy = SQLStorageStrategy.__new__(SQLStorageStrategy)
+        strategy.logger = MagicMock()
+        strategy.table_name = "machines"
+        return strategy
+
+    def test_stamps_head_under_the_advisory_lock(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from orb.infrastructure.storage.sql import strategy as strategy_module
+
+        monkeypatch.setattr(strategy_module, "_launch_time_is_integer", lambda _e: False)
+        engine, connection = self._engine()
+        strategy = self._strategy()
+
+        strategy._auto_stamp_head(engine)
+
+        sql = [statement for statement, _ in connection.statements]
+        assert "pg_advisory_xact_lock" in sql[0]
+        assert any("CREATE TABLE IF NOT EXISTS alembic_version" in s for s in sql)
+        inserts = [p for s, p in connection.statements if s.startswith("INSERT")]
+        assert inserts == [{"revision": HEAD}]
+        assert connection.committed
+        strategy.logger.warning.assert_not_called()
+
+    def test_already_stamped_inserts_nothing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from orb.infrastructure.storage.sql import strategy as strategy_module
+
+        monkeypatch.setattr(strategy_module, "_launch_time_is_integer", lambda _e: False)
+        engine, connection = self._engine(existing=(HEAD,))
+        strategy = self._strategy()
+
+        strategy._auto_stamp_head(engine)
+
+        assert not any(s.startswith("INSERT") for s, _ in connection.statements)
+        assert not connection.committed
+        strategy.logger.warning.assert_not_called()

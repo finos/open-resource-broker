@@ -246,11 +246,11 @@ class SQLStorageStrategy(BaseStorageStrategy):
         * SQLite — ``BEGIN IMMEDIATE`` acquires a RESERVED lock before the
                    SELECT, preventing any other writer from inserting between
                    the check and the INSERT.
-        * PostgreSQL — the connection is set to ``SERIALIZABLE`` isolation so
-                       a concurrent phantom insert is detected and the loser
-                       rolls back and logs at INFO (not a failure).
-        * Other dialects — best-effort: try the inline INSERT; let the
-                           caller's exception handler catch duplicates.
+        * PostgreSQL and MySQL — the check and the insert run under the
+                       migration lock (``migration_lock``) on a SQLAlchemy
+                       connection, so any driver works (pg8000 included).
+        * Other dialects — the same code without a lock: best-effort, and the
+                           caller's exception handler catches duplicates.
         """
         try:
             import os
@@ -288,67 +288,12 @@ class SQLStorageStrategy(BaseStorageStrategy):
             if _launch_time_is_integer(engine):
                 stamp_revision = _LAUNCH_TIME_BIGINT_REVISION
 
-            # Use a fresh DBAPI connection for the stamp so we control the
-            # transaction isolation level independently of the pooled
-            # application connections.
-            raw_conn = engine.raw_connection()
-            try:
-                raw_cursor = raw_conn.cursor()
-
-                # Acquire a write-intent lock BEFORE the IF-NOT-EXISTS check so
-                # that no other concurrent worker can insert between our check and
-                # our INSERT.
-                #
-                # SQLite:     BEGIN IMMEDIATE upgrades to RESERVED lock so only
-                #             one writer proceeds; others queue or get BUSY.
-                # PostgreSQL: Set SERIALIZABLE isolation; a concurrent phantom
-                #             INSERT will cause the loser's transaction to abort.
-                # Other:      No explicit lock — best-effort serialisation via
-                #             the database's default isolation.
-                if dialect == "sqlite":
-                    raw_cursor.execute("BEGIN IMMEDIATE")
-                elif dialect in ("postgresql", "postgres"):
-                    raw_conn.set_isolation_level(
-                        # psycopg2 SERIALIZABLE constant
-                        getattr(raw_conn, "ISOLATION_LEVEL_SERIALIZABLE", 4)
-                    )
-                    raw_cursor.execute("BEGIN")
-
-                # Ensure alembic_version table exists (may be absent on very
-                # old installs that pre-date even the table creation).
-                raw_cursor.execute(
-                    "CREATE TABLE IF NOT EXISTS alembic_version "
-                    "(version_num VARCHAR(32) NOT NULL, "
-                    "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
-                )
-
-                # Re-check inside the lock: another worker may have already stamped.
-                raw_cursor.execute("SELECT version_num FROM alembic_version LIMIT 1")
-                existing = raw_cursor.fetchone()
-
-                if existing is not None:
-                    self.logger.info(
-                        "Auto-stamp skipped for table %s: alembic_version already contains %s "
-                        "(another worker stamped first).",
-                        self.table_name,
-                        existing[0],
-                    )
-                    raw_conn.rollback()
-                    return
-
-                raw_cursor.execute(
-                    "INSERT INTO alembic_version (version_num) VALUES (?)"
-                    if dialect == "sqlite"
-                    else "INSERT INTO alembic_version (version_num) VALUES (%s)",
-                    (stamp_revision,),
-                )
-                raw_conn.commit()
-                raw_cursor.close()
-            except Exception:
-                raw_conn.rollback()
-                raise
-            finally:
-                raw_conn.close()
+            if dialect == "sqlite":
+                stamped = self._stamp_sqlite(engine, stamp_revision)
+            else:
+                stamped = self._stamp_locked(engine, stamp_revision)
+            if not stamped:
+                return
 
             self.logger.info(
                 "Auto-stamped Alembic revision %s for pre-existing install "
@@ -366,6 +311,76 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 self.table_name,
                 exc,
             )
+
+    _ALEMBIC_VERSION_DDL = (
+        "CREATE TABLE IF NOT EXISTS alembic_version "
+        "(version_num VARCHAR(32) NOT NULL, "
+        "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
+    )
+
+    def _log_stamp_skipped(self, existing: Any) -> None:
+        self.logger.info(
+            "Auto-stamp skipped for table %s: alembic_version already contains %s "
+            "(another worker stamped first).",
+            self.table_name,
+            existing,
+        )
+
+    def _stamp_sqlite(self, engine: Any, revision: str) -> bool:
+        """Record ``revision`` on SQLite; False when another worker stamped first.
+
+        pysqlite opens no transaction before a SELECT, so ``BEGIN IMMEDIATE`` is
+        issued on a raw connection to take the write lock before the check.
+        """
+        raw_conn = engine.raw_connection()
+        try:
+            raw_cursor = raw_conn.cursor()
+            raw_cursor.execute("BEGIN IMMEDIATE")
+            raw_cursor.execute(self._ALEMBIC_VERSION_DDL)
+            raw_cursor.execute("SELECT version_num FROM alembic_version LIMIT 1")
+            existing = raw_cursor.fetchone()
+            if existing is not None:
+                self._log_stamp_skipped(existing[0])
+                raw_conn.rollback()
+                return False
+            raw_cursor.execute("INSERT INTO alembic_version (version_num) VALUES (?)", (revision,))
+            raw_conn.commit()
+            raw_cursor.close()
+            return True
+        except Exception:
+            raw_conn.rollback()
+            raise
+        finally:
+            raw_conn.close()
+
+    def _stamp_locked(self, engine: Any, revision: str) -> bool:
+        """Record ``revision`` under the migration lock; False when already stamped.
+
+        Uses a SQLAlchemy connection, so it works with any driver. The check and
+        the insert run while the migration lock is held (an advisory lock on
+        PostgreSQL, ``GET_LOCK`` on MySQL), and the insert is committed before
+        the lock is released, so concurrent workers stamp exactly once.
+        """
+        from sqlalchemy import text
+
+        from orb.infrastructure.storage.sql.migration_lock import migration_lock
+
+        with engine.connect() as connection:
+            with migration_lock(connection):
+                connection.execute(text(self._ALEMBIC_VERSION_DDL))
+                existing = connection.execute(
+                    text("SELECT version_num FROM alembic_version")
+                ).first()
+                if existing is not None:
+                    self._log_stamp_skipped(existing[0])
+                    connection.rollback()
+                    return False
+                connection.execute(
+                    text("INSERT INTO alembic_version (version_num) VALUES (:revision)"),
+                    {"revision": revision},
+                )
+                connection.commit()
+        return True
 
     def _upgrade_to_head(self, engine: Any, script_dir: Any) -> None:
         """Apply the migrations after the stamped revision, on the engine's own database.
