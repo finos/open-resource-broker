@@ -1309,3 +1309,91 @@ class TestMachinesAreReleasedAfterFailedReturn:
         await handler._execute_deprovisioning_for_request(["vm-3"], request, "aws")
 
         assert store["vm-3"].return_request_id == "ret-other"
+
+
+@pytest.mark.unit
+class TestCreateMachineRequestHandlerOverrides:
+    @staticmethod
+    def _dto():
+        from orb.application.dto.template import TemplateDTO
+
+        return TemplateDTO(
+            template_id=_TEMPLATE_ID,
+            subnet_ids=["subnet-a"],
+            provider_type="aws",
+            provider_api="EC2Fleet",
+        )
+
+    @pytest.mark.asyncio
+    async def test_overrides_reach_validation_and_provisioning_only(self):
+        stored = self._dto()
+        handler, _ = _make_machine_handler(template=stored)
+
+        cmd = CreateRequestCommand(
+            template_id=_TEMPLATE_ID,
+            requested_count=1,
+            template_overrides={"subnet_ids": ["subnet-b"]},
+        )
+        await handler.execute_command(cmd)
+
+        validated = (
+            handler._provider_validation_service.select_and_validate_provider.call_args.args[0]
+        )  # type: ignore[attr-defined]
+        provisioned = handler._provisioning_service.execute_provisioning.call_args.args[0]  # type: ignore[attr-defined]
+        assert validated.subnet_ids == ["subnet-b"]
+        assert provisioned.subnet_ids == ["subnet-b"]
+        assert stored.subnet_ids == ["subnet-a"]
+
+    @pytest.mark.asyncio
+    async def test_no_overrides_passes_template_through_unchanged(self):
+        stored = self._dto()
+        handler, _ = _make_machine_handler(template=stored)
+
+        await handler.execute_command(
+            CreateRequestCommand(template_id=_TEMPLATE_ID, requested_count=1)
+        )
+
+        provisioned = handler._provisioning_service.execute_provisioning.call_args.args[0]  # type: ignore[attr-defined]
+        assert provisioned is stored
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("key", ["machine_role", "instance_profile", "bogus"])
+    async def test_rejected_override_creates_nothing(self, key):
+        from orb.domain.request.exceptions import RequestValidationError
+
+        handler, _ = _make_machine_handler(template=self._dto())
+
+        cmd = CreateRequestCommand(
+            template_id=_TEMPLATE_ID, requested_count=1, template_overrides={key: "x"}
+        )
+        with pytest.raises(RequestValidationError):
+            await handler.execute_command(cmd)
+
+        handler._request_creation_service.create_machine_request.assert_not_called()  # type: ignore[attr-defined]
+        handler._provisioning_service.execute_provisioning.assert_not_awaited()  # type: ignore[attr-defined]
+
+
+@pytest.mark.unit
+class TestRequestCreationServiceRecordsTemplate:
+    def test_snapshot_and_overrides_recorded_in_metadata(self):
+        from orb.application.dto.template import TemplateDTO
+        from orb.application.services.request_creation_service import RequestCreationService
+        from orb.application.services.template_overrides import apply_template_overrides
+
+        tmpl = apply_template_overrides(
+            TemplateDTO(template_id="tmpl-1", provider_type="aws", provider_api="EC2Fleet"),
+            {"subnet_ids": ["subnet-b"]},
+        )
+        selection = MagicMock(provider_type="aws", provider_name="aws-1")
+        selection.selection_reason = "r"
+        selection.confidence = 1.0
+        cmd = CreateRequestCommand(
+            template_id="tmpl-1",
+            requested_count=1,
+            template_overrides={"subnet_ids": ["subnet-b"]},
+        )
+
+        request = RequestCreationService(MagicMock()).create_machine_request(cmd, tmpl, selection)
+
+        assert request.metadata["template_snapshot"]["subnet_ids"] == ["subnet-b"]
+        assert request.metadata["template_overrides"] == {"subnet_ids": ["subnet-b"]}

@@ -341,6 +341,35 @@ class TestConvenienceMethods:
         assert dto.timeout_seconds == 120
 
     @pytest.mark.asyncio
+    async def test_request_machines_forwards_overrides(self):
+        from orb.application.services.orchestration.dtos import AcquireMachinesOutput
+        from orb.interface.response_formatting_service import ResponseFormattingService
+
+        sdk = _initialized_sdk()
+        mock_container = MagicMock()
+        sdk._container = mock_container
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.execute = AsyncMock(
+            return_value=AcquireMachinesOutput(request_id="req-1", status="pending")
+        )
+        mock_scheduler = MagicMock()
+        mock_scheduler.format_request_response.side_effect = lambda raw: raw
+        mock_container.get.side_effect = lambda cls: (
+            ResponseFormattingService(mock_scheduler)
+            if cls is ResponseFormattingService
+            else mock_orchestrator
+        )
+        mock_container.get_optional.return_value = None
+
+        await sdk.request_machines("tmpl-1", 1, overrides={"subnet_ids": ["subnet-b"]})
+        assert mock_orchestrator.execute.call_args[0][0].template_overrides == {
+            "subnet_ids": ["subnet-b"]
+        }
+
+        await sdk.request_machines("tmpl-1", 1)
+        assert mock_orchestrator.execute.call_args[0][0].template_overrides == {}
+
+    @pytest.mark.asyncio
     async def test_return_machines_forwards_wait_kwargs(self):
         from orb.application.services.orchestration.dtos import ReturnMachinesOutput
         from orb.interface.response_formatting_service import ResponseFormattingService
