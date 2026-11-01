@@ -114,6 +114,19 @@ def _make_strategy(engine: sa.Engine) -> Any:
 # ---------------------------------------------------------------------------
 
 
+def _head_revision() -> str:
+    """The head revision of the shipped migrations."""
+    import alembic.config
+    import alembic.script
+
+    import orb.infrastructure.storage.sql as sql_package
+
+    ini = os.path.join(os.path.dirname(sql_package.__file__), "migrations", "alembic.ini")
+    head = alembic.script.ScriptDirectory.from_config(alembic.config.Config(ini)).get_current_head()
+    assert head is not None
+    return head
+
+
 @pytest.fixture()
 def pre_existing_db():
     """Temp-file SQLite DB with app tables but NO alembic_version; yields engine."""
@@ -156,7 +169,7 @@ class TestAutoStampSingleWorker:
         strategy._auto_stamp_head(pre_existing_db)
 
         value = _stamp_value(pre_existing_db)
-        assert value == "55e3b5553d98", f"Expected head revision 55e3b5553d98 but got {value!r}"
+        assert value == _head_revision(), f"Expected the Alembic head but got {value!r}"
 
     def test_second_call_is_no_op(self, pre_existing_db):
         """Calling _auto_stamp_head twice must not create a second row."""
@@ -231,7 +244,7 @@ class TestAutoStampConcurrentWorkers:
         """The stamped revision must equal the Alembic head after concurrent writes."""
         self._run_n_workers(pre_existing_db, n=5)
         value = _stamp_value(pre_existing_db)
-        assert value == "55e3b5553d98"
+        assert value == _head_revision()
 
     def test_workers_do_not_raise_on_contention(self, pre_existing_db):
         """Workers that lose the race must log INFO and return cleanly (no exception)."""
