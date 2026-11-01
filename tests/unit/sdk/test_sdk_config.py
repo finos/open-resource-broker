@@ -366,4 +366,32 @@ class TestProviderDeprecation:
 
         with pytest.warns(DeprecationWarning, match="template"):
             client = ORBClient(provider="aws", config={"timeout": 60})
-        assert client.provider is None
+        assert client.config.provider_type is None
+
+    def test_client_provider_property_keeps_the_caller_value_and_warns(self):
+        from orb.sdk import ORBClient
+
+        with pytest.warns(DeprecationWarning):
+            client = ORBClient(provider="aws", config={"timeout": 60})
+        with pytest.warns(DeprecationWarning, match="provider_type"):
+            assert client.provider == "aws"
+
+    def test_client_stats_keep_the_caller_provider_value(self):
+        from orb.sdk import ORBClient
+
+        with pytest.warns(DeprecationWarning):
+            client = ORBClient(provider="aws", config={"timeout": 60})
+        stats = client.get_stats()
+        assert stats["provider"] == "aws"
+        assert stats["provider_type"] is None
+
+    def test_client_provider_property_falls_back_to_provider_type_without_warning(self):
+        import warnings
+
+        from orb.sdk import ORBClient
+
+        client = ORBClient(config={"provider_type": "k8s", "timeout": 60})
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            assert client.provider == "k8s"
+            assert client.get_stats()["provider"] == "k8s"

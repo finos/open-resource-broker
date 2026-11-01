@@ -403,7 +403,27 @@ class ORBClient:
     # Configuration and status methods
     @property
     def provider(self) -> Optional[str]:
-        """Get the configured provider type filter (``provider_type``)."""
+        """Get the provider setting.
+
+        Returns the deprecated ``provider`` value when the caller set one
+        (emitting a ``DeprecationWarning``), otherwise ``provider_type``.
+        """
+        if self._config.provider is not None:
+            import warnings
+
+            warnings.warn(
+                "ORBClient.provider returns the deprecated 'provider' setting, which "
+                "is ignored; read config.provider_type instead. It will be removed "
+                "in the next minor release.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        return self._reported_provider()
+
+    def _reported_provider(self) -> Optional[str]:
+        """Provider value for display: the caller's legacy setting, else provider_type."""
+        if self._config.provider is not None:
+            return self._config.provider
         return self._config.provider_type
 
     @property
@@ -426,7 +446,8 @@ class ORBClient:
         if not self._initialized:
             return {
                 "initialized": False,
-                "provider": self._config.provider_type,
+                "provider": self._reported_provider(),
+                "provider_type": self._config.provider_type,
                 "methods_discovered": 0,
             }
 
@@ -435,7 +456,8 @@ class ORBClient:
 
         return {
             "initialized": True,
-            "provider": self._config.provider_type,
+            "provider": self._reported_provider(),
+            "provider_type": self._config.provider_type,
             "methods_discovered": len(self._methods),
             "command_methods": len(command_methods),
             "query_methods": len(query_methods),
