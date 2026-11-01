@@ -556,6 +556,28 @@ If any resource cannot be stopped the command fails with a non-zero exit code an
 
 How each provider API is stopped is described in the AWS provider pages: [EC2 Fleet](../providers/aws/ec2-fleet.md#cancelling-a-request), [Spot Fleet](../providers/aws/spot-fleet.md#cancelling-a-request), [Auto Scaling group](../providers/aws/asg.md#cancelling-a-request) and [RunInstances](../providers/aws/run-instances.md#release-behaviour).
 
+#### `requests confirm-terminated`
+
+Record that you have verified machines of an OCI return request are terminated,
+for instances OCI reports as not found. See
+[Confirm termination](../providers/oci/compute.md#confirm-termination).
+
+**Usage:**
+```bash
+orb requests confirm-terminated REQUEST_ID --machine-id ID [--machine-id ID...] --reason TEXT
+```
+
+**Options:**
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--machine-id`, `-m` | Machine verified terminated (required, repeatable, at most 100) | `-m ocid1.instance.oc1...` |
+| `--reason` | Why the machines are known to be terminated (required, up to 500 characters) | `--reason "deleted in console"` |
+
+The operator is recorded as `cli:<user>@<host>`; this comes from the local
+environment and is advisory only. Exits 1 when a machine is not part of the
+request, the request is not an OCI return request in progress, or OCI still shows
+an instance that is not terminated.
+
 #### `requests status`
 
 Check request status.

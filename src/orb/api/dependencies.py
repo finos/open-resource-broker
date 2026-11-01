@@ -16,6 +16,9 @@ except ImportError:
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
 from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
+from orb.application.services.orchestration.confirm_terminated import (
+    ConfirmTerminatedOrchestrator,
+)
 from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
 from orb.application.services.orchestration.dashboard_summary import DashboardSummaryOrchestrator
 from orb.application.services.orchestration.delete_template import DeleteTemplateOrchestrator
@@ -107,6 +110,11 @@ def get_return_machines_orchestrator() -> ReturnMachinesOrchestrator:
 def get_cancel_request_orchestrator() -> CancelRequestOrchestrator:
     """Get CancelRequestOrchestrator from DI container."""
     return get_di_container().get(CancelRequestOrchestrator)
+
+
+def get_confirm_terminated_orchestrator() -> ConfirmTerminatedOrchestrator:
+    """Get ConfirmTerminatedOrchestrator from DI container."""
+    return get_di_container().get(ConfirmTerminatedOrchestrator)
 
 
 def get_list_machines_orchestrator() -> ListMachinesOrchestrator:

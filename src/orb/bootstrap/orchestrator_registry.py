@@ -10,6 +10,9 @@ def register_orchestrators(container: DIContainer) -> None:
     """Register all orchestrators with the DI container."""
     from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
     from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
+    from orb.application.services.orchestration.confirm_terminated import (
+        ConfirmTerminatedOrchestrator,
+    )
     from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
     from orb.application.services.orchestration.delete_template import DeleteTemplateOrchestrator
     from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
@@ -105,6 +108,19 @@ def register_orchestrators(container: DIContainer) -> None:
                 return_orchestrator=c.get(ReturnMachinesOrchestrator),
                 logger=c.get(LoggingPort),
                 provider_selection_port=c.get(ProviderSelectionPort),
+            ),
+        )
+    if not container.is_registered(ConfirmTerminatedOrchestrator):
+        from orb.application.services.provider_registry_service import ProviderRegistryService
+        from orb.domain.base import UnitOfWorkFactory
+
+        container.register_singleton(
+            ConfirmTerminatedOrchestrator,
+            lambda c: ConfirmTerminatedOrchestrator(
+                command_bus=c.get(CommandBus),
+                uow_factory=c.get(UnitOfWorkFactory),
+                provider_registry_service=c.get(ProviderRegistryService),
+                logger=c.get(LoggingPort),
             ),
         )
     if not container.is_registered(ListMachinesOrchestrator):

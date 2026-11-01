@@ -346,6 +346,48 @@ async def handle_cancel_request(
     return response
 
 
+def _cli_operator() -> str:
+    """Return ``cli:<user>@<host>``; advisory, as both parts come from the local environment."""
+    import getpass
+    import socket
+
+    try:
+        user = getpass.getuser()
+    except Exception:
+        user = "unknown"
+    return f"cli:{user}@{socket.gethostname()}"
+
+
+@handle_interface_exceptions(context="confirm_terminated", interface_type="cli")
+async def handle_confirm_terminated(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], "InterfaceResponse"]:
+    """Record that machines of an OCI return request are verified terminated."""
+    from orb.application.services.orchestration.dtos import ConfirmTerminatedInput
+    from orb.domain.request.termination_confirmation import InstanceStillVisibleError
+    from orb.interface.catalog import OPERATION_CATALOG, Interface
+
+    request_id = getattr(args, "request_id", None) or getattr(args, "flag_request_id", None)
+    if not request_id:
+        return {"error": "Request ID is required", "message": "Request ID must be provided"}
+
+    entry = OPERATION_CATALOG["confirm_terminated"]
+    orchestrator = args._container.get(entry.orchestrator)
+    try:
+        result = await orchestrator.execute(
+            ConfirmTerminatedInput(
+                request_id=request_id,
+                machine_ids=list(getattr(args, "machine_ids", None) or []),
+                reason=getattr(args, "reason", None) or "",
+                operator=_cli_operator(),
+                role="cli",
+            )
+        )
+    except InstanceStillVisibleError as exc:
+        return {"error": "Instance still visible", "message": exc.message}
+    return entry.renderer_for(Interface.CLI)(args._container.get(ResponseFormattingService), result)
+
+
 @handle_interface_exceptions(context="watch_request_status", interface_type="cli")
 async def handle_watch_request_status(
     args: "argparse.Namespace",

@@ -211,8 +211,41 @@ To resolve a return that stays in progress after a 404:
    readable and reports a terminal state.
 3. If the instance is not listed at all, it was deleted and has aged out of OCI.
    The broker cannot tell that apart from an unreadable instance, so it does not
-   complete the return on its own and the request stays in progress until the
-   machine state is reconciled by hand.
+   complete the return on its own. Confirm the termination yourself, as described
+   below.
+
+### Confirm termination
+
+Once you have verified in OCI that the instances are gone, record that on the
+return request:
+
+```bash
+orb requests confirm-terminated RETURN_REQUEST_ID \
+  --machine-id ocid1.instance.oc1... --reason "verified deleted in console"
+```
+
+or `POST /api/v1/requests/{id}/confirm-terminated` with
+`{"machine_ids": [...], "reason": "..."}`. The next status poll treats exactly
+those machines as terminated and the return completes.
+
+- Only machines named in the return request can be confirmed, at most 100 at a
+  time, with a reason of up to 500 characters. There is no wildcard.
+- You are responsible for the claim. OCI cannot tell a deleted instance from one
+  the broker may not read. Before accepting, the broker searches OCI for the
+  instances through the tenancy search service. If one is still visible and not
+  terminated, the confirmation is rejected (REST status 409). If the search is
+  unavailable, for example because the policy does not allow it, the confirmation
+  is accepted and the response carries a warning.
+  The search index can lag behind deletion, so a just-deleted instance may still
+  be reported and the confirmation rejected with 409; retry after a short wait.
+- The confirmation only replaces a 404. An instance OCI can read is reported as it
+  is, so an instance that turns out to be running is never hidden.
+- Each confirmation is stored on the request with the operator, role, reason, time
+  and how it was checked. Confirming the same machine again changes nothing.
+- The REST endpoint requires the `operator` role; the principal ID and role are
+  recorded, or `anonymous` when authentication is off. The CLI records
+  `cli:<user>@<host>` taken from the local environment, which is advisory and not
+  an identity.
 
 Any other error for an instance, including a failed VNIC lookup, fails the whole
 status call; stored machine state is kept and the call is retried on the next poll.

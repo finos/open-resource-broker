@@ -34,6 +34,9 @@ from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
 from orb.application.services.orchestration.base import OrchestratorBase
 from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
+from orb.application.services.orchestration.confirm_terminated import (
+    ConfirmTerminatedOrchestrator,
+)
 from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
 from orb.application.services.orchestration.delete_template import DeleteTemplateOrchestrator
 from orb.application.services.orchestration.dtos import (
@@ -41,6 +44,8 @@ from orb.application.services.orchestration.dtos import (
     AcquireMachinesOutput,
     CancelRequestInput,
     CancelRequestOutput,
+    ConfirmTerminatedInput,
+    ConfirmTerminatedOutput,
     CreateTemplateInput,
     CreateTemplateOutput,
     DeleteTemplateInput,
@@ -346,6 +351,22 @@ OPERATION_CATALOG: dict[str, CatalogEntry[Any, Any]] = {
         output_dto=CancelRequestOutput,
         render=_render_cancel_request,
         exposed_on=frozenset({_CLI, _REST, _MCP, _SDK}),
+    ),
+    "confirm_terminated": CatalogEntry(
+        key="confirm_terminated",
+        orchestrator=ConfirmTerminatedOrchestrator,
+        input_dto=ConfirmTerminatedInput,
+        output_dto=ConfirmTerminatedOutput,
+        render=lambda rfs, out: InterfaceResponse(
+            data={
+                "request_id": out.request_id,
+                "confirmed": out.confirmed,
+                "already_confirmed": out.already_confirmed,
+                "records": out.records,
+                "warnings": out.warnings,
+            }
+        ),
+        exposed_on=frozenset({_CLI, _REST}),
     ),
     "list_machines": CatalogEntry(
         key="list_machines",

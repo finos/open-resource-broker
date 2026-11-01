@@ -116,6 +116,31 @@ class RequestOperationResponse(BaseModel):
     warning: Optional[str] = None
 
 
+class ConfirmTerminatedRecord(BaseModel):
+    """Audit record stored for one operator-confirmed machine."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    machine_id: str
+    operator: str
+    role: str
+    reason: str
+    verification: str
+    at: str
+
+
+class ConfirmTerminatedResponse(BaseModel):
+    """Response for confirming that return-request machines are terminated."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    request_id: str
+    confirmed: list[str] = []
+    already_confirmed: list[str] = []
+    records: list[ConfirmTerminatedRecord] = []
+    warnings: list[str] = []
+
+
 class TemplateItem(BaseModel):
     """
     A single template entry.
