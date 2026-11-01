@@ -451,6 +451,18 @@ class JSONStorageStrategy(BaseStorageStrategy):
         self, entity_id: str, data: dict[str, Any], expected: Optional[int]
     ) -> None:
         previous = self._buffer.get(entity_id)
+        if (
+            previous is not None
+            and previous.op == "put"
+            and expected is not None
+            and expected == cast("dict[str, Any]", previous.data).get("version")
+        ):
+            # Based on a reload of this transaction's own staged put: the same
+            # change continued, still guarded by the earlier write's baseline
+            self._buffer[entity_id] = _StagedWrite(
+                "put", data, previous.expected, previous.conflict
+            )
+            return
         # The first baseline guards the state before the transaction; a delete or
         # baseline-less put before it carries none, so the first one given counts
         first = (
