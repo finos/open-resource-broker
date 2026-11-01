@@ -56,8 +56,8 @@ jobs:
         chart=deploy/helm/orb
         for values in "$chart"/ci/*-values.yaml; do
           echo "::group::$values"
-          helm lint --strict "$chart" -f "$values"
-          helm template orb "$chart" -f "$values" --namespace orb \
+          helm lint --strict "$chart" -f "$values" --set image.tag=0.0.0-ci
+          helm template orb "$chart" -f "$values" --namespace orb --set image.tag=0.0.0-ci \
             | kubeconform -strict -summary -ignore-missing-schemas \
                 -kubernetes-version "$KUBERNETES_VERSION" -
           echo "::endgroup::"

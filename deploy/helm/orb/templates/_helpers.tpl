@@ -82,6 +82,9 @@ Fail the render for unsupported storage and replica combinations.
 {{- if not (has .Values.ui.mode (list "embedded" "split" "disabled")) }}
 {{- fail (printf "ui.mode must be embedded, split or disabled, got %q" (toString .Values.ui.mode)) }}
 {{- end }}
+{{- if not .Values.image.tag }}
+{{- fail "image.tag is required: set it to the ORB image version to deploy. Images up to and including 1.9.2 lack fixes this chart relies on (public probe paths under /orb with auth enabled, UI state on a read-only root filesystem), so the chart does not default to its appVersion." }}
+{{- end }}
 {{- if and (eq .Values.provider.type "k8s") .Values.rbac.create (not .Values.rbac.clusterScoped) }}
 {{- if has "*" .Values.provider.k8s.namespaces }}
 {{- fail "provider.k8s.namespaces [\"*\"] watches every namespace and needs rbac.clusterScoped: true" }}
@@ -150,6 +153,5 @@ Name of the PersistentVolumeClaim holding /app/data.
 Resolve the container image (repo:tag).
 */}}
 {{- define "orb.image" -}}
-{{- $tag := .Values.image.tag | default .Chart.AppVersion }}
-{{- printf "%s:%s" .Values.image.repository $tag }}
+{{- printf "%s:%s" .Values.image.repository (toString .Values.image.tag) }}
 {{- end }}

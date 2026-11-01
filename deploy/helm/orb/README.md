@@ -6,7 +6,8 @@ Deploys Open Resource Broker (ORB) as a REST server in a Kubernetes cluster.
 
 ```bash
 # Default install (k8s provider, auth off)
-helm install orb ./deploy/helm/orb --namespace orb --create-namespace
+helm install orb ./deploy/helm/orb --namespace orb --create-namespace \
+  --set image.tag=<version>
 
 # With custom values
 helm install orb ./deploy/helm/orb \
@@ -17,12 +18,17 @@ helm install orb ./deploy/helm/orb \
 helm upgrade orb ./deploy/helm/orb --namespace orb -f my-values.yaml
 ```
 
+`image.tag` is required. The chart needs an ORB image newer than 1.9.2: earlier images answer the
+`/orb/livez` and `/orb/readyz` probes with 401 when auth is enabled, and do not keep UI state on a
+writable path under the read-only root filesystem. The chart therefore does not default the tag
+to its `appVersion`.
+
 ## Key Values
 
 | Value | Default | Description |
 |---|---|---|
 | `image.repository` | `ghcr.io/finos/open-resource-broker` | Container image |
-| `image.tag` | chart `appVersion` | Image tag |
+| `image.tag` | `""` (required) | Image tag; must be newer than 1.9.2 |
 | `replicaCount` | `1` | Pod replicas; must be 1 with `json` or `sqlite` storage |
 | `storage.type` | `json` | `json` or `sqlite` |
 | `storage.persistence.enabled` | `true` | Keep `/app/data` on a PersistentVolumeClaim |

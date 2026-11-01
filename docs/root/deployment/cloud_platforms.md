@@ -11,11 +11,13 @@ The Open Resource Broker supports deployment on major cloud platforms with conta
 The chart in `deploy/helm/orb` is the supported way to run the REST server on Kubernetes.
 
 ```bash
-helm install orb ./deploy/helm/orb --namespace orb --create-namespace
+helm install orb ./deploy/helm/orb --namespace orb --create-namespace \
+  --set image.tag=<version>
 ```
 
-By default it runs a single replica with JSON storage on a PersistentVolumeClaim, uses the
-`k8s` provider in the release namespace and serves the API and embedded UI under `/orb`. See
+`image.tag` is required and must name an image newer than 1.9.2. By default the chart runs a
+single replica with JSON storage on a PersistentVolumeClaim, uses the `k8s` provider in the
+release namespace and serves the API and embedded UI under `/orb`. See
 [deploy/helm/orb/README.md](https://github.com/finos/open-resource-broker/blob/main/deploy/helm/orb/README.md)
 for all values.
 

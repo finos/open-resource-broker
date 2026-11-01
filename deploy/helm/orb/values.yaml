@@ -10,7 +10,8 @@ image:
   repository: ghcr.io/finos/open-resource-broker
   # -- Image pull policy.
   pullPolicy: IfNotPresent
-  # -- Image tag. Defaults to chart appVersion.
+  # -- Image tag. Required: set it to the ORB version to deploy. The chart
+  # needs an image newer than 1.9.2 (see the README install section).
   tag: ""
 
 # -- Image pull secrets for private registries.

@@ -49,6 +49,11 @@ tag=(--set image.tag=0.0.0-ci)
 expect_reject "replicaCount=2" "${tag[@]}" --set replicaCount=2
 expect_reject "replicaCount=2" "${tag[@]}" --set storage.type=sqlite --set replicaCount=2
 
+# The chart does not fall back to appVersion for the image.
+expect_reject "image.tag is required"
+out=$(render "${tag[@]}" | yq -N 'select(.kind == "Deployment") | .spec.template.spec.containers[0].image')
+expect_eq "image" "$out" "ghcr.io/finos/open-resource-broker:0.0.0-ci"
+
 # Default: the provider manages the release namespace, and RBAC covers it.
 out=$(render "${tag[@]}")
 expect_eq "default provider config" "$(provider_config <<<"$out")" \
