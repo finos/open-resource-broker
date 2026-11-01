@@ -267,6 +267,14 @@ sdk-typescript-generate: check-java _ensure-jar  ## Regenerate the TypeScript SD
 		sed -i.bak '/export \* from "\.\/api"/d' $(SDK_TYPESCRIPT_GENERATED)/index.ts && \
 		rm -f $(SDK_TYPESCRIPT_GENERATED)/index.ts.bak; \
 	fi
+	@# TypeScript 6.0 strict reports TS2527 on the generated request factory:
+	@# its inferred type references an inaccessible unique symbol (see
+	@# finos/open-resource-broker#457).  The generator cannot emit a correct
+	@# annotation because axios's real return type (AxiosResponseResult) is not
+	@# exported, so patch the generated file with an explicit public signature
+	@# instead.  Keep the script's expected strings in sync with the pinned
+	@# generator version above.
+	@node sdk/typescript/scripts/patch-generated-common.mjs
 	@echo "TypeScript SDK generation complete: $(SDK_TYPESCRIPT_GENERATED)"
 
 # ---------------------------------------------------------------------------
@@ -347,10 +355,10 @@ sdk-kotlin-check-drift: sdk-kotlin-generate  ## Verify Kotlin SDK: generate from
 	@cd sdk/kotlin && ./gradlew --no-daemon compileKotlin
 	@echo "Kotlin SDK: spec → generate → build OK."
 
-sdk-typescript-check-drift: sdk-typescript-generate  ## Verify TypeScript SDK: generate from spec + build
+sdk-typescript-check-drift: sdk-typescript-generate  ## Verify TypeScript SDK: generate from spec + build + typecheck
 	@echo "Verifying TypeScript SDK builds cleanly from the current spec..."
-	@cd sdk/typescript && npm ci && npm run build
-	@echo "TypeScript SDK: spec → generate → build OK."
+	@cd sdk/typescript && npm ci && npm run build && npm run typecheck
+	@echo "TypeScript SDK: spec → generate → build → typecheck OK."
 
 sdk-csharp-check-drift: sdk-csharp-generate  ## Verify C# SDK: generate from spec + compile
 	@echo "Verifying C# SDK builds cleanly from the current spec..."
