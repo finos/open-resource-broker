@@ -118,8 +118,8 @@ def _print_json(label: str, data: object) -> None:
 #               "region": "us-east-1"}]}, "storage": {"type": "json"}}
 #   async with orb(app_config=app_cfg) as sdk: ...
 #
-# Mode 5 — env vars only (ORB_PROVIDER, ORB_REGION, ORB_CONFIG_FILE, etc.):
-#   export ORB_PROVIDER=aws
+# Mode 5 — env vars only (ORB_PROVIDER_TYPE, ORB_REGION, ORB_CONFIG_FILE, etc.):
+#   export ORB_PROVIDER_TYPE=aws
 #   export ORB_REGION=us-east-1
 #   async with orb() as sdk: ...
 #

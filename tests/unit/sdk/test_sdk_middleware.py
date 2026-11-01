@@ -151,7 +151,7 @@ class TestORBClientMiddleware:
     def test_add_middleware_before_init(self):
         from orb.sdk.client import ORBClient
 
-        sdk = ORBClient(provider="mock")
+        sdk = ORBClient(provider_type="mock")
         recorder = RecordingMiddleware()
         sdk.add_middleware(recorder)
 
@@ -161,6 +161,6 @@ class TestORBClientMiddleware:
     def test_add_middleware_not_initialized_no_error(self):
         from orb.sdk.client import ORBClient
 
-        sdk = ORBClient(provider="mock")
+        sdk = ORBClient(provider_type="mock")
         sdk.add_middleware(RecordingMiddleware())
         # Should not raise — middleware stored for later application

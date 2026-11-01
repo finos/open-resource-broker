@@ -15,7 +15,7 @@ from orb.sdk.exceptions import ConfigurationError, ProviderError, SDKError
 
 def _make_sdk(provider="aws", **kwargs) -> OpenResourceBroker:
     """Create an SDK instance without triggering env-var lookup side-effects."""
-    return OpenResourceBroker(config={"provider": provider, **kwargs})
+    return OpenResourceBroker(config={"provider_type": provider, **kwargs})
 
 
 def _initialized_sdk(extra_methods: dict | None = None) -> OpenResourceBroker:
@@ -47,11 +47,11 @@ class TestOpenResourceBrokerConstruction:
         assert sdk.provider == "aws"
 
     def test_explicit_provider_stored(self):
-        sdk = OpenResourceBroker(config={"provider": "mock"})
+        sdk = OpenResourceBroker(config={"provider_type": "mock"})
         assert sdk.provider == "mock"
 
     def test_config_dict_accepted(self):
-        sdk = OpenResourceBroker(config={"provider": "aws", "timeout": 60})
+        sdk = OpenResourceBroker(config={"provider_type": "aws", "timeout": 60})
         assert sdk.config.timeout == 60
 
     def test_config_path_accepted(self, tmp_path):
@@ -63,12 +63,12 @@ class TestOpenResourceBrokerConstruction:
         assert sdk.config.config_path == str(f)
 
     def test_kwargs_go_to_custom_config(self):
-        sdk = OpenResourceBroker(config={"provider": "aws"}, my_key="my_val")
+        sdk = OpenResourceBroker(config={"provider_type": "aws"}, my_key="my_val")
         assert sdk.config.custom_config.get("my_key") == "my_val"
 
     def test_invalid_config_raises_configuration_error(self):
         with pytest.raises(ConfigurationError):
-            OpenResourceBroker(config={"provider": "", "timeout": 300})
+            OpenResourceBroker(config={"timeout": 0})
 
     def test_not_initialized_on_construction(self):
         sdk = _make_sdk()
@@ -95,8 +95,8 @@ class TestOpenResourceBrokerConstruction:
 
     def test_config_as_dict_still_works(self):
         """Passing a dict for config must still produce a valid SDKConfig."""
-        sdk = OpenResourceBroker(config={"provider": "aws", "timeout": 60})
-        assert sdk.config.provider == "aws"
+        sdk = OpenResourceBroker(config={"provider_type": "aws", "timeout": 60})
+        assert sdk.config.provider_type == "aws"
         assert sdk.config.timeout == 60
 
     def test_config_as_sdk_config_instance_respects_explicit_provider_kwarg(self):
@@ -442,7 +442,7 @@ class TestInitializeMissingConfigSafety:
     @pytest.mark.asyncio
     async def test_missing_config_raises_configuration_error_not_system_exit(self):
         """initialize() must raise ConfigurationError, never kill the process."""
-        sdk = OpenResourceBroker(config={"provider": "aws"})
+        sdk = OpenResourceBroker(config={"provider_type": "aws"})
 
         with patch("orb.sdk.client.Application", side_effect=SystemExit(1)):
             with pytest.raises(ConfigurationError):
@@ -451,7 +451,7 @@ class TestInitializeMissingConfigSafety:
     @pytest.mark.asyncio
     async def test_missing_config_does_not_raise_system_exit(self):
         """SystemExit must never propagate out of initialize()."""
-        sdk = OpenResourceBroker(config={"provider": "aws"})
+        sdk = OpenResourceBroker(config={"provider_type": "aws"})
 
         with patch("orb.sdk.client.Application", side_effect=SystemExit(1)):
             try:
@@ -469,7 +469,7 @@ class TestInitializeMissingConfigSafety:
     @pytest.mark.asyncio
     async def test_downstream_sys_exit_converted_to_configuration_error(self):
         """If Application.__init__ somehow calls sys.exit, it is caught and converted."""
-        sdk = OpenResourceBroker(config={"provider": "aws", "dummy": "value"})
+        sdk = OpenResourceBroker(config={"provider_type": "aws", "dummy": "value"})
         sdk._config.config_path = None
 
         with patch("orb.sdk.client.Application", side_effect=SystemExit(1)):
@@ -487,18 +487,18 @@ class TestDeprecatedRegionProfile:
 
     def test_region_kwarg_warns_and_populates_provider_config(self):
         with pytest.warns(DeprecationWarning, match="deprecated"):
-            sdk = OpenResourceBroker(config={"provider": "aws"}, region="us-east-1")
+            sdk = OpenResourceBroker(config={"provider_type": "aws"}, region="us-east-1")
         assert sdk.config.provider_config.get("region") == "us-east-1"
 
     def test_profile_kwarg_warns_and_populates_provider_config(self):
         with pytest.warns(DeprecationWarning, match="deprecated"):
-            sdk = OpenResourceBroker(config={"provider": "aws"}, profile="my-profile")
+            sdk = OpenResourceBroker(config={"provider_type": "aws"}, profile="my-profile")
         assert sdk.config.provider_config.get("profile") == "my-profile"
 
     def test_region_and_profile_together_warn_once_and_both_set(self):
         with pytest.warns(DeprecationWarning, match="deprecated"):
             sdk = OpenResourceBroker(
-                config={"provider": "aws"}, region="eu-west-1", profile="staging"
+                config={"provider_type": "aws"}, region="eu-west-1", profile="staging"
             )
         assert sdk.config.provider_config.get("region") == "eu-west-1"
         assert sdk.config.provider_config.get("profile") == "staging"
@@ -507,7 +507,7 @@ class TestDeprecatedRegionProfile:
         # provider_config takes precedence over the deprecated kwarg (setdefault semantics).
         with pytest.warns(DeprecationWarning):
             sdk = OpenResourceBroker(
-                config={"provider": "aws"},
+                config={"provider_type": "aws"},
                 provider_config={"region": "eu-central-1"},
                 region="us-east-1",
             )
@@ -519,4 +519,4 @@ class TestDeprecatedRegionProfile:
         with warnings.catch_warnings():
             warnings.simplefilter("error", DeprecationWarning)
             # Must not raise.
-            OpenResourceBroker(config={"provider": "aws"})
+            OpenResourceBroker(config={"provider_type": "aws"})

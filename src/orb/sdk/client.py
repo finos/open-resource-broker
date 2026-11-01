@@ -45,7 +45,7 @@ class ORBClient:
     principles and full integration with the existing system.
 
     Usage:
-        async with ORBClient(provider="aws") as sdk:
+        async with ORBClient(provider_type="aws") as sdk:
             templates = await sdk.list_templates(active_only=True)
             request = await sdk.create_request(template_id="basic", count=5)
             status = await sdk.get_request_status(request_id=request.id)
@@ -77,7 +77,8 @@ class ORBClient:
         Initialise the Open Resource Broker SDK.
 
         Args:
-            provider: Cloud provider type (aws, mock, etc.). Defaults to value from config/env.
+            provider: **Deprecated and ignored.** The provider comes from the template;
+                      use ``provider_type`` / ``provider_name`` to narrow selection.
             config: SDK configuration dictionary (timeout, log_level, etc.)
             config_path: Path to configuration file
             app_config: Application config dict — replaces config.json on disk.
@@ -127,6 +128,9 @@ class ORBClient:
 
         # Override with explicit parameters
         if provider is not None:
+            from .config import warn_provider_deprecated
+
+            warn_provider_deprecated(stacklevel=3)
             self._config.provider = provider
         if scheduler is not None:
             self._config.scheduler = scheduler
@@ -215,8 +219,8 @@ class ORBClient:
 
             if not await self._app.initialize(dry_run=self._config.dry_run):
                 raise ProviderError(
-                    f"Failed to initialize {self._config.provider} provider",
-                    provider=self._config.provider,
+                    f"Failed to initialize {self._config.provider_type or 'configured'} provider",
+                    provider=self._config.provider_type,
                 )
 
             # Get CQRS buses directly from the initialized application
@@ -399,8 +403,8 @@ class ORBClient:
     # Configuration and status methods
     @property
     def provider(self) -> Optional[str]:
-        """Get the configured provider type."""
-        return self._config.provider
+        """Get the configured provider type filter (``provider_type``)."""
+        return self._config.provider_type
 
     @property
     def initialized(self) -> bool:
@@ -422,7 +426,7 @@ class ORBClient:
         if not self._initialized:
             return {
                 "initialized": False,
-                "provider": self._config.provider,
+                "provider": self._config.provider_type,
                 "methods_discovered": 0,
             }
 
@@ -431,7 +435,7 @@ class ORBClient:
 
         return {
             "initialized": True,
-            "provider": self._config.provider,
+            "provider": self._config.provider_type,
             "methods_discovered": len(self._methods),
             "command_methods": len(command_methods),
             "query_methods": len(query_methods),
@@ -1241,7 +1245,7 @@ class ORBClient:
         """Return string representation of SDK instance."""
         status = "initialized" if self._initialized else "not initialized"
         method_count = len(self._methods) if self._initialized else 0
-        return f"ORBClient(provider='{self._config.provider}', status='{status}', methods={method_count})"
+        return f"ORBClient(provider_type='{self._config.provider_type}', status='{status}', methods={method_count})"
 
 
 # Backward-compatible aliases

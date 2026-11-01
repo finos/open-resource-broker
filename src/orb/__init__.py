@@ -5,7 +5,7 @@ Usage:
     from orb import ORBClient
     from orb.sdk import ORBClient, SDKConfig
 
-    async with ORBClient(provider="aws") as client:
+    async with ORBClient(provider_type="aws") as client:
         templates = await client.list_templates()
 """
 

@@ -20,6 +20,27 @@ from .exceptions import ConfigurationError
 _logger = logging.getLogger(__name__)
 
 
+PROVIDER_DEPRECATION_MESSAGE = (
+    "The SDK 'provider' setting (SDKConfig.provider, ORBClient(provider=...) and "
+    "ORB_PROVIDER) is deprecated and ignored; the provider is taken from the "
+    "template. Use provider_type / provider_name (ORB_PROVIDER_TYPE / "
+    "ORB_PROVIDER_NAME) to narrow selection. It will be removed in the next "
+    "minor release."
+)
+
+
+def warn_provider_deprecated(stacklevel: int = 3) -> None:
+    """Emit the deprecation signal for the legacy ``provider`` setting.
+
+    Raised both as a ``DeprecationWarning`` for developers and as a logger
+    warning so operators reading logs see it.
+    """
+    import warnings
+
+    warnings.warn(PROVIDER_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=stacklevel)
+    _logger.warning(PROVIDER_DEPRECATION_MESSAGE)
+
+
 @dataclass
 class SDKConfig:
     """
@@ -34,13 +55,19 @@ class SDKConfig:
     available as backward-compatibility shims that forward to
     ``provider_config``.  They will be removed in v2.0.  Use
     ``provider_config={"region": ..., "profile": ...}`` instead.
+
+    The ``provider`` field is deprecated and ignored.  The provider used for an
+    operation comes from the template (and ``provider_type`` / ``provider_name``
+    when narrowing is needed).  The field is still accepted, together with the
+    ``ORB_PROVIDER`` environment variable, and emits a deprecation warning.  It
+    will be removed in the next minor release.
     """
 
     # Provider configuration
-    # The default of "aws" is deprecated; a future major release will require
-    # the caller to pass provider explicitly.  Use SDKConfig(provider="aws")
-    # to silence the deprecation warning and express the intent clearly.
-    provider: Optional[str] = "aws"
+    # Deprecated and ignored: the provider comes from the template.  Use
+    # provider_type / provider_name to narrow selection.  Removed in the next
+    # minor release.
+    provider: Optional[str] = None
     provider_type: Optional[str] = None
     provider_name: Optional[str] = None
     provider_config: dict[str, Any] = field(default_factory=dict)
@@ -62,6 +89,10 @@ class SDKConfig:
 
     # Internal configuration path
     config_path: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.provider is not None:
+            warn_provider_deprecated(stacklevel=4)
 
     # ------------------------------------------------------------------
     # Backward-compatibility shims — deprecated in v1.8, removed in v2.0
@@ -157,7 +188,7 @@ class SDKConfig:
                 provider_config["profile"] = legacy_profile
 
         return cls(
-            provider=os.getenv("ORB_PROVIDER", "aws"),
+            provider=os.getenv("ORB_PROVIDER"),
             provider_type=os.getenv("ORB_PROVIDER_TYPE"),
             provider_name=os.getenv("ORB_PROVIDER_NAME"),
             provider_config=provider_config,
@@ -218,9 +249,9 @@ class SDKConfig:
                 # as the string override causes ConfigurationManager.override_scheduler_strategy
                 # to store a dict, which then propagates as the scheduler_type into the
                 # registry lookup and fails with "unhashable type: 'dict'".
-                if key == "scheduler" and isinstance(value, dict):
-                    # The ORB config scheduler object is not an SDK string override;
-                    # skip it so the scheduler type is resolved from the config file.
+                if key in ("scheduler", "provider") and isinstance(value, dict):
+                    # The ORB config scheduler/provider objects are not SDK string
+                    # overrides; keep them aside so they resolve from the config file.
                     custom_config[key] = value
                 else:
                     sdk_config[key] = value
@@ -266,7 +297,6 @@ class SDKConfig:
     def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary."""
         result: dict[str, Any] = {
-            "provider": self.provider,
             "provider_type": self.provider_type,
             "provider_name": self.provider_name,
             "timeout": self.timeout,
@@ -290,9 +320,6 @@ class SDKConfig:
 
         Follows the same validation patterns as existing config classes.
         """
-        if not self.provider:
-            raise ConfigurationError("Provider is required")
-
         if self.timeout <= 0:
             raise ConfigurationError("Timeout must be positive")
 

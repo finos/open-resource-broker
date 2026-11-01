@@ -6,7 +6,7 @@ from orb.sdk.client import ORBClient
 
 
 def _make_client(**kwargs) -> ORBClient:
-    return ORBClient(config={"provider": "aws", **kwargs})
+    return ORBClient(config={"provider_type": "aws", **kwargs})
 
 
 class TestContainerIsolation:

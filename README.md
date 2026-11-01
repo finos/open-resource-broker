@@ -340,7 +340,7 @@ Native client libraries for Python, Go, TypeScript, Java, Kotlin, and .NET. Pyth
 ```python
 from orb import ORBClient as orb
 
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     templates = await sdk.list_templates(active_only=True)
     request = await sdk.request_machines(
         template_id=templates["templates"][0]["template_id"],

@@ -15,7 +15,7 @@ from orb.sdk.exceptions import SDKError
 
 
 def _initialized_sdk() -> ORBClient:
-    sdk = ORBClient(config={"provider": "aws"})
+    sdk = ORBClient(config={"provider_type": "aws"})
     sdk._initialized = True
     sdk._container = MagicMock()
     return sdk
@@ -122,7 +122,7 @@ class TestListRequests:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_list_requests_not_initialized_raises(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.list_requests()
 
@@ -203,7 +203,7 @@ class TestListMachines:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_list_machines_not_initialized_raises(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.list_machines()
 
@@ -255,7 +255,7 @@ class TestGetRequestSummary:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_not_initialized_raises(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.get_request_summary(request_id="req-1")
 
@@ -279,7 +279,7 @@ class TestGetActiveMachineCount:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_not_initialized_raises(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.get_active_machine_count()
 
@@ -324,6 +324,6 @@ class TestGetRequestMetrics:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_not_initialized_raises(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.get_request_metrics()

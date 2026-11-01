@@ -14,7 +14,7 @@ from orb.sdk.exceptions import NotFoundError, SDKError
 
 
 def _initialized_sdk() -> ORBClient:
-    sdk = ORBClient(config={"provider": "aws"})
+    sdk = ORBClient(config={"provider_type": "aws"})
     sdk._initialized = True
     sdk._container = MagicMock()
     return sdk
@@ -99,7 +99,7 @@ class TestGetTemplate:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_raises_sdk_error_when_not_initialized(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.get_template("t1")
 
@@ -140,7 +140,7 @@ class TestCreateTemplate:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_raises_sdk_error_when_not_initialized(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.create_template("t1", "EC2Fleet", "ami-123")
 
@@ -181,7 +181,7 @@ class TestUpdateTemplate:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_raises_sdk_error_when_not_initialized(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.update_template("t1")
 
@@ -222,7 +222,7 @@ class TestDeleteTemplate:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_raises_sdk_error_when_not_initialized(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.delete_template("t1")
 
@@ -296,6 +296,6 @@ class TestRefreshTemplates:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_raises_sdk_error_when_not_initialized(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.refresh_templates()
