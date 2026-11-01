@@ -58,6 +58,31 @@ class TestApplyTemplateOverrides:
         with pytest.raises(RequestValidationError, match="reserved"):
             apply_template_overrides(_template(), {"tags": {"orb:request-id": "x"}})
 
+    @pytest.mark.parametrize("key", ["subnet_ids", "security_group_ids", "machine_types"])
+    @pytest.mark.parametrize("empty", [[], {}, None])
+    def test_empty_networking_and_machine_type_overrides_rejected(self, key, empty):
+        with pytest.raises(RequestValidationError, match="may not be empty"):
+            apply_template_overrides(_template(), {key: empty})
+
+    def test_unknown_price_type_rejected(self):
+        with pytest.raises(RequestValidationError, match="price_type"):
+            apply_template_overrides(_template(), {"price_type": "bogus"})
+
+    @pytest.mark.parametrize("price_type", ["ondemand", "spot", "heterogeneous"])
+    def test_known_price_types_accepted(self, price_type):
+        out = apply_template_overrides(_template(), {"price_type": price_type})
+        assert out.price_type == price_type
+
+    @pytest.mark.parametrize("key", ["aws:cloudformation:stack-name", "AWS:x", "ORB:request-id"])
+    def test_aws_and_case_variant_reserved_tag_prefixes_rejected(self, key):
+        with pytest.raises(RequestValidationError, match="reserved"):
+            apply_template_overrides(_template(), {"tags": {key: "x"}})
+
+    @pytest.mark.parametrize("tags", [{"env": 1}, {"env": None}, {1: "x"}, {"env": ["a"]}])
+    def test_non_string_tag_keys_and_values_rejected(self, tags):
+        with pytest.raises(RequestValidationError, match="must be strings"):
+            apply_template_overrides(_template(), {"tags": tags})
+
     @pytest.mark.parametrize(
         "key",
         [

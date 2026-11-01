@@ -564,7 +564,12 @@ class ORBClient:
                 ``machine_types_ondemand``, ``machine_types_priority``,
                 ``price_type``, ``max_price``, ``network_zones``,
                 ``public_ip_assignment`` and ``tags`` (merged over the template
-                tags). Identity, credential and bootstrap fields (for example
+                tags). ``subnet_ids``, ``security_group_ids`` and
+                ``machine_types`` may not be empty, ``price_type`` must be a
+                known price type, and tags must be strings outside the
+                reserved ``orb:`` and ``aws:`` prefixes. ``network_zones`` only
+                takes effect on providers that place machines by zone (GCP).
+                Identity, credential and bootstrap fields (for example
                 ``machine_role``, ``machine_ssh_key``, ``machine_bootstrap``)
                 cannot be overridden, and unknown keys are rejected.
             **kwargs: ``wait``, ``timeout_seconds``, ``additional_data``.

@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from orb.application.dto.template import TemplateDTO
+from orb.domain.base.value_objects import PriceType
 from orb.domain.request.exceptions import RequestValidationError
 
 # Fields a caller may override for a single request.
@@ -59,7 +60,16 @@ _PROTECTED_FIELDS: frozenset[str] = frozenset(
     }
 )
 
-_RESERVED_TAG_PREFIX = "orb:"
+# Tag key prefixes callers may not set: ``orb:`` is used by ORB for request
+# tracking and ``aws:`` is reserved by AWS (case-insensitive) and rejected there.
+_RESERVED_TAG_PREFIXES: tuple[str, ...] = ("orb:", "aws:")
+
+# Overrides that must not be empty. An empty subnet or security group list
+# would drop the template networking and launch into the default VPC with the
+# default security group; an empty machine_types leaves nothing to launch.
+_NON_EMPTY_FIELDS: frozenset[str] = frozenset({"subnet_ids", "security_group_ids", "machine_types"})
+
+_PRICE_TYPES: frozenset[str] = frozenset(p.value for p in PriceType)
 
 
 def normalize_override_keys(overrides: dict[str, Any]) -> dict[str, Any]:
@@ -98,18 +108,19 @@ def apply_template_overrides(template: Any, overrides: dict[str, Any]) -> Any:
             f"Allowed: {', '.join(sorted(OVERRIDABLE_FIELDS))}"
         )
 
+    empty = sorted(k for k in normalized if k in _NON_EMPTY_FIELDS and not normalized[k])
+    if empty:
+        raise RequestValidationError(f"Template overrides may not be empty: {', '.join(empty)}")
+
+    if "price_type" in normalized and normalized["price_type"] not in _PRICE_TYPES:
+        raise RequestValidationError(
+            f"Invalid template override 'price_type': {normalized['price_type']!r}. "
+            f"Allowed: {', '.join(sorted(_PRICE_TYPES))}"
+        )
+
     merged = dict(normalized)
     if "tags" in merged:
-        tags = merged["tags"]
-        if not isinstance(tags, dict):
-            raise RequestValidationError("Template override 'tags' must be a mapping")
-        reserved = sorted(str(k) for k in tags if str(k).startswith(_RESERVED_TAG_PREFIX))
-        if reserved:
-            raise RequestValidationError(
-                f"Template override tags may not use the reserved '{_RESERVED_TAG_PREFIX}' "
-                f"prefix: {', '.join(reserved)}"
-            )
-        merged["tags"] = {**template.tags, **tags}
+        merged["tags"] = {**template.tags, **_validate_override_tags(merged["tags"])}
 
     # Validate against the concrete DTO class, keeping the typed provider_config.
     data = {name: getattr(template, name) for name in type(template).model_fields}
@@ -118,3 +129,24 @@ def apply_template_overrides(template: Any, overrides: dict[str, Any]) -> Any:
         return type(template).model_validate(data)
     except Exception as exc:
         raise RequestValidationError(f"Invalid template override: {exc}") from exc
+
+
+def _validate_override_tags(tags: Any) -> dict[str, str]:
+    """Check override tags are string pairs outside the reserved prefixes."""
+    if not isinstance(tags, dict):
+        raise RequestValidationError("Template override 'tags' must be a mapping")
+    non_string = sorted(
+        str(k) for k, v in tags.items() if not isinstance(k, str) or not isinstance(v, str)
+    )
+    if non_string:
+        raise RequestValidationError(
+            f"Template override tag keys and values must be strings: {', '.join(non_string)}"
+        )
+    reserved = sorted(k for k in tags if k.lower().startswith(_RESERVED_TAG_PREFIXES))
+    if reserved:
+        raise RequestValidationError(
+            "Template override tags may not use the reserved "
+            f"{' or '.join(repr(p) for p in _RESERVED_TAG_PREFIXES)} prefixes: "
+            f"{', '.join(reserved)}"
+        )
+    return tags
