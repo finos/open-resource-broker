@@ -117,8 +117,8 @@ from orb import ORBClient as orb
 async with orb() as sdk:
     ...
 
-# Mode 2 — SDK config dict: tune provider, region, timeout, log_level, etc.
-async with orb(config={"provider": "aws", "region": "us-west-2"}) as sdk:
+# Mode 2 — SDK config dict: tune region, timeout, log_level, etc.
+async with orb(config={"region": "us-west-2"}) as sdk:
     ...
 
 # Mode 3 — config file on disk

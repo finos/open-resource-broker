@@ -121,7 +121,6 @@ Pass SDK-level settings as a dict. These control the SDK's own behaviour — tim
 
 ```python
 config = {
-    "provider": "aws",
     "region": "us-west-2",
     "timeout": 600,
     "log_level": "DEBUG",
@@ -231,7 +230,7 @@ async with orb(provider_type="aws") as sdk:
 The SDK automatically discovers all available methods from the existing CQRS handlers:
 
 ```python
-async with orb(provider="mock") as sdk:
+async with orb() as sdk:
     # List all available methods
     methods = sdk.list_available_methods()
     print(f"Available methods: {methods}")
