@@ -225,6 +225,8 @@ class RequestReconciler:
         summary = ReconcileSummary()
         semaphore = asyncio.Semaphore(settings.max_concurrency)
         open_cache: dict[str, bool] = {}
+        # Per provider: did any fetch this pass get an answer, did any fail.
+        outcomes: dict[str, list[bool]] = {}
 
         async def _one(request: Request) -> None:
             if request.awaiting_resources:
@@ -245,7 +247,8 @@ class RequestReconciler:
                     return
                 try:
                     await asyncio.wait_for(
-                        self.reconcile_request(request), timeout=settings.request_timeout_seconds
+                        self.reconcile_request(request, outcomes),
+                        timeout=settings.request_timeout_seconds,
                     )
                     summary.reconciled += 1
                 except asyncio.TimeoutError:
@@ -263,6 +266,12 @@ class RequestReconciler:
 
         requests = await asyncio.to_thread(self._in_flight_requests)
         await asyncio.gather(*(_one(r) for r in requests))
+        # One outcome per provider per pass: a request whose resources are gone
+        # fails on its own, so failures only count against the provider when it
+        # answered none of its requests. Several broken requests then cannot
+        # open the circuit and starve the healthy requests of the same provider.
+        for provider, answered in outcomes.items():
+            self._record_provider_outcome(provider, any(answered))
         if summary.failed or summary.timed_out:
             self._logger.info("Request reconcile pass finished: %s", summary)
         else:
@@ -280,8 +289,15 @@ class RequestReconciler:
         except Exception as exc:
             self._logger.debug("Could not record circuit outcome for %s: %s", provider_name, exc)
 
-    async def reconcile_request(self, request: Request) -> None:
-        """Refresh one request's machines and status from its provider."""
+    async def reconcile_request(
+        self, request: Request, outcomes: Optional[dict[str, list[bool]]] = None
+    ) -> None:
+        """Refresh one request's machines and status from its provider.
+
+        Whether the provider answered is appended to ``outcomes`` under the
+        provider name when given (the pass records it once per provider), and
+        fed straight into the provider's circuit breaker otherwise.
+        """
         await self._machine_sync_service.populate_missing_machine_ids(request)
         refreshed: Any = await self._query_service.get_request(str(request.request_id))
         if refreshed is not None:
@@ -294,7 +310,11 @@ class RequestReconciler:
             provider_metadata,
         ) = await self._machine_sync_service.fetch_provider_machines(request, db_machines)
         fetched = not isinstance(provider_machines, FailedProviderFetch)
-        self._record_provider_outcome(request.provider_name or "", fetched)
+        provider = request.provider_name or ""
+        if outcomes is None:
+            self._record_provider_outcome(provider, fetched)
+        else:
+            outcomes.setdefault(provider, []).append(fetched)
         if not fetched:
             raise ProviderFetchFailed(f"provider fetch failed for request {request.request_id}")
         synced_machines, _ = await self._machine_sync_service.sync_machines_with_provider(

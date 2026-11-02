@@ -378,3 +378,59 @@ async def test_list_staleness_window_applies_only_while_a_loop_runs() -> None:
     finally:
         await harness.reconciler.stop()
     assert settings.list_staleness_window == 0
+
+
+def _fetch_fails_for(harness: _Harness, failing: list[Request]) -> None:
+    """Make the provider fetch fail, as the sync service reports it, for ``failing``."""
+    from orb.application.services.machine_sync_service import FailedProviderFetch
+
+    keys = {str(r.request_id) for r in failing}
+
+    async def fetch(request: Request, _machines: list[Any]) -> tuple[list[Any], dict]:
+        if str(request.request_id) in keys:
+            return FailedProviderFetch(), {}
+        harness.synced.append(str(request.request_id))
+        return [], {}
+
+    harness.reconciler._machine_sync_service.fetch_provider_machines = AsyncMock(side_effect=fetch)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_broken_requests_do_not_open_the_circuit_of_a_provider_that_answers() -> None:
+    from orb.infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
+
+    provider = "reconcile-mixed-health"
+    key = f"provider:{provider}"
+    broken = [_request(n, provider=provider) for n in range(1, 7)]
+    healthy = _request(7, provider=provider)
+    harness = _Harness([*broken, healthy])
+    _fetch_fails_for(harness, broken)
+    harness.reconciler._circuit_breaker_factory = CircuitBreakerStrategy
+    CircuitBreakerStrategy._circuit_states.pop(key, None)
+    try:
+        for _ in range(3):
+            harness.synced.clear()
+            summary = await harness.reconciler.reconcile_once()
+            assert summary.skipped_open_circuit == 0
+            assert harness.synced == [str(healthy.request_id)]
+        assert not CircuitBreakerStrategy(key).is_open()
+    finally:
+        CircuitBreakerStrategy._circuit_states.pop(key, None)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_a_provider_that_answers_nothing_counts_one_failure_per_pass() -> None:
+    requests = [_request(n) for n in range(1, 4)]
+    harness = _Harness(requests)
+    _fetch_fails_for(harness, requests)
+    breaker = MagicMock()
+    breaker.has_state.return_value = True
+    breaker.is_open.return_value = False
+    harness.reconciler._circuit_breaker_factory = lambda key: breaker
+
+    await harness.reconciler.reconcile_once()
+
+    breaker.record_failure.assert_called_once()
+    breaker.record_success.assert_not_called()
