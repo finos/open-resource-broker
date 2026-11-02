@@ -121,7 +121,9 @@ async def test_cancel_request_terminates_its_machines(orb_config_dir, ec2_client
         assert cancelled.status_code == 200, cancelled.text
         assert _id(cancelled.json()) == request_id
 
-    assert _instance_states(ec2_client, machines) <= {"shutting-down", "terminated"}
+    states = _instance_states(ec2_client, machines)
+    assert states, "cancelled machines must still be reported by EC2"
+    assert states <= {"shutting-down", "terminated"}, states
 
 
 @pytest.mark.asyncio
