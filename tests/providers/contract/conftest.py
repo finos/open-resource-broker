@@ -4,15 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from orb.providers.base.provider_plugin import reset_for_testing
-from orb.providers.registration import register_all_providers
-from orb.providers.registry import get_provider_registry
+from tests.providers.contract.fresh_registry import freshly_registered_providers
 
 
 @pytest.fixture
 def registry():
-    """Provider registry populated through the real registration path."""
-    reset_for_testing()
-    register_all_providers()
-    yield get_provider_registry()
-    reset_for_testing()
+    """Provider registry populated through the real registration path only."""
+    with freshly_registered_providers() as populated:
+        yield populated
