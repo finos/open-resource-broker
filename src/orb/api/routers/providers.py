@@ -330,8 +330,9 @@ async def list_providers(
     summary="Provider Health",
     description=(
         "Returns per-provider configuration + live connectivity status. "
-        "Each enabled provider is probed via the registry's HEALTH_CHECK "
-        "operation (AWS: sts:GetCallerIdentity or equivalent)."
+        "Each enabled provider's health check is probed with a time limit "
+        "and the result is reused for a short time (AWS: sts:GetCallerIdentity "
+        "or equivalent)."
     ),
 )
 @handle_rest_exceptions(endpoint="/api/v1/providers/health", method="GET")
@@ -342,8 +343,8 @@ async def get_providers_health(
     """Return per-provider health/status.
 
     Status values:
-    - ``healthy``   – provider is enabled and HEALTH_CHECK succeeded
-    - ``degraded``  – provider is enabled but HEALTH_CHECK failed
+    - ``healthy``   – provider is enabled and its health probe succeeded
+    - ``degraded``  – provider is enabled but its health probe failed
     - ``unhealthy`` – provider is explicitly disabled
     - ``unknown``   – probe could not run (registry resolution failed)
     """
