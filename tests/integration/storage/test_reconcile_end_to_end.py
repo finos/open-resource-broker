@@ -633,3 +633,196 @@ async def test_machine_update_without_concurrent_change_applies_provider_state(
     machine = world.uow.machines.get_by_id("i-1")
     assert machine is not None
     assert (machine.status, machine.private_ip) == (MachineStatus.RUNNING, "10.0.0.5")
+
+
+# ---------------------------------------------------------------------------
+# A request still being created
+# ---------------------------------------------------------------------------
+
+
+def _add_pending(world: _World) -> Request:
+    world.uow.requests.save(
+        Request(
+            request_id=RequestId(value=_ACQUIRE_ID),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
+            provider_name="p1",
+            provider_api="EC2Fleet",
+            template_id="tmpl",
+            requested_count=1,
+        )
+    )
+    return world.stored(_ACQUIRE_ID)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_pending_request_is_left_to_the_create_flow(world: _World) -> None:
+    before = _add_pending(world)
+
+    summary = await world.reconciler.reconcile_once()
+
+    assert summary.skipped_provisioning == 1
+    assert (summary.reconciled, summary.failed) == (0, 0)
+    assert world.provider.calls == 0
+    world.logger.warning.assert_not_called()
+    stored = world.stored(_ACQUIRE_ID)
+    assert stored.version == before.version
+    assert stored.last_status_check is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_status_read_of_a_pending_request_writes_nothing(world: _World) -> None:
+    before = _add_pending(world)
+
+    await _get_handler(world).execute_query(SyncAndGetRequestQuery(request_id=_ACQUIRE_ID))
+
+    stored = world.stored(_ACQUIRE_ID)
+    assert stored.version == before.version
+    assert stored.last_status_check is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_list_read_of_a_pending_request_writes_nothing(world: _World) -> None:
+    before = _add_pending(world)
+
+    await _list_handler(world).execute_query(SyncAndListActiveRequestsQuery(all_resources=True))
+
+    assert world.provider.calls == 0
+    world.logger.warning.assert_not_called()
+    stored = world.stored(_ACQUIRE_ID)
+    assert stored.version == before.version
+    assert stored.last_status_check is None
+
+
+# ---------------------------------------------------------------------------
+# The create flow while another writer touches the same request
+# ---------------------------------------------------------------------------
+
+
+class _CreateProvider:
+    """Fake provider for the create call; ``on_create`` runs while it is in flight."""
+
+    def __init__(self) -> None:
+        self.on_create: Callable[[], None] | None = None
+
+    async def execute_operation(self, _provider: str, _operation: object) -> ProviderResult:
+        if self.on_create:
+            self.on_create()
+        return ProviderResult.success_result(
+            {
+                "resource_ids": ["fleet-1"],
+                "instances": [{"instance_id": "i-1", "resource_id": "fleet-1"}],
+                "instance_ids": ["i-1"],
+            },
+            {},
+        )
+
+
+def _create_handler(world: _World, provider: _CreateProvider):
+    from types import SimpleNamespace
+
+    from orb.application.commands.request_creation_handlers import CreateMachineRequestHandler
+    from orb.application.services.provisioning_orchestration_service import (
+        ProvisioningOrchestrationService,
+    )
+    from orb.domain.base.results import ProviderSelectionResult
+
+    config = MagicMock()
+    config.get_request_config.return_value = {
+        "fulfillment_max_retries": 0,
+        "fulfillment_timeout_seconds": 60,
+        "dispatch_timeout_seconds": 30,
+    }
+    provisioning = ProvisioningOrchestrationService(
+        logger=world.logger,
+        uow_factory=world.factory,  # type: ignore[arg-type]
+        scheduler=MagicMock(),
+        provider_selection_port=provider,  # type: ignore[arg-type]
+        provider_config_port=MagicMock(),
+        config_port=config,
+        circuit_breaker_factory=lambda _key: MagicMock(),
+        state_machine=world.state_machine,
+    )
+    validation = MagicMock()
+    validation.select_and_validate_provider = AsyncMock(
+        return_value=ProviderSelectionResult(
+            provider_type="aws", provider_name="p1", selection_reason="test"
+        )
+    )
+    query_bus = MagicMock()
+    query_bus.execute = AsyncMock(
+        return_value=SimpleNamespace(template_id="tmpl", provider_api="EC2Fleet")
+    )
+    return CreateMachineRequestHandler(
+        uow_factory=world.factory,  # type: ignore[arg-type]
+        logger=world.logger,
+        event_publisher=MagicMock(),
+        error_handler=MagicMock(),
+        query_bus=query_bus,
+        provider_selection_port=MagicMock(),
+        provisioning_service=provisioning,
+        provider_validation_service=validation,
+        state_machine=world.state_machine,
+    )
+
+
+async def _create(world: _World, provider: _CreateProvider) -> None:
+    from orb.application.dto.commands import CreateRequestCommand
+
+    command = CreateRequestCommand(request_id=_ACQUIRE_ID, template_id="tmpl", requested_count=1)
+    await _create_handler(world, provider).execute_command(command)
+
+
+def _stamp_after_checkpoint(world: _World) -> None:
+    """Run a status-check stamp when the create flow saves its machines.
+
+    That is after the resource-id checkpoint and before the final save, while
+    the create flow still holds its own copy of the request.
+    """
+    from datetime import datetime, timezone
+
+    machines = world.uow.machines
+    real_save_batch = machines.save_batch
+
+    def save_batch(batch: list[Machine]) -> None:
+        world.sync._stamp_status_check(world.stored(_ACQUIRE_ID), datetime.now(timezone.utc))
+        real_save_batch(batch)
+
+    machines.save_batch = save_batch  # type: ignore[method-assign]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_create_flow_keeps_its_result_over_a_concurrent_status_stamp(
+    world: _World,
+) -> None:
+    _stamp_after_checkpoint(world)
+
+    await _create(world, _CreateProvider())
+
+    stored = world.stored(_ACQUIRE_ID)
+    assert stored.resource_ids == ["fleet-1"]
+    assert stored.machine_ids == ["i-1"]
+    assert stored.status == RequestStatus.COMPLETED
+    assert stored.last_status_check is not None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_create_flow_records_launched_capacity_on_a_request_cancelled_meanwhile(
+    world: _World,
+) -> None:
+    provider = _CreateProvider()
+    provider.on_create = lambda: world.uow.requests.save(
+        world.stored(_ACQUIRE_ID).update_status(RequestStatus.CANCELLED, "cancelled", force=True)
+    )
+
+    await _create(world, provider)
+
+    stored = world.stored(_ACQUIRE_ID)
+    assert stored.status == RequestStatus.CANCELLED
+    assert stored.resource_ids == ["fleet-1"]
+    assert stored.machine_ids == ["i-1"]

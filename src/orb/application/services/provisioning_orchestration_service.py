@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 from orb.application.ports.resilience_port import CircuitBreakerOpenError, CircuitBreakerPort
 from orb.application.ports.scheduler_port import SchedulerPort
+from orb.application.services.provisioning_writes import save_provisioning_state
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import (
     OperationNotSupportedError,
@@ -368,10 +369,8 @@ class ProvisioningOrchestrationService:
                     FulfilmentEvent.RESOURCES_CREATED,
                     now=datetime.now(timezone.utc),
                 )
-            uow_factory = self._uow_factory
-            with uow_factory.create_unit_of_work() as uow:
-                uow.requests.save(updated)
-            return updated, True
+            saved, _ = save_provisioning_state(self._uow_factory, updated)
+            return saved, True
         except Exception as e:
             self._logger.warning(
                 "Failed to persist resource-ID checkpoint for request %s: %s",
@@ -401,10 +400,8 @@ class ProvisioningOrchestrationService:
                 # Already past PENDING (e.g. ACQUIRING) — re-persist as-is;
                 # the deadline sweep on the next state-machine touch governs it.
                 updated = request
-            uow_factory = self._uow_factory
-            with uow_factory.create_unit_of_work() as uow:
-                uow.requests.save(updated)
-            return updated, True
+            saved, _ = save_provisioning_state(self._uow_factory, updated)
+            return saved, True
         except Exception as e:
             self._logger.warning("Failed to persist ACQUIRING status: %s", e)
             return request, False

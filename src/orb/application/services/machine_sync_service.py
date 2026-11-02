@@ -204,9 +204,16 @@ class MachineSyncService:
             try:
                 with self.uow_factory.create_unit_of_work() as uow:
                     current = uow.requests.get_by_id(request.request_id)
-                    if current is None or current.status.is_terminal():
+                    if (
+                        current is None
+                        or current.status.is_terminal()
+                        or current.awaiting_resources
+                    ):
+                        # Gone, finished, or still owned by the in-flight
+                        # create with nothing polled: nothing fresher is known.
                         self.logger.debug(
-                            "Not stamping status_check on request %s: gone or finished",
+                            "Not stamping status_check on request %s: gone, finished "
+                            "or not yet provisioned",
                             request.request_id,
                         )
                         return

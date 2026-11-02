@@ -104,6 +104,7 @@ class ReconcileSummary:
     reconciled: int = 0
     skipped_recent: int = 0
     skipped_open_circuit: int = 0
+    skipped_provisioning: int = 0
     timed_out: int = 0
     failed: int = 0
 
@@ -226,6 +227,10 @@ class RequestReconciler:
         open_cache: dict[str, bool] = {}
 
         async def _one(request: Request) -> None:
+            if request.awaiting_resources:
+                # The create flow still owns it and there is nothing to poll.
+                summary.skipped_provisioning += 1
+                return
             provider = request.provider_name or ""
             if provider not in open_cache:
                 open_cache[provider] = self._circuit_open(provider)
@@ -281,7 +286,7 @@ class RequestReconciler:
         refreshed: Any = await self._query_service.get_request(str(request.request_id))
         if refreshed is not None:
             request = refreshed
-        if request.status.is_terminal():
+        if request.status.is_terminal() or request.awaiting_resources:
             return
         db_machines = await self._query_service.get_machines_for_request(request)
         (

@@ -18,6 +18,7 @@ from orb.application.services.provider_validation_service import ProviderValidat
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
 )
+from orb.application.services.provisioning_writes import save_provisioning_state
 from orb.application.services.template_overrides import apply_template_overrides
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.configuration_service import DomainConfigurationService
@@ -230,9 +231,13 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         exponential backoff (0.1 s, 0.2 s, 0.4 s).  If all retries fail the
         error is logged at ERROR level but NOT re-raised because the request was
         already successfully persisted.
+
+        The save is applied on top of a fresh read of the stored row, so a
+        status-check stamp, a cancel or any other write made while the provider
+        was being called is kept, and the provisioning result is not lost to a
+        version conflict.
         """
-        with self.uow_factory.create_unit_of_work() as uow:
-            events = uow.requests.save(request)
+        _, events = save_provisioning_state(self.uow_factory, request)
 
         _max_attempts = 3
         _backoff_base = 0.1  # seconds; doubles each retry: 0.1, 0.2, 0.4

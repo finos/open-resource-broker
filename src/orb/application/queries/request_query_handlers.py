@@ -109,7 +109,9 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
             # Terminal requests are immutable — skip the provider describe round-trip
             # and return the persisted machines directly.
             db_machines: list = []
-            if request.status.is_terminal():
+            # A request the create flow has not yet recorded any resource for
+            # has nothing to ask the provider about; serve it as stored too.
+            if request.status.is_terminal() or request.awaiting_resources:
                 db_machines = await self._query_service.get_machines_for_request(request)
                 # Terminal requests skip the live provider sync — return persisted data.
                 # first/last_status_check are stamped by MachineSyncService during the
@@ -730,7 +732,7 @@ class SyncAndListActiveRequestsHandler(
             _staleness_window = RequestSyncSettings.from_config(self._config).list_staleness_window
 
             async def _sync_one(request):
-                if is_recently_synced(request, _staleness_window):
+                if request.awaiting_resources or is_recently_synced(request, _staleness_window):
                     return
                 async with _sync_concurrency:
 
