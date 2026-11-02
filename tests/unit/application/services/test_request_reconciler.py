@@ -312,7 +312,7 @@ async def test_provider_failures_feed_the_circuit_breaker() -> None:
     breaker.has_state.return_value = True
     breaker.is_open.return_value = False
     harness.reconciler._circuit_breaker_factory = lambda key: breaker
-    sync = harness.reconciler._machine_sync_service
+    sync: Any = harness.reconciler._machine_sync_service
     sync.fetch_provider_machines = AsyncMock(return_value=(FailedProviderFetch(), {}))
 
     summary = await harness.reconciler.reconcile_once()
