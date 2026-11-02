@@ -1231,6 +1231,7 @@ class TestSyncAndGetRequestHandlerBranches:
         handler._cache_service.is_caching_enabled.return_value = False
         req = MagicMock()
         req.status.is_terminal.return_value = False
+        req.awaiting_resources = False
         handler._query_service.get_request = AsyncMock(return_value=req)
         handler._machine_sync_service.populate_missing_machine_ids = AsyncMock(
             side_effect=ProviderContractError("contract violation")
@@ -1248,6 +1249,7 @@ class TestSyncAndGetRequestHandlerBranches:
         handler._cache_service.is_caching_enabled.return_value = False
         req = MagicMock()
         req.status.is_terminal.return_value = False
+        req.awaiting_resources = False
         handler._query_service.get_request = AsyncMock(return_value=req)
         handler._machine_sync_service.populate_missing_machine_ids = AsyncMock(
             side_effect=RuntimeError("provider down")

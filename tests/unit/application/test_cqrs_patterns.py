@@ -122,6 +122,7 @@ class TestCommandQuerySeparation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
+        mock_repository.get_by_id.return_value = None
 
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
@@ -464,6 +465,7 @@ class TestCommandHandlerImplementation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
+        mock_repository.get_by_id.return_value = None
 
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
@@ -546,6 +548,7 @@ class TestCommandHandlerImplementation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
+        mock_repository.get_by_id.return_value = None
 
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
@@ -604,6 +607,7 @@ class TestCommandHandlerImplementation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
+        mock_repository.get_by_id.return_value = None
 
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)

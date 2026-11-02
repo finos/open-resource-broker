@@ -112,6 +112,7 @@ class TestPersistResourceIdsCheckpoint:
         uow.__enter__ = MagicMock(return_value=uow)
         uow.__exit__ = MagicMock(return_value=False)
         uow.requests.save = MagicMock(side_effect=lambda r: saved_requests.append(r))
+        uow.requests.get_by_id = MagicMock(return_value=None)
 
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
@@ -137,6 +138,7 @@ class TestPersistResourceIdsCheckpoint:
         uow.__enter__ = MagicMock(return_value=uow)
         uow.__exit__ = MagicMock(return_value=False)
         uow.requests.save = MagicMock(side_effect=lambda r: saved_requests.append(r))
+        uow.requests.get_by_id = MagicMock(return_value=None)
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
         svc._uow_factory = uow_factory
@@ -159,6 +161,7 @@ class TestPersistResourceIdsCheckpoint:
         uow.__enter__ = MagicMock(return_value=uow)
         uow.__exit__ = MagicMock(return_value=False)
         uow.requests.save = MagicMock(side_effect=lambda r: saved_requests.append(r))
+        uow.requests.get_by_id = MagicMock(return_value=None)
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
         svc._uow_factory = uow_factory
@@ -228,6 +231,7 @@ class TestExecuteProvisioningCrashWindow:
         uow.__enter__ = MagicMock(return_value=uow)
         uow.__exit__ = MagicMock(return_value=False)
         uow.requests.save = MagicMock(side_effect=lambda r: saved_requests.append(r))
+        uow.requests.get_by_id = MagicMock(return_value=None)
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.return_value = uow
         svc._uow_factory = uow_factory

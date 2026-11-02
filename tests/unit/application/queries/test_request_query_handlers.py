@@ -31,6 +31,7 @@ def _make_fake_request(request_id: str = _REQ_ID_A, machine_ids: list[str] | Non
         template_id="tmpl-1",
         request_type=SimpleNamespace(value="acquire"),
         provider_type="aws",
+        awaiting_resources=False,
     )
 
 

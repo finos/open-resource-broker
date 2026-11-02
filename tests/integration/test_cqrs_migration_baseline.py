@@ -82,6 +82,7 @@ class TestCQRSArchitectureIntegration:
         uow.requests = Mock()
         uow.machines = Mock()
         uow.requests.save.return_value = []  # No events
+        uow.requests.get_by_id.return_value = None
         uow.machines.save.return_value = []  # No events
         uow.machines.save_batch.return_value = []  # No events
         uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=uow)
