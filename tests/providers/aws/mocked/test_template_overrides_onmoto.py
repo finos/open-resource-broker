@@ -64,6 +64,7 @@ def test_override_request_is_returnable_from_a_fresh_process_without_the_templat
     override_subnet = moto_vpc_resources["subnet_ids"][1]
 
     request_id, status = asyncio.run(_sdk_request(config_data, {"subnet_ids": [override_subnet]}))
+    assert request_id, status
 
     # The override reached AWS: the request's launch template targets the
     # override subnet. Moto does not apply launch template networking to
