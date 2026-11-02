@@ -94,8 +94,9 @@ def register_aws_health_checks(
         try:
             response = aws_client.sts_client.get_caller_identity()
             # Identity is useful to operators but must not be served by the
-            # unauthenticated /health endpoint, so it is logged instead.
-            _logger.info(
+            # unauthenticated /health endpoint, so it is logged instead, at
+            # DEBUG: liveness probes run this every few seconds.
+            _logger.debug(
                 "AWS identity verified: account %s, arn %s",
                 response.get("Account"),
                 response.get("Arn"),

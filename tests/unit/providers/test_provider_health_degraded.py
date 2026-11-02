@@ -83,6 +83,25 @@ class TestAWSHealthDegraded:
         result = captured["aws"]()
         assert result.status == "healthy"
 
+    def test_aws_identity_is_not_logged_at_info_on_every_probe(self, monkeypatch) -> None:
+        from orb.providers.aws import health as aws_health
+
+        logger = MagicMock()
+        monkeypatch.setattr(aws_health, "_logger", logger)
+        aws_client = MagicMock()
+        aws_client.sts_client.get_caller_identity.return_value = {
+            "Account": "123456789012",
+            "Arn": "arn:aws:iam::123456789012:user/x",
+        }
+        captured = self._register_and_capture(aws_client)
+
+        for _ in range(3):
+            captured["aws"]()
+
+        for call in logger.info.call_args_list + logger.warning.call_args_list:
+            assert "123456789012" not in " ".join(str(a) for a in call.args)
+        assert logger.debug.called
+
 
 @pytest.mark.unit
 class TestK8sHealthDegraded:
