@@ -24,15 +24,21 @@ delegated to abstract methods implemented by each subclass.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
+from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.fleet_release_policy import (
     FleetCapacityInput,
     FleetReleaseDecision,
     compute_fleet_release_decision,
+)
+from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
+    emit_alert,
+    region_of,
+    unwrap_aws_error,
 )
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 
@@ -49,7 +55,7 @@ class BaseFleetReleaseManager(ABC):
         aws_client: AWSClient,
         aws_ops: AWSOperations,
         request_adapter: Optional[RequestAdapterPort],
-        cleanup_on_zero_capacity_fn: Callable[[str, str], None],
+        cleanup_on_zero_capacity_fn: Callable[..., None],
         logger: LoggingPort,
         retry_fn: Callable[..., Any],
     ) -> None:
@@ -91,6 +97,8 @@ class BaseFleetReleaseManager(ABC):
             if not fleet_details:
                 fleet_details = self._fetch_fleet_details(fleet_id)
 
+            request_id = self._resolve_request_id(fleet_details, request_id)
+
             capacity_input, extra = self._extract_capacity_input(
                 fleet_id, fleet_details, instance_ids
             )
@@ -118,12 +126,26 @@ class BaseFleetReleaseManager(ABC):
                     extra,
                     request_id,
                     fleet_label,
+                    instance_ids,
                 )
             else:
-                # No specific instances — cancel/delete the entire fleet.
+                # No specific instances — cancel/delete the entire fleet. The
+                # members are read first: the cancel terminates them
+                # asynchronously, and the launch template in-use check must not
+                # mistake them for live instances.
+                member_ids = self._list_fleet_instance_ids(fleet_id)
                 self._cancel_or_delete_fleet(fleet_id, terminate_instances=True)
                 self._logger.info("Cancelled entire %s: %s", fleet_label, fleet_id)
-                self._cleanup_launch_template(fleet_details, request_id)
+                if member_ids is None:
+                    # Members unknown: leave the template for the cleanup on the
+                    # later return rather than keep or delete it blindly.
+                    self._logger.warning(
+                        "Skipping launch template cleanup for %s %s (members unknown)",
+                        fleet_label,
+                        fleet_id,
+                    )
+                else:
+                    self._cleanup_launch_template(fleet_details, request_id, member_ids)
 
         except Exception as exc:
             self._logger.error("Failed to terminate %s %s: %s", fleet_label, fleet_id, exc)
@@ -195,6 +217,7 @@ class BaseFleetReleaseManager(ABC):
         extra: dict[str, Any],
         request_id: str,
         fleet_label: str,
+        released_instance_ids: Optional[Iterable[str]] = None,
     ) -> None:
         """Handle fleet-level teardown and launch-template cleanup after instance termination."""
         if should_teardown and decision.has_fleet_record:
@@ -203,15 +226,33 @@ class BaseFleetReleaseManager(ABC):
             # Implementations that need different termination semantics (e.g. EC2Fleet
             # maintain fleets that use TerminateInstances=True as a safety net) handle
             # this distinction inside their _cancel_or_delete_fleet override via is_maintain.
-            self._cancel_or_delete_fleet(
-                fleet_id,
-                terminate_instances=False,
-                is_maintain=decision.requires_capacity_reduction,
-            )
-            self._cleanup_launch_template(fleet_details, request_id)
+            try:
+                self._cancel_or_delete_fleet(
+                    fleet_id,
+                    terminate_instances=False,
+                    is_maintain=decision.requires_capacity_reduction,
+                )
+            except Exception as exc:
+                # Instances are gone, so the release itself succeeded; the
+                # leftover fleet object is surfaced as an alert instead.
+                maintain = decision.requires_capacity_reduction
+                self._alert_fleet_delete_failed(
+                    fleet_id, fleet_label, request_id, exc, may_relaunch=maintain
+                )
+                if maintain:
+                    # A maintain fleet that survives can relaunch instances, so
+                    # the release must not look successful.
+                    raise AWSInfrastructureError(
+                        f"Could not delete maintain {fleet_label} {fleet_id} after "
+                        f"terminating its instances; it may relaunch instances: "
+                        f"{unwrap_aws_error(exc)}"
+                    ) from exc
+                return
+            self._cleanup_launch_template(fleet_details, request_id, released_instance_ids)
         elif not decision.has_fleet_record:
             # Instant fleet — AWS may not have auto-deleted the fleet record.
-            # Always attempt an explicit delete; swallow errors if already gone.
+            # Attempt an explicit delete; "already gone" responses count as success
+            # and any other failure is alerted without failing the release.
             try:
                 self._cancel_or_delete_fleet(
                     fleet_id,
@@ -224,13 +265,35 @@ class BaseFleetReleaseManager(ABC):
                     fleet_id,
                 )
             except Exception as exc:
-                self._logger.warning(
-                    "Could not delete instant %s %s (may already be gone): %s",
-                    fleet_label,
-                    fleet_id,
-                    exc,
-                )
-            self._cleanup_launch_template(fleet_details, request_id)
+                self._alert_fleet_delete_failed(fleet_id, fleet_label, request_id, exc)
+            self._cleanup_launch_template(fleet_details, request_id, released_instance_ids)
+
+    def _alert_fleet_delete_failed(
+        self,
+        fleet_id: str,
+        fleet_label: str,
+        request_id: str,
+        exc: BaseException,
+        may_relaunch: bool = False,
+    ) -> None:
+        """Emit the alertable record for a fleet object left behind after release."""
+        reason = str(unwrap_aws_error(exc))
+        consequence = (
+            "it is a maintain fleet and may relaunch instances"
+            if may_relaunch
+            else "it counts against account quotas"
+        )
+        emit_alert(
+            self._logger,
+            "aws.fleet_delete_failed",
+            f"Could not delete {fleet_label} {fleet_id}; the fleet object is left behind "
+            f"and {consequence}: {reason}",
+            resource_type=self._fleet_label().lower().replace(" ", "_"),
+            resource_id=fleet_id,
+            request_id=request_id,
+            region=region_of(self._aws_client),
+            reason=reason,
+        )
 
     def _zero_capacity_before_teardown(self, fleet_id: str) -> None:
         """Attempt to zero fleet capacity before cancellation to prevent replacement launches.
@@ -326,6 +389,29 @@ class BaseFleetReleaseManager(ABC):
                 to get TerminateInstances=True behaviour).
         """
 
+    @staticmethod
+    def _resolve_request_id(fleet_details: dict[str, Any], request_id: str = "") -> str:
+        """Return the ORB request ID, falling back to the fleet's ``orb:request-id`` tag.
+
+        Return paths do not know the originating request; the fleet's tags (EC2
+        Fleet ``Tags`` or Spot Fleet request ``TagSpecifications``) carry it.
+        """
+        if request_id or not fleet_details:
+            return request_id
+        tags: list[Any] = list(fleet_details.get("Tags") or [])
+        for spec in (fleet_details.get("SpotFleetRequestConfig") or {}).get(
+            "TagSpecifications"
+        ) or []:
+            tags.extend(spec.get("Tags") or [])
+        for tag in tags:
+            if isinstance(tag, dict) and tag.get("Key") == "orb:request-id":
+                return str(tag.get("Value") or "")
+        return ""
+
+    def _list_fleet_instance_ids(self, fleet_id: str) -> Optional[list[str]]:
+        """Return the ids of the fleet's current instances, or None when unknown."""
+        return None
+
     @abstractmethod
     def _fleet_has_no_remaining_instances(self, fleet_id: str, excluded_ids: set[str]) -> bool:
         """Return True when no active instances outside *excluded_ids* remain in the fleet.
@@ -352,6 +438,7 @@ class BaseFleetReleaseManager(ABC):
         self,
         fleet_details: dict[str, Any],
         request_id: str = "",
+        released_instance_ids: Optional[Iterable[str]] = None,
     ) -> None:
         """Delete the ORB-managed launch template associated with this fleet.
 
@@ -359,4 +446,6 @@ class BaseFleetReleaseManager(ABC):
             fleet_details: Raw fleet description dict.
             request_id: Fallback ORB request ID when the fleet record is
                 unavailable or lacks the orb:request-id tag.
+            released_instance_ids: Instances just submitted for termination;
+                ignored when checking whether the request still has live ones.
         """

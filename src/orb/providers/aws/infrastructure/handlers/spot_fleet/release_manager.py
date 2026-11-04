@@ -4,7 +4,7 @@ Encapsulates all release/teardown logic for Spot Fleet requests,
 keeping SpotFleetHandler focused on orchestration.
 """
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
@@ -13,6 +13,9 @@ from orb.providers.aws.infrastructure.handlers.base_fleet_release import BaseFle
 from orb.providers.aws.infrastructure.handlers.fleet_release_policy import (
     FleetCapacityInput,
     FleetReleaseDecision,
+)
+from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
+    check_unsuccessful_fleet_response,
 )
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 
@@ -33,7 +36,7 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         aws_client: AWSClient,
         aws_ops: AWSOperations,
         request_adapter: Optional[RequestAdapterPort],
-        cleanup_on_zero_capacity_fn: Callable[[str, str], None],
+        cleanup_on_zero_capacity_fn: Callable[..., None],
         logger: LoggingPort,
         retry_fn: Optional[Callable[..., Any]] = None,
     ) -> None:
@@ -190,12 +193,49 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         terminate_instances: bool,
         is_maintain: bool = False,
     ) -> None:
-        self._retry(
+        response = self._retry(
             self._aws_client.ec2_client.cancel_spot_fleet_requests,
             operation_type="critical",
             SpotFleetRequestIds=[fleet_id],
             TerminateInstances=terminate_instances,
         )
+        check_unsuccessful_fleet_response(response, "spot_fleet", self._fleet_is_cancelled)
+
+    def _fleet_is_cancelled(self, fleet_id: str) -> bool:
+        """Return True when describe_spot_fleet_requests reports the request as cancelled."""
+        configs = self._retry(
+            self._aws_client.ec2_client.describe_spot_fleet_requests,
+            operation_type="read_only",
+            SpotFleetRequestIds=[fleet_id],
+        ).get("SpotFleetRequestConfigs", [])
+        return bool(configs) and all(
+            c.get("SpotFleetRequestState")
+            in ("cancelled", "cancelled_running", "cancelled_terminating")
+            for c in configs
+        )
+
+    def _list_fleet_instance_ids(self, fleet_id: str) -> Optional[list[str]]:
+        try:
+            ids: list[str] = []
+            next_token: Optional[str] = None
+            while True:
+                kwargs: dict[str, Any] = {"SpotFleetRequestId": fleet_id}
+                if next_token:
+                    kwargs["NextToken"] = next_token
+                resp = self._retry(
+                    self._aws_client.ec2_client.describe_spot_fleet_instances,
+                    operation_type="read_only",
+                    **kwargs,
+                )
+                ids.extend(
+                    i["InstanceId"] for i in resp.get("ActiveInstances", []) if i.get("InstanceId")
+                )
+                next_token = resp.get("NextToken")
+                if not isinstance(next_token, str) or not next_token:
+                    return ids
+        except Exception as exc:
+            self._logger.warning("Could not list instances of Spot Fleet %s: %s", fleet_id, exc)
+            return None
 
     def _fleet_has_no_remaining_instances(self, fleet_id: str, excluded_ids: set[str]) -> bool:
         """Return True when the Spot Fleet has no active instances outside *excluded_ids*."""
@@ -230,6 +270,7 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         self,
         fleet_details: dict[str, Any],
         request_id: str = "",
+        released_instance_ids: Optional[Iterable[str]] = None,
     ) -> None:
         fleet_config = fleet_details.get("SpotFleetRequestConfig", {}) if fleet_details else {}
         tags: dict[str, str] = {}
@@ -248,7 +289,7 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
                 "Spot Fleet has no orb:request-id tag, skipping launch template cleanup"
             )
             return
-        self._cleanup_on_zero_capacity("spot_fleet", resolved_request_id)
+        self._cleanup_on_zero_capacity("spot_fleet", resolved_request_id, released_instance_ids)
 
     # ------------------------------------------------------------------
     # Private helpers

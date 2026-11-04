@@ -3,7 +3,6 @@
 from typing import cast
 from unittest.mock import MagicMock, patch
 
-import pytest
 from botocore.exceptions import ClientError
 
 from orb.config.schemas.cleanup_schema import CleanupConfig, CleanupResourcesConfig
@@ -217,7 +216,7 @@ class TestASGCleanupOnReturn:
                 self._asg_details(desired=2),
             )
             mock_delete_asg.assert_called_once_with("asg-req-abc")
-            mock_delete_lt.assert_called_once_with("asg-req-abc")
+            mock_delete_lt.assert_called_once_with("asg-req-abc", ["i-1", "i-2"])
 
     def test_partial_return_does_not_trigger_lt_cleanup(self):
         config_port = _make_config_port()
@@ -268,7 +267,7 @@ class TestASGCleanupOnReturn:
                 ["i-1"],
                 self._asg_details(desired=1),
             )
-            mock_delete_lt.assert_called_once_with("req-abc-123")
+            mock_delete_lt.assert_called_once_with("req-abc-123", ["i-1"])
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +300,7 @@ class TestEC2FleetCleanupOnReturn:
                 self._fleet_details(total=2),
             )
             mock_delete_fleet.assert_called_once_with("fleet-123")
-            mock_delete_lt.assert_called_once_with("req-fleet-abc")
+            mock_delete_lt.assert_called_once_with("req-fleet-abc", ["i-1", "i-2"])
 
     def test_partial_return_does_not_trigger_lt_cleanup(self):
         config_port = _make_config_port()
@@ -389,7 +388,7 @@ class TestSpotFleetCleanupOnReturn:
                 ["i-1", "i-2"],
                 self._fleet_details(target=2),
             )
-            mock_delete_lt.assert_called_once_with("req-spot-abc")
+            mock_delete_lt.assert_called_once_with("req-spot-abc", ["i-1", "i-2"])
 
     def test_partial_return_does_not_trigger_lt_cleanup(self):
         config_port = _make_config_port()
@@ -549,7 +548,7 @@ class TestEC2FleetReleaseManagerFleetTypes:
         with patch.object(mgr, "_delete_fleet") as mock_delete:
             mgr.release("fleet-1", ["i-1", "i-2"], self._fleet_details("maintain", 2))
         mock_delete.assert_called_once_with("fleet-1")
-        cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc")
+        cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc", ["i-1", "i-2"])
 
     def test_request_type_full_return_deletes_fleet_when_empty(self):
         """Request fleet: is_full_return=True AND no remaining instances → fleet IS deleted.
@@ -574,7 +573,7 @@ class TestEC2FleetReleaseManagerFleetTypes:
         )
         mock_delete.assert_not_called()
         # Cleanup IS triggered because the fleet was deleted
-        cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc")
+        cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc", ["i-1"])
 
     def test_instant_type_calls_delete_fleets_and_cleanup(self):
         # Instant fleets are NOT guaranteed to be auto-deleted by AWS; ORB must
@@ -587,7 +586,7 @@ class TestEC2FleetReleaseManagerFleetTypes:
         aws_client.ec2_client.delete_fleets.assert_called_once_with(
             FleetIds=["fleet-3"], TerminateInstances=True
         )
-        cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc")
+        cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc", ["i-1"])
 
     def test_request_type_missing_request_id_tag_skips_cleanup_gracefully(self):
         cleanup_fn = MagicMock()
@@ -662,7 +661,7 @@ class TestSpotFleetReleaseManagerFleetTypes:
             SpotFleetRequestIds=["sfr-1"],
             TerminateInstances=False,
         )
-        cleanup_fn.assert_called_once_with("spot_fleet", "req-spot-xyz")
+        cleanup_fn.assert_called_once_with("spot_fleet", "req-spot-xyz", ["i-1", "i-2"])
 
     def test_request_type_full_return_cancels_fleet_when_empty(self):
         """Request fleet: is_full_return=True AND no remaining instances → fleet IS cancelled.
@@ -686,7 +685,7 @@ class TestSpotFleetReleaseManagerFleetTypes:
             TerminateInstances=False,
         )
         # Cleanup IS triggered because the fleet was cancelled
-        cleanup_fn.assert_called_once_with("spot_fleet", "req-spot-xyz")
+        cleanup_fn.assert_called_once_with("spot_fleet", "req-spot-xyz", ["i-1"])
 
     def test_maintain_missing_request_id_tag_skips_cleanup(self):
         cleanup_fn = MagicMock()
@@ -770,7 +769,34 @@ class TestASGCancelResource:
         ):
             result = handler.cancel_resource("asg-cancel-1", "req-cancel-1")
         mock_delete_asg.assert_called_once_with("asg-cancel-1")
-        mock_cleanup.assert_called_once_with("asg", "req-cancel-1")
+        mock_cleanup.assert_called_once_with("asg", "req-cancel-1", [])
+        assert result["status"] == "success"
+
+    def test_cancel_resource_excludes_the_groups_members_from_the_in_use_check(self):
+        handler = _make_asg_handler(config_port=_make_config_port())
+        handler._retry_with_backoff = lambda fn, operation_type="standard", **kw: fn(**kw)
+        handler.aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = {
+            "AutoScalingGroups": [{"Instances": [{"InstanceId": "i-1"}, {"InstanceId": "i-2"}]}]
+        }
+        with (
+            patch.object(handler, "_delete_asg"),
+            patch.object(handler, "_cleanup_on_zero_capacity") as mock_cleanup,
+        ):
+            handler.cancel_resource("asg-cancel-9", "req-cancel-9")
+        mock_cleanup.assert_called_once_with("asg", "req-cancel-9", ["i-1", "i-2"])
+
+    def test_cancel_resource_skips_lt_cleanup_when_members_unknown(self):
+        handler = _make_asg_handler(config_port=_make_config_port())
+        handler._retry_with_backoff = lambda fn, operation_type="standard", **kw: fn(**kw)
+        handler.aws_client.autoscaling_client.describe_auto_scaling_groups.side_effect = (
+            RuntimeError("throttled")
+        )
+        with (
+            patch.object(handler, "_delete_asg"),
+            patch.object(handler, "_cleanup_on_zero_capacity") as mock_cleanup,
+        ):
+            result = handler.cancel_resource("asg-cancel-8", "req-cancel-8")
+        mock_cleanup.assert_not_called()
         assert result["status"] == "success"
 
     def test_cancel_resource_no_request_id_skips_lt_cleanup(self):
@@ -784,13 +810,12 @@ class TestASGCancelResource:
         mock_cleanup.assert_not_called()
 
     def test_cancel_resource_returns_error_on_exception(self):
-        from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-
         config_port = _make_config_port()
         handler = _make_asg_handler(config_port=config_port)
         with patch.object(handler, "_delete_asg", side_effect=RuntimeError("fail")):
-            with pytest.raises(AWSInfrastructureError, match="Failed to cancel ASG asg-cancel-3"):
-                handler.cancel_resource("asg-cancel-3", "req-cancel-3")
+            result = handler.cancel_resource("asg-cancel-3", "req-cancel-3")
+        assert result["status"] == "error"
+        assert "asg-cancel-3" in result["message"]
 
 
 # ---------------------------------------------------------------------------
@@ -841,7 +866,7 @@ class TestASGCapacityManagerMissingDetails:
         mgr.set_delete_asg_fn(delete_fn)
         mgr.release_instances("asg-no-details", ["i-1"], {})
         delete_fn.assert_called_once_with("asg-no-details")
-        cleanup_fn.assert_called_once_with("asg", "asg-no-details")
+        cleanup_fn.assert_called_once_with("asg", "asg-no-details", ["i-1"])
 
     def test_empty_asg_details_logs_warning(self):
         mgr, aws_client, _cleanup_fn = _make_asg_capacity_manager()
@@ -887,7 +912,7 @@ class TestASGCapacityManagerMissingDetails:
             {"DesiredCapacity": 1, "MinSize": 0},
         )
         delete_fn.assert_called_once_with("asg-full-return")
-        cleanup_fn.assert_called_once_with("asg", "asg-full-return")
+        cleanup_fn.assert_called_once_with("asg", "asg-full-return", ["i-1"])
 
     def test_valid_asg_details_partial_return_no_delete_no_cleanup(self):
         cleanup_fn = MagicMock()
@@ -941,4 +966,55 @@ class TestCleanupOnZeroCapacity:
         handler = _make_asg_handler(config_port=_make_config_port())
         with patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
             handler._cleanup_on_zero_capacity("asg", "req-ok")
-        mock_delete_lt.assert_called_once_with("req-ok")
+        mock_delete_lt.assert_called_once_with("req-ok", None)
+
+
+class TestListFleetInstanceIds:
+    def test_ec2_fleet_lists_active_instances(self):
+        mgr, aws_client, _ = _make_ec2_fleet_release_manager()
+        mgr._collect_with_next_token = MagicMock(
+            return_value=[{"InstanceId": "i-1"}, {"InstanceId": "i-2"}]
+        )
+        assert mgr._list_fleet_instance_ids("fleet-1") == ["i-1", "i-2"]
+
+    def test_ec2_fleet_returns_none_when_unreadable(self):
+        mgr, _, _ = _make_ec2_fleet_release_manager()
+        mgr._collect_with_next_token = MagicMock(side_effect=RuntimeError("throttled"))
+        assert mgr._list_fleet_instance_ids("fleet-1") is None
+
+    def test_spot_fleet_follows_pages(self):
+        mgr, aws_client, _ = _make_spot_fleet_release_manager()
+        aws_client.ec2_client.describe_spot_fleet_instances.side_effect = [
+            {"ActiveInstances": [{"InstanceId": "i-1"}], "NextToken": "t"},
+            {"ActiveInstances": [{"InstanceId": "i-2"}]},
+        ]
+        assert mgr._list_fleet_instance_ids("sfr-1") == ["i-1", "i-2"]
+
+    def test_spot_fleet_returns_none_when_unreadable(self):
+        mgr, aws_client, _ = _make_spot_fleet_release_manager()
+        aws_client.ec2_client.describe_spot_fleet_instances.side_effect = RuntimeError("x")
+        assert mgr._list_fleet_instance_ids("sfr-1") is None
+
+
+class TestUnknownMembersSkipIsWarned:
+    def test_asg_cancel_warns_when_members_unreadable(self):
+        handler = _make_asg_handler(config_port=_make_config_port())
+        handler._retry_with_backoff = lambda fn, operation_type="standard", **kw: fn(**kw)
+        handler.aws_client.autoscaling_client.describe_auto_scaling_groups.side_effect = (
+            RuntimeError("throttled")
+        )
+        with patch.object(handler, "_delete_asg"):
+            handler.cancel_resource("asg-1", "req-1")
+        messages = [c.args[0] for c in handler._logger.warning.call_args_list]
+        assert any("skipping launch template cleanup" in m for m in messages)
+
+    def test_fleet_cancel_warns_when_members_unknown(self):
+        mgr, aws_client, cleanup_fn = _make_ec2_fleet_release_manager()
+        mgr._list_fleet_instance_ids = MagicMock(return_value=None)
+        mgr._cancel_or_delete_fleet = MagicMock()
+
+        mgr.release("fleet-1", [], {"Type": "request", "Tags": []}, request_id="req-1")
+
+        messages = [c.args[0] for c in mgr._logger.warning.call_args_list]
+        assert any("Skipping launch template cleanup" in m for m in messages)
+        cleanup_fn.assert_not_called()

@@ -1,10 +1,10 @@
 """Unit tests for AWSTemplateValidationService.
 
-Covers validate_template, _validate_aws_template, get_available_templates,
-and _get_fallback_templates across happy, sad, and edge-case paths.
+Covers validate_template and _validate_aws_template across happy, sad,
+and edge-case paths.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -153,101 +153,11 @@ class TestValidateTemplateOperation:
         assert result.error_code == "VALIDATE_TEMPLATE_ERROR"
 
 
-# ---------------------------------------------------------------------------
-# get_available_templates
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.unit
-class TestGetAvailableTemplates:
-    def test_returns_templates_from_scheduler_strategy(self):
+class TestNoHardcodedTemplateCatalog:
+    """Template listing is served by the template configuration, not this service."""
+
+    def test_service_has_no_sample_template_catalog(self):
         svc = _make_service()
-        mock_strategy = MagicMock()
-        mock_strategy.get_template_paths.return_value = ["/path/to/templates"]
-        mock_strategy.load_templates_from_path.return_value = [
-            {"template_id": "aws-linux-basic", "name": "Amazon Linux 2"}
-        ]
-        mock_registry = MagicMock()
-        mock_registry.get_active_strategy.return_value = mock_strategy
-        with patch(
-            "orb.infrastructure.scheduler.registry.get_scheduler_registry",
-            return_value=mock_registry,
-        ):
-            op = _make_operation()
-            result = svc.get_available_templates(op)
-        assert result.success is True
-        assert result.data["count"] == 1
-
-    def test_falls_back_to_fallback_templates_when_no_strategy(self):
-        svc = _make_service()
-        mock_registry = MagicMock()
-        mock_registry.get_active_strategy.return_value = None
-        with patch(
-            "orb.infrastructure.scheduler.registry.get_scheduler_registry",
-            return_value=mock_registry,
-        ):
-            op = _make_operation()
-            result = svc.get_available_templates(op)
-        assert result.success is True
-        assert result.data["count"] >= 2  # fallback has 2 templates
-
-    def test_falls_back_when_scheduler_raises(self):
-        svc = _make_service()
-        with patch(
-            "orb.infrastructure.scheduler.registry.get_scheduler_registry",
-            side_effect=RuntimeError("registry broken"),
-        ):
-            op = _make_operation()
-            result = svc.get_available_templates(op)
-        assert result.success is True
-        assert result.data["count"] >= 2
-
-    def test_load_path_failure_skips_path_with_warning(self):
-        svc = _make_service()
-        mock_strategy = MagicMock()
-        mock_strategy.get_template_paths.return_value = ["/good", "/bad"]
-        mock_strategy.load_templates_from_path.side_effect = [
-            [{"template_id": "t1"}],
-            RuntimeError("bad path"),
-        ]
-        mock_registry = MagicMock()
-        mock_registry.get_active_strategy.return_value = mock_strategy
-        with patch(
-            "orb.infrastructure.scheduler.registry.get_scheduler_registry",
-            return_value=mock_registry,
-        ):
-            op = _make_operation()
-            result = svc.get_available_templates(op)
-        assert result.success is True
-        assert result.data["count"] == 1  # only good path
-        svc._logger.warning.assert_called()
-
-    def test_exception_returns_error_result(self):
-        svc = _make_service()
-        # Patch _get_aws_templates at service level to raise
-        svc._get_aws_templates = MagicMock(side_effect=RuntimeError("explode"))
-        op = _make_operation()
-        result = svc.get_available_templates(op)
-        assert result.success is False
-        assert result.error_code == "GET_TEMPLATES_ERROR"
-
-
-# ---------------------------------------------------------------------------
-# _get_fallback_templates
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestGetFallbackTemplates:
-    def test_returns_list_of_dicts(self):
-        svc = _make_service()
-        templates = svc._get_fallback_templates()
-        assert isinstance(templates, list)
-        assert len(templates) >= 1
-
-    def test_fallback_templates_have_required_keys(self):
-        svc = _make_service()
-        for t in svc._get_fallback_templates():
-            assert "template_id" in t
-            assert "name" in t
-            assert "image_id" in t
+        assert not hasattr(svc, "get_available_templates")
+        assert not hasattr(svc, "_get_fallback_templates")

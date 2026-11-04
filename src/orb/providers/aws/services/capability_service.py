@@ -40,7 +40,6 @@ class AWSCapabilityService:
                 ProviderOperationType.GET_INSTANCE_STATUS,
                 ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
                 ProviderOperationType.VALIDATE_TEMPLATE,
-                ProviderOperationType.GET_AVAILABLE_TEMPLATES,
                 ProviderOperationType.HEALTH_CHECK,
                 ProviderOperationType.RESOLVE_IMAGE,
                 ProviderOperationType.START_INSTANCES,

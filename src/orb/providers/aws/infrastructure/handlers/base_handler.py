@@ -11,7 +11,7 @@ import json
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional, TypeVar
 
 from botocore.exceptions import ClientError
 
@@ -909,7 +909,12 @@ class AWSHandler(ProviderHandlerBase, ABC):
         """
         return self._lt_cleanup.get_cleanup_config()
 
-    def _cleanup_on_zero_capacity(self, resource_type: str, request_id: str) -> None:
+    def _cleanup_on_zero_capacity(
+        self,
+        resource_type: str,
+        request_id: str,
+        exclude_instance_ids: Optional[Iterable[str]] = None,
+    ) -> None:
         """Delete the ORB-managed launch template when a resource reaches zero capacity.
 
         Reads the cleanup config via :class:`LaunchTemplateCleanupService`, checks
@@ -921,6 +926,8 @@ class AWSHandler(ProviderHandlerBase, ABC):
             resource_type: Cleanup config resource key, e.g. ``"asg"``,
                 ``"ec2_fleet"``, or ``"spot_fleet"``.
             request_id: The ORB request ID used to locate the launch template.
+            exclude_instance_ids: Instances just submitted for termination; ignored
+                when checking whether the request still has live instances.
         """
         if self.config_port is None:
             return
@@ -937,14 +944,16 @@ class AWSHandler(ProviderHandlerBase, ABC):
         if not getattr(cleanup.resources, resource_type, True):
             return
 
-        self._delete_orb_launch_template(request_id)
+        self._delete_orb_launch_template(request_id, exclude_instance_ids)
 
-    def _delete_orb_launch_template(self, request_id: str) -> None:
+    def _delete_orb_launch_template(
+        self, request_id: str, exclude_instance_ids: Optional[Iterable[str]] = None
+    ) -> None:
         """Delete the ORB-managed launch template for a request, if one exists.
 
         Delegates to :class:`LaunchTemplateCleanupService`.
         """
-        self._lt_cleanup.delete_orb_launch_template(request_id)
+        self._lt_cleanup.delete_orb_launch_template(request_id, exclude_instance_ids)
 
 
 class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):

@@ -55,6 +55,23 @@ class TestTerminateInstancesWithFallback:
         adapter.terminate_instances.assert_called_once_with(["i-111"])
         assert result == {"terminated_instances": ["i-111"]}
 
+    def test_adapter_error_status_raises(self):
+        ops = _make_ops()
+        adapter = MagicMock()
+        adapter.terminate_instances.return_value = {
+            "status": "error",
+            "message": "Failed to terminate instances: denied",
+        }
+        with pytest.raises(AWSInfrastructureError, match="denied"):
+            ops.terminate_instances_with_fallback(["i-111"], request_adapter=adapter)
+
+    def test_adapter_success_status_returned(self):
+        ops = _make_ops()
+        adapter = MagicMock()
+        adapter.terminate_instances.return_value = {"status": "success", "terminated_instances": []}
+        result = ops.terminate_instances_with_fallback(["i-111"], request_adapter=adapter)
+        assert result["status"] == "success"
+
     def test_falls_back_to_ec2_client_without_adapter(self):
         ops = _make_ops()
         retry = MagicMock(return_value={"TerminatingInstances": []})

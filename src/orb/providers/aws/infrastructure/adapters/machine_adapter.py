@@ -233,6 +233,7 @@ class AWSMachineAdapter:
                             else PriceType.ON_DEMAND.value
                         ),
                         "subnet_id": aws_instance_data.get("SubnetId"),
+                        "vpc_id": aws_instance_data.get("VpcId"),
                         "security_group_ids": [],
                         "tags": {
                             tag["Key"]: tag["Value"]
@@ -295,6 +296,7 @@ class AWSMachineAdapter:
                         else PriceType.ON_DEMAND.value
                     ),
                     "subnet_id": aws_instance_data.get("SubnetId"),
+                    "vpc_id": aws_instance_data.get("VpcId"),
                     "security_group_ids": [
                         sg["GroupId"] for sg in aws_instance_data.get("SecurityGroups", [])
                     ],

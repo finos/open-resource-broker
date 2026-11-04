@@ -463,37 +463,20 @@ class TestValidateTemplate:
 
 
 class TestGetAvailableTemplates:
-    def test_returns_fallback_templates(self, strategy):
+    """Template listing is served by the template configuration, not the strategy."""
+
+    def test_operation_is_not_advertised_or_handled(self, strategy):
         op = ProviderOperation(
             operation_type=ProviderOperationType.GET_AVAILABLE_TEMPLATES,
             parameters={},
         )
         result = run_operation(strategy.execute_operation(op))
-        assert result.success
-        assert result.data["count"] >= 1
-
-    def test_fallback_templates_validate_as_azure_templates(self, strategy):
-        for template in strategy._template_catalog_service.get_fallback_templates():
-            AzureTemplate.model_validate(template)
-
-    def test_failure_preserves_azure_exception_context(self, strategy):
-        strategy._template_catalog_service.get_available_templates = MagicMock(
-            side_effect=AzureValidationError(
-                "Template catalog is invalid",
-                error_code="InvalidTemplateCatalog",
-            )
-        )
-        op = ProviderOperation(
-            operation_type=ProviderOperationType.GET_AVAILABLE_TEMPLATES,
-            parameters={},
-        )
-
-        result = run_operation(strategy.execute_operation(op))
-
         assert not result.success
-        assert result.error_code == "InvalidTemplateCatalog"
-        assert result.metadata["error_class"] == "AzureValidationError"
-        assert result.metadata["provider_error"]["error_code"] == "InvalidTemplateCatalog"
+        assert result.error_code == "UNSUPPORTED_OPERATION"
+        assert (
+            ProviderOperationType.GET_AVAILABLE_TEMPLATES
+            not in strategy.get_capabilities().supported_operations
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -82,6 +82,13 @@ class AWSOperations:
                 self._logger.info("Using request adapter for %s termination", operation_context)
                 result = request_adapter.terminate_instances(instance_ids)
                 self._logger.info("Request adapter termination result: %s", result)
+                if isinstance(result, dict) and result.get("status") == "error":
+                    # The adapter reports failures as a dict instead of raising;
+                    # surface them so callers never treat a failed termination
+                    # as success.
+                    raise AWSInfrastructureError(
+                        result.get("message") or f"Failed to terminate {operation_context}"
+                    )
                 return result
             else:
                 self._logger.info("Using EC2 client directly for %s termination", operation_context)
