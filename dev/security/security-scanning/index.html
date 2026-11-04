@@ -5324,6 +5324,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dependency-pinning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependency Pinning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dependency Pinning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#trusted-context-exceptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusted-context exceptions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#local-development" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6685,6 +6713,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#dependency-pinning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependency Pinning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dependency Pinning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#trusted-context-exceptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trusted-context exceptions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#local-development" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7077,6 +7133,32 @@ dummy-credential patterns are normal test code.</p>
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secrets-detection</span>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dockerfile-security</span>
 </code></pre></div>
+<h2 id="dependency-pinning">Dependency Pinning<a class="headerlink" href="#dependency-pinning" title="Permanent link">&para;</a></h2>
+<p>Tooling installed by CI workflows, container images and packaging scripts comes from
+hash-locked requirements in <code>.github/requirements/</code> (installed with
+<code>--require-hashes --no-deps</code>) or from exact versions. Regenerate the locks with
+<code>dev-tools/ci/update_tool_locks.sh</code>; Dependabot tracks the directory. The Java and Kotlin
+SDKs use strict Gradle dependency locking and the C# SDK package uses a NuGet lock file
+that CI restores in locked mode.</p>
+<h3 id="trusted-context-exceptions">Trusted-context exceptions<a class="headerlink" href="#trusted-context-exceptions" title="Permanent link">&para;</a></h3>
+<p>These installs are intentionally not hash-pinned. Each runs the code under test, a
+reviewed repository file, or a tool on a developer machine that is already trusted:</p>
+<ul>
+<li><strong>Wheel under test</strong> (<code>package-testing.yml</code>, <code>sdk.yml</code>, <code>sdk/java/Dockerfile.build</code>,
+  <code>dev-tools/package/test_install.sh</code>): the wheel built in the same
+  workflow run is installed together with its dependency ranges. Pinning them would stop
+  the job from testing what users get from <code>pip install</code>.</li>
+<li><strong>Project installs</strong> (<code>dev-tools/package/install_dev.sh</code> editable install,
+  <code>dev-tools/ci/run_ui_smoke.sh</code> and <code>dev-tools/package/build_ui.sh</code> installing <code>.[ui]</code>):
+  these install the checked-out project, whose dependencies are locked in <code>uv.lock</code>.</li>
+<li><strong>Developer-machine installers</strong> (<code>dev-tools/setup/install_dev_tools.py</code>): the Windows
+  bun installer and the syft, actionlint and uv <code>curl</code> installers download from the
+  vendors' official endpoints, which publish no checksum for those scripts. They are
+  not used by CI workflows. CI uses version-pinned actions and the hash-locked requirements above,
+  and the UI package build verifies the SHA-256 of the pinned bun release archive.</li>
+<li><strong>Base image tags selected by build argument</strong> (<code>Dockerfile</code>, <code>Dockerfile.dev-tools</code>):
+  the Python version is a build argument, so one digest cannot be pinned.</li>
+</ul>
 <h2 id="local-development">Local Development<a class="headerlink" href="#local-development" title="Permanent link">&para;</a></h2>
 <h3 id="running-security-scans">Running Security Scans<a class="headerlink" href="#running-security-scans" title="Permanent link">&para;</a></h3>
 <p><strong>Quick Security Check</strong>:
