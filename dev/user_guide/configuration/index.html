@@ -8667,6 +8667,7 @@
 <li><strong>System install</strong> — <code>{sys.prefix}/orb/config/</code></li>
 <li><strong>Fallback</strong> — <code>{cwd}/config/</code></li>
 </ol>
+<p>Steps 4 and 7 depend on the current working directory, so the same installation can resolve a different directory depending on where <code>orb</code> is launched. Set <code>ORB_ROOT_DIR</code> or <code>ORB_CONFIG_DIR</code> to make resolution independent of the working directory. The test suite sets <code>ORB_ROOT_DIR</code> to an empty temporary directory for this reason.</p>
 <h3 id="directory-layout-and-orb_root_dir">Directory Layout and ORB_ROOT_DIR<a class="headerlink" href="#directory-layout-and-orb_root_dir" title="Permanent link">&para;</a></h3>
 <p>Set <code>ORB_ROOT_DIR</code> to anchor all subdirectories under a single root:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_ROOT_DIR</span><span class="o">=</span>/opt/orb
