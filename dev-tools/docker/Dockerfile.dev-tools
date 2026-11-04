@@ -36,8 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && groupadd -r "${PACKAGE_NAME_SHORT}" \
     && useradd -r -g "${PACKAGE_NAME_SHORT}" -s /bin/false "${PACKAGE_NAME_SHORT}"
 
-# Install UV (pinned version for consistency)
-RUN pip install --no-cache-dir uv==0.13.6
+# Install UV (hash-locked version for consistency)
+COPY .github/requirements/uv.txt /tmp/uv.txt
+RUN pip install --no-cache-dir --require-hashes --no-deps -r /tmp/uv.txt \
+    && rm -f /tmp/uv.txt
 
 # Set working directory and create directories
 WORKDIR /app

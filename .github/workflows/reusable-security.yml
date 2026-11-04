@@ -79,12 +79,9 @@ jobs:
         if: inputs.scan-type == 'semgrep' && inputs.enabled
         run: pip install --require-hashes --no-deps -r .github/requirements/semgrep.txt
 
-      # || true on the semgrep command below is INTENTIONAL: semgrep is advisory-only
-      # for now.  --error requests a non-zero exit on findings, but || true absorbs it
-      # so CI is never blocked.  Findings are still captured in semgrep.sarif and
-      # surfaced in the GitHub Security tab via the upload-sarif step that follows.
-      # TODO: remove || true once the finding backlog is triaged and semgrep is
-      # promoted to a hard gate.
+      # --error makes semgrep exit non-zero on any finding, which fails the job.
+      # Findings are also written to semgrep.sarif and surfaced in the GitHub
+      # Security tab by the upload step that follows.
       - name: Run Semgrep security analysis
         if: inputs.scan-type == 'semgrep' && inputs.enabled
         run: |
@@ -95,7 +92,7 @@ jobs:
             --sarif \
             --output semgrep.sarif \
             --error \
-            . || true
+            .
 
       - name: Upload Semgrep SARIF results
         if: inputs.scan-type == 'semgrep' && inputs.enabled && always()
@@ -104,11 +101,10 @@ jobs:
           sarif_file: semgrep.sarif
 
       # Trivy Filesystem Scan
-      # Trivy emits SARIF limited to CRITICAL and HIGH findings (severity plus
-      # limit-severities-for-sarif) and sets no exit-code input, so it never fails
-      # the step regardless of findings.  This is INTENTIONAL: results are surfaced
-      # in the GitHub Security tab via the upload-sarif step below, but do not block
-      # CI.  Making Trivy a hard gate would need an explicit exit-code input.
+      # Trivy reports CRITICAL and HIGH findings (severity plus
+      # limit-severities-for-sarif) and exits non-zero when any are present, which
+      # fails the job.  Results are also surfaced in the GitHub Security tab via
+      # the upload-sarif step below.
       - name: Run Trivy filesystem vulnerability scanner
         if: inputs.scan-type == 'trivy-fs' && inputs.enabled
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
@@ -119,6 +115,7 @@ jobs:
           output: 'trivy-fs-results.sarif'
           severity: 'CRITICAL,HIGH'
           limit-severities-for-sarif: true
+          exit-code: '1'
           trivyignores: .trivyignore.yaml
 
       - name: Upload Trivy filesystem scan results
@@ -128,12 +125,9 @@ jobs:
           sarif_file: 'trivy-fs-results.sarif'
 
       # Hadolint Dockerfile Scan
-      # no-fail: true is INTENTIONAL: hadolint is advisory-only for now.  Findings
-      # are written to hadolint-results.sarif and uploaded to the GitHub Security tab
-      # via the upload-sarif step below, but a non-zero hadolint exit code does not
-      # block CI.
-      # TODO: remove no-fail: true once Dockerfile best-practice rules have been
-      # reviewed and hadolint is ready to act as a hard gate.
+      # Hadolint exits non-zero on findings at or above its default failure
+      # threshold, which fails the job.  Findings are also written to
+      # hadolint-results.sarif and uploaded to the GitHub Security tab below.
       - name: Run Hadolint Dockerfile scan
         if: inputs.scan-type == 'hadolint' && inputs.enabled
         uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387  # v3.5.0
@@ -141,7 +135,7 @@ jobs:
           dockerfile: Dockerfile
           format: sarif
           output-file: hadolint-results.sarif
-          no-fail: true
+          no-fail: false
 
       - name: Upload Hadolint SARIF results
         if: inputs.scan-type == 'hadolint' && inputs.enabled && always()
@@ -152,8 +146,7 @@ jobs:
   # CodeQL runs once per language so each analysis uploads under a stable
   # `/language:<lang>` category and keeps matching existing alerts.
   #
-  # Known coverage gaps:
-  # - TruffleHog (secret scanning) skips scheduled runs; it only runs on push/PR.
+  # Known coverage gap:
   # - dependency-review only runs on pull_request events, so direct pushes to
   #   main bypass it; branch protection is expected to prevent those.
   codeql:

@@ -67,14 +67,68 @@ resolve_bun() {
     fi
 }
 
+# Pinned bun release, installed from the GitHub release archive and checked
+# against a SHA-256 digest from the release's SHASUMS256.txt. Keep the version
+# in step with the bun-version used by the setup-bun steps in the CI workflows.
+BUN_VERSION="1.4.0"
+
+bun_archive_sha256() {
+    case "$1" in
+        darwin-aarch64) echo "c669e97f6164e1c96e0701748db98dfa77492908cbd8394c7557134a735de381" ;;
+        darwin-x64)     echo "1d0211b8f1dc991182344687ad15e72ee86f154845a5f7fa477994cd341dd9b0" ;;
+        linux-aarch64)  echo "4b1a332ee861983eb93bcfe6f770fff94e3e31b2c388bdaea3c8ed35e58eed0e" ;;
+        linux-x64)      echo "2d03fb5fb83ac8b567aca0a281b2ce1a1a19d488f56c2968d88c3f25e92fe452" ;;
+        *) return 1 ;;
+    esac
+}
+
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 "$1" | cut -d' ' -f1
+    fi
+}
+
+install_pinned_bun() {
+    local os arch platform expected archive tmp
+    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    arch="$(uname -m)"
+    case "$arch" in
+        arm64|aarch64) arch="aarch64" ;;
+        x86_64|amd64)  arch="x64" ;;
+    esac
+    platform="$os-$arch"
+    if ! expected="$(bun_archive_sha256 "$platform")"; then
+        echo "ERROR: no pinned bun $BUN_VERSION archive for $platform." >&2
+        return 1
+    fi
+    archive="bun-$platform.zip"
+    tmp="$(mktemp -d)"
+    if ! curl -fsSL -o "$tmp/$archive" \
+            "https://github.com/oven-sh/bun/releases/download/bun-v$BUN_VERSION/$archive" >&2; then
+        rm -rf "${tmp:?}"
+        return 1
+    fi
+    if [ "$(sha256_of "$tmp/$archive")" != "$expected" ]; then
+        echo "ERROR: checksum mismatch for $archive" >&2
+        rm -rf "${tmp:?}"
+        return 1
+    fi
+    mkdir -p "$HOME/.bun/bin"
+    unzip -qo "$tmp/$archive" -d "$tmp" >&2
+    install -m 0755 "$tmp/bun-$platform/bun" "$HOME/.bun/bin/bun"
+    rm -rf "${tmp:?}"
+}
+
 resolve_bun
 if [ -z "$BUN" ] || [ ! -x "$BUN" ]; then
-    log "INFO: bun not found; installing to \$HOME/.bun/bin/..."
-    curl -fsSL https://bun.sh/install | bash >&2
+    log "INFO: bun not found; installing $BUN_VERSION to \$HOME/.bun/bin/..."
+    install_pinned_bun || true
     resolve_bun
 fi
 if [ -z "$BUN" ] || [ ! -x "$BUN" ]; then
-    echo "ERROR: bun install failed. Install manually: curl -fsSL https://bun.sh/install | bash" >&2
+    echo "ERROR: bun install failed. Install bun $BUN_VERSION manually: https://bun.sh/docs/installation" >&2
     exit 1
 fi
 

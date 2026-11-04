@@ -1,0 +1,3 @@
+# python-version: 3.10
+# Minimum pip release installed by the setup-uv-fresh action.
+pip>=25.3

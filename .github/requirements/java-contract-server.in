@@ -1,0 +1,5 @@
+# python-version: 3.10
+# Server dependencies installed next to the ORB wheel in sdk/java/Dockerfile.build.
+fastapi>=0.115.0
+uvicorn>=0.24.0
+httptools>=0.6.0

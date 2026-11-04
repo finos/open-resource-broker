@@ -78,7 +78,7 @@ updates:
           - "minor"
           - "patch"
 
-  # Hash-locked CI tool requirements (semgrep, actionlint-py, pip-licenses).
+  # Hash-locked tool requirements (CI, packaging, container images).
   # Regenerate manually with dev-tools/ci/update_tool_locks.sh if an update
   # does not refresh the hashes.
   - package-ecosystem: "pip"
@@ -101,6 +101,23 @@ updates:
       ci-tools:
         patterns:
           - "*"
+
+  # Hash-locked MicroVM worker image requirements.
+  - package-ecosystem: "pip"
+    directory: "/tests/e2e/microvm/worker"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "06:00"
+      timezone: "America/New_York"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 1
+    cooldown:
+      default-days: 7
 
   # Go dependencies (SDK)
   - package-ecosystem: "gomod"

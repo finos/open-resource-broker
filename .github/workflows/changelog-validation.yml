@@ -52,7 +52,7 @@ jobs:
     
     - name: Install changelog dependencies
       run: |
-        uv pip install git-changelog
+        uv pip install --no-config --require-hashes --no-deps -r .github/requirements/changelog-tools.txt
     
     - name: Validate changelog format
       run: |
