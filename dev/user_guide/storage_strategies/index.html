@@ -8180,7 +8180,7 @@
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">&quot;strategy&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sql&quot;</span><span class="p">,</span>
 <a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">&quot;sql_strategy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sqlite&quot;</span><span class="p">,</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;request_database.db&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/var/lib/orb/data/orb.db&quot;</span><span class="p">,</span>
 <a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">      </span><span class="nt">&quot;host&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
 <a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">      </span><span class="nt">&quot;port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">      </span><span class="nt">&quot;pool_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
@@ -8190,6 +8190,39 @@
 <a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="p">}</span>
 </code></pre></div>
+<p>The SQLite database is one file, used by every part of ORB that stores data in SQL.
+<code>name</code> is resolved as follows:</p>
+<table>
+<thead>
+<tr>
+<th><code>name</code></th>
+<th>Database used</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Absolute path, for example <code>/var/lib/orb/data/orb.db</code></td>
+<td>That file. Missing parent directories are created.</td>
+</tr>
+<tr>
+<td>Relative path, for example <code>orb.db</code> or <code>sub/orb.db</code></td>
+<td>The same path under <code>&lt;work directory&gt;/data/</code>, like the JSON backend. The default is <code>database.db</code>.</td>
+</tr>
+<tr>
+<td><code>:memory:</code></td>
+<td>A private in-memory database that lasts as long as the process.</td>
+</tr>
+<tr>
+<td><code>file:</code> URI, for example <code>file:/var/lib/orb/orb.db?mode=rwc</code></td>
+<td>Opened as a SQLite URI.</td>
+</tr>
+</tbody>
+</table>
+<p>When the resolved file does not exist, ORB logs a warning with the full path and creates a new
+empty database. If you already have a database, move or rename it to that path, or set <code>name</code> to
+its absolute path.</p>
+<p>SQLite storage uses the configured database location. Data previously written to <code>./database.db</code>
+or <code>./data.db</code> in the working directory is not migrated.</p>
 <h3 id="postgresql-configuration">PostgreSQL Configuration<a class="headerlink" href="#postgresql-configuration" title="Permanent link">&para;</a></h3>
 <p>For production deployments:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p">{</span>
