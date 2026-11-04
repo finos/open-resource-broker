@@ -291,3 +291,32 @@ class TestStrategyUoWContextManager:
         uow = _ConcreteStrategyUoW([])
         with uow:
             pass  # no repos — no crash
+
+
+@pytest.mark.unit
+class TestFailedCommitReleasesTransaction:
+    def test_failed_commit_clears_in_transaction_without_implicit_rollback(self) -> None:
+        from orb.infrastructure.storage.base.unit_of_work import BaseUnitOfWork
+
+        class FailingCommit(BaseUnitOfWork):
+            rolled_back = False
+            machines = None
+            requests = None
+            templates = None
+
+            def _begin_transaction(self) -> None:
+                pass
+
+            def _commit_transaction(self) -> None:
+                raise RuntimeError("commit failed")
+
+            def _rollback_transaction(self) -> None:
+                self.rolled_back = True
+
+        uow = FailingCommit()
+        uow.begin()
+        with pytest.raises(RuntimeError, match="commit failed"):
+            uow.commit()
+
+        assert uow.in_transaction is False
+        assert uow.rolled_back is False

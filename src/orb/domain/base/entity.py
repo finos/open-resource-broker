@@ -2,9 +2,9 @@
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Optional, TypeVar
+from typing import Annotated, Any, Optional, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer
 
 T = TypeVar("T", bound="Entity")
 
@@ -33,8 +33,60 @@ class Entity(BaseModel, ABC):
         return hash((self.__class__, self.id))
 
 
+class PersistedRevision:
+    """Version of the stored state an aggregate instance derives from.
+
+    ``value`` is ``None`` for an aggregate that was never loaded or saved. The
+    holder is shared by every copy derived from one load (mutators rebuild the
+    aggregate through ``model_dump`` / ``model_validate``, which keep it), so a
+    save through any copy moves the baseline for all of them. Only repositories
+    set it; domain code never reads it.
+    """
+
+    __slots__ = ("value",)
+
+    def __init__(self) -> None:
+        self.value: Optional[int] = None
+
+    def mark_loaded(self, version: int) -> None:
+        """Record the version the aggregate was read at."""
+        self.value = version
+
+    def mark_saved(self, version: int) -> None:
+        """Record the version that was written."""
+        self.value = version
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, _core_schema: Any, _handler: Any) -> dict[str, Any]:
+        # Bookkeeping, not part of any published schema
+        return {}
+
+    def __eq__(self, other: object) -> bool:
+        # Bookkeeping, not state: two aggregates with equal state are equal
+        return isinstance(other, PersistedRevision)
+
+    def __hash__(self) -> int:
+        return 0
+
+
+def _fresh_if_none(value: Any) -> Any:
+    """A JSON round trip emits null for the holder; give the rebuilt aggregate a new one."""
+    return PersistedRevision() if value is None else value
+
+
+def _omit_from_json(_value: Any) -> None:
+    """Serialise the holder as null in JSON output."""
+    return None
+
+
 class AggregateRoot(Entity):
     """Base class for aggregate roots."""
+
+    persisted_revision: Annotated[
+        PersistedRevision,
+        BeforeValidator(_fresh_if_none),
+        PlainSerializer(_omit_from_json, return_type=type(None), when_used="json"),
+    ] = Field(default_factory=PersistedRevision, repr=False)
 
     def __init__(self, **data) -> None:
         """Initialize the instance."""

@@ -1,5 +1,6 @@
 """Registry services DI registration."""
 
+from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.di.container import DIContainer
 
@@ -26,5 +27,6 @@ def register_registry_services(container: DIContainer) -> None:
         lambda c: StorageRegistryService(
             registry=get_storage_registry(),  # type: ignore[arg-type]
             logger=c.get(LoggingPort),
+            config=c.get(ConfigurationPort),
         ),
     )

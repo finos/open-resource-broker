@@ -41,6 +41,7 @@ def _make_strategy(table_exists=False):
     strat.client_manager = MagicMock()
     strat.converter = MagicMock()
     strat.transaction_manager = MagicMock()
+    strat.transaction_manager.is_active = False
 
     # LockManager context managers must work
     strat.lock_manager = MagicMock()

@@ -9,6 +9,7 @@ dependencies beyond the in-process SQLite engine.
 """
 
 import pytest
+from sqlalchemy import text
 
 from orb.domain.base.exceptions import ConcurrencyError
 from orb.infrastructure.storage.components.sql_query_builder import (
@@ -68,7 +69,7 @@ class TestBuildUpdateVersionPredicate:
         sql, params = self.builder.build_update(
             {"name": "x", "version": 1}, "id", "e1", expected_version=0
         )
-        assert "AND version = :expected_version" in sql
+        assert "AND COALESCE(version, 0) = :expected_version" in sql
         assert params["expected_version"] == 0
 
     def test_expected_version_zero_is_valid(self):
@@ -77,7 +78,7 @@ class TestBuildUpdateVersionPredicate:
             {"name": "x", "version": 1}, "id", "e1", expected_version=0
         )
         assert params["expected_version"] == 0
-        assert "AND version = :expected_version" in sql
+        assert "AND COALESCE(version, 0) = :expected_version" in sql
 
     def test_version_column_included_in_set_clause(self):
         """The new version value appears in the SET clause."""
@@ -161,71 +162,131 @@ class TestVersionIncrementsOnSave:
 
 @pytest.mark.unit
 class TestStaleVersionRaisesConcurrencyError:
-    """Two saves with a stale version on the second must raise ConcurrencyError."""
+    """A save made from an out-of-date baseline raises ConcurrencyError."""
 
     def test_second_stale_save_raises(self):
         """
-        Scenario: two 'writers' load version=0 simultaneously.
-
-        Writer A saves first (version 0 → 1 in DB).
-        Writer B then tries to save with version=1 (expecting DB version=0),
-        but the DB now has version=1 — rowcount is 0 → ConcurrencyError.
+        Two writers both loaded version 0. Writer A saves first (0 -> 1).
+        Writer B still holds baseline 0, so its conditional UPDATE matches no row.
         """
         strategy = _make_strategy()
-
-        # Both writers read the entity at version=0
         _save_initial(strategy, "e1", version=0)
 
-        # Writer A succeeds: version 0 → 1
-        strategy.save("e1", {"id": "e1", "name": "writer-a", "version": 1})
+        assert strategy.save_versioned("e1", {"id": "e1", "name": "writer-a", "version": 1}, 0) == 1
 
-        # Writer B is stale: it also has version=0, increments to 1, but
-        # DB already has version=1 → expected_version=0 mismatch.
         with pytest.raises(ConcurrencyError) as exc_info:
-            strategy.save("e1", {"id": "e1", "name": "writer-b", "version": 1})
+            strategy.save_versioned("e1", {"id": "e1", "name": "writer-b", "version": 1}, 0)
 
         assert "e1" in str(exc_info.value)
-        # The winning write from A should still be in the DB unchanged.
         data = strategy.find_by_id("e1")
         assert data is not None
         assert data.get("name") == "writer-a"
         assert data.get("version") == 1
 
     def test_concurrency_error_includes_entity_id(self):
-        """ConcurrencyError message contains the entity id for debugging."""
         strategy = _make_strategy()
         _save_initial(strategy, "some-entity", version=0)
+        strategy.save_versioned("some-entity", {"id": "some-entity", "name": "a", "version": 1}, 0)
 
-        # Advance to version 1
-        strategy.save("some-entity", {"id": "some-entity", "name": "a", "version": 1})
-
-        # Stale save (still expects DB version=0)
         with pytest.raises(ConcurrencyError) as exc_info:
-            strategy.save("some-entity", {"id": "some-entity", "name": "b", "version": 1})
+            strategy.save_versioned(
+                "some-entity", {"id": "some-entity", "name": "b", "version": 1}, 0
+            )
 
         assert "some-entity" in str(exc_info.value)
 
     def test_concurrent_writes_only_one_wins(self):
-        """
-        Three 'writers' all read version=N.  Only the first to save wins;
-        the other two must receive ConcurrencyError.
-        """
+        """Three writers hold baseline 0; only the first save lands."""
         strategy = _make_strategy()
         _save_initial(strategy, "shared", version=0)
 
-        # Writer 1 wins
-        strategy.save("shared", {"id": "shared", "name": "winner", "version": 1})
+        strategy.save_versioned("shared", {"id": "shared", "name": "winner", "version": 1}, 0)
 
-        # Writers 2 and 3 are stale
         for loser_name in ("loser-2", "loser-3"):
             with pytest.raises(ConcurrencyError):
-                strategy.save("shared", {"id": "shared", "name": loser_name, "version": 1})
+                strategy.save_versioned(
+                    "shared", {"id": "shared", "name": loser_name, "version": 1}, 0
+                )
 
-        # DB reflects only the winner
         data = strategy.find_by_id("shared")
         assert data is not None
         assert data.get("name") == "winner"
         assert data.get("version") == 1
+
+    def test_several_in_memory_mutations_between_saves_are_fine(self):
+        """The baseline is the stored version, not the local counter minus one."""
+        strategy = _make_strategy()
+        _save_initial(strategy, "multi", version=0)
+
+        written = strategy.save_versioned("multi", {"id": "multi", "name": "v3", "version": 3}, 0)
+
+        assert written == 3
+        assert strategy.find_by_id("multi")["version"] == 3  # type: ignore[index]
+
+    def test_a_lagging_counter_still_moves_the_stored_version_forward(self):
+        strategy = _make_strategy()
+        _save_initial(strategy, "lag", version=4)
+
+        written = strategy.save_versioned("lag", {"id": "lag", "name": "x", "version": 3}, 4)
+
+        assert written == 5
+        assert strategy.find_by_id("lag")["version"] == 5  # type: ignore[index]
+
+    def test_row_deleted_since_load_conflicts(self):
+        strategy = _make_strategy()
+        _save_initial(strategy, "gone", version=0)
+        strategy.delete("gone")
+
+        with pytest.raises(ConcurrencyError):
+            strategy.save_versioned("gone", {"id": "gone", "name": "x", "version": 1}, 0)
+
+        assert strategy.find_by_id("gone") is None
+
+    def test_null_version_row_counts_as_zero(self):
+        strategy = _make_strategy()
+        with strategy.connection_manager.get_session() as session:
+            session.execute(
+                text("INSERT INTO entities (id, name, version) VALUES ('legacy', 'old', NULL)")
+            )
+            session.commit()
+
+        assert (
+            strategy.save_versioned("legacy", {"id": "legacy", "name": "new", "version": 1}, 0) == 1
+        )
+
+    def test_without_a_baseline_the_write_is_an_unconditional_upsert(self):
+        """A never-loaded aggregate (e.g. a machine discovered twice) must not conflict."""
+        strategy = _make_strategy()
+
+        strategy.save_versioned("d1", {"id": "d1", "name": "first", "version": 0}, None)
+        strategy.save_versioned("d1", {"id": "d1", "name": "second", "version": 0}, None)
+
+        assert strategy.find_by_id("d1")["name"] == "second"  # type: ignore[index]
+
+    def test_batch_is_all_or_nothing(self):
+        strategy = _make_strategy()
+        _save_initial(strategy, "a", version=0)
+        _save_initial(strategy, "b", version=0)
+        strategy.save_versioned("b", {"id": "b", "name": "moved", "version": 1}, 0)
+
+        with pytest.raises(ConcurrencyError):
+            strategy.save_versioned_batch(
+                [
+                    ("a", {"id": "a", "name": "changed", "version": 1}, 0),
+                    ("b", {"id": "b", "name": "stale", "version": 1}, 0),
+                ]
+            )
+
+        assert strategy.find_by_id("a")["name"] == "initial"  # type: ignore[index]
+        assert strategy.find_by_id("b")["name"] == "moved"  # type: ignore[index]
+
+    def test_plain_save_is_a_last_writer_wins_upsert(self):
+        strategy = _make_strategy()
+        _save_initial(strategy, "lw", version=0)
+        strategy.save("lw", {"id": "lw", "name": "one", "version": 1})
+        strategy.save("lw", {"id": "lw", "name": "two", "version": 1})
+
+        assert strategy.find_by_id("lw")["name"] == "two"  # type: ignore[index]
 
     def test_non_versioned_table_save_never_raises(self):
         """

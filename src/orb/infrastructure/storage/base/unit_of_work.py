@@ -56,8 +56,13 @@ class BaseUnitOfWork(UnitOfWork, ABC):
         if not self._in_transaction:
             raise TransactionError("No transaction in progress")
 
-        self._commit_transaction()
-        self._in_transaction = False
+        # A failed commit ends the transaction as far as this object is
+        # concerned; it is not rolled back implicitly and the unit of work must
+        # not be reused afterwards.
+        try:
+            self._commit_transaction()
+        finally:
+            self._in_transaction = False
 
         self.logger.debug("Transaction committed")
 
@@ -66,8 +71,10 @@ class BaseUnitOfWork(UnitOfWork, ABC):
         if not self._in_transaction:
             raise TransactionError("No transaction in progress")
 
-        self._rollback_transaction()
-        self._in_transaction = False
+        try:
+            self._rollback_transaction()
+        finally:
+            self._in_transaction = False
 
         self.logger.debug("Transaction rolled back")
 

@@ -55,7 +55,9 @@ class RepositoryFactory:
         try:
             storage_type = self.config_manager.get_storage_strategy()
             config = self.config_manager.app_config.model_dump()
-            storage_strategy = self.storage_registry.create_strategy(storage_type, config)
+            storage_strategy = self.storage_registry.create_strategy(
+                storage_type, config, entity="machines"
+            )
             return MachineRepository(storage_strategy)
 
         except Exception as e:
@@ -71,7 +73,9 @@ class RepositoryFactory:
         try:
             storage_type = self.config_manager.get_storage_strategy()
             config = self.config_manager.app_config.model_dump()
-            storage_strategy = self.storage_registry.create_strategy(storage_type, config)
+            storage_strategy = self.storage_registry.create_strategy(
+                storage_type, config, entity="requests"
+            )
             return RequestRepository(storage_strategy, event_publisher=self.event_bus)
 
         except Exception as e:
@@ -86,7 +90,9 @@ class RepositoryFactory:
 
         storage_type = self.config_manager.get_storage_strategy()
         config = self.config_manager.app_config.model_dump()
-        storage_strategy = self.storage_registry.create_strategy(storage_type, config)
+        storage_strategy = self.storage_registry.create_strategy(
+            storage_type, config, entity="templates"
+        )
 
         try:
             # Create repository with strategy injection

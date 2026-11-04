@@ -4,10 +4,43 @@ from contextlib import contextmanager
 from typing import Any, Generator, Optional
 
 from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
 from .resource_manager import StorageResourceManager as ResourceManager
+
+
+def build_sql_url(
+    db_type: str,
+    name: str,
+    host: str = "localhost",
+    port: Optional[int] = None,
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+) -> URL:
+    """Build the SQLAlchemy URL for a database described by its parts.
+
+    The result is a URL object, so credentials containing reserved characters
+    need no escaping and a missing password stays absent. Render it with
+    ``render_as_string(hide_password=False)`` only where a string is unavoidable.
+    """
+    if db_type == "sqlite":
+        return URL.create("sqlite", database=name)
+    if db_type == "postgresql":
+        drivername = "postgresql"
+    elif db_type == "mysql":
+        drivername = "mysql+pymysql"
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+    return URL.create(
+        drivername,
+        username=username or None,
+        password=password or None,
+        host=host,
+        port=port or None,
+        database=name,
+    )
 
 
 class SQLConnectionManager(ResourceManager):
@@ -22,10 +55,15 @@ class SQLConnectionManager(ResourceManager):
         Initialize SQL connection manager.
 
         Args:
-            config: Database configuration
+            config: Database configuration. An ``engine`` entry (an existing
+                SQLAlchemy engine) is used as-is and is disposed here only when
+                ``owns_engine`` is true; otherwise
+                ``connection_string`` or the discrete ``type``/``name``/``host``/...
+                fields describe the database.
         """
         super().__init__()
         self.config = config
+        self._owns_engine = True
         self.engine: Optional[Engine] = None
         self.session_factory: Optional[sessionmaker] = None
 
@@ -42,7 +80,8 @@ class SQLConnectionManager(ResourceManager):
     def cleanup(self) -> None:
         """Close all connections and dispose engine."""
         if self.engine:
-            self.engine.dispose()
+            if self._owns_engine:
+                self.engine.dispose()
             self.logger.debug("SQL connection manager cleaned up")
         self._initialized = False
 
@@ -82,6 +121,17 @@ class SQLConnectionManager(ResourceManager):
     def _initialize_engine(self) -> None:
         """Initialize SQLAlchemy engine with connection pooling."""
         try:
+            # An engine supplied by the caller is used as-is so every consumer
+            # shares one engine (and, for in-memory SQLite, one database).
+            supplied_engine = self.config.get("engine")
+            if supplied_engine is not None:
+                self.engine = supplied_engine
+                # Disposed on cleanup only when the caller says the engine is ours
+                self._owns_engine = self.config.get("owns_engine") is True
+                self.session_factory = sessionmaker(bind=self.engine)
+                self.logger.info("Initialized connection manager from supplied engine")
+                return
+
             # Fast-path: use connection_string directly when provided
             if "connection_string" in self.config:
                 connection_string = self.config["connection_string"]
@@ -93,7 +143,14 @@ class SQLConnectionManager(ResourceManager):
             db_type = self.config.get("type", "sqlite")
 
             if db_type == "sqlite":
-                db_path = self.config.get("name", "database.db")
+                db_path = self.config.get("name")
+                if not db_path:
+                    from orb.domain.base.exceptions import ConfigurationError
+
+                    raise ConfigurationError(
+                        "SQLite storage needs a database name (storage.sql_strategy.name) "
+                        "or a connection_string; there is no default database file."
+                    )
                 connection_string = f"sqlite:///{db_path}"
                 timeout = self.config.get("connection_timeout", 30)
 
@@ -133,7 +190,9 @@ class SQLConnectionManager(ResourceManager):
                 username = self.config.get("username", "user")
                 password = self.config.get("password", "")
 
-                connection_string = f"postgresql://{username}:{password}@{host}:{port}/{database}"
+                connection_string = build_sql_url(
+                    "postgresql", database, host, port, username, password
+                )
 
                 self.engine = create_engine(
                     connection_string,
@@ -151,9 +210,7 @@ class SQLConnectionManager(ResourceManager):
                 username = self.config.get("username", "user")
                 password = self.config.get("password", "")
 
-                connection_string = (
-                    f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}"
-                )
+                connection_string = build_sql_url("mysql", database, host, port, username, password)
 
                 self.engine = create_engine(
                     connection_string,

@@ -29,6 +29,13 @@ def _mock_aws():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _storage_scratch_cwd(tmp_path, monkeypatch):
+    """Run from a scratch directory so no test reads or creates ./database.db."""
+    monkeypatch.chdir(tmp_path)
+    yield
+
+
 _ENTITY_TABLE = "entities"
 _ENTITY_COLUMNS = {"id": "TEXT PRIMARY KEY", "data": "TEXT", "name": "TEXT"}
 
