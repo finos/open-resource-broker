@@ -26,6 +26,7 @@ try:
 except ImportError:
     pytest.skip("fastapi not installed", allow_module_level=True)
 
+from .conftest import make_test_server_config
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -196,7 +197,7 @@ def rest_client_for(scheduler_type: str) -> Any:  # type: ignore[return]
         # Fall through to real container for everything else
         return original_get(service_type)  # type: ignore[misc]
 
-    app = create_fastapi_app(None)
+    app = create_fastapi_app(make_test_server_config())
     container = get_container()
     original_get = container.get  # type: ignore[assignment]
     container.get = _patched_get  # type: ignore[method-assign]
@@ -287,7 +288,7 @@ async def test_list_machines_cli_equals_rest_top_level_keys(scheduler_type: str)
     mock_qbus = MagicMock()
     mock_qbus.execute = AsyncMock(return_value=[machine_dto])
 
-    app = create_fastapi_app(None)
+    app = create_fastapi_app(make_test_server_config())
     container = get_container()
     original_get = container.get
 
@@ -344,7 +345,7 @@ async def test_list_requests_cli_equals_rest_top_level_keys(scheduler_type: str)
     mock_qbus = MagicMock()
     mock_qbus.execute = AsyncMock(return_value=[request_dict])
 
-    app = create_fastapi_app(None)
+    app = create_fastapi_app(make_test_server_config())
     container = get_container()
     original_get = container.get
 
@@ -435,7 +436,7 @@ async def test_get_request_status_cli_equals_rest_top_level_keys(scheduler_type:
     mock_qbus_rest = MagicMock()
     mock_qbus_rest.execute = AsyncMock(return_value=request_dto)
 
-    app = create_fastapi_app(None)
+    app = create_fastapi_app(make_test_server_config())
     container2 = get_container()
     original_get2 = container2.get
 
@@ -489,7 +490,7 @@ async def test_list_templates_cli_equals_rest_top_level_keys(scheduler_type: str
     mock_qbus = MagicMock()
     mock_qbus.execute = AsyncMock(return_value=[template_dto])
 
-    app = create_fastapi_app(None)
+    app = create_fastapi_app(make_test_server_config())
     container = get_container()
     original_get = container.get
 

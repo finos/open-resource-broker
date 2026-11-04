@@ -192,6 +192,13 @@ def reset_singletons():
 # ---------------------------------------------------------------------------
 
 
+def make_test_server_config() -> Any:
+    """Return a real, default ServerConfig for building the REST app in tests."""
+    from orb.config.schemas.server_schema import ServerConfig
+
+    return ServerConfig()
+
+
 def _make_mock_logger() -> Any:
     logger = MagicMock()
     logger.debug = MagicMock()
