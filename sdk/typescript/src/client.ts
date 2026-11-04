@@ -14,6 +14,8 @@ import type { Readable } from "stream";
 import { makeUdsAdapter } from "./transport/uds.js";
 import { attachRetry, disableRetry, type RetryConfig } from "./transport/retry.js";
 import { attachAuth, type AuthOption } from "./auth/index.js";
+import { throwOnStreamOutcome } from "./sse/outcome.js";
+import { orbSseRequestToStreamEvent, type StreamEvent } from "./sse/event.js";
 import { SubprocessManager, tempSocketPath, type ProcessConfig } from "./process/manager.js";
 import {
   sseStream,
@@ -67,24 +69,7 @@ export {
 // Stream event type (high-level, consumer-facing)
 // ---------------------------------------------------------------------------
 
-export interface StreamEvent {
-  requestId: string;
-  status: string;
-  message?: string;
-  requestedCount?: number;
-  successfulCount?: number;
-  failedCount?: number;
-  machines: Array<{
-    machineId: string;
-    name?: string;
-    status?: string;
-    result?: string;
-    privateIp?: string;
-    publicIp?: string;
-    launchTime?: string;
-    message?: string;
-  }>;
-}
+export type { StreamEvent } from "./sse/event.js";
 
 // ---------------------------------------------------------------------------
 // Client configuration
@@ -666,6 +651,7 @@ export class OrbClient {
     }
 
     for await (const frame of sseStream(connect, { signal })) {
+      throwOnStreamOutcome(frame);
       if (isSentinel(frame)) return;
 
       const payload = parseOrbPayload(frame);
@@ -879,23 +865,3 @@ export class OrbClient {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function orbSseRequestToStreamEvent(req: OrbSseRequest): StreamEvent {
-  return {
-    requestId: req.request_id,
-    status: req.status,
-    message: req.message,
-    requestedCount: req.requested_count,
-    successfulCount: req.successful_count,
-    failedCount: req.failed_count,
-    machines: (req.machines ?? []).map((m) => ({
-      machineId: m.machine_id,
-      name: m.name,
-      status: m.status,
-      result: m.result,
-      privateIp: m.private_ip,
-      publicIp: m.public_ip,
-      launchTime: m.launch_time,
-      message: m.message,
-    })),
-  };
-}

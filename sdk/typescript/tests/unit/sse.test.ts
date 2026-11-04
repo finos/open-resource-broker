@@ -204,3 +204,26 @@ describe("sseStream (AsyncGenerator)", () => {
     expect(connectCount).toBe(1);
   }, 10_000);
 });
+
+describe("request status stream outcome frames", () => {
+  const status = 'data: {"requests":[{"request_id":"r1","status":"in_progress"}]}\n\n';
+
+  it.each([
+    ["complete", 'event: complete\ndata: {"status": "failed"}\n\n'],
+    ["error", 'event: error\ndata: {"error": "internal"}\n\n'],
+    ["timeout", 'event: timeout\ndata: {"status": "timeout"}\n\n'],
+  ])("%s frame yields no status update and the sentinel ends the stream", async (_name, outcome) => {
+    const ac = new AbortController();
+    async function connect(): Promise<Readable> {
+      return makeReadable(status + outcome + "data: {}\n\n");
+    }
+
+    const frames = await collectFrames(sseStream(connect, { signal: ac.signal }));
+
+    const updates = frames
+      .map((f) => parseOrbPayload(f))
+      .filter((p) => p !== null && (p.requests ?? []).length > 0);
+    expect(updates).toHaveLength(1);
+    expect(isSentinel(frames[frames.length - 1])).toBe(true);
+  }, 10_000);
+});

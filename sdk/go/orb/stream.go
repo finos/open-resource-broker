@@ -22,12 +22,14 @@ type StreamEvent struct {
 
 // MachineInfo holds per-machine status within a StreamEvent.
 type MachineInfo struct {
-	MachineID  string
-	Name       string
-	Status     string
-	Result     string
-	PrivateIP  string
-	PublicIP   string
+	MachineID string
+	Name      string
+	Status    string
+	Result    string
+	PrivateIP string
+	PublicIP  string
+	// LaunchTime is the machine launch time as sent by the server: a Unix
+	// timestamp in seconds as decimal text, or "" when not yet known.
 	LaunchTime string
 	Message    string
 }

@@ -537,6 +537,7 @@ public class OrbClient implements Closeable {
                     SseFrame frame;
                     while ((frame = reader.next()) != null) {
                         if (keepGoing != null && !keepGoing.getAsBoolean()) return;
+                        StreamOutcome.throwIfFailed(frame);
                         if (frame.isSentinel()) {
                             terminal = true;
                             break;

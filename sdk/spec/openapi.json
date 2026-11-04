@@ -1735,7 +1735,7 @@
           "Requests"
         ],
         "summary": "Stream Request Status",
-        "description": "Stream request status updates as Server-Sent Events",
+        "description": "Stream request status updates as Server-Sent Events. Each poll emits a data frame with the current status. The stream ends with a named event (`complete` with the final status, `error`, or `timeout`) followed by an empty `data: {}` frame, which is always the last frame.",
         "operationId": "streamRequest",
         "parameters": [
           {

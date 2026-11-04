@@ -632,7 +632,8 @@ class OrbClient private constructor(
                             "?interval=$intervalSeconds&timeout=$timeoutSeconds",
                     lastEventId,
                 )
-            }
+            },
+            failOnOutcomeFrames = true,
         )
             .takeWhile { frame -> !frame.isSentinel() }
             .map { frame -> parseStreamEvent(frame) }
@@ -846,8 +847,8 @@ class OrbClient private constructor(
                             name = m.name,
                             status = m.status,
                             result = m.result,
-                            privateIp = m.private_ip,
-                            publicIp = m.public_ip,
+                            privateIp = m.private_ip_address,
+                            publicIp = m.public_ip_address,
                             launchTime = m.launch_time,
                             message = m.message,
                         )

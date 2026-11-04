@@ -174,6 +174,33 @@ _MCP = Interface.MCP
 _SDK = Interface.SDK
 
 
+def _render_request_status_cli(
+    rfs: ResponseFormattingService, out: GetRequestStatusOutput
+) -> InterfaceResponse:
+    """Render request status for the CLI with an exit code that reflects the outcome.
+
+    The exit code is the worst code across the requested IDs, as defined by the
+    active scheduler: by default a request in a problem state (failed, cancelled,
+    timeout, partial) or one that could not be looked up makes the command exit
+    non-zero. The HostFactory scheduler always exits 0 and reports the outcome
+    in the output.
+    """
+    response = rfs.format_request_status(out.requests)
+    exit_code = 0
+    for item in out.requests:
+        if not isinstance(item, dict):
+            continue
+        status = item.get("status")
+        if status:
+            code = rfs.status_poll_exit_code(str(status))
+        elif item.get("error"):
+            code = rfs.status_poll_exit_code(None)
+        else:
+            continue
+        exit_code = max(exit_code, code)
+    return InterfaceResponse(data=response.data, exit_code=exit_code)
+
+
 def _render_machine_detail(
     rfs: ResponseFormattingService, out: GetMachineOutput
 ) -> InterfaceResponse:
@@ -250,6 +277,7 @@ OPERATION_CATALOG: dict[str, CatalogEntry[Any, Any]] = {
         input_dto=GetRequestStatusInput,
         output_dto=GetRequestStatusOutput,
         render=lambda rfs, out: rfs.format_request_status(out.requests),
+        render_overrides={_CLI: _render_request_status_cli},
         exposed_on=frozenset({_CLI, _REST, _MCP, _SDK}),
     ),
     "list_requests": CatalogEntry(

@@ -265,6 +265,15 @@ class ORBClient:
     async def cleanup(self) -> None:
         """Clean up resources and connections."""
 
+        # Deliver in-flight domain events before the container and telemetry go away.
+        with suppress(Exception):
+            from orb.domain.base.ports import EventPublisherPort
+
+            if self._container is not None:
+                drain = getattr(self._container.get_optional(EventPublisherPort), "drain", None)
+                if drain is not None:
+                    await drain()
+
         with suppress(Exception):
             if self._app and hasattr(self._app, "cleanup"):
                 await self._app.cleanup()  # type: ignore[attr-defined]

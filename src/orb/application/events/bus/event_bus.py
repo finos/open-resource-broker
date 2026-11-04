@@ -42,7 +42,12 @@ class EventBus:
         # Statistics for monitoring
         self._events_processed = 0
         self._events_failed = 0
+        self._events_dropped = 0
         self._processing_times: list[float] = []
+
+    def record_dropped_event(self) -> None:
+        """Count an event that was discarded before reaching the bus (backlog full)."""
+        self._events_dropped += 1
 
     def register_handler(self, event_type: str, handler: EventHandler) -> None:
         """
@@ -235,6 +240,7 @@ class EventBus:
         return {
             "events_processed": self._events_processed,
             "events_failed": self._events_failed,
+            "dropped_events": self._events_dropped,
             "success_rate": (
                 (self._events_processed - self._events_failed) / max(self._events_processed, 1)
             )
@@ -264,6 +270,7 @@ class EventBus:
         """
         self._events_processed = 0
         self._events_failed = 0
+        self._events_dropped = 0
         self._processing_times.clear()
 
         if self.logger:

@@ -168,8 +168,22 @@ class ProviderMetricsDTO(BaseDTO):
     error_rate_percent: float = Field(description="Error rate as percentage")
     throughput_per_minute: float = Field(description="Requests per minute")
     last_request_time: Optional[datetime] = Field(None, description="Timestamp of last request")
-    uptime_percent: float = Field(description="Provider uptime percentage")
-    health_status: str = Field(description="Current health status")
+    uptime_percent: Optional[float] = Field(
+        None,
+        description=(
+            "Provider uptime percentage. Not measured: ORB does not run continuous probes, "
+            "so this is null rather than an estimate."
+        ),
+    )
+    health_status: str = Field(
+        description=(
+            "Result of a live provider health probe (cached for a short interval): "
+            "healthy, unhealthy (failed or timed out) or unknown (no provider to probe)"
+        )
+    )
+    health_sample_count: int = Field(
+        0, description="Number of live health probes run for this provider since process start"
+    )
     metrics_timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="When metrics were collected",
