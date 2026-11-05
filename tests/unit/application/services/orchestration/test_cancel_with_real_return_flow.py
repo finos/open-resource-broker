@@ -48,17 +48,18 @@ def _return_handler(deprovision_result: dict[str, Any], statuses: dict[str, str]
             statuses[command.request_id] = command.status.value
 
     inner_bus.execute = AsyncMock(side_effect=record_status)
-    container = MagicMock()
-    container.get = MagicMock(return_value=inner_bus)
+    domain_config = MagicMock(get_return_request_prefix=MagicMock(return_value="ret-"))
 
     handler = CreateReturnRequestHandler(
         uow_factory=uow_factory,
         logger=MagicMock(),
-        container=container,
         event_publisher=MagicMock(),
         error_handler=MagicMock(),
         query_bus=MagicMock(),
         provider_selection_port=MagicMock(),
+        command_bus=inner_bus,
+        domain_config=domain_config,
+        deprovisioning_orchestrator=MagicMock(),
     )
     handler._deprovisioning_orchestrator.execute_deprovisioning = AsyncMock(
         return_value=deprovision_result
@@ -142,7 +143,7 @@ class TestCancelWhenFailureCannotBeRecorded:
 
     @staticmethod
     def _broken_status_store(handler: CreateReturnRequestHandler, statuses: dict[str, str]):
-        inner_bus = handler._container.get.return_value
+        inner_bus = handler._command_bus
 
         async def record(command: Any) -> None:
             if isinstance(command, UpdateRequestStatusCommand):
@@ -187,14 +188,7 @@ class TestCancelWhenFailureCannotBeRecorded:
             return_value={("aws", "aws-prod", "RunInstances"): ["i-aaa"]}
         )
         handler._cancel_validate_and_persist = MagicMock()
-        handler._container.get = MagicMock(
-            side_effect=lambda key: (
-                MagicMock(get_return_request_prefix=MagicMock(return_value="ret-"))
-                if key.__name__ == "DomainConfigurationService"
-                else handler._container.get.bus
-            )
-        )
-        handler._container.get.bus = handler_bus = MagicMock()
+        handler._command_bus = handler_bus = MagicMock()
 
         async def record(command: Any) -> None:
             if isinstance(command, UpdateRequestStatusCommand):
