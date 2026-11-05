@@ -92,13 +92,24 @@ def build_registry() -> None:
     # commands when the extra is not installed so the rest of the CLI still
     # loads; ``orb mcp`` then reports an unknown command rather than the whole
     # registry failing to build.
-    try:
-        from orb.interface.mcp.catalog_server import handle_mcp_serve, handle_mcp_validate
-    except ImportError:
-        pass
-    else:
-        register("mcp", "serve", handle_mcp_serve)
-        register("mcp", "validate", handle_mcp_validate)
+    # Handlers are wrapped so the MCP stack is only imported when an ``orb mcp``
+    # command actually runs.
+    import importlib.util
+
+    if importlib.util.find_spec("mcp") is not None:
+
+        async def _mcp_serve(args: Any) -> Any:
+            from orb.interface.mcp.catalog_server import handle_mcp_serve
+
+            return await handle_mcp_serve(args)
+
+        async def _mcp_validate(args: Any) -> Any:
+            from orb.interface.mcp.catalog_server import handle_mcp_validate
+
+            return await handle_mcp_validate(args)
+
+        register("mcp", "serve", _mcp_serve)
+        register("mcp", "validate", _mcp_validate)
 
     # --- infrastructure ---
     from orb.interface.infrastructure_command_handler import (
