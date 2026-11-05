@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 
@@ -44,6 +45,10 @@ class build_py(_build_py):  # noqa: N801 — must match setuptools' command name
             if not _STATIC_INDEX.exists():
                 raise SystemExit(f"UI build ran but {_STATIC_INDEX} is missing — see output above.")
 
+        # build_py only copies files into build/lib; it never removes ones that
+        # have since been deleted from src/, so a leftover build/ directory would
+        # ship removed modules. Start from an empty build_lib every time.
+        shutil.rmtree(self.build_lib, ignore_errors=True)
         super().run()
 
 
