@@ -342,7 +342,9 @@ def is_container_ready() -> bool:
 
 def _load_default_container_factory() -> None:
     """Import the composition root, which registers the container factory."""
-    import orb.bootstrap  # noqa: F401
+    import importlib
+
+    importlib.import_module("orb.bootstrap")
 
 
 def _create_configured_container() -> DIContainer:

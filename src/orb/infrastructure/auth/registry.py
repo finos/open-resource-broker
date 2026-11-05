@@ -93,6 +93,10 @@ class LazyAuthStrategy:
 
         return getattr(importlib.import_module(self._module_path), self._class_name)
 
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Instantiate the real strategy class."""
+        return self.resolve()(*args, **kwargs)
+
     def from_auth_config(self, auth_config: Any) -> Any:
         """Build the strategy from *auth_config* via the real class."""
         return self.resolve().from_auth_config(auth_config)
