@@ -231,7 +231,15 @@ class RequestReconciler:
         async def _one(request: Request) -> None:
             if request.awaiting_resources:
                 # The create flow still owns it and there is nothing to poll.
+                # Only the deadline can still end it, e.g. when the create
+                # flow died before recording anything.
                 summary.skipped_provisioning += 1
+                try:
+                    await asyncio.to_thread(self._status_service.sweep_expired_deadline, request)
+                except Exception as exc:
+                    self._logger.warning(
+                        "Deadline sweep of request %s failed: %s", request.request_id, exc
+                    )
                 return
             provider = request.provider_name or ""
             if provider not in open_cache:

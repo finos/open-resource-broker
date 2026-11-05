@@ -7,7 +7,7 @@ deprovisioning path; only the buses, stores and the provider call are faked.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -153,7 +153,7 @@ class TestCancelWhenFailureCannotBeRecorded:
 
         inner_bus.execute = AsyncMock(side_effect=record)
         # The direct write fallback fails as well.
-        handler.uow_factory.create_unit_of_work.side_effect = None
+        cast(Any, handler.uow_factory).create_unit_of_work.side_effect = None
         uow = MagicMock()
         uow.requests.get_by_id.side_effect = RuntimeError("db down")
         uow.machines.get_by_id.return_value = MagicMock()
@@ -162,7 +162,7 @@ class TestCancelWhenFailureCannotBeRecorded:
         def _create():
             yield uow
 
-        handler.uow_factory.create_unit_of_work.side_effect = _create
+        cast(Any, handler.uow_factory).create_unit_of_work.side_effect = _create
 
     @pytest.mark.asyncio
     async def test_status_update_double_failure_raises_with_alert_record(self):
@@ -175,7 +175,7 @@ class TestCancelWhenFailureCannotBeRecorded:
         with pytest.raises(ApplicationError, match="could not be recorded"):
             await handler._update_request_status(request, RequestStatus.FAILED, "m")
 
-        extra = handler.logger.error.call_args_list[-1].kwargs["extra"]
+        extra = cast(Any, handler.logger).error.call_args_list[-1].kwargs["extra"]
         assert extra["event"] == "return.status_update_failed"
         assert extra["request_id"] == "ret-1"
 

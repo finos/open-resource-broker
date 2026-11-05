@@ -204,6 +204,38 @@ class RequestStatusService:
         else:
             return RequestStatus.IN_PROGRESS.value, "Instances terminating"
 
+    def sweep_expired_deadline(self, request: Request) -> Request:
+        """Resolve a request whose deadline has passed, without any provider call.
+
+        A request the create flow never recorded resources for (its process died
+        mid-provisioning) is skipped by every status sync, so this is the only
+        thing that can still end it. The state machine decides whether the
+        deadline applies; the flip is applied to a fresh read taken inside the
+        write, with one re-read on a concurrent write.
+        """
+        now = datetime.now(timezone.utc)
+        for attempt in range(_WRITE_ATTEMPTS):
+            try:
+                with self.uow_factory.create_unit_of_work() as uow:
+                    current = uow.requests.get_by_id(request.request_id)
+                    if current is None or current.status.is_terminal():
+                        return current or request
+                    swept = self._state_machine.evaluate_deadline(current, now=now)
+                    if swept is current or swept.status == current.status:
+                        return current
+                    swept = swept.model_copy(update={"version": current.version + 1})
+                    uow.requests.save(swept)
+                self.logger.info(
+                    "Request %s passed its deadline and is now %s",
+                    request.request_id.value,
+                    swept.status.value,
+                )
+                return swept
+            except ConcurrencyError:
+                if attempt + 1 >= _WRITE_ATTEMPTS:
+                    raise
+        return request
+
     async def update_request_status(
         self,
         request: Request,

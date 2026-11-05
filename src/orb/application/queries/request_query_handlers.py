@@ -111,6 +111,9 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
             db_machines: list = []
             # A request the create flow has not yet recorded any resource for
             # has nothing to ask the provider about; serve it as stored too.
+            if request.awaiting_resources:
+                # Nothing to poll, but an expired deadline can still end it.
+                request = await self._evaluate_deadline_and_persist(request)
             if request.status.is_terminal() or request.awaiting_resources:
                 db_machines = await self._query_service.get_machines_for_request(request)
                 # Terminal requests skip the live provider sync — return persisted data.
@@ -662,13 +665,16 @@ class SyncAndListActiveRequestsHandler(
         error_handler: ErrorHandlingPort,
         generic_filter_service: GenericFilterService,
         machine_sync_service: MachineSyncService,
+        state_machine: FulfilmentStateMachine,
         config: ConfigurationPort | None = None,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._generic_filter_service = generic_filter_service
         self._machine_sync_service = machine_sync_service
-        self._status_service = RequestStatusService(uow_factory, logger)
+        self._status_service = RequestStatusService(
+            uow_factory, logger, state_machine=state_machine
+        )
         self._query_service = RequestQueryService(uow_factory, logger)
         self._dto_factory = RequestDTOFactory()
         self._sync_timeout: float = self._resolve_sync_timeout(config)
@@ -732,7 +738,18 @@ class SyncAndListActiveRequestsHandler(
             _staleness_window = RequestSyncSettings.from_config(self._config).list_staleness_window
 
             async def _sync_one(request):
-                if request.awaiting_resources or is_recently_synced(request, _staleness_window):
+                if request.awaiting_resources:
+                    # Nothing to poll, but an expired deadline can still end it.
+                    try:
+                        self._status_service.sweep_expired_deadline(request)
+                    except Exception as sweep_err:
+                        self.logger.warning(
+                            "Deadline sweep of request %s failed: %s",
+                            request.request_id.value,
+                            sweep_err,
+                        )
+                    return
+                if is_recently_synced(request, _staleness_window):
                     return
                 async with _sync_concurrency:
 

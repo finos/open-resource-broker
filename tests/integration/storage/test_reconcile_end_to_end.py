@@ -486,6 +486,7 @@ def _list_handler(world: _World) -> SyncAndListActiveRequestsHandler:
         error_handler=MagicMock(),
         generic_filter_service=filters,
         machine_sync_service=world.sync,
+        state_machine=world.state_machine,
     )
 
 
@@ -695,6 +696,65 @@ async def test_list_read_of_a_pending_request_writes_nothing(world: _World) -> N
     stored = world.stored(_ACQUIRE_ID)
     assert stored.version == before.version
     assert stored.last_status_check is None
+
+
+def _add_expired_acquiring(world: _World) -> Request:
+    """An ACQUIRING request with no ids whose create flow never finished."""
+    from datetime import datetime, timedelta, timezone
+
+    world.uow.requests.save(
+        Request(
+            request_id=RequestId(value=_ACQUIRE_ID),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
+            provider_name="p1",
+            provider_api="EC2Fleet",
+            template_id="tmpl",
+            requested_count=1,
+            status=RequestStatus.ACQUIRING,
+            deadline_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+        )
+    )
+    return world.stored(_ACQUIRE_ID)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_expired_request_without_ids_ends_terminal_via_reconcile(world: _World) -> None:
+    _add_expired_acquiring(world)
+
+    summary = await world.reconciler.reconcile_once()
+
+    assert world.provider.calls == 0
+    assert summary.failed == 0
+    assert world.stored(_ACQUIRE_ID).status.is_terminal()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@pytest.mark.parametrize("lightweight", [False, True])
+async def test_expired_request_without_ids_ends_terminal_via_get(
+    world: _World, lightweight: bool
+) -> None:
+    _add_expired_acquiring(world)
+
+    await _get_handler(world).execute_query(
+        SyncAndGetRequestQuery(request_id=_ACQUIRE_ID, lightweight=lightweight)
+    )
+
+    assert world.provider.calls == 0
+    assert world.stored(_ACQUIRE_ID).status.is_terminal()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_expired_request_without_ids_ends_terminal_via_list(world: _World) -> None:
+    _add_expired_acquiring(world)
+
+    await _list_handler(world).execute_query(SyncAndListActiveRequestsQuery(all_resources=True))
+
+    assert world.provider.calls == 0
+    assert world.stored(_ACQUIRE_ID).status.is_terminal()
 
 
 # ---------------------------------------------------------------------------

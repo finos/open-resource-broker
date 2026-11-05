@@ -79,6 +79,7 @@ def _build_handler(
             error_handler=mock_error_handler,
             generic_filter_service=mock_filter_service,
             machine_sync_service=mock_machine_sync,
+            state_machine=MagicMock(),
             config=None,
         )
 
@@ -223,6 +224,7 @@ def test_resolve_sync_timeout_uses_config_when_provided():
             error_handler=Mock(),
             generic_filter_service=MagicMock(),
             machine_sync_service=MagicMock(),
+            state_machine=MagicMock(),
             config=mock_config,
         )
 
@@ -238,6 +240,7 @@ def test_resolve_sync_timeout_falls_back_to_default_when_config_is_none():
             error_handler=Mock(),
             generic_filter_service=MagicMock(),
             machine_sync_service=MagicMock(),
+            state_machine=MagicMock(),
             config=None,
         )
 
@@ -256,6 +259,7 @@ def test_resolve_sync_timeout_falls_back_to_default_when_config_raises():
             error_handler=Mock(),
             generic_filter_service=MagicMock(),
             machine_sync_service=MagicMock(),
+            state_machine=MagicMock(),
             config=mock_config,
         )
 
