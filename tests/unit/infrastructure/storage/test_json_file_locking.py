@@ -137,10 +137,12 @@ class TestFlockAcquireRelease:
                     pass
 
         operations = [op for _, op in flock_calls]
-        assert fcntl.LOCK_EX in operations, "LOCK_EX was never requested"
+        # The lock is requested without blocking (LOCK_EX | LOCK_NB) and polled
+        exclusive = [i for i, op in enumerate(operations) if op & fcntl.LOCK_EX]
+        assert exclusive, "LOCK_EX was never requested"
         assert fcntl.LOCK_UN in operations, "LOCK_UN was never called (lock not released)"
         # Ensure LOCK_EX precedes LOCK_UN
-        assert operations.index(fcntl.LOCK_EX) < operations.index(fcntl.LOCK_UN)
+        assert exclusive[0] < operations.index(fcntl.LOCK_UN)
 
     def test_exclusive_write_lock_releases_on_exception(self, tmp_path: Path) -> None:
         """LOCK_UN must be called even when the body of the context raises."""
@@ -233,10 +235,10 @@ class TestReReadUnderLock:
         strategy._cache_valid = False
 
         event_log: list[str] = []
-        original_read = strategy.file_manager.read_file
+        original_read = strategy.file_manager.read_file_with_signature
         original_flock = strategy.file_manager.exclusive_write_lock
 
-        def logging_read() -> str:
+        def logging_read() -> Any:
             event_log.append("read")
             return original_read()
 
@@ -249,7 +251,9 @@ class TestReReadUnderLock:
                 yield
             event_log.append("lock_released")
 
-        with patch.object(strategy.file_manager, "read_file", side_effect=logging_read):
+        with patch.object(
+            strategy.file_manager, "read_file_with_signature", side_effect=logging_read
+        ):
             with patch.object(strategy.file_manager, "exclusive_write_lock", logging_lock):
                 strategy.save("new-rec", {"v": 1})
 

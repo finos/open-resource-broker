@@ -16,8 +16,12 @@ from orb.application.services.orchestration.dtos import (
     ListMachinesInput,
     ListMachinesOutput,
     Paginated,
-    decode_cursor,
     encode_cursor,
+)
+from orb.application.services.orchestration.page_cursor import (
+    decode_page_cursor,
+    next_cursor_for,
+    query_fingerprint,
 )
 from orb.domain.base.exceptions import ValidationError
 from orb.domain.base.ports.logging_port import LoggingPort
@@ -48,7 +52,20 @@ class ListMachinesOrchestrator(OrchestratorBase[ListMachinesInput, ListMachinesO
         if input.sync and (input.q or input.sort):
             raise ValidationError("q and sort are not supported with sync=true")
 
-        offset = decode_cursor(input.cursor) if input.cursor else input.offset
+        sort = input.sort if input.sort else _DEFAULT_SORT
+        fingerprint = query_fingerprint(
+            "machines",
+            status=input.status,
+            provider_name=input.provider_name,
+            provider_type=input.provider_type,
+            request_id=input.request_id,
+            q=input.q,
+            filter_expressions=input.filter_expressions,
+            sync=input.sync,
+            sort=sort,
+        )
+        decoded = decode_page_cursor(input.cursor, fingerprint, sort)
+        offset = decoded.offset if decoded else input.offset
 
         query = ListMachinesQuery(
             status=input.status,
@@ -60,8 +77,9 @@ class ListMachinesOrchestrator(OrchestratorBase[ListMachinesInput, ListMachinesO
             timestamp_format=input.timestamp_format,
             filter_expressions=input.filter_expressions,
             q=input.q,
-            sort=input.sort if input.sort else _DEFAULT_SORT,
+            sort=sort,
             sync=input.sync,
+            after=decoded.position if decoded else None,
         )
         result = await self._dispatch("ListMachines", self._query_bus.execute(query))
 
@@ -72,10 +90,13 @@ class ListMachinesOrchestrator(OrchestratorBase[ListMachinesInput, ListMachinesO
             items = list(result or [])
             total_count = len(items)
 
-        next_cursor: str | None = None
-        effective_limit = input.limit if input.limit is not None else total_count
-        if effective_limit and total_count > offset + effective_limit:
-            next_cursor = encode_cursor(offset + effective_limit)
+        handled, next_cursor = next_cursor_for(
+            result, fingerprint=fingerprint, sort=sort, offset=offset, returned=len(items)
+        )
+        if not handled:
+            effective_limit = input.limit if input.limit is not None else total_count
+            if effective_limit and total_count > offset + effective_limit:
+                next_cursor = encode_cursor(offset + effective_limit)
 
         return ListMachinesOutput(
             machines=items,

@@ -413,7 +413,9 @@ class TestSqlUrlBuilding:
 
         assert parsed.password == password
         assert parsed.host == "db.example"
-        assert parsed.drivername == ("postgresql" if db_type == "postgresql" else "mysql+pymysql")
+        assert parsed.drivername == (
+            "postgresql+pg8000" if db_type == "postgresql" else "mysql+pymysql"
+        )
 
     @pytest.mark.parametrize("password", ["p@ss", "p/ss", "p%rd", "a@b:c/d%e"])
     def test_migration_config_round_trips_the_escaped_url(self, password):
@@ -473,14 +475,15 @@ class TestSqlUrlBuilding:
 
         engine.dispose.assert_called_once()
 
-    def test_engine_created_for_a_strategy_is_disposed_on_cleanup(self, tmp_path):
+    def test_engine_created_for_a_strategy_is_left_to_the_process_registry(self, tmp_path):
         strategy = create_sql_strategy(_app_config(str(tmp_path / "owned.db")))
         engine = strategy.connection_manager.engine
 
         with patch.object(engine, "dispose", wraps=engine.dispose) as dispose:
             strategy.connection_manager.cleanup()
 
-        dispose.assert_called_once()
+        # Other consumers of the same database share this engine
+        dispose.assert_not_called()
 
     def test_engine_shared_with_the_unit_of_work_is_not_disposed_by_a_strategy(self):
         engine = MagicMock()
@@ -489,3 +492,23 @@ class TestSqlUrlBuilding:
         manager.cleanup()
 
         engine.dispose.assert_not_called()
+
+
+class TestPercentSignsInTheDatabaseUrl:
+    """The alembic config treats "%" as interpolation syntax; URLs must be escaped."""
+
+    def test_sqlite_path_with_a_percent_sign_stamps_without_a_warning(self, tmp_path, caplog):
+        directory = tmp_path / "100%done"
+        directory.mkdir()
+
+        with caplog.at_level(logging.WARNING):
+            uow = _uow(type="sqlite", name=str(directory / "orb.db"))
+
+        assert uow._machine_strategy.connection_manager.table_exists("machines")
+        assert [w for w in _warnings(caplog) if "auto-stamp" in w] == []
+
+    def test_percent_encoded_memory_url_is_escaped_too(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            _uow(type="sqlite", name=":memory:")
+
+        assert _warnings(caplog) == []

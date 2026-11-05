@@ -19,8 +19,8 @@ from orb.infrastructure.storage.exceptions import (
 class TestStorageError:
     def test_basic_construction(self) -> None:
         err = StorageError("something failed")
-        # StorageError calls super().__init__("Storage", message) so error_code holds the msg
-        assert err.error_code == "something failed"
+        assert err.message == "something failed"
+        assert str(err) == "something failed"
         assert err.cause is None
 
     def test_with_cause(self) -> None:
@@ -51,8 +51,7 @@ class TestStorageError:
 class TestConnectionError:
     def test_basic_construction(self) -> None:
         err = ConnectionError("conn failed")
-        # error_code holds the constructor message string
-        assert err.error_code == "conn failed"
+        assert err.message == "conn failed"
         assert err.connection_details == {}
 
     def test_with_connection_details(self) -> None:

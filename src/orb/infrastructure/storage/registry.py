@@ -37,6 +37,7 @@ class StorageRegistration(BaseRegistration):
         unit_of_work_factory: Optional[Callable] = None,
         display_name: Optional[str] = None,
         entity_strategy_factory: Optional[Callable] = None,
+        migration_url_factory: Optional[Callable] = None,
     ) -> None:
         """Initialize the instance."""
         super().__init__(
@@ -45,6 +46,7 @@ class StorageRegistration(BaseRegistration):
             config_factory,
             unit_of_work_factory=unit_of_work_factory,
             entity_strategy_factory=entity_strategy_factory,
+            migration_url_factory=migration_url_factory,
         )
         self.unit_of_work_factory = unit_of_work_factory
         self.display_name = display_name
@@ -70,6 +72,7 @@ class StorageRegistry(BaseRegistry):
         unit_of_work_factory: Optional[Callable] = None,
         display_name: Optional[str] = None,
         entity_strategy_factory: Optional[Callable] = None,
+        migration_url_factory: Optional[Callable] = None,
     ) -> None:
         """Register storage strategy factory - implements abstract method."""
         self.register_type(
@@ -79,6 +82,7 @@ class StorageRegistry(BaseRegistry):
             unit_of_work_factory=unit_of_work_factory,
             display_name=display_name,
             entity_strategy_factory=entity_strategy_factory,
+            migration_url_factory=migration_url_factory,
         )
 
     def register_storage(
@@ -89,6 +93,7 @@ class StorageRegistry(BaseRegistry):
         unit_of_work_factory: Optional[Callable] = None,
         display_name: Optional[str] = None,
         entity_strategy_factory: Optional[Callable] = None,
+        migration_url_factory: Optional[Callable] = None,
     ) -> None:
         """
         Register a storage type with its factories - backward compatibility method.
@@ -102,6 +107,9 @@ class StorageRegistry(BaseRegistry):
             entity_strategy_factory: Optional ``(config, entity) -> strategy`` factory for
                 backends that store each entity in its own table. Backends without it
                 use ``strategy_factory`` for every entity.
+            migration_url_factory: Optional ``(config) -> sqlalchemy URL`` factory naming
+                the database whose schema ``orb storage migrate`` manages. Only backends
+                with an Alembic-managed SQL schema register one.
 
         Raises:
             ConfigurationError: If storage type is already registered
@@ -120,6 +128,7 @@ class StorageRegistry(BaseRegistry):
                 unit_of_work_factory=unit_of_work_factory,
                 display_name=display_name,
                 entity_strategy_factory=entity_strategy_factory,
+                migration_url_factory=migration_url_factory,
             )
         except ValueError as e:
             raise ConfigurationError(str(e))
@@ -197,6 +206,30 @@ class StorageRegistry(BaseRegistry):
             return uow_factory(config)
         return None
 
+    def has_migrations(self, storage_type: str) -> bool:
+        """True when *storage_type* is registered with an Alembic-managed SQL schema."""
+        if not self.is_registered(storage_type):
+            return False
+        registration = self._get_type_registration(storage_type)
+        return registration.get_factory("migration_url_factory") is not None
+
+    def get_migration_url(self, storage_type: str, config: Any) -> Any:
+        """The SQLAlchemy URL of the database *storage_type* stores its data in.
+
+        Args:
+            storage_type: A type for which ``has_migrations`` is True
+            config: Configuration source passed to the backend's factory
+
+        Raises:
+            UnsupportedStorageError: If the type has no migratable SQL schema
+        """
+        if not self.has_migrations(storage_type):
+            raise UnsupportedStorageError(
+                f"Storage type '{storage_type}' has no SQL schema to migrate"
+            )
+        factory = self._get_type_registration(storage_type).get_factory("migration_url_factory")
+        return factory(config)  # type: ignore[misc]
+
     def get_display_name(self, storage_type: str) -> str:
         """Return the human-readable display name for *storage_type*.
 
@@ -244,6 +277,7 @@ class StorageRegistry(BaseRegistry):
             additional_factories.get("unit_of_work_factory"),
             display_name=additional_factories.get("display_name"),
             entity_strategy_factory=additional_factories.get("entity_strategy_factory"),
+            migration_url_factory=additional_factories.get("migration_url_factory"),
         )
 
 

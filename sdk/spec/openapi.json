@@ -845,10 +845,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Opaque pagination cursor",
+              "description": "Opaque pagination cursor: the next_cursor of the previous page. Overrides offset. A malformed cursor, or one issued for a different filter or sort, is rejected with 400.",
               "title": "Cursor"
             },
-            "description": "Opaque pagination cursor"
+            "description": "Opaque pagination cursor: the next_cursor of the previous page. Overrides offset. A malformed cursor, or one issued for a different filter or sort, is rejected with 400."
           },
           {
             "name": "q",
@@ -1177,10 +1177,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Opaque pagination cursor",
+              "description": "Opaque pagination cursor: the next_cursor of the previous page. Overrides offset. A malformed cursor, or one issued for a different filter or sort, is rejected with 400.",
               "title": "Cursor"
             },
-            "description": "Opaque pagination cursor"
+            "description": "Opaque pagination cursor: the next_cursor of the previous page. Overrides offset. A malformed cursor, or one issued for a different filter or sort, is rejected with 400."
           },
           {
             "name": "q",
@@ -1377,10 +1377,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Opaque pagination cursor",
+              "description": "Opaque pagination cursor: the next_cursor of the previous page. Overrides offset. A malformed cursor, or one issued for a different filter or sort, is rejected with 400.",
               "title": "Cursor"
             },
-            "description": "Opaque pagination cursor"
+            "description": "Opaque pagination cursor: the next_cursor of the previous page. Overrides offset. A malformed cursor, or one issued for a different filter or sort, is rejected with 400."
           },
           {
             "name": "q",

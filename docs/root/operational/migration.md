@@ -101,6 +101,23 @@ After migration:
    orb providers health
    ```
 
+## SQL Schema Upgrades
+
+SQL storage (SQLite, PostgreSQL, MySQL and Aurora MySQL) keeps its schema under Alembic. After upgrading ORB, apply the pending schema migrations:
+
+```bash
+orb storage migrate up
+```
+
+The command migrates the database of the active `storage.strategy`: `storage.sql_strategy` for `sql`, the AWS provider's Aurora settings for `aurora`. With any other strategy it stops with an error.
+
+When a database is behind the migrations the installed release expects, ORB logs a warning at startup naming the database's revision and the expected one, and tells you to run this command. It never upgrades a versioned database by itself, so you choose when the change runs. Back up the database first.
+
+Release notes for schema changes:
+
+- **`machines.launch_time` is now TEXT.** It was declared as a BIGINT while ORB stores an ISO-8601 timestamp, so PostgreSQL and MySQL rejected machines that had a launch time. The migration converts the column (existing epoch values, in seconds or milliseconds, are rewritten as ISO-8601 UTC text, so sorting by launch time stays chronological; a downgrade converts them back and drops fractions of a second). A launch time that is neither an epoch nor ISO-8601 text stops the upgrade or downgrade before anything is changed, naming the number of rows and the first machine id. On PostgreSQL and MySQL, run `orb storage migrate up` before relying on machines with launch times; until then the column keeps rejecting them.
+- A database that has tables but no Alembic version (created before schema versioning) is recognised when ORB starts: it is recorded at the revision that matches its layout and upgraded to the current one automatically, so no manual step is needed for it.
+
 ## Configuration Migration
 
 ### Legacy Configuration Support

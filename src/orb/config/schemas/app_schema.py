@@ -3,7 +3,7 @@
 import os
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .common_schema import (
     EventsConfig,
@@ -26,6 +26,9 @@ from .ui_schema import UIConfig
 
 class AppConfig(BaseModel):
     """Application configuration."""
+
+    # Secrets live in nested settings; their values never belong in an error text
+    model_config = ConfigDict(hide_input_in_errors=True)
 
     version: str = Field("2.0.0", description="Configuration version")
     provider: ProviderConfig

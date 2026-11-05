@@ -76,6 +76,8 @@ class SyncAndListReturnRequestsQuery(Query, BaseModel):
     offset: Optional[int] = 0
     q: Optional[str] = None
     sort: Optional[str] = None
+    # Keyset position (sort text, id) of the last row of the previous page
+    after: Optional[tuple[str, str]] = None
 
 
 class GetTemplateQuery(Query, BaseModel):
@@ -156,6 +158,8 @@ class ListMachinesQuery(Query, BaseModel):
     # endpoints stay cheap; callers that need authoritative state should
     # use the per-machine /status endpoint instead.
     sync: bool = False
+    # Keyset position (sort text, id) of the last row of the previous page
+    after: Optional[tuple[str, str]] = None
 
 
 class GetActiveMachineCountQuery(Query, BaseModel):

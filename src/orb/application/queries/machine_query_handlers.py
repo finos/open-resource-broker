@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 from orb.application.base.handlers import BaseQueryHandler
 from orb.application.decorators import query_handler
@@ -15,10 +15,17 @@ from orb.application.dto.responses import MachineDTO, MachineHealthDTO
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.services.machine_sync_service import MachineSyncService
 from orb.application.services.orchestration.dtos import Paginated
+from orb.application.services.orchestration.page_cursor import KeysetPaginated
 from orb.application.services.provider_registry_service import ProviderRegistryService
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.operations import Operation, OperationType
+from orb.domain.base.pagination import (
+    Position,
+    SortSpec,
+    StoragePage,
+    paginate_in_memory,
+)
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from orb.domain.services.generic_filter_service import GenericFilterService
 
@@ -245,79 +252,95 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, Paginated[MachineD
 
         try:
             with self.uow_factory.create_unit_of_work() as uow:
-                if query.all_resources:
-                    machines = uow.machines.find_active_machines()
-                elif query.status:
-                    from orb.domain.machine.value_objects import MachineStatus
-
-                    status_enum = MachineStatus(query.status)
-                    machines = uow.machines.find_by_status(status_enum)
-                elif query.request_id:
-                    machines = uow.machines.find_by_request_id(query.request_id)
-                else:
-                    machines = uow.machines.get_all()
-
-                total_unfiltered = len(machines)
-
-                if query.provider_name:
-                    machines = [
-                        m
-                        for m in machines
-                        if m.provider_name and query.provider_name in m.provider_name
-                    ]
-
-                if query.provider_type:
-                    machines = [m for m in machines if m.provider_type == query.provider_type]
-
-                # q: substring search over user-visible domain fields
-                if query.q:
-                    needle = query.q.lower()
-                    searchable = ("machine_id", "name", "instance_type", "private_ip", "public_ip")
-                    machines = [
-                        m
-                        for m in machines
-                        if any(needle in str(getattr(m, f, "") or "").lower() for f in searchable)
-                    ]
-
-                # sort: "+field" / "-field"
-                if query.sort:
-                    descending = query.sort.startswith("-")
-                    attr = query.sort.lstrip("-+")
-
-                    def _val(m: Any) -> str:
-                        raw = getattr(m, attr, "")
-                        return "" if raw is None else str(raw)
-
-                    try:
-                        machines = sorted(machines, key=_val, reverse=descending)
-                    except TypeError as exc:
-                        # Mixed-type column under sort. Fall back to
-                        # unsorted results rather than failing the
-                        # request; log so the bad column is observable.
-                        self.logger.warning(
-                            "ListMachines sort failed on attr=%s descending=%s: %s",
-                            attr,
-                            descending,
-                            exc,
-                        )
-
-                total_count = len(machines)
-
-                # Slice. None limit → no cap.
+                spec = SortSpec.parse(query.sort)
                 offset = query.offset or 0
-                if query.limit is None:
-                    machines = machines[offset:]
+                next_position: Optional[Position] = None
+                pushed = self._push_down(uow, query, spec)
+
+                if pushed is not None:
+                    # The database filtered, ordered and cut the page
+                    machines = pushed.items
+                    total_count = pushed.total_count
+                    total_unfiltered = None if query.provider_type else pushed.total_count
+                    next_position = pushed.next_position
                 else:
-                    limit = min(query.limit, 1000)
-                    if query.limit > 1000:
-                        self.logger.warning(
-                            "ListMachinesQuery.limit=%d clamped to 1000; "
-                            "total_count=%d. Consumers needing full counts "
-                            "should rely on total_count, not len(machines).",
-                            query.limit,
-                            total_count,
+                    if query.all_resources:
+                        machines = uow.machines.find_active_machines()
+                    elif query.status:
+                        from orb.domain.machine.value_objects import MachineStatus
+
+                        status_enum = MachineStatus(query.status)
+                        machines = uow.machines.find_by_status(status_enum)
+                    elif query.request_id:
+                        machines = uow.machines.find_by_request_id(query.request_id)
+                    else:
+                        machines = uow.machines.get_all()
+
+                    total_unfiltered = len(machines)
+
+                    if query.provider_name:
+                        machines = [
+                            m
+                            for m in machines
+                            if m.provider_name and query.provider_name in m.provider_name
+                        ]
+
+                    if query.provider_type:
+                        machines = [m for m in machines if m.provider_type == query.provider_type]
+
+                    # q: substring search over user-visible domain fields
+                    if query.q:
+                        needle = query.q.lower()
+                        searchable = (
+                            "machine_id",
+                            "name",
+                            "instance_type",
+                            "private_ip",
+                            "public_ip",
                         )
-                    machines = machines[offset : offset + limit] if limit > 0 else []
+                        machines = [
+                            m
+                            for m in machines
+                            if any(
+                                needle in str(getattr(m, f, "") or "").lower() for f in searchable
+                            )
+                        ]
+
+                    total_count = len(machines)
+
+                    # Slice. None limit → no cap.
+                    limit: Optional[int] = None
+                    if query.limit is not None:
+                        limit = min(query.limit, 1000)
+                        if query.limit > 1000:
+                            self.logger.warning(
+                                "ListMachinesQuery.limit=%d clamped to 1000; "
+                                "total_count=%d. Consumers needing full counts "
+                                "should rely on total_count, not len(machines).",
+                                query.limit,
+                                total_count,
+                            )
+
+                    if spec is not None:
+                        # Ordered by (sort text, id) after the cursor; the whole
+                        # filtered set is held in memory for this backend/query.
+                        in_memory = paginate_in_memory(
+                            machines,
+                            spec,
+                            query.after,
+                            limit,
+                            id_of=lambda m: str(m.machine_id),
+                            skip=0 if query.after is not None else offset,
+                            json_datetimes=True,  # machines are stored in pydantic's JSON form
+                        )
+                        machines = in_memory.items
+                        next_position = in_memory.next_position
+                    elif limit is None:
+                        machines = machines[offset:]
+                    elif limit > 0:
+                        machines = machines[offset : offset + limit]
+                    else:
+                        machines = []
 
                 machine_dtos = []
                 for machine in machines:
@@ -372,6 +395,13 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, Paginated[MachineD
                     total_unfiltered,
                     offset,
                 )
+                if spec is not None:
+                    return KeysetPaginated(
+                        items=machine_dtos,
+                        total_count=total_count,
+                        total_unfiltered=total_unfiltered,
+                        next_position=next_position,
+                    )
                 return Paginated(
                     items=machine_dtos,
                     total_count=total_count,
@@ -381,3 +411,40 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, Paginated[MachineD
         except Exception as e:
             self.logger.error("Failed to list machines: %s", e)
             raise
+
+    @staticmethod
+    def _push_down(uow: Any, query: ListMachinesQuery, spec: Optional[SortSpec]) -> Any:
+        """The page from the database, or None when this query must page in process.
+
+        Only plain equality filters on status, provider type and request can be
+        pushed down; a substring match, free-text search, expression filter,
+        provider refresh or an offset without a cursor cannot.
+        """
+        if (
+            spec is None
+            or query.limit is None
+            or query.limit <= 0
+            or query.all_resources
+            or query.provider_name
+            or query.q
+            or query.filter_expressions
+            or query.sync
+            or (query.offset and query.after is None)
+        ):
+            return None
+        find_page = getattr(uow.machines, "find_page", None)
+        if not callable(find_page):
+            return None
+
+        criteria: dict[str, str] = {}
+        if query.status:
+            from orb.domain.machine.value_objects import MachineStatus
+
+            criteria["status"] = MachineStatus(query.status).value
+        elif query.request_id:
+            criteria["request_id"] = query.request_id
+        if query.provider_type:
+            criteria["provider_type"] = query.provider_type
+
+        page = find_page(criteria, spec, query.after, min(query.limit, 1000))
+        return page if isinstance(page, StoragePage) else None

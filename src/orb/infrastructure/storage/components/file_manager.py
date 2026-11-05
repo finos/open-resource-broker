@@ -4,6 +4,7 @@ import hashlib
 import os
 import shutil
 import tempfile
+import time
 import warnings
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from orb.infrastructure.logging.logger import get_logger
+from orb.infrastructure.storage.exceptions import StorageError
 
 # fcntl is POSIX-only (Linux, macOS). On Windows it is unavailable.
 # If missing, we degrade gracefully to no cross-process file locking and emit
@@ -31,6 +33,23 @@ except ImportError:  # pragma: no cover — Windows-only path
         RuntimeWarning,
         stacklevel=2,
     )
+
+
+# How long to wait for another process's lock before giving up (seconds), and how
+# often to retry while waiting.
+LOCK_TIMEOUT_SECONDS = 30.0
+_LOCK_POLL_SECONDS = 0.01
+
+
+def _signature_of(stat: os.stat_result) -> tuple[int, int, int, int]:
+    """Identity of a file version: inode, modification and change time, size.
+
+    Every atomic replace installs a new inode and a new change time, so two
+    versions only alias when the filesystem reuses an inode and its timestamp
+    granularity hides two same-size rewrites. The signature therefore only
+    decides whether a cached read may be reused; writes never rely on it.
+    """
+    return (stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size)
 
 
 class FileManager:
@@ -71,15 +90,34 @@ class FileManager:
         if backup_enabled and create_dirs:
             self.backup_dir.mkdir(parents=True, exist_ok=True)
 
+    @property
+    def real_path(self) -> str:
+        """The file's path with symlinks resolved; the identity locks are keyed on."""
+        return os.path.realpath(self.file_path)
+
+    @property
+    def lock_path(self) -> Path:
+        """The sibling lock file, named after the real path so aliases share it."""
+        real = Path(self.real_path)
+        return real.parent / f".{real.name}.lock"
+
     @contextmanager
-    def exclusive_write_lock(self) -> Generator[None, None, None]:
+    def exclusive_write_lock(self, timeout: Optional[float] = None) -> Generator[None, None, None]:
         """Acquire an exclusive cross-process file lock for the duration of a
         read-modify-write cycle.
 
         Uses ``fcntl.flock(LOCK_EX)`` on a sibling ``.lock`` file so that the
         lock descriptor is independent of the data file (the data file is
         replaced atomically by ``_atomic_write`` and a lock on the replaced fd
-        would be lost).
+        would be lost). The lock file is named after the file's real path, so a
+        symlinked alias takes the same lock.
+
+        The lock is requested without blocking and retried until ``timeout``
+        seconds (default ``LOCK_TIMEOUT_SECONDS``) have passed, then
+        ``StorageError`` is raised, so a stuck holder cannot hang its waiters
+        forever. ``flock`` is per open file description: taking the lock twice
+        for one file from the same process waits for itself, so a caller must
+        hold it at most once per file.
 
         The sequence callers MUST follow inside this context manager:
           1. Read the current file contents (re-read, not a cached snapshot).
@@ -100,11 +138,20 @@ class FileManager:
 
         assert _fcntl is not None  # noqa: S101  # narrowed: _FCNTL_AVAILABLE implies _fcntl was imported
 
-        lock_path = self.file_path.parent / f".{self.file_path.name}.lock"
-        # Open (or create) the lock file; O_CREAT handles the not-yet-exists case.
-        lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
+        wait = LOCK_TIMEOUT_SECONDS if timeout is None else timeout
+        lock_fd = os.open(str(self.lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
         try:
-            _fcntl.flock(lock_fd, _fcntl.LOCK_EX)
+            deadline = time.monotonic() + wait
+            while True:
+                try:
+                    _fcntl.flock(lock_fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise StorageError(
+                            f"timed out waiting for the lock on {self.file_path.name}"
+                        ) from None
+                    time.sleep(_LOCK_POLL_SECONDS)
             try:
                 yield
             finally:
@@ -133,6 +180,29 @@ class FileManager:
         except Exception as e:
             self.logger.error("Failed to read file %s: %s", self.file_path, e)
             raise
+
+    def read_file_with_signature(self) -> tuple[str, Optional[tuple[int, int, int, int]]]:
+        """Read the file and describe the exact version that was read.
+
+        The signature comes from ``fstat`` on the descriptor the content is read
+        from, so it always describes those bytes (a ``stat`` taken before or after
+        the read could pair old content with a newer signature). A missing file
+        reads as empty with a ``None`` signature.
+        """
+        try:
+            with open(self.file_path, encoding="utf-8") as f:
+                stat = os.fstat(f.fileno())
+                content = f.read()
+        except FileNotFoundError:
+            return "", None
+        return content, _signature_of(stat)
+
+    def current_signature(self) -> Optional[tuple[int, int, int, int]]:
+        """Signature of the file as it is now, ``None`` when it does not exist."""
+        try:
+            return _signature_of(os.stat(self.file_path))
+        except FileNotFoundError:
+            return None
 
     def write_file(self, content: str) -> None:
         """

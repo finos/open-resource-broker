@@ -221,6 +221,28 @@ class DynamoDBClientManager(ResourceManager):
             self.logger.error("Failed to put item to %s: %s", table_name, e)
             return False
 
+    def put_item_conditional(
+        self,
+        table_name: str,
+        item: dict[str, Any],
+        condition_expression: str,
+        expression_attribute_names: dict[str, str],
+        expression_attribute_values: dict[str, Any],
+    ) -> None:
+        """Put an item only while the condition holds.
+
+        Unlike ``put_item`` this does not swallow errors: a failed condition
+        raises the ``ClientError`` (``ConditionalCheckFailedException``) so the
+        caller can tell a lost race from an outage.
+        """
+        table = self.get_table(table_name)
+        table.put_item(
+            Item=item,
+            ConditionExpression=condition_expression,
+            ExpressionAttributeNames=expression_attribute_names,
+            ExpressionAttributeValues=expression_attribute_values,
+        )
+
     def get_item(self, table_name: str, key: dict[str, Any]) -> Optional[dict[str, Any]]:
         """
         Get item from DynamoDB table.
@@ -234,7 +256,9 @@ class DynamoDBClientManager(ResourceManager):
         """
         try:
             table = self.get_table(table_name)
-            response = table.get_item(Key=key)
+            # Strongly consistent: the version read here is the baseline of a later
+            # conditional write, and a reload after a conflict must see the winner
+            response = table.get_item(Key=key, ConsistentRead=True)
             return response.get("Item")
         except Exception as e:
             self.logger.error("Failed to get item from %s: %s", table_name, e)
@@ -279,7 +303,7 @@ class DynamoDBClientManager(ResourceManager):
         try:
             table = self.get_table(table_name)
 
-            scan_params = {}
+            scan_params: dict[str, Any] = {"ConsistentRead": True}
             if filter_expression:
                 scan_params["FilterExpression"] = filter_expression
             if expression_attribute_values:

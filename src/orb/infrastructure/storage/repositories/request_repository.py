@@ -8,6 +8,7 @@ from typing import Any, Awaitable, Optional
 from uuid import uuid4
 
 from orb.domain.base.events import DomainEvent
+from orb.domain.base.pagination import Position, SortSpec, StoragePage
 from orb.domain.request.aggregate import Request
 from orb.domain.request.repository import RequestRepository as RequestRepositoryInterface
 from orb.domain.request.value_objects import RequestId, RequestStatus, RequestType
@@ -515,6 +516,22 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
         except Exception as e:
             self.logger.error("Failed to find requests by status %s: %s", status, e)
             raise
+
+    def find_page(
+        self,
+        criteria: dict[str, str],
+        sort: SortSpec,
+        after: Optional[Position],
+        limit: int,
+    ) -> Optional[StoragePage[Request]]:
+        """One page of requests cut by the database, or None when the backend cannot.
+
+        ``criteria`` are equality filters on ``status``, ``provider_type``,
+        ``provider_name``, ``template_id`` and ``request_type``. Backends that
+        cannot sort in the database return None and the caller loads and pages in
+        process instead.
+        """
+        return self._load_page(criteria, sort, after, limit, "request_id")
 
     @handle_infrastructure_exceptions(context="request_repository_find_by_template_id")
     def find_by_template_id(self, template_id: str) -> list[Request]:

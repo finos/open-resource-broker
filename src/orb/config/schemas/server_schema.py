@@ -4,6 +4,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
+from orb.config.utils.env_expansion import reject_unexpanded_placeholder
+
 
 class RateLimitConfig(BaseModel):
     """Typed configuration for the in-process token-bucket rate limiter.
@@ -52,7 +54,7 @@ _ALLOWED_JWT_ALGORITHMS = frozenset({"HS256", "HS384", "HS512"})
 class BearerTokenAuthSubConfig(BaseModel):
     """Typed sub-configuration for the bearer_token auth strategy."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
     secret_key: SecretStr = Field(
         ...,
@@ -63,6 +65,15 @@ class BearerTokenAuthSubConfig(BaseModel):
     )
     algorithm: str = Field("HS256", description="JWT algorithm (HS256, HS384, or HS512)")
     token_expiry: int = Field(3600, description="Token expiry in seconds")
+
+    @field_validator("secret_key", mode="after")
+    @classmethod
+    def _reject_unexpanded_secret_key(cls, value: SecretStr) -> SecretStr:
+        """Fail when the key still holds a ``${VAR}`` placeholder for an unset variable."""
+        reject_unexpanded_placeholder(
+            value.get_secret_value(), "server.auth.bearer_token.secret_key"
+        )
+        return value
 
     @field_validator("algorithm")
     @classmethod
@@ -155,7 +166,7 @@ _NO_AUTH_STRATEGIES: frozenset[str | None] = frozenset({"none", "", None})
 class AuthConfig(BaseModel):
     """Authentication configuration."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
     enabled: bool = Field(True, description="Enable authentication")
     strategy: str = Field(
@@ -309,7 +320,7 @@ class DocsConfig(BaseModel):
 class ServerConfig(BaseModel):
     """REST API server configuration."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
     enabled: bool = Field(False, description="Enable REST API server")
     # Bind to loopback by default; operators who need network exposure must

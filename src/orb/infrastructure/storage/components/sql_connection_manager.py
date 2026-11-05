@@ -1,14 +1,38 @@
 """SQL connection management components for SQL storage operations."""
 
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any, Generator, Optional, Union
 
+from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.engine import URL
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
+from .engine_registry import get_or_create_engine
+from .postgres_tls import postgres_connect_args
 from .resource_manager import StorageResourceManager as ResourceManager
+
+
+def _is_memory_url(url: URL) -> bool:
+    return url.get_backend_name() == "sqlite" and (url.database or ":memory:") == ":memory:"
+
+
+def shared_engine_for_url(connection_string: Any, **engine_args: Any) -> Engine:
+    """The process's engine for a database named by URL (one pool per database).
+
+    In-memory SQLite is private to the connection that created it, so it is
+    never shared this way.
+    """
+    # Bound values never appear in error text or logs
+    engine_args.setdefault("hide_parameters", True)
+    url = make_url(connection_string)
+    if url.drivername == "postgresql+pg8000" and "connect_args" not in engine_args:
+        # A URL given as-is gets the same default TLS as one built from fields
+        engine_args["connect_args"] = postgres_connect_args(None)
+    if _is_memory_url(url):
+        return create_engine(url, **engine_args)
+    return get_or_create_engine(url, lambda u: create_engine(u, **engine_args))
 
 
 def build_sql_url(
@@ -17,7 +41,7 @@ def build_sql_url(
     host: str = "localhost",
     port: Optional[int] = None,
     username: Optional[str] = None,
-    password: Optional[str] = None,
+    password: Optional[Union[str, SecretStr]] = None,
 ) -> URL:
     """Build the SQLAlchemy URL for a database described by its parts.
 
@@ -27,8 +51,11 @@ def build_sql_url(
     """
     if db_type == "sqlite":
         return URL.create("sqlite", database=name)
+    if isinstance(password, SecretStr):
+        password = password.get_secret_value()
     if db_type == "postgresql":
-        drivername = "postgresql"
+        # pg8000 is the PostgreSQL driver ORB installs
+        drivername = "postgresql+pg8000"
     elif db_type == "mysql":
         drivername = "mysql+pymysql"
     else:
@@ -118,6 +145,16 @@ class SQLConnectionManager(ResourceManager):
 
         return info
 
+    def _engine_for(self, connection_string: Any, **engine_args: Any) -> Engine:
+        """Engine for a database this manager was told to open.
+
+        A database shared with other consumers in the process uses the
+        process-wide engine and is never disposed here; a private in-memory
+        database belongs to this manager.
+        """
+        self._owns_engine = _is_memory_url(make_url(connection_string))
+        return shared_engine_for_url(connection_string, **engine_args)
+
     def _initialize_engine(self) -> None:
         """Initialize SQLAlchemy engine with connection pooling."""
         try:
@@ -135,7 +172,13 @@ class SQLConnectionManager(ResourceManager):
             # Fast-path: use connection_string directly when provided
             if "connection_string" in self.config:
                 connection_string = self.config["connection_string"]
-                self.engine = create_engine(connection_string, pool_pre_ping=True)
+                engine_args: dict[str, Any] = {"pool_pre_ping": True}
+                if make_url(connection_string).drivername == "postgresql+pg8000":
+                    # Same driver-level TLS settings as the discrete-field path
+                    engine_args["connect_args"] = postgres_connect_args(
+                        self.config.get("sslmode"), self.config.get("sslrootcert")
+                    )
+                self.engine = self._engine_for(connection_string, **engine_args)
                 self.session_factory = sessionmaker(bind=self.engine)
                 self.logger.info("Initialized connection manager from connection_string")
                 return
@@ -173,7 +216,7 @@ class SQLConnectionManager(ResourceManager):
                 # mode already serializes cross-process writes correctly, and
                 # the in-memory (":memory:") databases used in tests do not
                 # support a persistent WAL file.
-                self.engine = create_engine(
+                self.engine = self._engine_for(
                     connection_string,
                     echo=self.config.get("echo", False),
                     pool_pre_ping=True,
@@ -194,13 +237,16 @@ class SQLConnectionManager(ResourceManager):
                     "postgresql", database, host, port, username, password
                 )
 
-                self.engine = create_engine(
+                self.engine = self._engine_for(
                     connection_string,
                     echo=self.config.get("echo", False),
                     poolclass=QueuePool,
                     pool_size=self.config.get("pool_size", 10),
                     max_overflow=self.config.get("max_overflow", 20),
                     pool_pre_ping=True,
+                    connect_args=postgres_connect_args(
+                        self.config.get("sslmode"), self.config.get("sslrootcert")
+                    ),
                 )
 
             elif db_type == "mysql":
@@ -212,7 +258,7 @@ class SQLConnectionManager(ResourceManager):
 
                 connection_string = build_sql_url("mysql", database, host, port, username, password)
 
-                self.engine = create_engine(
+                self.engine = self._engine_for(
                     connection_string,
                     echo=self.config.get("echo", False),
                     poolclass=QueuePool,

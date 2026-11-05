@@ -1,9 +1,10 @@
 """DynamoDB storage strategy implementation using componentized architecture."""
 
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from botocore.exceptions import ClientError
 
+from orb.domain.base.exceptions import ConcurrencyError
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
@@ -25,7 +26,15 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
 
     Orchestrates components for AWS client management, data conversion,
     and transaction management. Reduced from 908 lines to ~250 lines.
+
+    Saves made with ``save_versioned`` / ``save_versioned_batch`` are optimistic:
+    the item is written only while its stored ``version`` still equals the one
+    the caller read, otherwise ``ConcurrencyError`` is raised. Inside a unit of
+    work the condition is part of the staged transaction and a conflict surfaces
+    when it commits.
     """
+
+    supports_versioned_save = True
 
     def __init__(
         self,
@@ -156,6 +165,130 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
             except Exception as e:
                 self._logger.error("Failed to save entity %s: %s", entity_id, e)
                 raise StorageError(f"Failed to save entity {entity_id}: {e}")
+
+    def defer_until_commit(self, callback: Callable[[], None]) -> None:
+        """Run ``callback`` after the shared transaction commits; now if none is active."""
+        self.transaction_manager.defer_until_commit(callback)
+
+    def _version_condition(self, expected: int) -> tuple[str, dict[str, str], dict[str, Any]]:
+        """Condition expression, names and values requiring the stored version to be ``expected``.
+
+        A missing or NULL ``version`` counts as 0, matching how repositories read
+        unstamped items. The item must exist.
+        """
+        names = {"#pk": self.converter.partition_key, "#v": "version"}
+        if expected > 0:
+            return "attribute_exists(#pk) AND #v = :e", names, {":e": expected}
+        return (
+            "attribute_exists(#pk) AND "
+            "(attribute_not_exists(#v) OR #v = :e OR attribute_type(#v, :nulltype))",
+            names,
+            {":e": 0, ":nulltype": "NULL"},
+        )
+
+    @staticmethod
+    def _written_version(data: dict[str, Any], expected: Optional[int]) -> int:
+        """Version a write stores: the entity's own, and always above the baseline."""
+        local = data.get("version")
+        local = local if isinstance(local, int) else 0
+        return local if expected is None else max(local, expected + 1)
+
+    def save_versioned(
+        self, entity_id: str, data: dict[str, Any], expected_version: Optional[int]
+    ) -> int:
+        """Save one entity and return the version written.
+
+        With ``expected_version`` the put is conditional on the stored version
+        still being that value; an item that changed or disappeared raises
+        ``ConcurrencyError``. Without it the put is unconditional and stores the
+        entity's own version, which may lower a concurrent holder's baseline (that
+        holder then gets a conflict and retries).
+        """
+        return self.save_versioned_batch([(entity_id, data, expected_version)])[0]
+
+    def save_versioned_batch(
+        self, items: list[tuple[str, dict[str, Any], Optional[int]]]
+    ) -> list[int]:
+        """Save several entities in one transaction; returns the versions written.
+
+        Outside a unit of work the batch is its own atomic transaction (chunked,
+        and then not atomic as a whole, above DynamoDB's per-call limit). Inside
+        one the puts are staged with the rest of the unit of work.
+        """
+        if not items:
+            return []
+        with self.lock_manager.write_lock():
+            try:
+                versions = [self._written_version(data, exp) for _, data, exp in items]
+
+                if self.transaction_manager.is_active:
+                    self._stage_versioned(items, versions)
+                    return versions
+
+                if len(items) == 1:
+                    entity_id, data, expected = items[0]
+                    if expected is not None:
+                        self._put_conditional(entity_id, data, expected, versions[0])
+                        return versions
+                    row = {**data, "version": versions[0]}
+                    if not self.client_manager.put_item(
+                        self.table_name, self.converter.to_dynamodb_item(entity_id, row)
+                    ):
+                        raise StorageError(f"Failed to save entity {entity_id}")
+                    return versions
+
+                with self.transaction_manager.atomic_operation():
+                    self._stage_versioned(items, versions)
+                return versions
+
+            except (ConcurrencyError, StorageError):
+                raise
+            except ClientError as e:
+                self.client_manager.handle_client_error(e, "Save")
+                raise StorageError(f"Failed to save entities: {e}")
+            except Exception as e:
+                self._logger.error("Failed to save %s entities: %s", len(items), e)
+                raise StorageError(f"Failed to save entities: {e}")
+
+    def _stage_versioned(
+        self, items: list[tuple[str, dict[str, Any], Optional[int]]], versions: list[int]
+    ) -> None:
+        for (entity_id, data, expected), written in zip(items, versions):
+            item = self.converter.to_dynamodb_item(entity_id, {**data, "version": written})
+            condition: Optional[str] = None
+            names: Optional[dict[str, str]] = None
+            values: Optional[dict[str, Any]] = None
+            if expected is not None:
+                condition, names, values = self._version_condition(expected)
+            self.transaction_manager.add_put_item(
+                self.table_name,
+                item,
+                condition_expression=condition,
+                key=self.converter.get_key(entity_id),
+                expression_attribute_names=names,
+                expression_attribute_values=values,
+                version_conditioned=expected is not None,
+            )
+
+    def _put_conditional(
+        self, entity_id: str, data: dict[str, Any], expected: int, written: int
+    ) -> None:
+        """One conditional put outside a unit of work."""
+        item = self.converter.to_dynamodb_item(entity_id, {**data, "version": written})
+        condition, names, values = self._version_condition(expected)
+        try:
+            self.client_manager.put_item_conditional(
+                self.table_name, item, condition, names, values
+            )
+        except ClientError as e:
+            if e.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                raise ConcurrencyError(
+                    f"Concurrent write detected for entity '{entity_id}': the stored item is no "
+                    f"longer at version {expected} (it was changed or deleted by another "
+                    f"writer). Re-read the entity, re-apply your change, and retry.",
+                    details={"entity_id": entity_id, "expected_version": expected},
+                ) from None
+            raise
 
     def find_by_id(self, entity_id: str) -> Optional[dict[str, Any]]:
         """

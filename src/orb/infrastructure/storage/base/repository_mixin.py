@@ -134,6 +134,47 @@ class StorageRepositoryMixin:
         data_list = self._get_storage().find_by_criteria(criteria)
         return list(self._safe_deserialize_iter(data_list))
 
+    def _load_page(
+        self,
+        criteria: dict[str, Any],
+        sort: Any,
+        after: Optional[tuple[str, str]],
+        limit: int,
+        id_field: str,
+    ) -> Optional[Any]:
+        """One keyset page cut by the storage backend, or None if it cannot.
+
+        Rows that fail to load are skipped like on every other list path, but the
+        page still continues after them. A backend without ``find_page`` (JSON,
+        DynamoDB) or a query it cannot push down returns None, and the caller
+        pages in process.
+        """
+        from orb.domain.base.pagination import StoragePage
+
+        find_page = getattr(self._get_storage(), "find_page", None)
+        if not callable(find_page):
+            return None
+        result = find_page(criteria, sort.attr, sort.descending, after, limit)
+        if not isinstance(result, tuple) or len(result) != 3:
+            return None
+
+        rows, has_more, total = result
+        items: list[Any] = []
+        positions: list[tuple[str, str]] = []
+        last: Optional[tuple[str, str]] = None
+        for data, sort_text in rows:
+            last = (sort_text, str(data.get(id_field, "")))
+            for entity in self._safe_deserialize_iter([data]):
+                items.append(entity)
+                positions.append(last)
+        return StoragePage(
+            items=items,
+            positions=positions,
+            has_more=has_more,
+            total_count=total,
+            last_position=last,
+        )
+
     def _load_all(self) -> list[Any]:
         """Fetch all entities; skip rows that fail to load."""
         all_data = self._get_storage().find_all()

@@ -425,6 +425,10 @@ class Application:
         """Shutdown the application, flushing OTel providers before exit."""
         self.logger.info("Shutting down application")
         shutdown_telemetry()
+        # Release the process-wide SQL connection pools
+        from orb.infrastructure.storage.components.engine_registry import dispose_engines
+
+        dispose_engines()
         self._initialized = False
 
     async def cleanup(self) -> None:

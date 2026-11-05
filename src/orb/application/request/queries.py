@@ -19,6 +19,8 @@ class ListRequestsQuery(BaseQuery):
     # Server-side filter/sort — applied BEFORE the limit/offset slice.
     q: Optional[str] = None
     sort: Optional[str] = None
+    # Keyset position (sort text, id) of the last row of the previous page
+    after: Optional[tuple[str, str]] = None
 
 
 class GetRequestMetricsQuery(BaseQuery):

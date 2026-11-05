@@ -9,6 +9,7 @@ from orb.infrastructure.storage.base.unit_of_work import BaseUnitOfWork
 
 # Import JSON storage strategy
 from orb.infrastructure.storage.json.strategy import JSONStorageStrategy
+from orb.infrastructure.storage.json.transaction_scope import JSONTransactionScope
 
 # Import new simplified repositories
 from orb.infrastructure.storage.repositories.machine_repository import (
@@ -23,7 +24,14 @@ from orb.infrastructure.storage.repositories.template_repository import (
 
 
 class JSONUnitOfWork(BaseUnitOfWork):
-    """JSON-based unit of work implementation using simplified repositories."""
+    """JSON-based unit of work implementation using simplified repositories.
+
+    Writes made between ``begin`` and ``commit`` are buffered by the three
+    strategies and reads inside the unit of work see them. ``rollback`` discards
+    them without touching the files; ``commit`` validates every version-checked
+    write and then writes, so a conflict writes nothing (see
+    ``JSONTransactionScope`` for locking and the residual cross-file risk).
+    """
 
     def __init__(
         self,
@@ -95,6 +103,11 @@ class JSONUnitOfWork(BaseUnitOfWork):
             backup_enabled=backup_enabled,
         )
 
+        # One commit scope for all three strategies
+        self._scope = JSONTransactionScope()
+        for strategy in (machine_strategy, request_strategy, template_strategy):
+            strategy.join_scope(self._scope)
+
         # Create repositories using simplified implementations
         self.machine_repository = MachineRepository(machine_strategy)
         self.request_repository = RequestRepository(request_strategy)
@@ -120,33 +133,27 @@ class JSONUnitOfWork(BaseUnitOfWork):
         return self.template_repository
 
     def _begin_transaction(self) -> None:
-        """Begin transaction on all storage strategies."""
+        """Start buffering writes on all storage strategies."""
         try:
-            self.machine_repository.storage_strategy.begin_transaction()
-            self.request_repository.storage_strategy.begin_transaction()
-            self.template_repository.storage_strategy.begin_transaction()
+            self._scope.begin()
             self.logger.debug("Transaction begun on all repositories")
         except Exception as e:
             self.logger.error("Failed to begin transaction: %s", e)
             raise
 
     def _commit_transaction(self) -> None:
-        """Commit transaction on all storage strategies."""
+        """Write the buffered changes of all storage strategies."""
         try:
-            self.machine_repository.storage_strategy.commit_transaction()
-            self.request_repository.storage_strategy.commit_transaction()
-            self.template_repository.storage_strategy.commit_transaction()
+            self._scope.commit()
             self.logger.debug("Transaction committed on all repositories")
         except Exception as e:
             self.logger.error("Failed to commit transaction: %s", e)
             raise
 
     def _rollback_transaction(self) -> None:
-        """Rollback transaction on all storage strategies."""
+        """Discard the buffered changes of all storage strategies."""
         try:
-            self.machine_repository.storage_strategy.rollback_transaction()
-            self.request_repository.storage_strategy.rollback_transaction()
-            self.template_repository.storage_strategy.rollback_transaction()
+            self._scope.rollback()
             self.logger.debug("Transaction rolled back on all repositories")
         except Exception as e:
             self.logger.error("Failed to rollback transaction: %s", e)

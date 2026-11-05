@@ -231,12 +231,13 @@ def _run_migrations(db_url) -> None:
     alembic_ini = files("orb.k8s_legacy.alembic").joinpath("alembic.ini")
     alembic_cfg = Config(str(alembic_ini))
     alembic_cfg.attributes["configure_logger"] = False
-    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+    # "%" is interpolation syntax in alembic's ConfigParser; escape it
+    alembic_cfg.set_main_option("sqlalchemy.url", str(db_url).replace("%", "%%"))
     script_loc = str(files("orb.k8s_legacy.alembic"))
-    alembic_cfg.set_main_option("script_location", script_loc)
+    alembic_cfg.set_main_option("script_location", script_loc.replace("%", "%%"))
     alembic_cfg.set_main_option(
         "version_locations",
-        str(files("orb.k8s_legacy.alembic").joinpath("versions")),
+        str(files("orb.k8s_legacy.alembic").joinpath("versions")).replace("%", "%%"),
     )
     alembic_cfg.set_main_option("timezone", "UTC")
     alembic_cfg.set_main_option("output_encoding", "utf-8")

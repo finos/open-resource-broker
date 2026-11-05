@@ -1,11 +1,11 @@
 """Base unit of work interfaces and implementations."""
 
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from orb.domain.base.domain_interfaces import UnitOfWork
+from orb.domain.base.exceptions import ConcurrencyError
 from orb.infrastructure.logging.logger import get_logger
-from orb.infrastructure.storage.base.repository import StrategyBasedRepository
 from orb.infrastructure.storage.exceptions import TransactionError
 
 T = TypeVar("T")  # Repository type
@@ -91,10 +91,16 @@ class BaseUnitOfWork(UnitOfWork, ABC):
         """Rollback transaction implementation."""
 
 
-class StrategyUnitOfWork(BaseUnitOfWork):
-    """Unit of work implementation for strategy-based repositories."""
+class _StrategyBackedRepository(Protocol):
+    """A repository that keeps its records in a storage strategy."""
 
-    def __init__(self, repositories: list[StrategyBasedRepository]) -> None:
+    storage_strategy: Any
+
+
+class StrategyUnitOfWork(BaseUnitOfWork):
+    """Unit of work that begins, commits and rolls back its repositories' strategies."""
+
+    def __init__(self, repositories: list[_StrategyBackedRepository]) -> None:
         """
         Initialize unit of work.
 
@@ -103,16 +109,10 @@ class StrategyUnitOfWork(BaseUnitOfWork):
         """
         super().__init__()
         self.repositories = repositories
-        self._snapshots: dict[StrategyBasedRepository, dict[str, Any]] = {}
 
     def _begin_transaction(self) -> None:
         """Begin transaction by delegating to storage strategies."""
         try:
-            # First take snapshots for backward compatibility
-            for repo in self.repositories:
-                self._snapshots[repo] = repo._cache.copy()
-
-            # Then delegate to storage strategies
             for repo in self.repositories:
                 if hasattr(repo, "storage_strategy"):
                     repo.storage_strategy.begin_transaction()
@@ -125,40 +125,21 @@ class StrategyUnitOfWork(BaseUnitOfWork):
     def _commit_transaction(self) -> None:
         """Commit transaction by delegating to storage strategies."""
         try:
-            # Delegate to storage strategies
             for repo in self.repositories:
                 if hasattr(repo, "storage_strategy"):
                     repo.storage_strategy.commit_transaction()
-
-            # Clear snapshots
-            self._snapshots.clear()
+        except ConcurrencyError:
+            # Callers retry on a conflict; wrapping it would hide it from them
+            raise
         except Exception as e:
             self.logger.error("Error committing transaction: %s", str(e))
             raise TransactionError(f"Error committing transaction: {e!s}")
 
     def _rollback_transaction(self) -> None:
         """Rollback transaction by delegating to storage strategies."""
-        try:
-            # Delegate to storage strategies
-            for repo in self.repositories:
-                if hasattr(repo, "storage_strategy"):
-                    try:
-                        repo.storage_strategy.rollback_transaction()
-                    except Exception as e:
-                        self.logger.warning(
-                            "Error rolling back transaction for repository: %s", str(e)
-                        )
-
-            # Fall back to snapshots for backward compatibility
-            for repo, snapshot in self._snapshots.items():
-                repo._cache = snapshot.copy()
-                # Reload version map
-                repo._version_map = {
-                    entity_id: entity.version for entity_id, entity in snapshot.items()
-                }
-
-            # Clear snapshots
-            self._snapshots.clear()
-        except Exception as e:
-            self.logger.error("Error rolling back transaction: %s", str(e))
-            raise TransactionError(f"Error rolling back transaction: {e!s}")
+        for repo in self.repositories:
+            if hasattr(repo, "storage_strategy"):
+                try:
+                    repo.storage_strategy.rollback_transaction()
+                except Exception as e:
+                    self.logger.warning("Error rolling back transaction for repository: %s", str(e))

@@ -1,6 +1,5 @@
 """Base storage package."""
 
-from orb.infrastructure.storage.base.repository import StrategyBasedRepository
 from orb.infrastructure.storage.base.repository_mixin import StorageRepositoryMixin
 from orb.infrastructure.storage.base.strategy import (
     BaseStorageStrategy,
@@ -16,6 +15,5 @@ __all__: list[str] = [
     "BaseUnitOfWork",
     "StorageRepositoryMixin",
     "StorageStrategy",
-    "StrategyBasedRepository",
     "StrategyUnitOfWork",
 ]

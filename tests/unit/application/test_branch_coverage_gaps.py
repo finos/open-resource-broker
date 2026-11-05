@@ -1075,55 +1075,6 @@ class TestListRequestsHandlerFilters:
         result, _, _ = self._run_with_handler([req_a, req_b], query)
         assert len(result.items) == 2
 
-    def test_sort_type_error_logged_as_warning(self):
-        """sort key that raises TypeError is caught and logged."""
-        from orb.application.queries.request_query_handlers import ListRequestsHandler
-        from orb.application.request.queries import ListRequestsQuery
-
-        req_a = _make_req_ns("req-a")
-        req_b = _make_req_ns("req-b")
-
-        uow = MagicMock()
-        uow.requests.find_all.return_value = [req_a, req_b]
-        uow.machines.find_by_ids.return_value = []
-
-        @contextmanager
-        def _cm():
-            yield uow
-
-        uow_factory = MagicMock()
-        uow_factory.create_unit_of_work.side_effect = _cm
-
-        filter_service = MagicMock()
-        filter_service.apply_filters.side_effect = lambda items, _: items
-
-        def _fake_create(req, machines):
-            return _FakeRequestDTO(request_id=str(getattr(req, "request_id", "r")))
-
-        mock_factory = MagicMock()
-        mock_factory.create_from_domain.side_effect = _fake_create
-
-        with patch(
-            "orb.application.queries.request_query_handlers.RequestDTOFactory",
-            return_value=mock_factory,
-        ):
-            handler = ListRequestsHandler(
-                uow_factory=uow_factory,
-                logger=MagicMock(),
-                error_handler=MagicMock(),
-                generic_filter_service=filter_service,
-            )
-            # Patch sorted inside the handler's module to raise TypeError
-            with patch(
-                "orb.application.queries.request_query_handlers.sorted",
-                side_effect=TypeError("not sortable"),
-            ):
-                query = ListRequestsQuery(sort="-request_id")
-                result = _sync(handler.execute_query(query))
-
-        handler.logger.warning.assert_called()
-        assert result is not None
-
     def test_filter_expressions_applied_to_dtos(self):
         """filter_expressions path calls generic_filter_service.apply_filters on dicts."""
         from orb.application.queries.request_query_handlers import ListRequestsHandler

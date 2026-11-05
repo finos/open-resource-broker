@@ -21,6 +21,22 @@ from orb.infrastructure.storage.components import (
 )
 from orb.infrastructure.storage.exceptions import StorageError
 
+# The last revision before machines.launch_time became TEXT
+_LAUNCH_TIME_BIGINT_REVISION = "55e3b5553d98"
+
+
+def _launch_time_is_integer(engine: Any) -> bool:
+    """Whether the machines table still declares launch_time as an integer column."""
+    from sqlalchemy import Integer, inspect
+
+    inspector = inspect(engine)
+    if not inspector.has_table("machines"):
+        return False
+    for column in inspector.get_columns("machines"):
+        if column["name"] == "launch_time":
+            return isinstance(column["type"], Integer)
+    return False
+
 
 def _is_duplicate_key(exc: IntegrityError) -> bool:
     """Whether an integrity error is a unique / primary-key violation."""
@@ -172,6 +188,8 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 # legitimate mid-migration state.
                 if tables_already_exist and not alembic_version_exists:
                     self._auto_stamp_head(engine)
+                elif tables_already_exist:
+                    self._warn_if_schema_behind(engine)
 
             # Fallback: build CREATE TABLE from the column dict (legacy path).
             elif not self.connection_manager.table_exists(self.table_name):
@@ -228,11 +246,11 @@ class SQLStorageStrategy(BaseStorageStrategy):
         * SQLite — ``BEGIN IMMEDIATE`` acquires a RESERVED lock before the
                    SELECT, preventing any other writer from inserting between
                    the check and the INSERT.
-        * PostgreSQL — the connection is set to ``SERIALIZABLE`` isolation so
-                       a concurrent phantom insert is detected and the loser
-                       rolls back and logs at INFO (not a failure).
-        * Other dialects — best-effort: try the inline INSERT; let the
-                           caller's exception handler catch duplicates.
+        * PostgreSQL and MySQL — the check and the insert run under the
+                       migration lock (``migration_lock``) on a SQLAlchemy
+                       connection, so any driver works (pg8000 included).
+        * Other dialects — the same code without a lock: best-effort, and the
+                           caller's exception handler catches duplicates.
         """
         try:
             import os
@@ -249,7 +267,9 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 "alembic.ini",
             )
             cfg = alembic.config.Config(alembic_ini)
-            cfg.set_main_option("sqlalchemy.url", str(engine.url))
+            # ConfigParser treats "%" as interpolation syntax: a percent-encoded or
+            # percent-containing URL (memory databases, paths, passwords) must be escaped
+            cfg.set_main_option("sqlalchemy.url", str(engine.url).replace("%", "%%"))
             script_dir = alembic.script.ScriptDirectory.from_config(cfg)
             head_revision = script_dir.get_current_head()
             if head_revision is None:
@@ -261,74 +281,28 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
             dialect = engine.dialect.name.lower()
 
-            # Use a fresh DBAPI connection for the stamp so we control the
-            # transaction isolation level independently of the pooled
-            # application connections.
-            raw_conn = engine.raw_connection()
-            try:
-                raw_cursor = raw_conn.cursor()
+            # A database whose machines.launch_time is still the old BIGINT column
+            # was created before the column became TEXT: record the revision that
+            # matches that layout, and upgrade it below so the column is converted.
+            stamp_revision = head_revision
+            if _launch_time_is_integer(engine):
+                stamp_revision = _LAUNCH_TIME_BIGINT_REVISION
 
-                # Acquire a write-intent lock BEFORE the IF-NOT-EXISTS check so
-                # that no other concurrent worker can insert between our check and
-                # our INSERT.
-                #
-                # SQLite:     BEGIN IMMEDIATE upgrades to RESERVED lock so only
-                #             one writer proceeds; others queue or get BUSY.
-                # PostgreSQL: Set SERIALIZABLE isolation; a concurrent phantom
-                #             INSERT will cause the loser's transaction to abort.
-                # Other:      No explicit lock — best-effort serialisation via
-                #             the database's default isolation.
-                if dialect == "sqlite":
-                    raw_cursor.execute("BEGIN IMMEDIATE")
-                elif dialect in ("postgresql", "postgres"):
-                    raw_conn.set_isolation_level(
-                        # psycopg2 SERIALIZABLE constant
-                        getattr(raw_conn, "ISOLATION_LEVEL_SERIALIZABLE", 4)
-                    )
-                    raw_cursor.execute("BEGIN")
-
-                # Ensure alembic_version table exists (may be absent on very
-                # old installs that pre-date even the table creation).
-                raw_cursor.execute(
-                    "CREATE TABLE IF NOT EXISTS alembic_version "
-                    "(version_num VARCHAR(32) NOT NULL, "
-                    "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
-                )
-
-                # Re-check inside the lock: another worker may have already stamped.
-                raw_cursor.execute("SELECT version_num FROM alembic_version LIMIT 1")
-                existing = raw_cursor.fetchone()
-
-                if existing is not None:
-                    self.logger.info(
-                        "Auto-stamp skipped for table %s: alembic_version already contains %s "
-                        "(another worker stamped first).",
-                        self.table_name,
-                        existing[0],
-                    )
-                    raw_conn.rollback()
-                    return
-
-                raw_cursor.execute(
-                    "INSERT INTO alembic_version (version_num) VALUES (?)"
-                    if dialect == "sqlite"
-                    else "INSERT INTO alembic_version (version_num) VALUES (%s)",
-                    (head_revision,),
-                )
-                raw_conn.commit()
-                raw_cursor.close()
-            except Exception:
-                raw_conn.rollback()
-                raise
-            finally:
-                raw_conn.close()
+            if dialect == "sqlite":
+                stamped = self._stamp_sqlite(engine, stamp_revision)
+            else:
+                stamped = self._stamp_locked(engine, stamp_revision)
+            if not stamped:
+                return
 
             self.logger.info(
-                "Auto-stamped Alembic revision %s at head for pre-existing install "
+                "Auto-stamped Alembic revision %s for pre-existing install "
                 "(tables existed without alembic_version row). "
                 "Run 'orb storage migrate current' to verify.",
-                head_revision,
+                stamp_revision,
             )
+            if stamp_revision != head_revision:
+                self._upgrade_to_head(engine, script_dir)
         except Exception as exc:
             # Stamping is best-effort: log the failure but do not abort startup.
             self.logger.warning(
@@ -337,6 +311,151 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 self.table_name,
                 exc,
             )
+
+    _ALEMBIC_VERSION_DDL = (
+        "CREATE TABLE IF NOT EXISTS alembic_version "
+        "(version_num VARCHAR(32) NOT NULL, "
+        "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
+    )
+
+    def _log_stamp_skipped(self, existing: Any) -> None:
+        self.logger.info(
+            "Auto-stamp skipped for table %s: alembic_version already contains %s "
+            "(another worker stamped first).",
+            self.table_name,
+            existing,
+        )
+
+    def _stamp_sqlite(self, engine: Any, revision: str) -> bool:
+        """Record ``revision`` on SQLite; False when another worker stamped first.
+
+        pysqlite opens no transaction before a SELECT, so ``BEGIN IMMEDIATE`` is
+        issued on a raw connection to take the write lock before the check.
+        """
+        raw_conn = engine.raw_connection()
+        try:
+            raw_cursor = raw_conn.cursor()
+            raw_cursor.execute("BEGIN IMMEDIATE")
+            raw_cursor.execute(self._ALEMBIC_VERSION_DDL)
+            raw_cursor.execute("SELECT version_num FROM alembic_version LIMIT 1")
+            existing = raw_cursor.fetchone()
+            if existing is not None:
+                self._log_stamp_skipped(existing[0])
+                raw_conn.rollback()
+                return False
+            raw_cursor.execute("INSERT INTO alembic_version (version_num) VALUES (?)", (revision,))
+            raw_conn.commit()
+            raw_cursor.close()
+            return True
+        except Exception:
+            raw_conn.rollback()
+            raise
+        finally:
+            raw_conn.close()
+
+    def _stamp_locked(self, engine: Any, revision: str) -> bool:
+        """Record ``revision`` under the migration lock; False when already stamped.
+
+        Uses a SQLAlchemy connection, so it works with any driver. The check and
+        the insert run while the migration lock is held (an advisory lock on
+        PostgreSQL, ``GET_LOCK`` on MySQL), and the insert is committed before
+        the lock is released, so concurrent workers stamp exactly once.
+        """
+        from sqlalchemy import text
+
+        from orb.infrastructure.storage.sql.migration_lock import migration_lock
+
+        with engine.connect() as connection:
+            with migration_lock(connection):
+                connection.execute(text(self._ALEMBIC_VERSION_DDL))
+                existing = connection.execute(
+                    text("SELECT version_num FROM alembic_version")
+                ).first()
+                if existing is not None:
+                    self._log_stamp_skipped(existing[0])
+                    connection.rollback()
+                    return False
+                connection.execute(
+                    text("INSERT INTO alembic_version (version_num) VALUES (:revision)"),
+                    {"revision": revision},
+                )
+                connection.commit()
+        return True
+
+    def _upgrade_to_head(self, engine: Any, script_dir: Any) -> None:
+        """Apply the migrations after the stamped revision, on the engine's own database.
+
+        Runs in this process on a connection of ``engine`` rather than through the
+        Alembic command line, so it always touches the database this strategy
+        opened, whatever ``ORB_SQL_URL`` says.
+        """
+        from alembic.operations import Operations
+        from alembic.runtime.migration import MigrationContext
+
+        from orb.infrastructure.storage.sql.migration_lock import migration_lock
+
+        def upgrade_steps(revision: Any, _context: Any) -> Any:
+            return script_dir._upgrade_revs("head", revision)
+
+        try:
+            with engine.begin() as connection:
+                context = MigrationContext.configure(connection, opts={"fn": upgrade_steps})
+                # Another process starting on the same old database waits here, then
+                # finds the schema at head and changes nothing.
+                with (
+                    Operations.context(context),
+                    context.begin_transaction(),
+                    migration_lock(connection),
+                ):
+                    context.run_migrations()
+            self.logger.info("Upgraded the SQL schema to Alembic head.")
+        except Exception as exc:
+            self.logger.warning(
+                "Could not upgrade the SQL schema to Alembic head: %s. "
+                "Run 'orb storage migrate up' to apply the pending migrations.",
+                exc,
+            )
+
+    _schema_checked: set[str] = set()
+
+    def _warn_if_schema_behind(self, engine: Any) -> None:
+        """Warn when a versioned database is behind the migrations this release ships.
+
+        A database that already has an Alembic version is never upgraded
+        automatically; the operator decides when to run the migration.
+        """
+        try:
+            # One check per database per process: each unit of work builds several
+            # strategies on the same engine, and loading the scripts is not free
+            database = engine.url.render_as_string(hide_password=True)
+            if database in self._schema_checked:
+                return
+            self._schema_checked.add(database)
+
+            import os
+
+            import alembic.config
+            import alembic.script
+            from alembic.runtime.migration import MigrationContext
+
+            cfg = alembic.config.Config(
+                os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)), "migrations", "alembic.ini"
+                )
+            )
+            head = alembic.script.ScriptDirectory.from_config(cfg).get_current_head()
+            with engine.connect() as connection:
+                current = MigrationContext.configure(connection).get_current_revision()
+            if head is None or current == head:
+                return
+            self.logger.warning(
+                "The SQL schema is at revision %s but this release expects %s. "
+                "Run 'orb storage migrate up' to apply the pending migrations.",
+                current or "(none)",
+                head,
+            )
+        except Exception as exc:
+            self.logger.debug("Could not compare the SQL schema revision: %s", exc)
 
     # Repositories route aggregates through save_versioned when this is True
     supports_versioned_save = True
@@ -712,6 +831,69 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 session.rollback()
                 self.logger.error("Transaction failed: %s", e)
                 raise
+
+    def find_page(
+        self,
+        criteria: dict[str, Any],
+        sort_column: str,
+        descending: bool,
+        after: Optional[tuple[str, str]],
+        limit: int,
+    ) -> Optional[tuple[list[tuple[dict[str, Any], str]], bool, int]]:
+        """One page of rows after ``after``, ordered by ``(sort_column, id)``.
+
+        Returns ``(rows, has_more, total_count)`` where each row is the entity
+        data with the text it sorted by, or None when this table, sort column,
+        filter or dialect cannot be pushed down (the caller pages in process).
+        ``total_count`` counts every row ``criteria`` selects; it still scans
+        them, so the gain is memory rather than latency.
+        """
+        from orb.infrastructure.storage.sql.pagination import (
+            SORT_KEY_LABEL,
+            build_count_statement,
+            build_page_statement,
+        )
+
+        columns = list(self.columns)
+        dialect = self.connection_manager.get_engine().dialect.name
+        prepared = self.serializer.prepare_criteria(criteria) if criteria else {}
+        statement = build_page_statement(
+            table=self.table_name,
+            columns=columns,
+            id_column=self._get_id_column(),
+            sort_column=sort_column,
+            descending=descending,
+            criteria=prepared,
+            after=after,
+            limit=limit,
+            dialect=dialect,
+        )
+        count = build_count_statement(
+            table=self.table_name, columns=columns, criteria=prepared, dialect=dialect
+        )
+        if statement is None or count is None:
+            return None
+
+        with self.lock_manager.read_lock():
+            try:
+                with self.connection_manager.get_session() as session:
+                    result_rows = session.execute(statement).fetchall()
+                    total = int(session.execute(count).scalar_one())
+
+                rows: list[tuple[dict[str, Any], str]] = []
+                for row in result_rows[:limit]:
+                    row_dict = dict(row._mapping)
+                    sort_text = row_dict.pop(SORT_KEY_LABEL, "")
+                    rows.append(
+                        (
+                            self.serializer.deserialize_from_row(row_dict),
+                            "" if sort_text is None else str(sort_text),
+                        )
+                    )
+                return rows, len(result_rows) > limit, total
+            except Exception as e:
+                self.logger.error("Failed to page %s: %s", self.table_name, e)
+                raise StorageError(f"Failed to page entities: {e}")
 
     def count(self) -> int:
         """Count total entities in the table."""

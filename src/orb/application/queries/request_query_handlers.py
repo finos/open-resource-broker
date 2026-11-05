@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Optional
 
 from orb.application.base.handlers import BaseQueryHandler
 from orb.application.decorators import query_handler
@@ -17,11 +17,18 @@ from orb.application.factories.request_dto_factory import RequestDTOFactory
 from orb.application.request.queries import ListRequestsQuery
 from orb.application.services.machine_sync_service import MachineSyncService
 from orb.application.services.orchestration.dtos import Paginated
+from orb.application.services.orchestration.page_cursor import KeysetPaginated
 from orb.application.services.provider_registry_service import ProviderRegistryService
 from orb.application.services.request_query_service import RequestQueryService
 from orb.application.services.request_status_service import RequestStatusService
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError, ProviderContractError
+from orb.domain.base.pagination import (
+    Position,
+    SortSpec,
+    StoragePage,
+    paginate_in_memory,
+)
 from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.services.generic_filter_service import GenericFilterService
@@ -303,79 +310,88 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, Paginated[RequestD
 
         try:
             with self.uow_factory.create_unit_of_work() as uow:
-                requests = uow.requests.find_all()
-                total_unfiltered = len(requests)
-
-                if query.provider_name:
-                    requests = [r for r in requests if r.provider_name == query.provider_name]
-
-                if query.provider_type:
-                    requests = [r for r in requests if r.provider_type == query.provider_type]
-
-                if query.status:
-                    from orb.domain.request.value_objects import RequestStatus
-
-                    status_filter = RequestStatus(query.status)
-                    requests = [r for r in requests if r.status == status_filter]
-
-                if query.template_id:
-                    requests = [r for r in requests if r.template_id == query.template_id]
-
-                if query.request_type:
-                    requests = [
-                        r
-                        for r in requests
-                        if getattr(r, "request_type", None) == query.request_type
-                    ]
-
-                # q: substring across user-visible fields
-                if getattr(query, "q", None):
-                    needle = query.q.lower()  # type: ignore[union-attr]
-                    searchable = ("request_id", "template_id", "provider_api", "provider_name")
-                    requests = [
-                        r
-                        for r in requests
-                        if any(needle in str(getattr(r, f, "") or "").lower() for f in searchable)
-                    ]
-
-                # sort: "+field" / "-field"
-                sort_key_attr = getattr(query, "sort", None)
-                if sort_key_attr:
-                    sort_key = str(sort_key_attr)
-                    descending = sort_key.startswith("-")
-                    attr = sort_key.lstrip("-+")
-
-                    def _val(r: Any) -> str:
-                        raw = getattr(r, attr, "")
-                        return "" if raw is None else str(raw)
-
-                    try:
-                        requests = sorted(requests, key=_val, reverse=descending)
-                    except TypeError as exc:
-                        self.logger.warning(
-                            "ListRequests sort failed on attr=%s descending=%s: %s",
-                            attr,
-                            descending,
-                            exc,
-                        )
-
-                total_count = len(requests)
-
+                spec = SortSpec.parse(getattr(query, "sort", None))
                 start_idx = query.offset or 0
-                if query.limit is None:
-                    requests = requests[start_idx:]
+                next_position: Optional[Position] = None
+                pushed = self._push_down(uow, query, spec)
+
+                if pushed is not None:
+                    # The database filtered, ordered and cut the page
+                    requests = pushed.items
+                    total_count = pushed.total_count
+                    total_unfiltered = None  # the database counted only the filtered rows
+                    next_position = pushed.next_position
                 else:
-                    limit = min(query.limit, 1000)
-                    if query.limit > 1000:
-                        self.logger.warning(
-                            "ListRequestsQuery.limit=%d clamped to 1000; "
-                            "total_count=%d. Consumers needing full counts "
-                            "should rely on total_count, not len(requests).",
-                            query.limit,
-                            total_count,
+                    requests = uow.requests.find_all()
+                    total_unfiltered = len(requests)
+
+                    if query.provider_name:
+                        requests = [r for r in requests if r.provider_name == query.provider_name]
+
+                    if query.provider_type:
+                        requests = [r for r in requests if r.provider_type == query.provider_type]
+
+                    if query.status:
+                        from orb.domain.request.value_objects import RequestStatus
+
+                        status_filter = RequestStatus(query.status)
+                        requests = [r for r in requests if r.status == status_filter]
+
+                    if query.template_id:
+                        requests = [r for r in requests if r.template_id == query.template_id]
+
+                    if query.request_type:
+                        requests = [
+                            r
+                            for r in requests
+                            if getattr(r, "request_type", None) == query.request_type
+                        ]
+
+                    # q: substring across user-visible fields
+                    if getattr(query, "q", None):
+                        needle = query.q.lower()  # type: ignore[union-attr]
+                        searchable = ("request_id", "template_id", "provider_api", "provider_name")
+                        requests = [
+                            r
+                            for r in requests
+                            if any(
+                                needle in str(getattr(r, f, "") or "").lower() for f in searchable
+                            )
+                        ]
+
+                    total_count = len(requests)
+
+                    limit: Optional[int] = None
+                    if query.limit is not None:
+                        limit = min(query.limit, 1000)
+                        if query.limit > 1000:
+                            self.logger.warning(
+                                "ListRequestsQuery.limit=%d clamped to 1000; "
+                                "total_count=%d. Consumers needing full counts "
+                                "should rely on total_count, not len(requests).",
+                                query.limit,
+                                total_count,
+                            )
+
+                    if spec is not None:
+                        # Ordered by (sort text, id) after the cursor; the whole
+                        # filtered set is held in memory for this backend/query.
+                        in_memory = paginate_in_memory(
+                            requests,
+                            spec,
+                            query.after,
+                            limit,
+                            id_of=lambda r: str(r.request_id),
+                            skip=0 if query.after is not None else start_idx,
                         )
-                    end_idx = start_idx + limit
-                    requests = requests[start_idx:end_idx] if limit > 0 else []
+                        requests = in_memory.items
+                        next_position = in_memory.next_position
+                    elif limit is None:
+                        requests = requests[start_idx:]
+                    elif limit > 0:
+                        requests = requests[start_idx : start_idx + limit]
+                    else:
+                        requests = []
 
                 dto_factory = RequestDTOFactory()
                 request_dtos = []
@@ -400,6 +416,13 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, Paginated[RequestD
                     total_count,
                     total_unfiltered,
                 )
+                if spec is not None:
+                    return KeysetPaginated(
+                        items=request_dtos,
+                        total_count=total_count,
+                        total_unfiltered=total_unfiltered,
+                        next_position=next_position,
+                    )
                 return Paginated(
                     items=request_dtos,
                     total_count=total_count,
@@ -409,6 +432,43 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, Paginated[RequestD
         except Exception as e:
             self.logger.error("Failed to list requests: %s", e)
             raise
+
+    @staticmethod
+    def _push_down(uow: Any, query: ListRequestsQuery, spec: Optional[SortSpec]) -> Any:
+        """The page from the database, or None when this query must page in process.
+
+        Only plain equality filters can be pushed down; free-text search,
+        expression filters and an offset without a cursor cannot.
+        """
+        if (
+            spec is None
+            or query.limit is None
+            or query.limit <= 0
+            or getattr(query, "q", None)
+            or query.filter_expressions
+            or (query.offset and query.after is None)
+        ):
+            return None
+        find_page = getattr(uow.requests, "find_page", None)
+        if not callable(find_page):
+            return None
+
+        criteria: dict[str, str] = {}
+        if query.status:
+            from orb.domain.request.value_objects import RequestStatus
+
+            criteria["status"] = RequestStatus(query.status).value
+        if query.provider_name:
+            criteria["provider_name"] = query.provider_name
+        if query.provider_type:
+            criteria["provider_type"] = query.provider_type
+        if query.template_id:
+            criteria["template_id"] = query.template_id
+        if query.request_type:
+            criteria["request_type"] = str(getattr(query.request_type, "value", query.request_type))
+
+        page = find_page(criteria, spec, query.after, min(query.limit, 1000))
+        return page if isinstance(page, StoragePage) else None
 
 
 @query_handler(SyncAndListReturnRequestsQuery)
@@ -550,31 +610,10 @@ class SyncAndListReturnRequestsHandler(
                         if any(needle in str(getattr(d, f, "") or "").lower() for f in searchable)
                     ]
 
-                sort_key_attr = getattr(query, "sort", None)
-                if sort_key_attr:
-                    sort_key = str(sort_key_attr)
-                    descending = sort_key.startswith("-")
-                    attr = sort_key.lstrip("-+")
-
-                    def _val(d: Any) -> str:
-                        raw = getattr(d, attr, "")
-                        return "" if raw is None else str(raw)
-
-                    try:
-                        request_dtos = sorted(request_dtos, key=_val, reverse=descending)
-                    except TypeError as exc:
-                        self.logger.warning(
-                            "ListReturnRequests sort failed on attr=%s descending=%s: %s",
-                            attr,
-                            descending,
-                            exc,
-                        )
-
                 total_count = len(request_dtos)
                 offset = query.offset or 0  # type: ignore[union-attr]
-                if query.limit is None:
-                    request_dtos = request_dtos[offset:]
-                else:
+                limit: Optional[int] = None
+                if query.limit is not None:
                     limit = min(query.limit, 1000)
                     if query.limit > 1000:
                         self.logger.warning(
@@ -584,6 +623,25 @@ class SyncAndListReturnRequestsHandler(
                             query.limit,
                             total_count,
                         )
+
+                spec = SortSpec.parse(getattr(query, "sort", None))
+                next_position: Optional[Position] = None
+                if spec is not None:
+                    # Every return request was just refreshed from the provider, so
+                    # the whole set is in memory; page it by (sort text, id).
+                    in_memory = paginate_in_memory(
+                        request_dtos,
+                        spec,
+                        query.after,
+                        limit,
+                        id_of=lambda d: str(d.request_id),
+                        skip=0 if query.after is not None else offset,
+                    )
+                    request_dtos = in_memory.items
+                    next_position = in_memory.next_position
+                elif limit is None:
+                    request_dtos = request_dtos[offset:]
+                else:
                     request_dtos = request_dtos[offset : offset + limit] if limit > 0 else []
 
                 self.logger.info(
@@ -592,6 +650,12 @@ class SyncAndListReturnRequestsHandler(
                     total_count,
                     offset,
                 )
+                if spec is not None:
+                    return KeysetPaginated(
+                        items=request_dtos,
+                        total_count=total_count,
+                        next_position=next_position,
+                    )
                 return Paginated(
                     items=request_dtos,
                     total_count=total_count,

@@ -149,10 +149,8 @@ class TestBaseUnitOfWorkContextManager:
 
 
 def _make_repo() -> MagicMock:
-    """Make a mock StrategyBasedRepository."""
+    """Make a mock repository backed by a storage strategy."""
     repo = MagicMock()
-    repo._cache = {"e1": MagicMock(version=1)}
-    repo._version_map = {"e1": 1}
     repo.storage_strategy = MagicMock()
     return repo
 
@@ -164,12 +162,6 @@ def _make_repo() -> MagicMock:
 
 @pytest.mark.unit
 class TestStrategyUoWBegin:
-    def test_snapshots_are_taken_for_each_repo(self) -> None:
-        repo = _make_repo()
-        uow = _ConcreteStrategyUoW([repo])
-        uow.begin()
-        assert repo in uow._snapshots
-
     def test_storage_strategy_begin_called(self) -> None:
         repo = _make_repo()
         uow = _ConcreteStrategyUoW([repo])
@@ -178,8 +170,6 @@ class TestStrategyUoWBegin:
 
     def test_repo_without_storage_strategy_attr_skipped(self) -> None:
         repo = MagicMock(spec=[])  # no storage_strategy attribute
-        repo._cache = {}
-        repo._version_map = {}
         uow = _ConcreteStrategyUoW([repo])
         uow.begin()  # must not raise
 
@@ -198,12 +188,15 @@ class TestStrategyUoWCommit:
         uow.commit()
         repo.storage_strategy.commit_transaction.assert_called_once()
 
-    def test_snapshots_cleared_after_commit(self) -> None:
+    def test_concurrency_error_reaches_the_caller_unwrapped(self) -> None:
+        from orb.domain.base.exceptions import ConcurrencyError
+
         repo = _make_repo()
+        repo.storage_strategy.commit_transaction.side_effect = ConcurrencyError("stale")
         uow = _ConcreteStrategyUoW([repo])
         uow.begin()
-        uow.commit()
-        assert uow._snapshots == {}
+        with pytest.raises(ConcurrencyError):
+            uow.commit()
 
     def test_commit_exception_wrapped_as_transaction_error(self) -> None:
         repo = _make_repo()
@@ -228,37 +221,14 @@ class TestStrategyUoWRollback:
         uow.rollback()
         repo.storage_strategy.rollback_transaction.assert_called_once()
 
-    def test_cache_restored_from_snapshot(self) -> None:
-        repo = _make_repo()
-        original_cache = {"e1": MagicMock(version=1)}
-        repo._cache = original_cache.copy()
-        repo._version_map = {"e1": 1}
-        uow = _ConcreteStrategyUoW([repo])
-        uow.begin()
-        # Simulate mutation after begin
-        repo._cache["e2"] = MagicMock(version=0)
-        uow.rollback()
-        # Cache should be restored (e2 gone, e1 present)
-        assert "e1" in repo._cache
-        assert "e2" not in repo._cache
-
     def test_rollback_strategy_exception_warns_but_continues(self) -> None:
-        """If one repo's rollback raises, the UoW still restores snapshots."""
-        repo = _make_repo()
-        repo.storage_strategy.rollback_transaction.side_effect = RuntimeError("rollback err")
-        uow = _ConcreteStrategyUoW([repo])
+        """If one repo's rollback raises, the other repositories are still rolled back."""
+        failing, healthy = _make_repo(), _make_repo()
+        failing.storage_strategy.rollback_transaction.side_effect = RuntimeError("rollback err")
+        uow = _ConcreteStrategyUoW([failing, healthy])
         uow.begin()
-        # Should not raise — warning is logged but execution continues
-        uow.rollback()
-        # Snapshot was cleared regardless
-        assert uow._snapshots == {}
-
-    def test_snapshots_cleared_after_rollback(self) -> None:
-        repo = _make_repo()
-        uow = _ConcreteStrategyUoW([repo])
-        uow.begin()
-        uow.rollback()
-        assert uow._snapshots == {}
+        uow.rollback()  # must not raise
+        healthy.storage_strategy.rollback_transaction.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

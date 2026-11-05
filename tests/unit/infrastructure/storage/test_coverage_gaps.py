@@ -336,19 +336,22 @@ class TestJSONStrategyLoadDataRecovery:
 
 
 @pytest.mark.unit
-class TestJSONStrategySaveDataReadError:
-    """_save_data raises when re-reading inside the lock fails."""
+class TestJSONStrategySaveReadError:
+    """A save aborts when re-reading the file inside the lock fails."""
 
-    def test_save_data_raises_when_reread_inside_lock_fails(self, tmp_path: Path) -> None:
+    def test_save_raises_when_reread_inside_lock_fails(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
         strategy = _make_json_strategy(tmp_path)
-        # Patch create_backup to no-op so it doesn't call read_file before we expect.
         with patch.object(strategy.file_manager, "create_backup", return_value=None):
-            # Now patch read_file to fail on first call (inside the lock).
             with patch.object(
-                strategy.file_manager, "read_file", side_effect=OSError("lock-read fails")
+                strategy.file_manager,
+                "read_file_with_signature",
+                side_effect=OSError("lock-read fails"),
             ):
-                with pytest.raises(OSError, match="lock-read fails"):
-                    strategy._save_data({"e1": {"v": 1}})
+                with pytest.raises(StorageError) as exc_info:
+                    strategy.save("e1", {"v": 1})
+        assert "lock-read fails" in str(exc_info.value.__cause__)
 
 
 # ---------------------------------------------------------------------------

@@ -197,7 +197,13 @@ async def list_machines(
     request_id: Optional[str] = REQUEST_ID_QUERY,
     limit: int = Query(50, ge=1, le=1000),
     offset: int = OFFSET_QUERY,
-    cursor: Optional[str] = Query(None, description="Opaque pagination cursor"),
+    cursor: Optional[str] = Query(
+        None,
+        description=(
+            "Opaque pagination cursor: the next_cursor of the previous page. Overrides offset. "
+            "A malformed cursor, or one issued for a different filter or sort, is rejected with 400."
+        ),
+    ),
     q: Optional[str] = Query(None, description="Substring search"),
     sort: Optional[str] = Query(None, description='Sort: "field" / "-field"'),
     sync: bool = Query(

@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from orb._package import DOCS_URL
 from orb.config.schemas.app_schema import AppConfig
+from orb.config.utils.env_expansion import expand_config_env_vars
 from orb.domain.base.ports.console_port import ConsolePort
 from orb.infrastructure.adapters.null_console_adapter import NullConsoleAdapter
 
@@ -72,9 +73,14 @@ class StartupValidator:
             self._console.command("  2. Or reinitialize: orb init --force")
             sys.exit(1)
 
-        # 3. Config validates against Pydantic schema
+        # 3. Config validates against Pydantic schema. Environment variables are
+        # expanded first, exactly as the loader does before it builds the
+        # configuration the application runs with: validating the file as written
+        # would see "${VAR}" where the real value is, and would reject a secret
+        # whose variable is set.
         try:
-            self.app_config = AppConfig(**(self.config_data or {}))
+            expanded = expand_config_env_vars(self.config_data or {})
+            self.app_config = AppConfig(**expanded)
         except ValidationError as e:
             self._console.error(f"Invalid configuration in: {self.config_path}")
             for error in e.errors():
