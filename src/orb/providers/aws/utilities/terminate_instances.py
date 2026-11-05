@@ -7,11 +7,23 @@ terminate call is asking for, so it is reported separately instead of failing
 the whole call.
 """
 
-from typing import Any, Callable
+import re
+import time
+from datetime import datetime, timezone
+from typing import Any, Callable, Mapping
 
 from botocore.exceptions import ClientError
 
+from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+
 INSTANCE_NOT_FOUND = "InvalidInstanceID.NotFound"
+
+_INSTANCE_ID_TOKEN = re.compile(r"(?<![\w-])i-[A-Za-z0-9]+(?![\w-])")
+
+
+def instance_ids_in_message(message: str) -> set[str]:
+    """Return the instance id tokens named in an EC2 error message."""
+    return set(_INSTANCE_ID_TOKEN.findall(message))
 
 
 def is_instance_not_found(error: BaseException) -> bool:
@@ -51,7 +63,8 @@ def terminate_skipping_missing(
             if not is_instance_not_found(error):
                 raise
             message = str(error.response.get("Error", {}).get("Message", ""))
-            unknown = [i for i in remaining if i in message]
+            named = instance_ids_in_message(message)
+            unknown = [i for i in remaining if i in named]
             if not unknown and len(remaining) == 1:
                 unknown = list(remaining)
             if not unknown:
@@ -73,3 +86,76 @@ def terminate_skipping_missing(
             break
 
     return {"TerminatingInstances": terminating, "already_terminated": already_terminated}
+
+
+# EC2 can answer NotFound for an instance for a few seconds after RunInstances.
+RECENT_LAUNCH_SECONDS = 60
+VISIBILITY_ATTEMPTS = 5
+VISIBILITY_DELAY_SECONDS = 2.0
+
+
+def ensure_machines_in_client_region(
+    coordinates: Mapping[str, Mapping[str, Any]], client_region: str
+) -> None:
+    """Raise when a machine record belongs to a different region than the client.
+
+    An unknown id is only evidence the instance is gone when ORB looked in the
+    region it was launched in; elsewhere it would mark live instances terminated.
+    """
+    for machine_id, record in coordinates.items():
+        recorded = (record.get("provider_data") or {}).get("region")
+        if recorded and client_region and str(recorded).lower() != client_region.lower():
+            raise AWSInfrastructureError(
+                f"Machine {machine_id} was launched in region {recorded} but the AWS client "
+                f"is configured for {client_region}; refusing to terminate it from there"
+            )
+
+
+def recently_launched_ids(
+    coordinates: Mapping[str, Mapping[str, Any]],
+    now: datetime | None = None,
+    max_age_seconds: float = RECENT_LAUNCH_SECONDS,
+) -> list[str]:
+    """Return ids of machines launched less than *max_age_seconds* ago."""
+    now = now or datetime.now(timezone.utc)
+    young: list[str] = []
+    for machine_id, record in coordinates.items():
+        launched = record.get("launched_at")
+        if not launched:
+            continue
+        try:
+            moment = datetime.fromisoformat(str(launched))
+        except ValueError:
+            continue
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        if (now - moment).total_seconds() < max_age_seconds:
+            young.append(machine_id)
+    return young
+
+
+def wait_until_visible(
+    ec2_client: Any,
+    instance_ids: list[str],
+    attempts: int = VISIBILITY_ATTEMPTS,
+    delay: float = VISIBILITY_DELAY_SECONDS,
+    sleep: Callable[[float], None] = time.sleep,
+) -> None:
+    """Give just-launched instances a bounded window to become visible to EC2.
+
+    Returns as soon as every id is known, or after *attempts* tries; the caller
+    then terminates and treats any id still unknown as already gone.
+    """
+    pending = list(instance_ids)
+    for attempt in range(attempts):
+        try:
+            ec2_client.describe_instances(InstanceIds=pending)
+            return
+        except ClientError as error:
+            if not is_instance_not_found(error):
+                return
+            named = instance_ids_in_message(str(error.response.get("Error", {}).get("Message", "")))
+            still_unknown = [i for i in pending if i in named]
+            pending = still_unknown or pending
+        if attempt < attempts - 1:
+            sleep(delay)
