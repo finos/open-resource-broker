@@ -271,8 +271,16 @@ def _health_url(server_config: Any, ui_config: Any | None) -> str:
     return f"http://{host}:{server_config.port}/health"
 
 
+_WILDCARD_HOSTS = {"0.0.0.0": "127.0.0.1", "::": "localhost"}  # noqa: S104  # maps bind-all hosts to a connectable address for display
+
+
 def _url_host(host: str) -> str:
-    """Format *host* for use inside a URL (brackets for IPv6 literals)."""
+    """Format *host* for a URL a user can open.
+
+    Bind-all addresses are not connectable, so they are shown as loopback; IPv6
+    literals are bracketed.
+    """
+    host = _WILDCARD_HOSTS.get(host, host)
     return f"[{host}]" if ":" in host and not host.startswith("[") else host
 
 
@@ -308,7 +316,7 @@ def _server_urls(
         urls["ui_url"] = f"http://{host}:{ui_config.backend_port}/"
     else:  # dev
         urls["api_url"] = f"http://{host}:{ui_config.backend_port}/orb"
-        urls["ui_url"] = f"http://localhost:{ui_config.frontend_port}/"
+        urls["ui_url"] = f"http://{host}:{ui_config.frontend_port}/"
     return urls
 
 
@@ -373,8 +381,10 @@ async def handle_server_start(args) -> dict[str, Any]:
         runtime=runtime,
         foreground=foreground,
     )
-    _announce_urls(urls)
-    return {**result, **urls}
+    if result.get("status") == "started":
+        _announce_urls(urls)
+        return {**result, **urls}
+    return result
 
 
 @handle_interface_exceptions(context="server_stop", interface_type="cli")

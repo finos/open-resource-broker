@@ -59,7 +59,7 @@ MODES = [
         _server(),
         _ui("dev"),
         {},
-        {"api_url": "http://127.0.0.1:8001/orb", "ui_url": "http://localhost:3000/"},
+        {"api_url": "http://127.0.0.1:8001/orb", "ui_url": "http://127.0.0.1:3000/"},
     ),
     (
         "ipv6-host",
@@ -67,6 +67,21 @@ MODES = [
         None,
         {},
         {"api_url": "http://[::1]:8000"},
+    ),
+    ("wildcard-v4", _server(host="0.0.0.0"), None, {}, {"api_url": "http://127.0.0.1:8000"}),  # noqa: S104
+    (
+        "wildcard-v6",
+        _server(host="::"),
+        _ui("embedded"),
+        {},
+        {"api_url": "http://localhost:8000/orb", "ui_url": "http://localhost:8000/"},
+    ),
+    (
+        "dev-wildcard",
+        _server(host="0.0.0.0"),  # noqa: S104
+        _ui("dev"),
+        {},
+        {"api_url": "http://127.0.0.1:8001/orb", "ui_url": "http://127.0.0.1:3000/"},
     ),
     (
         "unix-socket",
@@ -176,4 +191,29 @@ async def test_status_omits_urls_when_not_running() -> None:
     ):
         result = await handlers.handle_server_status(_args())
 
+    assert "api_url" not in result
+
+
+@pytest.mark.unit
+@pytest.mark.cli
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["running", "failed"])
+async def test_daemon_start_announces_only_after_success(outcome, capsys) -> None:
+    daemon = MagicMock()
+    if outcome == "failed":
+        daemon.start.side_effect = RuntimeError("daemon failed")
+    else:
+        daemon.start.return_value = {"pid": 5, "status": "running"}
+
+    with (
+        patch(_BUILD_RUNTIME, return_value=(AsyncMock(), _server(), None)),
+        patch(_RESOLVE_PATHS, return_value=("/tmp/p.pid", "/tmp/p.log", "/tmp")),
+        patch("orb.interface.server_daemon", daemon, create=True),
+    ):
+        try:
+            result = await handlers.handle_server_start(_args())
+        except Exception:  # noqa: BLE001 - wrapped by the interface decorator
+            result = {}
+
+    assert "listening on" not in capsys.readouterr().err
     assert "api_url" not in result
