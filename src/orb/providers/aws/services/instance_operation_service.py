@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+from orb.providers.aws.utilities.terminate_instances import terminate_skipping_missing
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 
 if TYPE_CHECKING:
@@ -180,8 +181,13 @@ class AWSInstanceOperationService:
                     )
 
             # Fallback to direct termination
-            response = self._aws_client.ec2_client.terminate_instances(InstanceIds=instance_ids)
-            terminated_count = len(response.get("TerminatingInstances", []))
+            outcome = terminate_skipping_missing(
+                lambda ids: self._aws_client.ec2_client.terminate_instances(InstanceIds=ids),
+                instance_ids,
+            )
+            terminated_count = len(outcome["TerminatingInstances"]) + len(
+                outcome["already_terminated"]
+            )
 
             return ProviderResult.success_result(
                 {

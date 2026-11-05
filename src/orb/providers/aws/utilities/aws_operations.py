@@ -17,6 +17,10 @@ from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.tags import build_system_tags, merge_tags
+from orb.providers.aws.utilities.terminate_instances import (
+    is_instance_not_found,
+    terminate_skipping_missing,
+)
 
 
 @injectable
@@ -95,27 +99,48 @@ class AWSOperations:
                 if not self._retry_with_backoff:
                     raise ValueError("Retry method not set. Call set_retry_method first.")
 
-                result = self._retry_with_backoff(
-                    self.aws_client.ec2_client.terminate_instances,
-                    operation_type="critical",
-                    InstanceIds=instance_ids,
-                )
-                self._logger.info("Successfully terminated %s: %s", operation_context, instance_ids)
-                return result
-
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
+                result = terminate_skipping_missing(self._terminate_once, instance_ids)
+                if result["already_terminated"]:
+                    self._logger.info(
+                        "Instances already gone during %s termination "
+                        "(InvalidInstanceID.NotFound), treated as terminated: %s",
+                        operation_context,
+                        result["already_terminated"],
+                    )
                 self._logger.info(
-                    "Instances already gone during %s termination (InvalidInstanceID.NotFound) — treating as success",
+                    "Successfully terminated %s: %s",
                     operation_context,
+                    [i["InstanceId"] for i in result["TerminatingInstances"]],
                 )
-                return {"terminated_instances": []}
-            self._logger.error("Failed to terminate %s: %s", operation_context, str(e))
-            raise
+                return result
 
         except Exception as e:
             self._logger.error("Failed to terminate %s: %s", operation_context, str(e))
             raise
+
+    def _terminate_once(self, instance_ids: list[str]) -> dict[str, Any]:
+        """Run one TerminateInstances call with retry.
+
+        ``InvalidInstanceID.NotFound`` is a definitive answer, not a transient
+        failure, so it is handed back to the caller outside the retry layer:
+        no backoff and no circuit-breaker failure is recorded for it.
+        """
+        if not self._retry_with_backoff:
+            raise ValueError("Retry method not set. Call set_retry_method first.")
+        ec2_client = self.aws_client.ec2_client
+
+        def terminate() -> Any:
+            try:
+                return ec2_client.terminate_instances(InstanceIds=instance_ids)
+            except ClientError as e:
+                if is_instance_not_found(e):
+                    return e
+                raise
+
+        result = self._retry_with_backoff(terminate, operation_type="critical")
+        if isinstance(result, ClientError):
+            raise result
+        return result
 
     def execute_operation_with_standard_handling(
         self,
