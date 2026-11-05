@@ -416,7 +416,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 exc,
             )
 
-    _behind_warned: set[str] = set()
+    _schema_checked: set[str] = set()
 
     def _warn_if_schema_behind(self, engine: Any) -> None:
         """Warn when a versioned database is behind the migrations this release ships.
@@ -425,6 +425,13 @@ class SQLStorageStrategy(BaseStorageStrategy):
         automatically; the operator decides when to run the migration.
         """
         try:
+            # One check per database per process: each unit of work builds several
+            # strategies on the same engine, and loading the scripts is not free
+            database = engine.url.render_as_string(hide_password=True)
+            if database in self._schema_checked:
+                return
+            self._schema_checked.add(database)
+
             import os
 
             import alembic.config
@@ -441,10 +448,6 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 current = MigrationContext.configure(connection).get_current_revision()
             if head is None or current == head:
                 return
-            database = engine.url.render_as_string(hide_password=True)
-            if database in self._behind_warned:
-                return
-            self._behind_warned.add(database)
             self.logger.warning(
                 "The SQL schema is at revision %s but this release expects %s. "
                 "Run 'orb storage migrate up' to apply the pending migrations.",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import alembic.command
 import alembic.config
@@ -51,7 +52,7 @@ _capture: list[logging.Handler] = []
 
 @pytest.fixture(autouse=True)
 def _fresh_warning_state(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    monkeypatch.setattr(SQLStorageStrategy, "_behind_warned", set())
+    monkeypatch.setattr(SQLStorageStrategy, "_schema_checked", set())
     _capture[:] = [caplog.handler]
 
 
@@ -218,6 +219,33 @@ class TestVersionedDatabaseBehindHead:
                 create_sql_entity_strategy(config, table)
 
         assert caplog.text.count("pending migrations") == 1
+
+    def test_loads_the_migration_scripts_once_per_database(
+        self, database: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import alembic.script
+
+        _migrate_to("head")
+        loads: list[int] = []
+        original = alembic.script.ScriptDirectory.from_config
+
+        def counting(*args: Any, **kwargs: Any) -> Any:
+            loads.append(1)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(alembic.script.ScriptDirectory, "from_config", counting)
+        config = {
+            "storage": {
+                "strategy": "sql",
+                "sql_strategy": {"type": "sqlite", "name": str(database)},
+            }
+        }
+
+        for _ in range(3):
+            for table in ("requests", "machines", "templates"):
+                create_sql_entity_strategy(config, table)
+
+        assert len(loads) == 1
 
     def test_no_warning_at_head(
         self, database: Path, keep_logging_config: None, caplog: pytest.LogCaptureFixture

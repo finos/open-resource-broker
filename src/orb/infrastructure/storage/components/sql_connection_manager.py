@@ -27,6 +27,9 @@ def shared_engine_for_url(connection_string: Any, **engine_args: Any) -> Engine:
     # Bound values never appear in error text or logs
     engine_args.setdefault("hide_parameters", True)
     url = make_url(connection_string)
+    if url.drivername == "postgresql+pg8000" and "connect_args" not in engine_args:
+        # A URL given as-is gets the same default TLS as one built from fields
+        engine_args["connect_args"] = postgres_connect_args(None)
     if _is_memory_url(url):
         return create_engine(url, **engine_args)
     return get_or_create_engine(url, lambda u: create_engine(u, **engine_args))
@@ -169,7 +172,13 @@ class SQLConnectionManager(ResourceManager):
             # Fast-path: use connection_string directly when provided
             if "connection_string" in self.config:
                 connection_string = self.config["connection_string"]
-                self.engine = self._engine_for(connection_string, pool_pre_ping=True)
+                engine_args: dict[str, Any] = {"pool_pre_ping": True}
+                if make_url(connection_string).drivername == "postgresql+pg8000":
+                    # Same driver-level TLS settings as the discrete-field path
+                    engine_args["connect_args"] = postgres_connect_args(
+                        self.config.get("sslmode"), self.config.get("sslrootcert")
+                    )
+                self.engine = self._engine_for(connection_string, **engine_args)
                 self.session_factory = sessionmaker(bind=self.engine)
                 self.logger.info("Initialized connection manager from connection_string")
                 return

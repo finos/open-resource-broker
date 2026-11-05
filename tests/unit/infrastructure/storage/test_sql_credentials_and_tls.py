@@ -150,3 +150,55 @@ def test_auto_upgrade_takes_the_migration_lock(tmp_path, monkeypatch):
     finally:
         engine.dispose()
     assert entered == ["sqlite"]
+
+
+def _capture_engine_args(monkeypatch: pytest.MonkeyPatch) -> dict:
+    from orb.infrastructure.storage.components import sql_connection_manager as module
+
+    captured: dict = {}
+
+    def fake_create_engine(url, **kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(module, "create_engine", fake_create_engine)
+    monkeypatch.setattr(module, "get_or_create_engine", lambda url, creator: creator(url))
+    return captured
+
+
+def test_explicit_pg8000_url_gets_tls_by_default(monkeypatch: pytest.MonkeyPatch):
+    from orb.infrastructure.storage.components.sql_connection_manager import (
+        shared_engine_for_url,
+    )
+
+    captured = _capture_engine_args(monkeypatch)
+
+    shared_engine_for_url("postgresql+pg8000://u:p@db.example/orb")
+
+    assert isinstance(captured["connect_args"]["ssl_context"], ssl.SSLContext)
+
+
+def test_explicit_url_connection_manager_applies_configured_sslmode(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from orb.infrastructure.storage.components import sql_connection_manager as module
+
+    captured = _capture_engine_args(monkeypatch)
+    monkeypatch.setattr(module, "sessionmaker", lambda **_: None)
+
+    module.SQLConnectionManager(
+        {"connection_string": "postgresql+pg8000://u:p@db.example/orb", "sslmode": "disable"}
+    )
+
+    assert captured["connect_args"] == {}
+
+
+def test_explicit_url_connection_manager_defaults_to_tls(monkeypatch: pytest.MonkeyPatch):
+    from orb.infrastructure.storage.components import sql_connection_manager as module
+
+    captured = _capture_engine_args(monkeypatch)
+    monkeypatch.setattr(module, "sessionmaker", lambda **_: None)
+
+    module.SQLConnectionManager({"connection_string": "postgresql+pg8000://u:p@db.example/orb"})
+
+    assert isinstance(captured["connect_args"]["ssl_context"], ssl.SSLContext)
