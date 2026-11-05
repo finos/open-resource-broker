@@ -65,6 +65,14 @@ jobs:
     - name: Render checks
       run: deploy/helm/orb/ci/render-checks.sh
 
+    - name: Package the chart
+      run: |
+        set -euo pipefail
+        out=$(mktemp -d)
+        helm package deploy/helm/orb --destination "${out:?}" --version 0.0.0-ci --app-version 0.0.0
+        helm show chart "${out:?}"/orb-0.0.0-ci.tgz >/dev/null
+        rm -rf "${out:?}"
+
   kind:
     name: Install on kind
     runs-on: ubuntu-latest
