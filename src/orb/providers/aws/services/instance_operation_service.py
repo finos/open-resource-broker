@@ -187,6 +187,7 @@ class AWSInstanceOperationService:
         params = operation.parameters
         provider_api = params.get("provider_api")
         resource_ids = [str(r) for r in params.get("resource_ids") or []]
+        instance_ids = [str(i) for i in params.get("instance_ids") or []]
         request_id = str(params.get("request_id") or "")
         if not provider_api or not resource_ids:
             return ProviderResult.error_result(
@@ -200,6 +201,7 @@ class AWSInstanceOperationService:
                 provider_api,
                 resource_ids,
                 request_id,
+                instance_ids,
             )
         except Exception as e:
             return ProviderResult.error_result(

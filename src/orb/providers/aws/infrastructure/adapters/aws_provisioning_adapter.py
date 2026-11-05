@@ -308,7 +308,11 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         )
 
     def cancel_resources(
-        self, provider_api: str, resource_ids: list[str], request_id: str = ""
+        self,
+        provider_api: str,
+        resource_ids: list[str],
+        request_id: str = "",
+        instance_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Abort in-flight provisioning of each resource, one at a time.
 
@@ -319,6 +323,8 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             provider_api: Provider API of the resources (ASG, EC2Fleet, SpotFleet, ...)
             resource_ids: Fleet ids, Spot Fleet request ids, ASG names or reservation ids
             request_id: ORB request id, used for launch template cleanup
+            instance_ids: Instances the provider returned when it created the
+                resources, for handlers that terminate instances directly
 
         Returns:
             One ``{"resource_id", "outcome", "message"}`` dict per resource where
@@ -328,7 +334,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         outcomes: list[dict[str, Any]] = []
         for resource_id in resource_ids:
             try:
-                result = handler.cancel_resource(resource_id, request_id)
+                result = handler.cancel_resource_with_members(
+                    resource_id, request_id, instance_ids or []
+                )
             except Exception as exc:
                 result = {"status": "error", "message": str(exc)}
             if not isinstance(result, dict) or result.get("status") != "success":

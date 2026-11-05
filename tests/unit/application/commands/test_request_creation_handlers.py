@@ -78,7 +78,7 @@ def _make_machine_handler(
         selection_result = MagicMock()
     if provisioning_result is None:
         provisioning_result = SimpleNamespace(
-            success=True, errors=[], cancelled=False, resource_ids=[]
+            success=True, errors=[], cancelled=False, resource_ids=[], machine_ids=[]
         )
 
     uow_factory = _make_uow_factory(request_agg)
@@ -275,7 +275,9 @@ class TestCreateMachineRequestHandlerProvisioning:
     async def test_execute_command_calls_status_update_with_provisioning_result(self):
         request_agg = _make_request_aggregate()
         request_agg.metadata = {}
-        prov_result = SimpleNamespace(success=True, errors=[], cancelled=False, resource_ids=[])
+        prov_result = SimpleNamespace(
+            success=True, errors=[], cancelled=False, resource_ids=[], machine_ids=[]
+        )
         handler, _ = _make_machine_handler(request_agg=request_agg, provisioning_result=prov_result)
 
         cmd = CreateRequestCommand(template_id=_TEMPLATE_ID, requested_count=1)
@@ -1316,7 +1318,7 @@ class TestCancelDuringCreation:
     @pytest.mark.asyncio
     async def test_a_result_flagged_cancelled_keeps_the_stored_status(self):
         prov_result = SimpleNamespace(
-            success=True, errors=[], cancelled=True, resource_ids=["fleet-1"]
+            success=True, errors=[], cancelled=True, resource_ids=["fleet-1"], machine_ids=[]
         )
         handler, _ = _make_machine_handler(provisioning_result=prov_result)
         persisted = []
@@ -1333,7 +1335,7 @@ class TestCancelDuringCreation:
     @pytest.mark.asyncio
     async def test_a_cancel_after_the_last_checkpoint_is_not_overwritten_by_the_final_persist(self):
         prov_result = SimpleNamespace(
-            success=True, errors=[], cancelled=False, resource_ids=["fleet-1"]
+            success=True, errors=[], cancelled=False, resource_ids=["fleet-1"], machine_ids=[]
         )
         handler, _ = _make_machine_handler(provisioning_result=prov_result)
         handler._provisioning_service.abort_if_cancelled = AsyncMock(return_value=True)  # type: ignore[attr-defined]

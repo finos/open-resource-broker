@@ -204,6 +204,18 @@ class ProvisioningOrchestrationService:
                 )
                 break
 
+            # A cancel that landed after the last checkpoint must not start another
+            # attempt, which would create a fleet or group only to abort it.
+            if attempt_number > 0 and await asyncio.to_thread(
+                self._request_was_cancelled, request.request_id
+            ):
+                self._logger.info(
+                    "Request %s was cancelled; not starting another provisioning attempt",
+                    request.request_id,
+                )
+                cancelled = True
+                break
+
             attempt_number += 1
             attempt_count = min(remaining, batch_size)
             attempt_started = datetime.now(timezone.utc)
@@ -298,6 +310,7 @@ class ProvisioningOrchestrationService:
                     selection_result,
                     accumulated_resource_ids,
                     template.provider_api,
+                    accumulated_machine_ids,
                 ):
                     cancelled = True
                     break
@@ -362,6 +375,7 @@ class ProvisioningOrchestrationService:
         selection_result: ProviderSelectionResult,
         resource_ids: list[str],
         provider_api: str | None = None,
+        instance_ids: list[str] | None = None,
     ) -> bool:
         """Abort *resource_ids* when the stored request has been cancelled.
 
@@ -373,13 +387,21 @@ class ProvisioningOrchestrationService:
         Returns:
             True when the stored request is cancelled (and the resources were
             handed to the provider for abort), False otherwise.
+
+        ``instance_ids`` are the instances the provider returned when it created the
+        resources. Providers that launch instances directly terminate these by id,
+        since a lookup by reservation can lag behind the launch.
         """
         if not resource_ids:
             return False
         if not await asyncio.to_thread(self._request_was_cancelled, request.request_id):
             return False
         await self._abort_created_resources(
-            request, selection_result, list(resource_ids), provider_api or request.provider_api
+            request,
+            selection_result,
+            list(resource_ids),
+            provider_api or request.provider_api,
+            list(instance_ids or []),
         )
         # Keep the ids on the cancelled request (its status is unchanged) so that a
         # later cancel can abort them again if this abort did not take effect.
@@ -433,6 +455,7 @@ class ProvisioningOrchestrationService:
         selection_result: ProviderSelectionResult,
         resource_ids: list[str],
         provider_api: str | None,
+        instance_ids: list[str] | None = None,
     ) -> None:
         """Hand resources created for a cancelled request to the provider for abort."""
         provider_name = selection_result.provider_name
@@ -455,6 +478,7 @@ class ProvisioningOrchestrationService:
                             "request_id": str(request.request_id),
                             "provider_api": provider_api,
                             "resource_ids": resource_ids,
+                            "instance_ids": list(instance_ids or []),
                         },
                         context={
                             "correlation_id": str(request.request_id),

@@ -6,7 +6,7 @@ All AWS calls are mocked; no real AWS connections are made.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from botocore.exceptions import ClientError
@@ -103,7 +103,8 @@ class TestRunInstancesCancel:
         handler = _run_instances_handler()
         handler.aws_client.ec2_client.describe_instances.return_value = {"Reservations": []}
 
-        result = handler.cancel_resource("r-1", "req-1")
+        with patch("orb.providers.aws.infrastructure.handlers.run_instances.handler.time.sleep"):
+            result = handler.cancel_resource("r-1", "req-1")
 
         assert result["status"] == "success"
         assert "unverified" in result["message"]
@@ -111,7 +112,10 @@ class TestRunInstancesCancel:
         assert warning.kwargs["extra"]["event"] == "aws.cancel_unverified"
         handler.aws_ops.terminate_instances_with_fallback.assert_not_called()
         handler._cleanup_on_zero_capacity.assert_not_called()
-        assert handler.aws_client.ec2_client.describe_instances.call_count == 1
+        # An empty lookup is retried a bounded number of times before it is given up.
+        assert handler.aws_client.ec2_client.describe_instances.call_count == (
+            1 + RunInstancesHandler._CANCEL_LOOKUP_RETRIES
+        )
 
     def test_reservation_not_found_is_treated_as_empty(self):
         handler = _run_instances_handler()
@@ -119,7 +123,8 @@ class TestRunInstancesCancel:
             "InvalidReservationID.NotFound"
         )
 
-        result = handler.cancel_resource("r-1", "req-1")
+        with patch("orb.providers.aws.infrastructure.handlers.run_instances.handler.time.sleep"):
+            result = handler.cancel_resource("r-1", "req-1")
 
         assert result["status"] == "success"
         assert "unverified" in result["message"]

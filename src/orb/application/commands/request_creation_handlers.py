@@ -144,7 +144,11 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
             # A cancel may also land after the last checkpoint and before the final
             # persist below, which would overwrite it.
             if await self._provisioning_service.abort_if_cancelled(
-                request, selection_result, provisioning_result.resource_ids, template.provider_api
+                request,
+                selection_result,
+                provisioning_result.resource_ids,
+                template.provider_api,
+                provisioning_result.machine_ids,
             ):
                 self.logger.info(
                     "Request %s was cancelled during creation; keeping its cancelled status",

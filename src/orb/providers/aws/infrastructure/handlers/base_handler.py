@@ -321,6 +321,16 @@ class AWSHandler(ProviderHandlerBase, ABC):
             ``status`` key of ``"success"`` or ``"error"``.
         """
 
+    def cancel_resource_with_members(
+        self, resource_id: str, request_id: str, instance_ids: list[str]
+    ) -> dict[str, Any]:
+        """Cancel a resource, given the instances created for it.
+
+        Fleet and group handlers abort the resource itself and ignore the ids;
+        handlers that launch instances directly override this to terminate them.
+        """
+        return self.cancel_resource(resource_id, request_id)
+
     @classmethod
     @abstractmethod
     def get_example_templates(cls) -> list[Template]:

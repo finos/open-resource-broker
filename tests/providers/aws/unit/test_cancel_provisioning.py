@@ -55,7 +55,7 @@ def _adapter_for(handlers: dict[str, Any]) -> AWSProvisioningAdapter:
 class TestOutcomeMapping:
     def test_success_is_aborted_and_already_gone_is_reported(self):
         handler = MagicMock()
-        handler.cancel_resource.side_effect = [
+        handler.cancel_resource_with_members.side_effect = [
             {"status": "success", "message": "m"},
             {"status": "success", "already_gone": True, "message": "m"},
         ]
@@ -66,29 +66,29 @@ class TestOutcomeMapping:
 
     def test_handler_error_dict_becomes_failed(self):
         handler = MagicMock()
-        handler.cancel_resource.return_value = {"status": "error", "message": "denied"}
+        handler.cancel_resource_with_members.return_value = {"status": "error", "message": "denied"}
         (outcome,) = _adapter_for({"ASG": handler}).cancel_resources("ASG", ["a-1"], "req-1")
         assert outcome == {"resource_id": "a-1", "outcome": "failed", "message": "denied"}
 
     def test_handler_exception_becomes_failed(self):
         handler = MagicMock()
-        handler.cancel_resource.side_effect = RuntimeError("kaboom")
+        handler.cancel_resource_with_members.side_effect = RuntimeError("kaboom")
         (outcome,) = _adapter_for({"ASG": handler}).cancel_resources("ASG", ["a-1"], "req-1")
         assert outcome["outcome"] == "failed"
         assert "kaboom" in outcome["message"]
 
     def test_a_failed_resource_does_not_stop_the_others_and_a_retry_finishes_the_rest(self):
         handler = MagicMock()
-        handler.cancel_resource.side_effect = [
+        handler.cancel_resource_with_members.side_effect = [
             {"status": "success", "message": ""},
             {"status": "error", "message": "throttled"},
         ]
         adapter = _adapter_for({"EC2Fleet": handler})
         first = adapter.cancel_resources("EC2Fleet", ["f-a", "f-b"], "req-1")
         assert [o["outcome"] for o in first] == ["aborted", "failed"]
-        assert handler.cancel_resource.call_count == 2
+        assert handler.cancel_resource_with_members.call_count == 2
 
-        handler.cancel_resource.side_effect = [
+        handler.cancel_resource_with_members.side_effect = [
             {"status": "success", "already_gone": True, "message": ""},
             {"status": "success", "message": ""},
         ]

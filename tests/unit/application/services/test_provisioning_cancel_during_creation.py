@@ -9,6 +9,7 @@ state, and it must abort what it just created.
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -239,6 +240,57 @@ class TestAbortWhatWasJustCreated:
             "res-1",
             "res-2",
         ]
+
+
+class TestCancelBeforeAnotherAttempt:
+    @pytest.mark.asyncio
+    async def test_a_cancel_between_attempts_stops_the_loop_before_creating_more(self):
+        store = _Store(RequestStatus.PENDING)
+        service, port = _service(store)
+        calls = {"n": 0}
+
+        async def dispatch(*args: Any, **kwargs: Any) -> ProvisioningResult:
+            calls["n"] += 1
+            # The cancel lands while the first attempt runs; it created nothing.
+            store.stored_status = RequestStatus.CANCELLED
+            return _result([])
+
+        with patch.object(service, "_dispatch_single_attempt", side_effect=dispatch):
+            result = await service.execute_provisioning(_template(), _request(), _selection())
+
+        assert calls["n"] == 1
+        assert result.cancelled is True
+        port.execute_operation.assert_not_awaited()
+
+
+class TestInstanceIdsAreHandedToTheAbort:
+    @pytest.mark.asyncio
+    async def test_the_instances_the_provider_returned_are_passed_to_the_abort(self):
+        store = _Store(RequestStatus.CANCELLED)
+        service, port = _service(store)
+        dispatch_result = replace(_result(["r-1"], final=True), machine_ids=["i-1", "i-2"])
+
+        with patch.object(
+            service, "_dispatch_single_attempt", AsyncMock(return_value=dispatch_result)
+        ):
+            result = await service.execute_provisioning(
+                _template("RunInstances"), _request("RunInstances"), _selection()
+            )
+
+        assert result.cancelled is True
+        parameters = port.execute_operation.await_args.args[1].parameters
+        assert parameters["instance_ids"] == ["i-1", "i-2"]
+
+    @pytest.mark.asyncio
+    async def test_abort_if_cancelled_forwards_instance_ids(self):
+        store = _Store(RequestStatus.CANCELLED)
+        service, port = _service(store)
+
+        await service.abort_if_cancelled(
+            _request("RunInstances"), _selection(), ["r-1"], "RunInstances", ["i-9"]
+        )
+
+        assert port.execute_operation.await_args.args[1].parameters["instance_ids"] == ["i-9"]
 
 
 class TestUnabortableResourcesAreAlerted:

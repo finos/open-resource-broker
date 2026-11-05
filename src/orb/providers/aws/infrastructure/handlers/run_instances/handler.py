@@ -27,6 +27,7 @@ Note:
     and workloads that require predictable instance provisioning.
 """
 
+import time
 import uuid
 from typing import Any, Optional
 
@@ -786,7 +787,21 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             if not next_token:
                 return instance_ids
 
+    # An empty reservation lookup right after a launch may only be describe lag.
+    _CANCEL_LOOKUP_RETRIES = 2
+    _CANCEL_LOOKUP_DELAY_SECONDS = 1.0
+
     def cancel_resource(self, resource_id: str, request_id: str) -> dict[str, Any]:
+        """Cancel a RunInstances reservation by terminating its instances.
+
+        See :meth:`cancel_resource_with_members`; this form knows only the
+        reservation id and finds the instances by lookup.
+        """
+        return self.cancel_resource_with_members(resource_id, request_id, [])
+
+    def cancel_resource_with_members(
+        self, resource_id: str, request_id: str, instance_ids: list[str]
+    ) -> dict[str, Any]:
         """Cancel a RunInstances reservation by terminating its instances.
 
         RunInstances has no fleet-level cancel concept: instances are
@@ -795,20 +810,42 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         reservation. A failed lookup or failed termination is an ``error``,
         because instances may still be running.
 
-        An empty lookup is reported as success but marked unverified:
-        DescribeInstances is eventually consistent and terminated instances
-        age out of it, so the authoritative teardown path is the stored
+        ``instance_ids`` are the ids RunInstances returned. They are terminated
+        directly, together with whatever the reservation lookup adds, because
+        DescribeInstances is eventually consistent and can miss instances
+        launched moments ago. Without known ids an empty lookup is retried a
+        bounded number of times and, if still empty, reported as success but
+        marked unverified; the authoritative teardown path is then the stored
         machine IDs handled by the return flow.
 
         Args:
             resource_id: The reservation ID (used to locate instances).
             request_id: The ORB request ID, used for launch template cleanup.
+            instance_ids: Instance IDs RunInstances returned for the reservation.
 
         Returns:
             Dictionary with ``status`` of ``"success"`` or ``"error"``.
         """
         try:
-            instance_ids = self._lookup_reservation_instance_ids(resource_id)
+            known_ids = list(dict.fromkeys(instance_ids))
+            try:
+                found_ids = self._lookup_reservation_instance_ids(resource_id)
+                attempt = 0
+                while not known_ids and not found_ids and attempt < self._CANCEL_LOOKUP_RETRIES:
+                    attempt += 1
+                    time.sleep(self._CANCEL_LOOKUP_DELAY_SECONDS)
+                    found_ids = self._lookup_reservation_instance_ids(resource_id)
+            except Exception as lookup_error:
+                if not known_ids:
+                    raise
+                self._logger.warning(
+                    "Could not look up RunInstances reservation %s; terminating the "
+                    "instances it returned: %s",
+                    resource_id,
+                    lookup_error,
+                )
+                found_ids = []
+            instance_ids = list(dict.fromkeys([*known_ids, *found_ids]))
 
             if instance_ids:
                 self.aws_ops.terminate_instances_with_fallback(
