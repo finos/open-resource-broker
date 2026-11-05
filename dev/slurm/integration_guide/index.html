@@ -1396,6 +1396,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/daemon-mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Daemon Mode Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../architecture/field_mapping_architecture/" class="md-nav__link">
         
   
@@ -6590,6 +6618,16 @@ source a configuration file instead.</p>
 <td><code>http://localhost:8000</code></td>
 </tr>
 <tr>
+<td><code>SLURM_ORB_ADDR_POLL_TIMEOUT</code></td>
+<td>Seconds to wait for node addresses after the request is submitted; keep below <code>ResumeTimeout</code>. On timeout the script exits 0 and slurmd self-registers</td>
+<td><code>120</code></td>
+</tr>
+<tr>
+<td><code>SLURM_ORB_ADDR_POLL_INTERVAL</code></td>
+<td>Seconds between request status polls</td>
+<td><code>5</code></td>
+</tr>
+<tr>
 <td><code>SLURM_ORB_RESTD_URL</code></td>
 <td>slurmrestd URL (for health checks)</td>
 <td>Not set</td>
@@ -6711,13 +6749,14 @@ the correct identity:</p>
 <a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>ORB batch provisions N fresh EC2 instances
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    │
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    ▼
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>resumeProgram.sh calls: scontrol update NodeAddr=&lt;IP&gt; (for each)
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    │
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    ▼
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>Instances boot → slurmd starts → registers with slurmctld
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    │
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    ▼
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>SLURM clears POWERING_UP → nodes become IDLE → jobs scheduled
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>resumeProgram.sh polls the request status until addresses are assigned,
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>then calls: scontrol update NodeAddr=&lt;IP&gt; (for each)
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    │
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    ▼
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>Instances boot → slurmd starts → registers with slurmctld
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    │
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    ▼
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>SLURM clears POWERING_UP → nodes become IDLE → jobs scheduled
 </code></pre></div>
 <p><strong>Timing considerations:</strong></p>
 <table>
