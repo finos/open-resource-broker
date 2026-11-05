@@ -459,6 +459,6 @@ jobs:
     uses: ./.github/workflows/reusable-security.yml
     with:
       scan-type: codeql
-      enabled: ${{ (github.event_name == 'pull_request' && (needs.changes.result != 'success' || needs.changes.outputs.relevant == 'true')) || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || contains(github.event.head_commit.message, '[security]') }}
+      enabled: ${{ (github.event_name == 'pull_request' && (needs.changes.result != 'success' || needs.changes.outputs.relevant == 'true')) || github.event_name == 'merge_group' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || contains(github.event.head_commit.message, '[security]') }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       python-version: ${{ needs.config.outputs.default-python-version }}
