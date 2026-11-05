@@ -61,15 +61,62 @@ Resolve the ServiceAccount name.
 {{- end }}
 
 {{/*
-Fail the render for unsupported storage and replica combinations.
+True when the storage backend keeps state in files under /app/data.
+*/}}
+{{- define "orb.localStorage" -}}
+{{- if has .Values.storage.type (list "json" "sqlite") }}true{{ end }}
+{{- end }}
+
+{{/*
+Final list of Host header values the API accepts, as a JSON array. Loopback, the
+Service DNS names, ingress hosts and server.trustedHosts are merged here, and the
+wildcard "*" is rejected whatever its source, because it switches Host header
+validation off. Wildcard subdomains such as "*.example.com" are allowed.
+*/}}
+{{- define "orb.trustedHosts" -}}
+{{- $fullname := include "orb.fullname" . }}
+{{- $hosts := list "localhost" "127.0.0.1" "::1" $fullname (printf "%s.%s" $fullname .Release.Namespace) (printf "%s.%s.svc" $fullname .Release.Namespace) (printf "%s.%s.svc.cluster.local" $fullname .Release.Namespace) }}
+{{- range .Values.ingress.hosts }}{{ $hosts = append $hosts (toString .host) }}{{ end }}
+{{- range .Values.server.trustedHosts }}{{ $hosts = append $hosts (toString .) }}{{ end }}
+{{- $final := list }}
+{{- range $hosts }}
+{{- $host := trim . }}
+{{- if eq $host "*" }}
+{{- fail "the trusted host list contains \"*\", which disables Host header validation: remove it from server.trustedHosts and ingress.hosts (use an explicit host name or a subdomain wildcard such as *.example.com)" }}
+{{- end }}
+{{- $final = append $final $host }}
+{{- end }}
+{{- $final | uniq | toJson }}
+{{- end }}
+
+{{/*
+Fail the render for unsupported combinations.
 */}}
 {{- define "orb.validate" -}}
-{{- if not (has .Values.storage.type (list "json" "sqlite")) }}
-{{- fail (printf "storage.type must be json or sqlite, got %q" (toString .Values.storage.type)) }}
+{{- if not (has .Values.storage.type (list "json" "sqlite" "sql" "dynamodb")) }}
+{{- fail (printf "storage.type must be json, sqlite or dynamodb, got %q" (toString .Values.storage.type)) }}
+{{- end }}
+{{- if eq .Values.storage.type "sql" }}
+{{- fail "SQL storage via the chart requires an ORB image with PostgreSQL driver support; use json, sqlite or dynamodb" }}
+{{- end }}
+{{- if and (eq .Values.storage.type "dynamodb") (ne .Values.provider.type "aws") }}
+{{- fail "storage.type=dynamodb requires provider.type=aws: the table settings live in the AWS provider configuration" }}
 {{- end }}
 {{- if gt (int .Values.replicaCount) 1 }}
+{{- if include "orb.localStorage" . }}
 {{- fail (printf "replicaCount=%d is not supported with storage.type=%s: json and sqlite storage allow a single writer. Use replicaCount: 1." (int .Values.replicaCount) .Values.storage.type) }}
 {{- end }}
+{{- fail (printf "replicaCount=%d is not supported yet with storage.type=%s: concurrent writers are not safe until the shared storage detects conflicting writes. Use replicaCount: 1." (int .Values.replicaCount) .Values.storage.type) }}
+{{- end }}
+{{- if and (include "orb.localStorage" .) .Values.storage.persistence.enabled (has (toString .Values.storage.persistence.accessMode) (list "ReadWriteMany" "ReadOnlyMany")) }}
+{{- fail (printf "storage.persistence.accessMode=%s is not supported with %s storage: a single writer needs a ReadWriteOnce block volume, not a network filesystem" .Values.storage.persistence.accessMode .Values.storage.type) }}
+{{- end }}
+{{- range (default (list) .Values.extraEnv) }}
+{{- if regexMatch "(?i)trusted_?hosts" (toString (default "" .name)) }}
+{{- fail (printf "extraEnv must not set %s: configure server.trustedHosts instead so the wildcard check applies" .name) }}
+{{- end }}
+{{- end }}
+{{- $_ := include "orb.trustedHosts" . }}
 {{- if and .Values.auth.enabled (eq .Values.auth.strategy "none") }}
 {{- fail "auth.enabled is true but auth.strategy is none: set auth.strategy to bearer_token or disable auth" }}
 {{- end }}

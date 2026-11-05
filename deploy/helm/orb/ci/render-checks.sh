@@ -109,6 +109,38 @@ case "$(cluster_rules <<<"$out")" in *nodes*) fail "wildcard without node watch 
 out=$(render "${tag[@]}" --set provider.type=aws --set rbac.clusterScoped=true)
 expect_eq "aws rbac" "$(rbac_objects <<<"$out")" ""
 
+# Storage backends. SQL is refused until the image has a PostgreSQL driver.
+expect_reject "requires an ORB image with PostgreSQL driver support" "${tag[@]}" --set storage.type=sql
+expect_reject "requires an ORB image with PostgreSQL driver support" "${tag[@]}" --skip-schema-validation --set storage.type=sql
+expect_reject "requires provider.type=aws" "${tag[@]}" --set storage.type=dynamodb
+dynamo=(--set provider.type=aws --set storage.type=dynamodb)
+expect_reject "replicaCount=2" "${tag[@]}" "${dynamo[@]}" --set replicaCount=2
+out=$(render "${tag[@]}" "${dynamo[@]}")
+expect_eq "no PVC for dynamodb" "$(yq -N 'select(.kind == "PersistentVolumeClaim") | .kind' <<<"$out")" ""
+expect_eq "dynamodb strategy" "$(yq 'select(.kind == "ConfigMap") | .data["docker.json"]' <<<"$out" | jq -r .storage.strategy)" "dynamodb"
+expect_eq "dynamodb table prefix" \
+    "$(yq 'select(.kind == "ConfigMap") | .data["docker.json"]' <<<"$out" | jq -r '.provider.providers[0].config.storage.dynamodb.table_prefix')" "orb"
+expect_eq "json keeps its PVC" \
+    "$(render "${tag[@]}" | yq -N 'select(.kind == "PersistentVolumeClaim") | .kind')" "PersistentVolumeClaim"
+
+# ReadWriteMany is refused for file storage, also when schema validation is skipped.
+expect_reject "storage/persistence/accessMode" "${tag[@]}" --set storage.persistence.accessMode=ReadWriteMany
+expect_reject "ReadWriteMany" "${tag[@]}" --skip-schema-validation --set storage.persistence.accessMode=ReadWriteMany
+expect_reject "ReadWriteMany" "${tag[@]}" --skip-schema-validation --set storage.type=sqlite --set storage.persistence.accessMode=ReadWriteMany
+
+# The wildcard host is refused on the final rendered list, from every source.
+expect_reject "server/trustedHosts/0" "${tag[@]}" --set 'server.trustedHosts[0]=*'
+expect_reject "trusted host list contains" "${tag[@]}" --skip-schema-validation --set 'server.trustedHosts[0]=*'
+expect_reject "trusted host list contains" "${tag[@]}" --skip-schema-validation --set 'server.trustedHosts[0]= * '
+expect_reject "trusted host list contains" "${tag[@]}" --set ingress.enabled=true --set 'ingress.hosts[0].host=*'
+expect_reject "trusted host list contains" "${tag[@]}" --skip-schema-validation --set ingress.enabled=true --set 'ingress.hosts[0].host=*'
+expect_reject "must not set" "${tag[@]}" --set 'extraEnv[0].name=HF_SERVER_TRUSTED_HOSTS' --set 'extraEnv[0].value=*'
+expect_reject "must not set" "${tag[@]}" --set 'extraEnv[0].name=ORB_SERVER_TRUSTED_HOSTS' \
+    --set 'extraEnv[0].valueFrom.secretKeyRef.name=s' --set 'extraEnv[0].valueFrom.secretKeyRef.key=k'
+out=$(render "${tag[@]}" --set 'server.trustedHosts[0]=*.example.com' \
+    | yq 'select(.kind == "ConfigMap") | .data["docker.json"]' | jq -c '.server.trusted_hosts')
+case "$out" in *'"*.example.com"'*) ;; *) fail "subdomain wildcard host must be kept: $out" ;; esac
+
 if [ "$failures" -ne 0 ]; then
     echo "$failures render check(s) failed" >&2
     exit 1

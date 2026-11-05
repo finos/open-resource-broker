@@ -148,7 +148,10 @@
         "trustedHosts": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "not": {
+              "const": "*"
+            }
           }
         }
       }
@@ -221,7 +224,9 @@
         "type": {
           "enum": [
             "json",
-            "sqlite"
+            "sqlite",
+            "sql",
+            "dynamodb"
           ]
         },
         "persistence": {
@@ -249,6 +254,19 @@
             },
             "annotations": {
               "type": "object"
+            }
+          }
+        },
+        "dynamodb": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tablePrefix": {
+              "type": "string",
+              "minLength": 1
+            },
+            "region": {
+              "type": "string"
             }
           }
         }

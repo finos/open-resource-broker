@@ -23,14 +23,19 @@ helm upgrade orb ./deploy/helm/orb --namespace orb -f my-values.yaml
 writable path under the read-only root filesystem. The chart therefore does not default the tag
 to its `appVersion`.
 
+## Publishing
+
+Releases publish the chart to `oci://ghcr.io/finos/charts/orb` (`helm install orb
+oci://ghcr.io/finos/charts/orb --version <version> --set image.tag=<version>`).
+
 ## Key Values
 
 | Value | Default | Description |
 |---|---|---|
 | `image.repository` | `ghcr.io/finos/open-resource-broker` | Container image |
 | `image.tag` | `""` (required) | Image tag; must be newer than 1.9.2 |
-| `replicaCount` | `1` | Pod replicas; must be 1 with `json` or `sqlite` storage |
-| `storage.type` | `json` | `json` or `sqlite` |
+| `replicaCount` | `1` | Pod replicas; the chart refuses to render more than 1 |
+| `storage.type` | `json` | `json`, `sqlite` or `dynamodb` (`sql` is not available yet) |
 | `storage.persistence.enabled` | `true` | Keep `/app/data` on a PersistentVolumeClaim |
 | `storage.persistence.size` | `1Gi` | Claim size |
 | `storage.persistence.existingClaim` | `""` | Use a claim you manage |
@@ -108,7 +113,10 @@ The chart refuses to render `namespaces: ["*"]` or `nodeWatchEnabled: true` with
 `json` and `sqlite` store state in files under `/app/data` and support a single writer. The chart
 therefore:
 
-- renders `replicaCount` greater than 1 as an error,
+- renders `replicaCount` greater than 1 as an error (for every backend, until shared storage detects
+  conflicting writes),
+- rejects `ReadWriteMany` volumes: the single-writer guarantee needs `ReadWriteOnce` block storage,
+  not a network filesystem,
 - uses the `Recreate` update strategy so the old pod releases the volume before the new one starts,
 - mounts a PersistentVolumeClaim at `/app/data` and annotates it `helm.sh/resource-policy: keep`
   so `helm uninstall` does not delete request and machine data.
@@ -193,12 +201,29 @@ write to the volume.
 
 Writable paths are `/app/data` (volume), `/app/logs`, `/app/tmp`, `/app/work` and `/tmp` (`emptyDir`).
 
+### DynamoDB (`storage.type: dynamodb`)
+
+Requires `provider.type: aws`. Set `storage.dynamodb.tablePrefix` and optionally `region`, and grant
+table access to the pod through `serviceAccount.annotations` (IRSA). There is no PVC: `/app/data`
+is an `emptyDir` for scratch files and nothing in it is authoritative. `replicaCount` stays at 1.
+
+### PostgreSQL
+
+`storage.type: sql` is refused ("SQL storage via the chart requires an ORB image with PostgreSQL
+driver support") until the image ships a PostgreSQL driver and applies TLS and credential settings
+itself.
+
 ## Trusted Hosts
 
 The server rejects requests whose `Host` header is not trusted with a 400. Loopback addresses,
 the Service DNS names and the `ingress.hosts` entries are always trusted. Requests that address
 the pod or a node by IP, such as Prometheus scraping pods by IP or `NodePort` and `LoadBalancer`
 access, need those addresses or names added to `server.trustedHosts`.
+
+The wildcard `*` turns Host header validation off, so the chart refuses to render it from any
+source (`server.trustedHosts`, `ingress.hosts`), also with `--skip-schema-validation`, and
+`extraEnv` may not set a trusted-hosts variable. Subdomain wildcards such as `*.example.com` are
+allowed.
 
 ## /metrics Caveat (Multi-Worker)
 

@@ -1,8 +1,9 @@
 # Default values for orb.
 # Override with: helm install orb ./deploy/helm/orb -f my-values.yaml
 
-# -- Number of REST server replicas. Must stay 1 with json or sqlite storage
-# (the chart refuses to render otherwise); see the README storage section.
+# -- Number of REST server replicas. Must stay 1: the chart refuses to render
+# more until the shared storage supports concurrent writers; see the README
+# storage section.
 replicaCount: 1
 
 image:
@@ -110,6 +111,7 @@ server:
   serverLogLevel: "info"
   # -- Extra Host header values the API accepts. Loopback, the Service DNS names
   # and ingress.hosts are always allowed; the kubelet probes send Host: localhost.
+  # The wildcard "*" is rejected wherever it comes from; "*.example.com" is fine.
   trustedHosts: []
 
 auth:
@@ -147,8 +149,10 @@ provider:
     profile: ""
 
 storage:
-  # -- Storage backend: json or sqlite. Both keep state in files under /app/data
-  # and are single-writer; see the README storage section.
+  # -- Storage backend: json, sqlite or dynamodb. json and sqlite keep state in
+  # files under /app/data and are single-writer; dynamodb keeps it outside the
+  # pod. sql is refused until the image ships a PostgreSQL driver. See the
+  # README storage section.
   type: "json"
   persistence:
     # -- Keep /app/data on a PersistentVolumeClaim. When false the data directory
@@ -158,12 +162,21 @@ storage:
     size: 1Gi
     # -- StorageClass of the claim. Empty uses the cluster default.
     storageClass: ""
-    # -- Access mode of the claim. Keep ReadWriteOnce: only one pod may write.
+    # -- Access mode of the claim. Keep ReadWriteOnce: only one pod may write, and
+    # ReadWriteMany is rejected because the single-writer guarantee needs block storage.
     accessMode: ReadWriteOnce
     # -- Use an existing claim instead of creating one.
     existingClaim: ""
     # -- Extra annotations for the created claim.
     annotations: {}
+
+  # DynamoDB tables, used when storage.type is dynamodb (requires provider.type aws).
+  # Credentials come from IRSA through serviceAccount.annotations.
+  dynamodb:
+    # -- Table name prefix.
+    tablePrefix: orb
+    # -- Region; defaults to provider.aws.region.
+    region: ""
 
 ui:
   # -- How the web UI is served. Selects the health probe paths and the

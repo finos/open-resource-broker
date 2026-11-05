@@ -34,6 +34,14 @@ data:
               {{- if .Values.provider.aws.profile }},
               "profile": {{ .Values.provider.aws.profile | quote }}
               {{- end }}
+              {{- if eq .Values.storage.type "dynamodb" }},
+              "storage": {
+                "dynamodb": {
+                  "table_prefix": {{ .Values.storage.dynamodb.tablePrefix | quote }},
+                  "region": {{ default .Values.provider.aws.region .Values.storage.dynamodb.region | quote }}
+                }
+              }
+              {{- end }}
               {{- end }}
             }
           }
@@ -48,6 +56,8 @@ data:
           "type": "sqlite",
           "name": "/app/data/database.db"
         }
+        {{- else if eq .Values.storage.type "dynamodb" }}
+        "strategy": "dynamodb"
         {{- else }}
         "strategy": "json",
         "json_strategy": {
@@ -69,11 +79,7 @@ data:
         "port": {{ .Values.server.port }},
         "workers": {{ .Values.server.workers }},
         {{- /* Probes and in-cluster clients address the pod by IP or Service name; ingress hosts and extra names come from values. */}}
-        {{- $fullname := include "orb.fullname" . }}
-        {{- $hosts := list "localhost" "127.0.0.1" "::1" $fullname (printf "%s.%s" $fullname .Release.Namespace) (printf "%s.%s.svc" $fullname .Release.Namespace) (printf "%s.%s.svc.cluster.local" $fullname .Release.Namespace) }}
-        {{- range .Values.ingress.hosts }}{{ $hosts = append $hosts .host }}{{ end }}
-        {{- range .Values.server.trustedHosts }}{{ $hosts = append $hosts . }}{{ end }}
-        "trusted_hosts": {{ $hosts | uniq | toJson }},
+        "trusted_hosts": {{ include "orb.trustedHosts" . }},
         "auth": {
           "enabled": {{ .Values.auth.enabled }},
           "strategy": {{ .Values.auth.strategy | quote }}
