@@ -287,6 +287,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         strategy_class: Optional[type] = None,
         default_api: Optional[str] = None,
         display_name: Optional[str] = None,
+        strategy_class_loader: Optional[Callable[[], type]] = None,
         **kwargs: Any,
     ) -> None:
         """Register provider type - implements abstract method."""
@@ -300,6 +301,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
                 strategy_class=strategy_class,
                 default_api=default_api,
                 display_name=display_name,
+                strategy_class_loader=strategy_class_loader,
             )
         except ValueError as e:
             raise ConfigurationError(str(e))
@@ -358,6 +360,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         strategy_class: Optional[type] = None,
         default_api: Optional[str] = None,
         display_name: Optional[str] = None,
+        strategy_class_loader: Optional[Callable[[], type]] = None,
     ) -> None:
         """
         Register a provider with its factory functions - backward compatibility method.
@@ -371,6 +374,8 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             strategy_class: Optional provider strategy class
             default_api: Optional default API name contributed by this provider
             display_name: Optional human-readable name for this provider
+            strategy_class_loader: Optional callable returning the strategy class,
+                used to defer importing the provider SDK until it is needed
 
         Raises:
             ValueError: If provider_type is already registered
@@ -384,6 +389,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             strategy_class=strategy_class,
             default_api=default_api,
             display_name=display_name,
+            strategy_class_loader=strategy_class_loader,
         )
 
     def register_provider_instance(
@@ -697,6 +703,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             strategy_class=additional_factories.get("strategy_class"),
             default_api=additional_factories.get("default_api"),
             display_name=additional_factories.get("display_name"),
+            strategy_class_loader=additional_factories.get("strategy_class_loader"),
         )
 
     @staticmethod

@@ -351,7 +351,7 @@ class ProviderPlugin(ABC):
                     config_factory=self.config_factory(),
                     resolver_factory=self.resolver_factory(),
                     validator_factory=self.validator_factory(),
-                    strategy_class=self.strategy_class(),
+                    strategy_class_loader=self.strategy_class,
                     default_api=self.default_api(),
                     display_name=self.display_name(),
                 )
