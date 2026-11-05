@@ -36,18 +36,10 @@ from tests.integration.storage.test_handler_conflict_retry import (  # noqa: F40
 )
 
 LOOPS = ["update-status", "cancel", "complete", "deadline-sweep"]
-# Loops that publish while the unit of work is still open: on a backend whose
-# conflict surfaces at commit, the retry publishes the same event again
-_PUBLISH_INSIDE_THE_UNIT_OF_WORK = {"update-status", "cancel", "deadline-sweep"}
 
 
 @pytest.fixture(params=LOOPS)
 def loop(request, make_uow):  # noqa: F811
-    backend = request.node.callspec.params["make_uow"]
-    if request.param in _PUBLISH_INSIDE_THE_UNIT_OF_WORK and backend in ("json", "dynamodb"):
-        request.applymarker(
-            pytest.mark.xfail(strict=True, reason="event publishing moves after commit")
-        )
     return request.param
 
 
