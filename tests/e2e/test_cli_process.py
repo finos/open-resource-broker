@@ -116,8 +116,7 @@ def test_templates_list_prints_configured_templates(orb_home: Path) -> None:
 def test_status_of_unknown_request_reports_not_found(orb_home: Path) -> None:
     result = _run_orb(orb_home, "requests", "status", UNKNOWN_REQUEST)
 
-    # Exit status 0 for an unknown id is current behaviour, tracked in #731.
-    assert result.returncode == 0, result.stderr
+    assert result.returncode != 0
     entry = _json_from(result.stdout)["requests"][0]
     assert entry["request_id"] == UNKNOWN_REQUEST
     assert entry["not_found"] is True
@@ -129,7 +128,7 @@ def test_cancel_of_unknown_request_fails(orb_home: Path) -> None:
     assert result.returncode != 0
     error = _json_from(result.stderr)
     assert error["error"] is True
-    assert error["type"] == "EntityNotFoundError"
+    assert error["type"] == "RequestNotFoundError"
     assert UNKNOWN_REQUEST in error["message"]
 
 
