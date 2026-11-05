@@ -175,10 +175,8 @@ class RequestReconciler:
         _, pending = await asyncio.wait({task}, timeout=grace_seconds)
         if pending:
             task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+            # The cancelled task's CancelledError is collected, not raised.
+            await asyncio.gather(task, return_exceptions=True)
         self._logger.info("Background request reconciliation stopped")
 
     async def _run(self) -> None:
