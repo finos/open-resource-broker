@@ -4533,6 +4533,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#paging-through-long-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paging through long lists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#hostfactory-compatibility" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7235,6 +7246,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#paging-through-long-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paging through long lists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#hostfactory-compatibility" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8539,6 +8561,10 @@
 </tr>
 </tbody>
 </table>
+<h3 id="paging-through-long-lists">Paging through long lists<a class="headerlink" href="#paging-through-long-lists" title="Permanent link">&para;</a></h3>
+<p><code>machines list</code>, <code>requests list</code> and <code>requests list-returns</code> (and the REST and SDK list calls) return a <code>next_cursor</code> when more results remain; in the <code>table</code> and <code>list</code> formats the CLI prints it on stderr as <code>next cursor: &lt;token&gt;</code>. Pass it back with <code>--cursor</code> (only these three commands accept it; it overrides <code>--offset</code>) to get the next page.</p>
+<p>A cursor continues after the last row of the previous page, ordered by the sort value and the id. Rows added or removed elsewhere in the list between pages therefore do not cause repeats or gaps, as long as the sort value of the rows already returned does not change (a row whose status or launch time changes between pages can still move). A cursor is only valid for the filters and sort it was issued for; a malformed cursor or one from a different query is rejected instead of silently starting over. Cursors from earlier releases keep working.</p>
+<p>With SQL storage the database filters, orders and cuts the page for plain equality filters (status, provider type, and for machines the request, for requests the template, request type and provider name) when sorting by a status, id or creation time column; sorting machines by <code>launch_time</code> (the default) is done in the database on SQLite only. With JSON or DynamoDB storage, with other dialects or sorts, and for <code>q</code> or <code>--filter</code> expressions, every page still loads and sorts the full result set, so paging there does not reduce memory or latency. The total count of a database page still scans the filtered rows, so the saving is memory rather than time.</p>
 <h3 id="hostfactory-compatibility">HostFactory Compatibility<a class="headerlink" href="#hostfactory-compatibility" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
