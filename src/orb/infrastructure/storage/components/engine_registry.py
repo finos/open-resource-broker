@@ -13,6 +13,7 @@ without closing the parent's sockets, so the child builds its own on first use.
 from __future__ import annotations
 
 import atexit
+import contextlib
 import os
 import threading
 from typing import Any, Callable, Union
@@ -83,10 +84,9 @@ def _forget_inherited_engines() -> None:
     engines = list(_engines.values())
     _engines.clear()
     for engine in engines:
-        try:
+        # Nothing useful to do about a failure in a fresh child
+        with contextlib.suppress(Exception):
             engine.dispose(close=False)
-        except Exception:  # noqa: BLE001  # nothing useful to do in a fresh child
-            pass
 
 
 def _release_after_fork_in_child() -> None:
