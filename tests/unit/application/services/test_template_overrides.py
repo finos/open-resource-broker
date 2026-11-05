@@ -68,6 +68,11 @@ class TestApplyTemplateOverrides:
         with pytest.raises(RequestValidationError, match="price_type"):
             apply_template_overrides(_template(), {"price_type": "bogus"})
 
+    @pytest.mark.parametrize("price_type", [["spot"], {"a": 1}, 3, None])
+    def test_non_string_price_type_rejected(self, price_type):
+        with pytest.raises(RequestValidationError, match="price_type"):
+            apply_template_overrides(_template(), {"price_type": price_type})
+
     @pytest.mark.parametrize("price_type", ["ondemand", "spot", "heterogeneous"])
     def test_known_price_types_accepted(self, price_type):
         out = apply_template_overrides(_template(), {"price_type": price_type})

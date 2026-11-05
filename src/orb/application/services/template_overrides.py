@@ -112,7 +112,9 @@ def apply_template_overrides(template: Any, overrides: dict[str, Any]) -> Any:
     if empty:
         raise RequestValidationError(f"Template overrides may not be empty: {', '.join(empty)}")
 
-    if "price_type" in normalized and normalized["price_type"] not in _PRICE_TYPES:
+    if "price_type" in normalized and not (
+        isinstance(normalized["price_type"], str) and normalized["price_type"] in _PRICE_TYPES
+    ):
         raise RequestValidationError(
             f"Invalid template override 'price_type': {normalized['price_type']!r}. "
             f"Allowed: {', '.join(sorted(_PRICE_TYPES))}"
