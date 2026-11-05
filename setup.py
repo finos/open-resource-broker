@@ -22,6 +22,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import tempfile
 
 from setuptools import setup
 from setuptools.command.build_py import build_py as _build_py
@@ -48,7 +49,11 @@ class build_py(_build_py):  # noqa: N801 — must match setuptools' command name
         # build_py only copies files into build/lib; it never removes ones that
         # have since been deleted from src/, so a leftover build/ directory would
         # ship removed modules. Start from an empty build_lib every time.
-        shutil.rmtree(self.build_lib, ignore_errors=True)
+        # Only ever delete a directory inside <repo>/build or a temp dir.
+        build_lib = pathlib.Path(self.build_lib).resolve()
+        allowed = (_PROJECT_ROOT / "build", pathlib.Path(tempfile.gettempdir()).resolve())
+        if any(build_lib.is_relative_to(root) and build_lib != root for root in allowed):
+            shutil.rmtree(build_lib, ignore_errors=True)
         super().run()
 
 

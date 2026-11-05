@@ -41,6 +41,8 @@ def _build_command() -> list[str] | None:
 def wheel_names(tmp_path_factory) -> set[str]:
     cmd = _build_command()
     if cmd is None:
+        if os.environ.get("CI"):
+            pytest.fail("uv or the build package must be available in CI to build the wheel")
         pytest.skip("uv or the build package is required to build the wheel")
     outdir = tmp_path_factory.mktemp("wheel")
     env = {**os.environ, "ORB_SKIP_UI_BUILD": "1"}
@@ -56,7 +58,6 @@ def wheel_names(tmp_path_factory) -> set[str]:
         return set(zf.namelist())
 
 
-@pytest.mark.slow
 def test_runtime_data_files_are_in_wheel(wheel_names):
     expected = [
         "orb/providers/aws/specs/launch-template/default.json",
@@ -65,11 +66,13 @@ def test_runtime_data_files_are_in_wheel(wheel_names):
         "orb/providers/k8s/config/k8s_defaults.json",
         "orb/config/default_config.json",
         "orb/infrastructure/storage/sql/migrations/alembic.ini",
+        "orb/infrastructure/scheduler/hostfactory/scripts/invoke_provider.sh",
+        "orb/infrastructure/scheduler/hostfactory/scripts/invoke_provider.bat",
+        "orb/infrastructure/scheduler/slurm/scripts/resumeProgram.sh",
     ]
     assert [n for n in expected if n not in wheel_names] == []
 
 
-@pytest.mark.slow
 def test_every_tracked_data_file_is_in_wheel(wheel_names):
     missing = []
     for path in _tracked_package_files():
@@ -83,7 +86,6 @@ def test_every_tracked_data_file_is_in_wheel(wheel_names):
     assert missing == []
 
 
-@pytest.mark.slow
 def test_wheel_has_no_modules_absent_from_src(wheel_names):
     stale = [
         n
