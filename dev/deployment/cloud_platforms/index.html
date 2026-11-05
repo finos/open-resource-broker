@@ -6250,10 +6250,12 @@
 <h2 id="kubernetes-deployment">Kubernetes Deployment<a class="headerlink" href="#kubernetes-deployment" title="Permanent link">&para;</a></h2>
 <h3 id="helm-chart">Helm Chart<a class="headerlink" href="#helm-chart" title="Permanent link">&para;</a></h3>
 <p>The chart in <code>deploy/helm/orb</code> is the supported way to run the REST server on Kubernetes.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>helm<span class="w"> </span>install<span class="w"> </span>orb<span class="w"> </span>./deploy/helm/orb<span class="w"> </span>--namespace<span class="w"> </span>orb<span class="w"> </span>--create-namespace
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>helm<span class="w"> </span>install<span class="w"> </span>orb<span class="w"> </span>./deploy/helm/orb<span class="w"> </span>--namespace<span class="w"> </span>orb<span class="w"> </span>--create-namespace<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--set<span class="w"> </span>image.tag<span class="o">=</span>&lt;version&gt;
 </code></pre></div>
-<p>By default it runs a single replica with JSON storage on a PersistentVolumeClaim, uses the
-<code>k8s</code> provider and serves the API and embedded UI under <code>/orb</code>. See
+<p><code>image.tag</code> is required and must name an image newer than 1.9.2. By default the chart runs a
+single replica with JSON storage on a PersistentVolumeClaim, uses the <code>k8s</code> provider in the
+release namespace and serves the API and embedded UI under <code>/orb</code>. See
 <a href="https://github.com/finos/open-resource-broker/blob/main/deploy/helm/orb/README.md">deploy/helm/orb/README.md</a>
 for all values.</p>
 <p>Points that matter in production:</p>
