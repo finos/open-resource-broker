@@ -213,7 +213,16 @@ class RequestStatusManagementService:
             request.requested_count,
             has_api_errors,
             provider_errors,
-            fulfillment_final=provisioning_result.is_final,
+            fulfillment_final=provisioning_result.is_final
+            and not self._has_unsettled_instances(instances),
+        )
+
+    @staticmethod
+    def _has_unsettled_instances(instances: Any) -> bool:
+        """True when any returned instance is still pending or launching."""
+        return any(
+            isinstance(i, dict) and str(i.get("status", "")).lower() in {"pending", "launching"}
+            for i in instances or []
         )
 
     def _merge_provider_diagnostic(self, request: Any, provider_data: Any) -> Any:
