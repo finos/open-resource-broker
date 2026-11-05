@@ -133,3 +133,146 @@ class TestTerminateSkippingMissing:
 
         with pytest.raises(ClientError):
             terminate_skipping_missing(terminate, ["i-a"])
+
+
+class TestExactIdMatching:
+    def test_prefix_of_another_id_is_not_treated_as_unknown(self):
+        # "i-1" is a substring of the unknown "i-10" but is a different, existing instance.
+        ec2 = FakeEC2(existing={"i-1"})
+        result = terminate_skipping_missing(
+            lambda ids: ec2.terminate_instances(InstanceIds=ids), ["i-1", "i-10"]
+        )
+        assert result["already_terminated"] == ["i-10"]
+        assert [i["InstanceId"] for i in result["TerminatingInstances"]] == ["i-1"]
+        assert ec2.existing == {"i-1"}
+
+    def test_tokens_are_whole_ids(self):
+        from orb.providers.aws.utilities.terminate_instances import instance_ids_in_message
+
+        assert instance_ids_in_message("The instance IDs 'i-1, i-22' do not exist") == {
+            "i-1",
+            "i-22",
+        }
+
+
+class TestRegionGuard:
+    def test_wrong_region_raises(self):
+        from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+        from orb.providers.aws.utilities.terminate_instances import (
+            ensure_machines_in_client_region,
+        )
+
+        coordinates = {"i-a": {"provider_data": {"region": "us-east-1"}}}
+        with pytest.raises(AWSInfrastructureError, match="us-east-1"):
+            ensure_machines_in_client_region(coordinates, "eu-west-2")
+
+    def test_matching_or_unrecorded_region_passes(self):
+        from orb.providers.aws.utilities.terminate_instances import (
+            ensure_machines_in_client_region,
+        )
+
+        ensure_machines_in_client_region(
+            {
+                "i-a": {"provider_data": {"region": "eu-west-2"}},
+                "i-b": {"provider_data": {}},
+                "i-c": {},
+            },
+            "eu-west-2",
+        )
+
+    def test_service_refuses_terminate_in_wrong_region(self):
+        from orb.providers.aws.services.instance_operation_service import (
+            AWSInstanceOperationService,
+        )
+        from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
+
+        client = MagicMock()
+        client.region_name = "eu-west-2"
+        service = AWSInstanceOperationService(client, MagicMock(), MagicMock(), MagicMock())
+        operation = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "instance_ids": ["i-a"],
+                "machine_coordinates": {"i-a": {"provider_data": {"region": "us-east-1"}}},
+            },
+        )
+        result = service.terminate_instances(operation)
+
+        assert not result.success
+        client.ec2_client.terminate_instances.assert_not_called()
+
+
+class TestRecentlyLaunched:
+    def test_recent_ids_are_selected(self):
+        from datetime import datetime, timedelta, timezone
+
+        from orb.providers.aws.utilities.terminate_instances import recently_launched_ids
+
+        now = datetime.now(timezone.utc)
+        coordinates = {
+            "i-new": {"launched_at": (now - timedelta(seconds=5)).isoformat()},
+            "i-old": {"launched_at": (now - timedelta(minutes=10)).isoformat()},
+            "i-unknown": {"launched_at": None},
+        }
+        assert recently_launched_ids(coordinates, now=now) == ["i-new"]
+
+    def test_young_instance_is_retried_until_visible_then_terminated(self):
+        from orb.providers.aws.utilities.terminate_instances import wait_until_visible
+
+        calls = {"n": 0}
+
+        class Late:
+            def describe_instances(self, InstanceIds: list[str]) -> dict[str, Any]:
+                calls["n"] += 1
+                if calls["n"] < 3:
+                    raise _not_found(*InstanceIds)
+                return {}
+
+        sleeps: list[float] = []
+        wait_until_visible(Late(), ["i-new"], attempts=5, delay=2.0, sleep=sleeps.append)
+        assert calls["n"] == 3
+        assert sleeps == [2.0, 2.0]
+
+    def test_wait_is_bounded_then_not_found_is_trusted(self):
+        from orb.providers.aws.utilities.terminate_instances import wait_until_visible
+
+        ec2 = FakeEC2(existing=set())
+        sleeps: list[float] = []
+
+        class Never:
+            def describe_instances(self, InstanceIds: list[str]) -> dict[str, Any]:
+                raise _not_found(*InstanceIds)
+
+        wait_until_visible(Never(), ["i-new"], attempts=5, delay=2.0, sleep=sleeps.append)
+        assert len(sleeps) == 4
+        result = terminate_skipping_missing(
+            lambda ids: ec2.terminate_instances(InstanceIds=ids), ["i-new"]
+        )
+        assert result["already_terminated"] == ["i-new"]
+
+    def test_service_waits_for_young_machines_before_terminating(self, monkeypatch):
+        from datetime import datetime, timezone
+
+        from orb.providers.aws.services import instance_operation_service as module
+        from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
+
+        waited: list[list[str]] = []
+        monkeypatch.setattr(module, "wait_until_visible", lambda _ec2, ids: waited.append(ids))
+        client = MagicMock()
+        client.region_name = "eu-west-2"
+        client.ec2_client.terminate_instances.return_value = {"TerminatingInstances": []}
+        adapter = MagicMock()
+        service = module.AWSInstanceOperationService(client, MagicMock(), adapter, MagicMock())
+        operation = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "instance_ids": ["i-new"],
+                "machine_coordinates": {
+                    "i-new": {"launched_at": datetime.now(timezone.utc).isoformat()}
+                },
+            },
+        )
+        service.terminate_instances(operation)
+
+        assert waited == [["i-new"]]
+        adapter.release_resources.assert_called_once()
