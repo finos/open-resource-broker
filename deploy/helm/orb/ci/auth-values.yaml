@@ -1,0 +1,10 @@
+auth:
+  enabled: true
+  strategy: bearer_token
+  existingSecret: orb-auth
+rbac:
+  clusterScoped: true
+provider:
+  k8s:
+    namespaces: ["*"]
+    nodeWatchEnabled: true

@@ -110,7 +110,7 @@ def test_get_slurm_client_propagates_injected_logger_to_rest_client(monkeypatch)
 
 # ---------------------------------------------------------------------------
 # expand_node_range — exposed via SchedulerPort instead of importing
-# SlurmNodeMapper directly from infrastructure (open-resource-broker-2706.7)
+# hostlist helpers directly from infrastructure
 # ---------------------------------------------------------------------------
 
 
@@ -127,18 +127,6 @@ def test_expand_node_range_space_separated_list(strategy):
         "compute-001",
         "compute-002",
     ]
-
-
-def test_expand_node_range_delegates_to_node_mapper(strategy, monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        strategy.node_mapper, "expand_node_range", lambda spec: calls.append(spec) or ["x"]
-    )
-
-    result = strategy.expand_node_range("compute-[001-003]")
-
-    assert calls == ["compute-[001-003]"]
-    assert result == ["x"]
 
 
 def test_scheduler_port_default_expand_node_range_splits_whitespace():
@@ -450,46 +438,3 @@ def test_format_machine_details_response_prefers_template_id_as_partition(strate
 
     assert result["partition"] == "compute"
     assert result["node_name"] == "compute-001"
-
-
-# ---------------------------------------------------------------------------
-# register_provisioned_nodes
-# ---------------------------------------------------------------------------
-
-
-def test_register_provisioned_nodes_registers_mapping_and_address(strategy, monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        "orb.infrastructure.scheduler.slurm.node_bootstrap.SlurmNodeBootstrap.register_node_address",
-        lambda self, node_name, ip_address, hostname=None: (
-            calls.append((node_name, ip_address)) or True
-        ),
-    )
-
-    strategy.register_provisioned_nodes(
-        [{"node_name": "compute-001", "machine_id": "i-abc123", "ip_address": "10.0.0.5"}]
-    )
-
-    assert strategy.node_mapper.get_machine_id("compute-001") == "i-abc123"
-    assert calls == [("compute-001", "10.0.0.5")]
-
-
-def test_register_provisioned_nodes_handles_address_registration_failure(strategy, monkeypatch):
-    monkeypatch.setattr(
-        "orb.infrastructure.scheduler.slurm.node_bootstrap.SlurmNodeBootstrap.register_node_address",
-        lambda self, node_name, ip_address, hostname=None: False,
-    )
-
-    # Should not raise even though address registration reports failure.
-    strategy.register_provisioned_nodes(
-        [{"node_name": "compute-002", "machine_id": "i-def456", "ip_address": "10.0.0.6"}]
-    )
-
-    assert strategy.node_mapper.get_machine_id("compute-002") == "i-def456"
-
-
-def test_register_provisioned_nodes_skips_entries_missing_required_fields(strategy):
-    # No node_name/machine_id → nothing registered, no exception.
-    strategy.register_provisioned_nodes([{"ip_address": "10.0.0.7"}])
-
-    assert strategy.node_mapper.get_all_mappings() == {}

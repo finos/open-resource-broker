@@ -1,0 +1,24 @@
+{{- if and .Values.storage.persistence.enabled (not .Values.storage.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "orb.claimName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "orb.labels" . | nindent 4 }}
+  annotations:
+    # Uninstalling the release must never delete request and machine state.
+    helm.sh/resource-policy: keep
+    {{- with .Values.storage.persistence.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.storage.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.persistence.size }}
+  {{- with .Values.storage.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}

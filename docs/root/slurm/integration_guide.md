@@ -116,6 +116,8 @@ Configure these environment variables for ORB's Slurm integration
 | `SLURM_ORB_LOG_DIR` | ORB log directory | `/var/log/orb` |
 | `SLURM_ORB_MODE` | `cli` or `api` | `cli` |
 | `SLURM_ORB_API_URL` | ORB API URL (for api mode) | `http://localhost:8000` |
+| `SLURM_ORB_ADDR_POLL_TIMEOUT` | Seconds to wait for node addresses after the request is submitted; keep below `ResumeTimeout`. On timeout the script exits 0 and slurmd self-registers | `120` |
+| `SLURM_ORB_ADDR_POLL_INTERVAL` | Seconds between request status polls | `5` |
 | `SLURM_ORB_RESTD_URL` | slurmrestd URL (for health checks) | Not set |
 | `SLURM_ORB_JWT_TOKEN` | JWT token for slurmrestd auth | Not set |
 | `SLURM_ORB_RESTD_ALLOW_HTTP` | Allow plain `http://` for `SLURM_ORB_RESTD_URL` on a non-loopback host (not recommended) | `0` (rejected) |
@@ -257,7 +259,8 @@ ResumeProgram (N nodes, single batch)
 ORB batch provisions N fresh EC2 instances
     │
     ▼
-resumeProgram.sh calls: scontrol update NodeAddr=<IP> (for each)
+resumeProgram.sh polls the request status until addresses are assigned,
+then calls: scontrol update NodeAddr=<IP> (for each)
     │
     ▼
 Instances boot → slurmd starts → registers with slurmctld

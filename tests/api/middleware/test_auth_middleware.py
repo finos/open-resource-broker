@@ -536,3 +536,54 @@ class TestLoopbackTokenNonAscii:
         asyncio.run(mw._dispatch(request, fake_call_next))
         # State must NOT have been stamped with loopback-admin
         assert stamped.get("user_id") is None
+
+
+def _make_mounted_app(mount_path: str) -> FastAPI:
+    """API app with auth enforced, mounted under a prefix like the embedded UI does."""
+    api = FastAPI()
+    api.add_middleware(
+        AuthMiddleware,
+        auth_port=_make_auth_port(authenticated=False),
+        excluded_paths=["/livez", "/readyz"],
+        require_auth=True,
+    )
+
+    @api.get("/livez")
+    def livez():
+        return {"status": "alive"}
+
+    @api.get("/readyz")
+    def readyz():
+        return {"status": "ready"}
+
+    @api.get("/api/v1/machines")
+    def machines():
+        return {"machines": []}
+
+    root = FastAPI()
+    root.mount(mount_path, api)
+    return root
+
+
+class TestAuthMiddlewareMountedApp:
+    """Excluded paths must match relative to the mount point of the API app."""
+
+    def test_probes_are_public_under_mount_prefix(self):
+        client = TestClient(_make_mounted_app("/orb"))
+        assert client.get("/orb/livez").status_code == 200
+        assert client.get("/orb/readyz").status_code == 200
+
+    def test_protected_routes_still_require_auth_under_mount_prefix(self):
+        client = TestClient(_make_mounted_app("/orb"))
+        assert client.get("/orb/api/v1/machines").status_code == 401
+
+    def test_prefix_does_not_widen_exclusions(self):
+        client = TestClient(_make_mounted_app("/orb"))
+        # A probe name nested inside a protected path is not excluded.
+        assert client.get("/orb/api/v1/livez").status_code in (401, 404)
+        assert client.get("/orb/api/v1/machines/../machines").status_code == 401
+
+    def test_unmounted_app_is_unchanged(self):
+        api = _make_mounted_app("/orb")
+        client = TestClient(api)
+        assert client.get("/livez").status_code == 404

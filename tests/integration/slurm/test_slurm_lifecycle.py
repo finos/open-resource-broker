@@ -8,7 +8,7 @@ import uuid
 
 import pytest
 
-from orb.infrastructure.scheduler.slurm.node_mapper import SlurmNodeMapper
+from orb.infrastructure.scheduler.slurm.hostlist import expand_node_range
 from orb.infrastructure.scheduler.slurm.slurm_strategy import SlurmSchedulerStrategy
 from orb.infrastructure.template.dtos import TemplateDTO
 
@@ -18,7 +18,7 @@ class MockSlurmAppService:
 
     def __init__(self):
         self._strategy = SlurmSchedulerStrategy()
-        self._node_mapper = SlurmNodeMapper()
+        self._node_to_machine: dict[str, str] = {}
         self._requests: dict[str, dict] = {}
         self._templates = [
             TemplateDTO(
@@ -54,7 +54,7 @@ class MockSlurmAppService:
         machines = []
         for node_name in node_names:
             machine_id = f"i-{uuid.uuid4().hex[:12]}"
-            self._node_mapper.register_mapping(node_name, machine_id)
+            self._node_to_machine[node_name] = machine_id
             machines.append(
                 {
                     "machine_id": machine_id,
@@ -85,7 +85,7 @@ class MockSlurmAppService:
         req_id = f"ret-{uuid.uuid4()}"
         machines = []
         for node_name in node_names:
-            machine_id = self._node_mapper.get_machine_id(node_name)
+            machine_id = self._node_to_machine.get(node_name)
             if machine_id:
                 machines.append(
                     {
@@ -95,7 +95,7 @@ class MockSlurmAppService:
                         "result": "succeed",
                     }
                 )
-                self._node_mapper.remove_mapping(node_name)
+                self._node_to_machine.pop(node_name, None)
 
         self._requests[req_id] = {
             "request_id": req_id,
@@ -153,36 +153,6 @@ def test_suspend_unknown_nodes_fails_gracefully(slurm_app):
     assert resp["status"] == "complete"
 
 
-@pytest.mark.integration
-def test_node_mapper_ephemeral_per_cycle(slurm_app):
-    """Mappings are ephemeral — cleared on suspend (dynamic slot model)."""
-    slurm_app.resume_nodes(["ephemeral-node-1"], "compute-partition")
-    machine_id = slurm_app._node_mapper.get_machine_id("ephemeral-node-1")
-    assert machine_id is not None
-    assert machine_id.startswith("i-")
-
-    # Suspend clears the mapping
-    resp = slurm_app.suspend_nodes(["ephemeral-node-1"])
-    assert resp["status"] == "complete"
-    assert slurm_app._node_mapper.get_machine_id("ephemeral-node-1") is None
-
-
-@pytest.mark.integration
-def test_resume_same_nodes_gets_fresh_instances(slurm_app):
-    """Resume→suspend→resume same nodes gets different machine_ids (no reuse)."""
-    # First cycle
-    slurm_app.resume_nodes(["fresh-node-1"], "compute-partition")
-    first_id = slurm_app._node_mapper.get_machine_id("fresh-node-1")
-    assert first_id is not None
-    slurm_app.suspend_nodes(["fresh-node-1"])
-
-    # Second cycle — must get a different instance
-    slurm_app.resume_nodes(["fresh-node-1"], "compute-partition")
-    second_id = slurm_app._node_mapper.get_machine_id("fresh-node-1")
-    assert second_id is not None
-    assert second_id != first_id  # Fresh instance, not reused
-
-
 # ---------------------------------------------------------------------------
 # Response format tests
 # ---------------------------------------------------------------------------
@@ -210,30 +180,23 @@ def test_templates_response_structure(slurm_app):
 
 
 # ---------------------------------------------------------------------------
-# Node mapper integration tests
+# Hostlist expansion integration tests
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.integration
 def test_node_range_expansion_in_resume(slurm_app):
     """Resume with expanded node range processes correct count."""
-    node_names = SlurmNodeMapper.expand_node_range("compute-[001-003]")
+    node_names = expand_node_range("compute-[001-003]")
     resp = slurm_app.resume_nodes(node_names, "compute-partition")
     assert resp["status"] == "complete"
-    # All 3 nodes should be mapped
-    for name in ["compute-001", "compute-002", "compute-003"]:
-        assert slurm_app._node_mapper.get_machine_id(name) is not None
+    assert node_names == ["compute-001", "compute-002", "compute-003"]
 
 
 @pytest.mark.integration
 def test_multiple_resume_suspend_cycles(slurm_app):
-    """Multiple cycles don't corrupt state."""
+    """Multiple cycles complete cleanly."""
     for i in range(3):
         nodes = [f"cycle-node-{i}"]
-        slurm_app.resume_nodes(nodes, "gpu-partition")
-        assert slurm_app._node_mapper.get_machine_id(f"cycle-node-{i}") is not None
-        slurm_app.suspend_nodes(nodes)
-        assert slurm_app._node_mapper.get_machine_id(f"cycle-node-{i}") is None
-
-    # State should be clean
-    assert slurm_app._node_mapper.get_all_mappings() == {}
+        assert slurm_app.resume_nodes(nodes, "gpu-partition")["status"] == "complete"
+        assert slurm_app.suspend_nodes(nodes)["status"] == "complete"

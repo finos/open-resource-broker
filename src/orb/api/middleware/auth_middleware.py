@@ -76,8 +76,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Response from downstream handlers
         """
-        # Normalize request path for comparison
-        normalized_path = self._normalize_path(request.url.path)
+        # Normalize request path for comparison. When the app is mounted under a
+        # prefix (embedded UI mounts it at /orb) the full path still carries that
+        # prefix, so drop the mount point before matching the excluded paths.
+        normalized_path = self._normalize_path(self._strip_mount_prefix(request))
 
         # Skip authentication for excluded paths (exact match only)
         if self._is_excluded_path(normalized_path):
@@ -168,6 +170,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Remove any remaining .. or . components
         parts = [p for p in normalized.split("/") if p and p not in (".", "..")]
         return "/" + "/".join(parts) if parts else "/"
+
+    @staticmethod
+    def _strip_mount_prefix(request: Request) -> str:
+        """Return the request path relative to the ASGI mount point (``root_path``)."""
+        path = request.url.path
+        root_path = request.scope.get("root_path", "").rstrip("/")
+        if root_path and (path == root_path or path.startswith(root_path + "/")):
+            return path[len(root_path) :] or "/"
+        return path
 
     def _is_excluded_path(self, normalized_path: str) -> bool:
         """

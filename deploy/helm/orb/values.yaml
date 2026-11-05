@@ -1,0 +1,225 @@
+# Default values for orb.
+# Override with: helm install orb ./deploy/helm/orb -f my-values.yaml
+
+# -- Number of REST server replicas. Must stay 1 with json or sqlite storage
+# (the chart refuses to render otherwise); see the README storage section.
+replicaCount: 1
+
+image:
+  # -- Container image repository.
+  repository: ghcr.io/finos/open-resource-broker
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+  # -- Image tag. Defaults to chart appVersion.
+  tag: ""
+
+# -- Image pull secrets for private registries.
+imagePullSecrets: []
+
+# -- Override the chart name.
+nameOverride: ""
+# -- Override the fully-qualified app name.
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Create a dedicated ServiceAccount for the pod.
+  create: true
+  # -- Annotations to add to the ServiceAccount (e.g. EKS IRSA, GKE Workload Identity).
+  annotations: {}
+  # -- Override the generated SA name.
+  name: ""
+  # automountServiceAccountToken is intentionally absent from the ServiceAccount so that
+  # the pod-level setting (controlled by provider.type) takes effect. The SA token is
+  # mounted only when provider.type=k8s.
+
+rbac:
+  # -- Create Role/RoleBinding (namespaced) for the k8s provider.
+  create: true
+  # -- Also create a ClusterRole/ClusterRoleBinding for cluster-scoped watch
+  # (required when provider.k8s.namespaces is ["*"] or node_watch_enabled is true).
+  clusterScoped: false
+
+service:
+  # -- Kubernetes Service type.
+  type: ClusterIP
+  # -- REST API port exposed by the Service.
+  port: 8000
+  # -- Annotations to add to the Service.
+  annotations: {}
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# -- Node selector for pod scheduling.
+nodeSelector: {}
+
+# -- Tolerations for pod scheduling.
+tolerations: []
+
+# -- Affinity rules for pod scheduling.
+affinity: {}
+
+# -- Additional pod annotations.
+podAnnotations: {}
+
+# -- Additional pod labels.
+podLabels: {}
+
+# -- Pod security context. The numeric ids must match the user baked into the
+# image (the Dockerfile creates a system user with `useradd -r`, which receives
+# uid/gid 999 on the python:slim base). fsGroup makes the PVC writable by that user.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 999
+  runAsGroup: 999
+  fsGroup: 999
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container security context.
+securityContext:
+  allowPrivilegeEscalation: false
+  # The root filesystem is read-only. Writable paths are /app/data (PVC or
+  # emptyDir), /app/logs, /app/tmp, /app/work and /tmp (emptyDir).
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# -- Seconds the pod gets to shut down after SIGTERM.
+terminationGracePeriodSeconds: 45
+
+# ORB server configuration
+server:
+  # -- REST API listen host.
+  host: "0.0.0.0"
+  # -- REST API listen port (must match service.port).
+  port: 8000
+  # -- Number of uvicorn workers. >1 causes per-process /metrics; see README.
+  workers: 1
+  # -- Log level (DEBUG, INFO, WARNING, ERROR).
+  logLevel: "INFO"
+  # -- Uvicorn log level (debug, info, warning, error, critical).
+  serverLogLevel: "info"
+  # -- Extra Host header values the API accepts. Loopback, the Service DNS names
+  # and ingress.hosts are always allowed; the kubelet probes send Host: localhost.
+  trustedHosts: []
+
+auth:
+  # -- Enable authentication on the API. Probe paths stay public.
+  enabled: false
+  # -- Authentication strategy: none or bearer_token. The iam and cognito
+  # strategies need provider-specific settings the chart does not render yet.
+  strategy: "none"
+  # -- Name of an existing Secret holding the JWT signing key (at least 32
+  # bytes). Required when strategy is bearer_token. The key is passed to the
+  # server in an environment variable and never written to the ConfigMap.
+  existingSecret: ""
+  # -- Key within that Secret.
+  existingSecretKey: "secret-key"
+
+provider:
+  # -- Active provider type: k8s or aws.
+  type: "k8s"
+
+  k8s:
+    # -- Kubernetes namespaces to watch. Use ["*"] for cluster-scoped watch
+    # (requires rbac.clusterScoped: true).
+    namespaces:
+      - default
+    # -- Enable per-node metadata cache (requires nodes get/list/watch —
+    # automatically included when rbac.clusterScoped is true).
+    nodeWatchEnabled: false
+
+  aws:
+    # -- AWS region (used when provider.type is aws).
+    region: "us-east-1"
+    # -- AWS profile name (optional; prefer IRSA/instance profiles in-cluster).
+    profile: ""
+
+storage:
+  # -- Storage backend: json or sqlite. Both keep state in files under /app/data
+  # and are single-writer; see the README storage section.
+  type: "json"
+  persistence:
+    # -- Keep /app/data on a PersistentVolumeClaim. When false the data directory
+    # is an emptyDir and all requests and machines are lost when the pod restarts.
+    enabled: true
+    # -- Size of the claim created by the chart.
+    size: 1Gi
+    # -- StorageClass of the claim. Empty uses the cluster default.
+    storageClass: ""
+    # -- Access mode of the claim. Keep ReadWriteOnce: only one pod may write.
+    accessMode: ReadWriteOnce
+    # -- Use an existing claim instead of creating one.
+    existingClaim: ""
+    # -- Extra annotations for the created claim.
+    annotations: {}
+
+ui:
+  # -- How the web UI is served. Selects the health probe paths and the
+  # `ui` block of the generated config.
+  #   embedded: API and UI in one process, API mounted under /orb (default image behaviour)
+  #   split:    API only; the UI is served elsewhere
+  #   disabled: API only, no UI
+  mode: embedded
+
+probes:
+  # -- Replaces the computed path of all three probes when set. Prefer leaving
+  # it empty: the defaults are /livez (liveness, startup) and /readyz (readiness),
+  # prefixed with /orb in embedded UI mode.
+  pathOverride: ""
+  liveness:
+    # -- Path override for this probe only.
+    path: ""
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    path: ""
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  startup:
+    path: ""
+    periodSeconds: 5
+    timeoutSeconds: 5
+    # Allows up to periodSeconds * failureThreshold for the first start.
+    failureThreshold: 60
+
+ingress:
+  # -- Create an Ingress for the Service.
+  enabled: false
+  # -- IngressClass name.
+  className: ""
+  # -- Ingress annotations (cert-manager issuers, controller options).
+  annotations: {}
+  # -- Hosts and paths. Paths default to "/" routed to the ORB Service. In embedded
+  # mode the API is served at /orb/api/v1 and the UI at /orb. A path may carry
+  # `serviceName` and `servicePort` to route it to a different Service, for
+  # example an externally hosted UI in split mode.
+  hosts: []
+  # - host: orb.example.com
+  #   paths:
+  #     - path: /
+  #       pathType: Prefix
+  # -- TLS termination at the ingress. The pod itself serves plain HTTP.
+  tls: []
+  # - secretName: orb-tls
+  #   hosts:
+  #     - orb.example.com
+
+# -- Extra environment variables injected into the container.
+# Useful for AWS_ROLE_ARN, KUBECONFIG overrides, etc.
+extraEnv: []
+# - name: AWS_ROLE_ARN
+#   value: "arn:aws:iam::123456789012:role/orb-role"
+
+# -- Mount extra volumes (e.g. AWS credentials, custom CA bundles).
+extraVolumes: []
+extraVolumeMounts: []
