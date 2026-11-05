@@ -200,7 +200,7 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
             # Without this, a fleet that still counts an instance that is already
             # terminating picks an extra instance to terminate when the target
             # drops, and the maintain fleet then launches a replacement.
-            ExcessCapacityTerminationPolicy="NoTermination",
+            ExcessCapacityTerminationPolicy="noTermination",
         )
 
     def _read_target_capacities(

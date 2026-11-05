@@ -186,7 +186,7 @@ class TestSpotFleetReduction:
         manager.release("sfr-1", ["i-1"], _spot_fleet("maintain", 3))
 
         kwargs = ec2.modify_spot_fleet_request.call_args.kwargs
-        assert kwargs["ExcessCapacityTerminationPolicy"] == "NoTermination"
+        assert kwargs["ExcessCapacityTerminationPolicy"] == "noTermination"
         assert kwargs["TargetCapacity"] == 2
 
     def test_targets_are_re_read_immediately_before_the_modify(self):

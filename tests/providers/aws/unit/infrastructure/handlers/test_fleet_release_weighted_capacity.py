@@ -528,7 +528,7 @@ class TestSpotFleetReleaseWeighted:
             SpotFleetRequestId="sfr-weighted",
             TargetCapacity=0,
             OnDemandTargetCapacity=0,
-            ExcessCapacityTerminationPolicy="NoTermination",
+            ExcessCapacityTerminationPolicy="noTermination",
         )
 
     def test_partial_spot_release_uses_weighted_sum(self):
@@ -565,7 +565,7 @@ class TestSpotFleetReleaseWeighted:
             SpotFleetRequestId="sfr-partial",
             TargetCapacity=4,
             OnDemandTargetCapacity=0,
-            ExcessCapacityTerminationPolicy="NoTermination",
+            ExcessCapacityTerminationPolicy="noTermination",
         )
 
     def test_request_fleet_partial_return_does_not_cancel_on_empty_describe_response(self):
