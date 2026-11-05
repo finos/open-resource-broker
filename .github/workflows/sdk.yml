@@ -303,7 +303,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Set up Gradle
         if: matrix.lang == 'java' || matrix.lang == 'kotlin'
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
         with:
           gradle-version: current
           # Only used once to regenerate the wrapper launcher; no build to cache.
@@ -345,7 +345,7 @@ jobs:
 
       - name: Validate Gradle wrapper checksum
         if: matrix.lang == 'java' || matrix.lang == 'kotlin'
-        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+        uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
 
       - name: Set up Go
         if: matrix.lang == 'go'
