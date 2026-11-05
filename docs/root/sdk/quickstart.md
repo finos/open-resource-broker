@@ -24,7 +24,7 @@ pip install orb-py
 ```python
 from orb import ORBClient as orb
 
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     # List available templates
     result = await sdk.list_templates(active_only=True)
     templates = result.get("templates", result) if isinstance(result, dict) else result
@@ -45,7 +45,7 @@ async with orb(provider="aws") as sdk:
 The SDK provides CLI-equivalent convenience methods for common operations:
 
 ```python
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     # CLI: orb machines request <template_id> <count>
     request = await sdk.request_machines("template-id", 5)
     
@@ -66,7 +66,7 @@ These convenience methods map to the underlying CQRS methods:
 ```python
 from orb import ORBClient as orb
 
-sdk = orb(provider="aws")
+sdk = orb(provider_type="aws")
 await sdk.initialize()
 
 try:
@@ -95,7 +95,7 @@ When no config arguments are passed, the SDK reads `ORB_*` environment variables
 
 ```python
 async with orb() as sdk:
-    # provider=aws, timeout=300, log_level=INFO (or whatever ORB_* vars are set)
+    # timeout=300, log_level=INFO (or whatever ORB_* vars are set)
     templates = await sdk.list_templates()
 ```
 
@@ -104,7 +104,7 @@ async with orb() as sdk:
 All SDK-level settings can be set via environment variables:
 
 ```bash
-export ORB_PROVIDER=aws
+export ORB_PROVIDER_TYPE=aws
 export ORB_REGION=us-east-1
 export ORB_PROFILE=default
 export ORB_TIMEOUT=300
@@ -121,7 +121,6 @@ Pass SDK-level settings as a dict. These control the SDK's own behaviour — tim
 
 ```python
 config = {
-    "provider": "aws",
     "region": "us-west-2",
     "timeout": 600,
     "log_level": "DEBUG",
@@ -214,13 +213,13 @@ For users familiar with the CLI, the SDK provides both convenience methods and d
 
 ```python
 # CLI-style convenience methods (shorter, familiar to CLI users)
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     template = await sdk.show_template("my-template")
     request = await sdk.request_machines("my-template", 3)
     health = await sdk.health_check()
 
 # CQRS methods (more explicit, full parameter control)
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     template = await sdk.get_template(template_id="my-template")
     request = await sdk.create_request(template_id="my-template", count=3, timeout=1800)
     health = await sdk.get_provider_health()
@@ -231,7 +230,7 @@ async with orb(provider="aws") as sdk:
 The SDK automatically discovers all available methods from the existing CQRS handlers:
 
 ```python
-async with orb(provider="mock") as sdk:
+async with orb() as sdk:
     # List all available methods
     methods = sdk.list_available_methods()
     print(f"Available methods: {methods}")
@@ -270,7 +269,7 @@ async def provision_machines(client: ORBClientProtocol, template_id: str, count:
 ### Template Management
 
 ```python
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     # List all templates
     templates = await sdk.list_templates()
 
@@ -306,7 +305,7 @@ async with orb(provider="aws") as sdk:
 ### Machine Provisioning
 
 ```python
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     # Create machine request
     request = await sdk.create_request(template_id="basic-template", count=3, timeout=1800)
 
@@ -323,7 +322,7 @@ async with orb(provider="aws") as sdk:
 ### Request Management
 
 ```python
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     # List active requests
     requests = await sdk.list_active_requests()
 
@@ -334,7 +333,7 @@ async with orb(provider="aws") as sdk:
 ### Provider Operations
 
 ```python
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     # Check provider health
     health = await sdk.get_provider_health()
 
@@ -351,7 +350,7 @@ async with orb(provider="aws") as sdk:
 ### System Operations
 
 ```python
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     # Get system status
     status = await sdk.get_system_status()
 ```
@@ -363,7 +362,7 @@ from orb import ORBClient as orb
 from orb.sdk.exceptions import SDKError, ConfigurationError, ProviderError
 
 try:
-    async with orb(provider="aws") as sdk:
+    async with orb(provider_type="aws") as sdk:
         templates = await sdk.list_templates()
 except ConfigurationError as e:
     print(f"Configuration error: {e}")
@@ -398,7 +397,7 @@ class LoggingMiddleware(SDKMiddleware):
         return result
 
 
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     sdk.add_middleware(LoggingMiddleware())
     templates = await sdk.list_templates()
 ```
@@ -406,7 +405,7 @@ async with orb(provider="aws") as sdk:
 ### Batch Operations
 
 ```python
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     # Create multiple machines in different regions
     results = await sdk.batch(
         [
@@ -449,7 +448,7 @@ All SDK methods accept optional serialization parameters:
 > **Note:** `format=` and `raw_response=` only apply to CQRS-discovered methods (e.g. `list_active_requests`, `get_request`). The 14 explicit orchestrator-backed methods (`list_templates`, `request_machines`, `return_machines`, etc.) accept these kwargs but ignore them silently.
 
 ```python
-async with orb(provider="aws") as sdk:
+async with orb(provider_type="aws") as sdk:
     # Raw handler result — no dict conversion applied
     raw_data = await sdk.list_active_requests(raw_response=True)
 

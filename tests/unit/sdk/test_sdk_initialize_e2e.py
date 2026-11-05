@@ -56,7 +56,7 @@ class TestInitializeWithRealDiscovery:
     @pytest.mark.asyncio
     async def test_initialize_discovers_cqrs_methods(self):
         """initialize() calls discover_cqrs_methods and populates _methods."""
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         discovered = {"list_templates": AsyncMock(), "create_request": AsyncMock()}
 
         mock_app, mock_disc = _make_app_mocks(discovered)
@@ -75,7 +75,7 @@ class TestInitializeWithRealDiscovery:
     @pytest.mark.asyncio
     async def test_initialize_sets_methods_as_attributes(self):
         """initialize() attaches discovered methods as instance attributes."""
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         discovered = {"list_templates": AsyncMock(), "get_request": AsyncMock()}
 
         mock_app, mock_disc = _make_app_mocks(discovered)
@@ -92,7 +92,7 @@ class TestInitializeWithRealDiscovery:
     @pytest.mark.asyncio
     async def test_initialize_idempotent(self):
         """Calling initialize() twice returns True without re-running discovery."""
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         mock_app, mock_disc = _make_app_mocks()
         with (
             patch("orb.sdk.client.Application", return_value=mock_app),
@@ -132,7 +132,7 @@ class TestSDKConfigFromEnv:
         for var in ("ORB_PROVIDER", "ORB_TIMEOUT", "ORB_LOG_LEVEL"):
             monkeypatch.delenv(var, raising=False)
         cfg = SDKConfig.from_env()
-        assert cfg.provider == "aws"
+        assert cfg.provider is None
         assert cfg.timeout == 300
         assert cfg.log_level == "INFO"
 
@@ -157,7 +157,7 @@ class TestGetMethodParameters:
         """get_method_parameters returns a dict for a method with MethodInfo."""
         from orb.sdk.discovery import MethodInfo
 
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         mock_method_info = MethodInfo(
             name="list_templates",
             description="List Templates - Query operation",
@@ -187,12 +187,12 @@ class TestGetMethodParameters:
         assert isinstance(params, dict)
 
     def test_get_method_parameters_raises_when_not_initialized(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError, match="not initialized"):
             sdk.get_method_parameters("list_templates")
 
     def test_get_method_parameters_returns_none_for_unknown_method(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         sdk._initialized = True
         sdk._discovery = MagicMock()
         sdk._discovery.get_method_info.return_value = None
@@ -209,7 +209,7 @@ class TestSDKErrorWrapping:
     @pytest.mark.asyncio
     async def test_initialize_wraps_generic_exception_as_sdk_error(self):
         """A generic exception from Application is wrapped in SDKError."""
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with patch("orb.sdk.client.Application", side_effect=ValueError("unexpected")):
             with pytest.raises(SDKError, match="SDK initialization failed"):
                 await sdk.initialize()
@@ -217,7 +217,7 @@ class TestSDKErrorWrapping:
     @pytest.mark.asyncio
     async def test_initialize_wraps_system_exit_as_configuration_error(self):
         """SystemExit from Application is wrapped in ConfigurationError."""
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with patch("orb.sdk.client.Application", side_effect=SystemExit(1)):
             with pytest.raises(ConfigurationError):
                 await sdk.initialize()
@@ -225,7 +225,7 @@ class TestSDKErrorWrapping:
     @pytest.mark.asyncio
     async def test_initialize_raises_provider_error_when_app_init_fails(self):
         """ProviderError raised when Application.initialize() returns False."""
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         mock_app = MagicMock()
         mock_app.initialize = AsyncMock(return_value=False)
         with (
@@ -238,7 +238,7 @@ class TestSDKErrorWrapping:
     @pytest.mark.asyncio
     async def test_initialize_raises_configuration_error_when_buses_none(self):
         """ConfigurationError raised when buses are not available."""
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         mock_app = MagicMock()
         mock_app.initialize = AsyncMock(return_value=True)
         mock_app.get_query_bus.return_value = None
@@ -270,7 +270,7 @@ class TestGetStats:
         """get_stats() method counts match what was discovered."""
         from orb.sdk.discovery import MethodInfo
 
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
 
         query_info = MethodInfo(
             name="list_templates",
@@ -317,7 +317,7 @@ class TestGetStats:
         assert "create_request" in stats["available_methods"]
 
     def test_get_stats_before_initialize(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         stats = sdk.get_stats()
         assert stats["initialized"] is False
         assert stats["methods_discovered"] == 0
@@ -332,7 +332,7 @@ class TestCleanup:
     @pytest.mark.asyncio
     async def test_cleanup_removes_dynamic_attributes(self):
         """cleanup() removes attributes that were set by initialize()."""
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         discovered = {"list_templates": AsyncMock(), "create_request": AsyncMock()}
 
         mock_app, mock_disc = _make_app_mocks(discovered)
@@ -357,7 +357,7 @@ class TestCleanup:
     @pytest.mark.asyncio
     async def test_cleanup_resets_methods_dict(self):
         """cleanup() clears _methods dict."""
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         discovered = {"list_templates": AsyncMock()}
 
         mock_app, mock_disc = _make_app_mocks(discovered)
@@ -376,7 +376,7 @@ class TestCleanup:
     @pytest.mark.asyncio
     async def test_context_manager_cleans_up_on_exit(self):
         """Async context manager calls cleanup on exit."""
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         discovered = {"list_templates": AsyncMock()}
 
         mock_app, mock_disc = _make_app_mocks(discovered)

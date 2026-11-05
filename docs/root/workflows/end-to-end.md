@@ -112,13 +112,13 @@ The SDK supports four initialization modes:
 ```python
 from orb import ORBClient as orb
 
-# Mode 1 — default: reads env vars (ORB_CONFIG_FILE, ORB_PROVIDER, ORB_REGION, …)
+# Mode 1 — default: reads env vars (ORB_CONFIG_FILE, ORB_PROVIDER_TYPE, ORB_REGION, …)
 #           or built-in defaults
 async with orb() as sdk:
     ...
 
-# Mode 2 — SDK config dict: tune provider, region, timeout, log_level, etc.
-async with orb(config={"provider": "aws", "region": "us-west-2"}) as sdk:
+# Mode 2 — SDK config dict: tune region, timeout, log_level, etc.
+async with orb(config={"region": "us-west-2"}) as sdk:
     ...
 
 # Mode 3 — config file on disk

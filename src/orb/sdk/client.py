@@ -45,7 +45,7 @@ class ORBClient:
     principles and full integration with the existing system.
 
     Usage:
-        async with ORBClient(provider="aws") as sdk:
+        async with ORBClient(provider_type="aws") as sdk:
             templates = await sdk.list_templates(active_only=True)
             request = await sdk.create_request(template_id="basic", count=5)
             status = await sdk.get_request_status(request_id=request.id)
@@ -77,7 +77,8 @@ class ORBClient:
         Initialise the Open Resource Broker SDK.
 
         Args:
-            provider: Cloud provider type (aws, mock, etc.). Defaults to value from config/env.
+            provider: **Deprecated and ignored.** The provider comes from the template;
+                      use ``provider_type`` / ``provider_name`` to narrow selection.
             config: SDK configuration dictionary (timeout, log_level, etc.)
             config_path: Path to configuration file
             app_config: Application config dict — replaces config.json on disk.
@@ -127,6 +128,9 @@ class ORBClient:
 
         # Override with explicit parameters
         if provider is not None:
+            from .config import warn_provider_deprecated
+
+            warn_provider_deprecated(stacklevel=3)
             self._config.provider = provider
         if scheduler is not None:
             self._config.scheduler = scheduler
@@ -215,8 +219,8 @@ class ORBClient:
 
             if not await self._app.initialize(dry_run=self._config.dry_run):
                 raise ProviderError(
-                    f"Failed to initialize {self._config.provider} provider",
-                    provider=self._config.provider,
+                    f"Failed to initialize {self._config.provider_type or 'configured'} provider",
+                    provider=self._config.provider_type,
                 )
 
             # Get CQRS buses directly from the initialized application
@@ -399,8 +403,28 @@ class ORBClient:
     # Configuration and status methods
     @property
     def provider(self) -> Optional[str]:
-        """Get the configured provider type."""
-        return self._config.provider
+        """Get the provider setting.
+
+        Returns the deprecated ``provider`` value when the caller set one
+        (emitting a ``DeprecationWarning``), otherwise ``provider_type``.
+        """
+        if self._config.provider is not None:
+            import warnings
+
+            warnings.warn(
+                "ORBClient.provider returns the deprecated 'provider' setting, which "
+                "is ignored; read config.provider_type instead. It will be removed "
+                "in the next minor release.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        return self._reported_provider()
+
+    def _reported_provider(self) -> Optional[str]:
+        """Provider value for display: the caller's legacy setting, else provider_type."""
+        if self._config.provider is not None:
+            return self._config.provider
+        return self._config.provider_type
 
     @property
     def initialized(self) -> bool:
@@ -422,7 +446,8 @@ class ORBClient:
         if not self._initialized:
             return {
                 "initialized": False,
-                "provider": self._config.provider,
+                "provider": self._reported_provider(),
+                "provider_type": self._config.provider_type,
                 "methods_discovered": 0,
             }
 
@@ -431,7 +456,8 @@ class ORBClient:
 
         return {
             "initialized": True,
-            "provider": self._config.provider,
+            "provider": self._reported_provider(),
+            "provider_type": self._config.provider_type,
             "methods_discovered": len(self._methods),
             "command_methods": len(command_methods),
             "query_methods": len(query_methods),
@@ -539,10 +565,36 @@ class ORBClient:
         result = await orchestrator.execute(dto)
         return entry.renderer_for(Interface.SDK)(formatter, result).data
 
-    async def request_machines(self, template_id: str, count: int, **kwargs) -> dict:
+    async def request_machines(
+        self,
+        template_id: str,
+        count: int,
+        *,
+        overrides: "dict[str, Any] | None" = None,
+        **kwargs,
+    ) -> dict:
         """Request machines via AcquireMachinesOrchestrator.
 
         Equivalent to: orb machines request <template_id> <count>
+
+        Args:
+            template_id: Template to provision from.
+            count: Number of machines to request.
+            overrides: Per-request adjustments to the template, applied for this
+                request only; the stored template is not modified. Allowed keys:
+                ``subnet_ids``, ``security_group_ids``, ``machine_types``,
+                ``machine_types_ondemand``, ``machine_types_priority``,
+                ``price_type``, ``max_price``, ``network_zones``,
+                ``public_ip_assignment`` and ``tags`` (merged over the template
+                tags). ``subnet_ids``, ``security_group_ids`` and
+                ``machine_types`` may not be empty, ``price_type`` must be a
+                known price type, and tags must be strings outside the
+                reserved ``orb:`` and ``aws:`` prefixes. ``network_zones`` only
+                takes effect on providers that place machines by zone (GCP).
+                Identity, credential and bootstrap fields (for example
+                ``machine_role``, ``machine_ssh_key``, ``machine_bootstrap``)
+                cannot be overridden, and unknown keys are rejected.
+            **kwargs: ``wait``, ``timeout_seconds``, ``additional_data``.
         """
         if not self._initialized:
             raise SDKError("SDK not initialized. Use as async context manager.")
@@ -558,6 +610,7 @@ class ORBClient:
                 wait=kwargs.get("wait", False),
                 timeout_seconds=kwargs.get("timeout_seconds", 300),
                 additional_data=kwargs.get("additional_data", {}),
+                template_overrides=dict(overrides or {}),
             ),
         )
 
@@ -1241,7 +1294,7 @@ class ORBClient:
         """Return string representation of SDK instance."""
         status = "initialized" if self._initialized else "not initialized"
         method_count = len(self._methods) if self._initialized else 0
-        return f"ORBClient(provider='{self._config.provider}', status='{status}', methods={method_count})"
+        return f"ORBClient(provider_type='{self._config.provider_type}', status='{status}', methods={method_count})"
 
 
 # Backward-compatible aliases

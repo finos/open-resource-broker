@@ -32,7 +32,7 @@ from orb.sdk.exceptions import NotFoundError, SDKError
 
 
 def _make_client(**kwargs) -> ORBClient:
-    return ORBClient(config={"provider": "mock", **kwargs})
+    return ORBClient(config={"provider_type": "mock", **kwargs})
 
 
 def _initialized_client() -> ORBClient:
@@ -90,7 +90,7 @@ class TestInitializeConfigPathMissing:
         # SDKConfig.from_file raises at construction time, but we can test
         # the initialize() guard path by providing config_path via the config dict
         # and having the file absent at initialize() time.
-        client = ORBClient(config={"provider": "mock"})
+        client = ORBClient(config={"provider_type": "mock"})
         client._config.config_path = str(tmp_path / "nonexistent_config.json")
 
         with pytest.raises(ConfigurationError, match="Configuration file not found"):

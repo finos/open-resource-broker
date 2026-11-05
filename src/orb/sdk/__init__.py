@@ -39,7 +39,7 @@ Supported Mappings:
 Usage:
     from orb import orb
 
-    async with orb(provider="aws") as client:
+    async with orb(provider_type="aws") as client:
         templates = await client.list_templates(active_only=True)
         # Both parameter styles work:
         request1 = await client.create_request(template_id="basic", count=5)

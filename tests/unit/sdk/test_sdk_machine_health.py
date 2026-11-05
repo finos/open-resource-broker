@@ -9,7 +9,7 @@ from orb.sdk.exceptions import NotFoundError, SDKError
 
 
 def _initialized_sdk() -> ORBClient:
-    sdk = ORBClient(config={"provider": "aws"})
+    sdk = ORBClient(config={"provider_type": "aws"})
     sdk._initialized = True
     sdk._container = MagicMock()
     return sdk
@@ -73,6 +73,6 @@ class TestGetMachineHealth:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_not_initialized_raises(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError):
             await sdk.get_machine_health(machine_id="m-1")

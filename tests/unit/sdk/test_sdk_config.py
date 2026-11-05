@@ -11,7 +11,7 @@ from orb.sdk.exceptions import ConfigurationError
 class TestSDKConfigDefaults:
     def test_default_values(self):
         config = SDKConfig()
-        assert config.provider == "aws"
+        assert config.provider is None
         assert config.timeout == 300
         assert config.retry_attempts == 3
         assert config.log_level == "INFO"
@@ -24,9 +24,8 @@ class TestSDKConfigDefaults:
 
 
 class TestSDKConfigValidation:
-    def test_empty_provider_raises(self):
-        with pytest.raises(ConfigurationError, match="Provider is required"):
-            SDKConfig(provider="").validate()
+    def test_missing_provider_is_valid(self):
+        SDKConfig(provider=None).validate()
 
     def test_zero_timeout_raises(self):
         with pytest.raises(ConfigurationError, match="Timeout must be positive"):
@@ -57,13 +56,13 @@ class TestSDKConfigValidation:
 
 class TestSDKConfigFromEnv:
     def test_reads_env_vars(self, monkeypatch):
-        monkeypatch.setenv("ORB_PROVIDER", "mock")
+        monkeypatch.setenv("ORB_PROVIDER_TYPE", "mock")
         monkeypatch.setenv("ORB_TIMEOUT", "60")
         monkeypatch.setenv("ORB_RETRY_ATTEMPTS", "5")
         monkeypatch.setenv("ORB_LOG_LEVEL", "DEBUG")
 
         config = SDKConfig.from_env()
-        assert config.provider == "mock"
+        assert config.provider_type == "mock"
         assert config.timeout == 60
         assert config.retry_attempts == 5
         assert config.log_level == "DEBUG"
@@ -78,23 +77,23 @@ class TestSDKConfigFromEnv:
             monkeypatch.delenv(var, raising=False)
 
         config = SDKConfig.from_env()
-        assert config.provider == "aws"
+        assert config.provider is None
         assert config.timeout == 300
 
 
 class TestSDKConfigFromDict:
     def test_known_fields_mapped(self):
-        config = SDKConfig.from_dict({"provider": "mock", "timeout": 120})
-        assert config.provider == "mock"
+        config = SDKConfig.from_dict({"provider_type": "mock", "timeout": 120})
+        assert config.provider_type == "mock"
         assert config.timeout == 120
 
     def test_unknown_fields_go_to_custom_config(self):
-        config = SDKConfig.from_dict({"provider": "aws", "my_custom_key": "value"})
+        config = SDKConfig.from_dict({"provider_type": "aws", "my_custom_key": "value"})
         assert config.custom_config == {"my_custom_key": "value"}
 
     def test_empty_dict_uses_defaults(self):
         config = SDKConfig.from_dict({})
-        assert config.provider == "aws"
+        assert config.provider is None
 
     def test_scheduler_dict_not_absorbed_as_string_override(self):
         # Regression: when loading from an ORB config.json the top-level "scheduler" key
@@ -117,12 +116,12 @@ class TestSDKConfigFromDict:
 
     def test_scheduler_string_override_is_still_accepted(self):
         # Explicit string scheduler overrides (e.g. passed programmatically) must still work.
-        config = SDKConfig.from_dict({"provider": "aws", "scheduler": "default"})
+        config = SDKConfig.from_dict({"provider_type": "aws", "scheduler": "default"})
         assert config.scheduler == "default"
 
     def test_provider_config_dict_mapped(self):
         config = SDKConfig.from_dict(
-            {"provider": "aws", "provider_config": {"region": "us-east-1", "profile": "prod"}}
+            {"provider_type": "aws", "provider_config": {"region": "us-east-1", "profile": "prod"}}
         )
         assert config.provider_config == {"region": "us-east-1", "profile": "prod"}
 
@@ -130,7 +129,7 @@ class TestSDKConfigFromDict:
         # A caller that still passes region= at the top level gets it folded into
         # provider_config (not custom_config) via the deprecation shim.
         with pytest.warns(DeprecationWarning, match="deprecated"):
-            config = SDKConfig.from_dict({"provider": "aws", "region": "eu-central-1"})
+            config = SDKConfig.from_dict({"provider_type": "aws", "region": "eu-central-1"})
         assert config.provider_config.get("region") == "eu-central-1"
         assert "region" not in config.custom_config
 
@@ -140,7 +139,7 @@ class TestSDKConfigFromDict:
         # logger.warning must also fire on the deprecated top-level keys.
         with caplog.at_level("WARNING", logger="orb.sdk.config"):
             with pytest.warns(DeprecationWarning):
-                SDKConfig.from_dict({"provider": "aws", "profile": "prod"})
+                SDKConfig.from_dict({"provider_type": "aws", "profile": "prod"})
         assert any(
             "profile" in record.message and "deprecated" in record.message
             for record in caplog.records
@@ -149,12 +148,12 @@ class TestSDKConfigFromDict:
 
 class TestSDKConfigFromFile:
     def test_loads_json_file(self, tmp_path):
-        data = {"provider": "mock", "timeout": 60}
+        data = {"provider_type": "mock", "timeout": 60}
         f = tmp_path / "config.json"
         f.write_text(json.dumps(data))
 
         config = SDKConfig.from_file(str(f))
-        assert config.provider == "mock"
+        assert config.provider_type == "mock"
         assert config.timeout == 60
         assert config.config_path == str(f)
 
@@ -165,12 +164,13 @@ class TestSDKConfigFromFile:
 
 class TestSDKConfigToDict:
     def test_to_dict_excludes_none(self):
-        config = SDKConfig(provider="aws")
+        config = SDKConfig(provider_type="aws")
         d = config.to_dict()
         assert "region" not in d
         assert "profile" not in d
         assert "provider_config" not in d
-        assert d["provider"] == "aws"
+        assert "provider" not in d
+        assert d["provider_type"] == "aws"
 
     def test_to_dict_includes_provider_config_when_set(self):
         config = SDKConfig(provider_config={"region": "eu-west-1"})
@@ -190,20 +190,19 @@ class TestSDKConfigProviderTypeAndName:
         assert config.provider_name is None
 
     def test_all_three_provider_fields_are_independent(self):
-        config = SDKConfig(provider="aws", provider_type="k8s", provider_name="my-k8s-instance")
-        assert config.provider == "aws"
+        config = SDKConfig(provider_type="k8s", provider_name="my-k8s-instance")
+        assert config.provider is None
         assert config.provider_type == "k8s"
         assert config.provider_name == "my-k8s-instance"
 
     def test_to_dict_includes_provider_type_and_name_when_set(self):
-        config = SDKConfig(provider="aws", provider_type="k8s", provider_name="my-k8s-instance")
+        config = SDKConfig(provider_type="k8s", provider_name="my-k8s-instance")
         d = config.to_dict()
-        assert d["provider"] == "aws"
         assert d["provider_type"] == "k8s"
         assert d["provider_name"] == "my-k8s-instance"
 
     def test_to_dict_omits_provider_type_and_name_when_none(self):
-        config = SDKConfig(provider="aws")
+        config = SDKConfig()
         d = config.to_dict()
         assert "provider_type" not in d
         assert "provider_name" not in d
@@ -216,13 +215,13 @@ class TestDeprecatedRegionProfile:
 
     def test_from_dict_legacy_region_key_warns_and_populates_provider_config(self):
         with pytest.warns(DeprecationWarning, match="deprecated"):
-            config = SDKConfig.from_dict({"provider": "aws", "region": "us-east-1"})
+            config = SDKConfig.from_dict({"provider_type": "aws", "region": "us-east-1"})
         assert config.provider_config.get("region") == "us-east-1"
         assert "region" not in config.custom_config
 
     def test_from_dict_legacy_profile_key_warns_and_populates_provider_config(self):
         with pytest.warns(DeprecationWarning, match="deprecated"):
-            config = SDKConfig.from_dict({"provider": "aws", "profile": "my-profile"})
+            config = SDKConfig.from_dict({"provider_type": "aws", "profile": "my-profile"})
         assert config.provider_config.get("profile") == "my-profile"
         assert "profile" not in config.custom_config
 
@@ -316,3 +315,83 @@ class TestDeprecatedRegionProfile:
         with pytest.warns(DeprecationWarning):
             config.profile = None
         assert "profile" not in config.provider_config
+
+
+class TestProviderDeprecation:
+    """The legacy ``provider`` setting is accepted, ignored and warns."""
+
+    def test_constructor_warns_and_is_ignored_by_validation(self):
+        with pytest.warns(DeprecationWarning, match="template"):
+            config = SDKConfig(provider="aws")
+        config.validate()
+        assert config.provider_type is None
+        assert "provider" not in config.to_dict()
+
+    def test_env_var_warns(self, monkeypatch):
+        monkeypatch.setenv("ORB_PROVIDER", "mock")
+        with pytest.warns(DeprecationWarning, match="ORB_PROVIDER"):
+            config = SDKConfig.from_env()
+        assert config.provider_type is None
+
+    def test_env_warning_is_logged_for_operators(self, monkeypatch, caplog):
+        monkeypatch.setenv("ORB_PROVIDER", "mock")
+        with caplog.at_level("WARNING"):
+            SDKConfig.from_env()
+        assert any("deprecated" in r.message for r in caplog.records)
+
+    def test_dict_key_warns(self):
+        with pytest.warns(DeprecationWarning):
+            SDKConfig.from_dict({"provider": "aws"})
+
+    def test_orb_config_provider_section_does_not_warn(self):
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            config = SDKConfig.from_dict({"provider": {"type": "aws"}})
+        assert config.provider is None
+        assert config.custom_config["provider"] == {"type": "aws"}
+
+    def test_no_warning_without_provider(self, monkeypatch):
+        import warnings
+
+        monkeypatch.delenv("ORB_PROVIDER", raising=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            SDKConfig.from_env()
+            SDKConfig(provider_type="aws")
+
+    def test_client_kwarg_warns_and_does_not_select_provider(self):
+        from orb.sdk import ORBClient
+
+        with pytest.warns(DeprecationWarning, match="template"):
+            client = ORBClient(provider="aws", config={"timeout": 60})
+        assert client.config.provider_type is None
+
+    def test_client_provider_property_keeps_the_caller_value_and_warns(self):
+        from orb.sdk import ORBClient
+
+        with pytest.warns(DeprecationWarning):
+            client = ORBClient(provider="aws", config={"timeout": 60})
+        with pytest.warns(DeprecationWarning, match="provider_type"):
+            assert client.provider == "aws"
+
+    def test_client_stats_keep_the_caller_provider_value(self):
+        from orb.sdk import ORBClient
+
+        with pytest.warns(DeprecationWarning):
+            client = ORBClient(provider="aws", config={"timeout": 60})
+        stats = client.get_stats()
+        assert stats["provider"] == "aws"
+        assert stats["provider_type"] is None
+
+    def test_client_provider_property_falls_back_to_provider_type_without_warning(self):
+        import warnings
+
+        from orb.sdk import ORBClient
+
+        client = ORBClient(config={"provider_type": "k8s", "timeout": 60})
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            assert client.provider == "k8s"
+            assert client.get_stats()["provider"] == "k8s"

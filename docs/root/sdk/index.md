@@ -43,7 +43,7 @@ from orb import ORBClient
 
 
 async def main():
-    async with ORBClient(provider="aws") as client:
+    async with ORBClient(provider_type="aws") as client:
         templates = await client.list_templates(active_only=True)
         if not templates["templates"]:
             print("No templates registered")

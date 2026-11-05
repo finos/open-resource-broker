@@ -14,7 +14,7 @@ from orb.sdk.exceptions import SDKError
 
 
 def _initialized_sdk() -> ORBClient:
-    sdk = ORBClient(config={"provider": "aws"})
+    sdk = ORBClient(config={"provider_type": "aws"})
     sdk._initialized = True
     sdk._query_bus = AsyncMock()
     sdk._command_bus = AsyncMock()
@@ -29,7 +29,7 @@ def _initialized_sdk() -> ORBClient:
 class TestBatch:
     @pytest.mark.asyncio
     async def test_batch_raises_when_not_initialized(self):
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         with pytest.raises(SDKError, match="not initialized"):
             await sdk.batch([AsyncMock()])
 

@@ -35,7 +35,7 @@ from orb.sdk.exceptions import NotFoundError, SDKError
 
 def _make_client(**kwargs) -> ORBClient:
     """Create ORBClient with minimal config to avoid env-var side effects."""
-    return ORBClient(config={"provider": "mock", **kwargs})
+    return ORBClient(config={"provider_type": "mock", **kwargs})
 
 
 def _initialized_client() -> ORBClient:
@@ -71,32 +71,32 @@ class TestDeprecatedRegionProfile:
     def test_region_kwarg_emits_deprecation_warning(self):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            ORBClient(config={"provider": "mock"}, region="us-east-1")
+            ORBClient(config={"provider_type": "mock"}, region="us-east-1")
         assert any(issubclass(w.category, DeprecationWarning) for w in caught)
 
     def test_profile_kwarg_emits_deprecation_warning(self):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            ORBClient(config={"provider": "mock"}, profile="my-profile")
+            ORBClient(config={"provider_type": "mock"}, profile="my-profile")
         assert any(issubclass(w.category, DeprecationWarning) for w in caught)
 
     def test_region_forwarded_to_provider_config(self):
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
-            client = ORBClient(config={"provider": "mock"}, region="eu-west-1")
+            client = ORBClient(config={"provider_type": "mock"}, region="eu-west-1")
         assert client._config.provider_config.get("region") == "eu-west-1"
 
     def test_profile_forwarded_to_provider_config(self):
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
-            client = ORBClient(config={"provider": "mock"}, profile="dev")
+            client = ORBClient(config={"provider_type": "mock"}, profile="dev")
         assert client._config.provider_config.get("profile") == "dev"
 
     def test_existing_provider_config_merged_not_overwritten(self):
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
             client = ORBClient(
-                config={"provider": "mock"},
+                config={"provider_type": "mock"},
                 provider_config={"existing_key": "val"},
                 region="ap-southeast-1",
             )
@@ -114,7 +114,7 @@ class TestInitializeConfigPath:
     def test_missing_config_path_raises_configuration_error(self, tmp_path):
         from orb.sdk.exceptions import ConfigurationError
 
-        client = ORBClient(config={"provider": "mock"})
+        client = ORBClient(config={"provider_type": "mock"})
         client._config.config_path = str(tmp_path / "missing.json")
 
         loop = asyncio.new_event_loop()

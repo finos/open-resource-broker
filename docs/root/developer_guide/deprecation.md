@@ -146,3 +146,20 @@ deadline and tends to live forever.
 - [ ] Stated the removal version
 - [ ] Added a test asserting the signal fires (use `caplog` for `logger.warning`,
       `pytest.warns` for `DeprecationWarning`)
+
+## Current deprecations
+
+### SDK `provider` setting
+
+`SDKConfig.provider`, `ORBClient(provider=...)`, the `"provider"` key in an SDK
+config dictionary, and the `ORB_PROVIDER` environment variable are deprecated
+and ignored. The provider used for an operation comes from the template; use
+`provider_type` / `provider_name` (`ORB_PROVIDER_TYPE` / `ORB_PROVIDER_NAME`)
+when selection has to be narrowed. Setting the old value emits a
+`DeprecationWarning` and a logger warning, and has no other effect.
+`ORBClient.provider` and the `"provider"` entry of `ORBClient.get_stats()` still
+report the value the caller set (reading the property emits a
+`DeprecationWarning`); when it is not set they report `provider_type`.
+`get_stats()` also reports `provider_type` on its own.
+
+Removal: the next minor release.

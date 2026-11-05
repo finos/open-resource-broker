@@ -39,6 +39,7 @@ class AcquireMachinesOrchestrator(OrchestratorBase[AcquireMachinesInput, Acquire
             template_id=input.template_id,
             requested_count=input.requested_count,
             additional_data=input.additional_data,
+            template_overrides=input.template_overrides or None,
         )
         await self._dispatch("AcquireMachines", self._command_bus.execute(command))
         request_id: str = command.created_request_id or ""

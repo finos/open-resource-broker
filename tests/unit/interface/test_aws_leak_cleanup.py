@@ -108,21 +108,21 @@ class TestSDKClientNoAWSSentinel:
         """Passing provider='mock' must override the config default."""
         from orb.sdk.client import ORBClient
 
-        sdk = ORBClient(provider="mock", config={"provider": "aws"})
+        sdk = ORBClient(provider_type="mock", config={"provider_type": "aws"})
         assert sdk.provider == "mock"
 
     def test_no_provider_uses_config_default(self):
         """Not passing provider must leave config provider untouched."""
         from orb.sdk.client import ORBClient
 
-        sdk = ORBClient(config={"provider": "aws"})
+        sdk = ORBClient(config={"provider_type": "aws"})
         assert sdk.provider == "aws"
 
     def test_none_provider_uses_config_default(self):
         """Explicitly passing provider=None must leave config provider untouched."""
         from orb.sdk.client import ORBClient
 
-        sdk = ORBClient(provider=None, config={"provider": "aws"})
+        sdk = ORBClient(provider=None, config={"provider_type": "aws"})
         assert sdk.provider == "aws"
 
 
