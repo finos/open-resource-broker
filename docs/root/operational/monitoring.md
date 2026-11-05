@@ -74,7 +74,10 @@ The loop runs only in a server with `server.workers` set to 1; with more
 workers it is not started (a message is logged at startup), because each worker
 would run its own loop against the same providers and storage. It starts with
 the server; on shutdown calls already in flight get a few seconds to finish
-before the pass is cancelled. One-shot CLI commands do not run it. The
+before the pass is cancelled. Several single-worker replicas that share one
+SQL or DynamoDB store each run their own loop; the writes stay safe, but each
+replica calls the providers for the same requests, so enable the loop on one
+replica only. One-shot CLI commands do not run it. The
 list-view caching described above is per process.
 
 ## Alerting

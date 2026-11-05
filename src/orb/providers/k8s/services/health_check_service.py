@@ -127,9 +127,9 @@ class K8sHealthCheckService:
             response_time_ms = (time.time() - start) * 1000.0
             self._logger.warning("Kubernetes health check failed: %s", exc, exc_info=True)
             return ProviderHealthStatus.unhealthy(
-                message=f"Kubernetes API server unreachable: {exc}",
+                message="Kubernetes API server unreachable",
                 error_details={
-                    "error": str(exc),
+                    "error_type": type(exc).__name__,
                     "response_time_ms": response_time_ms,
                 },
             )
