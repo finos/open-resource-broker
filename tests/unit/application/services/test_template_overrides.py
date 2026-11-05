@@ -117,7 +117,7 @@ class TestApplyTemplateOverrides:
             apply_template_overrides(_template(), {"instance_profile": "a", "machine_role": "b"})
 
     def test_invalid_value_rejected(self):
-        with pytest.raises(RequestValidationError, match="Invalid template override"):
+        with pytest.raises(RequestValidationError, match="subnet_ids"):
             apply_template_overrides(_template(), {"subnet_ids": "not-a-list"})
 
     def test_allowlist_has_no_identity_or_credential_fields(self):
@@ -131,3 +131,35 @@ class TestApplyTemplateOverrides:
             "provider_api",
             "encryption_key",
         }
+
+
+class TestOverrideValueShapes:
+    @pytest.mark.parametrize("field", ["subnet_ids", "security_group_ids"])
+    @pytest.mark.parametrize("value", [[""], ["  "], ["subnet-1", ""], [None], "subnet-1"])
+    def test_blank_or_malformed_id_lists_rejected(self, field, value):
+        with pytest.raises(RequestValidationError, match=field):
+            apply_template_overrides(_template(), {field: value})
+
+    @pytest.mark.parametrize(
+        "value", [{"": 1}, {"m5.large": 0}, {"m5.large": -1}, {"m5.large": 1.5}, {"m5.large": True}]
+    )
+    def test_invalid_machine_type_weights_rejected(self, value):
+        with pytest.raises(RequestValidationError, match="machine_types"):
+            apply_template_overrides(_template(), {"machine_types": value})
+
+    def test_positive_machine_type_weights_accepted(self):
+        out = apply_template_overrides(_template(), {"machine_types": {"m5.large": 2}})
+        assert out.machine_types == {"m5.large": 2}
+
+    @pytest.mark.parametrize("value", [0, -1, float("nan"), float("inf"), "1", True, None])
+    def test_max_price_must_be_finite_and_positive(self, value):
+        with pytest.raises(RequestValidationError, match="max_price"):
+            apply_template_overrides(_template(), {"max_price": value})
+
+    def test_positive_max_price_accepted(self):
+        assert apply_template_overrides(_template(), {"max_price": 0.5}).max_price == 0.5
+
+    @pytest.mark.parametrize("key", [1, None, (1, 2)])
+    def test_non_string_override_names_rejected(self, key):
+        with pytest.raises(RequestValidationError, match="names must be strings"):
+            apply_template_overrides(_template(), {key: "x", "tags": {}})

@@ -7,6 +7,7 @@ is rejected, including identity, credential and bootstrap fields.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from orb.application.dto.template import TemplateDTO
@@ -96,6 +97,14 @@ def apply_template_overrides(template: Any, overrides: dict[str, Any]) -> Any:
     if not isinstance(template, TemplateDTO):
         raise RequestValidationError("Template overrides are not supported for this template type")
 
+    if not isinstance(overrides, dict):
+        raise RequestValidationError("Template overrides must be a mapping")
+    bad_keys = sorted(map(str, (k for k in overrides if not isinstance(k, str))))
+    if bad_keys:
+        raise RequestValidationError(
+            f"Template override names must be strings: {', '.join(bad_keys)}"
+        )
+
     normalized = normalize_override_keys(overrides)
 
     protected = sorted(k for k in normalized if k in _PROTECTED_FIELDS)
@@ -119,6 +128,8 @@ def apply_template_overrides(template: Any, overrides: dict[str, Any]) -> Any:
             f"Invalid template override 'price_type': {normalized['price_type']!r}. "
             f"Allowed: {', '.join(sorted(_PRICE_TYPES))}"
         )
+
+    _validate_override_values(normalized)
 
     merged = dict(normalized)
     if "tags" in merged:
@@ -152,3 +163,44 @@ def _validate_override_tags(tags: Any) -> dict[str, str]:
             f"{', '.join(reserved)}"
         )
     return tags
+
+
+def _is_blank_string(value: Any) -> bool:
+    return not isinstance(value, str) or not value.strip()
+
+
+def _validate_override_values(overrides: dict[str, Any]) -> None:
+    """Reject entries that would only fail later at the provider."""
+    for field in ("subnet_ids", "security_group_ids"):
+        if field in overrides:
+            values = overrides[field]
+            if not isinstance(values, (list, tuple)) or any(_is_blank_string(v) for v in values):
+                raise RequestValidationError(
+                    f"Template override '{field}' must be a list of non-empty strings"
+                )
+
+    if "machine_types" in overrides:
+        weights = overrides["machine_types"]
+        if not isinstance(weights, dict) or any(
+            _is_blank_string(name)
+            or isinstance(weight, bool)
+            or not isinstance(weight, int)
+            or weight <= 0
+            for name, weight in weights.items()
+        ):
+            raise RequestValidationError(
+                "Template override 'machine_types' must map non-empty machine type names "
+                "to positive integer weights"
+            )
+
+    if "max_price" in overrides:
+        price = overrides["max_price"]
+        if (
+            isinstance(price, bool)
+            or not isinstance(price, (int, float))
+            or not math.isfinite(price)
+            or price <= 0
+        ):
+            raise RequestValidationError(
+                "Template override 'max_price' must be a finite number greater than 0"
+            )
