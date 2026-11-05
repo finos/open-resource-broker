@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Optional
 from orb.domain.base.ports import LoggingPort
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from orb.providers.aws.utilities.terminate_instances import (
-    ensure_machines_in_client_region,
     recently_launched_ids,
     terminate_skipping_missing,
     wait_until_visible,
@@ -151,7 +150,6 @@ class AWSInstanceOperationService:
                 )
 
             coordinates = operation.parameters.get("machine_coordinates") or {}
-            ensure_machines_in_client_region(coordinates, self._aws_client.region_name)
             young = recently_launched_ids(coordinates)
             if young:
                 wait_until_visible(self._aws_client.ec2_client, young)

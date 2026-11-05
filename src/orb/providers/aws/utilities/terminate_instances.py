@@ -14,8 +14,6 @@ from typing import Any, Callable, Mapping
 
 from botocore.exceptions import ClientError
 
-from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-
 INSTANCE_NOT_FOUND = "InvalidInstanceID.NotFound"
 
 _INSTANCE_ID_TOKEN = re.compile(r"(?<![\w-])i-[A-Za-z0-9]+(?![\w-])")
@@ -92,23 +90,6 @@ def terminate_skipping_missing(
 RECENT_LAUNCH_SECONDS = 60
 VISIBILITY_ATTEMPTS = 5
 VISIBILITY_DELAY_SECONDS = 2.0
-
-
-def ensure_machines_in_client_region(
-    coordinates: Mapping[str, Mapping[str, Any]], client_region: str
-) -> None:
-    """Raise when a machine record belongs to a different region than the client.
-
-    An unknown id is only evidence the instance is gone when ORB looked in the
-    region it was launched in; elsewhere it would mark live instances terminated.
-    """
-    for machine_id, record in coordinates.items():
-        recorded = (record.get("provider_data") or {}).get("region")
-        if recorded and client_region and str(recorded).lower() != client_region.lower():
-            raise AWSInfrastructureError(
-                f"Machine {machine_id} was launched in region {recorded} but the AWS client "
-                f"is configured for {client_region}; refusing to terminate it from there"
-            )
 
 
 def recently_launched_ids(

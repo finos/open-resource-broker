@@ -155,53 +155,6 @@ class TestExactIdMatching:
         }
 
 
-class TestRegionGuard:
-    def test_wrong_region_raises(self):
-        from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-        from orb.providers.aws.utilities.terminate_instances import (
-            ensure_machines_in_client_region,
-        )
-
-        coordinates = {"i-a": {"provider_data": {"region": "us-east-1"}}}
-        with pytest.raises(AWSInfrastructureError, match="us-east-1"):
-            ensure_machines_in_client_region(coordinates, "eu-west-2")
-
-    def test_matching_or_unrecorded_region_passes(self):
-        from orb.providers.aws.utilities.terminate_instances import (
-            ensure_machines_in_client_region,
-        )
-
-        ensure_machines_in_client_region(
-            {
-                "i-a": {"provider_data": {"region": "eu-west-2"}},
-                "i-b": {"provider_data": {}},
-                "i-c": {},
-            },
-            "eu-west-2",
-        )
-
-    def test_service_refuses_terminate_in_wrong_region(self):
-        from orb.providers.aws.services.instance_operation_service import (
-            AWSInstanceOperationService,
-        )
-        from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
-
-        client = MagicMock()
-        client.region_name = "eu-west-2"
-        service = AWSInstanceOperationService(client, MagicMock(), MagicMock(), MagicMock())
-        operation = ProviderOperation(
-            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
-            parameters={
-                "instance_ids": ["i-a"],
-                "machine_coordinates": {"i-a": {"provider_data": {"region": "us-east-1"}}},
-            },
-        )
-        result = service.terminate_instances(operation)
-
-        assert not result.success
-        client.ec2_client.terminate_instances.assert_not_called()
-
-
 class TestRecentlyLaunched:
     def test_recent_ids_are_selected(self):
         from datetime import datetime, timedelta, timezone
