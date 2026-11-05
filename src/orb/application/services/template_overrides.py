@@ -70,6 +70,13 @@ _RESERVED_TAG_PREFIXES: tuple[str, ...] = ("orb:", "aws:")
 # default security group; an empty machine_types leaves nothing to launch.
 _NON_EMPTY_FIELDS: frozenset[str] = frozenset({"subnet_ids", "security_group_ids", "machine_types"})
 
+# Machine type maps whose values are positive integer weights.
+_WEIGHTED_FIELDS: tuple[str, ...] = (
+    "machine_types",
+    "machine_types_ondemand",
+    "machine_types_priority",
+)
+
 _PRICE_TYPES: frozenset[str] = frozenset(p.value for p in PriceType)
 
 
@@ -179,19 +186,20 @@ def _validate_override_values(overrides: dict[str, Any]) -> None:
                     f"Template override '{field}' must be a list of non-empty strings"
                 )
 
-    if "machine_types" in overrides:
-        weights = overrides["machine_types"]
-        if not isinstance(weights, dict) or any(
-            _is_blank_string(name)
-            or isinstance(weight, bool)
-            or not isinstance(weight, int)
-            or weight <= 0
-            for name, weight in weights.items()
-        ):
-            raise RequestValidationError(
-                "Template override 'machine_types' must map non-empty machine type names "
-                "to positive integer weights"
-            )
+    for field in _WEIGHTED_FIELDS:
+        if field in overrides:
+            weights = overrides[field]
+            if not isinstance(weights, dict) or any(
+                _is_blank_string(name)
+                or isinstance(weight, bool)
+                or not isinstance(weight, int)
+                or weight <= 0
+                for name, weight in weights.items()
+            ):
+                raise RequestValidationError(
+                    f"Template override '{field}' must map non-empty machine type names "
+                    "to positive integer weights"
+                )
 
     if "max_price" in overrides:
         price = overrides["max_price"]

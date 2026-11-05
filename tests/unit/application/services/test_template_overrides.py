@@ -141,11 +141,14 @@ class TestOverrideValueShapes:
             apply_template_overrides(_template(), {field: value})
 
     @pytest.mark.parametrize(
+        "field", ["machine_types", "machine_types_ondemand", "machine_types_priority"]
+    )
+    @pytest.mark.parametrize(
         "value", [{"": 1}, {"m5.large": 0}, {"m5.large": -1}, {"m5.large": 1.5}, {"m5.large": True}]
     )
-    def test_invalid_machine_type_weights_rejected(self, value):
-        with pytest.raises(RequestValidationError, match="machine_types"):
-            apply_template_overrides(_template(), {"machine_types": value})
+    def test_invalid_machine_type_weights_rejected(self, field, value):
+        with pytest.raises(RequestValidationError, match=field):
+            apply_template_overrides(_template(), {field: value})
 
     def test_positive_machine_type_weights_accepted(self):
         out = apply_template_overrides(_template(), {"machine_types": {"m5.large": 2}})
