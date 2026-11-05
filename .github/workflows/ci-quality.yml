@@ -15,6 +15,10 @@ on:
   # they run on every PR (including docs-only changes). push keeps its paths filter.
   pull_request:
     branches: [ main, develop ]
+  # merge_group: the merge queue runs the required checks on the combined
+  # result before merging; without this trigger queued PRs would wait forever.
+  merge_group:
+    types: [checks_requested]
   # workflow_dispatch: allows re-running quality checks manually from the Actions UI
   workflow_dispatch:
 

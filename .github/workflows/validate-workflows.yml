@@ -12,6 +12,10 @@ on:
   # its own concern to check) on every PR, including docs-only ones. The
   # job itself is cheap, so no job-level change detection is needed here.
   pull_request: {}
+  # merge_group: the merge queue runs the required checks on the combined
+  # result before merging; without this trigger queued PRs would wait forever.
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
