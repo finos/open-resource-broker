@@ -229,3 +229,69 @@ class TestRecentlyLaunched:
 
         assert waited == [["i-new"]]
         adapter.release_resources.assert_called_once()
+
+
+class TestStrategyTermination:
+    def test_event_loop_stays_responsive_during_the_visibility_wait(self):
+        import asyncio
+        import time
+
+        from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+        from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
+
+        class SlowService:
+            def terminate_instances(self, operation: Any) -> str:
+                time.sleep(0.3)
+                return "done"
+
+        strategy = AWSProviderStrategy.__new__(AWSProviderStrategy)
+        strategy._get_instance_service = lambda: SlowService()  # type: ignore[method-assign]
+        operation = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES, parameters={}
+        )
+
+        async def scenario() -> tuple[Any, int]:
+            ticks = 0
+
+            async def ticker() -> None:
+                nonlocal ticks
+                while True:
+                    await asyncio.sleep(0.02)
+                    ticks += 1
+
+            task = asyncio.create_task(ticker())
+            result = await strategy._execute_operation_internal(operation)
+            task.cancel()
+            return result, ticks
+
+        result, ticks = asyncio.run(scenario())
+        assert result == "done"
+        assert ticks >= 5
+
+    @pytest.mark.parametrize("provider_api", ["EC2Fleet", "SpotFleet", "ASG", "RunInstances"])
+    def test_release_paths_wait_for_just_launched_machines(self, monkeypatch, provider_api):
+        from datetime import datetime, timezone
+
+        from orb.providers.aws.services import instance_operation_service as module
+        from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
+
+        waited: list[list[str]] = []
+        monkeypatch.setattr(module, "wait_until_visible", lambda _ec2, ids: waited.append(ids))
+        client = MagicMock()
+        adapter = MagicMock()
+        service = module.AWSInstanceOperationService(client, MagicMock(), adapter, MagicMock())
+        operation = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "instance_ids": ["i-new"],
+                "provider_api": provider_api,
+                "machine_coordinates": {
+                    "i-new": {"launched_at": datetime.now(timezone.utc).isoformat()}
+                },
+            },
+        )
+        result = service.terminate_instances(operation)
+
+        assert result.success
+        assert waited == [["i-new"]]
+        assert adapter.release_resources.call_args.kwargs["provider_api"] == provider_api
