@@ -685,6 +685,62 @@ async def test_list_read_of_a_pending_request_writes_nothing(world: _World) -> N
     assert stored.last_status_check is None
 
 
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_run_instances_request_with_pending_machines_is_synced_and_stays_in_progress(
+    world: _World,
+) -> None:
+    """A launched request has resource ids, so it is polled, and pending machines keep it open."""
+    world.uow.requests.save(
+        Request(
+            request_id=RequestId(value=_ACQUIRE_ID),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
+            provider_name="p1",
+            provider_api="RunInstances",
+            template_id="tmpl",
+            requested_count=1,
+            resource_ids=["r-1"],
+            machine_ids=["i-1"],
+            status=RequestStatus.ACQUIRING,
+        )
+    )
+    world.uow.machines.save(
+        Machine(
+            machine_id=MachineId(value="i-1"),
+            template_id="tmpl",
+            request_id=_ACQUIRE_ID,
+            provider_type="aws",
+            provider_name="p1",
+            provider_api="RunInstances",
+            instance_type=InstanceType(value="t3.micro"),
+            image_id="ami-1",
+            status=MachineStatus.PENDING,
+        )
+    )
+    world.provider.verdict = ProviderFulfilment(state="in_progress", message="pending", final=False)
+    world.provider.instances = [
+        {
+            "instance_id": "i-1",
+            "status": "pending",
+            "instance_type": "t3.micro",
+            "image_id": "ami-1",
+        }
+    ]
+
+    summary = await world.reconciler.reconcile_once()
+
+    assert summary.skipped_provisioning == 0
+    assert world.provider.calls >= 1
+    assert summary.failed == 0
+    stored = world.stored(_ACQUIRE_ID)
+    assert stored.last_status_check is not None
+    assert not stored.status.is_terminal()
+    machine = world.uow.machines.get_by_id("i-1")
+    assert machine is not None
+    assert machine.status == MachineStatus.PENDING
+
+
 def _add_expired_acquiring(world: _World) -> Request:
     """An ACQUIRING request with no ids whose create flow never finished."""
     from datetime import datetime, timedelta, timezone
