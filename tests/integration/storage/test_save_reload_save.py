@@ -119,11 +119,13 @@ def test_force_return_supersedes_a_stuck_return_request(make_uow):
     handler = CreateReturnRequestHandler(
         uow_factory=factory,
         logger=MagicMock(),
-        container=MagicMock(),
         event_publisher=MagicMock(),
         error_handler=MagicMock(),
         query_bus=MagicMock(),
         provider_selection_port=MagicMock(),
+        command_bus=MagicMock(),
+        domain_config=MagicMock(),
+        deprovisioning_orchestrator=MagicMock(),
     )
     new_request = _return_request("i-1")
 
