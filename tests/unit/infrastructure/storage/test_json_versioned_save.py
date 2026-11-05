@@ -178,10 +178,13 @@ class TestUnitOfWorkRollback:
     def test_exception_in_the_block_writes_nothing(self, tmp_path: Path) -> None:
         uow = _uow(tmp_path)
 
+        def fail() -> None:
+            raise RuntimeError("boom")
+
         with pytest.raises(RuntimeError):
             with uow:
                 uow.machines.storage_strategy.save("m1", {"version": 1})
-                raise RuntimeError("boom")
+                fail()
 
         assert not (tmp_path / "machines.json").exists()
 
@@ -316,7 +319,7 @@ class TestUnitOfWorkCommit:
             fm = strategy.storage_strategy.file_manager
             real = fm.write_file
             fm.write_file = lambda content, real=real: (writes.append(1), real(content))[1]  # type: ignore[method-assign]
-        errors: list[BaseException] = []
+        errors: list[Exception] = []
 
         def work() -> None:
             try:
@@ -324,7 +327,7 @@ class TestUnitOfWorkCommit:
                     uow.requests.storage_strategy.save("r1", {"version": 1})
                     uow.machines.storage_strategy.save("m1", {"version": 1})
                     uow.templates.storage_strategy.save("t1", {"version": 1})
-            except BaseException as exc:  # noqa: BLE001
+            except Exception as exc:
                 errors.append(exc)
 
         thread = threading.Thread(target=work, daemon=True)

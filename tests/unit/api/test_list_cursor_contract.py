@@ -109,7 +109,7 @@ def client_and_rows():
 
     app.dependency_overrides[get_list_requests_orchestrator] = lambda: orchestrator
     app.dependency_overrides[get_request_formatter] = lambda: formatter
-    app.dependency_overrides[get_scheduler_strategy] = lambda: MagicMock()
+    app.dependency_overrides[get_scheduler_strategy] = MagicMock
     return TestClient(app, raise_server_exceptions=False), rows
 
 

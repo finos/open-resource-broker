@@ -31,7 +31,6 @@ from orb.domain.request.request_types import RequestStatus
 from tests.integration.storage.test_handler_conflict_retry import (  # noqa: F401  (fixture)
     _InterferingFactory,
     _new_request,
-    _saved_request,
     make_uow,
 )
 

@@ -23,14 +23,14 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from contextlib import ExitStack
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 from orb.domain.base.exceptions import ConcurrencyError
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.storage.exceptions import StorageError
 
-if TYPE_CHECKING:
-    from orb.infrastructure.storage.json.strategy import JSONStorageStrategy
+# The strategy module imports this one, so the strategy type is not imported here
+JSONStorageStrategy = Any
 
 # The request file anchors the others: written first when the commit puts rows,
 # last when it only deletes them, so a partial failure never leaves rows that

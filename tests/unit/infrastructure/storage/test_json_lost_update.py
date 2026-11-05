@@ -212,7 +212,7 @@ def test_single_file_mode_saves_all_entity_types_without_deadlock(tmp_path: Path
         template_file="all.json",
         backup_enabled=False,
     )
-    errors: list[BaseException] = []
+    errors: list[Exception] = []
 
     def work() -> None:
         try:
@@ -220,7 +220,7 @@ def test_single_file_mode_saves_all_entity_types_without_deadlock(tmp_path: Path
                 uow.machines.storage_strategy.save("m1", {"v": 1})
                 uow.requests.storage_strategy.save("r1", {"v": 2})
                 uow.templates.storage_strategy.save("t1", {"v": 3})
-        except BaseException as exc:  # noqa: BLE001
+        except Exception as exc:
             errors.append(exc)
 
     worker = threading.Thread(target=work, daemon=True)

@@ -45,11 +45,14 @@ def factory(request, tmp_path):
             {"storage": {"sql_strategy": {"type": "sqlite", "name": str(tmp_path / "orb.db")}}},
         )
     else:
+        # No profile: a runner has no AWS config file, only these credentials
+        for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"):
+            request.getfixturevalue("monkeypatch").setenv(name, "testing")
         register_dynamodb_storage(registry)
         with moto.mock_aws():
             yield _factory(
                 "dynamodb",
-                {"region": "us-east-1", "profile": "default", "table_prefix": "capability"},
+                {"region": "us-east-1", "profile": "", "table_prefix": "capability"},
             )
 
 

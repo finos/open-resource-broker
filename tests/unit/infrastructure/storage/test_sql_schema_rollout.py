@@ -31,8 +31,6 @@ INI = os.path.join(
 @pytest.fixture
 def keep_logging_config():
     """alembic's env.py reconfigures logging and disables existing loggers."""
-    import logging
-
     loggers = [
         logger
         for logger in logging.root.manager.loggerDict.values()

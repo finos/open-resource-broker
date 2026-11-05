@@ -234,7 +234,6 @@ class TestKeysetPaging:
 
     def test_walk_by_cursor_position_visits_each_row_once(self):
         ids = ["ret-e", "ret-b", "ret-d", "ret-a", "ret-c"]
-        handler = self._handler(ids)
         seen = []
         after = None
         for _ in range(5):

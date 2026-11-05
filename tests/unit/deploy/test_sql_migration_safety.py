@@ -43,8 +43,12 @@ def test_mysql_releases_the_lock_when_the_migration_fails():
     connection = MagicMock()
     connection.dialect.name = "mysql"
     connection.execute.return_value.scalar.return_value = 1
-    with pytest.raises(ValueError), migration_lock(connection):
+
+    def fail() -> None:
         raise ValueError("boom")
+
+    with pytest.raises(ValueError), migration_lock(connection):
+        fail()
     assert "RELEASE_LOCK" in str(connection.execute.call_args.args[0])
 
 
