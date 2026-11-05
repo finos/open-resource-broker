@@ -14,8 +14,10 @@ The flow implemented here:
 6. Decide whether to cancel/delete the fleet:
    - Request-type: call _fleet_has_no_remaining_instances as an
      eventual-consistency guard before deleting.
-   - Maintain-type: is_full_return=True → delete directly; secondary
-     _fleet_has_no_remaining_instances check for weighted-capacity edge case.
+   - Maintain-type: is_full_return=True → delete only when
+     _fleet_has_no_remaining_instances confirms nothing outside the returned
+     set is still running (the delete terminates every member); the same
+     check is the fallback for the weighted-capacity edge case.
    - Instant-type (has_fleet_record=False): always attempt deletion.
 7. Clean up the associated ORB launch template.
 
@@ -243,9 +245,11 @@ class BaseFleetReleaseManager(ABC):
         the _fleet_has_no_remaining_instances guard is consulted to prevent
         stranding running instances due to AWS API eventual-consistency lag.
 
-        For maintain-type fleets the secondary guard is only used when capacity
-        arithmetic alone says partial (is_full_return=False) but the fleet may
-        be physically empty — a weighted-capacity edge case.
+        For maintain-type fleets the same guard gates a full return, since the
+        maintain delete terminates every member and the target can be below the
+        live count. It is also used when capacity arithmetic alone says partial
+        (is_full_return=False) but the fleet may be physically empty — a
+        weighted-capacity edge case.
 
         Instant fleets (has_fleet_record=False) bypass this logic entirely and
         are handled unconditionally in _handle_post_terminate.
@@ -262,6 +266,21 @@ class BaseFleetReleaseManager(ABC):
             if should_teardown:
                 self._logger.info(
                     "%s %s has no remaining active instances; cancelling/deleting request-type fleet",
+                    fleet_label,
+                    fleet_id,
+                )
+        elif should_teardown and decision.has_fleet_record and decision.requires_capacity_reduction:
+            # Maintain-type full return by arithmetic. The target can sit below the
+            # live count (no-termination capacity reductions, returned instances the
+            # fleet no longer lists), and the maintain delete terminates every member,
+            # so only delete when nothing outside the returned set is still running.
+            # Otherwise the fleet stays at its reduced target, which keeps the other
+            # instances and launches nothing; their own return deletes the fleet.
+            should_teardown = self._fleet_has_no_remaining_instances(fleet_id, set(instance_ids))
+            if not should_teardown:
+                self._logger.warning(
+                    "%s %s still has instances outside the returned set; "
+                    "keeping the maintain fleet instead of deleting it",
                     fleet_label,
                     fleet_id,
                 )

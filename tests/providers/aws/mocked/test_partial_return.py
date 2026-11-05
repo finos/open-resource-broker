@@ -611,3 +611,191 @@ class TestPartialReturnCapacityReduction:
 
         assert len(modify_calls) >= 1
         assert modify_calls[0]["TargetCapacity"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Maintain fleets whose target sits below the live instance count
+# ---------------------------------------------------------------------------
+
+
+def _moto_ec2_backend() -> Any:
+    from moto.core import DEFAULT_ACCOUNT_ID
+    from moto.ec2.models import ec2_backends
+
+    return ec2_backends[DEFAULT_ACCOUNT_ID][REGION]
+
+
+def _running_ids(ec2_client: Any, instance_ids: list[str]) -> set[str]:
+    resp = ec2_client.describe_instances(InstanceIds=instance_ids)
+    return {
+        inst["InstanceId"]
+        for res in resp["Reservations"]
+        for inst in res["Instances"]
+        if inst["State"]["Name"] in ("pending", "running")
+    }
+
+
+class TestMaintainFleetReturnBelowLiveCount:
+    """A retried return must not delete a maintain fleet that still has other instances.
+
+    The first return lowers the target and then fails to terminate, so the target
+    ends up one below the live count. Retrying that return brings the target to 0;
+    deleting the fleet at that point would terminate an instance nobody returned.
+    """
+
+    def test_ec2_fleet_retried_return_keeps_other_instance_and_fleet(self, moto_vpc_resources):
+        subnet_id = moto_vpc_resources["subnet_ids"][0]
+        sg_id = moto_vpc_resources["sg_id"]
+
+        aws_client = _make_capacity_aws_client()
+        logger = _make_logger()
+        config_port = _make_capacity_config_port()
+        lt_manager = _make_capacity_lt_manager(aws_client)
+        aws_ops = AWSOperations(aws_client, logger, config_port)
+        handler = EC2FleetHandler(
+            aws_client=aws_client,
+            logger=logger,
+            aws_ops=aws_ops,
+            launch_template_manager=lt_manager,
+            config_port=config_port,
+        )
+        handler.aws_native_spec_service = None
+
+        template = AWSTemplate(
+            template_id="tpl-ec2fleet-below",
+            name="test-ec2fleet-below",
+            provider_api="EC2Fleet",
+            machine_types={"t3.micro": 1},
+            image_id="ami-12345678",
+            max_instances=2,
+            price_type="ondemand",
+            fleet_type="maintain",
+            subnet_ids=[subnet_id],
+            security_group_ids=[sg_id],
+        )
+        request = _make_capacity_request("req-ec2fleet-below-001", requested_count=2)
+        result = handler.acquire_hosts(request, template)
+        assert result["success"] is True
+        fleet_id = result["resource_ids"][0]
+
+        ec2 = aws_client.ec2_client
+        members = [
+            i["InstanceId"]
+            for i in ec2.describe_fleet_instances(FleetId=fleet_id)["ActiveInstances"]
+        ]
+        assert len(members) == 2
+        returned, kept = members
+
+        def _modify_fleet(**kwargs: Any) -> dict:
+            # moto does not implement ModifyFleet; apply the new target to its model.
+            fleet = _moto_ec2_backend().fleets[kwargs["FleetId"]]
+            new_target = kwargs["TargetCapacitySpecification"]["TotalTargetCapacity"]
+            fleet.target_capacity = new_target
+            fleet.target_capacity_specification["TotalTargetCapacity"] = new_target
+            return {"Return": True}
+
+        manager = handler._fleet_release_manager
+
+        def _details() -> dict[str, Any]:
+            return ec2.describe_fleets(FleetIds=[fleet_id])["Fleets"][0]
+
+        with patch.object(ec2, "modify_fleet", side_effect=_modify_fleet):
+            with patch.object(manager, "_terminate_instances", side_effect=RuntimeError("boom")):
+                with pytest.raises(RuntimeError):
+                    manager.release(
+                        fleet_id=fleet_id, instance_ids=[returned], fleet_details=_details()
+                    )
+            assert _details()["TargetCapacitySpecification"]["TotalTargetCapacity"] == 1
+
+            manager.release(fleet_id=fleet_id, instance_ids=[returned], fleet_details=_details())
+
+        assert _running_ids(ec2, members) == {kept}
+        fleet = _details()
+        assert fleet["FleetState"] not in ("deleted", "deleted_running", "deleted_terminating")
+        assert fleet["TargetCapacitySpecification"]["TotalTargetCapacity"] == 0
+
+        # Returning the last instance then deletes the fleet. moto's DeleteFleets
+        # fails when the fleet has nothing left to terminate, so the call is recorded.
+        delete_calls: list[dict] = []
+
+        def _delete_fleets(**kwargs: Any) -> dict:
+            delete_calls.append(kwargs)
+            return {"SuccessfulFleetDeletions": [{"FleetId": fleet_id}]}
+
+        with (
+            patch.object(ec2, "modify_fleet", side_effect=_modify_fleet),
+            patch.object(ec2, "delete_fleets", side_effect=_delete_fleets),
+        ):
+            manager.release(fleet_id=fleet_id, instance_ids=[kept], fleet_details=_details())
+        assert _running_ids(ec2, members) == set()
+        assert [c["FleetIds"] for c in delete_calls] == [[fleet_id]]
+
+    def test_spot_fleet_retried_return_keeps_other_instance_and_fleet(self, moto_vpc_resources):
+        subnet_id = moto_vpc_resources["subnet_ids"][0]
+        sg_id = moto_vpc_resources["sg_id"]
+
+        aws_client = _make_capacity_aws_client()
+        logger = _make_logger()
+        config_port = _make_capacity_config_port()
+        lt_manager = _make_capacity_lt_manager(aws_client)
+        aws_ops = AWSOperations(aws_client, logger, config_port)
+        config_builder = _MotoSpotFleetConfigBuilder(None, config_port, logger)
+        handler = SpotFleetHandler(
+            aws_client=aws_client,
+            logger=logger,
+            aws_ops=aws_ops,
+            launch_template_manager=lt_manager,
+            config_port=config_port,
+            config_builder=config_builder,
+        )
+
+        template = AWSTemplate(
+            template_id="tpl-spot-below",
+            name="test-spot-below",
+            provider_api="SpotFleet",
+            machine_types={"t3.micro": 1},
+            image_id="ami-12345678",
+            max_instances=2,
+            price_type="spot",
+            fleet_type="maintain",
+            fleet_role=SPOT_FLEET_ROLE,
+            allocation_strategy="lowestPrice",
+            subnet_ids=[subnet_id],
+            security_group_ids=[sg_id],
+        )
+        request = _make_capacity_request("req-spot-below-001", requested_count=2)
+        result = handler.acquire_hosts(request, template)
+        assert result["success"] is True
+        fleet_id = result["resource_ids"][0]
+
+        ec2 = aws_client.ec2_client
+        members = [
+            i["InstanceId"]
+            for i in ec2.describe_spot_fleet_instances(SpotFleetRequestId=fleet_id)[
+                "ActiveInstances"
+            ]
+        ]
+        assert len(members) == 2
+        returned, kept = members
+        manager = handler._release_manager
+
+        def _details() -> dict[str, Any]:
+            configs = ec2.describe_spot_fleet_requests(SpotFleetRequestIds=[fleet_id])[
+                "SpotFleetRequestConfigs"
+            ]
+            return configs[0] if configs else {}
+
+        with patch.object(manager, "_terminate_instances", side_effect=RuntimeError("boom")):
+            with pytest.raises(RuntimeError):
+                manager.release(
+                    fleet_id=fleet_id, instance_ids=[returned], fleet_details=_details()
+                )
+        assert _details()["SpotFleetRequestConfig"]["TargetCapacity"] == 1
+
+        manager.release(fleet_id=fleet_id, instance_ids=[returned], fleet_details=_details())
+
+        assert _running_ids(ec2, members) == {kept}
+        details = _details()
+        assert details, "the Spot Fleet request must not be cancelled"
+        assert details["SpotFleetRequestState"] == "active"
+        assert details["SpotFleetRequestConfig"]["TargetCapacity"] == 0

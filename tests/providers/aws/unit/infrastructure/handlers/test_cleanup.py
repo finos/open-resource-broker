@@ -292,6 +292,11 @@ class TestEC2FleetCleanupOnReturn:
 
         with (
             patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet,
+            patch.object(
+                handler._fleet_release_manager,
+                "_fleet_has_no_remaining_instances",
+                return_value=True,
+            ),
             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt,
         ):
             handler._release_hosts_for_single_ec2_fleet(
@@ -308,6 +313,11 @@ class TestEC2FleetCleanupOnReturn:
 
         with (
             patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet,
+            patch.object(
+                handler._fleet_release_manager,
+                "_fleet_has_no_remaining_instances",
+                return_value=True,
+            ),
             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt,
             patch.object(
                 handler._fleet_release_manager,
@@ -329,6 +339,11 @@ class TestEC2FleetCleanupOnReturn:
 
         with (
             patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet,
+            patch.object(
+                handler._fleet_release_manager,
+                "_fleet_has_no_remaining_instances",
+                return_value=True,
+            ),
             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt,
         ):
             handler._release_hosts_for_single_ec2_fleet(
@@ -345,6 +360,11 @@ class TestEC2FleetCleanupOnReturn:
 
         with (
             patch.object(handler._fleet_release_manager, "_delete_fleet"),
+            patch.object(
+                handler._fleet_release_manager,
+                "_fleet_has_no_remaining_instances",
+                return_value=True,
+            ),
             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt,
         ):
             handler._release_hosts_for_single_ec2_fleet(
@@ -545,7 +565,10 @@ class TestEC2FleetReleaseManagerFleetTypes:
     def test_maintain_at_zero_capacity_deletes_fleet_and_calls_cleanup(self):
         cleanup_fn = MagicMock()
         mgr, _aws_client, _ = _make_ec2_fleet_release_manager(cleanup_fn)
-        with patch.object(mgr, "_delete_fleet") as mock_delete:
+        with (
+            patch.object(mgr, "_delete_fleet") as mock_delete,
+            patch.object(mgr, "_fleet_has_no_remaining_instances", return_value=True),
+        ):
             mgr.release("fleet-1", ["i-1", "i-2"], self._fleet_details("maintain", 2))
         mock_delete.assert_called_once_with("fleet-1")
         cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc", ["i-1", "i-2"])
@@ -611,7 +634,10 @@ class TestEC2FleetReleaseManagerFleetTypes:
             "TargetCapacitySpecification": {"TotalTargetCapacity": 1},
             "Tags": [],
         }
-        with patch.object(mgr, "_delete_fleet"):
+        with (
+            patch.object(mgr, "_delete_fleet"),
+            patch.object(mgr, "_fleet_has_no_remaining_instances", return_value=True),
+        ):
             mgr.release("fleet-5", ["i-1"], details)
         cleanup_fn.assert_not_called()
 
