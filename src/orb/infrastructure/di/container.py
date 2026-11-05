@@ -340,10 +340,17 @@ def is_container_ready() -> bool:
     return _container_ready.is_set()
 
 
+def _load_default_container_factory() -> None:
+    """Import the composition root, which registers the container factory."""
+    import orb.bootstrap  # noqa: F401
+
+
 def _create_configured_container() -> DIContainer:
     """Create and configure the DI container."""
     container = DIContainer()
 
+    if _container_factory is None:
+        _load_default_container_factory()
     if _container_factory is None:
         raise RuntimeError(
             "No container factory registered. Import orb.bootstrap before calling get_container()."

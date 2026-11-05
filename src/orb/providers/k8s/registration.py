@@ -420,6 +420,13 @@ def register_k8s_template_factory(
 # ---------------------------------------------------------------------------
 
 
+def _load_k8s_strategy_class() -> type:
+    """Import the strategy class on demand so registration does not load the SDK."""
+    from orb.providers.k8s.strategy.k8s_provider_strategy import K8sProviderStrategy
+
+    return K8sProviderStrategy
+
+
 def register_k8s_provider(
     registry: Optional[ProviderRegistry] = None,
     logger: Optional[LoggingPort] = None,
@@ -439,10 +446,6 @@ def register_k8s_provider(
         registry = get_provider_registry()
 
     try:
-        from orb.providers.k8s.strategy.k8s_provider_strategy import (
-            K8sProviderStrategy,
-        )
-
         if instance_name:
             registry.register_provider_instance(
                 provider_type="k8s",
@@ -459,7 +462,7 @@ def register_k8s_provider(
                 config_factory=create_k8s_config,
                 resolver_factory=create_k8s_resolver,
                 validator_factory=create_k8s_validator,
-                strategy_class=K8sProviderStrategy,
+                strategy_class_loader=_load_k8s_strategy_class,
                 default_api="Pod",
             )
 
@@ -490,15 +493,13 @@ def register_k8s_provider_instance(provider_instance, logger=None) -> bool:
         registry = get_provider_registry()
 
         if not registry.is_provider_registered("k8s"):
-            from orb.providers.k8s.strategy.k8s_provider_strategy import K8sProviderStrategy
-
             registry.register_provider(
                 provider_type="k8s",
                 strategy_factory=create_k8s_strategy,
                 config_factory=create_k8s_config,
                 resolver_factory=create_k8s_resolver,
                 validator_factory=create_k8s_validator,
-                strategy_class=K8sProviderStrategy,
+                strategy_class_loader=_load_k8s_strategy_class,
                 default_api="Pod",
             )
 

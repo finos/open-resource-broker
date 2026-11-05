@@ -24,6 +24,13 @@ from orb.providers.gcp.factories import (
 _module_logger = get_logger(__name__)
 
 
+def _load_gcp_strategy_class() -> type:
+    """Import the strategy class on demand so registration does not load the SDK."""
+    from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
+
+    return GCPProviderStrategy
+
+
 def register_gcp_provider(
     registry: Optional[ProviderRegistry] = None,
     logger: Optional[LoggingPort] = None,
@@ -51,14 +58,12 @@ def register_gcp_provider(
             ),
         )
     else:
-        from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
-
         registry.register_provider(
             provider_type="gcp",
             strategy_factory=create_gcp_strategy,
             config_factory=create_gcp_config,
             validator_factory=create_gcp_validator,
-            strategy_class=GCPProviderStrategy,
+            strategy_class_loader=_load_gcp_strategy_class,
         )
     CLISpecRegistry.register("gcp", GCPCLISpec())
     if logger:

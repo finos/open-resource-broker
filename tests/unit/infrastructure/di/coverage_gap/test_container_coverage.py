@@ -6,6 +6,8 @@ Coverage targets: lines 100,137,141-143,145,191,206,208,210,216-219,222,
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from orb.infrastructure.di.container import (
@@ -356,7 +358,10 @@ class TestContainerSingleton:
         orig = _c_mod._container_factory
         _c_mod._container_factory = None
         try:
-            with pytest.raises(RuntimeError, match="No container factory"):
+            with (
+                patch.object(_c_mod, "_load_default_container_factory"),
+                pytest.raises(RuntimeError, match="No container factory"),
+            ):
                 get_container()
         finally:
             _c_mod._container_factory = orig

@@ -126,27 +126,9 @@ class GCPProviderStrategy(ProviderStrategy):
     @classmethod
     def get_defaults_config(cls) -> dict:
         """Expose template defaults used when generating provider config."""
-        defaults = GCPTemplateExtensionConfig().to_template_defaults()
-        handlers = {
-            api_name: {
-                "handler_class": capabilities["handler_class"],
-                "supported_fleet_types": capabilities["supported_fleet_types"],
-                "supports_spot": capabilities["supports_spot"],
-                "supports_ondemand": capabilities["supports_on_demand"],
-                "max_instances": capabilities["max_instances"],
-            }
-            for api_name, capabilities in get_supported_api_capabilities().items()
-        }
-        return {
-            "provider": {
-                "provider_defaults": {
-                    "gcp": {
-                        "handlers": handlers,
-                        "template_defaults": defaults,
-                    }
-                },
-            }
-        }
+        from orb.providers.gcp.defaults_loader import build_gcp_defaults
+
+        return build_gcp_defaults()
 
     @classmethod
     def get_supported_apis(cls) -> list[str]:
