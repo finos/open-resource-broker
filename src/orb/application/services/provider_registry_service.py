@@ -227,7 +227,7 @@ class ProviderRegistryService:
                 return
             try:
                 future.set_result(strategy.check_health())
-            except BaseException as exc:  # delivered to the awaiting probe
+            except Exception as exc:  # delivered to the awaiting probe
                 future.set_exception(exc)
 
         self._health_threads[provider_id] = future

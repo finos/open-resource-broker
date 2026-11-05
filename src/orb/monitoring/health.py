@@ -259,7 +259,7 @@ class HealthCheck(HealthCheckPort):
                         return
                     try:
                         fut.set_result(check_fn())
-                    except BaseException as exc:  # delivered to the waiting callers
+                    except Exception as exc:  # delivered to the waiting callers
                         fut.set_exception(exc)
 
                 entry = (future, time.monotonic())
