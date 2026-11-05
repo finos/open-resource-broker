@@ -383,3 +383,39 @@ class TestReturnEmptyProviderMachinesPositiveEvidence:
         )
         assert status == RequestStatus.COMPLETED.value
         assert "no longer visible" in (msg or "")
+
+
+class TestFailedProviderDescribe:
+    """A failed provider describe keeps the stored request state."""
+
+    @pytest.mark.asyncio
+    async def test_acquire_status_read_degrades_to_stored_state(self):
+        from orb.application.services.machine_sync_service import MachineSyncService
+
+        sync = MachineSyncService(
+            command_bus=MagicMock(),
+            uow_factory=MagicMock(),
+            config_port=MagicMock(),
+            logger=MagicMock(),
+        )
+        sync._provider_registry_service = MagicMock(
+            execute_operation=MagicMock(side_effect=RuntimeError("describe failed"))
+        )
+        req = _make_request("acquire", requested_count=2)
+        req.resource_ids = ["r-1"]
+        req.machine_ids = []
+        db_machines = [_make_machine(MachineStatus.PENDING)]
+
+        provider_machines, metadata = await sync.fetch_provider_machines(req, db_machines)  # type: ignore[arg-type]
+        status, message = _make_service().determine_status_from_machines(
+            db_machines,  # type: ignore[arg-type]
+            provider_machines,
+            req,
+            metadata,
+        )
+
+        assert (status, message) == (None, None)
+
+    def test_missing_fulfilment_without_a_failed_describe_is_still_a_contract_error(self):
+        with pytest.raises(ProviderContractError):
+            _make_service().determine_status_from_machines([], [], _make_request("acquire"), {})
