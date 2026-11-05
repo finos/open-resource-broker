@@ -156,12 +156,11 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     "resource_type": "run_instances",
                     "reservation_id": resource_id,
                     "instance_ids": instance_ids,
-                    # RunInstances is synchronous provisioning — the CREATE
-                    # call returns all instance IDs immediately.  No further
-                    # async polling of the provider is needed to settle this
-                    # request; ``requires_async_polling=False`` tells the
-                    # dispatch layer to emit Completed directly.
-                    "requires_async_polling": False,
+                    # The CREATE call returns instance IDs while the instances
+                    # are still pending. Keep the request in progress so the
+                    # next status read syncs the machines and settles it once
+                    # they are running.
+                    "requires_async_polling": True,
                 },
             }
         except Exception as e:

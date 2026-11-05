@@ -249,6 +249,12 @@ class MachineSyncService:
         machine_data["version"] = existing.version + 1
         return Machine.model_validate(machine_data)
 
+    @staticmethod
+    def _should_adopt_image_id(existing: Machine, provider_machine: Machine) -> bool:
+        """True when the provider reports an image the stored machine does not have yet."""
+        unset = (None, "", "unknown")
+        return provider_machine.image_id not in unset and existing.image_id in unset
+
     async def sync_machines_with_provider(
         self,
         request: Request,
@@ -299,6 +305,7 @@ class MachineSyncService:
                         or existing.status_reason != provider_machine.status_reason
                         or existing.provider_data != provider_machine.provider_data
                         or (provider_machine.resource_id and not existing.resource_id)
+                        or self._should_adopt_image_id(existing, provider_machine)
                     )
 
                     # Debug logging
@@ -344,6 +351,10 @@ class MachineSyncService:
                         machine_data["tags"] = provider_machine.tags
                         if provider_machine.resource_id and not existing.resource_id:
                             machine_data["resource_id"] = provider_machine.resource_id
+                        # A machine recorded from a launch response may not carry its
+                        # image yet; adopt it once the provider reports it.
+                        if self._should_adopt_image_id(existing, provider_machine):
+                            machine_data["image_id"] = provider_machine.image_id
 
                         updated_machine = Machine.model_validate(machine_data)
                         to_upsert.append(updated_machine)

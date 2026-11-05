@@ -2608,8 +2608,8 @@ class TestRequiresAsyncPollingKey:
     - EC2Fleet REQUEST  → False (fleet creation IS the final synchronous answer)
     - SpotFleet         → False (request submitted synchronously; status via polling happens
                                  via check_hosts_status, not the create path)
-    - ASG               → False (ASG created synchronously)
-    - RunInstances      → False (explicit: synchronous provisioning, no async polling needed)
+    - ASG               → True  (instances are launched asynchronously by the group)
+    - RunInstances      → True  (instances are returned while still pending)
     """
 
     def _make_ec2_fleet_handler(self, fleet_id="fleet-001"):
@@ -2724,8 +2724,8 @@ class TestRequiresAsyncPollingKey:
         assert result["success"] is True
         assert result["provider_data"]["requires_async_polling"] is False
 
-    def test_asg_sets_requires_async_polling_false(self):
-        """ASGHandler must set requires_async_polling=False in provider_data."""
+    def test_asg_sets_requires_async_polling_true(self):
+        """ASGHandler must set requires_async_polling=True in provider_data."""
         mock_aws_ops = Mock()
         mock_aws_ops.execute_with_standard_error_handling = Mock(return_value="asg-001")
         handler = ASGHandler(
@@ -2754,10 +2754,10 @@ class TestRequiresAsyncPollingKey:
         )
 
         assert result["success"] is True
-        assert result["provider_data"]["requires_async_polling"] is False
+        assert result["provider_data"]["requires_async_polling"] is True
 
-    def test_run_instances_sets_requires_async_polling_false(self):
-        """RunInstancesHandler must set requires_async_polling=False explicitly."""
+    def test_run_instances_sets_requires_async_polling_true(self):
+        """RunInstancesHandler must keep the request in progress (requires_async_polling=True)."""
         run_response = {
             "ReservationId": "r-001",
             "Instances": [],
@@ -2790,4 +2790,4 @@ class TestRequiresAsyncPollingKey:
         )
 
         assert result["success"] is True
-        assert result["provider_data"]["requires_async_polling"] is False
+        assert result["provider_data"]["requires_async_polling"] is True

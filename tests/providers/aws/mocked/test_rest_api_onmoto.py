@@ -11,6 +11,7 @@ Moto limitations accounted for (same patches as test_sdk_onmoto.py):
 - AWSProvisioningAdapter: patched to synthesise instances from instance_ids
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -539,3 +540,28 @@ class TestFullLifecycle:
                     import asyncio
 
                     await asyncio.sleep(0.5)
+
+
+class TestRunInstancesCompletion:
+    @pytest.mark.asyncio
+    async def test_request_completes_only_with_running_machines(self, rest_client):
+        created = await rest_client.post(
+            "/api/v1/machines/request",
+            json={"template_id": "RunInstances-OnDemand", "count": 1},
+        )
+        assert created.status_code == 202, created.text
+        request_id = created.json().get("requestId") or created.json().get("request_id")
+
+        status = await rest_client.get(f"/api/v1/requests/{request_id}/status")
+        assert status.status_code == 200, status.text
+        request = status.json()["requests"][0]
+        assert request["status"] == "complete", json.dumps(request)
+        assert request["machines"], json.dumps(request)
+        assert all(m["result"] == "succeed" for m in request["machines"]), json.dumps(request)
+
+        listed = await rest_client.get("/api/v1/machines/?limit=100&offset=0")
+        assert listed.status_code == 200, listed.text
+        machines = listed.json()["machines"]
+        assert machines
+        assert all(m["status"] == "running" for m in machines), json.dumps(machines)
+        assert all(m["privateIp"] for m in machines)
