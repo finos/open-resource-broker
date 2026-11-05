@@ -1,8 +1,9 @@
 # Default values for orb.
 # Override with: helm install orb ./deploy/helm/orb -f my-values.yaml
 
-# -- Number of REST server replicas. Must stay 1 with json or sqlite storage
-# (the chart refuses to render otherwise); see the README storage section.
+# -- Number of REST server replicas. Must stay 1: the chart refuses to render
+# more until the shared storage supports concurrent writers; see the README
+# storage section.
 replicaCount: 1
 
 image:
@@ -10,7 +11,8 @@ image:
   repository: ghcr.io/finos/open-resource-broker
   # -- Image pull policy.
   pullPolicy: IfNotPresent
-  # -- Image tag. Defaults to chart appVersion.
+  # -- Image tag. Required: set it to the ORB version to deploy. The chart
+  # needs an image newer than 1.9.2 (see the README install section).
   tag: ""
 
 # -- Image pull secrets for private registries.
@@ -33,10 +35,11 @@ serviceAccount:
   # mounted only when provider.type=k8s.
 
 rbac:
-  # -- Create Role/RoleBinding (namespaced) for the k8s provider.
+  # -- Create a Role/RoleBinding for the k8s provider in each namespace it
+  # manages. Nothing is created when provider.type is aws.
   create: true
   # -- Also create a ClusterRole/ClusterRoleBinding for cluster-scoped watch
-  # (required when provider.k8s.namespaces is ["*"] or node_watch_enabled is true).
+  # (required when provider.k8s.namespaces is ["*"] or nodeWatchEnabled is true).
   clusterScoped: false
 
 service:
@@ -108,6 +111,7 @@ server:
   serverLogLevel: "info"
   # -- Extra Host header values the API accepts. Loopback, the Service DNS names
   # and ingress.hosts are always allowed; the kubelet probes send Host: localhost.
+  # The wildcard "*" is rejected wherever it comes from; "*.example.com" is fine.
   trustedHosts: []
 
 auth:
@@ -128,10 +132,12 @@ provider:
   type: "k8s"
 
   k8s:
-    # -- Kubernetes namespaces to watch. Use ["*"] for cluster-scoped watch
-    # (requires rbac.clusterScoped: true).
-    namespaces:
-      - default
+    # -- Kubernetes namespaces the provider creates workloads in and watches.
+    # Empty means the release namespace. The first entry is the default for
+    # templates that do not name a namespace, unless the list includes the
+    # release namespace. Use ["*"] for cluster-scoped watch (requires
+    # rbac.clusterScoped: true).
+    namespaces: []
     # -- Enable per-node metadata cache (requires nodes get/list/watch —
     # automatically included when rbac.clusterScoped is true).
     nodeWatchEnabled: false
@@ -143,8 +149,10 @@ provider:
     profile: ""
 
 storage:
-  # -- Storage backend: json or sqlite. Both keep state in files under /app/data
-  # and are single-writer; see the README storage section.
+  # -- Storage backend: json, sqlite or dynamodb. json and sqlite keep state in
+  # files under /app/data and are single-writer; dynamodb keeps it outside the
+  # pod. sql is refused until the image ships a PostgreSQL driver. See the
+  # README storage section.
   type: "json"
   persistence:
     # -- Keep /app/data on a PersistentVolumeClaim. When false the data directory
@@ -154,12 +162,21 @@ storage:
     size: 1Gi
     # -- StorageClass of the claim. Empty uses the cluster default.
     storageClass: ""
-    # -- Access mode of the claim. Keep ReadWriteOnce: only one pod may write.
+    # -- Access mode of the claim. Keep ReadWriteOnce: only one pod may write, and
+    # ReadWriteMany is rejected because the single-writer guarantee needs block storage.
     accessMode: ReadWriteOnce
     # -- Use an existing claim instead of creating one.
     existingClaim: ""
     # -- Extra annotations for the created claim.
     annotations: {}
+
+  # DynamoDB tables, used when storage.type is dynamodb (requires provider.type aws).
+  # Credentials come from IRSA through serviceAccount.annotations.
+  dynamodb:
+    # -- Table name prefix.
+    tablePrefix: orb
+    # -- Region; defaults to provider.aws.region.
+    region: ""
 
 ui:
   # -- How the web UI is served. Selects the health probe paths and the

@@ -1,0 +1,11 @@
+provider:
+  type: aws
+  aws:
+    region: eu-west-1
+storage:
+  type: dynamodb
+  dynamodb:
+    tablePrefix: orb-ci
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/orb

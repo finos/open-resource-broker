@@ -1,0 +1,72 @@
+name: Helm Chart Publish
+
+# Publishes the chart as an OCI artifact on GitHub Container Registry when a
+# release is published. Nothing runs for pull requests or branches; packaging is
+# exercised separately in the Helm Chart workflow.
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: helm-chart-publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Push chart to GHCR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+      packages: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      REGISTRY_USER: ${{ github.actor }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Install Helm
+      uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
+
+    - name: Derive the chart version from the release tag
+      run: |
+        set -euo pipefail
+        version="${RELEASE_TAG#v}"
+        if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'; then
+          echo "Release tag '${RELEASE_TAG}' is not a semantic version" >&2
+          exit 1
+        fi
+        echo "CHART_VERSION=${version}" >> "$GITHUB_ENV"
+
+    - name: Lint and check the guards
+      run: |
+        set -euo pipefail
+        helm lint --strict deploy/helm/orb --set image.tag="${CHART_VERSION:?}"
+        deploy/helm/orb/ci/render-checks.sh
+
+    - name: Package the chart
+      run: |
+        set -euo pipefail
+        mkdir -p "${RUNNER_TEMP:?}/chart"
+        helm package deploy/helm/orb --destination "${RUNNER_TEMP:?}/chart" \
+          --version "${CHART_VERSION:?}" --app-version "${CHART_VERSION:?}"
+
+    - name: Log in to GitHub Container Registry
+      env:
+        REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        printf '%s' "$REGISTRY_TOKEN" | helm registry login ghcr.io \
+          --username "$REGISTRY_USER" --password-stdin
+
+    - name: Push the chart
+      run: |
+        set -euo pipefail
+        owner="${GITHUB_REPOSITORY_OWNER,,}"
+        helm push "${RUNNER_TEMP:?}/chart/orb-${CHART_VERSION:?}.tgz" "oci://ghcr.io/${owner}/charts"

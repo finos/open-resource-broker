@@ -56,24 +56,22 @@ jobs:
         chart=deploy/helm/orb
         for values in "$chart"/ci/*-values.yaml; do
           echo "::group::$values"
-          helm lint --strict "$chart" -f "$values"
-          helm template orb "$chart" -f "$values" --namespace orb \
+          helm lint --strict "$chart" -f "$values" --set image.tag=0.0.0-ci
+          helm template orb "$chart" -f "$values" --namespace orb --set image.tag=0.0.0-ci \
             | kubeconform -strict -summary -ignore-missing-schemas \
                 -kubernetes-version "$KUBERNETES_VERSION" -
           echo "::endgroup::"
         done
-    - name: Chart rejects unsupported combinations
+    - name: Render checks
+      run: deploy/helm/orb/ci/render-checks.sh
+
+    - name: Package the chart
       run: |
         set -euo pipefail
-        chart=deploy/helm/orb
-        if helm template orb "$chart" --set replicaCount=2 >/dev/null 2>&1; then
-          echo "replicaCount=2 with json storage must be rejected" >&2
-          exit 1
-        fi
-        if helm template orb "$chart" --set storage.type=sqlite --set replicaCount=2 >/dev/null 2>&1; then
-          echo "replicaCount=2 with sqlite storage must be rejected" >&2
-          exit 1
-        fi
+        out=$(mktemp -d)
+        helm package deploy/helm/orb --destination "${out:?}" --version 0.0.0-ci --app-version 0.0.0
+        helm show chart "${out:?}"/orb-0.0.0-ci.tgz >/dev/null
+        rm -rf "${out:?}"
 
   kind:
     name: Install on kind

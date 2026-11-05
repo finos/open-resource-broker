@@ -146,8 +146,10 @@ spec:
         - name: orb-config
           configMap:
             name: {{ include "orb.fullname" . }}-config
+        # Local state only. With dynamodb storage this is scratch space and nothing in it
+        # is authoritative.
         - name: orb-data
-          {{- if .Values.storage.persistence.enabled }}
+          {{- if and (include "orb.localStorage" .) .Values.storage.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ include "orb.claimName" . }}
           {{- else }}

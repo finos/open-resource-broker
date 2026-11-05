@@ -6,7 +6,7 @@ API base URL inside the cluster:
 Try it from your workstation:
   kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "orb.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
   curl http://localhost:{{ .Values.service.port }}{{ include "orb.apiPrefix" . }}/readyz
-{{- if not .Values.storage.persistence.enabled }}
+{{- if and (include "orb.localStorage" .) (not .Values.storage.persistence.enabled) }}
 
 WARNING: storage.persistence.enabled is false. Requests and machines are lost when the pod restarts.
 {{- end }}

@@ -1,13 +1,17 @@
-{{- if .Values.rbac.create -}}
-# Namespaced Role — covers pods, deployments, statefulsets, jobs within the
-# release namespace.  Mirrors docs/root/providers/k8s/rbac.yaml.
+{{- if and .Values.rbac.create (eq .Values.provider.type "k8s") }}
+{{- $namespaces := include "orb.k8sNamespaces" . | fromJsonArray }}
+{{- range $namespace := $namespaces }}
+{{- if ne $namespace "*" }}
+---
+# Namespaced Role — covers pods, deployments, statefulsets, jobs in each
+# namespace the provider manages. Mirrors docs/root/providers/k8s/rbac.yaml.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "orb.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "orb.fullname" $ }}
+  namespace: {{ $namespace }}
   labels:
-    {{- include "orb.labels" . | nindent 4 }}
+    {{- include "orb.labels" $ | nindent 4 }}
 rules:
   # Core — Pod handler + watch task
   - apiGroups: [""]
@@ -43,24 +47,29 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "orb.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "orb.fullname" $ }}
+  namespace: {{ $namespace }}
   labels:
-    {{- include "orb.labels" . | nindent 4 }}
+    {{- include "orb.labels" $ | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "orb.serviceAccountName" . }}
-    namespace: {{ .Release.Namespace }}
+    name: {{ include "orb.serviceAccountName" $ }}
+    namespace: {{ $.Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "orb.fullname" . }}
+  name: {{ include "orb.fullname" $ }}
 {{- end }}
-{{- if and .Values.rbac.create .Values.rbac.clusterScoped }}
+{{- end }}
+{{- end }}
+{{- $wildcard := has "*" (include "orb.k8sNamespaces" . | fromJsonArray) }}
+{{- $nodeWatch := .Values.provider.k8s.nodeWatchEnabled }}
+{{- if and .Values.rbac.create .Values.rbac.clusterScoped (eq .Values.provider.type "k8s") (or $wildcard $nodeWatch) }}
 ---
-# ClusterRole — required when provider.k8s.namespaces is ["*"] (cluster-scoped
-# watch) or when provider.k8s.nodeWatchEnabled is true.
-# Nodes are cluster-scoped; a namespaced Role cannot grant access.
+# ClusterRole — only what the configuration needs beyond the per-namespace Roles:
+# provider.k8s.namespaces ["*"] watches every namespace and gets the full rule set;
+# nodeWatchEnabled alone adds read access to nodes, which are cluster-scoped. Explicit
+# namespaces never get cluster-wide access to workloads.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -69,6 +78,7 @@ metadata:
     {{- include "orb.labels" . | nindent 4 }}
     app.kubernetes.io/component: cluster-scoped-watch
 rules:
+{{- if $wildcard }}
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch", "create", "patch", "delete"]
@@ -80,10 +90,6 @@ rules:
     verbs: ["get"]
   - apiGroups: [""]
     resources: ["events"]
-    verbs: ["get", "list", "watch"]
-  # Nodes — required for node_watch_enabled: true
-  - apiGroups: [""]
-    resources: ["nodes"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets"]
@@ -100,6 +106,12 @@ rules:
   - apiGroups: ["batch"]
     resources: ["jobs/status"]
     verbs: ["get"]
+{{- end }}
+{{- if $nodeWatch }}
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

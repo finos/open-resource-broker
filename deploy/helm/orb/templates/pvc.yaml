@@ -1,4 +1,4 @@
-{{- if and .Values.storage.persistence.enabled (not .Values.storage.persistence.existingClaim) }}
+{{- if and (include "orb.localStorage" .) .Values.storage.persistence.enabled (not .Values.storage.persistence.existingClaim) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
