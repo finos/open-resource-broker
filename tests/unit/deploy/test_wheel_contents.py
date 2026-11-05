@@ -29,13 +29,18 @@ def _tracked_package_files() -> list[Path]:
     return [Path(p) for p in out]
 
 
+def _build_command() -> list[str] | None:
+    if shutil.which("uv"):
+        return ["uv", "build", "--wheel", "--out-dir"]
+    if importlib.util.find_spec("build") is not None:
+        return [sys.executable, "-m", "build", "--wheel", "--no-isolation", "--outdir"]
+    return None
+
+
 @pytest.fixture(scope="module")
 def wheel_names(tmp_path_factory) -> set[str]:
-    if shutil.which("uv"):
-        cmd = ["uv", "build", "--wheel", "--out-dir"]
-    elif importlib.util.find_spec("build") is not None:
-        cmd = [sys.executable, "-m", "build", "--wheel", "--no-isolation", "--outdir"]
-    else:
+    cmd = _build_command()
+    if cmd is None:
         pytest.skip("uv or the build package is required to build the wheel")
     outdir = tmp_path_factory.mktemp("wheel")
     env = {**os.environ, "ORB_SKIP_UI_BUILD": "1"}
