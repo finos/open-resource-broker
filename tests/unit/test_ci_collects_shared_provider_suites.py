@@ -48,7 +48,7 @@ def _unit_leg_pytest_args() -> list[str]:
         argv = shlex.split(line)
         if "pytest" in argv:
             return argv[argv.index("pytest") + 1 :]
-    pytest.fail(f"ci-tests-unit does not invoke pytest:\n{result.stdout}")
+    raise AssertionError(f"ci-tests-unit does not invoke pytest:\n{result.stdout}")
 
 
 @pytest.mark.unit
