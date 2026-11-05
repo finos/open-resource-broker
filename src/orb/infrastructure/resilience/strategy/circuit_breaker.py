@@ -101,6 +101,7 @@ class CircuitBreakerStrategy(RetryStrategy):
                     "last_success_time": None,
                     "half_open_start_time": None,
                     "probe_in_flight": False,
+                    "probe_timed_out": False,
                 }
 
         logger.debug(
@@ -131,6 +132,7 @@ class CircuitBreakerStrategy(RetryStrategy):
             circuit_state["state"] = CircuitState.OPEN
             circuit_state["last_failure_time"] = time.time()
             circuit_state["probe_in_flight"] = False
+            circuit_state["probe_timed_out"] = False
             circuit_state["half_open_start_time"] = None
         logger.error(
             "Circuit breaker force-opened for %s due to quota error",
@@ -185,6 +187,7 @@ class CircuitBreakerStrategy(RetryStrategy):
         circuit_state["last_failure_time"] = current_time
         circuit_state["half_open_start_time"] = None
         circuit_state["probe_in_flight"] = False
+        circuit_state["probe_timed_out"] = False
         logger.warning(
             "Circuit breaker HALF_OPEN for %s - probe failed, reopening circuit",
             self.service_name,
@@ -314,11 +317,16 @@ class CircuitBreakerStrategy(RetryStrategy):
             circuit_state["last_success_time"] = current_time
             circuit_state["failure_count"] = 0  # Reset failure count on success
 
-            # If we were in half-open state, close the circuit
-            if circuit_state["state"] == CircuitState.HALF_OPEN:
+            # Close the circuit when the half-open probe succeeds, including a probe
+            # that outlived half_open_timeout and so already timed out back to OPEN.
+            late_probe_success = circuit_state["state"] == CircuitState.OPEN and circuit_state.get(
+                "probe_timed_out", False
+            )
+            if circuit_state["state"] == CircuitState.HALF_OPEN or late_probe_success:
                 circuit_state["state"] = CircuitState.CLOSED
                 circuit_state["half_open_start_time"] = None
                 circuit_state["probe_in_flight"] = False
+                circuit_state["probe_timed_out"] = False
 
                 logger.info(
                     "Circuit breaker CLOSED for %s after successful recovery",
@@ -383,6 +391,7 @@ class CircuitBreakerStrategy(RetryStrategy):
                     circuit_state["state"] = CircuitState.HALF_OPEN
                     circuit_state["half_open_start_time"] = current_time
                     circuit_state["probe_in_flight"] = False
+                    circuit_state["probe_timed_out"] = False
 
                     logger.info(
                         "Circuit breaker transitioning to HALF_OPEN for %s",
@@ -403,6 +412,11 @@ class CircuitBreakerStrategy(RetryStrategy):
                     and current_time - circuit_state["half_open_start_time"]
                     >= self.half_open_timeout
                 ):
+                    # An admitted probe that is still running keeps its verdict: a
+                    # late success closes the circuit, see record_success().
+                    circuit_state["probe_timed_out"] = bool(
+                        circuit_state.get("probe_in_flight", False)
+                    )
                     circuit_state["state"] = CircuitState.OPEN
                     circuit_state["half_open_start_time"] = None
                     circuit_state["probe_in_flight"] = False

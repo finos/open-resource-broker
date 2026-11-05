@@ -247,3 +247,37 @@ class TestCountPerCall:
             assert _state(svc) == CircuitState.CLOSED
         finally:
             registry._classifiers[:] = saved
+
+
+def _open_and_expire(svc: str, **kwargs: int) -> CircuitBreakerStrategy:
+    cb = CircuitBreakerStrategy(service_name=svc, failure_threshold=1, reset_timeout=1, **kwargs)
+    cb._force_open(svc)
+    CircuitBreakerStrategy._circuit_states[svc]["last_failure_time"] = time.time() - 5
+    return cb
+
+
+@pytest.mark.unit
+class TestLateProbeSuccess:
+    def test_probe_that_succeeds_after_half_open_timeout_closes_the_circuit(self) -> None:
+        svc = _svc()
+        cb = _open_and_expire(svc, half_open_timeout=1)
+        cb.before_call()  # becomes the probe
+        CircuitBreakerStrategy._circuit_states[svc]["half_open_start_time"] = time.time() - 5
+        # The probe slot times out while the probe call is still running.
+        with pytest.raises(CircuitBreakerOpenError):
+            cb.before_call()
+        assert _state(svc) == CircuitState.OPEN
+
+        cb.record_success()
+
+        assert _state(svc) == CircuitState.CLOSED
+        cb.before_call()
+
+    def test_success_of_a_call_that_was_not_the_probe_leaves_an_open_circuit_open(self) -> None:
+        svc = _svc()
+        cb = CircuitBreakerStrategy(service_name=svc, failure_threshold=1, reset_timeout=60)
+        cb._force_open(svc)
+
+        cb.record_success()
+
+        assert _state(svc) == CircuitState.OPEN
