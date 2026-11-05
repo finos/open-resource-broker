@@ -109,6 +109,8 @@ SQL storage (SQLite, PostgreSQL, MySQL and Aurora MySQL) keeps its schema under 
 orb storage migrate up
 ```
 
+The command migrates the database of the active `storage.strategy`: `storage.sql_strategy` for `sql`, the AWS provider's Aurora settings for `aurora`. With any other strategy it stops with an error.
+
 When a database is behind the migrations the installed release expects, ORB logs a warning at startup naming the database's revision and the expected one, and tells you to run this command. It never upgrades a versioned database by itself, so you choose when the change runs. Back up the database first.
 
 Release notes for schema changes:

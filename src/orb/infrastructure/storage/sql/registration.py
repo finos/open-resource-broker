@@ -196,6 +196,16 @@ def _build_connection_string(sql_config: Any) -> str:
     return _build_url(sql_config).render_as_string(hide_password=False)
 
 
+def sql_migration_url(config: Any) -> Any:
+    """URL of the database the SQL repositories use, for ``orb storage migrate``.
+
+    Accepts the same configuration sources as the SQL strategy and raises
+    ``ConfigurationError`` when none names a database.
+    """
+    sql_config, _db_config = _sql_settings(config)
+    return _build_url(sql_config)
+
+
 def reset_shared_memory_engines() -> None:
     """Dispose every shared engine, in-memory databases included (tests start empty)."""
     from orb.infrastructure.storage.components.engine_registry import dispose_engines
@@ -328,6 +338,7 @@ def register_sql_storage() -> None:
             unit_of_work_factory=create_sql_unit_of_work,
             display_name="SQL",
             entity_strategy_factory=create_sql_entity_strategy,
+            migration_url_factory=sql_migration_url,
         )
 
         logger.info("Successfully registered SQL storage type")

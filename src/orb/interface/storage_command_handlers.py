@@ -138,11 +138,11 @@ async def handle_storage_health(
 async def handle_storage_migrate(
     args: argparse.Namespace,
 ) -> dict[str, Any] | InterfaceResponse:
-    """Run Alembic migrations for the SQL storage strategy.
+    """Run Alembic migrations for the active SQL storage strategy.
 
     Subcommands: up (upgrade head), down (downgrade -1), current, history.
-    The database URL is read from the ORB configuration so it respects
-    whatever connection string the operator has configured.
+    The database is the one the active ``storage.strategy`` (sql or aurora)
+    stores its data in; any other strategy is refused.
     """
     container = args._container
     formatter = container.get(ResponseFormattingService)
@@ -188,25 +188,45 @@ async def handle_storage_migrate(
         from orb.config.manager import ConfigurationManager
         from orb.config.schemas.storage_schema import StorageConfig
         from orb.domain.base.exceptions import ConfigurationError
-        from orb.infrastructure.storage.sql.registration import _build_connection_string
+        from orb.infrastructure.storage.registry import get_storage_registry
 
         try:
             cfg = container.get(ConfigurationManager)
             storage_cfg = cfg.get_typed(StorageConfig)
-            db_url = _build_connection_string(storage_cfg.sql_strategy)
+        except Exception as exc:
+            raise ConfigurationError(
+                "Cannot determine the SQL database to migrate from the configuration "
+                f"({type(exc).__name__}). Check the storage configuration."
+            ) from None
+
+        # Migrate the database the active strategy stores its data in, never
+        # another configured (or default) one
+        active_strategy = storage_cfg.strategy
+        registry = get_storage_registry()
+        if not registry.has_migrations(active_strategy):
+            return formatter.format_error(
+                f"The active storage strategy '{active_strategy}' has no SQL schema to "
+                "migrate. 'orb storage migrate' applies to SQL storage (sql, aurora)."
+            )
+        try:
+            db_url = registry.get_migration_url(active_strategy, cfg).render_as_string(
+                hide_password=False
+            )
         except Exception as exc:
             # Never fall back to a default database: migrating the wrong one is worse than failing
             raise ConfigurationError(
                 "Cannot determine the SQL database to migrate from the configuration "
-                f"({type(exc).__name__}). Check storage.sql_strategy."
+                f"({type(exc).__name__}). Check the '{active_strategy}' storage settings."
             ) from None
 
         env = os.environ.copy()
         env["ORB_SQL_URL"] = db_url
-        sql_cfg = storage_cfg.sql_strategy
-        env["ORB_SQL_SSLMODE"] = sql_cfg.sslmode
-        if sql_cfg.sslrootcert:
-            env["ORB_SQL_SSLROOTCERT"] = sql_cfg.sslrootcert
+        if active_strategy == "sql":
+            # PostgreSQL TLS settings; other backends carry theirs in the URL
+            sql_cfg = storage_cfg.sql_strategy
+            env["ORB_SQL_SSLMODE"] = sql_cfg.sslmode
+            if sql_cfg.sslrootcert:
+                env["ORB_SQL_SSLROOTCERT"] = sql_cfg.sslrootcert
 
         # alembic.ini ships inside the package at
         # src/orb/infrastructure/storage/sql/migrations/alembic.ini so it
@@ -244,9 +264,9 @@ async def handle_storage_migrate(
         _migrate_logger.debug("alembic stdout: %s", raw_stdout)
         _migrate_logger.debug("alembic stderr: %s", raw_stderr)
 
-        # Scrub DB credentials before returning to caller.  Matches both
-        # postgresql:// and the future postgres+driver:// variants.
-        _DB_URL_RE = re.compile(r"((?:postgresql|postgres)[^:]*://[^:]+:)[^@]+(@)", re.IGNORECASE)
+        # Scrub DB credentials before returning to caller, for any URL scheme
+        # (postgresql+pg8000://, mysql+pymysql://, ...).
+        _DB_URL_RE = re.compile(r"([a-z][a-z0-9+.-]*://[^:/@\s]+:)[^@\s]+(@)", re.IGNORECASE)
 
         def _scrub(text: str) -> str:
             return _DB_URL_RE.sub(r"\1***\2", text)

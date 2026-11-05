@@ -420,6 +420,16 @@ def create_aurora_unit_of_work(config: Any) -> Any:
     return SQLUnitOfWork(_aurora_engine(url, settings))
 
 
+def aurora_migration_url(config: Any) -> Any:
+    """URL of the Aurora database the repositories use, for ``orb storage migrate``.
+
+    Raises:
+        StorageError: If no Aurora connection can be derived from ``config``
+    """
+    url, _settings = resolve_aurora_connection(config)
+    return url
+
+
 def register_aurora_storage(
     registry: "Optional[StorageRegistry]" = None, logger: "Optional[LoggingPort]" = None
 ) -> None:
@@ -442,6 +452,7 @@ def register_aurora_storage(
             unit_of_work_factory=create_aurora_unit_of_work,
             display_name="Aurora",
             entity_strategy_factory=create_aurora_entity_strategy,
+            migration_url_factory=aurora_migration_url,
         )
 
         if logger:

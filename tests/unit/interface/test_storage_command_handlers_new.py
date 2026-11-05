@@ -312,7 +312,58 @@ def _container_with_config(fmt):
     return container
 
 
+@pytest.fixture
+def _sql_backends_registered():
+    """The sql and aurora storage types registered, as after bootstrap."""
+    from orb.infrastructure.storage.registry import get_storage_registry
+    from orb.infrastructure.storage.sql.registration import register_sql_storage
+    from orb.providers.aws.storage.registration import register_aurora_storage
+
+    registry = get_storage_registry()
+    if not registry.is_registered("sql"):
+        register_sql_storage()
+    if not registry.is_registered("aurora"):
+        register_aurora_storage(registry)
+
+
+def _container_with_aurora(fmt):
+    """A container whose active storage strategy is Aurora (sql_strategy left at defaults)."""
+    from orb.config.manager import ConfigurationManager
+    from orb.config.schemas.storage_schema import StorageConfig
+    from orb.providers.aws.configuration.config import AWSProviderConfig
+    from orb.providers.aws.storage.config import AuroraSqlStrategyConfig
+
+    aurora = AuroraSqlStrategyConfig(  # type: ignore[call-arg]
+        type="mysql",
+        cluster_endpoint="orb.cluster-abc.eu-west-1.rds.amazonaws.com",
+        host="orb.cluster-abc.eu-west-1.rds.amazonaws.com",
+        port=3306,
+        name="orb",
+        username="orb_admin",
+        password="aurora-pw",
+        ssl_ca="/etc/ssl/rds-ca.pem",
+    )
+    aws_cfg = MagicMock()
+    aws_cfg.storage.aurora = aurora
+
+    manager = MagicMock(spec=ConfigurationManager)
+    manager.get_typed.side_effect = lambda kind: (
+        aws_cfg if kind is AWSProviderConfig else StorageConfig(strategy="aurora")
+    )
+    container = MagicMock()
+    container.get.side_effect = lambda kind: fmt if kind is ResponseFormattingService else manager
+    return container
+
+
+def _successful_alembic(stdout: bytes = b"done") -> tuple[AsyncMock, AsyncMock]:
+    proc = AsyncMock()
+    proc.returncode = 0
+    proc.communicate = AsyncMock(return_value=(stdout, b""))
+    return AsyncMock(return_value=proc), proc
+
+
 @pytest.mark.unit
+@pytest.mark.usefixtures("_sql_backends_registered")
 class TestHandleStorageMigrate:
     """Tests for handle_storage_migrate."""
 
@@ -440,6 +491,88 @@ class TestHandleStorageMigrate:
 
         fmt.format_error.assert_called()
         assert isinstance(result, InterfaceResponse)
+
+    @pytest.mark.asyncio
+    async def test_sql_strategy_migrates_the_configured_sql_database(self):
+        fmt = _make_formatter()
+        container = _container_with_config(fmt)
+        mock_exec, _proc = _successful_alembic()
+
+        with (
+            patch("importlib.util.find_spec", return_value=MagicMock()),
+            patch("asyncio.create_subprocess_exec", mock_exec),
+        ):
+            await handle_storage_migrate(Namespace(_container=container, migrate_subcommand="up"))
+
+        env = mock_exec.call_args.kwargs["env"]
+        assert env["ORB_SQL_URL"] == "sqlite:////srv/orb/migrate.db"
+
+    @pytest.mark.asyncio
+    async def test_aurora_strategy_migrates_the_aurora_database(self):
+        fmt = _make_formatter()
+        container = _container_with_aurora(fmt)
+        mock_exec, _proc = _successful_alembic()
+
+        with (
+            patch("importlib.util.find_spec", return_value=MagicMock()),
+            patch("asyncio.create_subprocess_exec", mock_exec),
+            patch.dict("os.environ", {}, clear=False) as environ,
+        ):
+            environ.pop("ORB_SQL_SSLMODE", None)
+            await handle_storage_migrate(Namespace(_container=container, migrate_subcommand="up"))
+
+        mock_exec.assert_awaited_once()
+        env = mock_exec.call_args.kwargs["env"]
+        url = env["ORB_SQL_URL"]
+        assert url.startswith("mysql+pymysql://orb_admin:aurora-pw@")
+        assert "orb.cluster-abc.eu-west-1.rds.amazonaws.com:3306/orb" in url
+        # TLS travels in the URL, as for the application's own engine
+        assert "ssl_ca=" in url
+        # Not the default local SQLite database from storage.sql_strategy
+        assert "sqlite" not in url
+        assert "ORB_SQL_SSLMODE" not in env
+
+    @pytest.mark.asyncio
+    async def test_strategy_without_a_sql_schema_is_refused(self):
+        from orb.config.manager import ConfigurationManager
+        from orb.config.schemas.storage_schema import StorageConfig
+
+        fmt = _make_formatter()
+        manager = MagicMock(spec=ConfigurationManager)
+        manager.get_typed.return_value = StorageConfig(strategy="json")
+        container = MagicMock()
+        container.get.side_effect = lambda kind: (
+            fmt if kind is ResponseFormattingService else manager
+        )
+        mock_exec = AsyncMock()
+
+        with (
+            patch("importlib.util.find_spec", return_value=MagicMock()),
+            patch("asyncio.create_subprocess_exec", mock_exec),
+        ):
+            await handle_storage_migrate(Namespace(_container=container, migrate_subcommand="up"))
+
+        mock_exec.assert_not_called()
+        message = fmt.format_error.call_args[0][0]
+        assert "'json' has no SQL schema to migrate" in message
+
+    @pytest.mark.asyncio
+    async def test_mysql_credentials_are_scrubbed_from_alembic_output(self):
+        fmt = _make_formatter()
+        container = _container_with_aurora(fmt)
+        mock_exec, _proc = _successful_alembic(
+            b"connecting to mysql+pymysql://orb_admin:aurora-pw@orb.cluster-abc/orb"
+        )
+
+        with (
+            patch("importlib.util.find_spec", return_value=MagicMock()),
+            patch("asyncio.create_subprocess_exec", mock_exec),
+        ):
+            await handle_storage_migrate(Namespace(_container=container, migrate_subcommand="up"))
+
+        output = fmt.format_success.call_args[0][0]["output"]
+        assert "aurora-pw" not in output
+        assert "mysql+pymysql://orb_admin:***@orb.cluster-abc/orb" in output
 
 
 @pytest.mark.unit
