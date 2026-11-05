@@ -719,15 +719,27 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         """Collect and merge defaults contributed by all registered provider strategies."""
         merged: dict = {}
         for reg in self._type_registrations.values():
-            if isinstance(reg, ProviderRegistration) and reg.strategy_class is not None:
-                try:
-                    defaults = reg.strategy_class.get_defaults_config()
-                    if defaults:
-                        self._deep_merge(merged, defaults)
-                except Exception as e:
-                    self._logger.warning(
-                        "Failed to collect defaults from %s: %s", reg.strategy_class, e
-                    )
+            if not isinstance(reg, ProviderRegistration):
+                continue
+            try:
+                strategy_class = reg.strategy_class
+                if strategy_class is None:
+                    continue
+                defaults = strategy_class.get_defaults_config()
+                if defaults:
+                    self._deep_merge(merged, defaults)
+            except ImportError as e:
+                self._logger.warning(
+                    "Provider %s requires the %s extra (pip install 'orb-py[%s]'): %s",
+                    reg.type_name,
+                    reg.type_name,
+                    reg.type_name,
+                    e,
+                )
+            except Exception as e:
+                self._logger.warning(
+                    "Failed to collect defaults from provider %s: %s", reg.type_name, e
+                )
         return merged
 
 
