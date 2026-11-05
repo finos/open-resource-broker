@@ -110,8 +110,10 @@ jobs:
       run: |
         # Providers: directories under tests/providers/ that own a testconf.mk.
         # Shared helper dirs (base/, contract/, logs/) have no testconf.mk and
-        # are therefore excluded.  Static fallback keeps CI valid in forks or
-        # shallow clones where the directory structure might differ.
+        # are therefore excluded; their cross-provider suites run in the unit
+        # leg instead (TESTS_PROVIDERS_SHARED in makefiles/common.mk).
+        # Static fallback keeps CI valid in forks or shallow clones where the
+        # directory structure might differ.
         PROVIDERS=$(python3 -c "
         import os, json
         providers = sorted([

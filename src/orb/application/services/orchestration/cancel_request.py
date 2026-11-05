@@ -27,7 +27,7 @@ from orb.application.services.orchestration.dtos import (
     ReturnMachinesInput,
 )
 from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
-from orb.domain.base.exceptions import ApplicationError
+from orb.domain.base.exceptions import ApplicationError, EntityNotFoundError
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.request.request_types import RequestStatus
 
@@ -182,6 +182,9 @@ class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelReque
         try:
             query = SyncAndGetRequestQuery(request_id=request_id, verbose=False)
             request = await self._query_bus.execute(query)
+        except EntityNotFoundError:
+            # An unknown request is a not-found outcome, not a failed cancel.
+            raise
         except Exception as exc:
             raise self._cancel_failed(
                 request_id, f"could not load its machines ({exc})", context

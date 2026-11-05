@@ -13,7 +13,7 @@ from orb.application.services.orchestration.dtos import (
     CancelRequestOutput,
     ReturnMachinesOutput,
 )
-from orb.domain.base.exceptions import ApplicationError
+from orb.domain.base.exceptions import ApplicationError, EntityNotFoundError
 
 
 @pytest.fixture
@@ -261,6 +261,22 @@ class TestCancelRequestOrchestrator:
             logger=mock_logger,
         )
         with pytest.raises(ApplicationError, match="db down"):
+            await orchestrator.execute(CancelRequestInput(request_id="req-001"))
+        mock_command_bus.execute.assert_not_called()
+        mock_return_orchestrator.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_unknown_request_raises_not_found(
+        self, mock_command_bus, mock_query_bus, mock_return_orchestrator, mock_logger
+    ):
+        mock_query_bus.execute.side_effect = EntityNotFoundError("Request", "req-001")
+        orchestrator = CancelRequestOrchestrator(
+            command_bus=mock_command_bus,
+            query_bus=mock_query_bus,
+            return_orchestrator=mock_return_orchestrator,
+            logger=mock_logger,
+        )
+        with pytest.raises(EntityNotFoundError):
             await orchestrator.execute(CancelRequestInput(request_id="req-001"))
         mock_command_bus.execute.assert_not_called()
         mock_return_orchestrator.execute.assert_not_called()

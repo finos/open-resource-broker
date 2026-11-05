@@ -46,6 +46,11 @@ TESTS_E2E := $(TESTS)/e2e
 TESTS_PERFORMANCE := $(TESTS)/performance
 TESTS_INFRASTRUCTURE := $(TESTS)/infrastructure
 TESTS_PROVIDERS := $(TESTS)/providers
+# Cross-provider suites under tests/providers/ that have no testconf.mk, so the
+# per-provider matrix never picks them up.  They need no provider SDKs and run
+# in the unit leg.  tests/unit/test_ci_collects_shared_provider_suites.py fails
+# when a directory with tests is missing from this list.
+TESTS_PROVIDERS_SHARED := $(TESTS_PROVIDERS)/base $(TESTS_PROVIDERS)/contract $(TESTS_PROVIDERS)/services
 CONFIG := config/config.json
 
 # Coverage settings
