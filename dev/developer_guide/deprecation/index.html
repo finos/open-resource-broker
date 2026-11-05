@@ -2340,6 +2340,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#current-deprecations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current deprecations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Current deprecations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sdk-provider-setting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SDK provider setting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6237,6 +6265,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#current-deprecations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current deprecations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Current deprecations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sdk-provider-setting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SDK provider setting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6398,6 +6454,19 @@ deadline and tends to live forever.</p>
 <li>[ ] Added a test asserting the signal fires (use <code>caplog</code> for <code>logger.warning</code>,
       <code>pytest.warns</code> for <code>DeprecationWarning</code>)</li>
 </ul>
+<h2 id="current-deprecations">Current deprecations<a class="headerlink" href="#current-deprecations" title="Permanent link">&para;</a></h2>
+<h3 id="sdk-provider-setting">SDK <code>provider</code> setting<a class="headerlink" href="#sdk-provider-setting" title="Permanent link">&para;</a></h3>
+<p><code>SDKConfig.provider</code>, <code>ORBClient(provider=...)</code>, the <code>"provider"</code> key in an SDK
+config dictionary, and the <code>ORB_PROVIDER</code> environment variable are deprecated
+and ignored. The provider used for an operation comes from the template; use
+<code>provider_type</code> / <code>provider_name</code> (<code>ORB_PROVIDER_TYPE</code> / <code>ORB_PROVIDER_NAME</code>)
+when selection has to be narrowed. Setting the old value emits a
+<code>DeprecationWarning</code> and a logger warning, and has no other effect.
+<code>ORBClient.provider</code> and the <code>"provider"</code> entry of <code>ORBClient.get_stats()</code> still
+report the value the caller set (reading the property emits a
+<code>DeprecationWarning</code>); when it is not set they report <code>provider_type</code>.
+<code>get_stats()</code> also reports <code>provider_type</code> on its own.</p>
+<p>Removal: the next minor release.</p>
 
 
 
