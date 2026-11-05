@@ -340,3 +340,28 @@ class TestReturnStatusCarriesMachineCoordinates:
 
         loader.assert_called_once_with(svc.uow_factory, ["vm-a"])
         assert captured[0].parameters["machine_coordinates"] == coordinates
+
+
+@pytest.mark.parametrize(
+    ("stored", "reported", "expected"),
+    [
+        ("unknown", "ami-1", True),
+        ("", "ami-1", True),
+        (None, "ami-1", True),
+        ("ami-0", "ami-1", False),
+        ("unknown", "unknown", False),
+        ("unknown", None, False),
+    ],
+)
+def test_image_id_is_adopted_only_when_the_stored_machine_has_none(stored, reported, expected):
+    from types import SimpleNamespace
+
+    from orb.application.services.machine_sync_service import MachineSyncService
+
+    assert (
+        MachineSyncService._should_adopt_image_id(
+            SimpleNamespace(image_id=stored),  # type: ignore[arg-type]
+            SimpleNamespace(image_id=reported),  # type: ignore[arg-type]
+        )
+        is expected
+    )
