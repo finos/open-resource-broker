@@ -43,17 +43,6 @@ _ACQUIRE_ID = "req-00000000-0000-0000-0000-0000000000a1"
 _RETURN_ID = "ret-00000000-0000-0000-0000-0000000000b1"
 
 
-def _needs_json_file_lock(uow: "_Uow", request: pytest.FixtureRequest) -> None:
-    """A second JSON writer is only merged correctly with read-modify-write under the file lock."""
-    if uow.kind == "json":
-        request.applymarker(
-            pytest.mark.xfail(
-                strict=True,
-                reason="requires JSON read-modify-write under the file lock (#701)",
-            )
-        )
-
-
 class _Uow:
     def __init__(self, requests, machines) -> None:
         self.requests = requests
@@ -535,9 +524,8 @@ async def test_list_query_updates_the_stored_request(world: _World) -> None:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_cancel_during_machine_id_discovery_stays_cancelled(
-    world: _World, request: pytest.FixtureRequest
+    world: _World,
 ) -> None:
-    _needs_json_file_lock(world.uow, request)
     world.add_acquire()
     world.provider.instances = [{"instance_id": "i-1"}]
     world.cancel_and_create_return_by_other_writer(call=1)
@@ -554,9 +542,8 @@ async def test_cancel_during_machine_id_discovery_stays_cancelled(
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_return_request_filed_by_another_writer_survives_the_loop(
-    world: _World, request: pytest.FixtureRequest
+    world: _World,
 ) -> None:
-    _needs_json_file_lock(world.uow, request)
     world.add_acquire()
     world.provider.instances = [{"instance_id": "i-1"}]
     world.cancel_and_create_return_by_other_writer(call=1)
