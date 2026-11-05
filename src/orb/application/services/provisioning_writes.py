@@ -60,6 +60,8 @@ def apply_onto_stored(request: Request, stored: Optional[Request]) -> Request:
         "metadata": {**stored.metadata, **request.metadata},
         "provider_data": {**stored.provider_data, **request.provider_data},
         "version": stored.version + 1,
+        # The save is checked against the revision the stored row was read at.
+        "persisted_revision": stored.persisted_revision,
     }
     terminal_meanwhile = stored.status.is_terminal()
     if terminal_meanwhile:
