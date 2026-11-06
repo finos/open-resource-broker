@@ -634,6 +634,9 @@ addopts = "--tb=short --strict-markers --disable-warnings"
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
+    # A test that returns a value instead of asserting must fail, not warn:
+    # addopts hides warnings, so a returned False would otherwise pass.
+    "error::pytest.PytestReturnNotNoneWarning",
 ]
 markers = [
     "unit: Unit tests",
