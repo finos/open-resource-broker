@@ -94,12 +94,14 @@ def test_probe_reports_visible_instances_via_search_not_get_by_id():
     assert calls[0][:3] == ["search", "resource", "structured-search"]
 
 
-def test_probe_with_no_hits_reports_instances_gone():
+def test_probe_with_no_hits_reports_instances_unknown():
     result = _handler(lambda *a, **k: {"data": {"items": []}}).get_instance_status(
         _probe_operation(["i-1"])
     )
     assert result.success
-    assert [(i["instance_id"], i["status"]) for i in result.data["instances"]] == [("i-1", "gone")]
+    assert [(i["instance_id"], i["status"]) for i in result.data["instances"]] == [
+        ("i-1", "unknown")
+    ]
 
 
 def test_probe_reports_terminated_search_hit_as_terminated():
@@ -148,7 +150,7 @@ def test_probe_reports_hits_from_any_batch():
     result = _handler(run).get_instance_status(_probe_operation(ids))
     states = {i["instance_id"]: i["status"] for i in result.data["instances"]}
     assert states["i-15"] == "visible"
-    assert {s for m, s in states.items() if m != "i-15"} == {"gone"}
+    assert {s for m, s in states.items() if m != "i-15"} == {"unknown"}
 
 
 def test_probe_over_time_budget_is_unavailable(monkeypatch):

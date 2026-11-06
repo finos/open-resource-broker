@@ -154,6 +154,26 @@ async def test_unknown_with_force_is_recorded_as_operator_attested(scenario):
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"instances": 5},
+        {"instances": [None]},
+        {"instances": ["i-1"]},
+    ],
+)
+async def test_malformed_probe_payload_leaves_machines_unknown(data):
+    request = _request()
+    result = SimpleNamespace(success=True, data=data, error_code=None)
+    orchestrator, bus, _ = _orchestrator(request, result)
+    with pytest.raises(TerminationNotVerifiedError, match="i-1"):
+        await orchestrator.execute(_input(request))
+    await orchestrator.execute(_input(request, force=True))
+    assert bus.execute.await_args.args[0].verifications == {"i-1": "operator_attested"}
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_mixed_result_attests_only_what_the_provider_could_not_verify():
     request = _request()
     orchestrator, bus, _ = _orchestrator(

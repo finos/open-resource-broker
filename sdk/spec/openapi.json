@@ -1838,6 +1838,15 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid request: the request is not a return request in progress, or a machine is not part of it"
+          },
+          "404": {
+            "description": "Request not found"
+          },
+          "409": {
+            "description": "A machine is still present at the provider, or the provider could not verify it and force was not set"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
