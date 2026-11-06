@@ -2991,6 +2991,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#background-request-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background Request Reconciliation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#alerting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6213,6 +6224,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#background-request-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background Request Reconciliation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#alerting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6312,6 +6334,64 @@
 <li>Error logs and stack traces</li>
 <li>Audit logs</li>
 </ul>
+<h2 id="background-request-reconciliation">Background Request Reconciliation<a class="headerlink" href="#background-request-reconciliation" title="Permanent link">&para;</a></h2>
+<p>A long-running ORB server (REST API or daemon) can refresh in-flight requests
+from their providers on a timer, so stored request and machine state follows the
+provider without a client polling each request. List views serve stored state
+that was refreshed recently instead of calling the provider again.</p>
+<p>Configure it under <code>request</code> in the configuration file:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reconcile_enabled</code></td>
+<td><code>false</code></td>
+<td>Set to <code>true</code> to run the loop. Off by default because it makes periodic provider API calls, one per in-flight request per pass. While off, list views always refresh from the provider.</td>
+</tr>
+<tr>
+<td><code>reconcile_interval_seconds</code></td>
+<td><code>60</code></td>
+<td>Seconds between passes.</td>
+</tr>
+<tr>
+<td><code>reconcile_max_concurrency</code></td>
+<td><code>4</code></td>
+<td>Most requests refreshed against providers at the same time.</td>
+</tr>
+<tr>
+<td><code>reconcile_request_timeout_seconds</code></td>
+<td><code>30</code></td>
+<td>Time limit for refreshing one request.</td>
+</tr>
+<tr>
+<td><code>list_cache_max_age_seconds</code></td>
+<td><code>30</code></td>
+<td>A request refreshed within this window is listed from stored state. <code>0</code> always refreshes.</td>
+</tr>
+</tbody>
+</table>
+<p>Requests of a provider whose circuit breaker is open are skipped until the
+circuit closes, and provider failures seen by the loop count toward that
+circuit. A failed provider call does not refresh a request's last-checked time.</p>
+<p>Every write the loop makes re-reads the request first, so a request cancelled while its
+provider call was running stays cancelled. With the SQL store a conflicting write is
+detected and re-applied once; the JSON store has no version check, so a change that lands
+in the few milliseconds between that read and the save can still be lost.</p>
+<p>The loop runs only in a server with <code>server.workers</code> set to 1; with more
+workers it is not started (a message is logged at startup), because each worker
+would run its own loop against the same providers and storage. It starts with
+the server; on shutdown calls already in flight get a few seconds to finish
+before the pass is cancelled. Several single-worker replicas that share one
+SQL or DynamoDB store each run their own loop; the writes stay safe, but each
+replica calls the providers for the same requests, so enable the loop on one
+replica only. One-shot CLI commands do not run it. The
+list-view caching described above is per process.</p>
 <h2 id="alerting">Alerting<a class="headerlink" href="#alerting" title="Permanent link">&para;</a></h2>
 <p>Set up alerts for:</p>
 <ul>

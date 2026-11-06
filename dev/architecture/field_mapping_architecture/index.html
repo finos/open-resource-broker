@@ -1675,6 +1675,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#neutral-template-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Template Fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Neutral Template Fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fields-that-stay-on-the-shared-template-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields that stay on the shared template, and why
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-provider-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a provider key
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#benefits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6555,6 +6594,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#neutral-template-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Template Fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Neutral Template Fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fields-that-stay-on-the-shared-template-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields that stay on the shared template, and why
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-provider-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a provider key
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#benefits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6898,6 +6976,81 @@
 <li><code>instanceProfile</code> → <code>instance_profile</code></li>
 <li><code>userDataScript</code> → <code>user_data</code></li>
 </ul>
+<h2 id="neutral-template-fields">Neutral Template Fields<a class="headerlink" href="#neutral-template-fields" title="Permanent link">&para;</a></h2>
+<p>A few template fields look provider-specific but have a counterpart on every
+supported provider, so they stay on the shared template aggregate and each
+provider maps them to its own concept.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>AWS</th>
+<th>Azure</th>
+<th>GCP</th>
+<th>OCI</th>
+<th>Kubernetes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>subnet_ids</code></td>
+<td>VPC subnet</td>
+<td>VNet subnet</td>
+<td>Subnetwork</td>
+<td>Subnet</td>
+<td>Not used (empty)</td>
+</tr>
+<tr>
+<td><code>security_group_ids</code></td>
+<td>Security group</td>
+<td>Network security group</td>
+<td>Network tags / firewall</td>
+<td>Network security group</td>
+<td>Not used (empty)</td>
+</tr>
+<tr>
+<td><code>vpc_id</code> (machine)</td>
+<td>VPC</td>
+<td>VNet id</td>
+<td>Network</td>
+<td>VCN</td>
+<td>Not used (<code>None</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>subnetIds</code> and <code>securityGroupIds</code> HostFactory keys map to <code>subnet_ids</code>
+and <code>security_group_ids</code> for every provider, so external HostFactory consumers
+see the same spelling whichever provider serves the template.</p>
+<h3 id="fields-that-stay-on-the-shared-template-and-why">Fields that stay on the shared template, and why<a class="headerlink" href="#fields-that-stay-on-the-shared-template-and-why" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>machine_types_ondemand</code>, <code>machine_types_priority</code>, <code>iops</code>, <code>throughput</code></strong>
+  originate on AWS (EC2 Fleet pool split, EBS volume tuning). They remain
+  optional on the shared aggregate. Moving them out needs a mechanism that
+  round-trips provider-specific keys through the template repository, which
+  serialises through an explicit key list, the template DTO, the SQL columns,
+  the REST models and the UI. A move without that mechanism silently drops
+  stored values, and Azure and GCP aggregates reject unknown keys, so the
+  consumers below would all change together:
+  the application <code>TemplateDTO</code>, the DTO factories, the template repository,
+  the SQL template model, the REST template models, the UI template pages and
+  the template defaults service. Revisit only if a second provider needs a
+  conflicting meaning for the same key.</li>
+<li><strong><code>allocation_strategy</code> default.</strong> The shared aggregate defaults an unset
+  value from the price type (<code>priceCapacityOptimized</code> for spot, <code>lowestPrice</code>
+  otherwise). Stored templates and HostFactory input supply their own
+  spelling before that default can apply, and the EC2 Fleet request builder
+  only emits <code>AllocationStrategy</code> when the value is set, so removing the
+  default would drop the parameter from fleet requests. AWS normalises every
+  spelling (<code>lowestPrice</code>, <code>lowest_price</code>, <code>lowest-price</code>) when it uses the
+  value. Azure does not use the field and holds an empty value.</li>
+</ul>
+<p>The behaviour above is pinned by the allocation-strategy golden tests, the
+template DTO field snapshot, the storage round-trip tests and the HostFactory
+network goldens, which are the acceptance gate for any future field move.</p>
+<h3 id="adding-a-provider-key">Adding a provider key<a class="headerlink" href="#adding-a-provider-key" title="Permanent link">&para;</a></h3>
+<p>A provider that needs template keys of its own defines its own field mapping
+(<code>FieldMappingPort</code>) and its own template aggregate; it should not add
+provider-named keys to the shared aggregate.</p>
 <h2 id="benefits">Benefits<a class="headerlink" href="#benefits" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Single Source of Truth</strong>: All field mappings are centralized in one registry</li>
