@@ -70,7 +70,7 @@ class TestAcquireWait:
         assert all(q.lightweight is False and q.skip_cache is True for q in query_bus.queries)
 
     @pytest.mark.asyncio
-    async def test_no_wait_returns_without_polling_or_sleeping(self, _no_sleep):
+    async def test_no_wait_reads_stored_status_without_polling_or_sleeping(self, _no_sleep):
         query_bus = _ProviderBackedQueryBus()
         orchestrator = AcquireMachinesOrchestrator(
             _command_bus(created_request_id="req-1"), query_bus, MagicMock()
@@ -81,7 +81,8 @@ class TestAcquireWait:
         )
 
         assert result.request_id == "req-1"
-        assert query_bus.queries == []
+        assert result.status == "in_progress"
+        assert all(query.lightweight for query in query_bus.queries)
         _no_sleep.assert_not_called()
 
 
