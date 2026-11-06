@@ -313,7 +313,7 @@ def test_deadline_sweep_full_capacity_completes_not_partial():
         successful_count=0,  # lags — not healed for ACQUIRING
         machine_ids=["i-1", "i-2", "i-3"],
     )
-    out = _sm().evaluate_deadline(r, now=NOW + timedelta(seconds=1))
+    out = _sm().evaluate_deadline(r, now=NOW + timedelta(seconds=1), fresh_read=True)
     assert out.status == RequestStatus.COMPLETED
     # No DEADLINE diagnostic — nothing fell short.
     assert out.fulfilment_diagnostic is None
@@ -330,7 +330,7 @@ def test_deadline_sweep_uses_machine_ids_when_successful_count_lags():
         successful_count=0,
         machine_ids=["i-1", "i-2"],
     )
-    out = _sm().evaluate_deadline(r, now=NOW + timedelta(seconds=1))
+    out = _sm().evaluate_deadline(r, now=NOW + timedelta(seconds=1), fresh_read=True)
     assert out.status == RequestStatus.PARTIAL
     assert out.status.is_terminal()
     assert out.fulfilment_diagnostic.category == DiagnosticCategory.DEADLINE
@@ -595,6 +595,6 @@ def test_deadline_sweep_completes_clears_prior_diagnostic():
             occurred_at=NOW - timedelta(seconds=GRACE),
         ),
     )
-    out = _sm().evaluate_deadline(r, now=NOW + timedelta(seconds=1))
+    out = _sm().evaluate_deadline(r, now=NOW + timedelta(seconds=1), fresh_read=True)
     assert out.status == RequestStatus.COMPLETED
     assert out.fulfilment_diagnostic is None
