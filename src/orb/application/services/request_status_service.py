@@ -24,6 +24,7 @@ from typing import Optional, Tuple
 from orb.application.services.machine_sync_service import PROVIDER_FETCH_FAILED
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import ConcurrencyError, ProviderContractError
+from orb.domain.base.ports import EventPublisherPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.machine.aggregate import Machine
@@ -51,9 +52,11 @@ class RequestStatusService:
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         state_machine: Optional[FulfilmentStateMachine] = None,
+        event_publisher: Optional[EventPublisherPort] = None,
     ) -> None:
         self.uow_factory = uow_factory
         self.logger = logger
+        self._event_publisher = event_publisher
         self._state_machine = state_machine or FulfilmentStateMachine(
             grace_period_seconds=_DEFAULT_GRACE_PERIOD_SECONDS
         )
@@ -204,6 +207,21 @@ class RequestStatusService:
         else:
             return RequestStatus.IN_PROGRESS.value, "Instances terminating"
 
+    def _publish_events(self, events: Optional[list]) -> None:
+        """Publish the events a saved request returned.
+
+        Called after the unit of work has committed and outside any optimistic
+        concurrency retry, so a retried write never emits a transition twice. The
+        publisher never raises into the caller; a failure here is only logged.
+        """
+        if self._event_publisher is None or not events:
+            return
+        for event in events:
+            try:
+                self._event_publisher.publish(event)
+            except Exception as exc:
+                self.logger.warning("Failed to publish %s: %s", event.event_type, exc)
+
     def sweep_expired_deadline(self, request: Request) -> Request:
         """Resolve a request whose deadline has passed, without any provider call.
 
@@ -224,7 +242,8 @@ class RequestStatusService:
                     if swept is current or swept.status == current.status:
                         return current
                     swept = swept.model_copy(update={"version": current.version + 1})
-                    uow.requests.save(swept)
+                    events = uow.requests.save(swept)
+                self._publish_events(events)
                 self.logger.info(
                     "Request %s passed its deadline and is now %s",
                     request.request_id.value,
@@ -278,6 +297,7 @@ class RequestStatusService:
         # cancel (or any other change) made meanwhile is neither undone nor
         # saved over with an older version.
         updated_request: Request = request
+        events: Optional[list] = None
         for attempt in range(_WRITE_ATTEMPTS):
             try:
                 with self.uow_factory.create_unit_of_work() as uow:
@@ -306,7 +326,7 @@ class RequestStatusService:
                     updated_request = updated_request.model_copy(
                         update={"version": current.version + 1}
                     )
-                    uow.requests.save(updated_request)
+                    events = uow.requests.save(updated_request)
                 break
             except ConcurrencyError as exc:
                 # Another writer saved between our read and our save. Re-read
@@ -326,6 +346,7 @@ class RequestStatusService:
                 self.logger.error(f"Failed to persist request status update: {e}")
                 raise
 
+        self._publish_events(events)
         self.logger.info(
             "Updated request %s status to %s",
             request.request_id.value,

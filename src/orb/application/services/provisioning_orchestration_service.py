@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from typing_extensions import assert_never
 
 if TYPE_CHECKING:
+    from orb.domain.base.ports.event_publisher_port import EventPublisherPort
     from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 
 from orb.application.ports.resilience_port import CircuitBreakerOpenError, CircuitBreakerPort
@@ -152,7 +153,9 @@ class ProvisioningOrchestrationService:
         config_port: ConfigurationPort,
         circuit_breaker_factory: Callable[[str], CircuitBreakerPort],
         state_machine: "FulfilmentStateMachine | None" = None,
+        event_publisher: "EventPublisherPort | None" = None,
     ):
+        self._event_publisher = event_publisher
         self._uow_factory = uow_factory
         self._scheduler = scheduler
         self._logger = logger
@@ -707,7 +710,8 @@ class ProvisioningOrchestrationService:
                         )
                     uow_factory2 = self._uow_factory
                     with uow_factory2.create_unit_of_work() as uow2:
-                        uow2.requests.save(failed_request)
+                        events = uow2.requests.save(failed_request)
+                    self._publish_events(events)
                     failed_count += 1
                     self._logger.info(
                         "startup scan: swept active request %s to %s "
@@ -728,6 +732,18 @@ class ProvisioningOrchestrationService:
             self._logger.warning("startup scan: active-request recovery scan failed: %s", exc)
 
         return failed_count
+
+    def _publish_events(self, events: "list[Any] | None") -> None:
+        """Publish the events returned by a committed save; never raises."""
+        if self._event_publisher is None:
+            return
+        for event in events or []:
+            try:
+                self._event_publisher.publish(event)
+            except Exception as exc:
+                self._logger.warning(
+                    "startup scan: could not publish %s: %s", event.event_type, exc
+                )
 
     def _record_provider_failure(self, provider_name: str) -> None:
         """Increment circuit breaker failure count and open circuit if threshold is reached."""
