@@ -64,7 +64,7 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.1")
 
     // JSON
-    implementation("com.google.code.gson:gson:2.14.0")
+    implementation("com.google.code.gson:gson:2.15.0")
 
     // OkIO (transitive via OkHttp, explicitly listed for clarity)
     implementation("com.squareup.okio:okio:3.18.2")
@@ -72,8 +72,8 @@ dependencies {
     // AWS SDK v2 auth — provides the native SigV4 signer (AwsV4HttpSigner / Aws4Signer)
     // and the standard credential provider chain. No AWS service stubs are pulled in;
     // only the auth/signer module and its minimal transitive dependencies are included.
-    implementation("software.amazon.awssdk:auth:2.57.4")
-    implementation("software.amazon.awssdk:regions:2.57.4")
+    implementation("software.amazon.awssdk:auth:2.57.8")
+    implementation("software.amazon.awssdk:regions:2.57.8")
 
     // Test
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
