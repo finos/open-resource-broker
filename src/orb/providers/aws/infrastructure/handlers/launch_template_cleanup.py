@@ -197,14 +197,32 @@ class LaunchTemplateCleanupService:
             )
             return True
 
+    def _launch_template_prefix(self) -> Optional[str]:
+        """Return the configured launch template name prefix, or None if unavailable."""
+        if self._config_port is None:
+            return None
+        try:
+            prefix = self._config_port.get_resource_prefix("launch_template")
+        except Exception as e:
+            self._logger.warning("Could not read launch template name prefix: %s", e)
+            return None
+        return prefix if isinstance(prefix, str) else None
+
     def delete_orb_launch_template(
         self, request_id: str, exclude_instance_ids: Optional[Iterable[str]] = None
     ) -> None:
         """Delete the ORB-managed launch template for a request, if one exists.
 
-        Reconstructs the launch template name from the request ID, verifies the
-        ``orb:managed-by`` tag to confirm ORB ownership, then deletes it.
-        Respects the cleanup config dry_run flag.  All failures are warning-only
+        Finds templates tagged with the request ID, verifies the
+        ``orb:managed-by`` tag and that the template name carries the configured
+        launch template prefix followed by the request ID, then deletes it.
+        An empty prefix is valid (the configuration adapter returns "" when no
+        prefix is set or its lookup fails): the expected name is then
+        ``<request id>-<template id>``, which still matches only this request's
+        templates.  Nothing is deleted if the port returns a non-string or raises.  A template kept
+        because its name does not match (for example after the prefix was
+        changed) is left in place and logged.  Respects the cleanup config
+        dry_run flag.  All failures are warning-only
         so that LT cleanup never blocks the main return flow.
         """
         if self._config_port is None:
@@ -230,6 +248,16 @@ class LaunchTemplateCleanupService:
                 request_id,
             )
             return
+
+        prefix = self._launch_template_prefix()
+        if prefix is None:
+            self._logger.warning(
+                "Launch template name prefix is unavailable; skipping launch template "
+                "cleanup for %s",
+                request_id,
+            )
+            return
+        expected_name_prefix = f"{prefix}{request_id}-"
 
         try:
             response = self._aws_client.ec2_client.describe_launch_templates(
@@ -259,6 +287,25 @@ class LaunchTemplateCleanupService:
                         " or wrong); skipping deletion",
                         lt_name,
                         lt_id,
+                    )
+                    continue
+
+                if tags.get("orb:request-id") != request_id:
+                    self._logger.info(
+                        "Launch template %s (%s) belongs to a different request; keeping it",
+                        lt_name,
+                        lt_id,
+                    )
+                    continue
+
+                if not str(lt_name).startswith(expected_name_prefix):
+                    self._logger.info(
+                        "Launch template %s (%s) is tagged for request %s but its name does not "
+                        "start with %r; keeping it",
+                        lt_name,
+                        lt_id,
+                        request_id,
+                        expected_name_prefix,
                     )
                     continue
 

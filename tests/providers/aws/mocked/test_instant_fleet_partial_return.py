@@ -19,7 +19,7 @@ from orb.providers.aws.infrastructure.handlers.launch_template_cleanup import (
 
 REGION = "us-east-1"
 REQUEST_ID = "req-instant-1"
-TEMPLATE_NAME = "lt-instant"
+TEMPLATE_NAME = f"{REQUEST_ID}-lt-instant"
 
 
 def _retry(fn, *args, operation_type="standard", operation_name=None, **kwargs):
@@ -97,6 +97,7 @@ def _manager(ec2: Any) -> tuple[EC2FleetReleaseManager, Any]:
     logger = MagicMock()
     config_port = MagicMock()
     config_port.get_provider_config.return_value = None
+    config_port.get_resource_prefix.return_value = ""
     cleanup = LaunchTemplateCleanupService(aws_client, config_port, logger)
     manager = EC2FleetReleaseManager(
         aws_client=aws_client,
@@ -131,7 +132,7 @@ def test_partial_return_leaves_unreturned_instances_running(ec2):
     fleet_id, ids = _create_instant_fleet(ec2, 3)
     manager, spy = _manager(ec2)
 
-    manager.release(fleet_id, ids[:1], _fleet_details(ec2, fleet_id))
+    manager.release(fleet_id, ids[:1], _fleet_details(ec2, fleet_id), REQUEST_ID)
 
     spy.delete_fleets.assert_not_called()
     states = _states(ec2, ids)
@@ -146,7 +147,7 @@ def test_full_return_deletes_fleet_without_terminating_further(ec2):
     fleet_id, ids = _create_instant_fleet(ec2, 2)
     manager, spy = _manager(ec2)
 
-    manager.release(fleet_id, ids, _fleet_details(ec2, fleet_id))
+    manager.release(fleet_id, ids, _fleet_details(ec2, fleet_id), REQUEST_ID)
 
     spy.delete_fleets.assert_called_once()
     assert spy.delete_fleets.call_args.kwargs["FleetIds"] == [fleet_id]
@@ -159,10 +160,10 @@ def test_batched_returns_remove_template_after_last_batch(ec2):
     fleet_id, ids = _create_instant_fleet(ec2, 3)
     manager, spy = _manager(ec2)
 
-    manager.release(fleet_id, ids[:1], _fleet_details(ec2, fleet_id))
+    manager.release(fleet_id, ids[:1], _fleet_details(ec2, fleet_id), REQUEST_ID)
     assert len(_template_ids(ec2)) == 1
 
-    manager.release(fleet_id, ids[1:], _fleet_details(ec2, fleet_id))
+    manager.release(fleet_id, ids[1:], _fleet_details(ec2, fleet_id), REQUEST_ID)
 
     assert all(_is_gone(s) for s in _states(ec2, ids).values())
     assert _template_ids(ec2) == []
@@ -179,7 +180,7 @@ def test_weighted_fleet_without_member_listing_keeps_others_then_cleans_template
         "DescribeFleetInstances",
     )
 
-    manager.release(fleet_id, ids[:1], _fleet_details(ec2, fleet_id))
+    manager.release(fleet_id, ids[:1], _fleet_details(ec2, fleet_id), REQUEST_ID)
 
     spy.delete_fleets.assert_not_called()
     states = _states(ec2, ids)
@@ -189,7 +190,7 @@ def test_weighted_fleet_without_member_listing_keeps_others_then_cleans_template
 
     # Each instance counts as weight 1 without the listing, so the arithmetic
     # never reads as a full return; the template must still be removed.
-    manager.release(fleet_id, ids[1:], _fleet_details(ec2, fleet_id))
+    manager.release(fleet_id, ids[1:], _fleet_details(ec2, fleet_id), REQUEST_ID)
 
     assert all(_is_gone(s) for s in _states(ec2, ids).values())
     assert _template_ids(ec2) == []
