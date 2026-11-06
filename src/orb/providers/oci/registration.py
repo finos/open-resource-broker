@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from orb.providers.base.config_input import provider_config_mapping
+from orb.providers.base.config_input import (
+    provider_config_mapping,
+    provider_instance_name,
+    warn_unknown_config_keys,
+)
 
 
 def _extract_oci_provider_settings(provider_config: Any) -> dict[str, Any]:
@@ -75,13 +79,18 @@ def create_oci_strategy(provider_config: Any) -> Any:
 
 def create_oci_config(data: Any) -> Any:
     """Create OCI configuration from data dictionary."""
+    from orb.infrastructure.logging.logger import get_logger
     from orb.providers.oci.configuration.config import OCIProviderConfig
 
     try:
         if isinstance(data, OCIProviderConfig):
             return data
         if isinstance(data, dict) or hasattr(data, "config"):
-            return OCIProviderConfig(**_extract_oci_provider_settings(data))
+            settings = _extract_oci_provider_settings(data)
+            warn_unknown_config_keys(
+                OCIProviderConfig, settings, provider_instance_name(data), get_logger(__name__)
+            )
+            return OCIProviderConfig(**settings)
         return OCIProviderConfig()
     except Exception as exc:
         raise RuntimeError(f"Failed to create OCI config: {exc!s}")
