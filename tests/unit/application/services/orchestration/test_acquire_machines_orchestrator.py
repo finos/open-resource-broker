@@ -69,6 +69,48 @@ class TestAcquireMachinesOrchestrator:
         assert result.machine_ids == []
 
     @pytest.mark.asyncio
+    async def test_execute_without_wait_reports_stored_status(
+        self, orchestrator, mock_command_bus, mock_query_bus
+    ):
+        async def set_request_id(cmd):
+            cmd.created_request_id = "req-failed"
+
+        mock_command_bus.execute.side_effect = set_request_id
+        stored = MagicMock()
+        stored.status = MagicMock()
+        stored.status.value = "failed"
+        mock_query_bus.execute.return_value = stored
+
+        result = await orchestrator.execute(
+            AcquireMachinesInput(template_id="tmpl-1", requested_count=1, wait=False)
+        )
+
+        assert result.request_id == "req-failed"
+        assert result.status == "failed"
+        query = mock_query_bus.execute.call_args[0][0]
+        assert isinstance(query, SyncAndGetRequestQuery)
+        assert query.request_id == "req-failed"
+        assert query.lightweight is True
+
+    @pytest.mark.asyncio
+    async def test_execute_without_wait_falls_back_to_pending_when_read_fails(
+        self, orchestrator, mock_command_bus, mock_query_bus, mock_logger
+    ):
+        async def set_request_id(cmd):
+            cmd.created_request_id = "req-unreadable"
+
+        mock_command_bus.execute.side_effect = set_request_id
+        mock_query_bus.execute.side_effect = ConnectionError("store unavailable")
+
+        result = await orchestrator.execute(
+            AcquireMachinesInput(template_id="tmpl-1", requested_count=1, wait=False)
+        )
+
+        assert result.request_id == "req-unreadable"
+        assert result.status == "pending"
+        mock_logger.warning.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_execute_wait_true_polls_query_bus(
         self, orchestrator, mock_command_bus, mock_query_bus
     ):
@@ -125,7 +167,7 @@ class TestAcquireMachinesOrchestrator:
 
     @pytest.mark.asyncio
     async def test_execute_wait_true_timeout_returns_timeout_status(
-        self, orchestrator, mock_command_bus, mock_query_bus
+        self, orchestrator, mock_command_bus, mock_query_bus, fake_clock
     ):
         async def set_request_id(cmd):
             cmd.created_request_id = "req-789"
@@ -142,8 +184,7 @@ class TestAcquireMachinesOrchestrator:
             template_id="tmpl-1", requested_count=1, wait=True, timeout_seconds=4
         )
 
-        with patch("asyncio.sleep", new_callable=AsyncMock):
-            result = await orchestrator.execute(input)
+        result = await orchestrator.execute(input)
 
         assert result.status == "timeout"
         assert result.machine_ids == []
@@ -183,11 +224,14 @@ class TestAcquireMachinesOrchestrator:
         assert hasattr(result, "machine_ids")
 
     @pytest.mark.asyncio
-    async def test_wait_false_raw_contains_machine_ids_empty(self, orchestrator, mock_command_bus):
+    async def test_wait_false_raw_contains_machine_ids_empty(
+        self, orchestrator, mock_command_bus, mock_query_bus
+    ):
         async def set_request_id(cmd):
             cmd.created_request_id = "req-001"
 
         mock_command_bus.execute.side_effect = set_request_id
+        mock_query_bus.execute.return_value = MagicMock(status="pending")
 
         result = await orchestrator.execute(
             AcquireMachinesInput(template_id="tmpl-1", requested_count=1, wait=False)
@@ -252,7 +296,7 @@ class TestAcquireMachinesOrchestrator:
 
     @pytest.mark.asyncio
     async def test_wait_true_timeout_raw_contains_machine_ids_empty(
-        self, orchestrator, mock_command_bus, mock_query_bus
+        self, orchestrator, mock_command_bus, mock_query_bus, fake_clock
     ):
         async def set_request_id(cmd):
             cmd.created_request_id = "req-004"
@@ -264,12 +308,11 @@ class TestAcquireMachinesOrchestrator:
         poll_result.status.value = "pending"
         mock_query_bus.execute.return_value = poll_result
 
-        with patch("asyncio.sleep", new_callable=AsyncMock):
-            result = await orchestrator.execute(
-                AcquireMachinesInput(
-                    template_id="tmpl-1", requested_count=1, wait=True, timeout_seconds=4
-                )
+        result = await orchestrator.execute(
+            AcquireMachinesInput(
+                template_id="tmpl-1", requested_count=1, wait=True, timeout_seconds=4
             )
+        )
 
         assert result.machine_ids == []
         assert result.status == "timeout"
@@ -351,7 +394,7 @@ class TestAcquireMachinesOrchestrator:
 
     @pytest.mark.asyncio
     async def test_poll_errors_below_threshold_returns_timeout(
-        self, orchestrator, mock_command_bus, mock_query_bus
+        self, orchestrator, mock_command_bus, mock_query_bus, fake_clock
     ):
         async def set_request_id(cmd):
             cmd.created_request_id = "req-below"
@@ -363,8 +406,7 @@ class TestAcquireMachinesOrchestrator:
             template_id="tmpl-1", requested_count=1, wait=True, timeout_seconds=4
         )
 
-        with patch("asyncio.sleep", new_callable=AsyncMock):
-            result = await orchestrator.execute(input)
+        result = await orchestrator.execute(input)
 
         assert result.status == "timeout"
         assert result.machine_ids == []

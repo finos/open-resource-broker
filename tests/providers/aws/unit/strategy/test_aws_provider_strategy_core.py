@@ -741,6 +741,46 @@ async def test_describe_resource_instances_falls_back_to_run_instances_handler()
     logger.warning.assert_called_once()
 
 
+def _describe_with_handler_error(error: Exception):
+    logger = MagicMock()
+    strategy = _make_strategy(logger=logger)
+    handler = MagicMock()
+    handler.check_hosts_status.side_effect = error
+    strategy._handler_registry = MagicMock()
+    strategy._handler_registry.get_handler.return_value = handler
+    operation = ProviderOperation(
+        operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+        parameters={"resource_ids": ["i-1"], "provider_api": "RunInstances"},
+    )
+    return strategy, logger, operation
+
+
+@pytest.mark.asyncio
+async def test_describe_resource_instances_logs_unexpected_handler_error_with_traceback():
+    strategy, logger, operation = _describe_with_handler_error(AttributeError("boom"))
+
+    result = await strategy._handle_describe_resource_instances(operation)
+
+    assert result.success is False
+    assert result.error_code == "DESCRIBE_RESOURCE_INSTANCES_ERROR"
+    assert logger.error.call_count == 1
+    assert logger.error.call_args.kwargs.get("exc_info") is True
+
+
+@pytest.mark.asyncio
+async def test_describe_resource_instances_provider_error_is_a_quiet_failed_fetch():
+    from botocore.exceptions import ClientError
+
+    error = ClientError({"Error": {"Code": "Throttling", "Message": "slow down"}}, "DescribeFleets")
+    strategy, logger, operation = _describe_with_handler_error(error)
+
+    result = await strategy._handle_describe_resource_instances(operation)
+
+    assert result.success is False
+    assert result.error_code == "DESCRIBE_RESOURCE_INSTANCES_ERROR"
+    logger.error.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_describe_resource_instances_success_with_empty_instances():
     from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment

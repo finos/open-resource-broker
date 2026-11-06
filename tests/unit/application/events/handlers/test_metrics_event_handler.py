@@ -129,6 +129,7 @@ async def test_completed_increments_requests_total():
         (v, attributes or {})
     )  # type: ignore[method-assign]
 
+    await handler.handle(_created())
     await handler.handle(_completed())
 
     assert any(v == 1 for v, _ in added)
@@ -143,6 +144,7 @@ async def test_completed_sets_active_instances_to_machine_count():
         (v, attributes or {})
     )  # type: ignore[method-assign]
 
+    await handler.handle(_created())
     await handler.handle(_completed(machine_ids=["m1", "m2", "m3"]))
 
     # Net change from 0 → 3 should appear as a +3 add
@@ -157,6 +159,7 @@ async def test_completed_decrements_pending_requests():
     adds: list[float] = []
     handler._pending_requests.add = lambda v, **kw: adds.append(v)  # type: ignore[method-assign]
 
+    await handler.handle(_created())
     await handler.handle(_completed())
 
     # Should contain a -1 for the completed decrement
@@ -208,6 +211,7 @@ async def test_completed_with_empty_machine_ids_sets_active_instances_to_zero():
     adds: list[float] = []
     handler._active_instances.add = lambda v, **kw: adds.append(v)  # type: ignore[method-assign]
 
+    await handler.handle(_created())
     await handler.handle(_completed(machine_ids=[]))
 
     # current was 0, new value is 0, delta = 0
@@ -228,6 +232,7 @@ async def test_failed_increments_requests_failed_total():
         (v, attributes or {})
     )  # type: ignore[method-assign]
 
+    await handler.handle(_created())
     await handler.handle(_failed())
 
     assert any(v == 1 for v, _ in added)
@@ -240,6 +245,7 @@ async def test_failed_decrements_pending_requests():
     adds: list[float] = []
     handler._pending_requests.add = lambda v, **kw: adds.append(v)  # type: ignore[method-assign]
 
+    await handler.handle(_created())
     await handler.handle(_failed())
 
     assert -1 in adds
@@ -351,3 +357,150 @@ async def test_handler_works_when_otel_absent(monkeypatch):
     finally:
         monkeypatch.setattr(builtins, "__import__", original_import)
         sys.modules.update(backup)
+
+
+# ---------------------------------------------------------------------------
+# Terminal states reported through status changes; tracking is bounded
+# ---------------------------------------------------------------------------
+
+
+def _status_changed(request_id: str, new_status: str, old_status: str = "in_progress"):
+    from orb.domain.base.events.domain_events import RequestStatusChangedEvent
+
+    return RequestStatusChangedEvent(
+        aggregate_id=request_id,
+        aggregate_type="Request",
+        request_id=request_id,
+        request_type="acquire",
+        old_status=old_status,
+        new_status=new_status,
+    )
+
+
+class _Gauge:
+    """Records the net pending count and the failed/total counters."""
+
+    def __init__(self, handler: MetricsEventHandler) -> None:
+        self.pending = 0.0
+        self.failed = 0.0
+        self.total = 0.0
+        self.durations: list[float] = []
+        handler._pending_requests.add = self._pending  # type: ignore[method-assign]
+        handler._requests_failed_total.add = self._failed  # type: ignore[method-assign]
+        handler._requests_total.add = self._total  # type: ignore[method-assign]
+        handler._provisioning_duration.record = self.durations.append  # type: ignore[method-assign]
+
+    def _pending(self, value, **kw):
+        self.pending += value
+
+    def _failed(self, value, **kw):
+        self.failed += value
+
+    def _total(self, value, **kw):
+        self.total += value
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("terminal", ["failed", "timeout", "cancelled", "partial"])
+async def test_status_change_to_terminal_releases_tracked_request(terminal):
+    handler = _make_handler()
+    gauge = _Gauge(handler)
+
+    await handler.handle(_created("req-t"))
+    await handler.handle(_status_changed("req-t", terminal))
+
+    assert gauge.pending == 0
+    assert "req-t" not in handler._request_start_times
+    assert gauge.failed == (1 if terminal in ("failed", "timeout") else 0)
+
+
+@pytest.mark.asyncio
+async def test_many_requests_finishing_by_status_change_leave_nothing_tracked():
+    handler = _make_handler()
+    gauge = _Gauge(handler)
+
+    for i in range(500):
+        await handler.handle(_created(f"req-{i}"))
+    for i in range(500):
+        await handler.handle(_status_changed(f"req-{i}", "failed"))
+
+    assert handler._request_start_times == {}
+    assert gauge.pending == 0
+
+
+@pytest.mark.asyncio
+async def test_non_terminal_status_change_keeps_request_tracked():
+    handler = _make_handler()
+    gauge = _Gauge(handler)
+
+    await handler.handle(_created("req-p"))
+    await handler.handle(_status_changed("req-p", "in_progress", old_status="pending"))
+    await handler.handle(_status_changed("req-p", "partial_pending"))
+
+    assert "req-p" in handler._request_start_times
+    assert gauge.pending == 1
+
+
+@pytest.mark.asyncio
+async def test_completed_for_untracked_request_changes_nothing():
+    handler = _make_handler()
+    gauge = _Gauge(handler)
+    instances: list[float] = []
+    handler._active_instances.add = instances.append  # type: ignore[method-assign]
+
+    await handler.handle(_completed("never-seen", machine_ids=["m1", "m2"]))
+
+    assert gauge.pending == 0
+    assert gauge.total == 0
+    assert gauge.durations == []
+    assert instances == []
+
+
+@pytest.mark.asyncio
+async def test_failed_for_untracked_request_changes_nothing():
+    handler = _make_handler()
+    gauge = _Gauge(handler)
+
+    await handler.handle(_failed("never-seen"))
+    await handler.handle(_status_changed("never-seen", "timeout"))
+
+    assert gauge.pending == 0
+    assert gauge.failed == 0
+
+
+@pytest.mark.asyncio
+async def test_request_is_counted_once_across_completed_and_later_events():
+    handler = _make_handler()
+    gauge = _Gauge(handler)
+
+    await handler.handle(_created("req-once"))
+    await handler.handle(_status_changed("req-once", "complete"))
+    await handler.handle(_completed("req-once"))
+    # A later partial -> complete style re-emission must not count again.
+    await handler.handle(_completed("req-once"))
+    await handler.handle(_status_changed("req-once", "failed", old_status="complete"))
+
+    assert gauge.pending == 0
+    assert gauge.total == 1
+    assert len(gauge.durations) == 1
+    assert gauge.failed == 0
+
+
+@pytest.mark.asyncio
+async def test_tracking_is_capped_and_eviction_releases_the_pending_count(monkeypatch):
+    monkeypatch.setattr(
+        "orb.application.events.handlers.metrics_event_handler._MAX_TRACKED_REQUESTS", 3
+    )
+    handler = _make_handler()
+    gauge = _Gauge(handler)
+
+    for i in range(5):
+        await handler.handle(_created(f"req-{i}"))
+
+    assert list(handler._request_start_times) == ["req-2", "req-3", "req-4"]
+    assert gauge.pending == 3
+
+    # The evicted request finishing later changes nothing.
+    await handler.handle(_status_changed("req-0", "failed"))
+    assert gauge.pending == 3
+    assert gauge.failed == 0

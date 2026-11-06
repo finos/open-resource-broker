@@ -58,6 +58,24 @@ async def _drain_events() -> None:
         get_logger(__name__).debug("Event drain skipped: %s", e)
 
 
+# How long a one-shot command waits for a machine release it started. A release
+# that cannot finish keeps its mark and is retried by the next run.
+_RELEASE_DRAIN_SECONDS = 60.0
+
+
+async def _drain_releases() -> None:
+    """Give releases started by this command a bounded time to finish before exit."""
+    try:
+        from orb.application.services.deadline_release_service import DeadlineReleaseService
+
+        # Only a command that already built the service can have started releases.
+        service = DeadlineReleaseService.active()
+        if service is not None:
+            await service.drain(_RELEASE_DRAIN_SECONDS)
+    except Exception as e:
+        get_logger(__name__).debug("Release drain skipped: %s", e)
+
+
 async def _show_resource_help(resource):
     """Show help for a resource when no action is provided."""
     import subprocess
@@ -303,6 +321,7 @@ async def main() -> None:
                 print_error(error_output)
             sys.exit(exit_code)
         finally:
+            await _drain_releases()
             await _drain_events()
             if scheduler_override_active:
                 try:

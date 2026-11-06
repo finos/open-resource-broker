@@ -166,6 +166,18 @@ class TestHTTPErrorResponseHandler:
         assert response.details == {"field": "config"}
         assert response.http_status == HTTPStatus.BAD_REQUEST
 
+    def test_template_validation_http_reports_a_supplied_reason(self, handler):
+        """A reason passed in the details reaches the caller; the message still does not."""
+        exception = TemplateValidationError(
+            "Invalid template: internal path /etc/templates/secret.yaml",
+            details={"reason": "spot is not supported", "path": "/etc/templates/secret.yaml"},
+        )
+
+        response = handler.handle_error_for_http(exception)
+
+        assert response.details == {"reason": "spot is not supported"}
+        assert "secret.yaml" not in str(response.details)
+
     def test_infrastructure_error_http(self, handler):
         """Test infrastructure error HTTP response does not leak original_error to client."""
         exception = InfrastructureError(

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from typing_extensions import assert_never
 
 if TYPE_CHECKING:
+    from orb.domain.base.ports.event_publisher_port import EventPublisherPort
     from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 
 from orb.application.ports.resilience_port import CircuitBreakerOpenError, CircuitBreakerPort
@@ -29,6 +30,10 @@ from orb.domain.base.operation_outcome import (
 from orb.domain.base.ports import ConfigurationPort, LoggingPort, ProviderConfigPort
 from orb.domain.base.results import ProviderSelectionResult
 from orb.domain.request.aggregate import Request
+from orb.domain.request.fulfillment_config import (
+    fulfillment_defaults_from_request_config,
+    merged_fulfillment_config,
+)
 from orb.domain.request.fulfilment_state_machine import (
     FulfilmentEvent,
     FulfilmentStateMachine,
@@ -144,7 +149,9 @@ class ProvisioningOrchestrationService:
         config_port: ConfigurationPort,
         circuit_breaker_factory: Callable[[str], CircuitBreakerPort],
         state_machine: "FulfilmentStateMachine | None" = None,
+        event_publisher: "EventPublisherPort | None" = None,
     ):
+        self._event_publisher = event_publisher
         self._uow_factory = uow_factory
         self._scheduler = scheduler
         self._logger = logger
@@ -161,14 +168,8 @@ class ProvisioningOrchestrationService:
     ) -> ProvisioningResult:
         """Execute provisioning with capacity top-up retry loop."""
         request_config = self._config_port.get_request_config()
-        default_config: dict[str, Any] = {
-            "max_retries": request_config.get("fulfillment_max_retries", 3),
-            "timeout_seconds": request_config.get("fulfillment_timeout_seconds", 300),
-            "dispatch_timeout_seconds": request_config.get("dispatch_timeout_seconds", 300),
-            "batch_size": request_config.get("fulfillment_batch_size", 1000),
-            "fallback_template_id": request_config.get("fulfillment_fallback_template_id"),
-        }
-        config = {**default_config, **request.metadata.get("fulfillment_config", {})}
+        default_config = fulfillment_defaults_from_request_config(request_config)
+        config = merged_fulfillment_config(default_config, request)
         max_retries: int = int(config["max_retries"])
         timeout_seconds: float = float(config["timeout_seconds"])
         dispatch_timeout_seconds: float = float(config["dispatch_timeout_seconds"])
@@ -457,7 +458,7 @@ class ProvisioningOrchestrationService:
 
         now: datetime = datetime.now(timezone.utc)
         cutoff: datetime = now - timedelta(seconds=timeout_seconds)
-        failed_count = 0
+        failed_count = self._recover_abandoned_pending(now)
 
         # Statuses the deadline sweep can resolve. IN_PROGRESS/PARTIAL_PENDING are
         # included so a client that stops polling cannot leave them active forever.
@@ -489,7 +490,7 @@ class ProvisioningOrchestrationService:
                     "startup scan: no active (acquiring/in_progress/partial_pending) "
                     "requests found — nothing to recover."
                 )
-                return 0
+                return failed_count
 
             if not expired:
                 self._logger.debug(
@@ -497,7 +498,7 @@ class ProvisioningOrchestrationService:
                     "leaving untouched.",
                     len(active),
                 )
-                return 0
+                return failed_count
 
             self._logger.info(
                 "startup scan: %d active request(s) found; %d past deadline "
@@ -519,6 +520,10 @@ class ProvisioningOrchestrationService:
                     )
                     if swept.status.is_terminal() and swept is not request:
                         failed_request = swept
+                    elif request.deadline_at is not None:
+                        # The state machine decided to wait for a provider read
+                        # (or the deadline has not really passed): leave it be.
+                        continue
                     else:
                         failed_request = request.update_status(
                             RequestStatus.FAILED,
@@ -527,7 +532,8 @@ class ProvisioningOrchestrationService:
                         )
                     uow_factory2 = self._uow_factory
                     with uow_factory2.create_unit_of_work() as uow2:
-                        uow2.requests.save(failed_request)
+                        events = uow2.requests.save(failed_request)
+                    self._publish_events(events)
                     failed_count += 1
                     self._logger.info(
                         "startup scan: swept active request %s to %s "
@@ -548,6 +554,60 @@ class ProvisioningOrchestrationService:
             self._logger.warning("startup scan: active-request recovery scan failed: %s", exc)
 
         return failed_count
+
+    def _recover_abandoned_pending(self, now: datetime) -> int:
+        """Fail PENDING requests whose create flow died before recording anything.
+
+        Only the state machine decides: a request is failed once it is older than
+        its own abandonment bound, which already accounts for per-request
+        overrides. The age-based fallback used for active rows is deliberately not
+        applied here, because a create still running on another server may
+        legitimately outlive it.
+        """
+        from orb.domain.request.repository import RequestRepository
+
+        swept_count = 0
+        try:
+            with self._uow_factory.create_unit_of_work() as uow:
+                repo: RequestRepository = uow.requests  # type: ignore[assignment]
+                pending = [r for r in repo.find_by_status(RequestStatus.PENDING)]
+            for request in pending:
+                if not request.awaiting_resources:
+                    continue
+                try:
+                    swept = self._state_machine.evaluate_deadline(request, now=now)
+                    if swept is request or not swept.status.is_terminal():
+                        continue
+                    with self._uow_factory.create_unit_of_work() as uow2:
+                        events = uow2.requests.save(swept)
+                    self._publish_events(events)
+                    swept_count += 1
+                    self._logger.info(
+                        "startup scan: failed abandoned pending request %s (created_at=%s)",
+                        request.request_id,
+                        request.created_at.isoformat() if request.created_at else "unknown",
+                    )
+                except Exception as exc:
+                    self._logger.warning(
+                        "startup scan: could not recover pending request %s: %s",
+                        request.request_id,
+                        exc,
+                    )
+        except Exception as exc:
+            self._logger.warning("startup scan: pending-request recovery scan failed: %s", exc)
+        return swept_count
+
+    def _publish_events(self, events: "list[Any] | None") -> None:
+        """Publish the events returned by a committed save; never raises."""
+        if self._event_publisher is None:
+            return
+        for event in events or []:
+            try:
+                self._event_publisher.publish(event)
+            except Exception as exc:
+                self._logger.warning(
+                    "startup scan: could not publish %s: %s", event.event_type, exc
+                )
 
     def _record_provider_failure(self, provider_name: str) -> None:
         """Increment circuit breaker failure count and open circuit if threshold is reached."""

@@ -713,6 +713,7 @@ class Request(AggregateRoot):
         diagnostic: Optional[FulfilmentDiagnostic] = None,
         deadline_at: Optional[datetime] = None,
         clear_diagnostic: bool = False,
+        metadata_updates: Optional[dict[str, Any]] = None,
     ) -> "Request":
         """Apply a single validated status transition.
 
@@ -736,6 +737,9 @@ class Request(AggregateRoot):
         exclusive by intent: the state machine only requests a clear when
         transitioning to a clean success terminal with no diagnostic supplied.
         A supplied diagnostic always wins (it is explicit new detail).
+
+        ``metadata_updates`` are merged into ``metadata`` in the same step, so a
+        marker that belongs to the outcome is saved atomically with it.
         """
         old_status = self.status
         fields = self.model_dump()
@@ -756,6 +760,9 @@ class Request(AggregateRoot):
 
         if deadline_at is not None and self.deadline_at is None:
             fields["deadline_at"] = deadline_at
+
+        if metadata_updates:
+            fields["metadata"] = {**self.metadata, **metadata_updates}
 
         if diagnostic is not None:
             existing = self.fulfilment_diagnostic

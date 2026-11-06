@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 from orb.application.dto.commands import CreateRequestCommand
 from orb.application.dto.queries import SyncAndGetRequestQuery
@@ -49,6 +50,8 @@ class AcquireMachinesOrchestrator(OrchestratorBase[AcquireMachinesInput, Acquire
 
         if input.wait and request_id:
             status, machine_ids = await self._poll_until_terminal(request_id, input.timeout_seconds)
+        elif request_id:
+            status = await self._read_stored_status(request_id)
 
         return AcquireMachinesOutput(
             request_id=request_id,
@@ -56,14 +59,32 @@ class AcquireMachinesOrchestrator(OrchestratorBase[AcquireMachinesInput, Acquire
             machine_ids=machine_ids,
         )
 
+    async def _read_stored_status(self, request_id: str) -> str:
+        """Return the stored status of a just-created request, without a provider sync.
+
+        The create handler may already have moved the request on (for example to a
+        terminal failure), so reporting a fixed ``pending`` would be wrong. If the
+        read fails the request was still created, so fall back to ``pending``.
+        """
+        try:
+            result = await self._query_bus.execute(
+                SyncAndGetRequestQuery(request_id=request_id, lightweight=True)
+            )
+        except Exception as exc:
+            self._logger.warning("Could not read status of new request %s: %s", request_id, exc)
+            return "pending"
+        status_val = getattr(result, "status", None)
+        if status_val is None:
+            return "pending"
+        return str(status_val.value if hasattr(status_val, "value") else status_val) or "pending"
+
     async def _poll_until_terminal(
         self, request_id: str, timeout_seconds: int
     ) -> tuple[str, list[str]]:
         """Poll SyncAndGetRequestQuery until terminal status or timeout."""
-        elapsed = 0
-        interval = 2
+        start = time.monotonic()
         consecutive_errors = 0
-        while elapsed < timeout_seconds:
+        while time.monotonic() - start < timeout_seconds:
             try:
                 query = SyncAndGetRequestQuery(
                     request_id=request_id, lightweight=False, skip_cache=True
@@ -94,6 +115,5 @@ class AcquireMachinesOrchestrator(OrchestratorBase[AcquireMachinesInput, Acquire
                         f"Polling request {request_id} aborted after "
                         f"{consecutive_errors} consecutive errors: {exc}"
                     ) from exc
-            await asyncio.sleep(interval)
-            elapsed += interval
+            await asyncio.sleep(self._poll_delay(start, timeout_seconds))
         return "timeout", []

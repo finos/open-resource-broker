@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable
 from typing import Generic, TypeVar
@@ -29,6 +30,20 @@ TERMINAL_STATUSES: frozenset[str] = frozenset(
     }
 )
 MAX_CONSECUTIVE_POLL_ERRORS: int = 3
+
+# Wait loops poll quickly while a request is young, then back off.  Provisioning
+# normally takes well over a minute, so a long wait that polled every two seconds
+# would spend most of its calls (each a provider sync) on an unchanged answer.
+FAST_POLL_WINDOW_SECONDS: float = 30.0
+FAST_POLL_INTERVAL_SECONDS: float = 2.0
+SLOW_POLL_INTERVAL_SECONDS: float = 5.0
+
+
+def next_poll_interval(elapsed_s: float) -> float:
+    """Return how long a wait loop should sleep after ``elapsed_s`` seconds of waiting."""
+    if elapsed_s < FAST_POLL_WINDOW_SECONDS:
+        return FAST_POLL_INTERVAL_SECONDS
+    return SLOW_POLL_INTERVAL_SECONDS
 
 
 class OrchestratorBase(ABC, Generic[InputT, OutputT]):
@@ -67,3 +82,12 @@ class OrchestratorBase(ABC, Generic[InputT, OutputT]):
         except Exception as exc:
             self._logger.error("%s failed: %s", operation, exc)
             raise
+
+    @staticmethod
+    def _poll_delay(start: float, timeout_seconds: float) -> float:
+        """Return how long to sleep before the next poll without passing the timeout.
+
+        ``start`` is the ``time.monotonic()`` reading taken when the wait began.
+        """
+        elapsed = time.monotonic() - start
+        return max(min(next_poll_interval(elapsed), timeout_seconds - elapsed), 0.0)

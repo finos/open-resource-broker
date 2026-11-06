@@ -40,6 +40,8 @@ PACKAGE := src
 PACKAGE_ROOT := $(shell yq '.build.package_root' $(PROJECT_CONFIG) 2>/dev/null || echo "src/orb")
 TESTS := tests
 TESTS_UNIT := $(TESTS)/unit
+# In-process REST error contract suite; no network, runs in the unit leg.
+TESTS_API_CONTRACT := $(TESTS)/api/contract
 TESTS_CONTRACT := $(TESTS)/contract
 TESTS_INTEGRATION := $(TESTS)/integration
 TESTS_E2E := $(TESTS)/e2e
