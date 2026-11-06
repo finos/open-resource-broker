@@ -180,7 +180,7 @@ func TestSpecConformance(t *testing.T) {
 	_, _ = c.ListReturnRequests(ctx)
 	_ = c.CancelRequest(ctx, "r1")
 	_ = c.PurgeRequest(ctx, "r1")
-	_, _ = c.ConfirmTerminated(ctx, "r1", []string{"m1"}, "verified")
+	_, _ = c.ConfirmTerminated(ctx, "r1", []string{"m1"}, "verified", false)
 	_, _ = c.GetRequestTimeline(ctx, "r1")
 
 	if stream, err := c.StreamRequestStatus(ctx, "r1"); err == nil {

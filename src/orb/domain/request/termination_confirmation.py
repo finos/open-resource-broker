@@ -2,9 +2,10 @@
 
 Some providers answer "not found" both for an instance that no longer exists
 and for one the caller may not read, so a return request can never observe the
-termination on its own. An operator who has verified the instances are gone
-records that fact on the request; the provider then honours it for exactly
-those machines, and only while the provider keeps answering "not found".
+termination on its own. A confirmation is recorded on the request, either
+because the provider verified the instances are gone or because an operator
+attested to it; the provider then honours it for exactly those machines, and
+only while the provider keeps answering "not found".
 """
 
 from __future__ import annotations
@@ -20,8 +21,9 @@ from orb.domain.request.request_types import RequestType
 
 CONFIRMED_TERMINATED_KEY = "operator_confirmed_terminated"
 
-# Providers whose "not found" answer is ambiguous and so accept confirmations.
-CONFIRMABLE_PROVIDER_TYPES = frozenset({"oci"})
+# How a confirmation was established.
+VERIFICATION_VERIFIED = "verified"
+VERIFICATION_OPERATOR_ATTESTED = "operator_attested"
 
 MAX_REASON_LENGTH = 500
 MAX_MACHINE_IDS = 100
@@ -31,6 +33,10 @@ _CONTROL_CHARS = re.compile("[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 
 class InstanceStillVisibleError(BusinessRuleViolationError):
     """The provider still shows an instance that is not terminated."""
+
+
+class TerminationNotVerifiedError(BusinessRuleViolationError):
+    """The provider could not tell whether an instance is gone and no override was given."""
 
 
 def sanitize_reason(reason: str | None) -> str:
@@ -68,11 +74,6 @@ def validate_confirmable(request: Request, machine_ids: list[str]) -> None:
     request_id = str(request.request_id)
     if request.request_type != RequestType.RETURN:
         raise ValidationError(f"Request {request_id} is not a return request")
-    if request.provider_type not in CONFIRMABLE_PROVIDER_TYPES:
-        raise ValidationError(
-            f"Request {request_id} uses provider '{request.provider_type}', "
-            "which does not need termination confirmation"
-        )
     if request.status.is_terminal():
         raise ValidationError(
             f"Request {request_id} is already {request.status.value}; nothing to confirm"

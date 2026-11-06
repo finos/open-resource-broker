@@ -176,6 +176,8 @@ class ConfirmTerminatedInput:
     reason: str
     operator: str
     role: str = "cli"
+    # Accept machines the provider could not verify, recorded as operator-attested.
+    force: bool = False
 
 
 @dataclasses.dataclass(frozen=True)

@@ -617,11 +617,12 @@ class OrbClient private constructor(
         requestId: String,
         machineIds: List<String>,
         reason: String,
+        force: Boolean = false,
     ): Map<String, Any?> =
         executeRaw(
             post(
                 "/api/v1/requests/${encode(requestId)}/confirm-terminated",
-                mapOf("machine_ids" to machineIds, "reason" to reason),
+                mapOf("machine_ids" to machineIds, "reason" to reason, "force" to force),
             )
         )
 

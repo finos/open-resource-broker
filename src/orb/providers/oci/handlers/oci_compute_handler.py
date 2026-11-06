@@ -23,7 +23,7 @@ from orb.providers.oci.mapping import OCITemplateMapper
 from orb.providers.oci.services import OCIPricingService
 
 # The confirm-time probe batches IDs into one search per chunk and stops after
-# a fixed budget; an unfinished probe is reported unavailable (fail-open).
+# a fixed budget; an unfinished probe is reported unavailable.
 _PROBE_IDS_PER_QUERY = 10
 _PROBE_TIME_BUDGET_SECONDS = 30.0
 
@@ -915,15 +915,17 @@ class OCIComputeHandler:
         """Best-effort check of which instances OCI can still see.
 
         Uses the tenancy search service rather than get-by-ID, so it is a
-        different signal from the 404 being overridden. It reports only
-        instances this principal can see; an empty list is not proof of
-        termination, which is why the operator stays responsible.
+        different signal from the 404 being overridden. Every requested
+        instance gets a state: ``terminated`` when the search lists it as
+        terminated, ``visible`` when it lists it in any other state, and
+        ``gone`` when the search does not list it. The search shows only what
+        this principal can see, so ``gone`` is a best-effort statement.
         """
         if not self._use_live_cli(operation):
             return ProviderResult.error_result(
                 "Visibility probe needs a live OCI CLI", "OCI_PROBE_UNAVAILABLE"
             )
-        visible: list[dict[str, Any]] = []
+        found: dict[str, str] = {}
         deadline = time.monotonic() + _PROBE_TIME_BUDGET_SECONDS
         try:
             for machine_id in machine_ids:
@@ -948,21 +950,28 @@ class OCIComputeHandler:
                 for item in (response.get("data") or {}).get("items") or []:
                     machine_id = item.get("identifier")
                     if machine_id in wanted:
-                        state = str(item.get("lifecycle-state", "unknown")).upper()
-                        visible.append(
-                            {
-                                "instance_id": machine_id,
-                                "status": "terminated" if state == "TERMINATED" else "visible",
-                                "provider_data": {"lifecycle_state": state},
-                            }
-                        )
+                        found[machine_id] = str(item.get("lifecycle-state", "unknown")).upper()
         except Exception as exc:
             self._logger.warning("OCI visibility probe failed: %s", exc)
             return ProviderResult.error_result(
                 "OCI visibility probe failed", "OCI_PROBE_UNAVAILABLE"
             )
+        instances = [
+            {
+                "instance_id": machine_id,
+                "status": (
+                    "gone"
+                    if machine_id not in found
+                    else "terminated"
+                    if found[machine_id] == "TERMINATED"
+                    else "visible"
+                ),
+                "provider_data": {"lifecycle_state": found.get(machine_id)},
+            }
+            for machine_id in machine_ids
+        ]
         return ProviderResult.success_result(
-            {"instances": visible}, {"operation": "visibility_probe", "provider": "oci"}
+            {"instances": instances}, {"operation": "visibility_probe", "provider": "oci"}
         )
 
     async def describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:

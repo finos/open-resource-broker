@@ -44,7 +44,10 @@ from orb.application.services.orchestration.dtos import (
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError, ValidationError
 from orb.domain.request.request_types import RequestStatus
-from orb.domain.request.termination_confirmation import InstanceStillVisibleError
+from orb.domain.request.termination_confirmation import (
+    InstanceStillVisibleError,
+    TerminationNotVerifiedError,
+)
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 from orb.interface.catalog import OPERATION_CATALOG, Interface
 
@@ -475,6 +478,8 @@ class ConfirmTerminatedBody(APIRequest):
 
     machine_ids: list[str]
     reason: str
+    # Accept machines the provider could not verify, recorded as operator-attested.
+    force: bool = False
 
 
 @router.post(
@@ -482,12 +487,14 @@ class ConfirmTerminatedBody(APIRequest):
     operation_id="confirmTerminated",
     summary="Confirm Machines Terminated",
     description=(
-        "Record that an operator has verified the named machines of an OCI return "
-        "request are terminated, for instances OCI reports as not found. The caller "
-        "takes responsibility for the claim: OCI answers not found both for deleted "
-        "instances and for ones it will not show this principal. Rejected with 409 "
-        "when OCI still shows an instance that is not terminated. Repeating a "
-        "confirmation changes nothing."
+        "Record that the named machines of a return request are terminated, for "
+        "instances the provider reports as not found. The provider is asked whether "
+        "each machine is gone; confirmed machines are recorded as verified. Rejected "
+        "with 409 when the provider still shows a machine that is not terminated, "
+        "or when it cannot tell and force is not set. With force, machines the "
+        "provider cannot verify are recorded as operator-attested and the caller "
+        "takes responsibility for the claim. Repeating a confirmation changes "
+        "nothing."
     ),
     response_model=ConfirmTerminatedResponse,
 )
@@ -507,6 +514,7 @@ async def confirm_terminated(
                 reason=body.reason,
                 operator=user.username,
                 role=user.role,
+                force=body.force,
             )
         )
     except (ValidationError, EntityNotFoundError) as exc:
@@ -523,13 +531,14 @@ async def confirm_terminated(
                 },
             },
         )
-    except InstanceStillVisibleError as exc:
+    except (InstanceStillVisibleError, TerminationNotVerifiedError) as exc:
+        still_visible = isinstance(exc, InstanceStillVisibleError)
         return JSONResponse(
             status_code=409,
             content={
                 "success": False,
                 "error": {
-                    "code": "INSTANCE_STILL_VISIBLE",
+                    "code": "INSTANCE_STILL_VISIBLE" if still_visible else "TERMINATION_NOT_VERIFIED",
                     "message": exc.message,
                     "machine_ids": exc.details.get("machine_ids", []),
                 },

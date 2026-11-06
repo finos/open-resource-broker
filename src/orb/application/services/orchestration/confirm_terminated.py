@@ -1,12 +1,17 @@
-"""Orchestrator for operator confirmation that return-request machines are terminated.
+"""Orchestrator for confirming that return-request machines are terminated.
 
-Providers such as OCI answer "not found" both for a deleted instance and for
-one the caller cannot read, so a return request cannot settle on its own. The
-operator states that the instances are gone; before accepting, a best-effort
-visibility probe asks the provider through a different path than get-by-ID. An
-instance that is still visible and not terminated rejects the confirmation. A
-probe that is unavailable, or that cannot see the instance either, accepts it
-with a warning: the operator takes responsibility for the claim.
+Some providers answer "not found" both for a deleted instance and for one the
+caller cannot read, so a return request cannot settle on its own. Before a
+confirmation is recorded, the provider is asked, through an optional visibility
+probe on the instance-status operation, what it can say about each machine:
+
+* reported gone or terminated: recorded as ``verified``;
+* still present: refused;
+* unknown (the provider has no probe, the probe failed, or it could not tell):
+  refused unless the operator forces it, then recorded as ``operator_attested``.
+
+Providers need no code for this: one that ignores the probe flag yields
+``unknown`` and the confirmation then needs the explicit override.
 """
 
 from __future__ import annotations
@@ -29,7 +34,10 @@ from orb.domain.base.operations import (
 )
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.request.termination_confirmation import (
+    VERIFICATION_OPERATOR_ATTESTED,
+    VERIFICATION_VERIFIED,
     InstanceStillVisibleError,
+    TerminationNotVerifiedError,
     confirmed_machine_ids,
     confirmed_records,
     normalize_machine_ids,
@@ -38,13 +46,12 @@ from orb.domain.request.termination_confirmation import (
     validate_confirmable,
 )
 
-_PROBE_UNAVAILABLE = (
-    "Could not check the provider for these instances; the confirmation rests on the operator."
+_GONE_STATES = frozenset({"gone", "terminated"})
+_UNKNOWN_STATES = frozenset({"", "unknown"})
+_ATTESTED_WARNING = (
+    "The provider could not verify these machines are gone; they are recorded as "
+    "operator-attested: "
 )
-_PROBE_NOT_VISIBLE = "not_visible"
-_PROBE_PROVIDER_TERMINATED = "provider_reports_terminated"
-_PROBE_UNAVAILABLE_TAG = "probe_unavailable"
-_TERMINATED_STATES = frozenset({"terminated"})
 
 
 class ConfirmTerminatedOrchestrator(
@@ -85,7 +92,9 @@ class ConfirmTerminatedOrchestrator(
                 records=existing,
             )
 
-        verification, warnings = await self._probe(provider_name, input.request_id, pending)
+        verifications, warnings = await self._verify(
+            provider_name, input.request_id, pending, force=input.force
+        )
 
         command = ConfirmMachinesTerminatedCommand(
             request_id=input.request_id,
@@ -93,7 +102,7 @@ class ConfirmTerminatedOrchestrator(
             reason=reason,
             operator=operator,
             role=role,
-            verification=verification,
+            verifications=verifications,
         )
         await self._dispatch("ConfirmMachinesTerminated", self._command_bus.execute(command))
         return ConfirmTerminatedOutput(
@@ -104,10 +113,48 @@ class ConfirmTerminatedOrchestrator(
             warnings=warnings if command.newly_confirmed else [],
         )
 
+    async def _verify(
+        self, provider_name: str, request_id: str, machine_ids: list[str], *, force: bool
+    ) -> tuple[dict[str, str], list[str]]:
+        """Return (verification per machine, warnings); raise when a machine is refused."""
+        states = await self._probe(provider_name, request_id, machine_ids)
+
+        present = sorted(m for m in machine_ids if self._is_present(states.get(m)))
+        if present:
+            raise InstanceStillVisibleError(
+                "The provider still shows these instances as not terminated: "
+                + ", ".join(present),
+                details={"machine_ids": present},
+            )
+
+        unknown = [m for m in machine_ids if states.get(m) not in _GONE_STATES]
+        if unknown and not force:
+            raise TerminationNotVerifiedError(
+                "The provider could not verify these instances are gone: "
+                + ", ".join(sorted(unknown))
+                + ". Use the force option to record them as operator-attested.",
+                details={"machine_ids": sorted(unknown)},
+            )
+
+        verifications = {
+            m: VERIFICATION_OPERATOR_ATTESTED if m in unknown else VERIFICATION_VERIFIED
+            for m in machine_ids
+        }
+        warnings = [_ATTESTED_WARNING + ", ".join(unknown)] if unknown else []
+        return verifications, warnings
+
+    @staticmethod
+    def _is_present(state: str | None) -> bool:
+        return state is not None and state not in _GONE_STATES and state not in _UNKNOWN_STATES
+
     async def _probe(
         self, provider_name: str, request_id: str, machine_ids: list[str]
-    ) -> tuple[str, list[str]]:
-        """Return (verification tag, warnings); raise if an instance is still live."""
+    ) -> dict[str, str]:
+        """Ask the provider about each machine; return its lower-cased state by machine ID.
+
+        A machine missing from the result, or any failure of the probe, leaves the
+        machine unknown.
+        """
         try:
             result = await self._provider_registry_service.execute_operation(
                 provider_name,
@@ -118,27 +165,18 @@ class ConfirmTerminatedOrchestrator(
                 ),
             )
         except Exception as exc:
-            self._logger.warning("Termination visibility probe failed for %s: %s", request_id, exc)
-            return _PROBE_UNAVAILABLE_TAG, [_PROBE_UNAVAILABLE]
+            self._logger.warning("Termination probe failed for %s: %s", request_id, exc)
+            return {}
 
         if not result.success:
             self._logger.warning(
-                "Termination visibility probe unavailable for %s: %s",
-                request_id,
-                result.error_code,
+                "Termination probe unavailable for %s: %s", request_id, result.error_code
             )
-            return _PROBE_UNAVAILABLE_TAG, [_PROBE_UNAVAILABLE]
+            return {}
 
-        visible: list[dict[str, Any]] = (result.data or {}).get("instances", [])
-        live = [
-            str(i.get("instance_id"))
-            for i in visible
-            if str(i.get("status", "")).lower() not in _TERMINATED_STATES
-        ]
-        if live:
-            raise InstanceStillVisibleError(
-                "The provider still shows these instances as not terminated: "
-                + ", ".join(sorted(live)),
-                details={"machine_ids": sorted(live)},
-            )
-        return (_PROBE_PROVIDER_TERMINATED if visible else _PROBE_NOT_VISIBLE), []
+        instances: list[dict[str, Any]] = (result.data or {}).get("instances") or []
+        return {
+            str(i["instance_id"]): str(i.get("status") or "").lower()
+            for i in instances
+            if i.get("instance_id") is not None
+        }

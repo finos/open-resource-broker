@@ -362,9 +362,12 @@ def _cli_operator() -> str:
 async def handle_confirm_terminated(
     args: "argparse.Namespace",
 ) -> Union[dict[str, Any], "InterfaceResponse"]:
-    """Record that machines of an OCI return request are verified terminated."""
+    """Record that machines of a return request are terminated."""
     from orb.application.services.orchestration.dtos import ConfirmTerminatedInput
-    from orb.domain.request.termination_confirmation import InstanceStillVisibleError
+    from orb.domain.request.termination_confirmation import (
+        InstanceStillVisibleError,
+        TerminationNotVerifiedError,
+    )
     from orb.interface.catalog import OPERATION_CATALOG, Interface
 
     request_id = getattr(args, "request_id", None) or getattr(args, "flag_request_id", None)
@@ -381,10 +384,13 @@ async def handle_confirm_terminated(
                 reason=getattr(args, "reason", None) or "",
                 operator=_cli_operator(),
                 role="cli",
+                force=bool(getattr(args, "force", False)),
             )
         )
     except InstanceStillVisibleError as exc:
         return {"error": "Instance still visible", "message": exc.message}
+    except TerminationNotVerifiedError as exc:
+        return {"error": "Termination not verified", "message": exc.message}
     return entry.renderer_for(Interface.CLI)(args._container.get(ResponseFormattingService), result)
 
 
