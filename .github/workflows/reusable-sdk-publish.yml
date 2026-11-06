@@ -289,7 +289,7 @@ jobs:
     # regenerate gradle-wrapper.jar before the publish step below invokes
     # ./gradlew, then verify the checksum.
     - name: Set up Gradle
-      uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+      uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
       with:
         gradle-version: current
         # Only used once to regenerate the wrapper launcher; no build to cache.
@@ -300,7 +300,7 @@ jobs:
       run: cd sdk/java && gradle wrapper --gradle-version 8.7 --distribution-type bin
 
     - name: Validate Gradle wrapper checksum
-      uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+      uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
 
     # REQUIRED: generated model classes are gitignored (0 committed files).
     # Without this step the published jar would contain no model types.
@@ -460,7 +460,7 @@ jobs:
     # regenerate gradle-wrapper.jar before the publish step below invokes
     # ./gradlew, then verify the checksum.
     - name: Set up Gradle
-      uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+      uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
       with:
         gradle-version: current
         # Only used once to regenerate the wrapper launcher; no build to cache.
@@ -471,7 +471,7 @@ jobs:
       run: cd sdk/kotlin && gradle wrapper --gradle-version 8.14.6 --distribution-type all
 
     - name: Validate Gradle wrapper checksum
-      uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+      uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
 
     # REQUIRED: generated model classes are gitignored (0 committed files).
     # Without this step the published jar would contain no model types.
