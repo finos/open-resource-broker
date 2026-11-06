@@ -120,13 +120,13 @@ Spot Fleet uses camelCase on the wire, so template values pass through nearly un
 
 | Template value | Sent to AWS |
 |---|---|
-| `lowestPrice` (default) | `lowestPrice` |
+| `lowestPrice` | `lowestPrice` |
 | `capacityOptimized` | `capacityOptimized` |
 | `capacityOptimizedPrioritized` | `capacityOptimizedPrioritized` |
 | `priceCapacityOptimized` | `priceCapacityOptimized` |
 | `diversified` | `diversified` |
 
-`prioritized` is not a Spot Fleet spot strategy and falls back to `lowestPrice`.
+When no strategy is set, spot and heterogeneous templates default to `priceCapacityOptimized` and on-demand templates default to `lowestPrice`. `prioritized` is not a Spot Fleet spot strategy and falls back to `lowestPrice`.
 
 ### Overrides, priority, and per-override price
 

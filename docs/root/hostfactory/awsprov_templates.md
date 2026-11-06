@@ -104,6 +104,9 @@ Each host template represents a class of instances that share some attributes, s
     - `capacityOptimizedPrioritized`
     - `diversified`
     - `lowestPrice`
+    - `priceCapacityOptimized`
+
+    Default is `priceCapacityOptimized` when priceType is `spot` or `heterogeneous`, and `lowestPrice` when priceType is `ondemand`.
 
 - **allocationStrategyOnDemand**
 
