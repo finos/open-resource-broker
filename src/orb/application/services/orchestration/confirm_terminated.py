@@ -122,8 +122,7 @@ class ConfirmTerminatedOrchestrator(
         present = sorted(m for m in machine_ids if self._is_present(states.get(m)))
         if present:
             raise InstanceStillVisibleError(
-                "The provider still shows these instances as not terminated: "
-                + ", ".join(present),
+                "The provider still shows these instances as not terminated: " + ", ".join(present),
                 details={"machine_ids": present},
             )
 

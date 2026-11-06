@@ -538,7 +538,9 @@ async def confirm_terminated(
             content={
                 "success": False,
                 "error": {
-                    "code": "INSTANCE_STILL_VISIBLE" if still_visible else "TERMINATION_NOT_VERIFIED",
+                    "code": "INSTANCE_STILL_VISIBLE"
+                    if still_visible
+                    else "TERMINATION_NOT_VERIFIED",
                     "message": exc.message,
                     "machine_ids": exc.details.get("machine_ids", []),
                 },
