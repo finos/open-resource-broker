@@ -143,18 +143,26 @@ def test_fault_matrix(app, client, clear_faults):
     assert failures == [], "\n" + "\n".join(failures)
 
 
-def test_template_rejection_reports_its_reason_to_the_caller(app, client, clear_faults):
+def test_template_rejection_reports_its_reason_but_not_the_message(app, client, clear_faults):
     """A rejected template is the caller's to fix, so the reason is part of the 400."""
     spec = app.openapi()
     routes = route_keys(app)
     key, _ = next(cell for cell in _cells(app) if cell[1] == "template_validation")
     probe = build_probe(key, spec)
-    inject(app, seams_for(routes[key]), TemplateValidationError("spot is not supported"))
+    inject(
+        app,
+        seams_for(routes[key]),
+        TemplateValidationError(
+            "failed reading /etc/templates/secret.yaml",
+            details={"reason": "spot is not supported", "path": "/etc/templates/secret.yaml"},
+        ),
+    )
 
     response = client.request(probe.method, probe.url, json=probe.json, params=probe.params)
 
     assert response.status_code == 400
-    assert response.json()["error"]["details"]["reason"] == "spot is not supported"
+    assert response.json()["error"]["details"] == {"reason": "spot is not supported"}
+    assert "secret.yaml" not in response.text
 
 
 def _check(response: Any, expected: tuple[int, ...], internal_text: str | None) -> list[str]:

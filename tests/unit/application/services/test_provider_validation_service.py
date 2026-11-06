@@ -102,8 +102,10 @@ class TestSelectAndValidateProvider:
         service, _, _ = _make_service(validation_result=validation_result)
         template = MagicMock()
 
-        with pytest.raises(TemplateValidationError, match="unsupported instance type"):
+        with pytest.raises(TemplateValidationError, match="unsupported instance type") as caught:
             await service.select_and_validate_provider(template)
+
+        assert caught.value.details == {"reason": "unsupported instance type"}
 
     @pytest.mark.asyncio
     async def test_warnings_are_logged_but_do_not_raise(self):
