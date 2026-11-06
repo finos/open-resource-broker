@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -17,9 +19,16 @@ from orb.api.dependencies import (
 )
 from orb.api.middleware.auth_middleware import AuthMiddleware
 from orb.api.routers.requests import router as requests_router
+from orb.application.services.orchestration.confirm_terminated import (
+    ConfirmTerminatedOrchestrator,
+)
 from orb.application.services.orchestration.dtos import ConfirmTerminatedOutput
 from orb.domain.base.exceptions import EntityNotFoundError, ValidationError
-from orb.domain.request.termination_confirmation import InstanceStillVisibleError
+from orb.domain.request.aggregate import Request
+from orb.domain.request.termination_confirmation import (
+    InstanceStillVisibleError,
+    TerminationNotVerifiedError,
+)
 from orb.infrastructure.adapters.ports.auth import AuthResult, AuthStatus
 from orb.infrastructure.error.exception_handler import get_exception_handler
 
@@ -37,7 +46,7 @@ def _output(**kwargs):
                 "operator": "alice",
                 "role": "operator",
                 "reason": "verified in console",
-                "verification": "not_visible",
+                "verification": "verified",
                 "at": "2026-01-01T00:00:00+00:00",
             }
         ],
@@ -179,3 +188,111 @@ class TestBehaviour:
         resp = _client(_app(orchestrator, CurrentUser("a", "operator"))).post(URL, json=body)
         assert resp.status_code == 422
         orchestrator.execute.assert_not_awaited()
+
+    def test_force_flag_reaches_the_orchestrator(self):
+        orchestrator = _orchestrator()
+        client = _client(_app(orchestrator, CurrentUser("a", "operator")))
+        client.post(URL, json=BODY)
+        assert orchestrator.execute.await_args.args[0].force is False
+        client.post(URL, json={**BODY, "force": True})
+        assert orchestrator.execute.await_args.args[0].force is True
+
+    def test_unverified_instance_is_409_with_its_own_code(self):
+        orchestrator = _orchestrator(
+            raises=TerminationNotVerifiedError("cannot verify", details={"machine_ids": ["i-1"]})
+        )
+        resp = _client(_app(orchestrator, CurrentUser("a", "operator"))).post(URL, json=BODY)
+        assert resp.status_code == 409
+        assert resp.json()["error"]["code"] == "TERMINATION_NOT_VERIFIED"
+        assert resp.json()["error"]["machine_ids"] == ["i-1"]
+
+
+def _acme_orchestrator(probe_instances=None, probe_success=True):
+    """Real orchestrator over a provider that is not OCI; only the provider is faked."""
+    request = Request.create_return_request(
+        machine_ids=["i-1"],
+        provider_type="acme",
+        provider_name="acme-main",
+        provider_api="AcmeCompute",
+    )
+    uow = MagicMock()
+    uow.requests.find_by_id.return_value = request
+
+    @contextmanager
+    def create():
+        yield uow
+
+    factory = MagicMock()
+    factory.create_unit_of_work.side_effect = create
+
+    async def execute(command):
+        command.newly_confirmed = list(command.machine_ids)
+        command.records = [
+            {
+                "machine_id": m,
+                "operator": command.operator,
+                "role": command.role,
+                "reason": command.reason,
+                "verification": command.verifications[m],
+                "at": "2026-01-01T00:00:00+00:00",
+            }
+            for m in command.machine_ids
+        ]
+
+    bus = MagicMock()
+    bus.execute = AsyncMock(side_effect=execute)
+    registry = MagicMock()
+    registry.execute_operation = AsyncMock(
+        return_value=SimpleNamespace(
+            success=probe_success,
+            data={"instances": probe_instances or []},
+            error_code=None if probe_success else "PROBE_FAILED",
+        )
+    )
+    orchestrator = ConfirmTerminatedOrchestrator(
+        command_bus=bus,
+        uow_factory=factory,
+        provider_registry_service=registry,
+        logger=MagicMock(),
+    )
+    return orchestrator, bus, str(request.request_id)
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestNonOciProvider:
+    def _post(self, orchestrator, request_id, **extra):
+        client = _client(_app(orchestrator, CurrentUser("alice", "operator")))
+        return client.post(f"/requests/{request_id}/confirm-terminated", json={**BODY, **extra})
+
+    def test_provider_verified_gone_is_recorded_verified(self):
+        orchestrator, _, request_id = _acme_orchestrator(
+            [{"instance_id": "i-1", "status": "terminated"}]
+        )
+        resp = self._post(orchestrator, request_id)
+        assert resp.status_code == 200
+        assert resp.json()["records"][0]["verification"] == "verified"
+
+    def test_still_present_is_409(self):
+        orchestrator, bus, request_id = _acme_orchestrator(
+            [{"instance_id": "i-1", "status": "running"}]
+        )
+        resp = self._post(orchestrator, request_id, force=True)
+        assert resp.status_code == 409
+        assert resp.json()["error"]["code"] == "INSTANCE_STILL_VISIBLE"
+        bus.execute.assert_not_awaited()
+
+    def test_unknown_without_force_is_refused(self):
+        orchestrator, bus, request_id = _acme_orchestrator(probe_success=False)
+        resp = self._post(orchestrator, request_id)
+        assert resp.status_code == 409
+        assert resp.json()["error"]["code"] == "TERMINATION_NOT_VERIFIED"
+        bus.execute.assert_not_awaited()
+
+    def test_unknown_with_force_is_recorded_operator_attested(self):
+        orchestrator, _, request_id = _acme_orchestrator(probe_success=False)
+        resp = self._post(orchestrator, request_id, force=True)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["records"][0]["verification"] == "operator_attested"
+        assert data["warnings"]

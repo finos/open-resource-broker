@@ -102,6 +102,38 @@ async def test_appends_one_record_per_machine_with_principal():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_records_carry_the_verification_per_machine():
+    store = _Store(_request())
+    command = _command(store.request, ["i-1", "i-2"])
+    command.verifications = {"i-1": "verified"}
+    await _handler(store).execute_command(command)
+
+    records = store.request.metadata[CONFIRMED_TERMINATED_KEY]
+    assert [(r["machine_id"], r["verification"]) for r in records] == [
+        ("i-1", "verified"),
+        ("i-2", "operator_attested"),
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_forced_repeat_never_downgrades_a_verified_record():
+    store = _Store(_request())
+    handler = _handler(store)
+    first = _command(store.request, ["i-1"])
+    first.verifications = {"i-1": "verified"}
+    await handler.execute_command(first)
+
+    again = _command(store.request, ["i-1"])
+    again.verifications = {"i-1": "operator_attested"}
+    await handler.execute_command(again)
+
+    assert again.records[0]["verification"] == "verified"
+    assert store.saves == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_repeat_confirmation_is_a_noop_with_existing_record():
     store = _Store(_request())
     handler = _handler(store)

@@ -83,9 +83,8 @@ class TestValidateConfirmable:
         with pytest.raises(ValidationError, match="not a return request"):
             validate_confirmable(request, ["i-1"])
 
-    def test_rejects_other_provider(self):
-        with pytest.raises(ValidationError, match="does not need"):
-            validate_confirmable(_return_request(provider_type="aws"), ["i-1"])
+    def test_accepts_any_provider(self):
+        validate_confirmable(_return_request(provider_type="aws"), ["i-1"])
 
     def test_rejects_terminal_request(self):
         request = _return_request().model_copy(update={"status": RequestStatus.COMPLETED})

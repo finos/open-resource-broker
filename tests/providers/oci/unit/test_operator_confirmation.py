@@ -94,12 +94,20 @@ def test_probe_reports_visible_instances_via_search_not_get_by_id():
     assert calls[0][:3] == ["search", "resource", "structured-search"]
 
 
-def test_probe_with_no_hits_reports_nothing_visible():
+def test_probe_with_no_hits_reports_instances_gone():
     result = _handler(lambda *a, **k: {"data": {"items": []}}).get_instance_status(
         _probe_operation(["i-1"])
     )
     assert result.success
-    assert result.data["instances"] == []
+    assert [(i["instance_id"], i["status"]) for i in result.data["instances"]] == [("i-1", "gone")]
+
+
+def test_probe_reports_terminated_search_hit_as_terminated():
+    def run(*a, **k):
+        return {"data": {"items": [{"identifier": "i-1", "lifecycle-state": "TERMINATED"}]}}
+
+    result = _handler(run).get_instance_status(_probe_operation(["i-1"]))
+    assert result.data["instances"][0]["status"] == "terminated"
 
 
 def test_probe_failure_is_reported_unavailable():
@@ -138,7 +146,9 @@ def test_probe_reports_hits_from_any_batch():
 
     ids = [f"i-{n}" for n in range(20)]
     result = _handler(run).get_instance_status(_probe_operation(ids))
-    assert [i["instance_id"] for i in result.data["instances"]] == ["i-15"]
+    states = {i["instance_id"]: i["status"] for i in result.data["instances"]}
+    assert states["i-15"] == "visible"
+    assert {s for m, s in states.items() if m != "i-15"} == {"gone"}
 
 
 def test_probe_over_time_budget_is_unavailable(monkeypatch):
