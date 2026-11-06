@@ -39,7 +39,8 @@ class K8sReconciliationLifecycle:
         logger: LoggingPort,
         client_provider: Callable[[], K8sClient],
         watch_lifecycle: K8sWatchManagerLifecycle,
-        known_request_ids: Callable[[], Iterable[str]],
+        known_request_ids: Optional[Callable[[], Iterable[str]]],
+        existing_request_ids: Optional[Callable[[Iterable[str]], Iterable[str]]] = None,
         startup_reconciler: Optional[StartupReconciler] = None,
         orphan_gc: Optional[OrphanGarbageCollector] = None,
     ) -> None:
@@ -48,6 +49,7 @@ class K8sReconciliationLifecycle:
         self._client_provider = client_provider
         self._watch_lifecycle = watch_lifecycle
         self._known_request_ids_fn = known_request_ids
+        self._existing_request_ids_fn = existing_request_ids
         self._startup_reconciler: Optional[StartupReconciler] = startup_reconciler
         self._orphan_gc: Optional[OrphanGarbageCollector] = orphan_gc
         self._last_reconciliation_report: Optional[ReconciliationReport] = None
@@ -135,11 +137,24 @@ class K8sReconciliationLifecycle:
             )
             return
         if self._orphan_gc is None:
+            if self._known_request_ids_fn is None:
+                self._logger.warning(
+                    "Kubernetes orphan GC not started: no request-id lookup is "
+                    "available, so orphans cannot be told apart from live pods."
+                )
+                return
+            if not self._config.orb_instance_id:
+                self._logger.warning(
+                    "Kubernetes orphan GC not started: set orb_instance_id so the GC "
+                    "only acts on pods this ORB installation created."
+                )
+                return
             self._orphan_gc = OrphanGarbageCollector(
                 kubernetes_client=self._client_provider(),
                 config=self._config,
                 logger=self._logger,
                 known_request_ids=self._known_request_ids_fn,
+                existing_request_ids=self._existing_request_ids_fn,
             )
         try:
             self._orphan_gc.start()

@@ -39,7 +39,10 @@ from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
-from orb.providers.k8s.utilities.labels import build_label_selector as _build_label_selector
+from orb.providers.k8s.utilities.labels import (
+    build_owned_pods_selector as _build_owned_pods_selector,
+    instance_label_key as _instance_label_key,
+)
 from orb.providers.k8s.utilities.pod_state import pod_status_string as _canonical_pod_status_string
 from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
 
@@ -101,7 +104,12 @@ class StartupReconciler:
             currently has in storage.  Called once per :meth:`run`.
             Decouples this module from the storage repository (which
             lives in ``infrastructure/storage/``) — callers supply a
-            closure over their own ``request_repository``.
+            closure over their own ``request_repository``.  When it is
+            ``None``, raises, or returns an empty set, or ``orb_instance_id`` is
+            unset, the reconciler
+            classifies nothing: no pod is adopted or reported as an
+            orphan, because an unreadable or empty store says nothing
+            about which pods are owned.
 
     The class is constructor-injected (no late binding) so the wiring
     in :class:`K8sProviderStrategy` is straightforward.
@@ -114,7 +122,7 @@ class StartupReconciler:
         cache: PodStateCache,
         logger: LoggingPort,
         *,
-        known_request_ids: Callable[[], Iterable[str]],
+        known_request_ids: Optional[Callable[[], Iterable[str]]],
     ) -> None:
         self._client = kubernetes_client
         self._config = config
@@ -141,22 +149,26 @@ class StartupReconciler:
             namespaces = self._resolve_namespaces()
             report.namespaces = [ns if ns is not None else "*" for ns in namespaces]
 
-            try:
-                known_ids = {str(rid) for rid in self._known_request_ids_fn()}
-            except Exception as exc:
-                # The caller's storage lookup is not allowed to break
-                # the provider start sequence.  We log and proceed with
-                # an empty known set, which classifies every pod as an
-                # orphan — that is the safest signal for the operator.
+            if not self._config.orb_instance_id:
+                report.completed = True
                 self._logger.warning(
-                    "StartupReconciler: known_request_ids lookup failed; "
-                    "treating every managed pod as an orphan: %s",
-                    exc,
-                    exc_info=True,
+                    "StartupReconciler: orb_instance_id is not configured, so ownership of "
+                    "managed pods cannot be established; no pods classified"
                 )
-                known_ids = set()
+                return report
 
-            label_selector = _build_label_selector(self._config.label_prefix, "managed", "true")
+            known_ids = self._read_known_ids()
+            if known_ids is None:
+                report.error = "request ids unavailable; no pods classified"
+                return report
+            if not known_ids:
+                report.completed = True
+                self._logger.info(
+                    "StartupReconciler: the request store holds no requests; no pods classified"
+                )
+                return report
+
+            label_selector = self._list_selector()
             request_id_label = f"{self._config.label_prefix}/request-id"
 
             for ns in namespaces:
@@ -223,18 +235,26 @@ class StartupReconciler:
             namespaces = self._resolve_namespaces()
             report.namespaces = [ns if ns is not None else "*" for ns in namespaces]
 
-            try:
-                known_ids = {str(rid) for rid in self._known_request_ids_fn()}
-            except Exception as exc:
+            if not self._config.orb_instance_id:
+                report.completed = True
                 self._logger.warning(
-                    "StartupReconciler: known_request_ids lookup failed; "
-                    "treating every managed pod as an orphan: %s",
-                    exc,
-                    exc_info=True,
+                    "StartupReconciler: orb_instance_id is not configured, so ownership of "
+                    "managed pods cannot be established; no pods classified"
                 )
-                known_ids = set()
+                return report
 
-            label_selector = _build_label_selector(self._config.label_prefix, "managed", "true")
+            known_ids = await asyncio.to_thread(self._read_known_ids)
+            if known_ids is None:
+                report.error = "request ids unavailable; no pods classified"
+                return report
+            if not known_ids:
+                report.completed = True
+                self._logger.info(
+                    "StartupReconciler: the request store holds no requests; no pods classified"
+                )
+                return report
+
+            label_selector = self._list_selector()
             request_id_label = f"{self._config.label_prefix}/request-id"
 
             results = await asyncio.gather(
@@ -323,6 +343,35 @@ class StartupReconciler:
     # Internals
     # ------------------------------------------------------------------
 
+    def _read_known_ids(self) -> Optional[set[str]]:
+        """Return the known request ids, or ``None`` when they cannot be read.
+
+        A missing lookup or a storage failure must never be treated as
+        "nothing is known", so both return ``None`` and the caller classifies
+        nothing.  The caller's storage lookup is not allowed to break the
+        provider start sequence, so failures are logged, not raised.
+        """
+        if self._known_request_ids_fn is None:
+            self._logger.warning(
+                "StartupReconciler: no request-id lookup is available; no pods classified"
+            )
+            return None
+        try:
+            return {str(rid) for rid in self._known_request_ids_fn()}
+        except Exception as exc:
+            self._logger.warning(
+                "StartupReconciler: known_request_ids lookup failed; no pods classified: %s",
+                exc,
+                exc_info=True,
+            )
+            return None
+
+    def _list_selector(self) -> str:
+        """Select this installation's managed pods; callers ensure an id is set."""
+        return _build_owned_pods_selector(
+            self._config.label_prefix, self._config.orb_instance_id or ""
+        )
+
     def _resolve_namespaces(self) -> list[Optional[str]]:
         """Translate ``config.namespaces`` into a list of namespaces to list.
 
@@ -385,7 +434,16 @@ class StartupReconciler:
         pod_namespace = getattr(metadata, "namespace", None) or namespace or ""
         creation_timestamp = getattr(metadata, "creation_timestamp", None)
 
-        if request_id is None or request_id not in known_ids:
+        instance_id = self._config.orb_instance_id
+        if not instance_id:
+            return None
+        if labels.get(_instance_label_key(self._config.label_prefix)) != instance_id:
+            return None
+        if not request_id:
+            # A managed pod without a request-id label is not attributable to
+            # any request; leave it alone rather than reporting it as an orphan.
+            return None
+        if request_id not in known_ids:
             return _Classified(
                 kind="orphan",
                 orphan=OrphanPod(

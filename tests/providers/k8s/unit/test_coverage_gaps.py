@@ -555,6 +555,7 @@ async def test_orphan_gc_404_on_delete_counts_as_deleted_not_failure() -> None:
         labels: dict[str, str] = {
             "orb.io/managed": "true",
             "orb.io/request-id": request_id,
+            "orb.io/orb-instance": "orb-a",
         }
         return SimpleNamespace(
             metadata=SimpleNamespace(
@@ -575,7 +576,7 @@ async def test_orphan_gc_404_on_delete_counts_as_deleted_not_failure() -> None:
     client = MagicMock()
     client.core_v1 = core_v1
 
-    cfg = K8sProviderConfig(namespace="orb", auto_cleanup_orphans=True)
+    cfg = K8sProviderConfig(namespace="orb", auto_cleanup_orphans=True, orb_instance_id="orb-a")
 
     gc = OrphanGarbageCollector(
         kubernetes_client=client,

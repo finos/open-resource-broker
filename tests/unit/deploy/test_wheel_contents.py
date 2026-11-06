@@ -1,6 +1,7 @@
 """The built wheel must carry every runtime data file and no stale modules."""
 
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -38,7 +39,7 @@ def _build_command() -> list[str] | None:
 
 
 @pytest.fixture(scope="module")
-def wheel_names(tmp_path_factory) -> set[str]:
+def built_wheel(tmp_path_factory) -> Path:
     cmd = _build_command()
     if cmd is None:
         if os.environ.get("CI"):
@@ -53,8 +54,12 @@ def wheel_names(tmp_path_factory) -> set[str]:
         check=True,
         capture_output=True,
     )
-    wheel = next(outdir.glob("orb_py-*.whl"))
-    with zipfile.ZipFile(wheel) as zf:
+    return next(outdir.glob("orb_py-*.whl"))
+
+
+@pytest.fixture(scope="module")
+def wheel_names(built_wheel) -> set[str]:
+    with zipfile.ZipFile(built_wheel) as zf:
         return set(zf.namelist())
 
 
@@ -93,3 +98,36 @@ def test_wheel_has_no_modules_absent_from_src(wheel_names):
         if n.startswith("orb/") and n.endswith(".py") and not (SRC / n).exists()
     ]
     assert stale == []
+
+
+def test_k8s_defaults_load_from_the_installed_wheel(built_wheel, tmp_path):
+    """The k8s defaults loader finds its bundled file when only the wheel is importable.
+
+    The loader swallows read errors and returns ``{}``, so a wheel that omits
+    ``k8s_defaults.json`` surfaces only as a provider with no supported APIs.
+    Import the loader from the unpacked wheel, not from the source tree, and
+    require the Pod handler to be present.
+    """
+    site = tmp_path / "site"
+    with zipfile.ZipFile(built_wheel) as zf:
+        zf.extractall(site)
+
+    probe = (
+        "import json, sys\n"
+        "sys.path.insert(0, sys.argv[1])\n"
+        "import orb.providers.k8s.defaults_loader as loader\n"
+        "from pathlib import Path\n"
+        "assert Path(loader.__file__).resolve().is_relative_to(Path(sys.argv[1]).resolve()), "
+        "loader.__file__\n"
+        "defaults = loader.KubernetesDefaultsLoader().load_defaults()\n"
+        "handlers = defaults['provider']['provider_defaults']['k8s']['handlers']\n"
+        "print(json.dumps(sorted(handlers)))\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", probe, str(site)],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Pod" in json.loads(result.stdout.strip().splitlines()[-1])

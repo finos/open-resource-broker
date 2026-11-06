@@ -365,6 +365,7 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
             replicas=replicas,
             request=request,
             label_prefix=self._config.label_prefix,
+            instance_id=self._config.orb_instance_id,
         )
 
     def apply_pod_timeouts(

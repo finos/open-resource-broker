@@ -99,7 +99,7 @@ def k8s_config():  # type: ignore[return]
     """Minimal K8sProviderConfig targeting the orb-test namespace."""
     from orb.providers.k8s.configuration.config import K8sProviderConfig
 
-    return K8sProviderConfig(namespace="orb-test")  # type: ignore[call-arg]
+    return K8sProviderConfig(namespace="orb-test", orb_instance_id="orb-a")  # type: ignore[call-arg]
 
 
 @pytest.fixture()
