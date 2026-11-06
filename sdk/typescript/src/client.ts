@@ -581,6 +581,19 @@ export class OrbClient {
     );
   }
 
+  /** confirmTerminated — POST /api/v1/requests/{request_id}/confirm-terminated */
+  async confirmTerminated(
+    requestId: string,
+    machineIds: string[],
+    reason: string,
+    force = false
+  ): Promise<unknown> {
+    return this.post<unknown>(
+      `/api/v1/requests/${encodeURIComponent(requestId)}/confirm-terminated`,
+      { machine_ids: machineIds, reason, force }
+    );
+  }
+
   /**
    * streamRequest
    * GET /api/v1/requests/{request_id}/stream

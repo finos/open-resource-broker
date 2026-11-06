@@ -71,6 +71,23 @@ class CancelRequestCommand(BaseCommand):
     final_status: Optional[str] = None
 
 
+class ConfirmMachinesTerminatedCommand(BaseCommand):
+    """Command recording an operator's confirmation that return-request machines are gone."""
+
+    request_id: str
+    machine_ids: list[str]
+    reason: str
+    operator: str
+    role: str
+    # Per machine: "verified" or "operator_attested"; absent means attested.
+    verifications: Dict[str, str] = {}
+
+    # Results for the caller, filled in by the handler.
+    newly_confirmed: list[str] = []
+    already_confirmed: list[str] = []
+    records: list[Dict[str, Any]] = []
+
+
 class SyncRequestCommand(Command, BaseModel):
     """Command to sync request with provider state."""
 

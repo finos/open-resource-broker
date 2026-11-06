@@ -471,6 +471,21 @@ public class OrbClient implements Closeable {
     }
 
     /**
+     * confirmTerminated
+     * — POST /api/v1/requests/{request_id}/confirm-terminated
+     */
+    public Map<String, Object> confirmTerminated(
+            String requestId, java.util.List<String> machineIds, String reason, boolean force)
+            throws Exception {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("machine_ids", machineIds);
+        body.put("reason", reason);
+        body.put("force", force);
+        return post("/api/v1/requests/" + encode(requestId) + "/confirm-terminated", body,
+                new TypeReference<>() {});
+    }
+
+    /**
      * getRequestTimeline
      * — GET /api/v1/requests/{request_id}/timeline
      */

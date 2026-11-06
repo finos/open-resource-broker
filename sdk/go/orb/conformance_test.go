@@ -95,13 +95,13 @@ func (r *recorder) record(method, path string) {
 
 // TestSpecConformance drives every client operation against a recording server
 // and asserts that (a) each issued request matches a spec operation (no wrong
-// verb / stale path), and (b) all 48 spec operations are exercised (no silent
+// verb / stale path), and (b) all 49 spec operations are exercised (no silent
 // under-coverage). This runs without a live orb, closing the static-conformance
 // gap independently of the integration leg.
 func TestSpecConformance(t *testing.T) {
 	ops := specOperations(t)
-	if len(ops) != 48 {
-		t.Fatalf("expected 48 spec operations, got %d (spec changed — update coverage)", len(ops))
+	if len(ops) != 49 {
+		t.Fatalf("expected 49 spec operations, got %d (spec changed — update coverage)", len(ops))
 	}
 
 	rec := &recorder{hits: make(map[string]bool)}
@@ -180,6 +180,7 @@ func TestSpecConformance(t *testing.T) {
 	_, _ = c.ListReturnRequests(ctx)
 	_ = c.CancelRequest(ctx, "r1")
 	_ = c.PurgeRequest(ctx, "r1")
+	_, _ = c.ConfirmTerminated(ctx, "r1", []string{"m1"}, "verified", false)
 	_, _ = c.GetRequestTimeline(ctx, "r1")
 
 	if stream, err := c.StreamRequestStatus(ctx, "r1"); err == nil {

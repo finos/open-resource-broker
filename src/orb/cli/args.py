@@ -392,6 +392,41 @@ def add_request_actions(subparsers, pp: "ParentParsers | None" = None):
         "--request-id", "-r", dest="flag_request_id", help="Request ID to cancel"
     )
 
+    requests_confirm = subparsers.add_parser(
+        "confirm-terminated",
+        help="Confirm return-request machines are terminated",
+        description=(
+            "Record that machines of a return request are terminated, for instances "
+            "the provider reports as not found. The provider is asked whether each "
+            "machine is gone; confirmed machines are recorded as verified. If the "
+            "provider still shows a machine, or cannot tell, the command fails; "
+            "--force records machines it cannot verify as operator-attested. The "
+            "operator is recorded as cli:<user>@<host>, which is advisory only."
+        ),
+        parents=[pp.common, pp.provider_scope],
+    )
+    requests_confirm.add_argument("request_id", nargs="?", help="Return request ID")
+    requests_confirm.add_argument(
+        "--request-id", "-r", dest="flag_request_id", help="Return request ID"
+    )
+    requests_confirm.add_argument(
+        "--machine-id",
+        "-m",
+        dest="machine_ids",
+        action="append",
+        required=True,
+        metavar="ID",
+        help="Machine ID verified terminated (repeat for several)",
+    )
+    requests_confirm.add_argument(
+        "--reason", required=True, help="Why the machines are known to be terminated"
+    )
+    requests_confirm.add_argument(
+        "--force",
+        action="store_true",
+        help="Record machines the provider cannot verify as operator-attested",
+    )
+
     requests_status = subparsers.add_parser(
         "status",
         help="Check request status",

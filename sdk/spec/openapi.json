@@ -1798,6 +1798,68 @@
         }
       }
     },
+    "/api/v1/requests/{request_id}/confirm-terminated": {
+      "post": {
+        "tags": [
+          "Requests"
+        ],
+        "summary": "Confirm Machines Terminated",
+        "description": "Record that the named machines of a return request are terminated, for instances the provider reports as not found. The provider is asked whether each machine is gone; confirmed machines are recorded as verified. Rejected with 409 when the provider still shows a machine that is not terminated, or when it cannot tell and force is not set. With force, machines the provider cannot verify are recorded as operator-attested and the caller takes responsibility for the claim. Repeating a confirmation changes nothing.",
+        "operationId": "confirmTerminated",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmTerminatedBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmTerminatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request: the request is not a return request in progress, or a machine is not part of it"
+          },
+          "404": {
+            "description": "Request not found"
+          },
+          "409": {
+            "description": "A machine is still present at the provider, or the provider could not verify it and force was not set"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/requests/{request_id}/purge": {
       "post": {
         "tags": [
@@ -2719,6 +2781,119 @@
         "type": "object",
         "title": "CleanupDatabaseBody",
         "description": "Body for POST /admin/database/cleanup."
+      },
+      "ConfirmTerminatedBody": {
+        "properties": {
+          "machineIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Machineids"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "machineIds",
+          "reason"
+        ],
+        "title": "ConfirmTerminatedBody",
+        "description": "Body for ``POST /api/v1/requests/{request_id}/confirm-terminated``."
+      },
+      "ConfirmTerminatedRecord": {
+        "properties": {
+          "machine_id": {
+            "type": "string",
+            "title": "Machine Id"
+          },
+          "operator": {
+            "type": "string",
+            "title": "Operator"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "verification": {
+            "type": "string",
+            "title": "Verification"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "machine_id",
+          "operator",
+          "role",
+          "reason",
+          "verification",
+          "at"
+        ],
+        "title": "ConfirmTerminatedRecord",
+        "description": "Audit record stored for one operator-confirmed machine."
+      },
+      "ConfirmTerminatedResponse": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "confirmed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Confirmed",
+            "default": []
+          },
+          "already_confirmed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Already Confirmed",
+            "default": []
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/ConfirmTerminatedRecord"
+            },
+            "type": "array",
+            "title": "Records",
+            "default": []
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "title": "ConfirmTerminatedResponse",
+        "description": "Response for confirming that return-request machines are terminated."
       },
       "GenerateTemplatesBody": {
         "properties": {

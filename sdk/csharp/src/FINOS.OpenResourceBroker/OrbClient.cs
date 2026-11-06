@@ -605,6 +605,14 @@ public sealed class OrbClient : IAsyncDisposable
         => await PostAsync<Dictionary<string, object?>>($"/api/v1/requests/{Uri.EscapeDataString(requestId)}/purge", ct: ct)
                  .ConfigureAwait(false);
 
+    /// <summary>confirmTerminated — POST /api/v1/requests/{request_id}/confirm-terminated</summary>
+    public async Task<Dictionary<string, object?>> ConfirmTerminatedAsync(
+        string requestId, IReadOnlyList<string> machineIds, string reason, bool force = false, CancellationToken ct = default)
+        => await PostAsync<Dictionary<string, object?>>(
+                $"/api/v1/requests/{Uri.EscapeDataString(requestId)}/confirm-terminated",
+                new Dictionary<string, object?> { ["machine_ids"] = machineIds, ["reason"] = reason, ["force"] = force }, ct)
+                 .ConfigureAwait(false);
+
     /// <summary>
     /// streamRequest
     /// GET /api/v1/requests/{request_id}/stream
