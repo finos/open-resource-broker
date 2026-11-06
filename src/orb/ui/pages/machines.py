@@ -545,9 +545,11 @@ class MachinesState(AppState):
             )
         return rows
 
-    @rx.var
     def dynamic_columns(self) -> list[ColumnDef]:
         """Provider-declared column definitions merged from backend schemas.
+
+        Deliberately not an ``rx.var``: ``ColumnDef`` holds formatter callables,
+        which cannot be pickled when Reflex persists the state.
 
         Reads ``self.provider_schemas`` — inherited from ``AppState`` via
         Reflex's substate mechanism, so a single HTTP fetch on page mount
