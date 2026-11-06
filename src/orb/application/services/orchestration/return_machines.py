@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 from orb.application.dto.commands import CreateReturnRequestCommand
 from orb.application.dto.queries import ListMachinesQuery, SyncAndGetRequestQuery
@@ -150,10 +151,9 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
 
     async def _poll_until_terminal(self, request_id: str, timeout_seconds: int) -> str:
         """Poll SyncAndGetRequestQuery until terminal status or timeout."""
-        elapsed = 0
-        interval = 2
+        start = time.monotonic()
         consecutive_errors = 0
-        while elapsed < timeout_seconds:
+        while time.monotonic() - start < timeout_seconds:
             try:
                 query = SyncAndGetRequestQuery(
                     request_id=request_id, lightweight=False, skip_cache=True
@@ -182,6 +182,5 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
                         f"Polling request {request_id} aborted after "
                         f"{consecutive_errors} consecutive errors: {exc}"
                     ) from exc
-            await asyncio.sleep(interval)
-            elapsed += interval
+            await asyncio.sleep(self._poll_delay(start, timeout_seconds))
         return "timeout"
