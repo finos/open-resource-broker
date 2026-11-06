@@ -68,6 +68,7 @@ from orb.providers.aws.infrastructure.launch_template.manager import (
 )
 from orb.providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from orb.providers.aws.utilities.aws_operations import AWSOperations
+from orb.providers.aws.utilities.terminate_instances import wait_until_visible
 
 
 @injectable
@@ -846,6 +847,11 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 )
                 found_ids = []
             instance_ids = list(dict.fromkeys([*known_ids, *found_ids]))
+            if known_ids:
+                # These ids were returned seconds ago, so EC2 may not list them yet;
+                # an unknown id would be read as already terminated and the instance
+                # would then appear and keep running.
+                wait_until_visible(self.aws_client.ec2_client, known_ids)
 
             if instance_ids:
                 self.aws_ops.terminate_instances_with_fallback(

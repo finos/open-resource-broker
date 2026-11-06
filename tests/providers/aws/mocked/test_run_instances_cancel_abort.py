@@ -135,3 +135,53 @@ def test_a_failed_lookup_without_known_ids_is_still_an_error(handler):
         outcome = handler.cancel_resource("r-none", "req-abort")
 
     assert outcome["status"] == "error"
+
+
+def test_instances_not_yet_visible_to_ec2_are_waited_for_before_they_are_terminated(
+    handler, moto_vpc_resources
+):
+    from botocore.exceptions import ClientError
+
+    result = _launch(handler, moto_vpc_resources)
+    instance_ids = result["instance_ids"]
+    ec2 = handler.aws_client.ec2_client
+    real_describe = ec2.describe_instances
+    real_terminate = ec2.terminate_instances
+    describes: list[int] = []
+
+    def not_found() -> ClientError:
+        return ClientError(
+            {
+                "Error": {
+                    "Code": "InvalidInstanceID.NotFound",
+                    "Message": f"The instance IDs '{', '.join(instance_ids)}' do not exist",
+                }
+            },
+            "DescribeInstances",
+        )
+
+    def lagging_describe(**kwargs: Any) -> Any:
+        describes.append(1)
+        if len(describes) <= 2:
+            raise not_found()
+        return real_describe(**kwargs)
+
+    def terminate(**kwargs: Any) -> Any:
+        # EC2 answers NotFound for ids it cannot see yet.
+        if len(describes) <= 2:
+            raise not_found()
+        return real_terminate(**kwargs)
+
+    with (
+        patch.object(ec2, "describe_instances", side_effect=lagging_describe),
+        patch.object(ec2, "terminate_instances", side_effect=terminate),
+        patch("orb.providers.aws.utilities.terminate_instances.time.sleep"),
+        patch.object(handler, "_lookup_reservation_instance_ids", return_value=[]),
+    ):
+        outcome = handler.cancel_resource_with_members(
+            result["resource_ids"][0], "req-abort", instance_ids
+        )
+
+    assert outcome["status"] == "success"
+    assert len(describes) == 3
+    assert _live(instance_ids) == set()
