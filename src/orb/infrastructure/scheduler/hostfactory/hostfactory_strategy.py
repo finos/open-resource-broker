@@ -490,7 +490,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "security_group_ids": raw_data.get("securityGroupIds", []),
             # Pricing and allocation
             "price_type": raw_data.get("priceType", "ondemand"),
-            "allocation_strategy": raw_data.get("allocationStrategy", "lowestPrice"),
+            "allocation_strategy": raw_data.get("allocationStrategy"),
             "max_price": raw_data.get("maxPrice"),
             # Tags and metadata
             "tags": raw_data.get("tags", {}),

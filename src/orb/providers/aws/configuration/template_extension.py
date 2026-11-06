@@ -40,9 +40,7 @@ class AWSTemplateExtensionConfig(ProviderTemplateExtensionBase):
     spot_fleet_request_expiry: int = Field(
         30, description="Time before unfulfilled requests are canceled (minutes)"
     )
-    allocation_strategy: str = Field(
-        "capacity_optimized", description="Strategy for Spot instances"
-    )
+    allocation_strategy: Optional[str] = Field(None, description="Strategy for Spot instances")
     allocation_strategy_on_demand: str = Field(
         "lowest_price", description="Strategy for On-Demand instances"
     )

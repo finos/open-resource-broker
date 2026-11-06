@@ -48,7 +48,7 @@ class Template(BaseModel):
 
     # Pricing and allocation
     price_type: str = "ondemand"
-    allocation_strategy: Optional[str] = None  # Will be set based on price_type
+    allocation_strategy: Optional[str] = None  # Provider templates apply their own default
     max_price: Optional[float] = None
 
     # Machine types configuration (unified for all providers)
@@ -274,13 +274,6 @@ class Template(BaseModel):
 
         if self.max_machines <= 0:
             raise ValueError("max_machines must be greater than 0")
-
-        # Set allocation strategy default based on price type
-        if self.allocation_strategy is None:
-            if self.price_type == "spot":
-                self.allocation_strategy = "priceCapacityOptimized"
-            else:  # ondemand, heterogeneous
-                self.allocation_strategy = "lowestPrice"
 
         # Reject tag keys that use the reserved system namespace
         reserved_keys = [k for k in self.tags if k.startswith("orb:")]

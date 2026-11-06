@@ -279,11 +279,11 @@ class TestTemplateSerializerFromDict:
         restored = self._s().from_dict(data)
         assert restored.price_type == "ondemand"
 
-    def test_allocation_strategy_defaults_to_lowest_price(self):
+    def test_allocation_strategy_left_unset_when_absent(self):
         data = _minimal_data()
         data.pop("allocation_strategy", None)
         restored = self._s().from_dict(data)
-        assert restored.allocation_strategy == "lowest_price"
+        assert restored.allocation_strategy is None
 
     def test_vm_type_machine_type_key_normalized(self):
         data = dict(_minimal_data(), vmType="t2.medium")

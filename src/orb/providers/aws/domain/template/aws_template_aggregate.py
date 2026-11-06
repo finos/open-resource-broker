@@ -374,6 +374,35 @@ class AWSTemplate(Template):
 
         return self
 
+    @field_validator("allocation_strategy", mode="before")
+    @classmethod
+    def normalise_allocation_strategy_input(cls, value: Any) -> Any:
+        """Accept a value object or any known spelling and store the canonical string.
+
+        Unknown strings are kept unchanged so the template still loads; the
+        request path rejects them with the unknown-strategy error.
+        """
+        if isinstance(value, AWSAllocationStrategy):
+            return value.value
+        if isinstance(value, str) and value:
+            try:
+                return normalise_allocation_strategy(value)
+            except ValueError:
+                return value
+        return value
+
+    @model_validator(mode="after")
+    def apply_allocation_strategy_default(self) -> "AWSTemplate":
+        """Default the allocation strategy from the price type when none is set."""
+        if not self.allocation_strategy:
+            default = (
+                "priceCapacityOptimized"
+                if self.price_type in ("spot", "heterogeneous")
+                else "lowestPrice"
+            )
+            object.__setattr__(self, "allocation_strategy", default)
+        return self
+
     @field_validator("allocation_strategy_on_demand", mode="before")
     @classmethod
     def coerce_allocation_strategy_on_demand(cls, value: Any) -> Optional["AWSAllocationStrategy"]:

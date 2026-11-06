@@ -493,10 +493,7 @@ class AzureTemplate(Template):
                 "vmss_allocation_strategy for Azure VMSS instance mix or "
                 "spot_placement_score_enabled for Spot Placement Score planning"
             )
-        # The shared Template base still owns an AWS-shaped allocation_strategy
-        # field and mutates it when absent. Azure does not use that contract, so
-        # set an inert value here after rejecting explicit non-empty input.
-        data["allocation_strategy"] = ""
+        data.pop("allocation_strategy", None)
 
         if data.get("spot_percentage") is not None and data.get("priority") in (
             None,

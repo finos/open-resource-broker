@@ -212,7 +212,7 @@ class TemplateSerializer(BaseEntitySerializer):
                 "machine_role": data.get("machine_role") or data.get("instance_profile"),
                 "monitoring_enabled": data.get("monitoring_enabled"),
                 "price_type": data.get("price_type", "ondemand"),
-                "allocation_strategy": data.get("allocation_strategy", "lowest_price"),
+                "allocation_strategy": data.get("allocation_strategy"),
                 "max_price": data.get("max_price"),
                 "tags": data.get("tags", {}),
                 "metadata": data.get("metadata", {}),
