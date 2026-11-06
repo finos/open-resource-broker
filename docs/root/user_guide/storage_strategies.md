@@ -664,6 +664,19 @@ except ConcurrencyConflictError as e:
     storage.update_entity("requests", request_id, merged_data)
 ```
 
+### Version Conflicts and Retries
+
+Requests, machines and templates carry a `version` field. A save that expects version `N` succeeds only if the stored record is still at version `N`. If another writer changed or deleted the record in between, the JSON, SQL and DynamoDB strategies raise `ConcurrencyError` (from `orb.domain.base.exceptions`) and leave the stored record unchanged. Inside a unit of work the error is passed up as `ConcurrencyError`, not wrapped in a `TransactionError`, so callers can tell a conflict from a storage failure.
+
+ORB's own request handlers catch the conflict, re-read the record, re-apply the change and save again:
+
+- Updating, cancelling and completing a request retry up to `request.concurrency_max_retries` times (default `3`).
+- Status refreshes and machine sync retry once.
+
+When the retries run out, the `ConcurrencyError` reaches the caller. The REST API returns `409 Conflict` with error code `CONCURRENCY_ERROR` and the message "The resource was modified concurrently; please retry." Check the current state of the resource before repeating the call.
+
+Code that saves through the storage layer directly should handle `ConcurrencyError` the same way: re-read the record, re-apply the change and retry, rather than saving the copy it already holds.
+
 ### Lock Management
 
 #### File-Based Locking (JSON)
