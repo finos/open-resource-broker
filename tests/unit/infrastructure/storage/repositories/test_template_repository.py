@@ -315,7 +315,7 @@ class TestTemplateSerializerFromDict:
     def test_defaults_service_failure_falls_back_to_original_data(self):
         """A failing defaults_service must not prevent deserialization."""
         defaults_service = MagicMock()
-        defaults_service.resolve_template_defaults.side_effect = RuntimeError("service down")
+        defaults_service.resolve_template_defaults.side_effect = ValueError("service down")
         s = TemplateSerializer(defaults_service=defaults_service)
         restored = s.from_dict(_minimal_data())
         assert restored.template_id == _TEMPLATE_ID
