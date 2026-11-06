@@ -17,15 +17,34 @@ Pure domain — no infra imports.
 
 from __future__ import annotations
 
+import logging
+import math
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from orb.domain.base.diagnostic import DiagnosticCategory, FulfilmentDiagnostic
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.request.aggregate import Request
 from orb.domain.request.exceptions import InvalidRequestStateError
+from orb.domain.request.fulfillment_config import merged_fulfillment_config
 from orb.domain.request.request_types import RequestStatus, RequestType
+
+logger = logging.getLogger(__name__)
+
+# Settings used when the state machine is built without configured defaults. They
+# match the configuration defaults for provisioning and dispatch timeouts.
+_BUILTIN_FULFILMENT_DEFAULTS: dict[str, Any] = {
+    "timeout_seconds": 300,
+    "dispatch_timeout_seconds": 300,
+}
+
+# Margin added to the longest a live create can run before it persists its
+# resource ids, so a request still being created is never judged abandoned.
+_ABANDON_MARGIN_SECONDS = 300
+
+_ABANDONED_MESSAGE = "Request abandoned before provisioning started"
 
 
 class FulfilmentEvent(str, Enum):
@@ -51,8 +70,24 @@ _VERDICT_STATUS: dict[str, RequestStatus] = {
 class FulfilmentStateMachine:
     """Single entry point for every request status write."""
 
-    def __init__(self, grace_period_seconds: int) -> None:
+    def __init__(
+        self,
+        grace_period_seconds: int,
+        fulfilment_defaults: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        """Create the state machine.
+
+        Args:
+            grace_period_seconds: How long a request may take before its deadline.
+            fulfilment_defaults: Configured provisioning settings
+                (``timeout_seconds``, ``dispatch_timeout_seconds``) that a request's
+                own ``fulfillment_config`` metadata may override.
+        """
         self._grace_period = timedelta(seconds=max(0, int(grace_period_seconds)))
+        defaults = {**_BUILTIN_FULFILMENT_DEFAULTS, **(fulfilment_defaults or {})}
+        if self._timeouts(defaults) is None:
+            defaults = dict(_BUILTIN_FULFILMENT_DEFAULTS)
+        self._fulfilment_defaults = defaults
 
     # ------------------------------------------------------------------
     # Public API
@@ -163,6 +198,8 @@ class FulfilmentStateMachine:
         # by the deadline machinery.
         if request.request_type != RequestType.ACQUIRE:
             return request
+        if request.status == RequestStatus.PENDING:
+            return self._fail_if_abandoned(request, now=now)
         if request.deadline_at is None or now < request.deadline_at:
             return request
         if request.status not in (
@@ -219,6 +256,75 @@ class FulfilmentStateMachine:
             diagnostic=diagnostic,
             clear_diagnostic=clear_diagnostic,
         )
+
+    def abandon_after(self, request: Request) -> timedelta:
+        """How long a request may stay PENDING before it counts as abandoned.
+
+        A live create runs its elapsed check only when an attempt starts, so it
+        lasts at most the provisioning timeout plus one dispatch timeout, followed
+        by persistence. Settings come from the same merge provisioning uses, so a
+        per-request override widens this bound too. Never shorter than the grace
+        period. Unusable overrides fall back to the configured defaults.
+        """
+        timeouts: Optional[tuple[float, float]] = None
+        try:
+            timeouts = self._timeouts(merged_fulfillment_config(self._fulfilment_defaults, request))
+        except Exception as exc:
+            logger.warning("Unusable fulfillment_config on request %s: %s", request.request_id, exc)
+        if timeouts is None:
+            logger.warning(
+                "Using the configured fulfilment timeouts for request %s", request.request_id
+            )
+            timeouts = self._timeouts(self._fulfilment_defaults) or (300.0, 300.0)
+        timeout_seconds, dispatch_timeout_seconds = timeouts
+        longest_create = timeout_seconds + dispatch_timeout_seconds + _ABANDON_MARGIN_SECONDS
+        return max(self._grace_period, timedelta(seconds=longest_create))
+
+    @staticmethod
+    def _timeouts(config: Mapping[str, Any]) -> Optional[tuple[float, float]]:
+        """Return (timeout_seconds, dispatch_timeout_seconds), or None if unusable."""
+        try:
+            timeout_seconds = float(config["timeout_seconds"])
+            dispatch_timeout_seconds = float(config["dispatch_timeout_seconds"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if not (math.isfinite(timeout_seconds) and math.isfinite(dispatch_timeout_seconds)):
+            return None
+        # Bound the sum so it always fits in a timedelta.
+        timeout_seconds = min(max(timeout_seconds, 0.0), 1e9)
+        dispatch_timeout_seconds = min(max(dispatch_timeout_seconds, 0.0), 1e9)
+        return timeout_seconds, dispatch_timeout_seconds
+
+    def _fail_if_abandoned(self, request: Request, *, now: datetime) -> Request:
+        """Fail a PENDING request whose create flow never recorded anything.
+
+        Only a request still awaiting resources can be abandoned: one that has
+        resource or machine ids is owned by the status sync, not by a create.
+        Never raises on a read path.
+        """
+        if not request.awaiting_resources:
+            return request
+        created_at = request.created_at
+        if created_at is None:
+            return request
+        try:
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=now.tzinfo)
+            if now - created_at < self.abandon_after(request):
+                return request
+            return request._transition(
+                RequestStatus.FAILED,
+                now=now,
+                message=_ABANDONED_MESSAGE,
+                diagnostic=FulfilmentDiagnostic(
+                    category=DiagnosticCategory.INTERNAL,
+                    summary=_ABANDONED_MESSAGE,
+                    occurred_at=now,
+                ),
+            )
+        except Exception as exc:
+            logger.debug("Abandoned-request check skipped for %s: %s", request.request_id, exc)
+            return request
 
     # ------------------------------------------------------------------
     # Internals
