@@ -488,9 +488,9 @@ async def test_request_is_counted_once_across_completed_and_later_events():
 
 @pytest.mark.asyncio
 async def test_tracking_is_capped_and_eviction_releases_the_pending_count(monkeypatch):
-    import orb.application.events.handlers.metrics_event_handler as module
-
-    monkeypatch.setattr(module, "_MAX_TRACKED_REQUESTS", 3)
+    monkeypatch.setattr(
+        "orb.application.events.handlers.metrics_event_handler._MAX_TRACKED_REQUESTS", 3
+    )
     handler = _make_handler()
     gauge = _Gauge(handler)
 
