@@ -520,6 +520,10 @@ class ProvisioningOrchestrationService:
                     )
                     if swept.status.is_terminal() and swept is not request:
                         failed_request = swept
+                    elif request.deadline_at is not None:
+                        # The state machine decided to wait for a provider read
+                        # (or the deadline has not really passed): leave it be.
+                        continue
                     else:
                         failed_request = request.update_status(
                             RequestStatus.FAILED,

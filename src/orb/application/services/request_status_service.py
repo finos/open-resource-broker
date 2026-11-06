@@ -21,13 +21,18 @@ import dataclasses
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 
-from orb.application.services.machine_sync_service import PROVIDER_FETCH_FAILED
+from orb.application.services.deadline_release_service import DeadlineReleaseService
+from orb.application.services.machine_sync_service import (
+    PROVIDER_FETCH_FAILED,
+    FailedProviderFetch,
+)
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import ConcurrencyError, ProviderContractError
 from orb.domain.base.ports import EventPublisherPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.machine.aggregate import Machine
+from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.aggregate import Request
 from orb.domain.request.fulfilment_state_machine import (
     FulfilmentEvent,
@@ -53,10 +58,12 @@ class RequestStatusService:
         logger: LoggingPort,
         state_machine: Optional[FulfilmentStateMachine] = None,
         event_publisher: Optional[EventPublisherPort] = None,
+        deadline_release: Optional[DeadlineReleaseService] = None,
     ) -> None:
         self.uow_factory = uow_factory
         self.logger = logger
         self._event_publisher = event_publisher
+        self._deadline_release = deadline_release
         self._state_machine = state_machine or FulfilmentStateMachine(
             grace_period_seconds=_DEFAULT_GRACE_PERIOD_SECONDS
         )
@@ -261,6 +268,7 @@ class RequestStatusService:
         status: str,
         message: str,
         provider_metadata: Optional[dict] = None,
+        provider_machines: Optional[list[Machine]] = None,
     ) -> Request:
         """Route a status update through the fulfilment state machine and persist.
 
@@ -276,6 +284,11 @@ class RequestStatusService:
         the state mapping, including the deadline-dependent partial resolution)
         and the fulfilment snapshot is cached in ``metadata["last_fulfilment"]``
         so ``RequestDTO.from_domain`` can surface capacity fields.
+
+        ``provider_machines`` are the machines of the provider read the caller just
+        made. When the deadline has passed they decide the outcome (see
+        :meth:`_fresh_running_count`); a request that owes a release because of it
+        has that release started after the save and the events are published.
         """
         from orb.domain.request.exceptions import InvalidRequestStateError
 
@@ -306,7 +319,7 @@ class RequestStatusService:
                         return request
                     try:
                         updated_request, changed = self._build_status_update(
-                            current, status, message, fulfilment, now
+                            current, status, message, fulfilment, now, provider_machines
                         )
                     except InvalidRequestStateError as exc:
                         # Illegal transition (e.g. terminal request, backward
@@ -347,12 +360,42 @@ class RequestStatusService:
                 raise
 
         self._publish_events(events)
+        # After the save and the publication, outside the retry loop: the release
+        # runs in the background and never holds up the caller.
+        if self._deadline_release is not None:
+            self._deadline_release.enqueue_if_owed(updated_request)
         self.logger.info(
             "Updated request %s status to %s",
             request.request_id.value,
             updated_request.status.value,
         )
         return updated_request
+
+    @staticmethod
+    def _fresh_running_count(
+        request: Request,
+        fulfilment: Optional[ProviderFulfilment],
+        provider_machines: Optional[list[Machine]],
+    ) -> Optional[int]:
+        """Count the request's running machines in the provider read just made.
+
+        The count comes from the machines the read returned for the request's own
+        ids, and only when it returned at least one of them: an empty, failed or
+        placeholder read says nothing, and None (unknown) is returned. Providers
+        report ``running_count=0`` while a lookup is still failing, so the verdict's
+        count is used only as a fallback when it is above zero. A ``fulfilled``
+        verdict counts as the requested count.
+        """
+        if fulfilment is not None and fulfilment.state == "fulfilled":
+            return request.requested_count
+        if provider_machines and not isinstance(provider_machines, FailedProviderFetch):
+            ours = set(request.machine_ids)
+            mine = [m for m in provider_machines if m.machine_id.value in ours]
+            if mine:
+                return sum(1 for m in mine if m.status == MachineStatus.RUNNING)
+        if fulfilment is not None and fulfilment.running_count and fulfilment.running_count > 0:
+            return fulfilment.running_count
+        return None
 
     def _build_status_update(
         self,
@@ -361,11 +404,14 @@ class RequestStatusService:
         message: str,
         fulfilment: Optional[ProviderFulfilment],
         now: datetime,
+        provider_machines: Optional[list[Machine]] = None,
     ) -> Tuple[Request, bool]:
         """Apply the state machine to ``request``; return (new request, changed).
 
         Raises ``InvalidRequestStateError`` when the machine refuses the move.
         """
+        fresh_read = provider_machines is not None
+        running_count = self._fresh_running_count(request, fulfilment, provider_machines)
         if fulfilment is not None:
             updated_request = self._state_machine.apply(
                 request,
@@ -373,6 +419,8 @@ class RequestStatusService:
                 now=now,
                 fulfilment=fulfilment,
                 message=message,
+                running_count=running_count,
+                fresh_read=fresh_read,
             )
         else:
             # No provider fulfilment (return path, or explicit status set):
@@ -387,6 +435,8 @@ class RequestStatusService:
                 now=now,
                 fulfilment=synthetic,
                 message=message,
+                running_count=running_count,
+                fresh_read=fresh_read,
             )
 
         # Reconcile the persisted ``successful_count`` against the authoritative

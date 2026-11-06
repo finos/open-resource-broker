@@ -173,6 +173,13 @@ async def _run_startup_recovery(container: Any) -> None:
         swept = await asyncio.to_thread(recovery_service.recover_stuck_acquiring_requests)
         if swept:
             logger.info("Startup recovery swept %d stuck active request(s) to terminal", swept)
+        from orb.application.services.deadline_release_service import DeadlineReleaseService
+
+        release_service = container.get_optional(DeadlineReleaseService)
+        if release_service is not None:
+            started = await release_service.scan_and_enqueue()
+            if started:
+                logger.info("Startup recovery started %d owed machine release(s)", started)
     except Exception as recovery_exc:
         logger.warning("Startup active-request recovery scan failed: %s", recovery_exc)
 
