@@ -23,6 +23,11 @@ class OCIPlugin(ProviderPlugin):
 
         return create_oci_config
 
+    def validator_factory(self) -> Any:
+        from orb.providers.oci.validation.template_validator import create_oci_validator
+
+        return create_oci_validator
+
     def strategy_class(self) -> type:
         from orb.providers.oci.strategy.oci_provider_strategy import OCIProviderStrategy
 

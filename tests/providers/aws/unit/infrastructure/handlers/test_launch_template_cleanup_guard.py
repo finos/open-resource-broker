@@ -24,12 +24,17 @@ def _service(live_response=None, live_error=None):
         "LaunchTemplates": [
             {
                 "LaunchTemplateId": "lt-1",
-                "LaunchTemplateName": "orb-lt",
-                "Tags": [{"Key": "orb:managed-by", "Value": "open-resource-broker"}],
+                "LaunchTemplateName": "req-1-tpl",
+                "Tags": [
+                    {"Key": "orb:managed-by", "Value": "open-resource-broker"},
+                    {"Key": "orb:request-id", "Value": "req-1"},
+                ],
             }
         ]
     }
-    svc = LaunchTemplateCleanupService(aws_client, MagicMock(), MagicMock())
+    config_port = MagicMock()
+    config_port.get_resource_prefix.return_value = ""
+    svc = LaunchTemplateCleanupService(aws_client, config_port, MagicMock())
     svc.get_cleanup_config = CleanupConfig  # type: ignore[method-assign,assignment]
     return svc, ec2
 
