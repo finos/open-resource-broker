@@ -14,8 +14,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from orb.application.services.provider_validation_service import ProviderValidationService
-from orb.domain.base.exceptions import ApplicationError
 from orb.domain.base.results import ProviderSelectionResult, ValidationResult
+from orb.domain.template.exceptions import TemplateValidationError
 
 
 def _make_selection_result(provider_name="aws-1") -> ProviderSelectionResult:
@@ -70,7 +70,7 @@ class TestSelectAndValidateProvider:
         logger.info.assert_called()
 
     @pytest.mark.asyncio
-    async def test_optional_validator_rejects_raises_application_error(self):
+    async def test_optional_validator_rejects_raises_template_validation_error(self):
         validator = MagicMock()
         validator.validate_template_configuration.return_value = {
             "valid": False,
@@ -79,7 +79,7 @@ class TestSelectAndValidateProvider:
         service, _, _ = _make_service(validator=validator)
         template = MagicMock()
 
-        with pytest.raises(ApplicationError, match="missing field: image_id"):
+        with pytest.raises(TemplateValidationError, match="missing field: image_id"):
             await service.select_and_validate_provider(template)
 
     @pytest.mark.asyncio
@@ -95,14 +95,14 @@ class TestSelectAndValidateProvider:
         port.validate_template_requirements.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_port_validation_errors_raise_application_error(self):
+    async def test_port_validation_errors_raise_template_validation_error(self):
         validation_result = _make_validation_result(
             is_valid=False, errors=["unsupported instance type"]
         )
         service, _, _ = _make_service(validation_result=validation_result)
         template = MagicMock()
 
-        with pytest.raises(ApplicationError, match="unsupported instance type"):
+        with pytest.raises(TemplateValidationError, match="unsupported instance type"):
             await service.select_and_validate_provider(template)
 
     @pytest.mark.asyncio
