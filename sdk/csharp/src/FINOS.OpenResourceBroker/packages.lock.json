@@ -4,9 +4,9 @@
     "net8.0": {
       "AWSSDK.Core": {
         "type": "Direct",
-        "requested": "[4.0.102.13, )",
-        "resolved": "4.0.102.13",
-        "contentHash": "vaYs/kwfB+Lv9PeVKYE4g2mQlzVtHImXLWgfTG8UgeCybUAPkew5kwb8GS6RhuzwvImbolyLHT+IM34WoM9lJg=="
+        "requested": "[4.0.102.16, )",
+        "resolved": "4.0.102.16",
+        "contentHash": "+Oka3HzrQdsHvsM0lLtJn+Zab7QE9TiPLV+dQ2usIuvCHa6PAcNhcvh6I6mbJZ4SsNBBoVQzeQv0tGmqIOKkNg=="
       },
       "System.Text.Json": {
         "type": "Direct",
