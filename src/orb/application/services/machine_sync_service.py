@@ -15,6 +15,11 @@ from orb.domain.machine.aggregate import Machine
 from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.aggregate import Request
 
+# Metadata key set by ``fetch_provider_machines`` when the provider could not be
+# queried, so callers keep the stored state instead of treating the missing
+# provider verdict as a contract violation.
+PROVIDER_FETCH_FAILED = "provider_fetch_failed"
+
 
 class MachineSyncService:
     """Provider synchronization service."""
@@ -170,11 +175,11 @@ class MachineSyncService:
                 return domain_machines, result.metadata or {}
             else:
                 self.logger.warning(f"Provider operation failed: {result.error_message}")
-                return db_machines, {}
+                return db_machines, {PROVIDER_FETCH_FAILED: True}
 
         except Exception as e:
             self.logger.error(f"Failed to fetch provider machines: {e}")
-            return db_machines, {}
+            return db_machines, {PROVIDER_FETCH_FAILED: True}
 
     def _create_machine_from_processed_data(
         self, processed_data: dict, request: Request

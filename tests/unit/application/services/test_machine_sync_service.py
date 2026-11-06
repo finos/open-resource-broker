@@ -53,7 +53,7 @@ def _make_machine(mid: str, status: MachineStatus = MachineStatus.RUNNING):
 
 @pytest.mark.unit
 class TestFetchProviderMachinesNoRegistryService:
-    """fetch_provider_machines returns (db_machines, {}) when no registry service."""
+    """fetch_provider_machines flags the failed fetch when no registry service."""
 
     @pytest.mark.asyncio
     async def test_returns_db_machines_when_registry_service_missing(self):
@@ -62,10 +62,10 @@ class TestFetchProviderMachinesNoRegistryService:
         req = _make_request()
 
         # No provider_registry_service injected → should raise RuntimeError
-        # which is caught internally and returns (db_machines, {})
+        # which is caught internally and returns the stored machines, flagged as unfetched
         machines, meta = await svc.fetch_provider_machines(req, db_machines)  # type: ignore[arg-type]
         assert machines == db_machines
-        assert meta == {}
+        assert meta == {"provider_fetch_failed": True}
 
 
 @pytest.mark.unit

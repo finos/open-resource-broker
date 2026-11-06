@@ -565,3 +565,46 @@ class TestRunInstancesCompletion:
         assert machines
         assert all(m["status"] == "running" for m in machines), json.dumps(machines)
         assert all(m["privateIp"] for m in machines)
+
+
+@pytest.fixture
+def pending_instances(orb_config_dir, moto_aws):
+    """Report instances as pending for the first DescribeInstances calls."""
+    from unittest.mock import patch
+
+    original = _make_moto_aws_client
+    remaining = {"count": 2}
+
+    def _pending(parsed, **_):
+        if remaining["count"] <= 0:
+            return
+        remaining["count"] -= 1
+        for reservation in parsed.get("Reservations", []):
+            for instance in reservation.get("Instances", []):
+                instance["State"] = {"Code": 0, "Name": "pending"}
+
+    def _client_with_hold(*args, **kwargs):
+        client = original(*args, **kwargs)
+        client.ec2_client.meta.events.register("after-call.ec2.DescribeInstances", _pending)
+        return client
+
+    with patch(f"{__name__}._make_moto_aws_client", _client_with_hold):
+        yield
+
+
+class TestWaitOnRequest:
+    @pytest.mark.asyncio
+    async def test_wait_returns_the_final_status_with_running_machines(
+        self, pending_instances, rest_client
+    ):
+        created = await rest_client.post(
+            "/api/v1/machines/request?wait=true&timeout=10",
+            json={"template_id": "RunInstances-OnDemand", "count": 1},
+        )
+        assert created.status_code in (200, 202), created.text
+        body = created.json()
+        assert "timeout" not in json.dumps(body).lower(), json.dumps(body)
+        request_id = body.get("requestId") or body.get("request_id")
+
+        status = await rest_client.get(f"/api/v1/requests/{request_id}/status")
+        assert status.json()["requests"][0]["status"] == "complete", status.text

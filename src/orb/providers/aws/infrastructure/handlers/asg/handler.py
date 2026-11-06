@@ -782,14 +782,19 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         """Compute ProviderFulfilment for an ASG request.
 
         sum(WeightedCapacity for InService) >= DesiredCapacity AND
-        pending_count == 0 AND failed_count == 0 → fulfilled.
+        pending_count == 0 AND failed_count == 0 AND every InService instance
+        is running in EC2 → fulfilled.
         """
         failed_count = sum(1 for i in ec2_instances if i.get("status") == "failed")
         running_count = sum(1 for i in ec2_instances if i.get("status") == "running")
 
         asg_fully_fulfilled = desired_capacity > 0 and in_service_weighted >= desired_capacity
 
-        if asg_fully_fulfilled and pending_count == 0 and failed_count == 0:
+        # InService per the ASG API is not enough: every InService instance must
+        # also be running according to EC2 before the request is fulfilled.
+        all_running = running_count >= in_service_count
+
+        if asg_fully_fulfilled and pending_count == 0 and failed_count == 0 and all_running:
             return ProviderFulfilment(
                 state="fulfilled",
                 message=(

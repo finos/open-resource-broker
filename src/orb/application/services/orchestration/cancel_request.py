@@ -137,7 +137,9 @@ class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelReque
         for return_request_id in request_ids:
             try:
                 request = await self._query_bus.execute(
-                    SyncAndGetRequestQuery(request_id=return_request_id, lightweight=True)
+                    SyncAndGetRequestQuery(
+                        request_id=return_request_id, lightweight=False, skip_cache=True
+                    )
                 )
             except Exception as exc:
                 self._logger.error(

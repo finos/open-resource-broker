@@ -155,7 +155,9 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
         consecutive_errors = 0
         while elapsed < timeout_seconds:
             try:
-                query = SyncAndGetRequestQuery(request_id=request_id, lightweight=True)
+                query = SyncAndGetRequestQuery(
+                    request_id=request_id, lightweight=False, skip_cache=True
+                )
                 result = await self._query_bus.execute(query)
                 consecutive_errors = 0
                 status_val = getattr(result, "status", None)

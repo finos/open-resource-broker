@@ -21,6 +21,7 @@ import dataclasses
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 
+from orb.application.services.machine_sync_service import PROVIDER_FETCH_FAILED
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import ProviderContractError
 from orb.domain.base.ports.logging_port import LoggingPort
@@ -75,6 +76,12 @@ class RequestStatusService:
                 return self._determine_return_status(
                     db_machines, provider_machines, request, provider_metadata
                 )
+            elif provider_metadata.get(PROVIDER_FETCH_FAILED):
+                self.logger.warning(
+                    "Provider describe failed for request %s; keeping stored state",
+                    request.request_id,
+                )
+                return None, None
             else:
                 return self._determine_acquire_status(
                     db_machines, provider_machines, request, provider_metadata
