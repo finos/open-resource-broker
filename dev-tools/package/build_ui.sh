@@ -203,13 +203,15 @@ fi
 # Install .[ui] into the chosen venv.  Use uv pip when available (faster);
 # fall back to the venv's own pip.
 log "INFO: Ensuring [ui] extras are installed..."
+# The project is installed editable so this step never replaces a developer's
+# editable install with a copy that lacks the source tree's data files.
 # Installing '.[ui]' builds the orb-py wheel, which runs setup.py's build_py
 # hook — which calls THIS script.  Set ORB_SKIP_UI_BUILD=1 for the nested
 # build so it does not recurse (we are already inside the UI build).
 if command -v uv >/dev/null 2>&1; then
-    ORB_SKIP_UI_BUILD=1 VIRTUAL_ENV="$(dirname "$_VENV_BIN")" uv pip install --quiet '.[ui]'
+    ORB_SKIP_UI_BUILD=1 VIRTUAL_ENV="$(dirname "$_VENV_BIN")" uv pip install --quiet -e '.[ui]'
 else
-    ORB_SKIP_UI_BUILD=1 "$_VENV_BIN/pip" install --quiet "$(pwd)[ui]"
+    ORB_SKIP_UI_BUILD=1 "$_VENV_BIN/pip" install --quiet -e "$(pwd)[ui]"
 fi
 _phase_end
 
