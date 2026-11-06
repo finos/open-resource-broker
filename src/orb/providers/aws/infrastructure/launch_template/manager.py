@@ -583,7 +583,7 @@ class AWSLaunchTemplateManager:
         # Process custom tags
         custom_tags = []
         if template.tags:
-            custom_tags = [{"key": k, "value": v} for k, v in template.tags.items()]
+            custom_tags = [{"key": str(k), "value": str(v)} for k, v in template.tags.items()]
 
         # Get instance name
         if self.config_port is None:

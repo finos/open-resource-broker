@@ -1,5 +1,5 @@
 {
-  "AutoScalingGroupName": "{{ asg_name }}",
+  "AutoScalingGroupName": {{ asg_name | tojson }},
   {% if has_abis or spot_count > 0 or has_machine_types %}"MixedInstancesPolicy": {
     "LaunchTemplate": {
       "LaunchTemplateSpecification": {
@@ -35,23 +35,23 @@
   "HealthCheckType": "{{ health_check_type }}",
   "HealthCheckGracePeriod": {{ health_check_grace_period }}{% if has_subnets %},
   "VPCZoneIdentifier": "{{ vpc_zone_identifier }}"{% endif %}{% if has_context %},
-  "Context": "{{ context }}"{% endif %},
+  "Context": {{ context | tojson }}{% endif %},
   "Tags": [
     {% for tag in base_tags %}
     {
-      "Key": "{{ tag.key }}",
-      "Value": "{{ tag.value }}",
+      "Key": {{ tag.key | tojson }},
+      "Value": {{ tag.value | tojson }},
       "PropagateAtLaunch": true,
-      "ResourceId": "{{ asg_name }}",
+      "ResourceId": {{ asg_name | tojson }},
       "ResourceType": "auto-scaling-group"
     }{% if not loop.last or has_custom_tags %},{% endif %}
-    {% endfor %}{% if has_custom_tags %},
+    {% endfor %}{% if has_custom_tags %}
     {% for tag in custom_tags %}
     {
-      "Key": "{{ tag.key }}",
-      "Value": "{{ tag.value }}",
+      "Key": {{ tag.key | tojson }},
+      "Value": {{ tag.value | tojson }},
       "PropagateAtLaunch": true,
-      "ResourceId": "{{ asg_name }}",
+      "ResourceId": {{ asg_name | tojson }},
       "ResourceType": "auto-scaling-group"
     }{% if not loop.last %},{% endif %}
     {% endfor %}{% endif %}

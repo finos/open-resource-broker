@@ -18,14 +18,14 @@
   {% endif %}
   {% endif %}
   {% if has_key_name %}
-  "KeyName": "{{ key_name }}",
+  "KeyName": {{ key_name | tojson }},
   {% endif %}
   {% if has_user_data %}
   "UserData": "{{ user_data | b64encode }}",
   {% endif %}
   {% if has_instance_profile %}
   "IamInstanceProfile": {
-    "Name": "{{ instance_profile }}"
+    "Name": {{ instance_profile | tojson }}
   },
   {% endif %}
   {% if has_ebs_optimized %}
@@ -53,13 +53,13 @@
     {
       "ResourceType": "instance",
       "Tags": [
-        {"Key": "Name", "Value": "{{ instance_name }}"},
-        {"Key": "RequestId", "Value": "{{ request_id }}"},
-        {"Key": "orb:request-id", "Value": "{{ request_id }}"},
-        {"Key": "TemplateId", "Value": "{{ template_id }}"},
-        {"Key": "CreatedBy", "Value": "{{ created_by }}"}{% if has_custom_tags %},
+        {"Key": "Name", "Value": {{ instance_name | tojson }}},
+        {"Key": "RequestId", "Value": {{ request_id | tojson }}},
+        {"Key": "orb:request-id", "Value": {{ request_id | tojson }}},
+        {"Key": "TemplateId", "Value": {{ template_id | tojson }}},
+        {"Key": "CreatedBy", "Value": {{ created_by | tojson }}}{% if has_custom_tags %},
         {% for tag in custom_tags %}
-        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
+        {"Key": {{ tag.key | tojson }}, "Value": {{ tag.value | tojson }}}{% if not loop.last %},{% endif %}
         {% endfor %}{% endif %}
       ]
     }
