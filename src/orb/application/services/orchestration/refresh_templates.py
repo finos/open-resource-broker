@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from orb.application.commands.system import RefreshTemplatesCommand
-from orb.application.dto.template import TemplateDTO
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.ports.query_bus_port import QueryBusPort
 from orb.application.services.orchestration.base import OrchestratorBase
@@ -11,6 +10,7 @@ from orb.application.services.orchestration.dtos import (
     RefreshTemplatesInput,
     RefreshTemplatesOutput,
 )
+from orb.domain.base.exceptions import ApplicationError
 from orb.domain.base.ports.logging_port import LoggingPort
 
 
@@ -34,6 +34,6 @@ class RefreshTemplatesOrchestrator(OrchestratorBase[RefreshTemplatesInput, Refre
         await self._dispatch("RefreshTemplates", self._command_bus.execute(command))
 
         result = command.result or {}
-        raw_templates: list[dict] = result.get("templates", [])
-        templates = [TemplateDTO.from_dict(t) for t in raw_templates if isinstance(t, dict)]
-        return RefreshTemplatesOutput(templates=templates)
+        if result.get("status") == "failed":
+            raise ApplicationError(f"Template refresh failed: {result.get('error')}")
+        return RefreshTemplatesOutput(templates=list(result.get("templates", [])))

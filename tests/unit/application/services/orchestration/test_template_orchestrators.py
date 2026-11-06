@@ -447,3 +447,34 @@ class TestRefreshTemplatesOrchestrator:
         await refresh_orch.execute(RefreshTemplatesInput(provider_name="custom-provider"))
         cmd = mock_command_bus.execute.call_args[0][0]
         assert cmd.provider_name == "custom-provider"
+
+    @pytest.mark.asyncio
+    async def test_execute_raises_when_the_refresh_failed(self, refresh_orch, mock_command_bus):
+        from orb.domain.base.exceptions import ApplicationError
+
+        async def _set(cmd):
+            cmd.result = {"status": "failed", "error": "templates file unreadable"}
+
+        mock_command_bus.execute.side_effect = _set
+        with pytest.raises(ApplicationError, match="templates file unreadable"):
+            await refresh_orch.execute(RefreshTemplatesInput())
+
+    @pytest.mark.asyncio
+    async def test_execute_returns_the_loaded_template_objects(
+        self, refresh_orch, mock_command_bus
+    ):
+        from pydantic import BaseModel
+
+        from orb.application.dto.template import TemplateDTO
+
+        class _Extension(BaseModel):
+            fleet_type: str = "request"
+
+        loaded = TemplateDTO(template_id="t-1", provider_config=_Extension())
+
+        async def _set(cmd):
+            cmd.result = {"status": "success", "templates": [loaded]}
+
+        mock_command_bus.execute.side_effect = _set
+        result = await refresh_orch.execute(RefreshTemplatesInput())
+        assert result.templates == [loaded]

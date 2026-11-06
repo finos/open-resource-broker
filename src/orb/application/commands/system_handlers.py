@@ -127,15 +127,17 @@ class RefreshTemplatesHandler(BaseCommandHandler[RefreshTemplatesCommand, None])
         try:
             template_manager = self._template_manager
 
-            # Refresh templates
-            templates = await template_manager.load_templates(command.provider_name)
+            # Reload from the template sources, not the cache
+            templates = await template_manager.load_templates(
+                provider_override=command.provider_name, force_refresh=True
+            )
 
             # Store result in command (CQRS compliance)
             command.result = {
                 "status": "success",
                 "message": "Templates refreshed successfully",
                 "template_count": len(templates),
-                "templates": [t.model_dump() for t in templates],
+                "templates": list(templates),
                 "provider_name": command.provider_name,
                 "command_id": command.command_id,
             }
