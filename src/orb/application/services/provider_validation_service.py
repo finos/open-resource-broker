@@ -4,14 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from orb.domain.base.exceptions import ApplicationError
-
 if TYPE_CHECKING:
     from orb.domain.template.template_aggregate import Template
 
 from orb.domain.base.ports import LoggingPort, ProviderSelectionPort
 from orb.domain.base.ports.provider_validation_port import ProviderValidationPort
 from orb.domain.base.results import ProviderSelectionResult
+from orb.domain.template.exceptions import TemplateValidationError
 
 
 class ProviderValidationService:
@@ -41,7 +40,7 @@ class ProviderValidationService:
             result = self._validator.validate_template_configuration(template_dict)
             if not result.get("valid", True):
                 errors = result.get("errors", [])
-                raise ApplicationError("; ".join(errors))
+                raise TemplateValidationError("; ".join(errors))
 
         validation_result = self._provider_selection_port.validate_template_requirements(
             template,
@@ -51,6 +50,6 @@ class ProviderValidationService:
             for warning in validation_result.warnings:
                 self.logger.warning("Template validation warning: %s", warning)
         if not validation_result.is_valid:
-            raise ApplicationError("; ".join(validation_result.errors))
+            raise TemplateValidationError("; ".join(validation_result.errors))
 
         return selection_result
