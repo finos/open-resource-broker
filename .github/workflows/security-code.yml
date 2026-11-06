@@ -42,6 +42,10 @@ on:
   # themselves accordingly instead of the workflow never running at all.
   pull_request:
     branches: [ main, develop ]
+  # merge_group: the merge queue runs the required checks on the combined
+  # result before merging; without this trigger queued PRs would wait forever.
+  merge_group:
+    types: [checks_requested]
   schedule:
     - cron: '0 3 * * 0'
 
@@ -199,6 +203,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [changes]
+    # Compares the PR diff against the base, so it is skipped (reported as
+    # skipped, which satisfies the required check) for merge_group runs.
     if: ${{ !cancelled() && needs.changes.result == 'success' && github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true' }}
     # Job-level only: pull-requests: write lets the optional Dependabot step
     # below comment on or close a PR. No step in this job executes code from
@@ -453,6 +459,6 @@ jobs:
     uses: ./.github/workflows/reusable-security.yml
     with:
       scan-type: codeql
-      enabled: ${{ (github.event_name == 'pull_request' && (needs.changes.result != 'success' || needs.changes.outputs.relevant == 'true')) || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || contains(github.event.head_commit.message, '[security]') }}
+      enabled: ${{ (github.event_name == 'pull_request' && (needs.changes.result != 'success' || needs.changes.outputs.relevant == 'true')) || github.event_name == 'merge_group' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || contains(github.event.head_commit.message, '[security]') }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       python-version: ${{ needs.config.outputs.default-python-version }}

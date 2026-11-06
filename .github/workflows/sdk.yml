@@ -25,6 +25,10 @@ on:
   # themselves accordingly instead of the workflow never running at all.
   pull_request:
     branches: [ main, develop ]
+  # merge_group: the merge queue runs the required checks on the combined
+  # result before merging; without this trigger queued PRs would wait forever.
+  merge_group:
+    types: [checks_requested]
   schedule:
     - cron: '0 2 * * *'
 
