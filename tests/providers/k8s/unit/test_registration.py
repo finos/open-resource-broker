@@ -126,7 +126,7 @@ def test_register_k8s_provider_registers_factories() -> None:
     registry.register_provider.assert_called_once()
     kwargs = registry.register_provider.call_args.kwargs
     assert kwargs["provider_type"] == "k8s"
-    assert kwargs["strategy_class"] is K8sProviderStrategy
+    assert kwargs["strategy_class_loader"]() is K8sProviderStrategy
     assert kwargs["default_api"] == "Pod"
 
 

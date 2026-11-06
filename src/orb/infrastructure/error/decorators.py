@@ -6,19 +6,23 @@ to functions while preserving domain semantics and following SOLID principles.
 """
 
 import inspect
+import sys
 from functools import wraps
 from typing import Any, Callable, Optional
 
-try:
-    from fastapi import HTTPException as _FastAPIHTTPException  # type: ignore[assignment]
 
-    _HTTP_EXCEPTION_TYPE: type[BaseException] = _FastAPIHTTPException  # type: ignore[assignment]
-except ImportError:  # FastAPI is optional — define a private sentinel never raised at runtime
+def _is_http_exception(exc: BaseException) -> bool:
+    """Return True for FastAPI's HTTPException without importing FastAPI.
 
-    class _FastAPIHTTPException(Exception):  # type: ignore[no-redef]
-        """Placeholder so the except clause is valid when FastAPI is absent."""
+    FastAPI is optional and slow to import. An HTTPException can only be raised
+    once FastAPI has been imported, so an unloaded module means "not one".
+    """
+    fastapi_module = sys.modules.get("fastapi")
+    if fastapi_module is None:
+        return False
+    http_exception = getattr(fastapi_module, "HTTPException", None)
+    return http_exception is not None and isinstance(exc, http_exception)
 
-    _HTTP_EXCEPTION_TYPE = _FastAPIHTTPException
 
 from orb.infrastructure.error.context import ExceptionContext
 from orb.infrastructure.error.exception_handler import ExceptionHandler, get_exception_handler
@@ -62,9 +66,9 @@ def handle_exceptions(
             async def async_wrapper(*args, **kwargs):
                 try:
                     return await func(*args, **kwargs)
-                except _HTTP_EXCEPTION_TYPE:
-                    raise
                 except Exception as e:
+                    if _is_http_exception(e):
+                        raise
                     # Get exception handler (use provided or global singleton)
                     exception_handler = handler or get_exception_handler()
 
@@ -93,9 +97,9 @@ def handle_exceptions(
                 """Synchronous wrapper with error handling."""
                 try:
                     return func(*args, **kwargs)
-                except _HTTP_EXCEPTION_TYPE:
-                    raise
                 except Exception as e:
+                    if _is_http_exception(e):
+                        raise
                     # Get exception handler (use provided or global singleton)
                     exception_handler = handler or get_exception_handler()
 

@@ -165,14 +165,26 @@ def _get_schema_for_provider_type(provider_type: str) -> list[dict[str, Any]]:
 
     registry = get_provider_registry()
     reg = registry._get_type_registration(provider_type)  # raises ValueError if missing
-    if not isinstance(reg, ProviderRegistration) or reg.strategy_class is None:
+    if not isinstance(reg, ProviderRegistration):
         return []
 
     try:
+        strategy_class = reg.strategy_class
+        if strategy_class is None:
+            return []
         # Call the classmethod directly — no instance needed.
         # get_ui_column_schema only constructs UIColumnDescriptor objects; no I/O.
-        schema = reg.strategy_class.get_ui_column_schema()
+        schema = strategy_class.get_ui_column_schema()
         return [col.to_dict() for col in schema]
+    except ImportError as exc:
+        logger.warning(
+            "Provider '%s' requires the %s extra (pip install 'orb-py[%s]'): %s",
+            provider_type.replace("\r", "").replace("\n", ""),
+            provider_type.replace("\r", "").replace("\n", ""),
+            provider_type.replace("\r", "").replace("\n", ""),
+            exc,
+        )
+        return []
     except Exception as exc:
         # Strip CR/LF before logging so a crafted provider_type can't forge
         # extra log entries.

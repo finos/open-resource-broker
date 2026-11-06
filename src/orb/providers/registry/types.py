@@ -35,8 +35,13 @@ class ProviderRegistration(BaseRegistration):
         strategy_class: Optional[type] = None,
         default_api: Optional[str] = None,
         display_name: Optional[str] = None,
+        strategy_class_loader: Optional[Callable[[], type]] = None,
     ) -> None:
-        """Initialize the instance."""
+        """Initialize the instance.
+
+        ``strategy_class_loader`` lets a provider defer importing its strategy
+        (and the cloud SDK behind it) until ``strategy_class`` is first read.
+        """
         super().__init__(
             type_name,
             strategy_factory,
@@ -46,6 +51,19 @@ class ProviderRegistration(BaseRegistration):
         )
         self.resolver_factory = resolver_factory
         self.validator_factory = validator_factory
-        self.strategy_class = strategy_class
+        self._strategy_class = strategy_class
+        self._strategy_class_loader = strategy_class_loader
         self.default_api = default_api
         self.display_name = display_name
+
+    @property
+    def strategy_class(self) -> Optional[type]:
+        """Return the strategy class, importing it on first access if deferred."""
+        if self._strategy_class is None and self._strategy_class_loader is not None:
+            self._strategy_class = self._strategy_class_loader()
+            self._strategy_class_loader = None
+        return self._strategy_class
+
+    @strategy_class.setter
+    def strategy_class(self, value: Optional[type]) -> None:
+        self._strategy_class = value

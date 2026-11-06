@@ -75,6 +75,33 @@ class AuthRegistry(BaseRegistry):
         return self.get_registered_types()
 
 
+class LazyAuthStrategy:
+    """Strategy factory that imports its class on first use.
+
+    Strategy modules pull in JWT, boto3 and similar libraries. Registering them
+    lazily keeps those imports off the startup path of commands that never
+    authenticate a request.
+    """
+
+    def __init__(self, module_path: str, class_name: str) -> None:
+        self._module_path = module_path
+        self._class_name = class_name
+
+    def resolve(self) -> Any:
+        """Return the real strategy class, importing it if necessary."""
+        import importlib
+
+        return getattr(importlib.import_module(self._module_path), self._class_name)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Instantiate the real strategy class."""
+        return self.resolve()(*args, **kwargs)
+
+    def from_auth_config(self, auth_config: Any) -> Any:
+        """Build the strategy from *auth_config* via the real class."""
+        return self.resolve().from_auth_config(auth_config)
+
+
 # Global registry instance using BaseRegistry singleton pattern
 def get_auth_registry() -> AuthRegistry:
     """
@@ -99,11 +126,18 @@ def _register_default_strategies(registry: AuthRegistry) -> None:  # type: ignor
         registry.register_strategy("none", NoAuthStrategy)
 
         # Register bearer token strategy
-        from .strategy.bearer_token_strategy import BearerTokenStrategy
-
-        registry.register_strategy("bearer_token", BearerTokenStrategy)
+        registry.register_strategy(
+            "bearer_token",
+            LazyAuthStrategy(
+                "orb.infrastructure.auth.strategy.bearer_token_strategy", "BearerTokenStrategy"
+            ),
+        )
 
         # Register enhanced bearer token strategy
-        from .strategy.bearer_token_strategy_enhanced import EnhancedBearerTokenStrategy
-
-        registry.register_strategy("bearer_token_enhanced", EnhancedBearerTokenStrategy)
+        registry.register_strategy(
+            "bearer_token_enhanced",
+            LazyAuthStrategy(
+                "orb.infrastructure.auth.strategy.bearer_token_strategy_enhanced",
+                "EnhancedBearerTokenStrategy",
+            ),
+        )

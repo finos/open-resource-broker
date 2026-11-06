@@ -271,6 +271,64 @@ def _health_url(server_config: Any, ui_config: Any | None) -> str:
     return f"http://{host}:{server_config.port}/health"
 
 
+_WILDCARD_HOSTS = {"0.0.0.0": "127.0.0.1", "::": "localhost"}  # noqa: S104  # maps bind-all hosts to a connectable address for display
+
+
+def _url_host(host: str) -> str:
+    """Format *host* for a URL a user can open.
+
+    Bind-all addresses are not connectable, so they are shown as loopback; IPv6
+    literals are bracketed.
+    """
+    host = _WILDCARD_HOSTS.get(host, host)
+    return f"[{host}]" if ":" in host and not host.startswith("[") else host
+
+
+def _server_urls(
+    server_config: Any,
+    ui_config: Any | None,
+    *,
+    api_only: bool = False,
+    socket_path: str | None = None,
+) -> dict[str, str]:
+    """Return the URLs the server listens on, keyed ``api_url`` and ``ui_url``.
+
+    Mirrors the mode selection in ``_build_runtime``: ``--api-only`` and a
+    disabled UI serve the API at the root of ``server_config.port``;
+    ``embedded`` serves the API at ``/orb`` and the UI at the root of the same
+    port; ``split`` serves the API on ``server_config.port`` and the UI on
+    ``ui_config.backend_port``; ``dev`` serves the API at ``/orb`` on
+    ``ui_config.backend_port`` and the UI on ``ui_config.frontend_port``.
+    """
+    host = _url_host(str(server_config.host))
+    base = f"http://{host}:{server_config.port}"
+    urls: dict[str, str] = {}
+    if socket_path:
+        urls["api_url"] = f"unix:{socket_path}"
+        return urls
+    if api_only or not (ui_config and ui_config.enabled):
+        urls["api_url"] = base
+    elif ui_config.mode == "embedded":
+        urls["api_url"] = f"{base}/orb"
+        urls["ui_url"] = f"{base}/"
+    elif ui_config.mode == "split":
+        urls["api_url"] = base
+        urls["ui_url"] = f"http://{host}:{ui_config.backend_port}/"
+    else:  # dev
+        urls["api_url"] = f"http://{host}:{ui_config.backend_port}/orb"
+        urls["ui_url"] = f"http://{host}:{ui_config.frontend_port}/"
+    return urls
+
+
+def _announce_urls(urls: dict[str, str]) -> None:
+    """Print where the server is listening, on stderr so JSON output stays clean."""
+    import sys
+
+    print(f"ORB API listening on {urls['api_url']}", file=sys.stderr, flush=True)
+    if "ui_url" in urls:
+        print(f"ORB UI available at {urls['ui_url']}", file=sys.stderr, flush=True)
+
+
 @handle_interface_exceptions(context="server_start", interface_type="cli")
 async def handle_server_start(args) -> dict[str, Any]:
     """Start the server. Daemonized by default; ``--foreground`` to block."""
@@ -278,9 +336,15 @@ async def handle_server_start(args) -> dict[str, Any]:
 
     from orb.interface import server_daemon as daemon_mod
 
-    runtime, server_config, _ui_config = _build_runtime(args)
+    runtime, server_config, ui_config = _build_runtime(args)
     pid_file, log_file, working_dir = _resolve_lifecycle_paths(server_config)
     foreground = getattr(args, "foreground", False)
+    urls = _server_urls(
+        server_config,
+        ui_config,
+        api_only=getattr(args, "api_only", False),
+        socket_path=getattr(args, "socket_path", None),
+    )
 
     if foreground:
         # Foreground mode runs inside the CLI's own event loop (orb.run.main
@@ -301,21 +365,26 @@ async def handle_server_start(args) -> dict[str, Any]:
             except OSError as exc:
                 logger.warning("loopback handshake file write failed: %s", exc)
             log_path.parent.mkdir(parents=True, exist_ok=True)
+            _announce_urls(urls)
             result = await runtime()
             rc = int(result.get("exit_code", 0)) if isinstance(result, dict) else 0
         finally:
             pid_path.unlink(missing_ok=True)
             daemon_mod._cleanup_token_file(pid_path)
             os.close(lock_fd)
-        return {"pid": os.getpid(), "status": "exited", "exit_code": rc}
+        return {"pid": os.getpid(), "status": "exited", "exit_code": rc, **urls}
 
-    return daemon_mod.start(
+    result = daemon_mod.start(
         pid_file=pid_file,
         log_file=log_file,
         working_dir=working_dir,
         runtime=runtime,
         foreground=foreground,
     )
+    if result.get("status") == "started":
+        _announce_urls(urls)
+        return {**result, **urls}
+    return result
 
 
 @handle_interface_exceptions(context="server_stop", interface_type="cli")
@@ -336,10 +405,20 @@ async def handle_server_status(args) -> dict[str, Any]:
 
     server_config, ui_config = _resolve_configs(args)
     pid_file, _log_file, _wd = _resolve_lifecycle_paths(server_config)
-    return daemon_mod.status(
+    result = daemon_mod.status(
         pid_file=pid_file,
         health_url=_health_url(server_config, ui_config),
     )
+    if result.get("running"):
+        result.update(
+            _server_urls(
+                server_config,
+                ui_config,
+                api_only=getattr(args, "api_only", False),
+                socket_path=getattr(args, "socket_path", None),
+            )
+        )
+    return result
 
 
 @handle_interface_exceptions(context="server_restart", interface_type="cli")

@@ -153,7 +153,7 @@ class TestHandleServerStart:
 
             result = await handle_server_start(_args())
 
-        assert result == expected
+        assert result == {**expected, "api_url": "http://127.0.0.1:8000"}
 
 
 # ---------------------------------------------------------------------------

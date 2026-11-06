@@ -246,6 +246,13 @@ def _load_aws_default_api() -> Optional[str]:
         return None
 
 
+def _load_aws_strategy_class() -> type:
+    """Import the strategy class on demand so registration does not load the SDK."""
+    from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+
+    return AWSProviderStrategy
+
+
 def register_aws_provider(
     registry: "Optional[ProviderRegistry]" = None,
     logger: "Optional[LoggingPort]" = None,
@@ -265,8 +272,6 @@ def register_aws_provider(
         registry = get_provider_registry()
 
     try:
-        from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
-
         if instance_name:
             # Register as named instance
             registry.register_provider_instance(
@@ -285,7 +290,7 @@ def register_aws_provider(
                 config_factory=create_aws_config,
                 resolver_factory=create_aws_resolver,
                 validator_factory=create_aws_validator,
-                strategy_class=AWSProviderStrategy,
+                strategy_class_loader=_load_aws_strategy_class,
                 default_api=_load_aws_default_api(),
             )
 
@@ -365,15 +370,13 @@ def register_aws_provider_instance(provider_instance, logger=None) -> bool:
 
         # Register AWS as provider type if not already registered
         if not registry.is_provider_registered("aws"):
-            from orb.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
-
             registry.register_provider(
                 provider_type="aws",
                 strategy_factory=create_aws_strategy,
                 config_factory=create_aws_config,
                 resolver_factory=create_aws_resolver,
                 validator_factory=create_aws_validator,
-                strategy_class=AWSProviderStrategy,
+                strategy_class_loader=_load_aws_strategy_class,
             )
 
         # Register the specific provider instance
@@ -489,21 +492,22 @@ def register_aws_auth_strategies(logger: "Optional[LoggingPort]" = None) -> None
         logger: Optional logger for registration messages
     """
     try:
-        from orb.infrastructure.auth.registry import get_auth_registry
+        from orb.infrastructure.auth.registry import LazyAuthStrategy, get_auth_registry
 
         registry = get_auth_registry()
 
         if not registry.is_registered("iam"):
-            from orb.providers.aws.auth.iam_strategy import IAMAuthStrategy
-
-            registry.register_strategy("iam", IAMAuthStrategy)
+            registry.register_strategy(
+                "iam", LazyAuthStrategy("orb.providers.aws.auth.iam_strategy", "IAMAuthStrategy")
+            )
             if logger:
                 logger.debug("AWS IAM auth strategy registered")
 
         if not registry.is_registered("cognito"):
-            from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
-
-            registry.register_strategy("cognito", CognitoAuthStrategy)
+            registry.register_strategy(
+                "cognito",
+                LazyAuthStrategy("orb.providers.aws.auth.cognito_strategy", "CognitoAuthStrategy"),
+            )
             if logger:
                 logger.debug("AWS Cognito auth strategy registered")
 
