@@ -75,7 +75,7 @@ def _import_error(name: str) -> ModuleNotFoundError:
 
 @pytest.mark.unit
 class TestUnconfiguredProviders:
-    def test_import_error_warns_with_traceback_and_others_register(
+    def test_import_error_warns_in_one_line_and_others_register(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         with caplog.at_level(logging.WARNING, logger=reg.__name__):
@@ -86,7 +86,9 @@ class TestUnconfiguredProviders:
 
         assert fake.registered == ["beta"]
         warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
-        assert any("alpha" in r.getMessage() and r.exc_info for r in warnings)
+        alpha = [r for r in warnings if "alpha" in r.getMessage()]
+        assert len(alpha) == 1
+        assert alpha[0].exc_info is None
 
     def test_registration_error_is_logged_as_error_and_others_register(
         self, caplog: pytest.LogCaptureFixture
