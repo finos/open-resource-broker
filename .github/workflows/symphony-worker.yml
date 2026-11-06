@@ -1,0 +1,72 @@
+name: Symphony Worker Image
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'deploy/symphony-worker/**'
+      - '.github/workflows/symphony-worker.yml'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'deploy/symphony-worker/**'
+      - '.github/workflows/symphony-worker.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: symphony-worker-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Stand-in for a licensed Symphony compute image. The image is built here
+  # only to check the Dockerfile; it is never pushed.
+  STUB_BASE: debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
+
+jobs:
+  build:
+    name: Build against a stub base
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Build the stub base
+      run: |
+        set -euo pipefail
+        docker build --tag symphony-stub:ci - <<DOCKERFILE
+        FROM ${STUB_BASE}
+        RUN apt-get update \
+          && apt-get install -y --no-install-recommends procps uuid-runtime \
+          && rm -rf /var/lib/apt/lists/*
+        DOCKERFILE
+
+    - name: Build the worker image
+      run: |
+        docker build --build-arg BASE_IMAGE=symphony-stub:ci \
+          --tag symphony-worker:ci deploy/symphony-worker
+
+    - name: Liveness probe runs in the image
+      run: |
+        set -euo pipefail
+        docker run --rm symphony-worker:ci /opt/orb-worker/bin/compute-liveness
+        for f in compute-liveness configure-pod-params symphony-exporter-bootstrap; do
+          docker run --rm symphony-worker:ci test -x "/opt/orb-worker/bin/$f"
+        done
+
+    - name: Build fails on a base without the required tools
+      run: |
+        set -uo pipefail
+        if docker build --progress=plain --build-arg BASE_IMAGE="${STUB_BASE}" \
+             deploy/symphony-worker > /tmp/negative-build.log 2>&1; then
+          cat /tmp/negative-build.log
+          echo "::error::build succeeded on a base that lacks pgrep and uuidgen"
+          exit 1
+        fi
+        cat /tmp/negative-build.log
+        grep -q 'missing pgrep' /tmp/negative-build.log
