@@ -11,6 +11,8 @@ import asyncio
 import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
+from botocore.exceptions import BotoCoreError, ClientError
+
 from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
@@ -18,6 +20,7 @@ from orb.infrastructure.di.injectable import injectable
 
 # Import AWS-specific components
 from orb.providers.aws.configuration.config import AWSProviderConfig
+from orb.providers.aws.exceptions.aws_exceptions import AWSError
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.services.capability_service import AWSCapabilityService
 from orb.providers.aws.services.handler_registry import AWSHandlerRegistry
@@ -722,7 +725,19 @@ class AWSProviderStrategy(ProviderStrategy):
                 metadata=metadata,
             )
 
+        except (ClientError, BotoCoreError, AWSError) as e:
+            # Transient provider failure: report a failed fetch so the caller keeps
+            # the stored state and retries on the next poll.
+            return ProviderResult.error_result(
+                f"Failed to describe resource instances: {e!s}",
+                "DESCRIBE_RESOURCE_INSTANCES_ERROR",
+            )
         except Exception as e:
+            # Not a provider error: most likely a handler bug. Surface it with a
+            # traceback, but still return an error result so the poll does not crash.
+            self._logger.error(
+                "Unexpected error describing resource instances: %s", e, exc_info=True
+            )
             return ProviderResult.error_result(
                 f"Failed to describe resource instances: {e!s}",
                 "DESCRIBE_RESOURCE_INSTANCES_ERROR",
