@@ -840,21 +840,21 @@ def test_create_backup_closes_destination_connection(tmp_path, monkeypatch, back
     backend = SqliteEventBackend(str(dbfile), rotate=False)
     backend.post([{"category": "pod", "id": "abcd-0", "request": "r1"}])
     real_conn = backend.conn
-    if backup_fails:
-        backend.conn = MagicMock()
-        backend.conn.backup.side_effect = sqlite3.DatabaseError("backup failed")
+    try:
+        if backup_fails:
+            backend.conn = MagicMock()
+            backend.conn.backup.side_effect = sqlite3.DatabaseError("backup failed")
 
-    opened = _record_backup_connections(monkeypatch, tmp_path / "backups")
-    backend._create_backup({"sqlite_backup": "leak"})
-    monkeypatch.undo()
+        opened = _record_backup_connections(monkeypatch, tmp_path / "backups")
+        backend._create_backup({"sqlite_backup": "leak"})
+        monkeypatch.undo()
 
-    assert len(opened) == 1
-    for conn in opened:
-        _assert_closed(conn)
-
-    if backup_fails:
+        assert len(opened) == 1
+        for conn in opened:
+            _assert_closed(conn)
+    finally:
         backend.conn = real_conn
-    backend.close()
+        backend.close()
 
 
 # ---------------------------------------------------------------------------
