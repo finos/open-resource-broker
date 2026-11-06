@@ -75,7 +75,13 @@ def handle_health_check(args) -> dict[str, Any]:
             checks.append({"name": "health_monitor", "status": "warn", "error": _CHECK_FAILED})
 
         # 1. Config file check
-        config_path = config_port.get_config_file_path() or "./config/config.json"
+        # The file the configuration was actually loaded from; the configured
+        # path and the relative default only when no file was loaded.
+        config_path = (
+            config_port.get_loaded_config_file()
+            or config_port.get_config_file_path()
+            or "./config/config.json"
+        )
         config_exists = Path(config_path).exists()
         if not config_exists:
             logger.warning("Configuration file not found: %s", config_path)
@@ -140,7 +146,10 @@ def handle_health_check(args) -> dict[str, Any]:
             from orb.application.services.provider_registry_service import ProviderRegistryService
 
             registry_service = container.get(ProviderRegistryService)
-            all_providers = registry_service.get_available_strategies()
+            # The configured provider instances, as REST /providers/health
+            # probes; registered provider types without an instance are not
+            # something this deployment can be unhealthy on.
+            all_providers = [p.name for p in config_port.get_active_providers()]
 
             if not all_providers:
                 checks.append(

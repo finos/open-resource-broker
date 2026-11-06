@@ -50,6 +50,8 @@ def _make_container(overrides: dict | None = None):
 
     mock_config = MagicMock(spec=ConfigurationPort)
     mock_config.get_config_file_path.return_value = None
+    mock_config.get_loaded_config_file.return_value = None
+    mock_config.get_active_providers.return_value = []
 
     mock_health_port = MagicMock(spec=HealthCheckPort)
     mock_health_port.run_all_checks.return_value = {}
@@ -82,6 +84,11 @@ def _make_container(overrides: dict | None = None):
         "template_repo": mock_template_repo,
         "registry_service": mock_registry_service,
     }
+
+
+def _set_providers(mocks: dict, names: list[str]) -> None:
+    """Configure provider instances with these names."""
+    mocks["config"].get_active_providers.return_value = [SimpleNamespace(name=n) for n in names]
 
 
 # ---------------------------------------------------------------------------
@@ -442,11 +449,11 @@ class TestTemplateChecks:
 @pytest.mark.unit
 class TestProviderHealthCheck:
     def test_no_providers_gives_warn(self):
-        """get_available_strategies returns [] → 'warn' provider_health check."""
+        """No provider instances configured → 'warn' provider_health check."""
         from orb.interface.health_command_handler import handle_health_check
 
         container, mocks = _make_container()
-        mocks["registry_service"].get_available_strategies.return_value = []
+        _set_providers(mocks, [])
         mocks["scheduler"].format_health_response.return_value = {
             "checks": [],
             "summary": {"passed": 0, "total": 1, "status": "warn"},
@@ -466,7 +473,7 @@ class TestProviderHealthCheck:
         from orb.interface.health_command_handler import handle_health_check
 
         container, mocks = _make_container()
-        mocks["registry_service"].get_available_strategies.return_value = ["aws", "k8s"]
+        _set_providers(mocks, ["aws", "k8s"])
 
         mocks["registry_service"].probe_strategy_health = AsyncMock(
             return_value=_snapshot("healthy")
@@ -490,7 +497,7 @@ class TestProviderHealthCheck:
         from orb.interface.health_command_handler import handle_health_check
 
         container, mocks = _make_container()
-        mocks["registry_service"].get_available_strategies.return_value = ["aws", "k8s"]
+        _set_providers(mocks, ["aws", "k8s"])
 
         mocks["registry_service"].probe_strategy_health = AsyncMock(
             side_effect=[_snapshot("healthy"), _snapshot("unhealthy")]
@@ -514,7 +521,7 @@ class TestProviderHealthCheck:
         from orb.interface.health_command_handler import handle_health_check
 
         container, mocks = _make_container()
-        mocks["registry_service"].get_available_strategies.return_value = ["aws"]
+        _set_providers(mocks, ["aws"])
 
         mocks["registry_service"].probe_strategy_health = AsyncMock(
             return_value=_snapshot("unhealthy")
@@ -538,7 +545,7 @@ class TestProviderHealthCheck:
         from orb.interface.health_command_handler import handle_health_check
 
         container, mocks = _make_container()
-        mocks["registry_service"].get_available_strategies.return_value = ["aws"]
+        _set_providers(mocks, ["aws"])
         mocks["registry_service"].probe_strategy_health = AsyncMock(
             return_value=_snapshot("unknown")
         )
@@ -561,7 +568,7 @@ class TestProviderHealthCheck:
         from orb.interface.health_command_handler import handle_health_check
 
         container, mocks = _make_container()
-        mocks["registry_service"].get_available_strategies.return_value = ["aws"]
+        _set_providers(mocks, ["aws"])
         mocks["registry_service"].probe_strategy_health = AsyncMock(
             side_effect=RuntimeError("provider crashed")
         )
@@ -585,9 +592,7 @@ class TestProviderHealthCheck:
         from orb.interface.health_command_handler import handle_health_check
 
         container, mocks = _make_container()
-        mocks["registry_service"].get_available_strategies.side_effect = Exception(
-            "registry unavailable"
-        )
+        mocks["config"].get_active_providers.side_effect = Exception("registry unavailable")
         mocks["scheduler"].format_health_response.return_value = {
             "checks": [],
             "summary": {"passed": 0, "total": 1, "status": "warn"},
@@ -892,7 +897,7 @@ class TestNoProviderInternalsInResponses:
         from orb.interface.health_command_handler import handle_health_check
 
         container, mocks = _make_container()
-        mocks["registry_service"].get_available_strategies.return_value = ["aws-a", "aws-b"]
+        _set_providers(mocks, ["aws-a", "aws-b"])
         mocks["registry_service"].probe_strategy_health = AsyncMock(
             side_effect=RuntimeError(f"{_RAW_ERROR} Account: {_ACCOUNT_ID}")
         )
@@ -1035,12 +1040,12 @@ class TestHungProviderBoundsTheCommand:
         registry.get_or_create_strategy.return_value = strategy
         real = ProviderRegistryService(registry, MagicMock(), MagicMock())
         service = MagicMock(spec=ProviderRegistryService)
-        service.get_available_strategies.return_value = ["aws-a", "aws-b"]
         service.probe_strategy_health = lambda name: real.probe_strategy_health(name, timeout=0.3)
 
         container, mocks = _make_container(
             {HealthCheckPort: health, ProviderRegistryService: service}
         )
+        _set_providers(mocks, ["aws-a", "aws-b"])
         args = _make_args()
         args._container = container
 
@@ -1056,3 +1061,51 @@ class TestHungProviderBoundsTheCommand:
         statuses = {c["name"]: c["status"] for c in checks}
         assert statuses["aws"] in {"warn", "fail"}
         assert statuses["provider_health"] == "warn"
+
+
+@pytest.mark.unit
+class TestHealthChecksTheDeployment:
+    """The health command checks what this deployment actually loaded and configured."""
+
+    def test_config_check_uses_the_loaded_file_not_the_working_directory(
+        self, tmp_path, monkeypatch
+    ):
+        from orb.interface.health_command_handler import handle_health_check
+
+        loaded = tmp_path / "etc" / "orb" / "config.json"
+        loaded.parent.mkdir(parents=True)
+        loaded.write_text("{}")
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.chdir(elsewhere)
+
+        container, mocks = _make_container()
+        mocks["config"].get_loaded_config_file.return_value = str(loaded)
+        mocks["config"].get_config_file_path.return_value = None
+        args = _make_args()
+        args._container = container
+
+        handle_health_check(args)
+
+        checks = mocks["scheduler"].format_health_response.call_args[0][0]
+        config_check = next(c for c in checks if c["name"] == "config_file")
+        assert config_check["status"] == "pass"
+
+    def test_only_configured_provider_instances_are_probed(self):
+        from orb.interface.health_command_handler import handle_health_check
+
+        container, mocks = _make_container()
+        registry = mocks["registry_service"]
+        registry.get_available_strategies.return_value = ["aws", "azure", "gcp", "aws-default"]
+        registry.probe_strategy_health = AsyncMock(return_value=_snapshot("healthy"))
+        _set_providers(mocks, ["aws-default"])
+        args = _make_args()
+        args._container = container
+
+        handle_health_check(args)
+
+        probed = [c.args[0] for c in registry.probe_strategy_health.await_args_list]
+        assert probed == ["aws-default"]
+        checks = mocks["scheduler"].format_health_response.call_args[0][0]
+        provider_check = next(c for c in checks if c["name"] == "provider_health")
+        assert provider_check["status"] == "pass"

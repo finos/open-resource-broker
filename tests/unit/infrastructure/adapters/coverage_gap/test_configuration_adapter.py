@@ -611,3 +611,24 @@ class TestDelegationMethods:
         cm.get_typed.return_value = mock_type
         result = adapter.get_typed(str)
         assert result is mock_type
+
+
+# ---------------------------------------------------------------------------
+# get_active_providers
+# ---------------------------------------------------------------------------
+
+
+class TestGetActiveProviders:
+    def test_returns_the_configured_active_instances(self):
+        adapter, cm = _make_adapter()
+        instance = MagicMock()
+        instance.name = "aws-default"
+        cm.get_provider_config.return_value.get_active_providers.return_value = [instance]
+
+        assert [p.name for p in adapter.get_active_providers()] == ["aws-default"]
+
+    def test_empty_without_provider_configuration(self):
+        adapter, cm = _make_adapter()
+        cm.get_provider_config.return_value = None
+
+        assert adapter.get_active_providers() == []

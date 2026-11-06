@@ -153,6 +153,8 @@ def test_cli_health_command_leaks_nothing(
     scheduler.format_health_response.return_value = {"summary": {"passed": 0, "total": 0}}
     config = MagicMock(spec=ConfigurationPort)
     config.get_config_file_path.return_value = None
+    config.get_loaded_config_file.return_value = None
+    config.get_active_providers.return_value = []
     console = MagicMock(spec=ConsolePort)
     services: dict[Any, Any] = {
         SchedulerPort: scheduler,
