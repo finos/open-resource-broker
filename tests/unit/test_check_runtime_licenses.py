@@ -12,13 +12,14 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 # Ensure dev-tools/ci is importable
 _DEV_TOOLS_PATH = str(Path(__file__).parents[2] / "dev-tools" / "ci")
 if _DEV_TOOLS_PATH not in sys.path:
     sys.path.insert(0, _DEV_TOOLS_PATH)
 
-from check_runtime_licenses import check, is_allowed, iter_packages  # type: ignore[import]
+from check_runtime_licenses import SPDX_ALLOW, check, is_allowed, iter_packages  # type: ignore[import]
 
 
 @pytest.mark.unit
@@ -163,3 +164,16 @@ class TestCheck:
         checked, violations = check(data, ignore_packages=set())
         assert checked == 1
         assert violations == []
+
+
+@pytest.mark.unit
+def test_dependency_review_allowlist_matches_runtime_allowlist():
+    """The dependency-review action cannot call this script, so its
+    `allow-licenses` input repeats the allowlist and must stay identical."""
+    workflow = Path(__file__).parents[2] / ".github" / "workflows" / "security-code.yml"
+    steps = yaml.safe_load(workflow.read_text())["jobs"]["dependency-review"]["steps"]
+    allow = next(
+        s["with"]["allow-licenses"] for s in steps if "allow-licenses" in s.get("with", {})
+    )
+    workflow_ids = {name.strip().lower() for name in allow.split(",") if name.strip()}
+    assert workflow_ids == {name.lower() for name in SPDX_ALLOW}

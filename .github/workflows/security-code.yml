@@ -407,8 +407,9 @@ jobs:
     # scanner, not an orb-py runtime dependency.
     #
     # NOTE: the dependency-review `allow-licenses` input above cannot call
-    # out to this script, so it must be kept in sync with the allowlist in
-    # dev-tools/ci/check_runtime_licenses.py by hand.
+    # out to this script, so it repeats the allowlist in
+    # dev-tools/ci/check_runtime_licenses.py. The unit test
+    # tests/unit/test_check_runtime_licenses.py fails if the two differ.
     - name: Check Python runtime dependency licenses
       run: |
         set -o pipefail

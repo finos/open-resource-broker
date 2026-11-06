@@ -12,7 +12,8 @@ https://community.finos.org/docs/governance/software-projects/license-categories
 This is the single source of truth for the runtime license gate. The
 dependency-review `allow-licenses` input in
 `.github/workflows/security-code.yml` cannot call out to this script, so it
-must be kept in sync with the allowlist below by hand.
+repeats the allowlist below; tests/unit/test_check_runtime_licenses.py fails
+if the two differ.
 
 Before either stage, known non-SPDX spellings of the same license (e.g. the
 several "...BSD..." classifier strings packaging tools emit instead of
