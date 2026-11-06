@@ -73,6 +73,7 @@ def register_core_services(container: DIContainer) -> None:
         bus.register_handler("RequestCreatedEvent", handler)
         bus.register_handler("RequestCompletedEvent", handler)
         bus.register_handler("RequestFailedEvent", handler)
+        bus.register_handler("RequestStatusChangedEvent", handler)
 
         # Register the @event_handler logging handlers. Importing the package
         # runs the decorators; auto-registration binds them to this bus.

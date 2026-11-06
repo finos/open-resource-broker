@@ -104,6 +104,7 @@ class TestDIWiringCircuitBreakerFactory:
         from orb.domain.base import UnitOfWorkFactory
         from orb.domain.base.ports import (
             ConfigurationPort,
+            EventPublisherPort,
             LoggingPort,
             ProviderConfigPort,
         )
@@ -117,6 +118,7 @@ class TestDIWiringCircuitBreakerFactory:
 
         container.register_instance(UnitOfWorkFactory, MagicMock(spec=UnitOfWorkFactory))
         container.register_instance(SchedulerPort, MagicMock(spec=SchedulerPort))
+        container.register_instance(EventPublisherPort, MagicMock(spec=EventPublisherPort))
         container.register_instance(LoggingPort, MagicMock(spec=LoggingPort))
         container.register_instance(ProviderSelectionPort, MagicMock(spec=ProviderSelectionPort))
         container.register_instance(ProviderConfigPort, MagicMock(spec=ProviderConfigPort))

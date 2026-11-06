@@ -67,7 +67,10 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
         self._query_service = RequestQueryService(uow_factory, logger)
         self._state_machine = state_machine
         self._status_service = RequestStatusService(
-            uow_factory, logger, state_machine=self._state_machine
+            uow_factory,
+            logger,
+            state_machine=self._state_machine,
+            event_publisher=event_publisher,
         )
         self._dto_factory = RequestDTOFactory()
 
@@ -460,12 +463,15 @@ class SyncAndListReturnRequestsHandler(
         generic_filter_service: GenericFilterService,
         machine_sync_service: MachineSyncService,
         config: ConfigurationPort | None = None,
+        event_publisher: Optional[EventPublisherPort] = None,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._generic_filter_service = generic_filter_service
         self._machine_sync_service = machine_sync_service
-        self._status_service = RequestStatusService(uow_factory, logger)
+        self._status_service = RequestStatusService(
+            uow_factory, logger, event_publisher=event_publisher
+        )
         self._query_service = RequestQueryService(uow_factory, logger)
         self._dto_factory = RequestDTOFactory()
         self._config = config
@@ -667,13 +673,14 @@ class SyncAndListActiveRequestsHandler(
         machine_sync_service: MachineSyncService,
         state_machine: FulfilmentStateMachine,
         config: ConfigurationPort | None = None,
+        event_publisher: Optional[EventPublisherPort] = None,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._generic_filter_service = generic_filter_service
         self._machine_sync_service = machine_sync_service
         self._status_service = RequestStatusService(
-            uow_factory, logger, state_machine=state_machine
+            uow_factory, logger, state_machine=state_machine, event_publisher=event_publisher
         )
         self._query_service = RequestQueryService(uow_factory, logger)
         self._dto_factory = RequestDTOFactory()

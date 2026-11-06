@@ -239,6 +239,7 @@ def _register_provisioning_orchestration_service(container: DIContainer) -> None
     from orb.domain.base import UnitOfWorkFactory
     from orb.domain.base.ports import (
         ConfigurationPort,
+        EventPublisherPort,
         LoggingPort,
         ProviderConfigPort,
         ProviderSelectionPort,
@@ -258,6 +259,7 @@ def _register_provisioning_orchestration_service(container: DIContainer) -> None
             config_port=c.get(ConfigurationPort),
             circuit_breaker_factory=CircuitBreakerStrategy,
             state_machine=c.get(FulfilmentStateMachine),
+            event_publisher=c.get(EventPublisherPort),
         )
 
     container.register_singleton(
