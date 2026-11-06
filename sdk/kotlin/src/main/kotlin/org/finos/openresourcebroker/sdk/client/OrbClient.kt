@@ -612,6 +612,19 @@ class OrbClient private constructor(
     suspend fun purgeRequest(requestId: String): Map<String, Any?> =
         executeRaw(post("/api/v1/requests/${encode(requestId)}/purge"))
 
+    /** confirmTerminated — POST /api/v1/requests/{request_id}/confirm-terminated */
+    suspend fun confirmTerminated(
+        requestId: String,
+        machineIds: List<String>,
+        reason: String,
+    ): Map<String, Any?> =
+        executeRaw(
+            post(
+                "/api/v1/requests/${encode(requestId)}/confirm-terminated",
+                mapOf("machine_ids" to machineIds, "reason" to reason),
+            )
+        )
+
     /**
      * streamRequest
      * GET /api/v1/requests/{request_id}/stream

@@ -457,6 +457,17 @@ func (c *Client) PurgeRequest(ctx context.Context, id string) error {
 	return c.post(ctx, "/api/v1/requests/"+url.PathEscape(id)+"/purge", nil, nil)
 }
 
+// ConfirmTerminated records that an operator has verified the named machines of an
+// OCI return request are terminated. The caller takes responsibility for the claim.
+func (c *Client) ConfirmTerminated(ctx context.Context, id string, machineIDs []string, reason string) (map[string]any, error) {
+	var out map[string]any
+	body := map[string]any{"machine_ids": machineIDs, "reason": reason}
+	if err := c.post(ctx, "/api/v1/requests/"+url.PathEscape(id)+"/confirm-terminated", body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RequestTimeline holds the ordered event history for a request.
 type RequestTimeline = map[string]any
 
