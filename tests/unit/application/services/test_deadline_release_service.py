@@ -331,8 +331,8 @@ async def test_cancelling_the_caller_does_not_cancel_the_release():
     caller_task = asyncio.ensure_future(caller())
     await asyncio.wait_for(started.wait(), 2)
     caller_task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await caller_task
+    (outcome,) = await asyncio.gather(caller_task, return_exceptions=True)
+    assert isinstance(outcome, asyncio.CancelledError)
     finish.set()
     await h.service.drain(2)
 
