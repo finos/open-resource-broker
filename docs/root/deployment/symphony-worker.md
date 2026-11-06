@@ -86,6 +86,28 @@ creates the exporter user. The exporter log is `/tmp/symphony-exporter.log`.
 
 ## Template example
 
+`configure-pod-params` needs `MY_POD_NAME`, `MY_POD_IP` and `MY_POD_NAMESPACE`
+from the downward API. The template `env` field only carries literal values:
+entries that use `valueFrom` are dropped when the template is loaded. Set the
+container through the [native spec](../providers/k8s/native-spec.md) instead,
+which passes the container definition to Kubernetes unchanged.
+
+Enable native specs in the ORB configuration:
+
+```json
+{
+  "providers": {
+    "k8s": {
+      "provider_type": "k8s",
+      "native_spec_enabled": true
+    }
+  },
+  "native_spec": {
+    "enabled": true
+  }
+}
+```
+
 A k8s provider template that sets the environment the scripts read and wires
 `compute-liveness` as the liveness probe:
 
@@ -94,30 +116,50 @@ A k8s provider template that sets the environment the scripts read and wires
   "template_id": "symphony-compute",
   "provider_type": "k8s",
   "provider_api": "Pod",
-  "image_id": "registry.example.com/symphony-worker:7.3.2",
+  "machine_image": "registry.example.com/symphony-worker:7.3.2",
   "namespace": "symphony",
-  "max_instances": 50,
-  "env": [
-    {"name": "MY_POD_NAME", "valueFrom": {"fieldRef": {"fieldPath": "metadata.name"}}},
-    {"name": "MY_POD_IP", "valueFrom": {"fieldRef": {"fieldPath": "status.podIP"}}},
-    {"name": "MY_POD_NAMESPACE", "valueFrom": {"fieldRef": {"fieldPath": "metadata.namespace"}}},
-    {"name": "SYMPHONY_SVC_VCPU", "value": "4"},
-    {"name": "SYMPHONY_SVC_MEMORY", "value": "16384"},
-    {"name": "EGO_IGNORE_CPU_CGROUP_SETTING_IN_CONTAINER", "value": "Y"},
-    {"name": "EGO_LIM_IS_IN_CONTAINER", "value": "Y"},
-    {"name": "SYMPHONY_CLUSTER_NAME", "value": "cluster1"}
-  ],
-  "liveness_probe": {
-    "exec": {"command": ["/opt/orb-worker/bin/compute-liveness"]},
-    "initialDelaySeconds": 60,
-    "periodSeconds": 30,
-    "failureThreshold": 3
+  "max_machines": 50,
+  "native_spec": {
+    "spec": {
+      "containers": [
+        {
+          "name": "orb",
+          "image": "{{ image }}",
+          "env": [
+            {"name": "MY_POD_NAME", "valueFrom": {"fieldRef": {"fieldPath": "metadata.name"}}},
+            {"name": "MY_POD_IP", "valueFrom": {"fieldRef": {"fieldPath": "status.podIP"}}},
+            {"name": "MY_POD_NAMESPACE", "valueFrom": {"fieldRef": {"fieldPath": "metadata.namespace"}}},
+            {"name": "SYMPHONY_SVC_VCPU", "value": "4"},
+            {"name": "SYMPHONY_SVC_MEMORY", "value": "16384"},
+            {"name": "EGO_IGNORE_CPU_CGROUP_SETTING_IN_CONTAINER", "value": "Y"},
+            {"name": "EGO_LIM_IS_IN_CONTAINER", "value": "Y"},
+            {"name": "SYMPHONY_CLUSTER_NAME", "value": "cluster1"}
+          ],
+          "livenessProbe": {
+            "exec": {"command": ["/opt/orb-worker/bin/compute-liveness"]},
+            "initialDelaySeconds": 60,
+            "periodSeconds": 30,
+            "failureThreshold": 3
+          }
+        }
+      ]
+    }
   }
 }
 ```
 
+The `containers` list replaces the default container as a whole, so it carries
+the image, the full environment and the probe. Fields such as resources,
+volume mounts or a command also go in this container rather than in the
+template's typed fields. `{{ image }}` is filled from `machine_image`.
+
 The probe itself keeps the 600-second grace period, so `initialDelaySeconds`
 only needs to cover container start-up.
+
+The example uses the snake_case field names of the default scheduler. With the
+HostFactory scheduler, template fields are camelCase and an inline native spec
+has no mapped key: put the `native_spec` body in a file and reference it with
+`nativeSpecPath`.
 
 ## What stays in k8s-legacy
 
