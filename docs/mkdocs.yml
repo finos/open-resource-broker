@@ -146,6 +146,7 @@ nav:
     - Deployment:
       - Overview: deployment/readme.md
       - Docker Deployment: deployment/docker.md
+      - Symphony Worker Image: deployment/symphony-worker.md
       - Cloud Platforms: deployment/cloud_platforms.md
       - Traditional Deployment: deployment/traditional.md
       - PyPI Setup: deployment/pypi-setup.md
