@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from orb.application.services.deadline_release_service import DeadlineReleaseService
 from orb.cli import main as cli_main
 
 
@@ -34,11 +35,22 @@ async def test_drain_events_never_raises():
 async def test_drain_releases_waits_a_bounded_time_for_started_releases():
     service = MagicMock()
     service.drain = AsyncMock()
-    container = MagicMock()
-    container.get_optional.return_value = service
-    with patch.object(cli_main, "get_container", return_value=container):
+    with patch.object(DeadlineReleaseService, "_active", service):
         await cli_main._drain_releases()
     service.drain.assert_awaited_once_with(cli_main._RELEASE_DRAIN_SECONDS)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_drain_releases_does_not_build_the_service():
+    container = MagicMock()
+    with (
+        patch.object(DeadlineReleaseService, "_active", None),
+        patch.object(cli_main, "get_container", return_value=container),
+    ):
+        await cli_main._drain_releases()
+    container.get_optional.assert_not_called()
+    container.get.assert_not_called()
 
 
 @pytest.mark.unit

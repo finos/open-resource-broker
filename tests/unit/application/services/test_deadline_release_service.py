@@ -477,3 +477,104 @@ async def test_scans_are_spaced_by_the_scan_interval_when_asked():
     h.clock_ticks += 400
     assert await h.service.scan_and_enqueue(respect_interval=True) == 1
     await h.service.drain(2)
+
+
+@pytest.mark.asyncio
+async def test_an_empty_read_is_unknown_and_leaves_the_mark_pending():
+    h = _Harness(_request())
+    h.provider_machines = []
+
+    assert await h.service.release(h.request_id) == "pending"
+
+    assert h.commands == []
+    assert h.stored.metadata[STAMP] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_an_empty_read_without_resource_ids_or_stored_machines_leaves_the_mark_pending():
+    h = _Harness(_request().model_copy(update={"resource_ids": []}))
+    h.provider_machines = []
+
+    assert await h.service.release(h.request_id) == "pending"
+    assert h.stored.metadata[STAMP] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_a_read_with_only_replacement_machines_leaves_the_mark_pending():
+    h = _Harness(_request())
+    h.provider_machines = [_machine("i-replacement", MachineStatus.RUNNING)]
+
+    assert await h.service.release(h.request_id) == "pending"
+    assert h.stored.metadata[STAMP] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_an_empty_read_is_accepted_when_every_stored_machine_is_already_terminal():
+    h = _Harness(
+        _request(),
+        stored_machines=[
+            _machine("i-1", MachineStatus.TERMINATED),
+            _machine("i-2", MachineStatus.TERMINATED),
+        ],
+    )
+    h.provider_machines = []
+
+    assert await h.service.release(h.request_id) == "nothing_to_release"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [MachineStatus.RUNNING, MachineStatus.TERMINATED])
+async def test_a_read_with_one_of_our_machines_in_any_state_still_finalises(status):
+    h = _Harness(_request())
+    h.provider_machines = [_machine("i-1", status)]
+
+    assert await h.service.release(h.request_id) == "nothing_to_release"
+
+
+@pytest.mark.asyncio
+async def test_a_machine_with_an_unknown_status_is_not_returned():
+    h = _Harness(_request())
+    h.provider_machines = [_machine("i-1", MachineStatus.UNKNOWN)]
+
+    await h.service.release(h.request_id)
+
+    assert h.commands == []
+
+
+@pytest.mark.asyncio
+async def test_cancelling_the_wrapper_keeps_the_slot_and_in_flight_mark_until_the_release_ends():
+    h = _Harness(_request())
+    h.provider_machines = [_machine("i-2", MachineStatus.PENDING)]
+    started, finish = asyncio.Event(), asyncio.Event()
+
+    async def slow(command: Any) -> None:
+        started.set()
+        await finish.wait()
+
+    h.on_command = slow
+    h.service.enqueue(h.request_id)
+    await asyncio.wait_for(started.wait(), 2)
+    wrapper = next(t for t in asyncio.all_tasks() if t.get_name().startswith("orb-deadline"))
+    wrapper.cancel()
+    await asyncio.gather(wrapper, return_exceptions=True)
+
+    assert h.request_id in h.service._in_flight
+    assert h.service.enqueue(h.request_id) is False
+    finish.set()
+    await h.service.drain(2)
+    assert h.request_id not in h.service._in_flight
+
+
+@pytest.mark.asyncio
+async def test_per_request_bookkeeping_stays_bounded():
+    h = _Harness(_request())
+    for n in range(3000):
+        h.service._last_enqueued[f"old-{n}"] = -1000.0
+        h.service._last_warned[(f"old-{n}", "stale")] = -100000.0
+    h.clock_ticks = 100000.0
+    h.provider_machines = [_machine("i-2", MachineStatus.PENDING)]
+
+    h.service.enqueue(h.request_id)
+    await h.service.drain(2)
+
+    assert len(h.service._last_enqueued) < 10
