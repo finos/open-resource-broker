@@ -281,3 +281,24 @@ class TestLateProbeSuccess:
         cb.record_success()
 
         assert _state(svc) == CircuitState.OPEN
+
+    def test_a_stale_probe_verdict_does_not_close_a_circuit_opened_by_a_quota_error(self) -> None:
+        svc = _svc()
+        cb = CircuitBreakerStrategy(service_name=svc, failure_threshold=1, reset_timeout=60)
+        CircuitBreakerStrategy._circuit_states[svc]["probe_timed_out"] = True
+
+        cb._force_open(svc)
+        cb.record_success()
+
+        assert _state(svc) == CircuitState.OPEN
+
+    def test_a_stale_probe_verdict_does_not_close_a_circuit_opened_by_failures(self) -> None:
+        svc = _svc()
+        cb = CircuitBreakerStrategy(service_name=svc, failure_threshold=1, reset_timeout=60)
+        CircuitBreakerStrategy._circuit_states[svc]["probe_timed_out"] = True
+
+        cb.record_failure(time.time())
+        assert _state(svc) == CircuitState.OPEN
+        cb.record_success()
+
+        assert _state(svc) == CircuitState.OPEN

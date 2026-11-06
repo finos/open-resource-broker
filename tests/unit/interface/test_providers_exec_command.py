@@ -31,7 +31,10 @@ def _capabilities(operations):
 
 
 def _args(
-    operation: str | None = "cleanup-orphaned-resources", operations=AWS_OPERATIONS, **kwargs
+    operation: str | None = "cleanup-orphaned-resources",
+    operations=AWS_OPERATIONS,
+    active=("aws-1",),
+    **kwargs,
 ):
     values = {
         "operation": operation,
@@ -53,7 +56,9 @@ def _args(
         )
     )
     config_port = MagicMock()
-    config_port.get_active_providers.return_value = [SimpleNamespace(name="aws-1")]
+    config_port.get_active_providers.return_value = [
+        SimpleNamespace(name=name, type="aws") for name in active
+    ]
     container = MagicMock()
     container.get.side_effect = lambda key: {
         ProviderSelectionPort: port,
@@ -101,6 +106,7 @@ async def test_an_operation_outside_the_allowlist_is_refused(requested):
     port.execute_operation.assert_not_awaited()
     assert response.exit_code == 1
     assert "cleanup-orphaned-resources" in response.data["message"]
+    port.select_active_provider.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -196,6 +202,53 @@ async def test_a_partial_result_exits_non_zero_with_its_report():
     assert response.exit_code == 1
     assert response.data["deleted"] == [{"launch_template_id": "lt-1"}]
     assert response.data["failed"] == [{"launch_template_id": "lt-2"}]
+
+
+@pytest.mark.asyncio
+async def test_a_changing_run_with_several_providers_needs_an_explicit_name():
+    args, port = _args(active=("aws-1", "aws-2"))
+
+    response = await handle_execute_provider_operation(args)
+
+    assert response.exit_code == 1
+    assert "--provider-name" in response.data["message"]
+    port.execute_operation.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_dry_run_with_several_providers_may_use_the_default():
+    args, _ = _args(active=("aws-1", "aws-2"), dry_run=True)
+
+    response = await handle_execute_provider_operation(args)
+
+    assert response.exit_code == 0
+    assert response.data["provider"] == "aws-1"
+
+
+@pytest.mark.asyncio
+async def test_an_explicit_name_with_several_providers_runs_and_is_echoed():
+    args, port = _args(active=("aws-1", "aws-2"), provider_name="aws-2")
+    port.select_active_provider.return_value = SimpleNamespace(provider_name="aws-2")
+
+    response = await handle_execute_provider_operation(args)
+
+    assert response.exit_code == 0
+    assert port.execute_operation.await_args.args[0] == "aws-2"
+    assert response.data["provider"] == "aws-2"
+
+
+@pytest.mark.asyncio
+async def test_the_provider_scope_in_the_result_is_passed_through():
+    args, port = _args()
+    port.execute_operation.return_value = SimpleNamespace(
+        success=True, data={"region": "eu-west-2", "account_id": "123456789012"}, error_message=None
+    )
+
+    response = await handle_execute_provider_operation(args)
+
+    assert response.data["provider"] == "aws-1"
+    assert response.data["region"] == "eu-west-2"
+    assert response.data["account_id"] == "123456789012"
 
 
 def test_the_command_is_parsed_with_its_options():

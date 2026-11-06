@@ -139,6 +139,15 @@ def _exec_error(message: str, **extra: Any) -> InterfaceResponse:
     return InterfaceResponse(data={"success": False, "message": message, **extra}, exit_code=1)
 
 
+def _active_provider_names(args, provider_type: Any) -> list[str]:
+    from orb.domain.base.ports.configuration_port import ConfigurationPort
+
+    providers = args._container.get(ConfigurationPort).get_active_providers()
+    return [
+        p.name for p in providers if not provider_type or getattr(p, "type", None) == provider_type
+    ]
+
+
 def _list_exec_operations(args, port: Any) -> InterfaceResponse:
     from orb.domain.base.ports.configuration_port import ConfigurationPort
 
@@ -190,21 +199,34 @@ async def handle_execute_provider_operation(args) -> InterfaceResponse:
     except ValueError:
         operation_type = None
 
+    if operation_type is None or operation_type.value not in EXEC_ALLOWED_OPERATIONS:
+        allowed = ", ".join(_display_name(op) for op in sorted(EXEC_ALLOWED_OPERATIONS))
+        return _exec_error(
+            f"Operation '{requested}' cannot be run with 'providers exec'. Allowed: {allowed}"
+        )
+
+    try:
+        parameters = _parse_exec_parameters(args)
+    except ValueError as exc:
+        return _exec_error(f"Invalid operation parameters: {exc}")
+
+    explicit_provider = getattr(args, "provider_name", None)
+    if not explicit_provider and parameters.get("dry_run") is not True:
+        active = _active_provider_names(args, getattr(args, "provider_type", None))
+        if len(active) > 1:
+            return _exec_error(
+                "More than one provider is configured, so a changing operation needs "
+                f"--provider-name. Providers: {', '.join(active)}"
+            )
+
     selection = port.select_active_provider(
-        provider_name=getattr(args, "provider_name", None),
+        provider_name=explicit_provider,
         provider_type=getattr(args, "provider_type", None),
     )
     provider_name = selection.provider_name
     capabilities = port.get_strategy_capabilities(provider_name)
     executable = [_display_name(op) for op in _executable_operations(capabilities)]
     supported_text = ", ".join(executable) if executable else "none"
-
-    if operation_type is None or operation_type.value not in EXEC_ALLOWED_OPERATIONS:
-        allowed = ", ".join(_display_name(op) for op in sorted(EXEC_ALLOWED_OPERATIONS))
-        return _exec_error(
-            f"Operation '{requested}' cannot be run with 'providers exec'. Allowed: {allowed}",
-            provider=provider_name,
-        )
 
     supports = getattr(capabilities, "supports_operation", None)  # getattr: port returns Any
     if supports is None or not supports(operation_type):
@@ -214,11 +236,6 @@ async def handle_execute_provider_operation(args) -> InterfaceResponse:
             provider=provider_name,
             supported_operations=executable,
         )
-
-    try:
-        parameters = _parse_exec_parameters(args)
-    except ValueError as exc:
-        return _exec_error(f"Invalid operation parameters: {exc}", provider=provider_name)
 
     result = await port.execute_operation(
         provider_name, Operation(operation_type=operation_type, parameters=parameters)

@@ -26,10 +26,19 @@ ORB_TAGS = [
 pytestmark = [pytest.mark.moto]
 
 
-def _template(ec2, name: str, request_id: str | None, managed: bool = True) -> str:
+PREFIX = "orb-"
+
+
+def _template(
+    ec2, name: str, request_id: str | None, managed: bool = True, orb_named: bool = True
+) -> str:
+    """Create a template; by default it is named the way ORB names the ones it creates."""
     tags = list(ORB_TAGS) if managed else []
     if request_id:
         tags.append({"Key": "orb:request-id", "Value": request_id})
+        tags.append({"Key": "orb:template-id", "Value": name})
+    if request_id and orb_named:
+        name = f"{PREFIX}{request_id}-{name}"
     return ec2.create_launch_template(
         LaunchTemplateName=name,
         LaunchTemplateData={"ImageId": "ami-12345678", "InstanceType": "t3.micro"},
@@ -38,7 +47,9 @@ def _template(ec2, name: str, request_id: str | None, managed: bool = True) -> s
 
 
 def _service(aws_client) -> AWSLaunchTemplateSweepService:
-    return AWSLaunchTemplateSweepService(aws_client, _make_logger(), _make_cleanup_config_port())
+    return AWSLaunchTemplateSweepService(
+        aws_client, _make_logger(), _make_cleanup_config_port(PREFIX)
+    )
 
 
 def _exists(ec2, lt_id: str) -> bool:
@@ -138,7 +149,7 @@ def test_a_disabled_cleanup_configuration_deletes_nothing(ec2, aws_client):
     from orb.config.schemas.provider_strategy_schema import ProviderDefaults
 
     orphan = _template(ec2, "orphan", "req-orphan")
-    config_port = _make_cleanup_config_port()
+    config_port = _make_cleanup_config_port(PREFIX)
     config_port.get_provider_config.return_value.provider_defaults = {
         "aws": ProviderDefaults(cleanup=CleanupConfig(enabled=False).model_dump())
     }
@@ -247,3 +258,158 @@ async def test_a_failed_delete_returns_a_truthful_partial_report(ec2, aws_client
     assert [f["launch_template_id"] for f in result.data["failed"]] == [second]
     assert "nothing was deleted" not in (result.error_message or "")
     assert not _exists(ec2, first) and _exists(ec2, second)
+
+
+def test_a_customer_template_carrying_the_orb_tags_survives(ec2, aws_client):
+    mine = _template(ec2, "my-user-template", "req-1", orb_named=False)
+    generated = _template(ec2, "tpl", "req-1")
+
+    report = _service(aws_client).sweep(dry_run=False, min_age=timedelta(0))
+
+    assert [d["launch_template_id"] for d in report["deleted"]] == [generated]
+    assert _exists(ec2, mine)
+    kept = {k["launch_template_id"]: k["reason"] for k in report["kept"]}
+    assert kept == {mine: "name is not ORB-generated"}
+
+
+def test_a_name_must_match_the_request_and_template_tags_exactly(ec2, aws_client):
+    """A template of request R1-extra is not matched by the tags of request R1."""
+    other = ec2.create_launch_template(
+        LaunchTemplateName="orb-R1-extra-tpl",
+        LaunchTemplateData={"ImageId": "ami-12345678", "InstanceType": "t3.micro"},
+        TagSpecifications=[
+            {
+                "ResourceType": "launch-template",
+                "Tags": [
+                    *ORB_TAGS,
+                    {"Key": "orb:request-id", "Value": "R1"},
+                    {"Key": "orb:template-id", "Value": "tpl"},
+                ],
+            }
+        ],
+    )["LaunchTemplate"]["LaunchTemplateId"]
+
+    report = _service(aws_client).sweep(dry_run=False, min_age=timedelta(0))
+
+    assert report["deleted"] == []
+    assert _exists(ec2, other)
+
+
+def test_without_a_config_port_nothing_is_deleted(ec2, aws_client):
+    orphan = _template(ec2, "tpl", "req-1")
+    service = AWSLaunchTemplateSweepService(aws_client, _make_logger(), None)
+
+    report = service.sweep(dry_run=False, min_age=timedelta(0))
+
+    assert report["deleted"] == [] and report["refused"] is True
+    assert _exists(ec2, orphan)
+
+
+def test_an_empty_resource_prefix_deletes_nothing(ec2, aws_client):
+    orphan = _template(ec2, "tpl", "req-1")
+    service = AWSLaunchTemplateSweepService(
+        aws_client, _make_logger(), _make_cleanup_config_port("")
+    )
+
+    report = service.sweep(dry_run=False, min_age=timedelta(0))
+
+    assert report["deleted"] == [] and report["refused"] is True
+    assert _exists(ec2, orphan)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("force", [False, "False", "false", "no", "off", 0, "0", None])
+async def test_a_false_force_never_removes_the_age_floor(ec2, aws_client, force):
+    from orb.domain.base.operations import Operation, OperationType
+
+    orphan = _template(ec2, "tpl", "req-1")
+
+    result = await _service(aws_client).cleanup_orphaned_templates(
+        Operation(OperationType.CLEANUP_ORPHANED_RESOURCES, {"min_age_hours": 0, "force": force})
+    )
+
+    assert result.success is False
+    assert result.error_code == "INVALID_PARAMETERS"
+    assert _exists(ec2, orphan)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dry_run", ["no", "off", 1, "yes"])
+async def test_a_non_boolean_dry_run_is_rejected(ec2, aws_client, dry_run):
+    from orb.domain.base.operations import Operation, OperationType
+
+    orphan = _template(ec2, "tpl", "req-1")
+
+    result = await _service(aws_client).cleanup_orphaned_templates(
+        Operation(OperationType.CLEANUP_ORPHANED_RESOURCES, {"dry_run": dry_run})
+    )
+
+    assert result.error_code == "INVALID_PARAMETERS"
+    assert _exists(ec2, orphan)
+
+
+@pytest.mark.asyncio
+async def test_unknown_parameters_are_rejected(ec2, aws_client):
+    from orb.domain.base.operations import Operation, OperationType
+
+    orphan = _template(ec2, "tpl", "req-1")
+
+    result = await _service(aws_client).cleanup_orphaned_templates(
+        Operation(OperationType.CLEANUP_ORPHANED_RESOURCES, {"min_age_hour": 0})
+    )
+
+    assert result.error_code == "INVALID_PARAMETERS"
+    assert "min_age_hour" in (result.error_message or "")
+    assert _exists(ec2, orphan)
+
+
+@pytest.mark.asyncio
+async def test_string_booleans_are_accepted_case_insensitively(ec2, aws_client):
+    from orb.domain.base.operations import Operation, OperationType
+
+    orphan = _template(ec2, "tpl", "req-1")
+
+    result = await _service(aws_client).cleanup_orphaned_templates(
+        Operation(
+            OperationType.CLEANUP_ORPHANED_RESOURCES,
+            {"min_age_hours": 0, "force": "True", "dry_run": "TRUE"},
+        )
+    )
+
+    assert result.success
+    assert [d["launch_template_id"] for d in result.data["would_delete"]] == [orphan]
+    assert _exists(ec2, orphan)
+
+
+@pytest.mark.asyncio
+async def test_the_result_names_the_region_and_account(ec2, aws_client):
+    from orb.domain.base.operations import Operation, OperationType
+
+    aws_client.region_name = REGION
+
+    result = await _service(aws_client).cleanup_orphaned_templates(
+        Operation(OperationType.CLEANUP_ORPHANED_RESOURCES, {"dry_run": True})
+    )
+
+    assert result.data["region"] == REGION
+    assert result.data["account_id"]
+
+
+@pytest.mark.asyncio
+async def test_disabled_cleanup_is_not_reported_as_success(ec2, aws_client):
+    from orb.config.schemas.cleanup_schema import CleanupConfig
+    from orb.config.schemas.provider_strategy_schema import ProviderDefaults
+    from orb.domain.base.operations import Operation, OperationType
+
+    config_port = _make_cleanup_config_port(PREFIX)
+    config_port.get_provider_config.return_value.provider_defaults = {
+        "aws": ProviderDefaults(cleanup=CleanupConfig(enabled=False).model_dump())
+    }
+    service = AWSLaunchTemplateSweepService(aws_client, _make_logger(), config_port)
+
+    result = await service.cleanup_orphaned_templates(
+        Operation(OperationType.CLEANUP_ORPHANED_RESOURCES, {"dry_run": False})
+    )
+
+    assert result.success is False
+    assert result.error_code == "LAUNCH_TEMPLATE_CLEANUP_DISABLED"

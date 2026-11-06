@@ -9,6 +9,10 @@ not a background job: nothing here runs unless it is asked for.
 A template is deleted only when every one of these holds:
 
 * it carries the ``orb:managed-by`` tag (templates a user supplied never do),
+* its name is exactly the one ORB generates: the resource prefix, the value of its
+  ``orb:request-id`` tag, ``-`` and the value of its ``orb:template-id`` tag (a
+  template that merely carries the tags, such as a user's own copy, is never
+  deleted; without a configured, non-empty resource prefix nothing is deleted),
 * it is older than the minimum age, so a template created for a request that has
   not launched anything yet is not removed,
 * no pending, running, stopping or stopped instance was launched from it and no
@@ -21,7 +25,7 @@ A lookup that fails therefore aborts the sweep with nothing deleted: a template 
 never deleted on incomplete information. A delete that fails part-way ends the
 sweep with a report that lists what was deleted, what failed and what was left.
 
-The sweep sees every ORB-managed template in the provider's account and region,
+The sweep sees every ORB-generated template in the provider's account and region,
 including those of other ORB installations that share them (the ``orb:managed-by``
 tag is the same for all of them); only unused ones are deleted. Other regions need a
 run per provider instance.
@@ -46,6 +50,10 @@ if TYPE_CHECKING:
 MANAGED_BY_TAG = "orb:managed-by"
 MANAGED_BY_VALUE = "open-resource-broker"
 REQUEST_ID_TAG = "orb:request-id"
+TEMPLATE_ID_TAG = "orb:template-id"
+
+OPERATION_PARAMETERS = frozenset({"dry_run", "force", "min_age_hours"})
+NOT_ORB_NAMED = "name is not ORB-generated"
 
 DEFAULT_MIN_AGE_HOURS = 24
 # A template created moments ago may belong to a request that has not launched
@@ -77,8 +85,18 @@ class AWSLaunchTemplateSweepService:
     async def cleanup_orphaned_templates(self, operation: ProviderOperation) -> ProviderResult:
         """Provider operation entry point (blocking AWS calls run in a worker thread)."""
         params = operation.parameters
-        dry_run = bool(params.get("dry_run", False))
-        force = bool(params.get("force", False))
+        unknown = sorted(set(params) - OPERATION_PARAMETERS)
+        if unknown:
+            return ProviderResult.error_result(
+                f"Unknown parameter(s): {', '.join(unknown)}. "
+                f"Accepted: {', '.join(sorted(OPERATION_PARAMETERS))}",
+                "INVALID_PARAMETERS",
+            )
+        try:
+            dry_run = _strict_bool(params.get("dry_run", False), "dry_run")
+            force = _strict_bool(params.get("force", False), "force")
+        except ValueError as exc:
+            return ProviderResult.error_result(str(exc), "INVALID_PARAMETERS")
         min_age_hours = params.get("min_age_hours", DEFAULT_MIN_AGE_HOURS)
         if (
             not isinstance(min_age_hours, int)
@@ -98,6 +116,7 @@ class AWSLaunchTemplateSweepService:
             report = await asyncio.to_thread(
                 self.sweep, dry_run=dry_run, min_age=timedelta(hours=min_age_hours)
             )
+            report = {**await asyncio.to_thread(self._scope), **report}
         except SweepAborted as exc:
             return ProviderResult.error_result(
                 f"Launch template sweep aborted, nothing was deleted: {exc}",
@@ -107,6 +126,15 @@ class AWSLaunchTemplateSweepService:
             return ProviderResult.error_result(
                 f"Launch template sweep failed: {exc}", "LAUNCH_TEMPLATE_SWEEP_FAILED"
             )
+        if report.get("disabled") or report.get("refused"):
+            code = (
+                "LAUNCH_TEMPLATE_CLEANUP_DISABLED"
+                if report.get("disabled")
+                else "LAUNCH_TEMPLATE_CLEANUP_REFUSED"
+            )
+            return ProviderResult.error_result(report["message"], code).model_copy(
+                update={"data": report}
+            )
         if report.get("failed"):
             return ProviderResult.error_result(
                 f"Deleted {len(report['deleted'])} launch template(s); "
@@ -114,6 +142,19 @@ class AWSLaunchTemplateSweepService:
                 "LAUNCH_TEMPLATE_SWEEP_PARTIAL",
             ).model_copy(update={"data": report})
         return ProviderResult.success_result(report, {"operation": "cleanup_orphaned_resources"})
+
+    def _scope(self) -> dict[str, Any]:
+        """The account and region the sweep covers, so the operator sees where it ran."""
+        account_id: Optional[str]
+        try:
+            account_id = self._aws_client.sts_client.get_caller_identity().get("Account")
+        except Exception as exc:
+            self._logger.warning("Could not resolve the AWS account id: %s", exc)
+            account_id = None
+        return {
+            "region": getattr(self._aws_client, "region_name", None),
+            "account_id": account_id,
+        }
 
     # ------------------------------------------------------------------
     # Sweep
@@ -127,7 +168,21 @@ class AWSLaunchTemplateSweepService:
                 "would_delete": [],
                 "kept": [],
                 "failed": [],
+                "disabled": True,
                 "message": "Launch template cleanup is disabled in the provider configuration",
+            }
+        prefix = self._name_prefix()
+        if not prefix:
+            return {
+                "deleted": [],
+                "would_delete": [],
+                "kept": [],
+                "failed": [],
+                "refused": True,
+                "message": (
+                    "Launch template cleanup needs a non-empty launch template resource prefix "
+                    "to tell ORB-generated templates from others; nothing was deleted"
+                ),
             }
         dry_run = dry_run or self._configured_dry_run()
 
@@ -142,10 +197,13 @@ class AWSLaunchTemplateSweepService:
         for template in templates:
             lt_id = template["LaunchTemplateId"]
             name = template.get("LaunchTemplateName", lt_id)
-            request_id = {t["Key"]: t["Value"] for t in template.get("Tags", [])}.get(
-                REQUEST_ID_TAG, ""
-            )
+            tags = {t["Key"]: t["Value"] for t in template.get("Tags", [])}
+            request_id = tags.get(REQUEST_ID_TAG, "")
             entry = {"launch_template_id": lt_id, "name": name, "request_id": request_id}
+            if not _is_orb_generated_name(name, prefix, request_id, tags.get(TEMPLATE_ID_TAG, "")):
+                self._logger.info("Keeping launch template %s (%s): %s", lt_id, name, NOT_ORB_NAMED)
+                kept.append({**entry, "reason": NOT_ORB_NAMED})
+                continue
             reason = self._keep_reason(template, request_id, referenced, now, min_age)
             if reason:
                 kept.append({**entry, "reason": reason})
@@ -194,6 +252,12 @@ class AWSLaunchTemplateSweepService:
         if request_id and self._has_live_instances(f"tag:{REQUEST_ID_TAG}", request_id):
             return "its request still has live instances"
         return ""
+
+    def _name_prefix(self) -> str:
+        if self._config_port is None:
+            return ""
+        prefix = self._config_port.get_resource_prefix("launch_template")
+        return prefix if isinstance(prefix, str) else ""
 
     # ------------------------------------------------------------------
     # AWS lookups (each raises SweepAborted on failure)
@@ -309,6 +373,22 @@ class AWSLaunchTemplateSweepService:
 
     def _configured_dry_run(self) -> bool:
         return bool(self._cleanup_config().dry_run)
+
+
+def _is_orb_generated_name(name: str, prefix: str, request_id: str, template_id: str) -> bool:
+    """True only for the exact name ORB generates for a request's launch template."""
+    if not (prefix and request_id and template_id):
+        return False
+    return name == f"{prefix}{request_id}-{template_id}"
+
+
+def _strict_bool(value: Any, name: str) -> bool:
+    """Accept a real bool or exactly "true"/"false"; anything else is an error."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in ("true", "false"):
+        return value.strip().lower() == "true"
+    raise ValueError(f"{name} must be true or false, got {value!r}")
 
 
 def _template_ids_of_configs(configs: Iterable[dict[str, Any]]) -> set[str]:

@@ -363,6 +363,7 @@ class CircuitBreakerStrategy(RetryStrategy):
                 and circuit_state["failure_count"] >= current_threshold
             ):
                 circuit_state["state"] = CircuitState.OPEN
+                circuit_state["probe_timed_out"] = False
 
                 logger.error(
                     "Circuit breaker OPENED for %s after %s failures",
