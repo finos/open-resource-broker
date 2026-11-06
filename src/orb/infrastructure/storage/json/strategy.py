@@ -2,7 +2,10 @@
 
 import json
 import os
+import shutil
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar, cast
 
 from orb.domain.base.exceptions import ConcurrencyError
@@ -325,6 +328,8 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self.logger.debug("%s entity %s exists: %s", self.entity_type, entity_id, exists)
                 return exists
 
+            except StorageError:
+                raise
             except Exception as e:
                 self.logger.error(
                     "Failed to check existence of %s entity %s: %s",
@@ -556,6 +561,8 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 count = len(all_data)
                 self.logger.debug(f"Counted {count} {self.entity_type} entities")
                 return count
+            except StorageError:
+                raise
             except Exception as e:
                 self.logger.error(f"Failed to count {self.entity_type} entities: {e}")
                 return 0
@@ -605,25 +612,92 @@ class JSONStorageStrategy(BaseStorageStrategy):
         ):
             return self._data_cache
 
+        file_path = self.file_manager.file_path
         try:
             content, signature = self.file_manager.read_file_with_signature()
             entity_data = self._section_from(content)
-
-            self._data_cache = entity_data
-            self._cache_signature = signature
-            self._cache_valid = True
-
-            return entity_data
-
+        except OSError as e:
+            # The file could not be read; it is not known to be damaged
+            raise StorageError(f"{file_path}: {e}") from e
+        except ValueError as e:
+            # The content does not parse (bad JSON or bad encoding)
+            self.logger.error("Storage file %s does not parse: %s", file_path, e)
+            entity_data, signature = self._recover_from_backup(e)
+        except StorageError:
+            raise
         except Exception as e:
-            self.logger.error("Failed to load data: %s", e)
-            # Try to recover from backup
-            if self.file_manager.recover_from_backup():
-                self.logger.info("Recovered data from backup")
-                return self._load_data()  # Recursive call after recovery
-            else:
-                self.logger.warning("No backup available, starting with empty data")
-                return {}
+            raise StorageError(f"{file_path}: {e}") from e
+
+        self._data_cache = entity_data
+        self._cache_signature = signature
+        self._cache_valid = True
+
+        return entity_data
+
+    def _recover_from_backup(
+        self, error: Exception
+    ) -> tuple[dict[str, dict[str, Any]], Optional[tuple[int, int, int, int]]]:
+        """Replace a file that does not parse with its newest backup that does.
+
+        Runs under the cross-process lock. The file is re-read first, in case
+        another process has rewritten it since. The damaged file is copied
+        aside before it is replaced, so records written after the backup can
+        still be recovered by hand. When no backup parses the file is left
+        untouched and ``StorageError`` is raised.
+        """
+        file_manager = self.file_manager
+        file_path = file_manager.file_path
+        with file_manager.exclusive_write_lock():
+            try:
+                content, signature = file_manager.read_file_with_signature()
+                return self._section_from(content), signature
+            except OSError as e:
+                raise StorageError(f"{file_path}: {e}") from e
+            except ValueError:
+                pass
+
+            for backup in file_manager.list_backups():
+                try:
+                    backup_content = backup.read_text(encoding="utf-8")
+                    backup_data = self.parse_file(backup_content)
+                except (OSError, ValueError) as e:
+                    self.logger.warning("Backup %s is not usable: %s", backup, e)
+                    continue
+
+                corrupt_copy = self._corrupt_copy_path()
+                try:
+                    shutil.copy2(file_path, corrupt_copy)
+                    file_manager.write_file(backup_content)
+                except OSError as e:
+                    raise StorageError(
+                        f"{file_path}: {error}; restoring backup {backup} failed: {e}"
+                    ) from e
+                self.logger.warning(
+                    "Storage file %s did not parse (%s); restored backup %s. Writes made "
+                    "after that backup are not in the restored file; the damaged file "
+                    "was kept as %s.",
+                    file_path,
+                    error,
+                    backup,
+                    corrupt_copy,
+                )
+                return self.section_of(backup_data), file_manager.current_signature()
+
+        raise StorageError(
+            f"{file_path}: {error}; no valid backup in {file_manager.backup_dir}; "
+            "restore one or move the file aside"
+        )
+
+    def _corrupt_copy_path(self) -> Path:
+        """A free name beside the file for keeping a damaged copy."""
+        file_path = self.file_manager.file_path
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        candidate = file_path.with_name(f"{file_path.name}.corrupt-{stamp}")
+        suffix = 1
+        while candidate.exists():
+            candidate = file_path.with_name(f"{file_path.name}.corrupt-{stamp}-{suffix}")
+            suffix += 1
+        return candidate
 
     def _mutate(
         self, apply: Callable[[dict[str, dict[str, Any]]], tuple[bool, _R]], what: str
@@ -642,10 +716,6 @@ class JSONStorageStrategy(BaseStorageStrategy):
         """
         with self.lock_manager.write_lock():
             try:
-                # Best effort and outside the critical section: at worst it backs
-                # up a slightly stale copy.
-                self.file_manager.create_backup()
-
                 with self.file_manager.exclusive_write_lock():
                     content, _ = self.file_manager.read_file_with_signature()
                     full_data = self.parse_file(content)
@@ -657,6 +727,9 @@ class JSONStorageStrategy(BaseStorageStrategy):
                         return result
 
                     full_data[self.entity_type] = working
+                    # The file parsed, so the backup holds exactly the content
+                    # about to be replaced (never a damaged file)
+                    self.file_manager.create_backup()
                     self.file_manager.write_file(self.serializer.serialize(full_data))
                     signature = self.file_manager.current_signature()
 

@@ -109,10 +109,6 @@ class JSONTransactionScope:
             groups.setdefault(strategy.file_manager.real_path, []).append(strategy)
         has_puts = any(s.has_buffered_puts() for s in ordered)
 
-        for strategies in groups.values():
-            # Best effort and outside the critical section, as for a single write
-            strategies[0].file_manager.create_backup()
-
         with ExitStack() as locks:
             for strategy in ordered:
                 locks.enter_context(strategy.lock_manager.write_lock())
@@ -137,6 +133,11 @@ class JSONTransactionScope:
                 for strategy in ordered:
                     strategy.drop_cache()
                 raise
+
+            # Every file parsed, so each backup is the exact content about to be
+            # replaced (a corrupt file is never copied into the backup ring)
+            for strategies in groups.values():
+                strategies[0].file_manager.create_backup()
 
             # Every buffered write has been validated; from here on files are written
             def holds_anchor(path: str) -> bool:

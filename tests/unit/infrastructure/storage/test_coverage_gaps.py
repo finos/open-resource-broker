@@ -8,7 +8,7 @@ Targets uncovered lines in:
 - components/file_manager.py  (error branches in read_file, write_file,
                                _atomic_write failure cleanup, create_backup
                                exception, _cleanup_old_backups unlink error,
-                               recover_from_backup exception,
+                               list_backups ordering,
                                verify_file_integrity exception)
 - repositories/template_repository.py  (exception branches in every public method)
 """
@@ -204,16 +204,18 @@ class TestJSONStrategyFindByIdException:
 
 @pytest.mark.unit
 class TestJSONStrategyFindAllException:
-    """find_all() returns empty dict on load error (swallowed by _load_data)."""
+    """find_all() raises StorageError when the file cannot be read."""
 
-    def test_find_all_returns_empty_on_load_error(self, tmp_path: Path) -> None:
+    def test_find_all_raises_on_read_error(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
         strategy = _make_json_strategy(tmp_path)
-        with patch.object(strategy.file_manager, "read_file", side_effect=OSError("unreadable")):
-            with patch.object(strategy.file_manager, "recover_from_backup", return_value=False):
-                strategy._cache_valid = False
-                strategy._data_cache = None
-                result = strategy.find_all()
-        assert result == {}
+        strategy._invalidate_cache()
+        with patch.object(
+            strategy.file_manager, "read_file_with_signature", side_effect=OSError("unreadable")
+        ):
+            with pytest.raises(StorageError, match="unreadable"):
+                strategy.find_all()
 
 
 @pytest.mark.unit
@@ -233,28 +235,33 @@ class TestJSONStrategyDeleteException:
 
 @pytest.mark.unit
 class TestJSONStrategyExistsException:
-    """exists() returns False (not raises) when loading fails."""
+    """exists() raises StorageError (not "absent") when loading fails."""
 
-    def test_exists_returns_false_on_load_failure(self, tmp_path: Path) -> None:
+    def test_exists_raises_on_load_failure(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
         strategy = _make_json_strategy(tmp_path)
-        with patch.object(strategy.file_manager, "read_file", side_effect=OSError("cannot read")):
-            with patch.object(strategy.file_manager, "recover_from_backup", return_value=False):
-                result = strategy.exists("e1")
-        assert result is False
+        with patch.object(
+            strategy.file_manager, "read_file_with_signature", side_effect=OSError("cannot read")
+        ):
+            with pytest.raises(StorageError, match="cannot read"):
+                strategy.exists("e1")
 
 
 @pytest.mark.unit
 class TestJSONStrategyFindByCriteriaException:
-    """find_by_criteria() returns empty list when _load_data swallows errors."""
+    """find_by_criteria() raises StorageError when the file cannot be read."""
 
-    def test_find_by_criteria_returns_empty_on_load_error(self, tmp_path: Path) -> None:
+    def test_find_by_criteria_raises_on_load_error(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
         strategy = _make_json_strategy(tmp_path)
-        with patch.object(strategy.file_manager, "read_file", side_effect=OSError("no read")):
-            with patch.object(strategy.file_manager, "recover_from_backup", return_value=False):
-                strategy._cache_valid = False
-                strategy._data_cache = None
-                result = strategy.find_by_criteria({"v": 1})
-        assert result == []
+        strategy._invalidate_cache()
+        with patch.object(
+            strategy.file_manager, "read_file_with_signature", side_effect=OSError("no read")
+        ):
+            with pytest.raises(StorageError, match="no read"):
+                strategy.find_by_criteria({"v": 1})
 
 
 @pytest.mark.unit
@@ -287,52 +294,46 @@ class TestJSONStrategyDeleteBatchException:
 
 @pytest.mark.unit
 class TestJSONStrategyCountException:
-    """count() returns 0 (not raises) on exception."""
+    """count() raises StorageError (not 0) when loading fails."""
 
-    def test_count_returns_zero_on_load_failure(self, tmp_path: Path) -> None:
+    def test_count_raises_on_load_failure(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
         strategy = _make_json_strategy(tmp_path)
-        with patch.object(strategy.file_manager, "read_file", side_effect=OSError("no read")):
-            with patch.object(strategy.file_manager, "recover_from_backup", return_value=False):
-                assert strategy.count() == 0
+        with patch.object(
+            strategy.file_manager, "read_file_with_signature", side_effect=OSError("no read")
+        ):
+            with pytest.raises(StorageError, match="no read"):
+                strategy.count()
 
 
 @pytest.mark.unit
 class TestJSONStrategyLoadDataRecovery:
-    """_load_data recovers from backup when read_file raises."""
+    """_load_data restores a backup only when the file does not parse."""
 
-    def test_load_data_recovers_when_read_fails_and_backup_succeeds(self, tmp_path: Path) -> None:
+    def test_load_data_restores_a_backup_when_the_file_does_not_parse(self, tmp_path: Path) -> None:
         strategy = _make_json_strategy(tmp_path)
         strategy.save("real", {"v": 42})
+        backup = tmp_path / "backups" / "data.backup_20260101_000000.json"
+        backup.parent.mkdir(exist_ok=True)
+        backup.write_text('{"items": {"real": {"v": 42}}}', encoding="utf-8")
+        (tmp_path / "data.json").write_text("{broken", encoding="utf-8")
+        strategy._invalidate_cache()
 
-        # Populate the backup dir so recovery logic can find a file.
-        call_count = {"n": 0}
-        original_read = strategy.file_manager.read_file
+        assert strategy._load_data() == {"real": {"v": 42}}
 
-        def flaky_read():
-            call_count["n"] += 1
-            if call_count["n"] == 1:
-                raise OSError("first read explodes")
-            return original_read()
+    def test_load_data_raises_when_the_read_fails(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
 
-        with patch.object(strategy.file_manager, "read_file", side_effect=flaky_read):
-            with patch.object(strategy.file_manager, "recover_from_backup", return_value=True):
-                # reset cache so _load_data actually reads
-                strategy._cache_valid = False
-                strategy._data_cache = None
-                result = strategy._load_data()
-        # After recovery the second read returns the real data
-        assert isinstance(result, dict)
-
-    def test_load_data_returns_empty_when_recovery_fails(self, tmp_path: Path) -> None:
         strategy = _make_json_strategy(tmp_path)
+        strategy._invalidate_cache()
         with patch.object(
-            strategy.file_manager, "read_file", side_effect=OSError("totally broken")
+            strategy.file_manager,
+            "read_file_with_signature",
+            side_effect=OSError("totally broken"),
         ):
-            with patch.object(strategy.file_manager, "recover_from_backup", return_value=False):
-                strategy._cache_valid = False
-                strategy._data_cache = None
-                result = strategy._load_data()
-        assert result == {}
+            with pytest.raises(StorageError, match="totally broken"):
+                strategy._load_data()
 
 
 @pytest.mark.unit
@@ -488,19 +489,24 @@ class TestFileManagerCleanupOldBackupsOuterException:
 
 
 @pytest.mark.unit
-class TestFileManagerRecoverFromBackupException:
-    """recover_from_backup() catches errors and returns False (lines 326-328)."""
+class TestFileManagerListBackups:
+    """list_backups() returns this file's backups newest first."""
 
-    def test_recover_from_backup_returns_false_on_copy_failure(self, tmp_path: Path) -> None:
+    def test_list_backups_newest_first(self, tmp_path: Path) -> None:
+        import os
+
         from orb.infrastructure.storage.components.file_manager import FileManager
 
         fm = FileManager(str(tmp_path / "data.json"), backup_count=5, backup_enabled=True)
-        fm.write_file("data")
-        fm.create_backup()
+        older = fm.backup_dir / "data.backup_1.json"
+        newer = fm.backup_dir / "data.backup_2.json"
+        older.write_text("{}")
+        newer.write_text("{}")
+        (fm.backup_dir / "other.backup_3.json").write_text("{}")
+        os.utime(older, (1_000_000, 1_000_000))
+        os.utime(newer, (2_000_000, 2_000_000))
 
-        with patch("shutil.copy2", side_effect=OSError("copy error")):
-            result = fm.recover_from_backup()
-        assert result is False
+        assert fm.list_backups() == [newer, older]
 
 
 @pytest.mark.unit
