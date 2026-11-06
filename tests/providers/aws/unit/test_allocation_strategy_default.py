@@ -152,6 +152,10 @@ def _load_hf_template(tmp_path, hf_template: dict[str, Any]) -> AWSTemplate:
 
     strategy = HostFactorySchedulerStrategy()
     strategy._logger = MagicMock()
+    # _apply_template_defaults needs a configured template defaults service.
+    # It is passed through so these tests cover the HostFactory field mapping
+    # and the AWSTemplate default only; a strategy supplied through config
+    # template_defaults is not exercised here.
     with (
         patch.object(
             FieldMappingRegistry,

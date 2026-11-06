@@ -74,6 +74,21 @@ class TestSafeDetails:
         assert result["current_state"]["name"] == "running"
         assert isinstance(result["current_state"]["since"], str)
 
+    def test_circular_safe_value_is_coerced_to_string(self) -> None:
+        state: dict[str, object] = {"name": "running"}
+        state["self"] = state
+
+        result = _safe_details({"current_state": state})
+
+        assert isinstance(result["current_state"], str)
+        assert "running" in result["current_state"]
+        json.dumps(result)
+
+    def test_round_trip_turns_tuples_into_lists_and_keys_into_strings(self) -> None:
+        result = _safe_details({"field": ("a", "b"), "current_state": {1: "x"}})
+
+        assert result == {"field": ["a", "b"], "current_state": {"1": "x"}}
+
     def test_http_envelope_serialises_with_unserialisable_safe_value(self) -> None:
         from orb.infrastructure.error.http_response_handler import HTTPErrorResponseHandler
 

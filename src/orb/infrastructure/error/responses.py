@@ -36,14 +36,23 @@ _SAFE_DETAIL_KEYS: frozenset[str] = frozenset(
 )
 
 
+def _json_safe(value: Any) -> Any:
+    """Return *value* as plain JSON data, or ``str(value)`` if it cannot be encoded."""
+    try:
+        return json.loads(json.dumps(value, default=str))
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def _safe_details(raw: dict[str, Any]) -> dict[str, Any]:
     """Return a JSON-serialisable copy of *raw* with only the keys safe to send to callers.
 
-    Values that JSON cannot encode are converted with ``str()``.
+    Each value goes through a JSON round trip, so tuples become lists and
+    non-string dict keys become strings. Leaf values that JSON cannot encode
+    are converted with ``str()``, and a value that cannot be encoded at all
+    (for example one that refers to itself) is replaced by ``str(value)``.
     """
-    return {
-        k: json.loads(json.dumps(v, default=str)) for k, v in raw.items() if k in _SAFE_DETAIL_KEYS
-    }
+    return {k: _json_safe(v) for k, v in raw.items() if k in _SAFE_DETAIL_KEYS}
 
 
 class InfrastructureErrorResponse(BaseDTO):
