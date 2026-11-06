@@ -56,6 +56,7 @@ class K8sCapabilityService:
             supported_operations=[
                 ProviderOperationType.CREATE_INSTANCES,
                 ProviderOperationType.TERMINATE_INSTANCES,
+                ProviderOperationType.CANCEL_PROVISIONING,
                 ProviderOperationType.GET_INSTANCE_STATUS,
                 ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
                 ProviderOperationType.VALIDATE_TEMPLATE,

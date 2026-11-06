@@ -377,3 +377,19 @@ class TestRequestDTOErrorField:
         dto = RequestDTO.from_domain(request)
         d = dto.to_dict()
         assert "error" not in d
+
+
+def test_quota_errors_keep_the_aws_error_code_in_the_message():
+    from unittest.mock import MagicMock
+
+    from botocore.exceptions import ClientError
+
+    from orb.providers.aws.exceptions.aws_exceptions import QuotaExceededError
+    from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+
+    handler = RunInstancesHandler(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+    for code in ("VcpuLimitExceeded", "InstanceLimitExceeded", "MaxSpotInstanceCountExceeded"):
+        error = ClientError({"Error": {"Code": code, "Message": "You have requested more"}}, "Op")
+        converted = handler._convert_client_error(error)
+        assert isinstance(converted, QuotaExceededError)
+        assert str(converted).startswith(f"{code}:")

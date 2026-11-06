@@ -220,12 +220,27 @@ class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
         10,
         description="Connection timeout in seconds",
     )
-    request_retry_attempts: int = Field(0, description="Number of retry attempts for AWS requests")
+    request_retry_attempts: int = Field(
+        3,
+        ge=0,
+        description=(
+            "Retries ORB makes for a failed EC2 and Auto Scaling call that changes "
+            "state (total calls = value + 1). botocore retries are disabled for those "
+            "clients, so this is the whole retry budget. Only throttling and "
+            "transient errors are retried."
+        ),
+    )
     instance_pending_timeout_sec: int = Field(
         180, description="Timeout for pending instances in seconds"
     )
     describe_request_retry_attempts: int = Field(
-        0, description="Number of retries for status requests"
+        2,
+        ge=0,
+        description=(
+            "Retries ORB makes for a failed read-only EC2 and Auto Scaling call "
+            "(total calls = value + 1). botocore retries are disabled for those "
+            "clients, so this is the whole retry budget."
+        ),
     )
     describe_request_interval: int = Field(0, description="Delay between retries in milliseconds")
 

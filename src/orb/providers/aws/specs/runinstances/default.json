@@ -4,19 +4,27 @@
     "Version": "{{ launch_template_version }}"
   },
   "MinCount": {{ min_count }},
-  "MaxCount": {{ max_count }},
+  "MaxCount": {{ max_count }},{% if default_capacity_type == "spot" %}
+  "InstanceMarketOptions": {
+    "MarketType": "spot"{% if max_spot_price %},
+    "SpotOptions": {
+      "MaxPrice": "{{ max_spot_price }}"
+    }{% endif %}
+  },{% endif %}
   "TagSpecifications": [
+    {% for resource_type in tag_resource_types | default(["instance"]) %}
     {
-      "ResourceType": "instance",
+      "ResourceType": "{{ resource_type }}",
       "Tags": [
         {"Key": "Name", "Value": "{{ instance_name }}"},
         {% for tag in base_tags %}
         {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last or has_custom_tags %},{% endif %}
-        {% endfor %}{% if has_custom_tags %},
+        {% endfor %}{% if has_custom_tags %}
         {% for tag in custom_tags %}
         {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
         {% endfor %}{% endif %}
       ]
-    }
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
   ]
 }

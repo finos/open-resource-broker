@@ -67,8 +67,8 @@ dependencies = [
     # which already works today.  When the second provider lands these will
     # move to the [aws] extra and a major-version bump will signal the
     # breaking change for operators who installed without extras.
-    "boto3>=1.42.21",
-    "botocore>=1.42.21",
+    "boto3>=1.43.3",
+    "botocore>=1.43.3",
     "psutil>=5.9.0", # Required by the system health check (CPU/memory)
 ]
 
@@ -87,8 +87,8 @@ sql = [
 # to the bare install and future-proofs operator install commands for the day
 # AWS deps move out of core.
 aws = [
-    "boto3>=1.42.21",
-    "botocore>=1.42.21",
+    "boto3>=1.43.3",
+    "botocore>=1.43.3",
 ]
 
 # Modern Kubernetes provider — explicit opt-in extra.  Install with:
@@ -133,7 +133,7 @@ all-providers = [
 # Install with: pip install orb-py[k8s-legacy]
 k8s-legacy = [
     "kubernetes>=36.0.0",
-    "boto3>=1.42.21",
+    "boto3>=1.43.3",
     "jinja2>=3.1.0",
     "typing-extensions>=4.0.0",
     "watchdog>=6.0.0",

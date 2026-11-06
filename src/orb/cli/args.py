@@ -557,11 +557,31 @@ def add_provider_actions(subparsers, pp: "ParentParsers | None" = None):
 
     providers_exec = subparsers.add_parser(
         "exec",
-        help="Execute provider command",
-        description="Execute a raw operation against a provider instance.",
+        help="Execute a provider maintenance operation",
+        description=(
+            "Execute an operator-safe maintenance operation against a provider instance. "
+            "Use --list to show the operations each provider instance supports."
+        ),
         parents=[pp.common, pp.list, pp.provider_scope],
     )
-    providers_exec.add_argument("operation", help="Operation to execute")
+    providers_exec.add_argument(
+        "operation",
+        nargs="?",
+        help="Operation to execute (for example cleanup-orphaned-resources)",
+    )
+    providers_exec.add_argument(
+        "--list",
+        dest="list_operations",
+        action="store_true",
+        help="List the operations the selected provider instance (or every instance) supports",
+    )
+    providers_exec.add_argument(
+        "--param",
+        dest="param",
+        action="append",
+        metavar="KEY=VALUE",
+        help="Operation parameter; repeat for several (values are read as JSON when possible)",
+    )
     providers_exec.add_argument(
         "--params", "--args", dest="params", help="Operation parameters (JSON format)"
     )

@@ -307,6 +307,48 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             "Successfully released %d instances using %s handler", len(machine_ids), provider_api
         )
 
+    def cancel_resources(
+        self,
+        provider_api: str,
+        resource_ids: list[str],
+        request_id: str = "",
+        instance_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Abort in-flight provisioning of each resource, one at a time.
+
+        Every resource is attempted even when an earlier one fails, so a retry
+        of a partly failed cancel only has the failed resources left to do.
+
+        Args:
+            provider_api: Provider API of the resources (ASG, EC2Fleet, SpotFleet, ...)
+            resource_ids: Fleet ids, Spot Fleet request ids, ASG names or reservation ids
+            request_id: ORB request id, used for launch template cleanup
+            instance_ids: Instances the provider returned when it created the
+                resources, for handlers that terminate instances directly
+
+        Returns:
+            One ``{"resource_id", "outcome", "message"}`` dict per resource where
+            ``outcome`` is ``aborted``, ``already_gone`` or ``failed``.
+        """
+        handler = self._get_handler_for_provider_api(provider_api)
+        outcomes: list[dict[str, Any]] = []
+        for resource_id in resource_ids:
+            try:
+                result = handler.cancel_resource_with_members(
+                    resource_id, request_id, instance_ids or []
+                )
+            except Exception as exc:
+                result = {"status": "error", "message": str(exc)}
+            if not isinstance(result, dict) or result.get("status") != "success":
+                outcome = "failed"
+            elif result.get("already_gone") is True:
+                outcome = "already_gone"
+            else:
+                outcome = "aborted"
+            message = str(result.get("message", "")) if isinstance(result, dict) else ""
+            outcomes.append({"resource_id": resource_id, "outcome": outcome, "message": message})
+        return outcomes
+
     # No current caller — available for a future health endpoint
     def get_resource_health(self, resource_id: str) -> dict[str, Any]:
         """

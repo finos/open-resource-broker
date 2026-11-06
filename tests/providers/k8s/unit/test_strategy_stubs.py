@@ -334,6 +334,45 @@ async def test_execute_operation_cancel_mode_routes_to_cancel_handler() -> None:
 
 
 @pytest.mark.asyncio
+async def test_execute_operation_cancel_provisioning_reaches_the_same_cancel_handler() -> None:
+    """CANCEL_PROVISIONING and the cancel_mode form of TERMINATE_INSTANCES share one handler."""
+    from unittest.mock import patch
+
+    from orb.providers.base.strategy import ProviderOperation, ProviderResult
+
+    strategy = _make_strategy()
+    cancel_result = ProviderResult.success_result(
+        {"status": "success", "deleted": [], "already_gone": [], "failed": []},
+        {"operation": "cancel_resource"},
+    )
+
+    with (
+        patch.object(
+            strategy, "_handle_cancel_resource", new=AsyncMock(return_value=cancel_result)
+        ) as mock_cancel,
+        patch.object(
+            strategy,
+            "_handle_terminate_instances",
+            new=AsyncMock(return_value=ProviderResult.error_result("wrong", "WRONG_BRANCH")),
+        ) as mock_terminate,
+    ):
+        new_op = ProviderOperation(
+            operation_type=ProviderOperationType.CANCEL_PROVISIONING,
+            parameters={"request_id": "req-1"},
+        )
+        legacy_op = ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={"request_id": "req-1"},
+            context={"cancel_mode": True},
+        )
+        assert (await strategy.execute_operation(new_op)).success is True
+        assert (await strategy.execute_operation(legacy_op)).success is True
+
+    assert mock_cancel.call_count == 2
+    mock_terminate.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_execute_operation_terminate_without_cancel_mode_routes_to_terminate() -> None:
     """Plain TERMINATE_INSTANCES (no cancel_mode) must reach _handle_terminate_instances.
 

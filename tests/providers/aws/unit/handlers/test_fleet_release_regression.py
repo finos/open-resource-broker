@@ -33,7 +33,7 @@ def _make_ec2_fleet_manager() -> tuple[EC2FleetReleaseManager, Mock]:
     aws_ops.terminate_instances_with_fallback = Mock()
     logger = Mock()
 
-    def _direct_retry(func, operation_type: str = "standard", **kwargs):  # type: ignore[return]
+    def _direct_retry(func, operation_type: str = "standard", operation_name=None, **kwargs):  # type: ignore[return]
         return func(**kwargs)
 
     def _noop_paginate(method, result_key, **kwargs):  # type: ignore[return]
@@ -64,7 +64,9 @@ def _make_spot_fleet_manager() -> tuple[SpotFleetReleaseManager, Mock]:
 
     # SpotFleetReleaseManager calls self._aws_ops._retry_with_backoff when present.
     # Stub it to call the function directly so no real retry logic runs.
-    def _direct_retry_with_backoff(func, operation_type: str = "standard", **kwargs):  # type: ignore[return]
+    def _direct_retry_with_backoff(
+        func, operation_type: str = "standard", operation_name=None, **kwargs
+    ):  # type: ignore[return]
         return func(**kwargs)
 
     aws_ops._retry_with_backoff = _direct_retry_with_backoff
@@ -281,4 +283,5 @@ class TestSpotFleetMaintainEnumBug:
             SpotFleetRequestId="sfr-002",
             TargetCapacity=2,
             OnDemandTargetCapacity=0,
+            ExcessCapacityTerminationPolicy="noTermination",
         )

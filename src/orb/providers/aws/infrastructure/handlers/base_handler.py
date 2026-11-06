@@ -7,7 +7,6 @@ and clean integration with our DI/CQRS system.
 """
 
 import asyncio
-import json
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -25,13 +24,14 @@ from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
-from orb.infrastructure.resilience import MaxRetriesExceededError, retry
+from orb.infrastructure.resilience import MaxRetriesExceededError
 from orb.providers.aws.configuration.cleanup_config import CleanupConfig
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (
     AuthorizationError,
     AWSConfigurationError,
     AWSEntityNotFoundError,
+    AWSError,
     AWSValidationError,
     NetworkError,
     QuotaExceededError,
@@ -43,6 +43,10 @@ from orb.providers.aws.infrastructure.handlers.launch_template_cleanup import (
     LaunchTemplateCleanupService,
 )
 from orb.providers.aws.infrastructure.tags import build_resource_tags
+from orb.providers.aws.resilience.call_executor import (
+    EVENTUAL_CONSISTENCY_ERRORS,
+    AWSCallExecutor,
+)
 from orb.providers.base.handler import ProviderHandlerBase
 
 T = TypeVar("T")
@@ -112,8 +116,20 @@ class AWSHandler(ProviderHandlerBase, ABC):
         self.base_delay = 1  # seconds
         self.max_delay = 10  # seconds
 
+        # Single owner of retries, circuit breaking and error shaping.
+        self._call_executor = AWSCallExecutor(
+            logger,
+            handler_type=self._get_service_name(),
+            provider_name=provider_name,
+            config_port=config_port,
+            attempts_provider=self._resolve_retry_attempts,
+            error_converter=self._convert_client_error,
+        )
+
         # Launch-template cleanup is its own concern — extracted to a service.
-        self._lt_cleanup = LaunchTemplateCleanupService(aws_client, config_port, logger)
+        self._lt_cleanup = LaunchTemplateCleanupService(
+            aws_client, config_port, logger, config_port_provider=lambda: self.config_port
+        )
 
         # Setup required dependencies
         self._setup_aws_operations(aws_ops)
@@ -305,6 +321,16 @@ class AWSHandler(ProviderHandlerBase, ABC):
             ``status`` key of ``"success"`` or ``"error"``.
         """
 
+    def cancel_resource_with_members(
+        self, resource_id: str, request_id: str, instance_ids: list[str]
+    ) -> dict[str, Any]:
+        """Cancel a resource, given the instances created for it.
+
+        Fleet and group handlers abort the resource itself and ignore the ids;
+        handlers that launch instances directly override this to terminate them.
+        """
+        return self.cancel_resource(resource_id, request_id)
+
     @classmethod
     @abstractmethod
     def get_example_templates(cls) -> list[Template]:
@@ -323,86 +349,69 @@ class AWSHandler(ProviderHandlerBase, ABC):
         non_retryable_errors: Optional[list[str]] = None,
         log_payload: bool = True,
         log_response: bool = True,
+        operation_name: Optional[str] = None,
+        retryable_errors: Optional[frozenset[str]] = None,
+        preserve_client_error: bool = False,
         **kwargs,
     ) -> T:
         """
-        Execute a function with operation-specific retry and circuit breaker strategy.
+        Execute a function through the shared AWS call executor.
 
         Args:
             func: Function to execute
             *args: Positional arguments for the function
             operation_type: Type of operation (critical, standard, read_only)
-            non_retryable_errors: List of error codes that should not be retried (for compatibility)
+            non_retryable_errors: Error codes attempted once and not counted by the
+                circuit breaker
+            operation_name: Name of the operation (defaults to ``func.__name__``);
+                keys the circuit breaker, so it is required for critical calls whose
+                function has no usable name
+            retryable_errors: Extra error codes retried for this call only
+            preserve_client_error: Raise the original ``ClientError`` rather than a
+                typed domain error
             **kwargs: Keyword arguments for the function
 
         Returns:
             The function's return value
 
         Raises:
-            CircuitBreakerOpenError: When circuit breaker is open
-            The last error encountered after all retries
+            CircuitBreakerOpenError: When the operation's circuit breaker is open
+            The typed domain error once retries are exhausted (the original
+            ``ClientError`` is its ``__cause__``)
         """
-        # Get operation details
-        operation_name = getattr(func, "__name__", "aws_operation")
-        service_name = self._get_service_name()
-
-        # Determine retry strategy based on operation type
-        strategy_config = self._get_retry_strategy_config(
-            operation_type, service_name, operation_name
+        return self._call_executor.execute(
+            func,
+            *args,
+            operation_type=operation_type,
+            operation_name=operation_name,
+            non_retryable_errors=non_retryable_errors,
+            retryable_errors=retryable_errors,
+            preserve_client_error=preserve_client_error,
+            log_payload=log_payload,
+            log_response=log_response,
+            **kwargs,
         )
 
-        operation_name = getattr(func, "__name__", repr(func))
+    def _resolve_retry_attempts(self) -> tuple[int, int]:
+        """Return ``(request_retries, describe_retries)`` from the provider config."""
+        from orb.providers.aws.resilience.call_executor import (
+            DEFAULT_DESCRIBE_RETRY_ATTEMPTS,
+            DEFAULT_REQUEST_RETRY_ATTEMPTS,
+        )
 
-        def _format_debug_data(data: Any) -> str:
-            try:
-                return json.dumps(data, default=str, indent=2, sort_keys=True)
-            except Exception:
-                return str(data)
-
-        # Create retry decorator with appropriate strategy
-        @retry(**strategy_config)
-        def wrapped_operation():
-            """Wrapped operation with retry logic applied."""
-            if log_payload:
-                payload_snapshot = {"args": args, "kwargs": kwargs}
-                self._logger.debug(
-                    "Calling AWS operation %s with payload:\n%s",
-                    operation_name,
-                    _format_debug_data(payload_snapshot),
-                )
-            return func(*args, **kwargs)
-
-        try:
-            result = wrapped_operation()
-            if log_response:
-                self._logger.debug(
-                    "AWS operation %s response:\n%s",
-                    operation_name,
-                    _format_debug_data(result),
-                )
-            return result
-        except Exception as e:
-            # Handle circuit breaker exceptions
-            if hasattr(e, "__class__") and "CircuitBreakerOpenError" in str(type(e)):
-                # Log circuit breaker state and re-raise
-                self._logger.error(
-                    "Circuit breaker OPEN for %s.%s",
-                    service_name,
-                    operation_name,
-                    extra={
-                        "service": service_name,
-                        "operation": operation_name,
-                        "operation_type": operation_type,
-                    },
-                )
-                raise
-
-            # Convert AWS ClientError to domain exception
-            if isinstance(e, ClientError):
-                raise self._convert_client_error(e, operation_name)
-
-            # Re-raise other exceptions as-is
-            raise
+        provider_config = self.aws_client.get_selected_aws_provider_config()
+        # getattr: the selected config may be absent or a loosely typed stand-in
+        request_retries = getattr(provider_config, "request_retry_attempts", None)
+        # getattr: the selected config may be absent or a loosely typed stand-in
+        describe_retries = getattr(provider_config, "describe_request_retry_attempts", None)
+        return (
+            request_retries if isinstance(request_retries, int) else DEFAULT_REQUEST_RETRY_ATTEMPTS,
+            (
+                describe_retries
+                if isinstance(describe_retries, int)
+                else DEFAULT_DESCRIBE_RETRY_ATTEMPTS
+            ),
+        )
 
     def _get_service_name(self) -> str:
         """Get service name from handler class name."""
@@ -416,26 +425,9 @@ class AWSHandler(ProviderHandlerBase, ABC):
             Dictionary with circuit breaker configuration:
             - failure_threshold: Number of failures before opening circuit
             - reset_timeout: Time to wait before attempting recovery (maps from recovery_timeout)
-            - half_open_timeout: Timeout for half-open state (hardcoded until schema updated)
+            - half_open_timeout: Seconds a half-open probe may run before another is admitted
         """
-        defaults = {
-            "failure_threshold": 5,
-            "reset_timeout": 60,
-            "half_open_timeout": 30,  # TODO: add half_open_timeout to CircuitBreakerConfig schema
-        }
-
-        if self.config_port is None:
-            return defaults
-
-        try:
-            cb_config = self.config_port.app_config.circuit_breaker
-            return {
-                "failure_threshold": cb_config.failure_threshold,
-                "reset_timeout": cb_config.recovery_timeout,  # Schema uses recovery_timeout
-                "half_open_timeout": 30,  # TODO: add half_open_timeout to CircuitBreakerConfig schema
-            }
-        except AttributeError:
-            return defaults
+        return self._call_executor.circuit_breaker_config()
 
     def _get_retry_strategy_config(
         self,
@@ -454,57 +446,7 @@ class AWSHandler(ProviderHandlerBase, ABC):
         Returns:
             Dictionary with retry configuration
         """
-        # Define critical operations that need circuit breaker
-        critical_operations = {
-            "create_fleet",
-            "request_spot_fleet",
-            "create_auto_scaling_group",
-            "run_instances",
-            "modify_fleet",
-            "delete_fleets",
-            "cancel_spot_fleet_requests",
-            "update_auto_scaling_group",
-            "delete_auto_scaling_group",
-        }
-
-        # Auto-detect critical operations if not explicitly specified
-        if (
-            operation_type == "standard"
-            and operation_name
-            and operation_name in critical_operations
-        ):
-            operation_type = "critical"
-            self._logger.debug("Auto-detected critical operation: %s", operation_name)
-
-        if operation_type == "critical":
-            # Use circuit breaker for critical operations
-            return {
-                "strategy": "circuit_breaker",
-                "service": service_name,
-                "max_attempts": 3,
-                "base_delay": 1.0,
-                "max_delay": 30.0,
-                "jitter": True,
-                **self._get_circuit_breaker_config(),
-            }
-        elif operation_type == "read_only":
-            # Use lighter retry for read operations
-            return {
-                "strategy": "exponential",
-                "service": service_name,
-                "max_attempts": 2,
-                "base_delay": 0.5,
-                "max_delay": 10.0,
-            }
-        else:
-            # Standard exponential backoff for regular operations
-            return {
-                "strategy": "exponential",
-                "service": service_name,
-                "max_attempts": 3,
-                "base_delay": 1.0,
-                "max_delay": 30.0,
-            }
+        return self._call_executor.strategy_config(operation_type, operation_name)
 
     # Pattern matching AWS temporary credential access key prefixes — strip if
     # accidentally included in an error message.
@@ -549,7 +491,7 @@ class AWSHandler(ProviderHandlerBase, ABC):
             "ServiceQuotaExceededException",
             "ResourceCountExceeded",
         ]:
-            return QuotaExceededError(error_message, **aws_kwargs)
+            return QuotaExceededError(f"{error_code}: {error_message}", **aws_kwargs)
         elif error_code == "ResourceInUse":
             return ResourceInUseError(error_message, **aws_kwargs)
         elif error_code in ["UnauthorizedOperation", "AccessDenied"]:
@@ -703,6 +645,10 @@ class AWSHandler(ProviderHandlerBase, ABC):
             response = self._retry_with_backoff(
                 lambda: self.aws_client.ec2_client.describe_instances(InstanceIds=instance_ids),
                 operation_type="read_only",
+                operation_name="describe_instances",
+                # Instances just returned by a launch can be briefly unknown to
+                # describe calls keyed by instance id.
+                retryable_errors=EVENTUAL_CONSISTENCY_ERRORS,
             )
 
             instances: list[dict[str, Any]] = []
@@ -769,6 +715,10 @@ class AWSHandler(ProviderHandlerBase, ABC):
             error = self._convert_client_error(cause)
             self._logger.error("Failed to get instance details: %s", str(error))
             raise error
+        except AWSError as e:
+            # Already typed by the retry executor (rate limit, not found, ...).
+            self._logger.error("Failed to get instance details: %s", str(e))
+            raise
         except Exception as e:
             self._logger.error("Unexpected error getting instance details: %s", str(e))
             raise InfrastructureError(f"Failed to get instance details: {e!s}")
@@ -917,10 +867,10 @@ class AWSHandler(ProviderHandlerBase, ABC):
     ) -> None:
         """Delete the ORB-managed launch template when a resource reaches zero capacity.
 
-        Reads the cleanup config via :class:`LaunchTemplateCleanupService`, checks
-        that cleanup is enabled and that the resource type is included in the
-        ``resources`` allow-list, then delegates to ``_delete_orb_launch_template``.
-        All failures are warning-only so that cleanup never blocks the main return flow.
+        Delegates to :class:`LaunchTemplateCleanupService`, which checks that cleanup
+        is enabled and that the resource type is in the ``resources`` allow-list, deletes
+        the ORB-managed template and removes the versions ORB added to a user-provided
+        one. All failures are warning-only so that cleanup never blocks the return flow.
 
         Args:
             resource_type: Cleanup config resource key, e.g. ``"asg"``,
@@ -929,22 +879,12 @@ class AWSHandler(ProviderHandlerBase, ABC):
             exclude_instance_ids: Instances just submitted for termination; ignored
                 when checking whether the request still has live instances.
         """
-        if self.config_port is None:
-            return
-
-        try:
-            cleanup = self._get_cleanup_config()
-        except Exception as e:
-            self._logger.warning("Failed to read cleanup config, skipping cleanup: %s", e)
-            return
-
-        if not cleanup.enabled:
-            return
-
-        if not getattr(cleanup.resources, resource_type, True):
-            return
-
-        self._delete_orb_launch_template(request_id, exclude_instance_ids)
+        self._lt_cleanup.cleanup_on_zero_capacity(
+            resource_type,
+            request_id,
+            exclude_instance_ids,
+            delete_template=self._delete_orb_launch_template,
+        )
 
     def _delete_orb_launch_template(
         self, request_id: str, exclude_instance_ids: Optional[Iterable[str]] = None

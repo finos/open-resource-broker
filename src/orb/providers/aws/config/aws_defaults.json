@@ -50,7 +50,7 @@
           },
           "RunInstances": {
             "handler_class": "RunInstancesHandler",
-            "supports_spot": false,
+            "supports_spot": true,
             "supports_ondemand": true
           },
           "MicroVM": {

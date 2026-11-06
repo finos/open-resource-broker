@@ -76,7 +76,7 @@ class AWSHandlerConfig:
             "RunInstances": AWSHandlerCapabilities(
                 supported_fleet_types=[],
                 default_fleet_type=None,
-                supports_spot=False,
+                supports_spot=True,
                 supports_on_demand=True,
             ),
             "MicroVM": AWSHandlerCapabilities(

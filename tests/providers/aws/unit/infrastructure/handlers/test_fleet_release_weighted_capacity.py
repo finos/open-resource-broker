@@ -35,7 +35,7 @@ def _make_ec2_release_manager(ec2_client_mock: Any = None) -> EC2FleetReleaseMan
     aws_ops = MagicMock()
     aws_ops.terminate_instances_with_fallback = MagicMock()
 
-    def identity_retry(fn, operation_type="standard", **kwargs):
+    def identity_retry(fn, operation_type="standard", operation_name=None, **kwargs):
         if callable(fn) and not kwargs:
             return fn()
         return fn(**kwargs)
@@ -67,7 +67,7 @@ def _make_spot_release_manager(ec2_client_mock: Any = None) -> SpotFleetReleaseM
     aws_ops = MagicMock()
     aws_ops.terminate_instances_with_fallback = MagicMock()
 
-    def identity_retry(fn, operation_type="standard", **kwargs):
+    def identity_retry(fn, operation_type="standard", operation_name=None, **kwargs):
         if callable(fn) and not kwargs:
             return fn()
         return fn(**kwargs)
@@ -310,6 +310,7 @@ class TestEC2FleetReleaseWeighted:
         ec2.modify_fleet.assert_called_once_with(
             FleetId="fleet-weighted",
             TargetCapacitySpecification={"TotalTargetCapacity": 0},
+            ExcessCapacityTerminationPolicy="no-termination",
         )
 
     def test_maintain_fleet_partial_return_uses_weighted_sum(self):
@@ -339,6 +340,7 @@ class TestEC2FleetReleaseWeighted:
         ec2.modify_fleet.assert_called_once_with(
             FleetId="fleet-partial",
             TargetCapacitySpecification={"TotalTargetCapacity": 4},
+            ExcessCapacityTerminationPolicy="no-termination",
         )
 
     def test_request_fleet_partial_return_does_not_delete_on_empty_describe_response(self):
@@ -526,6 +528,7 @@ class TestSpotFleetReleaseWeighted:
             SpotFleetRequestId="sfr-weighted",
             TargetCapacity=0,
             OnDemandTargetCapacity=0,
+            ExcessCapacityTerminationPolicy="noTermination",
         )
 
     def test_partial_spot_release_uses_weighted_sum(self):
@@ -562,6 +565,7 @@ class TestSpotFleetReleaseWeighted:
             SpotFleetRequestId="sfr-partial",
             TargetCapacity=4,
             OnDemandTargetCapacity=0,
+            ExcessCapacityTerminationPolicy="noTermination",
         )
 
     def test_request_fleet_partial_return_does_not_cancel_on_empty_describe_response(self):
@@ -797,7 +801,7 @@ class TestPrimaryCancelPathGating:
         # maintain fleet, is_full_return=True, requires_capacity_reduction=True → cancelled.
         ec2.cancel_spot_fleet_requests.assert_called_once_with(
             SpotFleetRequestIds=["sfr-maintain-full"],
-            TerminateInstances=False,
+            TerminateInstances=True,
         )
 
     # -- EC2Fleet --------------------------------------------------------

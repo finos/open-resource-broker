@@ -209,6 +209,32 @@ def _render_machine_detail(
     return rfs.format_machine_detail(out.machine.to_dict())
 
 
+def _render_cancel_request(
+    rfs: ResponseFormattingService, out: CancelRequestOutput
+) -> InterfaceResponse:
+    """Render a cancel result, adding the per-resource abort outcomes when there are any."""
+    response = rfs.format_request_operation(
+        {"request_id": out.request_id, "status": out.status},
+        out.status,
+    )
+    if (
+        out.cancel_effective
+        and out.status != "cancelled"
+        and isinstance(response.data, dict)
+        and "message" in response.data
+    ):
+        # The request had already settled (partial, timeout); its status is reported as
+        # it is, but the usual message for that status says nothing about the cancel.
+        response.data["message"] = (
+            f"Request cancelled; its provisioning was aborted (it had settled as {out.status})"
+        )
+    first = out.requests[0] if out.requests else {}
+    provider_abort = first.get("provider_abort") if isinstance(first, dict) else None
+    if isinstance(provider_abort, list) and provider_abort and isinstance(response.data, dict):
+        response.data["provider_abort"] = provider_abort
+    return response
+
+
 def _render_machine_operation(
     rfs: ResponseFormattingService, out: GetMachineOutput
 ) -> InterfaceResponse:
@@ -318,10 +344,7 @@ OPERATION_CATALOG: dict[str, CatalogEntry[Any, Any]] = {
         orchestrator=CancelRequestOrchestrator,
         input_dto=CancelRequestInput,
         output_dto=CancelRequestOutput,
-        render=lambda rfs, out: rfs.format_request_operation(
-            {"request_id": out.request_id, "status": out.status},
-            out.status,
-        ),
+        render=_render_cancel_request,
         exposed_on=frozenset({_CLI, _REST, _MCP, _SDK}),
     ),
     "list_machines": CatalogEntry(

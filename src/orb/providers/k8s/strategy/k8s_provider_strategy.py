@@ -649,14 +649,16 @@ class K8sProviderStrategy(ProviderStrategy):
                 )
             elif operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
                 result = await self._handle_create_instances(operation)
-            elif operation.operation_type == ProviderOperationType.TERMINATE_INSTANCES and (
-                operation.context or {}
-            ).get("cancel_mode"):
-                # cancel_mode: in-flight cancel before pods exist — delete
-                # workloads by orb.io/request-id label rather than by pod name.
-                # This branch must precede the plain TERMINATE_INSTANCES branch
-                # so that cancel-path operations are not silently routed to the
-                # normal deprovisioning handler.
+            elif operation.operation_type == ProviderOperationType.CANCEL_PROVISIONING or (
+                operation.operation_type == ProviderOperationType.TERMINATE_INSTANCES
+                and (operation.context or {}).get("cancel_mode")
+            ):
+                # In-flight cancel before pods exist — delete workloads by
+                # orb.io/request-id label rather than by pod name. The
+                # ``cancel_mode`` form of TERMINATE_INSTANCES is kept for existing
+                # callers. This branch must precede the plain TERMINATE_INSTANCES
+                # branch so that cancel-path operations are not silently routed to
+                # the normal deprovisioning handler.
                 result = await self._handle_cancel_resource(operation)
             elif operation.operation_type == ProviderOperationType.TERMINATE_INSTANCES:
                 result = await self._handle_terminate_instances(operation)

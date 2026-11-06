@@ -237,6 +237,18 @@ Instant fleets are a special case: AWS deletes the fleet record itself, so there
 
 If any fleet in a multi-fleet return fails to release, the whole return raises after the other fleets are processed.
 
+When a `maintain` fleet shrinks, ORB passes `ExcessCapacityTerminationPolicy: no-termination` to `modify_fleet`. The returned instances are terminated explicitly, and only those: without the policy a fleet that still counts an instance that is already terminating would pick another instance to terminate when its target drops, and then launch a replacement. The current target is read again immediately before it is lowered. That narrows, but cannot close, the window in which two returns on the same fleet overwrite each other, because the API has no compare-and-set. A returned instance the fleet does not list yet still counts as one unit, so a freshly launched instance never leaves capacity behind; after a failed terminate, retrying the return can therefore lower the target further than needed, which errs towards less capacity rather than a relaunch.
+
+A fleet that is already deleted is not modified or deleted again by a later return: its instances are terminated and the launch template is cleaned up.
+
+## Cancelling a request
+
+Cancelling a request that is still being fulfilled calls `delete_fleets` with `TerminateInstances: true` for every fleet of the request. That single call stops further launches and terminates the members of `request`, `maintain` and `instant` fleets alike, so capacity is not reduced first. The result is `aborted`, or `already_gone` when the fleet is already deleted or no longer exists; entries that AWS reports as unsuccessful make the cancel fail unless a describe confirms the fleet is deleted.
+
+An `instant` fleet has nothing in flight: its instances are part of the create response, so the return of those machines is what tears it down, and the delete is harmless.
+
+Instances that are still attached to the fleet after it was deleted are found with the `aws:ec2:fleet-id` tag, limited to instances that are pending, running, stopping, stopped or shutting down, and returned together with the machines already recorded.
+
 ## IAM permissions
 
 ```json

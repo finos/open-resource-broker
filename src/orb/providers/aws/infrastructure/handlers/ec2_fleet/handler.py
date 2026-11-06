@@ -26,6 +26,7 @@ Note:
     launches and is suitable for large-scale, complex deployments.
 """
 
+import uuid
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
@@ -259,11 +260,16 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             launch_template_version=launch_template_result.version,
         )
 
+        # One idempotency token per logical call, reused by every retry attempt, so
+        # a retry after a lost response cannot create a second fleet.
+        fleet_config.setdefault("ClientToken", uuid.uuid4().hex)
+
         # Create the fleet with circuit breaker for critical operation
         try:
             response = self._retry_with_backoff(
                 self.aws_client.ec2_client.create_fleet,
                 operation_type="critical",
+                operation_name="create_fleet",
                 **fleet_config,
             )
 
@@ -902,8 +908,14 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             Dictionary with ``status`` of ``"success"`` or ``"error"``.
         """
         try:
-            self._fleet_release_manager.release(resource_id, [], {}, request_id=request_id)
-            return {"status": "success", "message": f"EC2 Fleet {resource_id} cancelled"}
+            already_gone = self._fleet_release_manager.release(
+                resource_id, [], {}, request_id=request_id
+            )
+            return {
+                "status": "success",
+                "already_gone": already_gone is True,
+                "message": f"EC2 Fleet {resource_id} cancelled",
+            }
         except Exception as e:
             emit_alert(
                 self._logger,

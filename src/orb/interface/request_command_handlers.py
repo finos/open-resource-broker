@@ -330,13 +330,18 @@ async def handle_cancel_request(
 
     response = entry.renderer_for(Interface.CLI)(formatter, result)
     if (
-        getattr(result, "status", None) == "cancelled"
+        (
+            getattr(result, "cancel_effective", False)
+            or getattr(result, "status", None) == "cancelled"
+        )
         and hasattr(response, "exit_code")
         and response.exit_code != 0
     ):
-        # A cancel that succeeded must exit 0. The generic request-status mapping
-        # treats "cancelled" as a problem state, which is right when polling a
-        # request but wrong for the command that just cancelled it.
+        # A cancel that took effect must exit 0. The generic request-status mapping
+        # treats "cancelled" (and the settled partial / timeout states) as problem
+        # states, which is right when polling a request but wrong for the command
+        # that just cancelled it. The response still reports the request's true
+        # status.
         response = dataclasses.replace(response, exit_code=0)
     return response
 

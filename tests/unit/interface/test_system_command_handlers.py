@@ -69,15 +69,6 @@ class TestStubHandlers:
 
         assert isinstance(result, InterfaceResponse)
 
-    @pytest.mark.asyncio
-    async def test_handle_execute_provider_operation_returns_not_implemented(self):
-        from orb.interface.system_command_handlers import handle_execute_provider_operation
-
-        result = await handle_execute_provider_operation(_ns())
-
-        assert isinstance(result, dict)
-        assert result.get("error") == "Not implemented"
-
 
 # ---------------------------------------------------------------------------
 # CQRS handlers — assert correct query type dispatched

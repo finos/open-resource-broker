@@ -6,7 +6,7 @@ All AWS calls are mocked; no real AWS connections are made.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from botocore.exceptions import ClientError
@@ -32,7 +32,7 @@ def _client_error(code: str, op: str = "Op") -> ClientError:
     return ClientError({"Error": {"Code": code, "Message": "m"}}, op)
 
 
-def _direct_retry(fn, *args, operation_type="standard", **kwargs):
+def _direct_retry(fn, *args, operation_type="standard", operation_name=None, **kwargs):
     return fn(*args, **kwargs)
 
 
@@ -103,7 +103,8 @@ class TestRunInstancesCancel:
         handler = _run_instances_handler()
         handler.aws_client.ec2_client.describe_instances.return_value = {"Reservations": []}
 
-        result = handler.cancel_resource("r-1", "req-1")
+        with patch("orb.providers.aws.infrastructure.handlers.run_instances.handler.time.sleep"):
+            result = handler.cancel_resource("r-1", "req-1")
 
         assert result["status"] == "success"
         assert "unverified" in result["message"]
@@ -111,7 +112,10 @@ class TestRunInstancesCancel:
         assert warning.kwargs["extra"]["event"] == "aws.cancel_unverified"
         handler.aws_ops.terminate_instances_with_fallback.assert_not_called()
         handler._cleanup_on_zero_capacity.assert_not_called()
-        assert handler.aws_client.ec2_client.describe_instances.call_count == 1
+        # An empty lookup is retried a bounded number of times before it is given up.
+        assert handler.aws_client.ec2_client.describe_instances.call_count == (
+            1 + RunInstancesHandler._CANCEL_LOOKUP_RETRIES
+        )
 
     def test_reservation_not_found_is_treated_as_empty(self):
         handler = _run_instances_handler()
@@ -119,7 +123,8 @@ class TestRunInstancesCancel:
             "InvalidReservationID.NotFound"
         )
 
-        result = handler.cancel_resource("r-1", "req-1")
+        with patch("orb.providers.aws.infrastructure.handlers.run_instances.handler.time.sleep"):
+            result = handler.cancel_resource("r-1", "req-1")
 
         assert result["status"] == "success"
         assert "unverified" in result["message"]
@@ -371,7 +376,7 @@ class TestAsgDelete:
             if calls["n"] == 1:
                 raise _client_error("ScalingActivityInProgress")
 
-        def retry(fn, *a, operation_type="standard", **kw):
+        def retry(fn, *a, operation_type="standard", operation_name=None, **kw):
             try:
                 return fn(**kw)
             except ClientError:
@@ -467,7 +472,7 @@ class TestPostTerminateFleetTeardown:
         mgr = self._manager()
         attempts = {"n": 0}
 
-        def retry(fn, operation_type="standard", **kw):
+        def retry(fn, operation_type="standard", operation_name=None, **kw):
             attempts["n"] += 1
             if attempts["n"] == 1:
                 try:
@@ -672,14 +677,12 @@ class TestFleetDeleteAlertCarriesRequestId:
         assert [a["request_id"] for a in alerts] == ["req-ec2-3"]
 
 
-class TestProviderCancelIsNotWired:
-    def test_application_layer_does_not_call_provider_cancel(self):
-        """Provider-side cancel has no production caller yet.
+class TestProviderCancelIsReachedOnlyThroughTheProviderOperation:
+    def test_application_layer_does_not_call_a_handler_cancel_directly(self):
+        """The application layer aborts provisioning through the provider operation.
 
-        Request cancellation only returns known machines and flips state;
-        aborting in-flight fleets that have no machines yet is not wired. If
-        a caller is added, this guard must be revisited together with the
-        error contract of ``cancel_resource``.
+        Handlers' ``cancel_resource`` is provider-internal; the application layer
+        reaches it only through ``CANCEL_PROVISIONING`` so the layering stays intact.
         """
         from pathlib import Path
 
@@ -690,8 +693,22 @@ class TestProviderCancelIsNotWired:
             str(path.relative_to(root))
             for sub in ("application", "api", "interface")
             for path in (root / sub).rglob("*.py")
+            if ".cancel_resource(" in path.read_text(encoding="utf-8")
+        ]
+        assert offenders == []
+
+    def test_the_unchecked_request_adapter_cancel_path_is_gone(self):
+        """The adapter's own cancel indexed ``SuccessfulFleetDeletions`` unchecked and
+        ignored unsuccessful entries; the provider operation replaces it."""
+        from pathlib import Path
+
+        import orb
+
+        root = Path(orb.__file__).parent
+        offenders = [
+            str(path.relative_to(root))
+            for path in root.rglob("*.py")
             if "cancel_fleet_request" in path.read_text(encoding="utf-8")
-            or ".cancel_resource(" in path.read_text(encoding="utf-8")
         ]
         assert offenders == []
 

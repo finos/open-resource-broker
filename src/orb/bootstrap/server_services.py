@@ -49,6 +49,7 @@ def _register_orchestrators(container: DIContainer) -> None:
     """Register orchestrators with dependency injection."""
     try:
         from orb.domain.base.ports.logging_port import LoggingPort
+        from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
         from orb.infrastructure.di.buses import CommandBus, QueryBus
     except ImportError as e:
         logger.debug("Orchestrator dependencies not available: %s", e)
@@ -131,6 +132,7 @@ def _register_orchestrators(container: DIContainer) -> None:
                     query_bus=c.get(QueryBus),
                     return_orchestrator=c.get(ReturnMachinesOrchestrator),
                     logger=c.get(LoggingPort),
+                    provider_selection_port=c.get(ProviderSelectionPort),
                 ),
             )
     except ImportError:

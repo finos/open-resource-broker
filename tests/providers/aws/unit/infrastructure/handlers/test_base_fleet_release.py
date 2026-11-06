@@ -43,7 +43,7 @@ class _ConcreteFleetReleaseManager(BaseFleetReleaseManager):
             request_adapter=None,
             cleanup_on_zero_capacity_fn=cleanup_fn,
             logger=logger,
-            retry_fn=lambda fn, operation_type="standard", **kw: fn(**kw),
+            retry_fn=lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw),
         )
 
         # Expose concrete mock handles for test assertions.

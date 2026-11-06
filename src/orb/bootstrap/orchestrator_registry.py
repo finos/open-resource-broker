@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import DIContainer
 
@@ -103,6 +104,7 @@ def register_orchestrators(container: DIContainer) -> None:
                 query_bus=c.get(QueryBus),
                 return_orchestrator=c.get(ReturnMachinesOrchestrator),
                 logger=c.get(LoggingPort),
+                provider_selection_port=c.get(ProviderSelectionPort),
             ),
         )
     if not container.is_registered(ListMachinesOrchestrator):

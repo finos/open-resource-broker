@@ -292,6 +292,29 @@ async def handle_provider_get(args) -> dict[str, Any]:
         return {"error": True, "message": f"Failed to get provider: {e}", "exit_code": 1}
 
 
+def _with_supported_operations(container: Any, response: InterfaceResponse) -> InterfaceResponse:
+    """Add the operations the provider instance declares, when its strategy is available."""
+    from orb.domain.base.ports import ProviderSelectionPort
+
+    data = response.data
+    if not isinstance(data, dict) or not data.get("name"):
+        return response
+    try:
+        capabilities = container.get(ProviderSelectionPort).get_strategy_capabilities(data["name"])
+        operations = [
+            str(getattr(op, "value", op))
+            for op in getattr(capabilities, "supported_operations", [])
+        ]
+    except Exception as exc:  # the detail view must not fail because a strategy is unavailable
+        logger.debug("Could not read supported operations for %s: %s", data["name"], exc)
+        return response
+    if capabilities is None:
+        return response
+    return InterfaceResponse(
+        data={**data, "supported_operations": operations}, exit_code=response.exit_code
+    )
+
+
 async def handle_provider_show(args) -> dict[str, Any] | InterfaceResponse:
     """Handle orb providers show command."""
     try:
@@ -327,15 +350,21 @@ async def handle_provider_show(args) -> dict[str, Any] | InterfaceResponse:
             provider = next((p for p in providers if p["name"] == args.provider_name), None)
             if not provider:
                 return formatter.format_error(f"Provider '{args.provider_name}' not found")
-            return formatter.format_provider_detail(_build_provider_dict(provider))
+            return _with_supported_operations(
+                container, formatter.format_provider_detail(_build_provider_dict(provider))
+            )
         else:
             default_provider = config.get("provider", {}).get("default_provider")
             if default_provider:
                 for p in providers:
                     if p["name"] == default_provider:
-                        return formatter.format_provider_detail(_build_provider_dict(p))
+                        return _with_supported_operations(
+                            container, formatter.format_provider_detail(_build_provider_dict(p))
+                        )
             if providers:
-                return formatter.format_provider_detail(_build_provider_dict(providers[0]))
+                return _with_supported_operations(
+                    container, formatter.format_provider_detail(_build_provider_dict(providers[0]))
+                )
             return formatter.format_error("No providers configured")
 
     except Exception as e:

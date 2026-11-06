@@ -129,7 +129,7 @@ class AWSOperations:
             raise ValueError("Retry method not set. Call set_retry_method first.")
         ec2_client = self.aws_client.ec2_client
 
-        def terminate() -> Any:
+        def terminate_instances() -> Any:
             try:
                 return ec2_client.terminate_instances(InstanceIds=instance_ids)
             except ClientError as e:
@@ -137,7 +137,7 @@ class AWSOperations:
                     return e
                 raise
 
-        result = self._retry_with_backoff(terminate, operation_type="critical")
+        result = self._retry_with_backoff(terminate_instances, operation_type="critical")
         if isinstance(result, ClientError):
             raise result
         return result

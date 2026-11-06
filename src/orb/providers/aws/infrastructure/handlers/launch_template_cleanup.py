@@ -12,7 +12,7 @@ thin delegation wrappers (``_get_cleanup_config``, ``_cleanup_on_zero_capacity``
 are unaffected.
 """
 
-from typing import Iterable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from botocore.exceptions import ClientError
 
@@ -40,10 +40,29 @@ class LaunchTemplateCleanupService:
         aws_client: AWSClient,
         config_port: Optional[ConfigurationPort],
         logger: LoggingPort,
+        config_port_provider: Optional[Callable[[], Optional[ConfigurationPort]]] = None,
     ) -> None:
         self._aws_client = aws_client
-        self._config_port = config_port
+        self._fixed_config_port = config_port
+        self._config_port_provider = config_port_provider
         self._logger = logger
+
+    @property
+    def _config_port(self) -> Optional[ConfigurationPort]:
+        """The configuration port, read when used.
+
+        A handler's port can be injected after the handler is built, so a snapshot
+        taken at construction would keep cleanup disabled; a provider callable, when
+        given, is asked every time.
+        """
+        if self._config_port_provider is not None:
+            return self._config_port_provider()
+        return self._fixed_config_port
+
+    @_config_port.setter
+    def _config_port(self, value: Optional[ConfigurationPort]) -> None:
+        self._fixed_config_port = value
+        self._config_port_provider = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -73,8 +92,12 @@ class LaunchTemplateCleanupService:
         resource_type: str,
         request_id: str,
         exclude_instance_ids: Optional[Iterable[str]] = None,
+        delete_template: Optional[Callable[..., None]] = None,
     ) -> None:
         """Delete the ORB-managed launch template when a resource reaches zero capacity.
+
+        Also deletes the versions ORB added to a user-provided launch template for
+        the request. This is the single return-path entry point for both.
 
         Reads the cleanup config, checks that cleanup is enabled and that the
         resource type is included in the ``resources`` allow-list, then delegates
@@ -87,6 +110,8 @@ class LaunchTemplateCleanupService:
             request_id: The ORB request ID used to locate the launch template.
             exclude_instance_ids: Instances just submitted for termination;
                 they are treated as gone even if a describe still shows them.
+            delete_template: Callable that deletes the ORB-managed template; defaults
+                to :meth:`delete_orb_launch_template`. Handlers pass their own wrapper.
         """
         if self._config_port is None:
             return
@@ -103,7 +128,8 @@ class LaunchTemplateCleanupService:
         if not getattr(cleanup.resources, resource_type, True):
             return
 
-        self.delete_orb_launch_template(request_id, exclude_instance_ids)
+        (delete_template or self.delete_orb_launch_template)(request_id, exclude_instance_ids)
+        self.delete_orb_template_versions(request_id, exclude_instance_ids)
 
     # Instances in these states still belong to the request. ``shutting-down``
     # is excluded: it is the in-flight tail of a return that already happened.
@@ -281,4 +307,137 @@ class LaunchTemplateCleanupService:
                 "Unexpected error cleaning up launch templates for request %s: %s",
                 request_id,
                 e,
+            )
+
+    def delete_orb_template_versions(
+        self, request_id: str, released_instance_ids: Optional[Iterable[str]] = None
+    ) -> None:
+        """Delete the versions ORB created on user-provided launch templates for a request.
+
+        When a template supplies a launch template and overrides, ORB adds a
+        version to the user's template for each request; the template itself is
+        never ORB's to delete, so without this the versions accumulate toward
+        the per-template version limit.
+
+        The versions are found from the instances that were just released: EC2
+        stamps each instance with the launch template id and version it started
+        from. A version is deleted only when all of these hold:
+
+        * its template is not ORB-managed (those are removed as a whole),
+        * it is not the default version,
+        * its description is exactly the one ORB writes for this request,
+        * the request has no live instance left.
+
+        User-created versions therefore never match. All failures are
+        warning-only so the cleanup cannot block the return flow.
+        """
+        released = list(released_instance_ids or ())
+        if not released or self._config_port is None:
+            return
+        try:
+            cleanup = self.get_cleanup_config()
+        except Exception as e:
+            self._logger.warning("Could not read cleanup config, skipping version cleanup: %s", e)
+            return
+        if not cleanup.enabled or not cleanup.delete_launch_template:
+            return
+        if self._request_has_live_instances(request_id, released):
+            return
+
+        try:
+            used = self._launch_template_versions_of(released)
+            description = f"Override for request {request_id}"
+            for lt_id, versions in used.items():
+                if self._is_orb_managed_template(lt_id):
+                    continue
+                orb_versions = [
+                    v for v in sorted(versions) if self._version_is_orbs(lt_id, v, description)
+                ]
+                if not orb_versions:
+                    continue
+                if cleanup.dry_run:
+                    self._logger.info(
+                        "[dry-run] Would delete versions %s of launch template %s for request %s",
+                        orb_versions,
+                        lt_id,
+                        request_id,
+                    )
+                    continue
+                self._delete_versions(lt_id, orb_versions, request_id)
+        except Exception as e:
+            self._logger.warning(
+                "Unexpected error cleaning up launch template versions for request %s: %s",
+                request_id,
+                e,
+            )
+
+    def _launch_template_versions_of(self, instance_ids: list[str]) -> dict[str, set[str]]:
+        """Return ``{launch template id: {version}}`` read from the instances' EC2 tags."""
+        used: dict[str, set[str]] = {}
+        response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
+        for reservation in response.get("Reservations", []):
+            for instance in reservation.get("Instances", []):
+                tags = {t["Key"]: t["Value"] for t in instance.get("Tags", [])}
+                lt_id = tags.get("aws:ec2launchtemplate:id")
+                version = tags.get("aws:ec2launchtemplate:version")
+                if lt_id and version and version.isdigit():
+                    used.setdefault(lt_id, set()).add(version)
+        return used
+
+    def _is_orb_managed_template(self, launch_template_id: str) -> bool:
+        response = self._aws_client.ec2_client.describe_launch_templates(
+            LaunchTemplateIds=[launch_template_id]
+        )
+        for template in response.get("LaunchTemplates", []):
+            tags = {t["Key"]: t["Value"] for t in template.get("Tags", [])}
+            if tags.get("orb:managed-by") == "open-resource-broker":
+                return True
+        return False
+
+    def _version_is_orbs(self, launch_template_id: str, version: str, description: str) -> bool:
+        """True for a non-default version carrying exactly the description ORB wrote."""
+        response: Any = self._aws_client.ec2_client.describe_launch_template_versions(
+            LaunchTemplateId=launch_template_id, Versions=[version]
+        )
+        for entry in response.get("LaunchTemplateVersions", []):
+            if entry.get("DefaultVersion"):
+                return False
+            if entry.get("VersionDescription") == description:
+                return True
+        return False
+
+    def _delete_versions(
+        self, launch_template_id: str, versions: list[str], request_id: str
+    ) -> None:
+        try:
+            response = self._aws_client.ec2_client.delete_launch_template_versions(
+                LaunchTemplateId=launch_template_id, Versions=versions
+            )
+        except ClientError as e:
+            self._logger.warning(
+                "Failed to delete versions %s of launch template %s for request %s: %s",
+                versions,
+                launch_template_id,
+                request_id,
+                e,
+            )
+            return
+        failed = response.get("UnsuccessfullyDeletedLaunchTemplateVersions", [])
+        for entry in failed:
+            self._logger.warning(
+                "Launch template %s version %s was not deleted for request %s: %s",
+                launch_template_id,
+                entry.get("VersionNumber"),
+                request_id,
+                (entry.get("ResponseError") or {}).get("Message", "unknown reason"),
+            )
+        deleted = [
+            v for v in versions if str(v) not in {str(f.get("VersionNumber")) for f in failed}
+        ]
+        if deleted:
+            self._logger.info(
+                "Deleted versions %s of launch template %s for request %s",
+                deleted,
+                launch_template_id,
+                request_id,
             )

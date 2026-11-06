@@ -108,7 +108,10 @@ class TestCancelRequestOrchestrator:
         """Cancel now needs the request's machine_ids, so it consults the query bus."""
         input = CancelRequestInput(request_id="req-001")
         await orchestrator.execute(input)
-        mock_query_bus.execute.assert_called_once()
+        # The request is loaded once with the sync, then re-read without it after the
+        # flip to catch resources recorded in the meantime.
+        queries = [c.args[0] for c in mock_query_bus.execute.call_args_list]
+        assert [q.lightweight for q in queries] == [False, True]
 
     @pytest.mark.asyncio
     async def test_execute_skips_return_when_no_machines(

@@ -292,6 +292,11 @@ class TestEC2FleetCleanupOnReturn:
 
         with (
             patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet,
+            patch.object(
+                handler._fleet_release_manager,
+                "_fleet_has_no_remaining_instances",
+                return_value=True,
+            ),
             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt,
         ):
             handler._release_hosts_for_single_ec2_fleet(
@@ -308,6 +313,11 @@ class TestEC2FleetCleanupOnReturn:
 
         with (
             patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet,
+            patch.object(
+                handler._fleet_release_manager,
+                "_fleet_has_no_remaining_instances",
+                return_value=True,
+            ),
             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt,
             patch.object(
                 handler._fleet_release_manager,
@@ -329,6 +339,11 @@ class TestEC2FleetCleanupOnReturn:
 
         with (
             patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet,
+            patch.object(
+                handler._fleet_release_manager,
+                "_fleet_has_no_remaining_instances",
+                return_value=True,
+            ),
             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt,
         ):
             handler._release_hosts_for_single_ec2_fleet(
@@ -345,6 +360,11 @@ class TestEC2FleetCleanupOnReturn:
 
         with (
             patch.object(handler._fleet_release_manager, "_delete_fleet"),
+            patch.object(
+                handler._fleet_release_manager,
+                "_fleet_has_no_remaining_instances",
+                return_value=True,
+            ),
             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt,
         ):
             handler._release_hosts_for_single_ec2_fleet(
@@ -530,7 +550,7 @@ def _make_ec2_fleet_release_manager(cleanup_fn=None):
     mgr._aws_ops = aws_ops
     mgr._logger = logger
     mgr._cleanup_on_zero_capacity = cleanup_fn
-    mgr._retry = lambda fn, operation_type="standard", **kw: fn(**kw)
+    mgr._retry = lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw)
     return mgr, aws_client, cleanup_fn
 
 
@@ -545,7 +565,10 @@ class TestEC2FleetReleaseManagerFleetTypes:
     def test_maintain_at_zero_capacity_deletes_fleet_and_calls_cleanup(self):
         cleanup_fn = MagicMock()
         mgr, _aws_client, _ = _make_ec2_fleet_release_manager(cleanup_fn)
-        with patch.object(mgr, "_delete_fleet") as mock_delete:
+        with (
+            patch.object(mgr, "_delete_fleet") as mock_delete,
+            patch.object(mgr, "_fleet_has_no_remaining_instances", return_value=True),
+        ):
             mgr.release("fleet-1", ["i-1", "i-2"], self._fleet_details("maintain", 2))
         mock_delete.assert_called_once_with("fleet-1")
         cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc", ["i-1", "i-2"])
@@ -611,7 +634,10 @@ class TestEC2FleetReleaseManagerFleetTypes:
             "TargetCapacitySpecification": {"TotalTargetCapacity": 1},
             "Tags": [],
         }
-        with patch.object(mgr, "_delete_fleet"):
+        with (
+            patch.object(mgr, "_delete_fleet"),
+            patch.object(mgr, "_fleet_has_no_remaining_instances", return_value=True),
+        ):
             mgr.release("fleet-5", ["i-1"], details)
         cleanup_fn.assert_not_called()
 
@@ -636,7 +662,7 @@ def _make_spot_fleet_release_manager(cleanup_fn=None):
         request_adapter=None,
         cleanup_on_zero_capacity_fn=cleanup_fn,
         logger=logger,
-        retry_fn=lambda fn, operation_type="standard", **kw: fn(**kw),
+        retry_fn=lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw),
     )
     return mgr, aws_client, cleanup_fn
 
@@ -659,7 +685,7 @@ class TestSpotFleetReleaseManagerFleetTypes:
         mgr.release("sfr-1", ["i-1", "i-2"], self._fleet_details("maintain", 2))
         aws_client.ec2_client.cancel_spot_fleet_requests.assert_called_once_with(
             SpotFleetRequestIds=["sfr-1"],
-            TerminateInstances=False,
+            TerminateInstances=True,
         )
         cleanup_fn.assert_called_once_with("spot_fleet", "req-spot-xyz", ["i-1", "i-2"])
 
@@ -774,7 +800,9 @@ class TestASGCancelResource:
 
     def test_cancel_resource_excludes_the_groups_members_from_the_in_use_check(self):
         handler = _make_asg_handler(config_port=_make_config_port())
-        handler._retry_with_backoff = lambda fn, operation_type="standard", **kw: fn(**kw)
+        handler._retry_with_backoff = (
+            lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw)
+        )
         handler.aws_client.autoscaling_client.describe_auto_scaling_groups.return_value = {
             "AutoScalingGroups": [{"Instances": [{"InstanceId": "i-1"}, {"InstanceId": "i-2"}]}]
         }
@@ -787,7 +815,9 @@ class TestASGCancelResource:
 
     def test_cancel_resource_skips_lt_cleanup_when_members_unknown(self):
         handler = _make_asg_handler(config_port=_make_config_port())
-        handler._retry_with_backoff = lambda fn, operation_type="standard", **kw: fn(**kw)
+        handler._retry_with_backoff = (
+            lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw)
+        )
         handler.aws_client.autoscaling_client.describe_auto_scaling_groups.side_effect = (
             RuntimeError("throttled")
         )
@@ -836,7 +866,9 @@ def _make_asg_capacity_manager(cleanup_fn=None):
         request_adapter=None,
         cleanup_on_zero_capacity_fn=cleanup_fn,
         logger=logger,
-        retry_with_backoff=lambda fn, operation_type="standard", **kw: fn(**kw),
+        retry_with_backoff=lambda fn, operation_type="standard", operation_name=None, **kw: fn(
+            **kw
+        ),
         chunk_list=lambda lst, n: [lst[i : i + n] for i in range(0, len(lst), n)],
     )
     return mgr, aws_client, cleanup_fn
@@ -957,7 +989,9 @@ class TestCleanupOnZeroCapacity:
 
     def test_config_port_get_cleanup_config_raises_returns_without_action(self):
         handler = _make_asg_handler(config_port=_make_config_port())
-        with patch.object(handler, "_get_cleanup_config", side_effect=RuntimeError("config error")):
+        with patch.object(
+            handler._lt_cleanup, "get_cleanup_config", side_effect=RuntimeError("config error")
+        ):
             with patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
                 handler._cleanup_on_zero_capacity("asg", "req-config-err")
         mock_delete_lt.assert_not_called()
@@ -999,7 +1033,9 @@ class TestListFleetInstanceIds:
 class TestUnknownMembersSkipIsWarned:
     def test_asg_cancel_warns_when_members_unreadable(self):
         handler = _make_asg_handler(config_port=_make_config_port())
-        handler._retry_with_backoff = lambda fn, operation_type="standard", **kw: fn(**kw)
+        handler._retry_with_backoff = (
+            lambda fn, operation_type="standard", operation_name=None, **kw: fn(**kw)
+        )
         handler.aws_client.autoscaling_client.describe_auto_scaling_groups.side_effect = (
             RuntimeError("throttled")
         )

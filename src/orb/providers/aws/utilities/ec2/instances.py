@@ -1,13 +1,13 @@
 """EC2 instance management utility functions."""
 
 import threading
+import uuid
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
 
 from orb.domain.base.exceptions import InfrastructureError
 from orb.infrastructure.logging.logger import get_logger
-from orb.infrastructure.resilience import retry
 
 # Logger
 logger = get_logger(__name__)
@@ -394,26 +394,26 @@ def derive_cpu_ram_from_instance_type(
     return _heuristic_cpu_ram(instance_type)
 
 
-# Helper functions with retry
-@retry(strategy="exponential", max_attempts=3, base_delay=1.0, service="ec2")
+# Thin wrappers around single EC2 calls. Retrying is owned by the AWS call
+# executor, not by these helpers: a second retry layer here would multiply the
+# configured retry budget.
 def _describe_instance(ec2_client: Any, instance_id: str) -> dict[str, Any]:
     """Describe an EC2 instance."""
     return ec2_client.describe_instances(InstanceIds=[instance_id])
 
 
-@retry(strategy="exponential", max_attempts=3, base_delay=1.0, service="ec2")
 def _run_instance(ec2_client: Any, params: dict[str, Any]) -> dict[str, Any]:
     """Run an EC2 instance."""
+    # One idempotency token per logical call.
+    params.setdefault("ClientToken", uuid.uuid4().hex)
     return ec2_client.run_instances(**params)
 
 
-@retry(strategy="exponential", max_attempts=3, base_delay=1.0, service="ec2")
 def _terminate_instance(ec2_client: Any, instance_id: str) -> dict[str, Any]:
     """Terminate an EC2 instance."""
     return ec2_client.terminate_instances(InstanceIds=[instance_id])
 
 
-@retry(strategy="exponential", max_attempts=3, base_delay=1.0, service="ec2")
 def _create_tags(ec2_client: Any, instance_id: str, tags: list[dict[str, str]]) -> dict[str, Any]:
     """Create tags for an EC2 instance."""
     return ec2_client.create_tags(Resources=[instance_id], Tags=tags)

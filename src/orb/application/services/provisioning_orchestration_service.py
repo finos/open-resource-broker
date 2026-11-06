@@ -26,6 +26,10 @@ from orb.domain.base.operation_outcome import (
     OperationOutcome,
     RequiresFollowUp,
 )
+from orb.domain.base.operations import (
+    Operation as ProviderOperation,
+    OperationType as ProviderOperationType,
+)
 from orb.domain.base.ports import ConfigurationPort, LoggingPort, ProviderConfigPort
 from orb.domain.base.results import ProviderSelectionResult
 from orb.domain.request.aggregate import Request
@@ -80,6 +84,10 @@ class ProvisioningResult:
     # was not ready, or was asked for an operation it does not support), so it
     # must not count against the provider's circuit breaker.
     counts_as_provider_failure: bool = True
+    # True when the request was cancelled while its resources were being created.
+    # The created resources have been aborted and the stored cancelled status must
+    # not be overwritten by the caller.
+    cancelled: bool = False
 
     def __post_init__(self) -> None:
         """Derive ``is_final`` from ``outcome`` when an outcome is provided."""
@@ -184,6 +192,7 @@ class ProvisioningOrchestrationService:
         accumulated_instances: list[dict[str, Any]] = []
         accumulated_provider_data: dict[str, Any] = {}
         last_result: ProvisioningResult | None = None
+        cancelled = False
 
         while remaining > 0 and attempt_number <= max_retries:
             elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
@@ -193,6 +202,18 @@ class ProvisioningOrchestrationService:
                     elapsed,
                     request.request_id,
                 )
+                break
+
+            # A cancel that landed after the last checkpoint must not start another
+            # attempt, which would create a fleet or group only to abort it.
+            if attempt_number > 0 and await asyncio.to_thread(
+                self._request_was_cancelled, request.request_id
+            ):
+                self._logger.info(
+                    "Request %s was cancelled; not starting another provisioning attempt",
+                    request.request_id,
+                )
+                cancelled = True
                 break
 
             attempt_number += 1
@@ -280,6 +301,19 @@ class ProvisioningOrchestrationService:
                 request, checkpoint_ok = await asyncio.to_thread(
                     self._persist_resource_ids_checkpoint, request, last_result.resource_ids
                 )
+                # A cancel may have landed while the resources were being created.
+                # The check follows the guarded save, so a cancel that arrives at any
+                # point up to here is seen; the resources are then aborted instead of
+                # running unowned.
+                if await self.abort_if_cancelled(
+                    request,
+                    selection_result,
+                    accumulated_resource_ids,
+                    template.provider_api,
+                    accumulated_machine_ids,
+                ):
+                    cancelled = True
+                    break
                 if not checkpoint_ok:
                     self._logger.warning(
                         "Resource-ID checkpoint persist failed for request %s attempt %d — "
@@ -332,7 +366,153 @@ class ProvisioningOrchestrationService:
             error_message=last_result.error_message if last_result else "No provisioning attempted",
             fulfilled_count=total_fulfilled,
             is_final=last_result.is_final if last_result else True,
+            cancelled=cancelled,
         )
+
+    async def abort_if_cancelled(
+        self,
+        request: Request,
+        selection_result: ProviderSelectionResult,
+        resource_ids: list[str],
+        provider_api: str | None = None,
+        instance_ids: list[str] | None = None,
+    ) -> bool:
+        """Abort *resource_ids* when the stored request has been cancelled.
+
+        Resources created for a request that was cancelled while they were being
+        created have no owner: the cancel found nothing to abort and flipped the
+        request. They are aborted here. If they cannot be aborted, an alertable
+        ``request.created_after_cancel`` record names them so they can be removed.
+
+        Returns:
+            True when the stored request is cancelled (and the resources were
+            handed to the provider for abort), False otherwise.
+
+        ``instance_ids`` are the instances the provider returned when it created the
+        resources. Providers that launch instances directly terminate these by id,
+        since a lookup by reservation can lag behind the launch.
+        """
+        if not resource_ids:
+            return False
+        if not await asyncio.to_thread(self._request_was_cancelled, request.request_id):
+            return False
+        await self._abort_created_resources(
+            request,
+            selection_result,
+            list(resource_ids),
+            provider_api or request.provider_api,
+            list(instance_ids or []),
+        )
+        # Keep the ids on the cancelled request (its status is unchanged) so that a
+        # later cancel can abort them again if this abort did not take effect.
+        await asyncio.to_thread(
+            self._record_ids_on_cancelled_request,
+            request,
+            list(resource_ids),
+            list(instance_ids or []),
+        )
+        return True
+
+    def _record_ids_on_cancelled_request(
+        self, request: Request, resource_ids: list[str], machine_ids: list[str] | None = None
+    ) -> None:
+        """Add resource and machine ids to the stored request, only while it is cancelled."""
+        try:
+            with self._uow_factory.create_unit_of_work() as uow:
+                stored = uow.requests.find_by_id(str(request.request_id))
+                if stored is None or stored.status != RequestStatus.CANCELLED:
+                    return
+                updated = stored
+                for rid in resource_ids:
+                    updated = updated.add_resource_id(rid)
+                if machine_ids:
+                    updated = updated.add_machine_ids(machine_ids)
+                if updated is not stored:
+                    uow.requests.save(updated)
+        except Exception as e:
+            self._logger.warning(
+                "Could not record resource ids %s on cancelled request %s: %s",
+                resource_ids,
+                request.request_id,
+                e,
+            )
+
+    def _request_was_cancelled(self, request_id: Any) -> bool:
+        """True when the stored request is cancelled; unreadable state counts as not cancelled."""
+        try:
+            with self._uow_factory.create_unit_of_work() as uow:
+                stored = uow.requests.find_by_id(str(request_id))
+            return stored is not None and stored.status == RequestStatus.CANCELLED
+        except Exception as e:
+            self._logger.warning(
+                "Could not re-read request %s to check for a cancel: %s", request_id, e
+            )
+            return False
+
+    async def _abort_created_resources(
+        self,
+        request: Request,
+        selection_result: ProviderSelectionResult,
+        resource_ids: list[str],
+        provider_api: str | None,
+        instance_ids: list[str] | None = None,
+    ) -> None:
+        """Hand resources created for a cancelled request to the provider for abort."""
+        provider_name = selection_result.provider_name
+        reason = ""
+        try:
+            capabilities = self._provider_selection_port.get_strategy_capabilities(provider_name)
+            supports = getattr(
+                capabilities, "supports_operation", None
+            )  # getattr: port returns Any
+            if supports is None or not supports(ProviderOperationType.CANCEL_PROVISIONING):
+                reason = "the provider cannot abort in-flight provisioning"
+            elif not provider_api:
+                reason = "the request has no provider API"
+            else:
+                result = await self._provider_selection_port.execute_operation(
+                    provider_name,
+                    ProviderOperation(
+                        operation_type=ProviderOperationType.CANCEL_PROVISIONING,
+                        parameters={
+                            "request_id": str(request.request_id),
+                            "provider_api": provider_api,
+                            "resource_ids": resource_ids,
+                            "instance_ids": list(instance_ids or []),
+                        },
+                        context={
+                            "correlation_id": str(request.request_id),
+                            "request_id": str(request.request_id),
+                        },
+                    ),
+                )
+                if not getattr(result, "success", False):  # getattr: provider result shape
+                    reason = str(getattr(result, "error_message", "") or "abort failed")
+        except Exception as e:
+            reason = str(e)
+
+        extra = {
+            "event": "request.created_after_cancel",
+            "request_id": str(request.request_id),
+            "provider_name": provider_name,
+            "resource_ids": resource_ids,
+        }
+        if reason:
+            self._logger.error(
+                "Request %s was cancelled while its resources were being created and they "
+                "could not be aborted (%s); remove them manually: %s",
+                request.request_id,
+                reason,
+                resource_ids,
+                extra={**extra, "reason": reason},
+            )
+        else:
+            self._logger.warning(
+                "Request %s was cancelled while its resources were being created; aborted them: %s",
+                request.request_id,
+                resource_ids,
+                extra=extra,
+            )
 
     def _persist_resource_ids_checkpoint(
         self, request: Request, new_resource_ids: list[str]
