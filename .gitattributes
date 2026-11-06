@@ -9,6 +9,9 @@
 # (executed by kubelet via PATH lookup inside pods).
 k8s-legacy/tools/* text eol=lf
 
+# Symphony worker image scripts (no .sh extension, run inside the worker container).
+deploy/symphony-worker/bin/* text eol=lf
+
 # Windows batch files must use CRLF; cmd.exe can mis-resolve goto labels in LF-only files.
 *.bat text eol=crlf
 *.cmd text eol=crlf

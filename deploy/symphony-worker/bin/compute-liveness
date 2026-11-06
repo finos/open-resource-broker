@@ -1,8 +1,9 @@
 #!/bin/sh
 # Liveness probe for lim: fails if lim is missing for >10min or has no children for >10min
 
-NO_CHILD_FILE="/tmp/lim_no_child_since"
-NO_LIM_FILE="/tmp/lim_missing_since"
+STATE_DIR="${ORB_WORKER_STATE_DIR:-/tmp}"
+NO_CHILD_FILE="$STATE_DIR/lim_no_child_since"
+NO_LIM_FILE="$STATE_DIR/lim_missing_since"
 THRESHOLD=600 # 10 minutes
 
 now=$(date +%s)
