@@ -42,11 +42,6 @@ EXEMPT: dict[tuple[str, str], str] = {
 }
 
 
-# Providers that register no validator factory today. Closed set: the entry
-# must be removed once the provider registers one.
-NO_VALIDATOR_FACTORY = {"oci": "#732: no validator factory is registered"}
-
-
 def _contract_subclasses(provider: str) -> set[str]:
     """Names of shared contract bases subclassed under ``tests/providers/<provider>/contract``."""
     found: set[str] = set()
@@ -84,10 +79,7 @@ class TestRegistrationExports:
 
     def test_validator_factory(self, registry, provider) -> None:
         validator_factory = registry._get_type_registration(provider).validator_factory
-        if provider in NO_VALIDATOR_FACTORY:
-            assert validator_factory is None, "stale NO_VALIDATOR_FACTORY entry"
-        else:
-            assert callable(validator_factory)
+        assert callable(validator_factory)
 
 
 def test_contract_subclasses_match_exemptions(registry) -> None:
