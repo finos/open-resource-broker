@@ -280,11 +280,33 @@ class TestCheckDiskHealth:
         assert result.status in ("degraded", "unhealthy")
 
     def test_returns_unhealthy_on_write_failure(self, tmp_path) -> None:
+        import tempfile
+
         hc = _make_health_check(tmp_path)
-        with patch.object(Path, "write_text", side_effect=OSError("no space")):
+        with patch.object(tempfile, "NamedTemporaryFile", side_effect=OSError("no space")):
             result = hc._check_disk_health()
         assert result.status == "unhealthy"
         assert "error" in result.details
+
+    def test_overlapping_runs_do_not_remove_each_others_probe(self, tmp_path) -> None:
+        """A second check that runs while the first is cleaning up must not break it."""
+        hc = _make_health_check(tmp_path)
+        real_unlink = Path.unlink
+        nested: list = []
+        started = []
+
+        def unlink_after_a_nested_run(self, *args, **kwargs):
+            if not started:
+                started.append(True)
+                nested.append(hc._check_disk_health())
+            return real_unlink(self, *args, **kwargs)
+
+        with patch.object(Path, "unlink", unlink_after_a_nested_run):
+            outer = hc._check_disk_health()
+
+        assert nested[0].status != "unhealthy", nested[0].details
+        assert outer.status != "unhealthy", outer.details
+        assert list(hc.health_dir.iterdir()) == []
 
 
 # ---------------------------------------------------------------------------
