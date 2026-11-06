@@ -20,7 +20,6 @@ from orb.application.services.orchestration.dtos import (
 )
 from orb.interface.response_formatting_service import ResponseFormattingService
 from orb.interface.system_command_handlers import (
-    handle_execute_provider_operation,
     handle_list_providers,
     handle_provider_config,
     handle_provider_health,
@@ -202,20 +201,6 @@ class TestHandleValidateProviderConfig:
         assert isinstance(result, dict)
         assert result.get("error") == "Not implemented"
         assert "validate_provider_config" in result.get("endpoint", "")
-
-
-@pytest.mark.unit
-class TestHandleExecuteProviderOperation:
-    """Tests for handle_execute_provider_operation (stub)."""
-
-    @pytest.mark.asyncio
-    async def test_returns_not_implemented_response(self):
-        container = MagicMock()
-        args = Namespace(_container=container)
-        result = await handle_execute_provider_operation(args)
-
-        assert isinstance(result, dict)
-        assert result.get("error") == "Not implemented"
 
 
 @pytest.mark.unit

@@ -557,36 +557,33 @@ def add_provider_actions(subparsers, pp: "ParentParsers | None" = None):
 
     providers_exec = subparsers.add_parser(
         "exec",
-        help="Execute provider command",
-        description="Execute a raw operation against a provider instance.",
+        help="Execute a provider maintenance operation",
+        description=(
+            "Execute an operator-safe maintenance operation against a provider instance. "
+            "Use --list to show the operations each provider instance supports."
+        ),
         parents=[pp.common, pp.list, pp.provider_scope],
     )
-    providers_exec.add_argument("operation", help="Operation to execute")
+    providers_exec.add_argument(
+        "operation",
+        nargs="?",
+        help="Operation to execute (for example cleanup-orphaned-resources)",
+    )
+    providers_exec.add_argument(
+        "--list",
+        dest="list_operations",
+        action="store_true",
+        help="List the operations the selected provider instance (or every instance) supports",
+    )
+    providers_exec.add_argument(
+        "--param",
+        dest="param",
+        action="append",
+        metavar="KEY=VALUE",
+        help="Operation parameter; repeat for several (values are read as JSON when possible)",
+    )
     providers_exec.add_argument(
         "--params", "--args", dest="params", help="Operation parameters (JSON format)"
-    )
-
-    providers_cleanup = subparsers.add_parser(
-        "cleanup-launch-templates",
-        help="Delete unused ORB launch templates",
-        description=(
-            "Delete the launch templates ORB created that no instance, Auto Scaling group or "
-            "fleet uses any more. Nothing is removed that is younger than --min-age-hours, "
-            "that has live instances, or that an active resource still references. "
-            "Use --dry-run to list what would be deleted."
-        ),
-        parents=[pp.common, pp.provider_scope],
-    )
-    providers_cleanup.add_argument(
-        "--min-age-hours",
-        type=int,
-        default=24,
-        help="Only consider templates at least this many hours old (default: 24, minimum: 1)",
-    )
-    providers_cleanup.add_argument(
-        "--force",
-        action="store_true",
-        help="Allow --min-age-hours below 1; may delete a template a new request has just created",
     )
 
     providers_metrics = subparsers.add_parser(

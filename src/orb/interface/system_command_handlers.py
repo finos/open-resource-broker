@@ -91,59 +91,140 @@ async def handle_select_provider_strategy(args) -> dict[str, Any]:
     return await handle_provider_set_default(args)
 
 
+# Operations ``providers exec`` may run. Anything that changes the state of ORB's own
+# requests or machines (terminate, create, start, stop) has a dedicated command and is
+# deliberately absent: exec is for provider-side maintenance that is safe to run by hand.
+EXEC_ALLOWED_OPERATIONS: frozenset[str] = frozenset({"cleanup_orphaned_resources"})
+
+
+def _operation_name(operation: Any) -> str:
+    return str(getattr(operation, "value", operation))
+
+
+def _display_name(operation: str) -> str:
+    return operation.replace("_", "-")
+
+
+def _executable_operations(capabilities: Any) -> list[str]:
+    """Return the allowlisted operations a provider declares, in declaration order."""
+    declared = [_operation_name(op) for op in getattr(capabilities, "supported_operations", [])]
+    return [op for op in dict.fromkeys(declared) if op in EXEC_ALLOWED_OPERATIONS]
+
+
+def _parse_exec_parameters(args) -> dict[str, Any]:
+    """Merge ``--params`` JSON and repeated ``--param key=value`` into one dict."""
+    import json
+
+    parameters: dict[str, Any] = {}
+    raw_json = getattr(args, "params", None)
+    if raw_json:
+        loaded = json.loads(raw_json)
+        if not isinstance(loaded, dict):
+            raise ValueError("--params must be a JSON object")
+        parameters.update(loaded)
+    for item in getattr(args, "param", None) or []:
+        key, separator, value = item.partition("=")
+        if not separator or not key:
+            raise ValueError(f"--param expects KEY=VALUE, got '{item}'")
+        try:
+            parameters[key] = json.loads(value)
+        except ValueError:
+            parameters[key] = value
+    if getattr(args, "dry_run", False):
+        parameters["dry_run"] = True
+    return parameters
+
+
+def _exec_error(message: str, **extra: Any) -> InterfaceResponse:
+    return InterfaceResponse(data={"success": False, "message": message, **extra}, exit_code=1)
+
+
+def _list_exec_operations(args, port: Any) -> InterfaceResponse:
+    from orb.domain.base.ports.configuration_port import ConfigurationPort
+
+    provider_name = getattr(args, "provider_name", None)
+    if provider_name:
+        names = [provider_name]
+    else:
+        names = [p.name for p in args._container.get(ConfigurationPort).get_active_providers()]
+
+    providers = []
+    for name in names:
+        capabilities = port.get_strategy_capabilities(name)
+        providers.append(
+            {
+                "provider": name,
+                "supported_operations": [
+                    _operation_name(op) for op in getattr(capabilities, "supported_operations", [])
+                ],
+                "executable_operations": [
+                    _display_name(op) for op in _executable_operations(capabilities)
+                ],
+            }
+        )
+    return InterfaceResponse(data={"success": True, "providers": providers}, exit_code=0)
+
+
 @handle_interface_exceptions(context="execute_provider_operation", interface_type="cli")
-async def handle_execute_provider_operation(args) -> dict[str, Any]:
-    """Handle execute provider operation operations."""
-    return {
-        "error": "Not implemented",
-        "endpoint": "execute_provider_operation",
-        "message": "Generic provider operation execution is planned but not yet available.",
-    }
+async def handle_execute_provider_operation(args) -> InterfaceResponse:
+    """Run an allowlisted maintenance operation against a provider instance.
 
-
-@handle_interface_exceptions(context="cleanup_launch_templates", interface_type="cli")
-async def handle_cleanup_launch_templates(args) -> InterfaceResponse:
-    """Delete the launch templates ORB created that nothing uses any more.
-
-    An explicit maintenance operation: nothing runs it in the background. The
-    provider decides what is safe to delete; this handler only routes the request.
+    The provider decides what the operation does and what is safe to touch; this
+    handler checks the operation is allowed and declared by the provider, then routes it.
     """
     from orb.domain.base.operations import Operation, OperationType
     from orb.domain.base.ports import ProviderSelectionPort
 
-    container = args._container
-    port = container.get(ProviderSelectionPort)
+    port = args._container.get(ProviderSelectionPort)
+
+    if getattr(args, "list_operations", False):
+        return _list_exec_operations(args, port)
+
+    requested = getattr(args, "operation", None)
+    if not requested:
+        return _exec_error("An operation is required. Use --list to see what is available.")
+
+    normalized = requested.strip().lower().replace("-", "_")
+    try:
+        operation_type = OperationType(normalized)
+    except ValueError:
+        operation_type = None
+
     selection = port.select_active_provider(
         provider_name=getattr(args, "provider_name", None),
         provider_type=getattr(args, "provider_type", None),
     )
     provider_name = selection.provider_name
-
     capabilities = port.get_strategy_capabilities(provider_name)
-    supports = getattr(capabilities, "supports_operation", None)  # getattr: port returns Any
-    if supports is None or not supports(OperationType.CLEANUP_ORPHANED_RESOURCES):
-        return InterfaceResponse(
-            data={
-                "success": False,
-                "provider": provider_name,
-                "message": f"Provider '{provider_name}' has no launch templates to clean up",
-            },
-            exit_code=1,
+    executable = [_display_name(op) for op in _executable_operations(capabilities)]
+    supported_text = ", ".join(executable) if executable else "none"
+
+    if operation_type is None or operation_type.value not in EXEC_ALLOWED_OPERATIONS:
+        allowed = ", ".join(_display_name(op) for op in sorted(EXEC_ALLOWED_OPERATIONS))
+        return _exec_error(
+            f"Operation '{requested}' cannot be run with 'providers exec'. Allowed: {allowed}",
+            provider=provider_name,
         )
 
+    supports = getattr(capabilities, "supports_operation", None)  # getattr: port returns Any
+    if supports is None or not supports(operation_type):
+        return _exec_error(
+            f"Provider '{provider_name}' does not support '{_display_name(operation_type.value)}'. "
+            f"Supported: {supported_text}",
+            provider=provider_name,
+            supported_operations=executable,
+        )
+
+    try:
+        parameters = _parse_exec_parameters(args)
+    except ValueError as exc:
+        return _exec_error(f"Invalid operation parameters: {exc}", provider=provider_name)
+
     result = await port.execute_operation(
-        provider_name,
-        Operation(
-            operation_type=OperationType.CLEANUP_ORPHANED_RESOURCES,
-            parameters={
-                "dry_run": bool(getattr(args, "dry_run", False)),
-                "min_age_hours": getattr(args, "min_age_hours", 24),
-                "force": bool(getattr(args, "force", False)),
-            },
-        ),
+        provider_name, Operation(operation_type=operation_type, parameters=parameters)
     )
     if not result.success:
-        # A partly completed sweep carries its report: what was deleted, what failed.
+        # A partly completed operation carries its report: what was done, what failed.
         return InterfaceResponse(
             data={
                 "success": False,

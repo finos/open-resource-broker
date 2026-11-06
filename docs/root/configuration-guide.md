@@ -503,14 +503,9 @@ orb providers select --data '{
   "require_healthy": true
 }'
 
-# Execute provider operation
-orb providers exec --data '{
-  "operation_type": "CREATE_INSTANCES",
-  "operation_data": {
-    "instance_count": 2,
-    "instance_type": "t2.micro"
-  }
-}'
+# Run a provider maintenance operation (list what each provider supports first)
+orb providers exec --list
+orb providers exec cleanup-orphaned-resources --provider-name aws-prod --dry-run
 
 # Get provider health status
 orb providers health

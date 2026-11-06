@@ -141,7 +141,6 @@ def build_registry() -> None:
     register("providers", "get", handle_provider_get)
     register("providers", "show", handle_provider_show)
     from orb.interface.system_command_handlers import (
-        handle_cleanup_launch_templates,
         handle_execute_provider_operation,
         handle_list_providers,
         handle_provider_health,
@@ -153,7 +152,6 @@ def build_registry() -> None:
     register("providers", "health", handle_provider_health)
     register("providers", "metrics", handle_provider_metrics)
     register("providers", "exec", handle_execute_provider_operation)
-    register("providers", "cleanup-launch-templates", handle_cleanup_launch_templates)
     register("providers", "select", handle_select_provider_strategy)
 
     # --- system ---

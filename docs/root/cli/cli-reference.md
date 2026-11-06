@@ -932,42 +932,45 @@ orb providers select PROVIDER [OPTIONS]
 
 #### `providers exec`
 
-Execute provider operation.
+Run a provider-side maintenance operation. `exec` accepts only operator-safe operations; operations that create, start, stop or terminate machines have their own commands and are refused here. Today the only operation is `cleanup-orphaned-resources`.
 
 **Usage:**
 ```bash
 orb providers exec OPERATION [OPTIONS]
+orb providers exec --list [--provider-name NAME]
 ```
 
 **Arguments:**
 | Argument | Description | Required |
 |----------|-------------|----------|
-| `OPERATION` | Operation to execute | Yes |
+| `OPERATION` | Operation to execute, in kebab-case or snake_case | Yes, unless `--list` is used |
 
 **Options:**
 | Flag | Description | Example |
 |------|-------------|---------|
-| `--provider-name` | Provider to execute operation on | `--provider-name aws_prod_us-east-1` |
-| `--params` | Operation parameters (JSON format) | `--params '{"count":5}'` |
+| `--provider-name` | Provider instance to run the operation on | `--provider-name aws_prod_us-east-1` |
+| `--list` | List the operations each provider instance supports instead of running one | `--list` |
+| `--dry-run` | Ask the operation to report what it would do without changing anything | `--dry-run` |
+| `--param` | Operation parameter as `KEY=VALUE`; repeat for several. Values are read as JSON when possible | `--param min_age_hours=48` |
+| `--params` | Operation parameters as a JSON object | `--params '{"min_age_hours":48}'` |
 
-#### `providers cleanup-launch-templates`
+A provider that does not declare the operation causes exit code 1 and a message listing what it does support. `orb providers show` also lists a provider instance's `supported_operations`.
 
-Delete the launch templates ORB created that nothing uses any more. This is an explicit maintenance command; ORB never runs it in the background.
+##### `cleanup-orphaned-resources` (AWS)
 
-**Usage:**
+Delete the launch templates ORB created that nothing uses any more. This is an explicit maintenance operation; ORB never runs it in the background.
+
 ```bash
-orb providers cleanup-launch-templates [OPTIONS]
+orb providers exec cleanup-orphaned-resources --provider-name aws_prod_us-east-1 --dry-run
+orb providers exec cleanup-orphaned-resources --provider-name aws_prod_us-east-1 --param min_age_hours=48
 ```
 
-**Options:**
-| Flag | Description | Example |
-|------|-------------|---------|
-| `--dry-run` | List what would be deleted without deleting anything | `--dry-run` |
-| `--min-age-hours` | Only consider templates at least this old (default 24, minimum 1) | `--min-age-hours 48` |
-| `--force` | Allow `--min-age-hours` below 1. A template created moments ago may belong to a request that has not launched anything yet, so this can delete a template that request still needs | `--force --min-age-hours 0` |
-| `--provider-name` | Provider to clean up | `--provider-name aws_prod_us-east-1` |
+| Parameter | Description |
+|-----------|-------------|
+| `min_age_hours` | Only consider templates at least this old (default 24, minimum 1) |
+| `force` | Allow `min_age_hours` below 1. A template created moments ago may belong to a request that has not launched anything yet, so this can delete a template that request still needs. Example: `--param force=true --param min_age_hours=0` |
 
-A template is deleted only if it carries the `orb:managed-by` tag, is old enough, has no pending, running, stopping or stopped instance, and is not referenced by an active Auto Scaling group, EC2 Fleet or Spot Fleet request. The command does nothing when `cleanup.enabled` or `cleanup.delete_launch_template` is false in the provider configuration, and `cleanup.dry_run` makes it a dry run.
+A template is deleted only if it carries the `orb:managed-by` tag, is old enough, has no pending, running, stopping or stopped instance, and is not referenced by an active Auto Scaling group, EC2 Fleet or Spot Fleet request. The operation does nothing when `cleanup.enabled` or `cleanup.delete_launch_template` is false in the provider configuration, and `cleanup.dry_run` makes it a dry run.
 
 The sweep covers the account and region of the selected provider instance, so other regions need a run per provider instance. The `orb:managed-by` tag has the same value for every ORB installation, so the sweep also sees templates created by other ORB installations that share the account and region; it deletes only the unused ones.
 
