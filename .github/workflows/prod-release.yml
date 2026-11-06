@@ -193,6 +193,13 @@ jobs:
         name: release-wheel-${{ needs.config.outputs.package-version }}
         path: dist/
 
+    - name: Set apt refresh key
+      # One value for both builds below, so the pushed image reuses the apt
+      # layer the scan gate checked. It also busts a stale cached
+      # apt-get upgrade layer once a day (see Dockerfile). Runs for every
+      # matrix entry, including those without the scan gate.
+      run: echo "APT_REFRESH=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+
     - name: Build container image locally for scanning (full scan gate)
       # For the default-Python 'full' scan we build with --load so Trivy can
       # inspect the image locally BEFORE it is pushed.  A CRITICAL/HIGH finding
@@ -220,6 +227,7 @@ jobs:
           --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
           --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
           --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT" \
+          --build-arg "APT_REFRESH=${APT_REFRESH:?}" \
           --cache-from type=gha \
           --load \
           -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
@@ -260,6 +268,7 @@ jobs:
           --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
           --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
           --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT" \
+          --build-arg "APT_REFRESH=${APT_REFRESH:?}" \
           --provenance=true \
           --sbom=true \
           --annotation "index:org.opencontainers.image.title=Open Resource Broker API" \
