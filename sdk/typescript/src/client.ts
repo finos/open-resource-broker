@@ -585,11 +585,12 @@ export class OrbClient {
   async confirmTerminated(
     requestId: string,
     machineIds: string[],
-    reason: string
+    reason: string,
+    force = false
   ): Promise<unknown> {
     return this.post<unknown>(
       `/api/v1/requests/${encodeURIComponent(requestId)}/confirm-terminated`,
-      { machine_ids: machineIds, reason }
+      { machine_ids: machineIds, reason, force }
     );
   }
 

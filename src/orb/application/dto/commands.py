@@ -79,7 +79,8 @@ class ConfirmMachinesTerminatedCommand(BaseCommand):
     reason: str
     operator: str
     role: str
-    verification: str = "operator_attested"
+    # Per machine: "verified" or "operator_attested"; absent means attested.
+    verifications: Dict[str, str] = {}
 
     # Results for the caller, filled in by the handler.
     newly_confirmed: list[str] = []

@@ -16,6 +16,7 @@ from orb.domain.base.ports import (
 )
 from orb.domain.request.termination_confirmation import (
     CONFIRMED_TERMINATED_KEY,
+    VERIFICATION_OPERATOR_ATTESTED,
     build_record,
     confirmed_machine_ids,
     confirmed_records,
@@ -76,7 +77,9 @@ class ConfirmMachinesTerminatedHandler(
                             operator=command.operator,
                             role=command.role,
                             reason=command.reason,
-                            verification=command.verification,
+                            verification=command.verifications.get(
+                                machine_id, VERIFICATION_OPERATOR_ATTESTED
+                            ),
                         )
                         for machine_id in fresh
                     ]

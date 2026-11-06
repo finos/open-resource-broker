@@ -457,11 +457,12 @@ func (c *Client) PurgeRequest(ctx context.Context, id string) error {
 	return c.post(ctx, "/api/v1/requests/"+url.PathEscape(id)+"/purge", nil, nil)
 }
 
-// ConfirmTerminated records that an operator has verified the named machines of an
-// OCI return request are terminated. The caller takes responsibility for the claim.
-func (c *Client) ConfirmTerminated(ctx context.Context, id string, machineIDs []string, reason string) (map[string]any, error) {
+// ConfirmTerminated records that the named machines of a return request are
+// terminated. The provider is asked to verify each machine; with force set,
+// machines it cannot verify are recorded as operator-attested.
+func (c *Client) ConfirmTerminated(ctx context.Context, id string, machineIDs []string, reason string, force bool) (map[string]any, error) {
 	var out map[string]any
-	body := map[string]any{"machine_ids": machineIDs, "reason": reason}
+	body := map[string]any{"machine_ids": machineIDs, "reason": reason, "force": force}
 	if err := c.post(ctx, "/api/v1/requests/"+url.PathEscape(id)+"/confirm-terminated", body, &out); err != nil {
 		return nil, err
 	}

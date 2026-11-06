@@ -544,13 +544,17 @@ orb requests cancel REQUEST_ID [OPTIONS]
 
 #### `requests confirm-terminated`
 
-Record that you have verified machines of an OCI return request are terminated,
-for instances OCI reports as not found. See
+Record that machines of a return request are terminated, for instances the
+provider reports as not found. The provider is asked whether each machine is
+gone; machines it confirms are recorded as `verified`. If it still shows a
+machine, or cannot tell, the command fails unless `--force` is given, which
+records the unverified machines as `operator_attested`. Providers with no
+termination check always need `--force`. See also
 [Confirm termination](../providers/oci/compute.md#confirm-termination).
 
 **Usage:**
 ```bash
-orb requests confirm-terminated REQUEST_ID --machine-id ID [--machine-id ID...] --reason TEXT
+orb requests confirm-terminated REQUEST_ID --machine-id ID [--machine-id ID...] --reason TEXT [--force]
 ```
 
 **Options:**
@@ -558,11 +562,13 @@ orb requests confirm-terminated REQUEST_ID --machine-id ID [--machine-id ID...] 
 |------|-------------|---------|
 | `--machine-id`, `-m` | Machine verified terminated (required, repeatable, at most 100) | `-m ocid1.instance.oc1...` |
 | `--reason` | Why the machines are known to be terminated (required, up to 500 characters) | `--reason "deleted in console"` |
+| `--force` | Record machines the provider cannot verify as operator-attested | `--force` |
 
 The operator is recorded as `cli:<user>@<host>`; this comes from the local
 environment and is advisory only. Exits 1 when a machine is not part of the
-request, the request is not an OCI return request in progress, or OCI still shows
-an instance that is not terminated.
+request, the request is not a return request in progress, the provider still shows
+an instance that is not terminated, or the provider cannot verify a machine and
+`--force` was not given.
 
 #### `requests status`
 

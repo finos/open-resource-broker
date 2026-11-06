@@ -394,13 +394,14 @@ def add_request_actions(subparsers, pp: "ParentParsers | None" = None):
 
     requests_confirm = subparsers.add_parser(
         "confirm-terminated",
-        help="Confirm return-request machines are terminated (OCI)",
+        help="Confirm return-request machines are terminated",
         description=(
-            "Record that you have verified machines of an OCI return request are "
-            "terminated, for instances OCI reports as not found. OCI answers not "
-            "found both for deleted instances and for ones it will not show this "
-            "principal, so the claim is yours. The operator is recorded as "
-            "cli:<user>@<host>, which is advisory only."
+            "Record that machines of a return request are terminated, for instances "
+            "the provider reports as not found. The provider is asked whether each "
+            "machine is gone; confirmed machines are recorded as verified. If the "
+            "provider still shows a machine, or cannot tell, the command fails; "
+            "--force records machines it cannot verify as operator-attested. The "
+            "operator is recorded as cli:<user>@<host>, which is advisory only."
         ),
         parents=[pp.common, pp.provider_scope],
     )
@@ -419,6 +420,11 @@ def add_request_actions(subparsers, pp: "ParentParsers | None" = None):
     )
     requests_confirm.add_argument(
         "--reason", required=True, help="Why the machines are known to be terminated"
+    )
+    requests_confirm.add_argument(
+        "--force",
+        action="store_true",
+        help="Record machines the provider cannot verify as operator-attested",
     )
 
     requests_status = subparsers.add_parser(

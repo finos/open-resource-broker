@@ -1804,7 +1804,7 @@
           "Requests"
         ],
         "summary": "Confirm Machines Terminated",
-        "description": "Record that an operator has verified the named machines of an OCI return request are terminated, for instances OCI reports as not found. The caller takes responsibility for the claim: OCI answers not found both for deleted instances and for ones it will not show this principal. Rejected with 409 when OCI still shows an instance that is not terminated. Repeating a confirmation changes nothing.",
+        "description": "Record that the named machines of a return request are terminated, for instances the provider reports as not found. The provider is asked whether each machine is gone; confirmed machines are recorded as verified. Rejected with 409 when the provider still shows a machine that is not terminated, or when it cannot tell and force is not set. With force, machines the provider cannot verify are recorded as operator-attested and the caller takes responsibility for the claim. Repeating a confirmation changes nothing.",
         "operationId": "confirmTerminated",
         "parameters": [
           {
@@ -2785,6 +2785,11 @@
           "reason": {
             "type": "string",
             "title": "Reason"
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "default": false
           }
         },
         "additionalProperties": false,

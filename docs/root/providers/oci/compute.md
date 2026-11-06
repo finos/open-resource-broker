@@ -225,23 +225,25 @@ orb requests confirm-terminated RETURN_REQUEST_ID \
 ```
 
 or `POST /api/v1/requests/{id}/confirm-terminated` with
-`{"machine_ids": [...], "reason": "..."}`. The next status poll treats exactly
+`{"machine_ids": [...], "reason": "...", "force": false}`. The next status poll treats exactly
 those machines as terminated and the return completes.
 
 - Only machines named in the return request can be confirmed, at most 100 at a
   time, with a reason of up to 500 characters. There is no wildcard.
-- You are responsible for the claim. OCI cannot tell a deleted instance from one
-  the broker may not read. Before accepting, the broker searches OCI for the
-  instances through the tenancy search service. If one is still visible and not
-  terminated, the confirmation is rejected (REST status 409). If the search is
-  unavailable, for example because the policy does not allow it, the confirmation
-  is accepted and the response carries a warning.
+- OCI cannot tell a deleted instance from one the broker may not read. Before
+  accepting, the broker searches OCI for the instances through the tenancy search
+  service. An instance the search lists as terminated, or does not list, is
+  recorded as `verified`. If one is still visible and not terminated, the
+  confirmation is rejected (REST status 409). If the search is unavailable, for
+  example because the policy does not allow it, the confirmation is rejected the
+  same way unless `--force` (REST: `"force": true`) is given; the machines are
+  then recorded as `operator_attested` and the claim is yours.
   The search index can lag behind deletion, so a just-deleted instance may still
   be reported and the confirmation rejected with 409; retry after a short wait.
 - The confirmation only replaces a 404. An instance OCI can read is reported as it
   is, so an instance that turns out to be running is never hidden.
 - Each confirmation is stored on the request with the operator, role, reason, time
-  and how it was checked. Confirming the same machine again changes nothing.
+  and how it was established (`verified` or `operator_attested`). Confirming the same machine again changes nothing.
 - The REST endpoint requires the `operator` role; the principal ID and role are
   recorded, or `anonymous` when authentication is off. The CLI records
   `cli:<user>@<host>` taken from the local environment, which is advisory and not
