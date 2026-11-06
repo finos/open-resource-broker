@@ -40,6 +40,11 @@ def _make_service(
     if delete_raises is not None:
         mock_ec2.delete_launch_template.side_effect = delete_raises
 
+    if config_port is not None and not isinstance(
+        config_port.get_resource_prefix.return_value, (str, type(None), int)
+    ):
+        config_port.get_resource_prefix.return_value = "orb-"
+
     mock_logger = MagicMock()
     svc = LaunchTemplateCleanupService(
         aws_client=mock_ec2_client,
@@ -49,7 +54,7 @@ def _make_service(
     return svc, mock_ec2, mock_logger
 
 
-def _orb_lt(lt_id: str, request_id: str) -> dict:
+def _orb_lt(lt_id: str, request_id: str, name: str | None = None) -> dict:
     """Build a minimal describe_launch_templates LaunchTemplate entry.
 
     Tag format matches the EC2 describe_launch_templates response shape:
@@ -57,7 +62,7 @@ def _orb_lt(lt_id: str, request_id: str) -> dict:
     """
     return {
         "LaunchTemplateId": lt_id,
-        "LaunchTemplateName": f"orb-{request_id}",
+        "LaunchTemplateName": name or f"orb-{request_id}-tpl",
         "Tags": [
             {"Key": "orb:request-id", "Value": request_id},
             {"Key": "orb:managed-by", "Value": "open-resource-broker"},
@@ -269,6 +274,85 @@ class TestDeleteOrbLaunchTemplate:
 
         mock_ec2.delete_launch_template.assert_called_once_with(LaunchTemplateId="lt-real")
         mock_logger.info.assert_called()
+
+    @staticmethod
+    def _config_port(prefix="orb-"):
+        port = MagicMock()
+        port.get_provider_config.return_value = MagicMock(
+            provider_defaults={"aws": MagicMock(cleanup={"enabled": True, "dry_run": False})}
+        )
+        port.get_resource_prefix.return_value = prefix
+        return port
+
+    def test_template_with_orb_tags_but_foreign_name_is_kept(self):
+        """Tags alone do not authorise deletion; the name must match ORB's scheme."""
+        lt = _orb_lt("lt-user", "req-1", name="my-own-template")
+        svc, mock_ec2, mock_logger = _make_service(
+            config_port=self._config_port(), describe_response={"LaunchTemplates": [lt]}
+        )
+
+        svc.delete_orb_launch_template("req-1")
+
+        mock_ec2.delete_launch_template.assert_not_called()
+        assert any("keeping it" in str(c.args[0]) for c in mock_logger.info.call_args_list)
+
+    def test_template_named_with_a_previous_prefix_is_kept(self):
+        lt = _orb_lt("lt-old", "req-1", name="old-req-1-tpl")
+        svc, mock_ec2, _ = _make_service(
+            config_port=self._config_port("orb-"), describe_response={"LaunchTemplates": [lt]}
+        )
+
+        svc.delete_orb_launch_template("req-1")
+
+        mock_ec2.delete_launch_template.assert_not_called()
+
+    def test_empty_prefix_deletes_only_templates_named_for_the_request(self):
+        own = _orb_lt("lt-own", "req-1", name="req-1-tpl")
+        foreign = _orb_lt("lt-foreign", "req-1", name="something-else")
+        svc, mock_ec2, _ = _make_service(
+            config_port=self._config_port(""),
+            describe_response={"LaunchTemplates": [own, foreign]},
+        )
+
+        svc.delete_orb_launch_template("req-1")
+
+        mock_ec2.delete_launch_template.assert_called_once_with(LaunchTemplateId="lt-own")
+
+    @pytest.mark.parametrize("prefix", [None, 5])
+    def test_unreadable_prefix_deletes_nothing(self, prefix):
+        lt = _orb_lt("lt-1", "req-1")
+        svc, mock_ec2, mock_logger = _make_service(
+            config_port=self._config_port(), describe_response={"LaunchTemplates": [lt]}
+        )
+        svc._config_port.get_resource_prefix.return_value = prefix
+
+        svc.delete_orb_launch_template("req-1")
+
+        mock_ec2.delete_launch_template.assert_not_called()
+        mock_logger.warning.assert_called()
+
+    def test_prefix_lookup_failure_deletes_nothing(self):
+        lt = _orb_lt("lt-1", "req-1")
+        svc, mock_ec2, _ = _make_service(
+            config_port=self._config_port(), describe_response={"LaunchTemplates": [lt]}
+        )
+        svc._config_port.get_resource_prefix.side_effect = RuntimeError("boom")
+
+        svc.delete_orb_launch_template("req-1")
+
+        mock_ec2.delete_launch_template.assert_not_called()
+
+    def test_request_id_that_extends_another_does_not_cross_delete(self):
+        mine = _orb_lt("lt-r1", "R1", name="R1-tpl")
+        other = _orb_lt("lt-r1-extra", "R1-extra", name="R1-extra-tpl")
+        svc, mock_ec2, _ = _make_service(
+            config_port=self._config_port(""),
+            describe_response={"LaunchTemplates": [mine, other]},
+        )
+
+        svc.delete_orb_launch_template("R1")
+
+        mock_ec2.delete_launch_template.assert_called_once_with(LaunchTemplateId="lt-r1")
 
     def test_client_error_on_delete_is_warned_not_raised(self):
         """ClientError during delete is caught and warned; no exception propagates."""

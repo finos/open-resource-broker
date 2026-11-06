@@ -126,7 +126,7 @@ def _make_tagged_lt_manager(aws_client: AWSClient, logger: Any) -> AWSLaunchTemp
     lt_manager = MagicMock(spec=AWSLaunchTemplateManager)
 
     def _create_or_update(template: AWSTemplate, request: Any) -> LaunchTemplateResult:
-        lt_name = f"orb-lt-{request.request_id}"
+        lt_name = f"{request.request_id}-{template.template_id}"
         try:
             resp = aws_client.ec2_client.create_launch_template(
                 LaunchTemplateName=lt_name,
