@@ -33,6 +33,9 @@ from orb.infrastructure.error.categories import ErrorCategory, ErrorCode
 from orb.infrastructure.error.responses import ErrorResponse, _safe_details
 from orb.infrastructure.logging.logger import get_logger
 
+# Longest validation reason sent to a caller.
+_MAX_REASON_LENGTH = 500
+
 
 class HTTPErrorResponseHandler:
     """
@@ -246,11 +249,17 @@ class HTTPErrorResponseHandler:
             str(exception),
             extra={"details": getattr(exception, "details", {})},
         )
+        # The reason is the validator's description of what is wrong with the
+        # template, which the caller needs in order to fix it.
+        details = _safe_details(getattr(exception, "details", {}))
+        reason = str(getattr(exception, "message", "") or "")[:_MAX_REASON_LENGTH]
+        if reason:
+            details["reason"] = reason
         return ErrorResponse(
             error_code=ErrorCode.INVALID_INPUT,
             message="Invalid input",
             category=ErrorCategory.VALIDATION,
-            details=_safe_details(getattr(exception, "details", {})),
+            details=details,
             http_status=HTTPStatus.BAD_REQUEST,
         )
 

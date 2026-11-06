@@ -45,6 +45,12 @@ FAULTS: dict[str, tuple[Any, Any]] = {
     "application_error": (lambda: ApplicationError("cleanup failed"), (500, 503)),
 }
 
+# Text of an injected server-side fault that must never reach the response body.
+INTERNAL_TEXT: dict[str, str] = {
+    "unexpected": "boom",
+    "application_error": "cleanup failed",
+}
+
 # Routes with no injectable application seam, with the reason each is not in the
 # fault matrix. A route missing from both this table and the seam discovery fails
 # ``test_every_route_has_a_probe``.
@@ -130,15 +136,31 @@ def test_fault_matrix(app, client, clear_faults):
         inject(app, seams_for(routes[key]), factory())
         response = client.request(probe.method, probe.url, json=probe.json, params=probe.params)
 
-        problems = _check(response, expected)
+        problems = _check(response, expected, INTERNAL_TEXT.get(fault_name))
         if problems:
             failures.append(f"{key} <- {fault_name}: {problems}")
 
     assert failures == [], "\n" + "\n".join(failures)
 
 
-def _check(response: Any, expected: tuple[int, ...]) -> list[str]:
+def test_template_rejection_reports_its_reason_to_the_caller(app, client, clear_faults):
+    """A rejected template is the caller's to fix, so the reason is part of the 400."""
+    spec = app.openapi()
+    routes = route_keys(app)
+    key, _ = next(cell for cell in _cells(app) if cell[1] == "template_validation")
+    probe = build_probe(key, spec)
+    inject(app, seams_for(routes[key]), TemplateValidationError("spot is not supported"))
+
+    response = client.request(probe.method, probe.url, json=probe.json, params=probe.params)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["details"]["reason"] == "spot is not supported"
+
+
+def _check(response: Any, expected: tuple[int, ...], internal_text: str | None) -> list[str]:
     problems = []
+    if internal_text and response.status_code >= 500 and internal_text in response.text:
+        problems.append(f"internal message leaked: {response.text[:120]}")
     if response.status_code not in expected:
         problems.append(f"status {response.status_code}, expected {expected}")
     if min(expected) >= 400:
