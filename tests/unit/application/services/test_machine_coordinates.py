@@ -18,6 +18,8 @@ def _machine(machine_id: str, provider_data: dict, request_id: str | None = _ORI
     machine.resource_id = "mig-a"
     machine.provider_data = provider_data
     machine.request_id = request_id
+    machine.launch_time = None
+    machine.created_at = None
     return machine
 
 
@@ -44,6 +46,7 @@ def test_machine_provider_data_is_returned_with_resource() -> None:
         "provider_api": "MIG",
         "resource_id": "mig-a",
         "provider_data": {"scope": "zonal", "zone": "z1"},
+        "launched_at": None,
     }
 
 

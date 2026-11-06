@@ -16,6 +16,7 @@ from orb.domain.request.value_objects import RequestType
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.utilities.terminate_instances import terminate_skipping_missing
 
 if TYPE_CHECKING:
     from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
@@ -344,7 +345,15 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with termination results
         """
         try:
-            response = self._aws_client.ec2_client.terminate_instances(InstanceIds=instance_ids)
+            outcome = terminate_skipping_missing(
+                lambda ids: self._aws_client.ec2_client.terminate_instances(InstanceIds=ids),
+                instance_ids,
+            )
+            if outcome["already_terminated"]:
+                self._logger.info(
+                    "Instances already terminated (InvalidInstanceID.NotFound): %s",
+                    outcome["already_terminated"],
+                )
 
             return {
                 "status": "success",
@@ -354,20 +363,12 @@ class AWSRequestAdapter(RequestAdapterPort):
                         "previous_state": instance["PreviousState"]["Name"],
                         "current_state": instance["CurrentState"]["Name"],
                     }
-                    for instance in response["TerminatingInstances"]
+                    for instance in outcome["TerminatingInstances"]
                 ],
+                "already_terminated": outcome["already_terminated"],
             }
 
         except ClientError as e:
-            if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
-                self._logger.info(
-                    "Instances already terminated (InvalidInstanceID.NotFound) — treating as success"
-                )
-                return {
-                    "status": "success",
-                    "terminated_instances": [],
-                    "message": "Instances already terminated",
-                }
             self._logger.error("Failed to terminate instances: %s", str(e))
             return {
                 "status": "error",

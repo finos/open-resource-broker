@@ -5,6 +5,11 @@ from typing import TYPE_CHECKING, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+from orb.providers.aws.utilities.terminate_instances import (
+    recently_launched_ids,
+    terminate_skipping_missing,
+    wait_until_visible,
+)
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 
 if TYPE_CHECKING:
@@ -144,6 +149,11 @@ class AWSInstanceOperationService:
                     "Instance IDs are required for termination", "MISSING_INSTANCE_IDS"
                 )
 
+            coordinates = operation.parameters.get("machine_coordinates") or {}
+            young = recently_launched_ids(coordinates)
+            if young:
+                wait_until_visible(self._aws_client.ec2_client, young)
+
             # Try provisioning adapter first
             if self._provisioning_adapter:
                 try:
@@ -180,8 +190,13 @@ class AWSInstanceOperationService:
                     )
 
             # Fallback to direct termination
-            response = self._aws_client.ec2_client.terminate_instances(InstanceIds=instance_ids)
-            terminated_count = len(response.get("TerminatingInstances", []))
+            outcome = terminate_skipping_missing(
+                lambda ids: self._aws_client.ec2_client.terminate_instances(InstanceIds=ids),
+                instance_ids,
+            )
+            terminated_count = len(outcome["TerminatingInstances"]) + len(
+                outcome["already_terminated"]
+            )
 
             return ProviderResult.success_result(
                 {

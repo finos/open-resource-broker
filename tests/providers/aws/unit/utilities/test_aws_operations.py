@@ -89,7 +89,7 @@ class TestTerminateInstancesWithFallback:
         retry = MagicMock(side_effect=_client_error("InvalidInstanceID.NotFound"))
         ops.set_retry_method(retry)
         result = ops.terminate_instances_with_fallback(["i-gone"])
-        assert result == {"terminated_instances": []}
+        assert result == {"TerminatingInstances": [], "already_terminated": ["i-gone"]}
 
     def test_other_client_error_is_reraised(self):
         ops = _make_ops()

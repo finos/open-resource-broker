@@ -393,7 +393,11 @@ class AWSProviderStrategy(ProviderStrategy):
             handlers = self._get_handler_registry().get_available_handlers()
             return await self._get_instance_service().create_instances(operation, handlers)
         elif operation.operation_type == ProviderOperationType.TERMINATE_INSTANCES:
-            return self._get_instance_service().terminate_instances(operation)
+            # Termination is blocking (it may wait for just-launched instances to
+            # become visible), so it runs off the event loop.
+            return await asyncio.to_thread(
+                self._get_instance_service().terminate_instances, operation
+            )
         elif operation.operation_type == ProviderOperationType.GET_INSTANCE_STATUS:
             return self._get_instance_service().get_instance_status(operation)
         elif operation.operation_type == ProviderOperationType.VALIDATE_TEMPLATE:

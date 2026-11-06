@@ -365,6 +365,7 @@ def _make_config_port(prefix: str = ""):
 
 def _make_moto_aws_client(region: str = REGION) -> AWSClient:
     aws_client = MagicMock(spec=AWSClient)
+    aws_client.region_name = region
     aws_client.ec2_client = boto3.client("ec2", region_name=region)
     aws_client.autoscaling_client = boto3.client("autoscaling", region_name=region)
     aws_client.sts_client = boto3.client("sts", region_name=region)

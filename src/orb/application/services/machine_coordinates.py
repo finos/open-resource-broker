@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.request.value_objects import RequestId
+
+
+def _iso(moment: Any) -> Optional[str]:
+    return moment.isoformat() if moment is not None else None
 
 
 def load_machine_coordinates(
@@ -13,7 +17,8 @@ def load_machine_coordinates(
 ) -> dict[str, dict[str, Any]]:
     """Return per-machine provider coordinates keyed by machine id.
 
-    Each entry carries ``provider_api``, ``resource_id`` and ``provider_data``.
+    Each entry carries ``provider_api``, ``resource_id``, ``provider_data`` and
+    ``launched_at`` (ISO timestamp of the launch, or of the record's creation).
     Placement fields missing from a machine's own ``provider_data`` are filled
     from the request that originally provisioned it, so flows driven by a
     return request (which has no placement of its own) can still address the
@@ -37,5 +42,6 @@ def load_machine_coordinates(
                 "provider_api": machine.provider_api,
                 "resource_id": machine.resource_id,
                 "provider_data": provider_data,
+                "launched_at": _iso(machine.launch_time or machine.created_at),
             }
     return coordinates
