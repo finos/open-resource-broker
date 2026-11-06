@@ -20,14 +20,17 @@ this module imports cleanly even when those modules are absent.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Optional
 
+from orb.providers.base.config_input import provider_config_mapping
 from orb.providers.k8s.configuration.template_extension import (
     K8sTemplateExtensionConfig,
 )
 
 if TYPE_CHECKING:
+    from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
     from orb.domain.base.ports import LoggingPort
     from orb.domain.template.factory import TemplateFactory
     from orb.providers.registry import ProviderRegistry
@@ -64,19 +67,6 @@ def _k8s_config_is_empty(provider_config: Any) -> bool:
     return False
 
 
-def _strip_discriminator(config_data: Any) -> Any:
-    """Drop the provider-type discriminator keys from a raw config dict.
-
-    The ``type`` / ``provider_type`` keys select *which* provider to build;
-    they are not fields of :class:`K8sProviderConfig` (which uses
-    ``extra="forbid"``).  Passing them through would raise
-    ``Extra inputs are not permitted``.  Leaves non-dict inputs untouched.
-    """
-    if isinstance(config_data, dict):
-        return {k: v for k, v in config_data.items() if k not in ("type", "provider_type")}
-    return config_data
-
-
 def create_k8s_strategy(provider_config: Any) -> Any:
     """Create a :class:`K8sProviderStrategy` from configuration.
 
@@ -111,7 +101,7 @@ def create_k8s_strategy(provider_config: Any) -> Any:
             provider_instance_config = None
             provider_name = None
         elif hasattr(provider_config, "config"):
-            config_data = _strip_discriminator(provider_config.config)
+            config_data = provider_config_mapping(provider_config)
             provider_instance_config = provider_config
             provider_name = provider_config.name
             # Apply the empty-config guard on the extracted dict regardless of
@@ -129,7 +119,7 @@ def create_k8s_strategy(provider_config: Any) -> Any:
                 )
             k8s_config = K8sProviderConfig(**config_data)
         else:
-            config_data = _strip_discriminator(provider_config)
+            config_data = provider_config_mapping(provider_config)
             # Reject empty / None configs before constructing a strategy that
             # would silently connect to the wrong cluster.
             if _k8s_config_is_empty(config_data):
@@ -227,12 +217,12 @@ def create_k8s_strategy(provider_config: Any) -> Any:
         raise RuntimeError(f"Failed to create Kubernetes strategy: {exc!s}")
 
 
-def create_k8s_config(data: dict[str, Any]) -> Any:
+def create_k8s_config(data: "ProviderInstanceConfig | Mapping[str, Any]") -> Any:
     """Create :class:`K8sProviderConfig` from a dict of values."""
     try:
         from orb.providers.k8s.configuration.config import K8sProviderConfig
 
-        return K8sProviderConfig(**_strip_discriminator(data))
+        return K8sProviderConfig(**provider_config_mapping(data))
     except ImportError as exc:
         raise ImportError(f"Kubernetes configuration not available: {exc!s}")
     except Exception as exc:

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from orb.providers.base.config_input import provider_config_mapping
+
 
 def _extract_oci_provider_settings(provider_config: Any) -> dict[str, Any]:
     """Unwrap provider instance entries to the inner OCI settings dict."""
@@ -16,13 +18,14 @@ def _extract_oci_provider_settings(provider_config: Any) -> dict[str, Any]:
     elif hasattr(provider_config, "dict"):
         provider_config = provider_config.dict()
     if isinstance(provider_config, dict):
+        provider_config = provider_config_mapping(provider_config)
         nested = provider_config.get("config")
         if isinstance(nested, dict):
-            return nested
+            return provider_config_mapping(nested)
         if nested is not None and hasattr(nested, "model_dump"):
-            return nested.model_dump()
+            return provider_config_mapping(nested.model_dump())
         if nested is not None and hasattr(nested, "dict"):
-            return nested.dict()
+            return provider_config_mapping(nested.dict())
         return provider_config
     return {}
 
