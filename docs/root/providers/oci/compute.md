@@ -232,12 +232,13 @@ those machines as terminated and the return completes.
   time, with a reason of up to 500 characters. There is no wildcard.
 - OCI cannot tell a deleted instance from one the broker may not read. Before
   accepting, the broker searches OCI for the instances through the tenancy search
-  service. An instance the search lists as terminated, or does not list, is
-  recorded as `verified`. If one is still visible and not terminated, the
-  confirmation is rejected (REST status 409). If the search is unavailable, for
-  example because the policy does not allow it, the confirmation is rejected the
-  same way unless `--force` (REST: `"force": true`) is given; the machines are
-  then recorded as `operator_attested` and the claim is yours.
+  service. An instance the search lists as terminated is recorded as `verified`.
+  If one is listed in any other state, the confirmation is rejected (REST status
+  409). The search lists only what the broker can read, so an instance it does
+  not list may be deleted or merely unreadable, and the same applies when the
+  search is unavailable, for example because the policy does not allow it: the
+  confirmation is rejected unless `--force` (REST: `"force": true`) is given. The
+  machines are then recorded as `operator_attested` and the claim is yours.
   The search index can lag behind deletion, so a just-deleted instance may still
   be reported and the confirmation rejected with 409; retry after a short wait.
 - The confirmation only replaces a 404. An instance OCI can read is reported as it

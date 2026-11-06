@@ -163,19 +163,17 @@ class ConfirmTerminatedOrchestrator(
                     context={"request_id": request_id},
                 ),
             )
+            if not result.success:
+                self._logger.warning(
+                    "Termination probe unavailable for %s: %s", request_id, result.error_code
+                )
+                return {}
+            instances: list[dict[str, Any]] = (result.data or {}).get("instances") or []
+            return {
+                str(i["instance_id"]): str(i.get("status") or "").lower()
+                for i in instances
+                if i.get("instance_id") is not None
+            }
         except Exception as exc:
             self._logger.warning("Termination probe failed for %s: %s", request_id, exc)
             return {}
-
-        if not result.success:
-            self._logger.warning(
-                "Termination probe unavailable for %s: %s", request_id, result.error_code
-            )
-            return {}
-
-        instances: list[dict[str, Any]] = (result.data or {}).get("instances") or []
-        return {
-            str(i["instance_id"]): str(i.get("status") or "").lower()
-            for i in instances
-            if i.get("instance_id") is not None
-        }

@@ -497,6 +497,15 @@ class ConfirmTerminatedBody(APIRequest):
         "nothing."
     ),
     response_model=ConfirmTerminatedResponse,
+    responses={
+        400: {
+            "description": "Invalid request: the request is not a return request in progress, or a machine is not part of it"
+        },
+        404: {"description": "Request not found"},
+        409: {
+            "description": "A machine is still present at the provider, or the provider could not verify it and force was not set"
+        },
+    },
 )
 @handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}/confirm-terminated", method="POST")
 async def confirm_terminated(

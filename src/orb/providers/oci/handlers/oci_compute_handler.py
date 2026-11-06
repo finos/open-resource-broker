@@ -918,8 +918,9 @@ class OCIComputeHandler:
         different signal from the 404 being overridden. Every requested
         instance gets a state: ``terminated`` when the search lists it as
         terminated, ``visible`` when it lists it in any other state, and
-        ``gone`` when the search does not list it. The search shows only what
-        this principal can see, so ``gone`` is a best-effort statement.
+        ``unknown`` when the search does not list it. The search shows only what
+        this principal can see, so an unlisted instance may be deleted or merely
+        unreadable; the operator has to attest to it.
         """
         if not self._use_live_cli(operation):
             return ProviderResult.error_result(
@@ -950,6 +951,8 @@ class OCIComputeHandler:
                 for item in (response.get("data") or {}).get("items") or []:
                     machine_id = item.get("identifier")
                     if machine_id in wanted:
+                        # A missing lifecycle-state is kept as "UNKNOWN", which is reported
+                        # as visible: the instance is listed, so it is never treated as gone.
                         found[machine_id] = str(item.get("lifecycle-state", "unknown")).upper()
         except Exception as exc:
             self._logger.warning("OCI visibility probe failed: %s", exc)
@@ -960,7 +963,7 @@ class OCIComputeHandler:
             {
                 "instance_id": machine_id,
                 "status": (
-                    "gone"
+                    "unknown"
                     if machine_id not in found
                     else "terminated"
                     if found[machine_id] == "TERMINATED"
