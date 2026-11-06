@@ -172,3 +172,123 @@ def test_cli_health_command_leaks_nothing(
     _assert_clean(repr(result))
     _assert_clean(repr(console.mock_calls))
     assert any(c["name"] == "aws" for c in checks)
+
+
+_HS256_SECRET = "health-detail-test-secret-key-0123456789!"
+_SUMMARY_KEYS = {"service", "version", "status"}
+
+
+@pytest.fixture
+def _no_loopback_tokens():
+    """Isolate the class-level loopback token state of the auth wrapper."""
+    from orb.api.server import _LoopbackAdminAuthWrapper
+
+    saved = (
+        set(_LoopbackAdminAuthWrapper._tokens),
+        _LoopbackAdminAuthWrapper._token_file,
+        _LoopbackAdminAuthWrapper._token_file_mtime,
+    )
+    _LoopbackAdminAuthWrapper._tokens = set()
+    _LoopbackAdminAuthWrapper._token_file = None
+    _LoopbackAdminAuthWrapper._token_file_mtime = 0.0
+    yield _LoopbackAdminAuthWrapper
+    (
+        _LoopbackAdminAuthWrapper._tokens,
+        _LoopbackAdminAuthWrapper._token_file,
+        _LoopbackAdminAuthWrapper._token_file_mtime,
+    ) = saved
+
+
+def _authenticated_app(tmp_path: Path, *, storage_raises: bool = False) -> Any:
+    health = _health_check(tmp_path, aws_fails=False, storage_raises=storage_raises)
+    server_config = ServerConfig(  # type: ignore[call-arg]
+        enabled=True,
+        auth=AuthConfig(  # type: ignore[call-arg]
+            enabled=True,
+            strategy="bearer_token",
+            bearer_token={"secret_key": _HS256_SECRET, "algorithm": "HS256"},
+        ),
+        # The test client's peer is "testclient"; trusting it as a proxy makes
+        # X-Forwarded-For resolve the client IP
+        trusted_proxies=["testclient"],
+    )
+    with patch(
+        "orb.api.server._register_routers", side_effect=lambda app: app.include_router(APIRouter())
+    ):
+        app = create_fastapi_app(server_config)
+    app.dependency_overrides[get_health_check_port] = lambda: health
+    return app
+
+
+def _valid_token() -> str:
+    from orb.infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
+
+    strategy = BearerTokenStrategy(secret_key=_HS256_SECRET, algorithm="HS256", enabled=True)
+    return strategy._create_access_token(user_id="ops", roles=["user"], permissions=["read"])
+
+
+@pytest.mark.unit
+@pytest.mark.api
+@pytest.mark.usefixtures("_no_loopback_tokens")
+class TestHealthDetailNeedsCredentials:
+    """With auth enabled, /health shows per-check detail only to authenticated callers."""
+
+    def test_anonymous_caller_gets_only_the_overall_status(self, tmp_path: Path) -> None:
+        client = TestClient(_authenticated_app(tmp_path))
+
+        anonymous = client.get("/health")
+        authenticated = client.get("/health", headers={"Authorization": f"Bearer {_valid_token()}"})
+
+        assert set(anonymous.json()) == _SUMMARY_KEYS
+        assert anonymous.json()["status"] == authenticated.json()["status"]
+        assert anonymous.status_code == authenticated.status_code
+
+    def test_valid_bearer_gets_the_checks(self, tmp_path: Path) -> None:
+        client = TestClient(_authenticated_app(tmp_path))
+
+        response = client.get("/health", headers={"Authorization": f"Bearer {_valid_token()}"})
+
+        assert {"system", "disk"} <= set(response.json()["checks"])
+
+    def test_invalid_bearer_gets_the_summary_not_a_401(self, tmp_path: Path) -> None:
+        client = TestClient(_authenticated_app(tmp_path))
+
+        response = client.get("/health", headers={"Authorization": "Bearer not-a-real-token"})
+
+        assert response.status_code in (200, 503)
+        assert set(response.json()) == _SUMMARY_KEYS
+
+    def test_status_code_is_kept_for_anonymous_callers(self, tmp_path: Path) -> None:
+        client = TestClient(_authenticated_app(tmp_path, storage_raises=True))
+
+        anonymous = client.get("/health")
+        authenticated = client.get("/health", headers={"Authorization": f"Bearer {_valid_token()}"})
+
+        assert anonymous.status_code == authenticated.status_code
+        assert set(anonymous.json()) == _SUMMARY_KEYS
+
+    def test_loopback_token_from_a_remote_peer_with_forwarded_loopback_gets_the_summary(
+        self, tmp_path: Path, _no_loopback_tokens: Any
+    ) -> None:
+        _no_loopback_tokens._tokens = {"loopback-secret"}
+        client = TestClient(_authenticated_app(tmp_path))
+
+        response = client.get(
+            "/health",
+            headers={
+                "Authorization": "Bearer loopback-secret",
+                "X-Forwarded-For": "127.0.0.1",
+            },
+        )
+
+        assert set(response.json()) == _SUMMARY_KEYS
+
+    def test_loopback_token_from_a_loopback_peer_gets_the_checks(
+        self, tmp_path: Path, _no_loopback_tokens: Any
+    ) -> None:
+        _no_loopback_tokens._tokens = {"loopback-secret"}
+        client = TestClient(_authenticated_app(tmp_path), client=("127.0.0.1", 50000))
+
+        response = client.get("/health", headers={"Authorization": "Bearer loopback-secret"})
+
+        assert "checks" in response.json()

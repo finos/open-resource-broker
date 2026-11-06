@@ -575,11 +575,14 @@ def create_fastapi_app(server_config: Any) -> Any:
     # above and before TrustedHost/CORS below, so Auth is more deeply nested
     # than CORS/TrustedHost (both of which must clear the request first) but
     # less deeply nested than RateLimit (see the effective-order note above).
+    # Bound only when authentication is enabled; /health uses it to decide
+    # whether a caller may see the per-check detail.
+    auth_port: Any = None
     if server_config.auth.enabled:
         auth_strategy = _create_auth_strategy(server_config.auth)
         if auth_strategy:
             # Wrap the real strategy so loopback tokens are checked first.
-            auth_port: Any = _LoopbackAdminAuthWrapper(auth_strategy)
+            auth_port = _LoopbackAdminAuthWrapper(auth_strategy)
 
             # Build the excluded-paths list for auth middleware.
             # /health, /livez, /readyz are always public probe endpoints
@@ -703,9 +706,54 @@ def create_fastapi_app(server_config: Any) -> Any:
         health_port.run_all_checks()
         return getattr(health_port, summary)()
 
+    from fastapi import Request
+
+    _health_trusted_proxies: frozenset[str] = frozenset(server_config.trusted_proxies or [])
+
+    async def _may_see_health_detail(request: Request) -> bool:
+        """True when the per-check detail of /health may be returned to this caller.
+
+        /health is excluded from authentication so probes can reach it. With
+        authentication enabled, only a caller presenting valid credentials gets
+        the detail (host CPU, memory and disk figures); everyone else gets the
+        overall status. Any failure counts as anonymous.
+        """
+        if auth_port is None:
+            return True
+        if "authorization" not in request.headers:
+            return False
+        try:
+            from orb.api.middleware._utils import get_real_client_ip
+            from orb.infrastructure.adapters.ports.auth import AuthContext
+
+            context = AuthContext(
+                method=request.method,
+                path=request.url.path,
+                headers={k.lower(): str(v)[:1000] for k, v in request.headers.items()},
+                query_params=dict(request.query_params),
+                client_ip=get_real_client_ip(request, _health_trusted_proxies),
+                # The raw socket peer, never a forwarded header: the loopback
+                # admin token is honoured only for a loopback peer.
+                direct_client_ip=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent", "")[:500],
+                metadata={
+                    "url": str(request.url)[:2000],
+                    "base_url": str(request.base_url)[:2000],
+                },
+            )
+            result = await auth_port.authenticate(context)
+            return bool(result.is_authenticated)
+        except Exception:
+            return False
+
     @app.get("/health", tags=["System"], operation_id="healthCheck")
-    async def health_check(health_port: Any = Depends(get_health_check_port)) -> Any:  # type: ignore[misc]
+    async def health_check(  # type: ignore[misc]
+        request: Request,
+        health_port: Any = Depends(get_health_check_port),  # type: ignore[misc]
+    ) -> Any:
         """Health check endpoint."""
+        # With authentication enabled, anonymous callers get only the service,
+        # version and overall status; authenticated callers also get the checks.
         try:
             # The checks make blocking provider/storage calls: keep them off the loop.
             status = await asyncio.to_thread(_run_checks_then, health_port, "get_status")
@@ -714,6 +762,8 @@ def create_fastapi_app(server_config: Any) -> Any:
 
         status = {"service": "open-resource-broker", "version": __version__, **status}
         http_status = 503 if status.get("status") == "unhealthy" else 200
+        if not await _may_see_health_detail(request):
+            status = {key: status.get(key) for key in ("service", "version", "status")}
         return JSONResponse(content=status, status_code=http_status)  # type: ignore[misc]
 
     @app.get("/livez", tags=["System"], operation_id="livenessCheck")
