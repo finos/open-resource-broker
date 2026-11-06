@@ -97,20 +97,12 @@ class TestGetRequestFormatterDependency:
     def test_registered_scheduler_header_returns_new_service(self):
         """X-ORB-Scheduler with a registered type returns a freshly-built ResponseFormattingService."""
         from orb.api.dependencies import get_request_formatter
-        from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
-            HostFactorySchedulerStrategy,
+        from orb.infrastructure.scheduler.registration import (
+            register_symphony_hostfactory_scheduler,
         )
-        from orb.infrastructure.scheduler.registry import get_scheduler_registry
         from orb.interface.response_formatting_service import ResponseFormattingService
 
-        registry = get_scheduler_registry()
-        if not registry.is_registered("hostfactory"):
-            registry.register(
-                "hostfactory",
-                lambda cfg: HostFactorySchedulerStrategy(),
-                lambda c: None,
-                strategy_class=HostFactorySchedulerStrategy,
-            )
+        register_symphony_hostfactory_scheduler()
 
         request = self._make_request({"X-ORB-Scheduler": "hostfactory"})
         container = self._make_container("default")
