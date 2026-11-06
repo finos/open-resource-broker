@@ -8,10 +8,11 @@ from orb.application.dto.commands import (
     PopulateMachineIdsCommand,
     SyncRequestCommand,
 )
+from orb.application.services.machine_sync_service import MachineSyncService
+from orb.application.services.request_status_service import RequestStatusService
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.exceptions import EntityNotFoundError
+from orb.domain.base.exceptions import ConcurrencyError, EntityNotFoundError
 from orb.domain.base.ports import (
-    ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
@@ -27,36 +28,60 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
         self,
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
-        container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
         provider_selection_port: ProviderSelectionPort,
     ):
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory
-        self._container = container
         self._provider_selection_port = provider_selection_port
 
     async def execute_command(self, command: PopulateMachineIdsCommand) -> None:
-        """Discover and store machine IDs from provider resources."""
+        """Discover and store machine IDs from provider resources.
 
+        The provider call can take a long time, so no unit of work is held
+        across it and the stored request is not trusted afterwards: the write
+        re-reads the request and applies the discovered IDs to that copy.
+        """
+        from orb.domain.request.value_objects import RequestId
+
+        request_id = RequestId(value=command.request_id)
         with self.uow_factory.create_unit_of_work() as uow:
-            from orb.domain.request.value_objects import RequestId
+            request = uow.requests.get_by_id(request_id)
+        if not request or not request.needs_machine_id_population():
+            return
 
-            request = uow.requests.get_by_id(RequestId(value=command.request_id))
-            if not request or not request.needs_machine_id_population():
-                return
+        discovered_ids = await self._discover_machine_ids(request)
+        if not discovered_ids:
+            return
 
-            discovered_ids = await self._discover_machine_ids(request)
-            if discovered_ids:
-                updated_request = request.update_machine_ids(discovered_ids)
-                uow.requests.save(updated_request)
+        for attempt in range(2):
+            try:
+                with self.uow_factory.create_unit_of_work() as uow:
+                    current = uow.requests.get_by_id(request_id)
+                    # Cancelled, finished, removed or already populated while
+                    # the provider was being asked: nothing left to do.
+                    if (
+                        current is None
+                        or current.status.is_terminal()
+                        or not current.needs_machine_id_population()
+                    ):
+                        return
+                    updated = current.update_machine_ids(discovered_ids).model_copy(
+                        update={"version": current.version + 1}
+                    )
+                    uow.requests.save(updated)
+                break
+            except ConcurrencyError:
+                # Re-read once and re-apply; never save the copy already built.
+                if attempt == 1:
+                    raise
 
-                self.logger.info(
-                    "Populated request %s with %d machine IDs",
-                    command.request_id,
-                    len(discovered_ids),
-                )
+        self.logger.info(
+            "Populated request %s with %d machine IDs",
+            command.request_id,
+            len(discovered_ids),
+        )
 
     async def _discover_machine_ids(self, request) -> list[str]:
         """Discover machine IDs from provider resources."""
@@ -78,10 +103,6 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
                     "request": request,
                 },
             )
-
-            from orb.domain.base.ports.configuration_port import ConfigurationPort
-
-            self._container.get(ConfigurationPort)
 
             result = await self._provider_selection_port.execute_operation(
                 request.provider_name, operation
@@ -124,13 +145,15 @@ class SyncRequestHandler(BaseCommandHandler[SyncRequestCommand, None]):  # type:
         self,
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
-        container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
+        machine_sync_service: MachineSyncService,
+        status_service: RequestStatusService,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory
-        self._container = container
+        self._machine_sync_service = machine_sync_service
+        self._status_service = status_service
 
     async def execute_command(self, command: SyncRequestCommand) -> None:
         """Execute sync request command."""
@@ -150,11 +173,8 @@ class SyncRequestHandler(BaseCommandHandler[SyncRequestCommand, None]):  # type:
             query_service = RequestQueryService(self.uow_factory, self.logger)
             db_machines = await query_service.get_machines_for_request(request)
 
-            from orb.application.services.machine_sync_service import MachineSyncService
-            from orb.application.services.request_status_service import RequestStatusService
-
-            machine_sync_service = self._container.get(MachineSyncService)
-            status_service = self._container.get(RequestStatusService)
+            machine_sync_service = self._machine_sync_service
+            status_service = self._status_service
 
             (
                 provider_machines,

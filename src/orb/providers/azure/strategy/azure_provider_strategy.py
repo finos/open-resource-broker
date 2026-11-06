@@ -676,18 +676,6 @@ class AzureProviderStrategy(ProviderStrategy):
             return await self._handle_start_instances(operation)
         elif operation.operation_type == ProviderOperationType.STOP_INSTANCES:
             return await self._handle_stop_instances(operation)
-        elif operation.operation_type == ProviderOperationType.CLEANUP_MACHINE_RESOURCES:
-            return self._unsupported_machine_operation_result(
-                "cleanup_machine_resources",
-                "Azure VMSS/VM deletion already tears down the resources it owns "
-                "(disks, NICs); there is no separate per-machine cleanup step to run.",
-            )
-        elif operation.operation_type == ProviderOperationType.GET_MACHINE_HEALTH:
-            return self._unsupported_machine_operation_result(
-                "get_machine_health",
-                "Azure machine health is derived from check_hosts_status "
-                "(GET_INSTANCE_STATUS); there is no separate per-machine health check.",
-            )
         else:
             return ProviderResult.error_result(
                 f"Unsupported operation: {operation.operation_type}",
@@ -830,22 +818,6 @@ class AzureProviderStrategy(ProviderStrategy):
                 "STOP_INSTANCES_ERROR",
                 exc,
             )
-
-    @staticmethod
-    def _unsupported_machine_operation_result(operation_name: str, reason: str) -> ProviderResult:
-        """Build the documented-unsupported response for a per-machine operation.
-
-        Used for operations AWS implements via a dedicated machine adapter
-        (volume/ENI cleanup, live EC2 health checks) that have no Azure
-        equivalent -- rather than silently no-op'ing, this returns a clear,
-        intentional error so callers do not mistake it for a transient
-        failure.
-        """
-        return ProviderResult.error_result(
-            f"{operation_name} is not supported by the Azure provider: {reason}",
-            f"{operation_name.upper()}_NOT_SUPPORTED",
-            {"operation": operation_name},
-        )
 
     # ------------------------------------------------------------------
     # GET_INSTANCE_STATUS

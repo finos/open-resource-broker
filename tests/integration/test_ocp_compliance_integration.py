@@ -148,7 +148,6 @@ class TestOCPComplianceIntegration:
         )
 
         # Build handler with correct constructor signature
-        mock_container = Mock()
         mock_logger = Mock()
         mock_event_publisher = Mock()
         mock_error_handler = Mock()
@@ -156,7 +155,6 @@ class TestOCPComplianceIntegration:
         mock_registry_service.register_provider_strategy.return_value = True
 
         handler = RegisterProviderStrategyHandler(
-            container=mock_container,
             logger=mock_logger,
             event_publisher=mock_event_publisher,
             error_handler=mock_error_handler,

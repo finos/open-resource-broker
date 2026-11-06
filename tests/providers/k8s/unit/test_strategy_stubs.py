@@ -106,9 +106,10 @@ def test_check_health_happy_path() -> None:
 def test_check_health_unhappy_path() -> None:
     status = _make_strategy(api_failure=RuntimeError("boom")).check_health()
     assert status.is_healthy is False
-    assert "boom" in status.status_message
+    assert "boom" not in status.status_message
     assert status.error_details is not None
-    assert status.error_details["error"] == "boom"
+    assert status.error_details["error_type"] == "RuntimeError"
+    assert "boom" not in str(status.error_details)
 
 
 def test_get_available_regions_is_empty() -> None:

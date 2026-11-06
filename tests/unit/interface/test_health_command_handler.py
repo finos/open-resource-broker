@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -23,6 +24,10 @@ def _make_args(**kwargs) -> argparse.Namespace:
     for k, v in kwargs.items():
         setattr(ns, k, v)
     return ns
+
+
+def _snapshot(status: str, message: str = "msg") -> SimpleNamespace:
+    return SimpleNamespace(status=status, message=message)
 
 
 def _make_container(overrides: dict | None = None):
@@ -294,7 +299,7 @@ class TestConfigFileCheck:
 
         checks_arg = mocks["scheduler"].format_health_response.call_args[0][0]
         cfg_check = next(c for c in checks_arg if c["name"] == "config_file")
-        assert "config.json" in cfg_check["details"]
+        assert "config.json" not in cfg_check["details"]
 
 
 # ---------------------------------------------------------------------------
@@ -463,9 +468,9 @@ class TestProviderHealthCheck:
         container, mocks = _make_container()
         mocks["registry_service"].get_available_strategies.return_value = ["aws", "k8s"]
 
-        healthy_status = MagicMock()
-        healthy_status.is_healthy = True
-        mocks["registry_service"].check_strategy_health.return_value = healthy_status
+        mocks["registry_service"].probe_strategy_health = AsyncMock(
+            return_value=_snapshot("healthy")
+        )
         mocks["scheduler"].format_health_response.return_value = {
             "checks": [],
             "summary": {"passed": 1, "total": 1, "status": "ok"},
@@ -487,13 +492,9 @@ class TestProviderHealthCheck:
         container, mocks = _make_container()
         mocks["registry_service"].get_available_strategies.return_value = ["aws", "k8s"]
 
-        healthy = MagicMock()
-        healthy.is_healthy = True
-        unhealthy = MagicMock()
-        unhealthy.is_healthy = False
-        unhealthy.status_message = "connection refused"
-
-        mocks["registry_service"].check_strategy_health.side_effect = [healthy, unhealthy]
+        mocks["registry_service"].probe_strategy_health = AsyncMock(
+            side_effect=[_snapshot("healthy"), _snapshot("unhealthy")]
+        )
         mocks["scheduler"].format_health_response.return_value = {
             "checks": [],
             "summary": {"passed": 0, "total": 1, "status": "warn"},
@@ -515,10 +516,9 @@ class TestProviderHealthCheck:
         container, mocks = _make_container()
         mocks["registry_service"].get_available_strategies.return_value = ["aws"]
 
-        unhealthy = MagicMock()
-        unhealthy.is_healthy = False
-        unhealthy.status_message = "timed out"
-        mocks["registry_service"].check_strategy_health.return_value = unhealthy
+        mocks["registry_service"].probe_strategy_health = AsyncMock(
+            return_value=_snapshot("unhealthy")
+        )
         mocks["scheduler"].format_health_response.return_value = {
             "checks": [],
             "summary": {"passed": 0, "total": 1, "status": "warn"},
@@ -534,12 +534,14 @@ class TestProviderHealthCheck:
         assert ph["status"] == "warn"
 
     def test_health_check_returns_none_appends_error_message(self):
-        """check_strategy_health returning None → error string appended."""
+        """An unknown probe result → provider_health warns."""
         from orb.interface.health_command_handler import handle_health_check
 
         container, mocks = _make_container()
         mocks["registry_service"].get_available_strategies.return_value = ["aws"]
-        mocks["registry_service"].check_strategy_health.return_value = None
+        mocks["registry_service"].probe_strategy_health = AsyncMock(
+            return_value=_snapshot("unknown")
+        )
         mocks["scheduler"].format_health_response.return_value = {
             "checks": [],
             "summary": {"passed": 0, "total": 1, "status": "warn"},
@@ -555,13 +557,13 @@ class TestProviderHealthCheck:
         assert ph["status"] == "warn"
 
     def test_per_provider_exception_appended_as_error(self):
-        """check_strategy_health raising → error string added for that provider."""
+        """A probe that raises → provider_health warns without the error text."""
         from orb.interface.health_command_handler import handle_health_check
 
         container, mocks = _make_container()
         mocks["registry_service"].get_available_strategies.return_value = ["aws"]
-        mocks["registry_service"].check_strategy_health.side_effect = RuntimeError(
-            "provider crashed"
+        mocks["registry_service"].probe_strategy_health = AsyncMock(
+            side_effect=RuntimeError("provider crashed")
         )
         mocks["scheduler"].format_health_response.return_value = {
             "checks": [],
@@ -576,7 +578,7 @@ class TestProviderHealthCheck:
         checks_arg = mocks["scheduler"].format_health_response.call_args[0][0]
         ph = next(c for c in checks_arg if c["name"] == "provider_health")
         assert ph["status"] == "warn"
-        assert "provider crashed" in ph["details"]
+        assert "provider crashed" not in repr(ph)
 
     def test_provider_registry_exception_appended_as_warn(self):
         """If getting registry service itself raises → 'warn' appended."""
@@ -869,3 +871,188 @@ class TestHealthCheckOuterException:
 
         assert result["success"] is False
         assert "message" in result
+
+
+# ---------------------------------------------------------------------------
+# Responses carry generic text only; details go to the log
+# ---------------------------------------------------------------------------
+
+_ACCOUNT_ID = "123456789012"
+_RAW_ERROR = "Unable to locate credentials"
+
+
+def _all_text(value: Any) -> str:
+    """Flatten a response structure into one string for substring assertions."""
+    return repr(value)
+
+
+@pytest.mark.unit
+class TestNoProviderInternalsInResponses:
+    def test_provider_status_message_and_exception_text_stay_out_of_checks(self):
+        from orb.interface.health_command_handler import handle_health_check
+
+        container, mocks = _make_container()
+        mocks["registry_service"].get_available_strategies.return_value = ["aws-a", "aws-b"]
+        mocks["registry_service"].probe_strategy_health = AsyncMock(
+            side_effect=RuntimeError(f"{_RAW_ERROR} Account: {_ACCOUNT_ID}")
+        )
+
+        args = _make_args()
+        args._container = container
+        with patch("orb.interface.health_command_handler.logger") as log:
+            result = handle_health_check(args)
+
+        checks = mocks["scheduler"].format_health_response.call_args[0][0]
+        console_calls = _all_text(mocks["console"].mock_calls)
+        for surface in (_all_text(checks), _all_text(result), console_calls):
+            assert _ACCOUNT_ID not in surface
+            assert _RAW_ERROR not in surface
+
+        logged = _all_text(log.warning.call_args_list)
+        assert _ACCOUNT_ID in logged
+        assert _RAW_ERROR in logged
+
+    def test_failing_checks_report_a_generic_error(self):
+        from orb.interface.health_command_handler import handle_health_check
+
+        container, mocks = _make_container()
+        mocks["scheduler"].get_template_paths.side_effect = RuntimeError(_RAW_ERROR)
+        mocks["scheduler"].get_working_directory.side_effect = RuntimeError(_RAW_ERROR)
+        mocks["scheduler"].get_logs_directory.side_effect = RuntimeError(_RAW_ERROR)
+        mocks["template_repo"].find_active_templates.side_effect = RuntimeError(_RAW_ERROR)
+        mocks["health_port"].run_all_checks.return_value = {
+            "database": {"status": "unhealthy", "details": {"error": _RAW_ERROR}}
+        }
+
+        args = _make_args()
+        args._container = container
+        handle_health_check(args)
+
+        checks = mocks["scheduler"].format_health_response.call_args[0][0]
+        assert _RAW_ERROR not in _all_text(checks)
+        assert _RAW_ERROR not in _all_text(mocks["console"].mock_calls)
+        assert any(c.get("error") for c in checks)
+
+    def test_unexpected_failure_returns_a_generic_error(self):
+        from orb.interface.health_command_handler import handle_health_check
+
+        mock_console = MagicMock(spec=ConsolePort)
+
+        def _get(t):
+            if t is ConsolePort:
+                return mock_console
+            raise RuntimeError(f"{_RAW_ERROR} for {_ACCOUNT_ID}")
+
+        container = MagicMock()
+        container.get.side_effect = _get
+        args = _make_args()
+        args._container = container
+
+        result = handle_health_check(args)
+
+        assert result["success"] is False
+        assert _RAW_ERROR not in _all_text(result)
+        assert _ACCOUNT_ID not in _all_text(result)
+        assert _RAW_ERROR not in _all_text(mock_console.mock_calls)
+
+
+# ---------------------------------------------------------------------------
+# No filesystem paths in output; hung providers bound the whole command
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestNoPathsInResponses:
+    def test_paths_are_logged_not_returned(self, tmp_path):
+        from orb.interface.health_command_handler import handle_health_check
+
+        present = tmp_path / "present"
+        present.mkdir()
+        missing_config = str(tmp_path / "secret-dir" / "config.json")
+        container, mocks = _make_container()
+        mocks["config"].get_config_file_path.return_value = missing_config
+        mocks["scheduler"].get_template_paths.return_value = [
+            str(present),
+            str(tmp_path / "no-such-templates.json"),
+        ]
+        mocks["scheduler"].get_working_directory.return_value = str(tmp_path / "work-missing")
+        mocks["scheduler"].get_logs_directory.return_value = str(present)
+        args = _make_args()
+        args._container = container
+
+        with patch("orb.interface.health_command_handler.logger") as log:
+            result = handle_health_check(args)
+
+        checks = mocks["scheduler"].format_health_response.call_args[0][0]
+        for surface in (
+            _all_text(checks),
+            _all_text(result),
+            _all_text(mocks["console"].mock_calls),
+        ):
+            assert str(tmp_path) not in surface
+        assert missing_config in _all_text(log.warning.call_args_list)
+
+    def test_template_paths_missing_everywhere_are_not_listed(self, tmp_path):
+        from orb.interface.health_command_handler import handle_health_check
+
+        container, mocks = _make_container()
+        mocks["scheduler"].get_template_paths.return_value = [str(tmp_path / "a.json")]
+        args = _make_args()
+        args._container = container
+
+        handle_health_check(args)
+
+        checks = mocks["scheduler"].format_health_response.call_args[0][0]
+        templates = next(c for c in checks if c["name"] == "templates_file")
+        assert templates["status"] == "fail"
+        assert str(tmp_path) not in templates["details"]
+
+
+@pytest.mark.unit
+class TestHungProviderBoundsTheCommand:
+    def test_command_time_is_bounded_when_every_provider_call_hangs(self, tmp_path):
+        import threading
+        import time
+
+        from orb.application.services.provider_registry_service import ProviderRegistryService
+        from orb.interface.health_command_handler import handle_health_check
+        from orb.monitoring.health import HealthCheck, HealthCheckConfig, HealthStatus
+
+        release = threading.Event()
+
+        def hang() -> HealthStatus:
+            release.wait(30)
+            return HealthStatus("hung", "healthy", {})
+
+        health = HealthCheck(config=HealthCheckConfig(health_dir=tmp_path / "health"))
+        health.check_timeout_seconds = 0.3
+        health.register_check("aws", hang, kind="provider")
+        health.register_check("ec2", hang, kind="provider")
+
+        strategy = MagicMock()
+        strategy.check_health.side_effect = lambda: release.wait(30)
+        registry = MagicMock()
+        registry.get_or_create_strategy.return_value = strategy
+        real = ProviderRegistryService(registry, MagicMock(), MagicMock())
+        service = MagicMock(spec=ProviderRegistryService)
+        service.get_available_strategies.return_value = ["aws-a", "aws-b"]
+        service.probe_strategy_health = lambda name: real.probe_strategy_health(name, timeout=0.3)
+
+        container, mocks = _make_container(
+            {HealthCheckPort: health, ProviderRegistryService: service}
+        )
+        args = _make_args()
+        args._container = container
+
+        started = time.monotonic()
+        try:
+            handle_health_check(args)
+            elapsed = time.monotonic() - started
+        finally:
+            release.set()
+
+        assert elapsed < 3, f"health command took {elapsed:.1f}s with hung providers"
+        checks = mocks["scheduler"].format_health_response.call_args[0][0]
+        statuses = {c["name"]: c["status"] for c in checks}
+        assert statuses["aws"] in {"warn", "fail"}
+        assert statuses["provider_health"] == "warn"

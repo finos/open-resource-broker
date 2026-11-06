@@ -25,23 +25,14 @@ from orb.domain.request.value_objects import RequestType
 
 def _make_service(uow_factory: MagicMock) -> ProvisioningOrchestrationService:
     """Return a ProvisioningOrchestrationService with a pre-wired UoW factory."""
-    from orb.domain.base import UnitOfWorkFactory
-
-    container = MagicMock()
-
-    def _container_get(cls):
-        if cls is UnitOfWorkFactory:
-            return uow_factory
-        return MagicMock()
-
-    container.get.side_effect = _container_get
 
     logger = MagicMock()
     config_port = MagicMock()
     config_port.get_request_config.return_value = {}
 
     return ProvisioningOrchestrationService(
-        container=container,
+        uow_factory=uow_factory,
+        scheduler=MagicMock(),
         logger=logger,
         provider_selection_port=MagicMock(),
         provider_config_port=MagicMock(),

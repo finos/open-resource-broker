@@ -68,7 +68,6 @@ def _build_command_bus(
     # Register ExecuteProviderOperationHandler with real implementation
     # but leaf-mocked ProviderRegistryService
     from orb.domain.base.ports import (
-        ContainerPort,
         ErrorHandlingPort,
         EventPublisherPort,
         LoggingPort,
@@ -82,10 +81,8 @@ def _build_command_bus(
 
     mock_event_publisher = MagicMock(spec=EventPublisherPort)
     mock_error_handler = MagicMock(spec=ErrorHandlingPort)
-    mock_container_port = MagicMock(spec=ContainerPort)
 
     exec_handler = ExecuteProviderOperationHandler(
-        container=mock_container_port,
         logger=mock_logger,
         event_publisher=mock_event_publisher,
         error_handler=mock_error_handler,

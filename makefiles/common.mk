@@ -50,7 +50,7 @@ TESTS_PROVIDERS := $(TESTS)/providers
 # per-provider matrix never picks them up.  They need no provider SDKs and run
 # in the unit leg.  tests/unit/test_ci_collects_shared_provider_suites.py fails
 # when a directory with tests is missing from this list.
-TESTS_PROVIDERS_SHARED := $(TESTS_PROVIDERS)/base $(TESTS_PROVIDERS)/contract $(TESTS_PROVIDERS)/services
+TESTS_PROVIDERS_SHARED := $(TESTS_PROVIDERS)/base $(TESTS_PROVIDERS)/contract
 CONFIG := config/config.json
 
 # Coverage settings

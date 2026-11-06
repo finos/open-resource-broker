@@ -58,6 +58,7 @@ class K8sCapabilityService:
                 ProviderOperationType.TERMINATE_INSTANCES,
                 ProviderOperationType.GET_INSTANCE_STATUS,
                 ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+                ProviderOperationType.VALIDATE_TEMPLATE,
                 ProviderOperationType.HEALTH_CHECK,
                 # START / STOP are supported for Deployment and StatefulSet
                 # workloads via spec.replicas scaling.  Pod and Job return

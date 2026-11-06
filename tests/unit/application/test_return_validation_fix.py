@@ -24,7 +24,6 @@ class TestReturnValidationFix:
         self.mock_uow_factory.create_unit_of_work.return_value = self.mock_context_manager
 
         self.mock_logger = Mock()
-        self.mock_container = Mock()
         self.mock_event_publisher = Mock()
         self.mock_error_handler = Mock()
         self.mock_query_bus = Mock()
@@ -33,11 +32,13 @@ class TestReturnValidationFix:
         self.handler = CreateReturnRequestHandler(
             self.mock_uow_factory,
             self.mock_logger,
-            self.mock_container,
             self.mock_event_publisher,
             self.mock_error_handler,
             self.mock_query_bus,
             self.mock_provider_registry_service,
+            Mock(),
+            Mock(),
+            Mock(),
         )
 
     @pytest.mark.asyncio

@@ -23,6 +23,7 @@ from orb.application.dto.system import (
     SystemStatusDTO,
     ValidationResultDTO,
 )
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.ports.system_info_port import SystemInfoPort
 from orb.application.queries.system import (
     GetConfigurationSectionQuery,
@@ -32,7 +33,7 @@ from orb.application.queries.system import (
     ValidateProviderConfigQuery,
 )
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from orb.domain.base.ports import ConfigurationPort, ErrorHandlingPort, LoggingPort
 from orb.domain.services.timestamp_service import TimestampService
 
 # Use TYPE_CHECKING to avoid direct infrastructure imports
@@ -50,10 +51,10 @@ class GetConfigurationSectionHandler(
         self,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
     ):
         super().__init__(logger, error_handler)
-        self._container = container
+        self._config_manager = config_manager
 
     async def execute_query(
         self, query: GetConfigurationSectionQuery
@@ -67,10 +68,7 @@ class GetConfigurationSectionHandler(
         Returns:
             Configuration section response
         """
-        # Access configuration through DI container
-        from orb.domain.base.ports import ConfigurationPort
-
-        config_manager = self._container.get(ConfigurationPort)
+        config_manager = self._config_manager
         section_config = config_manager.get(query.section, {})
 
         return ConfigurationSectionResponse(
@@ -87,7 +85,7 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
         error_handler: ErrorHandlingPort,
         timestamp_service: TimestampService,
         system_info: SystemInfoPort,
@@ -97,13 +95,13 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
 
         Args:
             logger: Logging port for operation logging
-            container: Container port for dependency access
+            config_manager: Configuration port for reading settings
             error_handler: Error handling port for exception management
             timestamp_service: Service for timestamp formatting
             system_info: Port for system-level I/O (filesystem, env, metrics)
         """
         super().__init__(logger, error_handler)
-        self.container = container
+        self._config_manager = config_manager
         self.timestamp_service = timestamp_service
         self._system_info = system_info
 
@@ -112,10 +110,7 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
         self.logger.info("Getting provider configuration")
 
         try:
-            # Get configuration manager from container
-            from orb.domain.base.ports import ConfigurationPort
-
-            config_manager = self.container.get(ConfigurationPort)
+            config_manager = self._config_manager
 
             # Get provider configuration
             provider_config = config_manager.get_provider_config()
@@ -186,7 +181,7 @@ class ValidateProviderConfigHandler(
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         """
@@ -194,21 +189,18 @@ class ValidateProviderConfigHandler(
 
         Args:
             logger: Logging port for operation logging
-            container: Container port for dependency access
+            config_manager: Configuration port for reading settings
             error_handler: Error handling port for exception management
         """
         super().__init__(logger, error_handler)
-        self.container = container
+        self._config_manager = config_manager
 
     async def execute_query(self, query: ValidateProviderConfigQuery) -> ValidationResultDTO:  # type: ignore[override]
         """Execute provider configuration validation query."""
         self.logger.info("Validating provider configuration")
 
         try:
-            # Get configuration manager from container
-            from orb.domain.base.ports import ConfigurationPort
-
-            config_manager = self.container.get(ConfigurationPort)
+            config_manager = self._config_manager
 
             validation_errors = []
             warnings = []
@@ -253,7 +245,7 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
         error_handler: ErrorHandlingPort,
         timestamp_service: TimestampService,
         system_info: SystemInfoPort,
@@ -263,13 +255,13 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
 
         Args:
             logger: Logging port for operation logging
-            container: Container port for dependency access
+            config_manager: Configuration port for reading settings
             error_handler: Error handling port for exception management
             timestamp_service: Service for timestamp formatting
             system_info: Port for system-level I/O (filesystem, env, metrics)
         """
         super().__init__(logger, error_handler)
-        self.container = container
+        self._config_manager = config_manager
         self.timestamp_service = timestamp_service
         self._system_info = system_info
 
@@ -299,9 +291,6 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
 
             # Check provider status
             try:
-                from orb.domain.base.ports import ConfigurationPort
-
-                self.container.get(ConfigurationPort)
                 system_status["components"]["configuration"] = {
                     "status": "healthy",
                     "details": "Configuration manager operational",
@@ -350,13 +339,13 @@ class ValidateStorageHandler(BaseQueryHandler[ValidateStorageQuery, dict[str, An
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
         error_handler: ErrorHandlingPort,
         uow_factory: UnitOfWorkFactory,
     ) -> None:
         """Initialize validate storage handler."""
         super().__init__(logger, error_handler)
-        self.container = container
+        self._config_manager = config_manager
         self.uow_factory = uow_factory
 
     async def execute_query(self, query: ValidateStorageQuery) -> dict[str, Any]:
@@ -395,12 +384,12 @@ class ValidateMCPHandler(BaseQueryHandler[ValidateMCPQuery, dict[str, Any]]):
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         """Initialize validate MCP handler."""
         super().__init__(logger, error_handler)
-        self.container = container
+        self._config_manager = config_manager
 
     async def execute_query(self, query: ValidateMCPQuery) -> dict[str, Any]:
         """Execute MCP validation query."""
@@ -408,9 +397,7 @@ class ValidateMCPHandler(BaseQueryHandler[ValidateMCPQuery, dict[str, Any]]):
 
         try:
             # Basic MCP validation - check if configuration is accessible
-            from orb.domain.base.ports import ConfigurationPort
-
-            config_manager = self.container.get(ConfigurationPort)
+            config_manager = self._config_manager
 
             validation_errors = []
             warnings = []
@@ -459,27 +446,25 @@ class GetSystemConfigHandler(BaseQueryHandler[GetSystemConfigQuery, SystemConfig
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
+        scheduler: SchedulerPort,
         error_handler: ErrorHandlingPort,
         system_info: SystemInfoPort,
     ) -> None:
         super().__init__(logger, error_handler)
-        self.container = container
+        self._config_manager = config_manager
+        self._scheduler = scheduler
         self._system_info = system_info
 
     async def execute_query(self, query: GetSystemConfigQuery) -> SystemConfigDTO:
         """Execute system config query."""
-        from orb.domain.base.ports import ConfigurationPort
-
-        cfg = self.container.get(ConfigurationPort)
+        cfg = self._config_manager
 
         # --- paths ---
         loaded_templates_file: str | None = None
         template_search_paths: list[str] | None = None
         try:
-            from orb.application.ports.scheduler_port import SchedulerPort
-
-            scheduler = self.container.get(SchedulerPort)
+            scheduler = self._scheduler
             all_paths = scheduler.get_template_paths() or []
 
             for path in all_paths:

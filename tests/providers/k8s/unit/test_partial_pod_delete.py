@@ -81,7 +81,8 @@ async def test_bridge_exposes_ids_where_the_orchestrator_reads_them() -> None:
     orchestrator = DeprovisioningOrchestrator(
         uow_factory=MagicMock(),
         logger=MagicMock(),
-        container=MagicMock(),
+        scheduler=MagicMock(),
+        config_manager=MagicMock(),
         query_bus=query_bus,
         provider_selection_port=selection,
     )

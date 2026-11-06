@@ -11,10 +11,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from orb.domain.base.ports.health_check_port import HealthCheckPort
-from orb.monitoring.health import HealthStatus
+from orb.monitoring.health import HealthStatus, failure_details
 
 if TYPE_CHECKING:
     from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+
+_PROBE_TIMEOUT_SECONDS = 5
 
 
 def register_k8s_health_checks(
@@ -39,7 +41,9 @@ def register_k8s_health_checks(
 
     def _check_kubernetes_api_health() -> HealthStatus:
         try:
-            resources = kubernetes_client.core_v1.get_api_resources()
+            resources = kubernetes_client.core_v1.get_api_resources(
+                _request_timeout=_PROBE_TIMEOUT_SECONDS
+            )
             resource_count = len(getattr(resources, "resources", []) or [])
             return HealthStatus(
                 name="kubernetes_api",
@@ -59,7 +63,7 @@ def register_k8s_health_checks(
             return HealthStatus(
                 name="kubernetes_api",
                 status="degraded",
-                details={"error": str(exc)},
+                details=failure_details("kubernetes_api", exc),
                 dependencies=["kubernetes_api"],
             )
 

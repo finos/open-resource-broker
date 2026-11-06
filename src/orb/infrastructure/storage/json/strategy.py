@@ -127,7 +127,6 @@ class JSONStorageStrategy(BaseStorageStrategy):
         path = self.file_manager.file_path
         details: dict[str, Any] = {
             "type": "json",
-            "file_path": str(path),
             "entity_type": self.entity_type,
         }
         try:
@@ -157,7 +156,8 @@ class JSONStorageStrategy(BaseStorageStrategy):
             details["state"] = "ok"
             return True, details
         except (OSError, json.JSONDecodeError) as exc:
-            details["error"] = str(exc)
+            self.logger.warning("JSON storage health probe failed for %s: %s", path, exc)
+            details["reason"] = "storage file could not be read"
             return False, details
 
     @instrument_storage(lambda self: cast("JSONStorageStrategy", self)._metrics, "save")

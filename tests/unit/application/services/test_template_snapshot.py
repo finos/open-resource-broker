@@ -101,10 +101,8 @@ def _orchestrator(origin_metadata: dict, stored_template):
     uow.__exit__ = MagicMock(return_value=False)
     uow_factory = MagicMock()
     uow_factory.create_unit_of_work.return_value = uow
-    container = MagicMock()
     scheduler = MagicMock()
     scheduler.format_template_for_provider.side_effect = lambda t: t.to_dict()
-    container.get.return_value = scheduler
     query_bus = MagicMock()
     query_bus.execute = AsyncMock(return_value=stored_template)
     provider = MagicMock()
@@ -112,9 +110,10 @@ def _orchestrator(origin_metadata: dict, stored_template):
     orch = DeprovisioningOrchestrator(
         uow_factory=uow_factory,
         logger=MagicMock(),
-        container=container,
         query_bus=query_bus,
         provider_selection_port=provider,
+        scheduler=scheduler,
+        config_manager=MagicMock(),
     )
     return orch, provider, query_bus, scheduler
 

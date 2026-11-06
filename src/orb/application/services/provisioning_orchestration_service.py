@@ -11,7 +11,14 @@ if TYPE_CHECKING:
     from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 
 from orb.application.ports.resilience_port import CircuitBreakerOpenError, CircuitBreakerPort
-from orb.domain.base.exceptions import QuotaError
+from orb.application.ports.scheduler_port import SchedulerPort
+from orb.application.services.provisioning_writes import save_provisioning_state
+from orb.domain.base import UnitOfWorkFactory
+from orb.domain.base.exceptions import (
+    OperationNotSupportedError,
+    ProviderNotReadyError,
+    QuotaError,
+)
 from orb.domain.base.operation_outcome import (
     Accepted,
     Completed,
@@ -19,7 +26,7 @@ from orb.domain.base.operation_outcome import (
     OperationOutcome,
     RequiresFollowUp,
 )
-from orb.domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, ProviderConfigPort
+from orb.domain.base.ports import ConfigurationPort, LoggingPort, ProviderConfigPort
 from orb.domain.base.results import ProviderSelectionResult
 from orb.domain.request.aggregate import Request
 from orb.domain.request.fulfilment_state_machine import (
@@ -69,6 +76,10 @@ class ProvisioningResult:
     provider_error_message: str | None = None
     provider_request_id: str | None = None
     error_source: str | None = None
+    # False when the failure says nothing about provider health (the provider
+    # was not ready, or was asked for an operation it does not support), so it
+    # must not count against the provider's circuit breaker.
+    counts_as_provider_failure: bool = True
 
     def __post_init__(self) -> None:
         """Derive ``is_final`` from ``outcome`` when an outcome is provided."""
@@ -125,15 +136,17 @@ class ProvisioningOrchestrationService:
 
     def __init__(
         self,
-        container: ContainerPort,
         logger: LoggingPort,
+        uow_factory: UnitOfWorkFactory,
+        scheduler: SchedulerPort,
         provider_selection_port: "ProviderSelectionPort",
         provider_config_port: ProviderConfigPort,
         config_port: ConfigurationPort,
         circuit_breaker_factory: Callable[[str], CircuitBreakerPort],
         state_machine: "FulfilmentStateMachine | None" = None,
     ):
-        self._container = container
+        self._uow_factory = uow_factory
+        self._scheduler = scheduler
         self._logger = logger
         self._provider_selection_port = provider_selection_port
         self._provider_config_port = provider_config_port
@@ -251,7 +264,8 @@ class ProvisioningOrchestrationService:
                 self._logger.warning(
                     "Attempt %d failed: %s", attempt_number, last_result.error_message
                 )
-                self._record_provider_failure(selection_result.provider_name)
+                if last_result.counts_as_provider_failure:
+                    self._record_provider_failure(selection_result.provider_name)
                 break
 
             # Checkpoint: persist the resource IDs returned by this attempt before
@@ -340,7 +354,6 @@ class ProvisioningOrchestrationService:
             failed.  The caller continues with the in-memory request; the final
             persist in the handler will still carry the correct resource IDs.
         """
-        from orb.domain.base import UnitOfWorkFactory
 
         try:
             updated = request
@@ -356,10 +369,8 @@ class ProvisioningOrchestrationService:
                     FulfilmentEvent.RESOURCES_CREATED,
                     now=datetime.now(timezone.utc),
                 )
-            uow_factory = self._container.get(UnitOfWorkFactory)
-            with uow_factory.create_unit_of_work() as uow:
-                uow.requests.save(updated)
-            return updated, True
+            saved, _ = save_provisioning_state(self._uow_factory, updated)
+            return saved, True
         except Exception as e:
             self._logger.warning(
                 "Failed to persist resource-ID checkpoint for request %s: %s",
@@ -376,7 +387,6 @@ class ProvisioningOrchestrationService:
             failed.  The caller should log a warning but continue the retry loop
             because the in-memory request is still valid.
         """
-        from orb.domain.base import UnitOfWorkFactory
 
         try:
             if request.status == RequestStatus.PENDING:
@@ -390,10 +400,8 @@ class ProvisioningOrchestrationService:
                 # Already past PENDING (e.g. ACQUIRING) — re-persist as-is;
                 # the deadline sweep on the next state-machine touch governs it.
                 updated = request
-            uow_factory = self._container.get(UnitOfWorkFactory)
-            with uow_factory.create_unit_of_work() as uow:
-                uow.requests.save(updated)
-            return updated, True
+            saved, _ = save_provisioning_state(self._uow_factory, updated)
+            return saved, True
         except Exception as e:
             self._logger.warning("Failed to persist ACQUIRING status: %s", e)
             return request, False
@@ -445,7 +453,6 @@ class ProvisioningOrchestrationService:
         Returns:
             The number of requests that were transitioned to a terminal state.
         """
-        from orb.domain.base import UnitOfWorkFactory
         from orb.domain.request.repository import RequestRepository
 
         now: datetime = datetime.now(timezone.utc)
@@ -468,7 +475,7 @@ class ProvisioningOrchestrationService:
             return r.created_at is not None and r.created_at < cutoff
 
         try:
-            uow_factory = self._container.get(UnitOfWorkFactory)
+            uow_factory = self._uow_factory
             with uow_factory.create_unit_of_work() as uow:
                 repo: RequestRepository = uow.requests  # type: ignore[assignment]
                 active: list[Request] = []
@@ -518,7 +525,7 @@ class ProvisioningOrchestrationService:
                             "Request abandoned in active state (timeout exceeded)",
                             force=True,
                         )
-                    uow_factory2 = self._container.get(UnitOfWorkFactory)
+                    uow_factory2 = self._uow_factory
                     with uow_factory2.create_unit_of_work() as uow2:
                         uow2.requests.save(failed_request)
                     failed_count += 1
@@ -567,13 +574,12 @@ class ProvisioningOrchestrationService:
     ) -> ProvisioningResult:
         """Dispatch a single provisioning attempt for `count` instances."""
         try:
-            from orb.application.ports.scheduler_port import SchedulerPort
             from orb.domain.base.operations import (
                 Operation as ProviderOperation,
                 OperationType as ProviderOperationType,
             )
 
-            scheduler = self._container.get(SchedulerPort)
+            scheduler = self._scheduler
 
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.CREATE_INSTANCES,
@@ -696,6 +702,46 @@ class ProvisioningOrchestrationService:
                 provider_data={},
                 error_message=timeout_msg,
                 outcome=Failed(error=timeout_msg, recoverable=True),
+            )
+
+        except ProviderNotReadyError as e:
+            # Not a provider-health signal and not retried here: the provider
+            # may become ready later, so the failure is recoverable by a new
+            # request, but this attempt stops.
+            not_ready_msg = f"Provider not ready: {e.message}"
+            self._logger.warning(
+                "Provider %s not ready for request %s",
+                selection_result.provider_name if selection_result else "unknown",
+                str(request.request_id) if hasattr(request, "request_id") else "unknown",
+            )
+            return ProvisioningResult(
+                success=False,
+                resource_ids=[],
+                machine_ids=[],
+                instances=[],
+                provider_data={},
+                error_message=not_ready_msg,
+                outcome=Failed(error=not_ready_msg, recoverable=True),
+                counts_as_provider_failure=False,
+            )
+
+        except OperationNotSupportedError as e:
+            # Permanent template/provider mismatch: asking again cannot succeed.
+            unsupported_msg = f"Operation not supported: {e.message}"
+            self._logger.warning(
+                "Provider %s does not support provisioning for request %s",
+                selection_result.provider_name if selection_result else "unknown",
+                str(request.request_id) if hasattr(request, "request_id") else "unknown",
+            )
+            return ProvisioningResult(
+                success=False,
+                resource_ids=[],
+                machine_ids=[],
+                instances=[],
+                provider_data={},
+                error_message=unsupported_msg,
+                outcome=Failed(error=unsupported_msg, recoverable=False),
+                counts_as_provider_failure=False,
             )
 
         except QuotaError as e:

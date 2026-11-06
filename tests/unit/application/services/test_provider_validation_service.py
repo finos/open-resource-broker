@@ -38,7 +38,6 @@ def _make_validation_result(is_valid=True, errors=None, warnings=None) -> Valida
 
 
 def _make_service(validator=None, validation_result=None, selection_result=None):
-    container = MagicMock()
     logger = MagicMock()
     provider_selection_port = MagicMock()
     provider_selection_port.select_provider_for_template.return_value = (
@@ -49,7 +48,6 @@ def _make_service(validator=None, validation_result=None, selection_result=None)
     )
 
     service = ProviderValidationService(
-        container=container,
         logger=logger,
         provider_selection_port=provider_selection_port,
         validator=validator,

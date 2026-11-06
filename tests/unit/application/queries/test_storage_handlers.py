@@ -22,6 +22,7 @@ from orb.application.queries.storage_handlers import (
     GetStorageMetricsHandler,
     ListStorageStrategiesHandler,
 )
+from orb.domain.base.ports import ConfigurationPort
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -82,7 +83,7 @@ class TestListStorageStrategiesHandler:
             error_handler=_make_error_handler(),
             storage_service=_make_storage_service(strategies),
             generic_filter_service=filter_svc,
-            container=_make_container(current_strategy),
+            config_manager=_make_container(current_strategy).get(ConfigurationPort),
         )
 
     @pytest.mark.asyncio
@@ -128,7 +129,7 @@ class TestListStorageStrategiesHandler:
             error_handler=_make_error_handler(),
             storage_service=_make_storage_service(["memory"]),
             generic_filter_service=filter_svc,
-            container=_make_container(),
+            config_manager=_make_container().get(ConfigurationPort),
         )
         query = ListStorageStrategiesQuery(
             include_current=False, include_details=False, filter_expressions=["name=nope"]

@@ -346,7 +346,24 @@ class Request(AggregateRoot):
             update={
                 "first_status_check": self.first_status_check or now,
                 "last_status_check": now,
+                # Bumped like every other mutation so a version-checked store
+                # (SQL) accepts the save instead of rejecting it as stale.
+                "version": self.version + 1,
             }
+        )
+
+    @property
+    def awaiting_resources(self) -> bool:
+        """True while the create flow has not yet recorded anything to poll.
+
+        Such a request is still owned by the in-flight create: there is no
+        provider resource or machine to ask about, so a status sync has nothing
+        to fetch and must not write the request.
+        """
+        return (
+            self.status in (RequestStatus.PENDING, RequestStatus.ACQUIRING)
+            and not self.resource_ids
+            and not self.machine_ids
         )
 
     def needs_machine_id_population(self) -> bool:

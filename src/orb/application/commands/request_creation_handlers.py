@@ -11,23 +11,26 @@ from orb.application.dto.commands import (
     CreateRequestCommand,
     CreateReturnRequestCommand,
 )
+from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.ports.query_bus_port import QueryBusPort
+from orb.application.services.deprovisioning_orchestrator import DeprovisioningOrchestrator
 from orb.application.services.provider_validation_service import ProviderValidationService
 from orb.application.services.provisioning_orchestration_service import (
     ProvisioningOrchestrationService,
 )
+from orb.application.services.provisioning_writes import save_provisioning_state
 from orb.application.services.template_overrides import apply_template_overrides
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.base.exceptions import ApplicationError, EntityNotFoundError
 from orb.domain.base.ports import (
-    ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
     ProviderSelectionPort,
 )
 from orb.domain.request.aggregate import Request
+from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
 from orb.domain.request.request_identifiers import RequestId
 from orb.domain.request.request_types import RequestStatus
 from orb.domain.request.value_objects import RequestType
@@ -55,18 +58,17 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         self,
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
-        container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
         query_bus: QueryBusPort,  # QueryBus is required for template lookup
         provider_selection_port: ProviderSelectionPort,
         provisioning_service: ProvisioningOrchestrationService,
         provider_validation_service: ProviderValidationService,
+        state_machine: FulfilmentStateMachine,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory
-        self._container = container
         self._query_bus = query_bus
         self._provider_selection_port = provider_selection_port
 
@@ -79,19 +81,9 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         self._request_creation_service = RequestCreationService(logger)
         self._provisioning_service = provisioning_service
         self._status_service = RequestStatusManagementService(
-            uow_factory, logger, state_machine=self._resolve_state_machine(container)
+            uow_factory, logger, state_machine=state_machine
         )
         self._provider_validation_service = provider_validation_service
-
-    @staticmethod
-    def _resolve_state_machine(container: ContainerPort):
-        """Resolve the shared FulfilmentStateMachine from DI (None-safe)."""
-        from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
-
-        try:
-            return container.get(FulfilmentStateMachine)
-        except Exception:
-            return None
 
     async def validate_command(self, command: CreateRequestCommand) -> None:
         """Validate create request command."""
@@ -239,9 +231,13 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         exponential backoff (0.1 s, 0.2 s, 0.4 s).  If all retries fail the
         error is logged at ERROR level but NOT re-raised because the request was
         already successfully persisted.
+
+        The save is applied on top of a fresh read of the stored row, so a
+        status-check stamp, a cancel or any other write made while the provider
+        was being called is kept, and the provisioning result is not lost to a
+        version conflict.
         """
-        with self.uow_factory.create_unit_of_work() as uow:
-            events = uow.requests.save(request)
+        _, events = save_provisioning_state(self.uow_factory, request)
 
         _max_attempts = 3
         _backoff_base = 0.1  # seconds; doubles each retry: 0.1, 0.2, 0.4
@@ -280,26 +276,26 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         self,
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
-        container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
         query_bus: QueryBusPort,  # Add QueryBus for template lookup
         provider_selection_port: ProviderSelectionPort,  # Use port instead of service
+        command_bus: CommandBusPort,
+        domain_config: DomainConfigurationService,
+        deprovisioning_orchestrator: DeprovisioningOrchestrator,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory
-        self._container = container
+        self._command_bus = command_bus
+        self._domain_config = domain_config
         self._query_bus = query_bus
         self._provider_selection_port = provider_selection_port
 
         # Initialize SRP-compliant services
-        from orb.application.services.deprovisioning_orchestrator import DeprovisioningOrchestrator
         from orb.application.services.machine_grouping_service import MachineGroupingService
 
         self._machine_grouping_service = MachineGroupingService(uow_factory, logger)
-        self._deprovisioning_orchestrator = DeprovisioningOrchestrator(
-            uow_factory, logger, container, query_bus, provider_selection_port
-        )
+        self._deprovisioning_orchestrator = deprovisioning_orchestrator
 
     async def validate_command(self, command: CreateReturnRequestCommand):
         """Validate create return request command."""
@@ -339,8 +335,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         self.logger.info("Creating return request for machines: %s", command.machine_ids)
 
         try:
-            domain_config = self._container.get(DomainConfigurationService)
-            prefix = domain_config.get_return_request_prefix()
+            prefix = self._domain_config.get_return_request_prefix()
             force_return = command.force_return or False
             is_single_machine = len(command.machine_ids) == 1
 
@@ -531,15 +526,13 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         """Update return request status to in_progress."""
         try:
             from orb.application.dto.commands import UpdateRequestStatusCommand
-            from orb.application.ports.command_bus_port import CommandBusPort
 
             update_command = UpdateRequestStatusCommand(
                 request_id=str(request.request_id),
                 status=RequestStatus.IN_PROGRESS,
                 message="Return request processing started",
             )
-            command_bus = self._container.get(CommandBusPort)
-            await command_bus.execute(update_command)
+            await self._command_bus.execute(update_command)
             self.logger.info("Updated request %s status to in_progress", request.request_id)
         except Exception as update_error:
             self.logger.error(
@@ -575,7 +568,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 self._update_machines_to_pending(machine_ids)
                 if skipped_ids:
                     from orb.application.dto.commands import UpdateRequestStatusCommand
-                    from orb.application.ports.command_bus_port import CommandBusPort
 
                     skipped_str = ", ".join(skipped_ids)
                     update_command = UpdateRequestStatusCommand(
@@ -587,8 +579,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                             f"(missing provider context): {_format_id_list(skipped_ids)}"
                         ),
                     )
-                    command_bus = self._container.get(CommandBusPort)
-                    await command_bus.execute(update_command)
+                    await self._command_bus.execute(update_command)
                     self.logger.warning(
                         "Request %s marked PARTIAL: %d machine(s) skipped: %s",
                         request.request_id,
@@ -600,7 +591,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     self.logger.info("Termination accepted for request %s", request.request_id)
             elif provisioning_result.get("partial", False):
                 from orb.application.dto.commands import UpdateRequestStatusCommand
-                from orb.application.ports.command_bus_port import CommandBusPort
 
                 failed_ids = list(provisioning_result.get("failed_instance_ids") or [])
                 if successful_ids:
@@ -631,8 +621,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     status=RequestStatus.PARTIAL,
                     message=message,
                 )
-                command_bus = self._container.get(CommandBusPort)
-                await command_bus.execute(update_command)
+                await self._command_bus.execute(update_command)
                 self.logger.warning(
                     "Request %s marked PARTIAL: terminated=%s, failed=%s, errors=%s",
                     request.request_id,
@@ -722,7 +711,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         so the deprovisioning loop can apply its own fallback).
         """
         from orb.application.dto.commands import UpdateRequestStatusCommand
-        from orb.application.ports.command_bus_port import CommandBusPort
 
         update_command = UpdateRequestStatusCommand(
             request_id=str(request.request_id),
@@ -730,8 +718,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             message=message,
         )
         try:
-            command_bus = self._container.get(CommandBusPort)
-            await command_bus.execute(update_command)
+            await self._command_bus.execute(update_command)
             self.logger.info("Updated request %s status to %s", request.request_id, status)
         except Exception as update_error:
             self.logger.error(

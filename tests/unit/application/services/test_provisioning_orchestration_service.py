@@ -155,7 +155,6 @@ class TestOperationOutcomeExhaustiveness:
 
 
 def _make_service() -> ProvisioningOrchestrationService:
-    container = MagicMock()
     logger = MagicMock()
     provider_selection_port = MagicMock()
     provider_config_port = MagicMock()
@@ -171,7 +170,8 @@ def _make_service() -> ProvisioningOrchestrationService:
     circuit_breaker_factory.return_value = cb
 
     return ProvisioningOrchestrationService(
-        container=container,
+        uow_factory=MagicMock(),
+        scheduler=MagicMock(),
         logger=logger,
         provider_selection_port=provider_selection_port,
         provider_config_port=provider_config_port,
@@ -219,7 +219,7 @@ class TestDispatchSingleAttemptOutcome:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        svc._scheduler = scheduler
 
         result = await svc._dispatch_single_attempt(
             MagicMock(template_id="t-1"),
@@ -250,7 +250,7 @@ class TestDispatchSingleAttemptOutcome:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        svc._scheduler = scheduler
 
         result = await svc._dispatch_single_attempt(
             MagicMock(template_id="t-1"),
@@ -288,7 +288,7 @@ class TestDispatchSingleAttemptOutcome:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        svc._scheduler = scheduler
 
         result = await svc._dispatch_single_attempt(
             MagicMock(template_id="t-1"),
@@ -312,7 +312,7 @@ class TestDispatchSingleAttemptOutcome:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        svc._scheduler = scheduler
 
         result = await svc._dispatch_single_attempt(
             MagicMock(template_id="t-1"),
@@ -339,7 +339,7 @@ class TestDispatchSingleAttemptOutcome:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        svc._container.get.return_value = scheduler
+        svc._scheduler = scheduler
 
         result = await svc._dispatch_single_attempt(
             MagicMock(template_id="t-1"),

@@ -162,6 +162,32 @@ class RequestConfig(BaseModel):
         None, description="Fallback template ID for provisioning"
     )
     default_timeout: int = Field(3600, description="Default request timeout in seconds")
+    reconcile_enabled: bool = Field(
+        False,
+        description=(
+            "Run the background loop that refreshes in-flight requests from the "
+            "provider (single-worker server processes only; opt-in because it makes "
+            "periodic provider API calls for every in-flight request)"
+        ),
+    )
+    reconcile_interval_seconds: int = Field(
+        60, ge=1, description="Seconds between background reconcile passes"
+    )
+    reconcile_max_concurrency: int = Field(
+        4, ge=1, description="Maximum requests reconciled against providers at the same time"
+    )
+    reconcile_request_timeout_seconds: int = Field(
+        30, ge=1, description="Per-request time limit for one reconcile attempt"
+    )
+    list_cache_max_age_seconds: int = Field(
+        30,
+        ge=0,
+        description=(
+            "List views reuse stored request state that was refreshed within this many "
+            "seconds instead of calling the provider (applies while the background "
+            "reconcile loop is enabled; 0 always refreshes)"
+        ),
+    )
 
     @field_validator("max_machines_per_request")
     @classmethod

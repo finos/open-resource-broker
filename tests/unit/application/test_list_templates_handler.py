@@ -8,6 +8,7 @@ import pytest
 
 from orb.application.dto.queries import ListTemplatesQuery
 from orb.application.queries.template_query_handlers import ListTemplatesHandler
+from orb.domain.base.ports import TemplateConfigurationPort
 
 
 def _make_template_dto(is_active: bool) -> MagicMock:
@@ -34,7 +35,7 @@ def _make_handler() -> tuple[ListTemplatesHandler, MagicMock]:
     handler = ListTemplatesHandler(
         logger=logger,
         error_handler=error_handler,
-        container=container,
+        template_manager=container.get(TemplateConfigurationPort),
         generic_filter_service=generic_filter_service,
     )
     return handler, active_dto
@@ -85,7 +86,7 @@ async def test_pagination_limit_and_offset() -> None:
     handler = ListTemplatesHandler(
         logger=logger,
         error_handler=error_handler,
-        container=container,
+        template_manager=container.get(TemplateConfigurationPort),
         generic_filter_service=generic_filter_service,
     )
 
@@ -104,24 +105,19 @@ async def test_provider_template_listing_is_served_from_template_configuration(
     provider_name: str,
 ) -> None:
     """Provider templates come from the template configuration, not provider samples."""
-    from orb.domain.base.ports import TemplateConfigurationPort
-
     configured = MagicMock()
     configured.is_active = True
     configured.template_id = f"{provider_name}-configured"
     template_manager = MagicMock()
     template_manager.load_templates = AsyncMock(return_value=[configured])
-    container = MagicMock()
-    container.get = MagicMock(return_value=template_manager)
     handler = ListTemplatesHandler(
         logger=MagicMock(),
         error_handler=MagicMock(),
-        container=container,
+        template_manager=template_manager,
         generic_filter_service=MagicMock(),
     )
 
     result = await handler.execute_query(ListTemplatesQuery(provider_name=provider_name))
 
-    container.get.assert_called_once_with(TemplateConfigurationPort)
     template_manager.load_templates.assert_awaited_once_with(provider_override=provider_name)
     assert [t.template_id for t in result.items] == [f"{provider_name}-configured"]

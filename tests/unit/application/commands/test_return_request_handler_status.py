@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orb.application.commands.request_creation_handlers import CreateReturnRequestHandler
+from orb.application.services.deprovisioning_orchestrator import DeprovisioningOrchestrator
 from orb.domain.request.request_types import RequestStatus
 
 # ---------------------------------------------------------------------------
@@ -64,7 +65,6 @@ def _make_machine(machine_id: str) -> MagicMock:
 def _make_handler() -> tuple[CreateReturnRequestHandler, MagicMock]:
     """Return (handler, command_bus_mock)."""
     logger = MagicMock()
-    container = MagicMock()
     event_publisher = MagicMock()
     error_handler = MagicMock()
     query_bus = MagicMock()
@@ -74,19 +74,26 @@ def _make_handler() -> tuple[CreateReturnRequestHandler, MagicMock]:
 
     uow_factory = _make_uow_factory([_make_machine("i-aaa"), _make_machine("i-bbb")])
 
-    # Command bus is obtained via container.get(CommandBusPort)
     command_bus = MagicMock()
     command_bus.execute = AsyncMock()
-    container.get = MagicMock(return_value=command_bus)
 
     handler = CreateReturnRequestHandler(
         uow_factory=uow_factory,
         logger=logger,
-        container=container,
         event_publisher=event_publisher,
         error_handler=error_handler,
         query_bus=query_bus,
         provider_selection_port=provider_selection_port,
+        command_bus=command_bus,
+        domain_config=MagicMock(),
+        deprovisioning_orchestrator=DeprovisioningOrchestrator(
+            uow_factory=uow_factory,
+            logger=logger,
+            query_bus=query_bus,
+            provider_selection_port=provider_selection_port,
+            scheduler=MagicMock(),
+            config_manager=MagicMock(),
+        ),
     )
     return handler, command_bus
 

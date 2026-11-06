@@ -7,13 +7,6 @@ from pydantic import Field
 from orb.application.dto.base import BaseQuery
 
 
-class GetMachineStatusQuery(BaseQuery):
-    """Query to get machine status."""
-
-    machine_ids: list[str]
-    include_metadata: bool = True
-
-
 class ListMachinesQuery(BaseQuery):
     """Query to list machines with optional filtering."""
 
@@ -26,10 +19,3 @@ class ListMachinesQuery(BaseQuery):
     limit: int = 50
     offset: int = 0
     all_resources: bool = False
-
-
-class GetMachineDetailsQuery(BaseQuery):
-    """Query to get detailed machine information."""
-
-    machine_id: str
-    include_provider_data: bool = True

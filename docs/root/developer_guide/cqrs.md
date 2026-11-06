@@ -59,30 +59,30 @@ class RequestMachinesHandler:
 
 ```python
 from dataclasses import dataclass
-from src.application.dto.queries import BaseQuery
+from orb.application.dto.base import BaseQuery
 
 
 @dataclass
-class GetMachineStatusQuery(BaseQuery):
-    """Query to get machine status."""
+class GetTemplateSummaryQuery(BaseQuery):
+    """Query to get a one-line summary of a template."""
 
-    request_id: str
+    template_id: str
 ```
 
 ### Creating Query Handlers
 
 ```python
 from src.domain.base.dependency_injection import query_handler
-from src.application.dto.queries import GetMachineStatusQuery
+from orb.application.dto.queries import GetTemplateSummaryQuery
 
 
-@query_handler(GetMachineStatusQuery)
-class GetMachineStatusHandler:
+@query_handler(GetTemplateSummaryQuery)
+class GetTemplateSummaryHandler:
     def __init__(self, storage: StoragePort, logger: LoggingPort):
         self._storage = storage
         self._logger = logger
 
-    def handle(self, query: GetMachineStatusQuery) -> MachineStatusResponse:
+    def handle(self, query: GetTemplateSummaryQuery) -> TemplateSummaryResponse:
         # Implementation logic
         pass
 ```

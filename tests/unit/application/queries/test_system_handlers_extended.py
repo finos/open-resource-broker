@@ -14,6 +14,7 @@ from orb.application.dto.system import (
     SystemStatusDTO,
     ValidationResultDTO,
 )
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.queries.system import (
     GetConfigurationSectionQuery,
     GetProviderConfigQuery,
@@ -30,6 +31,7 @@ from orb.application.queries.system_handlers import (
     ValidateProviderConfigHandler,
     ValidateStorageHandler,
 )
+from orb.domain.base.ports import ConfigurationPort
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -107,7 +109,7 @@ class TestGetConfigurationSectionHandler:
         h = GetConfigurationSectionHandler(
             logger=_make_logger(),
             error_handler=_make_error_handler(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
         )
         q = GetConfigurationSectionQuery(section="storage")
         result = await h.execute_query(q)
@@ -122,7 +124,7 @@ class TestGetConfigurationSectionHandler:
         h = GetConfigurationSectionHandler(
             logger=_make_logger(),
             error_handler=_make_error_handler(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
         )
         q = GetConfigurationSectionQuery(section="missing_section")
         result = await h.execute_query(q)
@@ -135,7 +137,7 @@ class TestGetConfigurationSectionHandler:
         h = GetConfigurationSectionHandler(
             logger=_make_logger(),
             error_handler=_make_error_handler(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
         )
         q = GetConfigurationSectionQuery(section="x")
         result = await h.execute_query(q)
@@ -172,7 +174,7 @@ class TestGetProviderConfigHandler:
 
         return GetProviderConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
             timestamp_service=_make_timestamp_service(),
             system_info=system_info,
@@ -223,7 +225,7 @@ class TestGetProviderConfigHandler:
 
         h = GetProviderConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
             timestamp_service=_make_timestamp_service(),
             system_info=system_info,
@@ -234,11 +236,11 @@ class TestGetProviderConfigHandler:
 
     @pytest.mark.asyncio
     async def test_exception_propagates(self):
-        container = MagicMock()
-        container.get.side_effect = RuntimeError("container gone")
+        config_manager = MagicMock()
+        config_manager.get_provider_config.side_effect = RuntimeError("container gone")
         h = GetProviderConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=config_manager,
             error_handler=_make_error_handler(),
             timestamp_service=_make_timestamp_service(),
             system_info=_make_system_info(),
@@ -265,7 +267,7 @@ class TestValidateProviderConfigHandler:
 
         h = ValidateProviderConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
         )
         q = ValidateProviderConfigQuery()
@@ -283,7 +285,7 @@ class TestValidateProviderConfigHandler:
 
         h = ValidateProviderConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
         )
         q = ValidateProviderConfigQuery()
@@ -298,7 +300,7 @@ class TestValidateProviderConfigHandler:
 
         h = ValidateProviderConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
         )
         q = ValidateProviderConfigQuery()
@@ -314,7 +316,7 @@ class TestValidateProviderConfigHandler:
 
         h = ValidateProviderConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
         )
         q = ValidateProviderConfigQuery()
@@ -336,7 +338,7 @@ class TestGetSystemStatusHandler:
             system_info.get_env.return_value = env_val
         return GetSystemStatusHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
             timestamp_service=_make_timestamp_service(),
             system_info=system_info,
@@ -352,12 +354,12 @@ class TestGetSystemStatusHandler:
         assert result.uptime_seconds == 1000.0
 
     @pytest.mark.asyncio
-    async def test_degraded_when_config_not_accessible(self):
-        h = self._handler(config_raises=True)
+    async def test_configuration_component_reported_healthy(self):
+        h = self._handler()
         q = GetSystemStatusQuery()
         result = await h.execute_query(q)
-        assert result.status == "degraded"
-        assert "configuration" in result.components
+        assert result.status == "operational"
+        assert result.components["configuration"]["status"] == "healthy"
 
     @pytest.mark.asyncio
     async def test_env_from_orb_environment(self):
@@ -387,7 +389,7 @@ class TestValidateStorageHandler:
         factory = _make_uow_factory()
         h = ValidateStorageHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
             uow_factory=factory,
         )
@@ -403,7 +405,7 @@ class TestValidateStorageHandler:
         factory.create_unit_of_work.side_effect = RuntimeError("db gone")
         h = ValidateStorageHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
             uow_factory=factory,
         )
@@ -427,7 +429,7 @@ class TestValidateMCPHandler:
         cfg.get.return_value = {"enabled": True, "endpoint": "http://localhost:8080"}
         h = ValidateMCPHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
         )
         q = ValidateMCPQuery()
@@ -442,7 +444,7 @@ class TestValidateMCPHandler:
         cfg.get.return_value = {}
         h = ValidateMCPHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
         )
         q = ValidateMCPQuery()
@@ -457,7 +459,7 @@ class TestValidateMCPHandler:
         cfg.get.return_value = "not-a-dict"
         h = ValidateMCPHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
         )
         q = ValidateMCPQuery()
@@ -467,11 +469,11 @@ class TestValidateMCPHandler:
 
     @pytest.mark.asyncio
     async def test_exception_returns_error_response(self):
-        container = MagicMock()
-        container.get.side_effect = RuntimeError("container gone")
+        config_manager = MagicMock()
+        config_manager.get.side_effect = RuntimeError("config gone")
         h = ValidateMCPHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=config_manager,
             error_handler=_make_error_handler(),
         )
         q = ValidateMCPQuery()
@@ -516,7 +518,8 @@ class TestGetSystemConfigHandler:
 
         h = GetSystemConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
+            scheduler=container.get(SchedulerPort),
             error_handler=_make_error_handler(),
             system_info=system_info,
         )
@@ -543,7 +546,8 @@ class TestGetSystemConfigHandler:
 
         h = GetSystemConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
+            scheduler=container.get(SchedulerPort),
             error_handler=_make_error_handler(),
             system_info=_make_system_info(),
         )
@@ -567,7 +571,8 @@ class TestGetSystemConfigHandler:
 
         h = GetSystemConfigHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
+            scheduler=container.get(SchedulerPort),
             error_handler=_make_error_handler(),
             system_info=_make_system_info(),
         )

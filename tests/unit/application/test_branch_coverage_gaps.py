@@ -177,6 +177,14 @@ class TestRequestStatusServiceBranchCoverage:
 
         svc = self._make_svc()
         request = self._real_request(RequestStatus.COMPLETED)
+        uow = MagicMock()
+        uow.requests.get_by_id.return_value = request
+
+        @contextmanager
+        def _cm():
+            yield uow
+
+        svc.uow_factory.create_unit_of_work.side_effect = _cm
 
         result = _sync(svc.update_request_status(request, RequestStatus.PARTIAL.value, "msg"))
         assert result is request  # blocked — returned unchanged
@@ -196,6 +204,7 @@ class TestRequestStatusServiceBranchCoverage:
         svc.uow_factory.create_unit_of_work.side_effect = _cm
 
         request = self._real_request(RequestStatus.PARTIAL, machine_ids=["m-1", "m-2"])
+        uow.requests.get_by_id.return_value = request
         result = _sync(svc.update_request_status(request, RequestStatus.COMPLETED.value, "done"))
         assert result.status == RequestStatus.COMPLETED
         uow.requests.save.assert_called_once()
@@ -220,6 +229,7 @@ class TestRequestStatusServiceBranchCoverage:
             successful_count=1,
             deadline_at=None,
         )
+        uow.requests.get_by_id.return_value = request
         result = _sync(svc.update_request_status(request, RequestStatus.IN_PROGRESS.value, "ok"))
         # Idempotent status but successful_count reconciled to machine_ids length.
         assert result.successful_count == 3
@@ -242,6 +252,7 @@ class TestRequestStatusServiceBranchCoverage:
         fulfilment = ProviderFulfilment(state="fulfilled", message="ok")
         request = self._real_request(RequestStatus.IN_PROGRESS)
 
+        uow.requests.get_by_id.return_value = request
         result = _sync(
             svc.update_request_status(
                 request,
@@ -1220,6 +1231,7 @@ class TestSyncAndGetRequestHandlerBranches:
         handler._cache_service.is_caching_enabled.return_value = False
         req = MagicMock()
         req.status.is_terminal.return_value = False
+        req.awaiting_resources = False
         handler._query_service.get_request = AsyncMock(return_value=req)
         handler._machine_sync_service.populate_missing_machine_ids = AsyncMock(
             side_effect=ProviderContractError("contract violation")
@@ -1237,6 +1249,7 @@ class TestSyncAndGetRequestHandlerBranches:
         handler._cache_service.is_caching_enabled.return_value = False
         req = MagicMock()
         req.status.is_terminal.return_value = False
+        req.awaiting_resources = False
         handler._query_service.get_request = AsyncMock(return_value=req)
         handler._machine_sync_service.populate_missing_machine_ids = AsyncMock(
             side_effect=RuntimeError("provider down")
@@ -1583,7 +1596,8 @@ def _make_return_cmd_handler(uow=None):
     handler.event_publisher = MagicMock(spec=EventPublisherPort)
     handler._metrics = {}
     handler.uow_factory = uow_factory
-    handler._container = MagicMock()
+    handler._command_bus = AsyncMock()
+    handler._domain_config = MagicMock()
     handler._query_bus = AsyncMock()
     handler._provider_selection_port = MagicMock()
     handler._machine_grouping_service = MagicMock()
@@ -1670,7 +1684,7 @@ class TestCreateReturnRequestHandlerBranches:
         handler, uow = _make_return_cmd_handler()
         command_bus = AsyncMock()
         command_bus.execute.side_effect = RuntimeError("bus down")
-        handler._container.get.return_value = command_bus
+        handler._command_bus = command_bus
 
         stuck_request = MagicMock()
         stuck_request.update_status.return_value = stuck_request
@@ -1693,7 +1707,7 @@ class TestCreateReturnRequestHandlerBranches:
         handler, uow = _make_return_cmd_handler()
         command_bus = AsyncMock()
         command_bus.execute.side_effect = RuntimeError("bus down")
-        handler._container.get.return_value = command_bus
+        handler._command_bus = command_bus
 
         request = MagicMock()
         request.request_id = "req-1"

@@ -22,8 +22,6 @@ from orb.application.commands.system_handlers import (
     ReloadProviderConfigHandler,
     SetConfigurationHandler,
 )
-from orb.domain.base.ports import ConfigurationPort
-from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -36,18 +34,6 @@ def _ports() -> dict:
         "event_publisher": MagicMock(),
         "error_handler": MagicMock(),
     }
-
-
-def _container_returning(port_type, instance) -> MagicMock:
-    container = MagicMock()
-
-    def _get(requested):
-        if requested is port_type:
-            return instance
-        return MagicMock()
-
-    container.get.side_effect = _get
-    return container
 
 
 def _res(command) -> dict:
@@ -72,9 +58,8 @@ class TestReloadProviderConfigHandler:
 
         config_manager = MagicMock()
         config_manager.get_provider_config.return_value = provider_config
-        container = _container_returning(ConfigurationPort, config_manager)
 
-        handler = ReloadProviderConfigHandler(container=container, **_ports())
+        handler = ReloadProviderConfigHandler(config_manager=config_manager, **_ports())
         command = ReloadProviderConfigCommand(config_path="/tmp/x.yaml")
 
         await handler.handle(command)
@@ -87,9 +72,8 @@ class TestReloadProviderConfigHandler:
     async def test_failure_captured_in_result(self):
         config_manager = MagicMock()
         config_manager.reload.side_effect = RuntimeError("bad config")
-        container = _container_returning(ConfigurationPort, config_manager)
 
-        handler = ReloadProviderConfigHandler(container=container, **_ports())
+        handler = ReloadProviderConfigHandler(config_manager=config_manager, **_ports())
         command = ReloadProviderConfigCommand(config_path="/tmp/x.yaml")
 
         await handler.handle(command)
@@ -101,9 +85,8 @@ class TestReloadProviderConfigHandler:
     async def test_no_provider_config_defaults(self):
         config_manager = MagicMock()
         config_manager.get_provider_config.return_value = None
-        container = _container_returning(ConfigurationPort, config_manager)
 
-        handler = ReloadProviderConfigHandler(container=container, **_ports())
+        handler = ReloadProviderConfigHandler(config_manager=config_manager, **_ports())
         command = ReloadProviderConfigCommand()
 
         await handler.handle(command)
@@ -125,9 +108,8 @@ class TestRefreshTemplatesHandler:
         tmpl.model_dump.return_value = {"template_id": "t1"}
         template_manager = MagicMock()
         template_manager.load_templates = AsyncMock(return_value=[tmpl])
-        container = _container_returning(TemplateConfigurationPort, template_manager)
 
-        handler = RefreshTemplatesHandler(container=container, **_ports())
+        handler = RefreshTemplatesHandler(template_manager=template_manager, **_ports())
         command = RefreshTemplatesCommand(provider_name="aws")
 
         await handler.handle(command)
@@ -140,9 +122,8 @@ class TestRefreshTemplatesHandler:
     async def test_failure_captured_in_result(self):
         template_manager = MagicMock()
         template_manager.load_templates = AsyncMock(side_effect=RuntimeError("no source"))
-        container = _container_returning(TemplateConfigurationPort, template_manager)
 
-        handler = RefreshTemplatesHandler(container=container, **_ports())
+        handler = RefreshTemplatesHandler(template_manager=template_manager, **_ports())
         command = RefreshTemplatesCommand()
 
         await handler.handle(command)
@@ -160,9 +141,8 @@ class TestSetConfigurationHandler:
     @pytest.mark.asyncio
     async def test_sets_value_and_reports_success(self):
         config_manager = MagicMock()
-        container = _container_returning(ConfigurationPort, config_manager)
 
-        handler = SetConfigurationHandler(container=container, **_ports())
+        handler = SetConfigurationHandler(config_manager=config_manager, **_ports())
         command = SetConfigurationCommand(key="log.level", value="DEBUG")
 
         await handler.handle(command)
@@ -175,9 +155,8 @@ class TestSetConfigurationHandler:
     async def test_persists_to_disk_by_default(self):
         config_manager = MagicMock()
         config_manager.save_config.return_value = "/etc/orb/config.json"
-        container = _container_returning(ConfigurationPort, config_manager)
 
-        handler = SetConfigurationHandler(container=container, **_ports())
+        handler = SetConfigurationHandler(config_manager=config_manager, **_ports())
         command = SetConfigurationCommand(key="log.level", value="DEBUG")
 
         await handler.handle(command)
@@ -189,9 +168,8 @@ class TestSetConfigurationHandler:
     @pytest.mark.asyncio
     async def test_no_persist_skips_disk_write(self):
         config_manager = MagicMock()
-        container = _container_returning(ConfigurationPort, config_manager)
 
-        handler = SetConfigurationHandler(container=container, **_ports())
+        handler = SetConfigurationHandler(config_manager=config_manager, **_ports())
         command = SetConfigurationCommand(key="log.level", value="DEBUG", persist=False)
 
         await handler.handle(command)
@@ -205,9 +183,8 @@ class TestSetConfigurationHandler:
     async def test_failure_captured_in_result(self):
         config_manager = MagicMock()
         config_manager.set_configuration_value.side_effect = RuntimeError("locked")
-        container = _container_returning(ConfigurationPort, config_manager)
 
-        handler = SetConfigurationHandler(container=container, **_ports())
+        handler = SetConfigurationHandler(config_manager=config_manager, **_ports())
         command = SetConfigurationCommand(key="log.level", value="DEBUG")
 
         await handler.handle(command)
@@ -218,9 +195,8 @@ class TestSetConfigurationHandler:
     @pytest.mark.asyncio
     async def test_missing_key_fails_validation(self):
         config_manager = MagicMock()
-        container = _container_returning(ConfigurationPort, config_manager)
 
-        handler = SetConfigurationHandler(container=container, **_ports())
+        handler = SetConfigurationHandler(config_manager=config_manager, **_ports())
         command = SetConfigurationCommand(key="", value="DEBUG")
 
         with pytest.raises(ValueError):

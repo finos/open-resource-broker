@@ -23,7 +23,6 @@ from orb.domain.base.results import ProviderSelectionResult
 
 def _make_service(dispatch_timeout: float = 10.0) -> ProvisioningOrchestrationService:
     """Build a service with all mocks wired; dispatch_timeout_seconds from config."""
-    container = MagicMock()
     logger = MagicMock()
     provider_selection_port = MagicMock()
     provider_config_port = MagicMock()
@@ -39,7 +38,8 @@ def _make_service(dispatch_timeout: float = 10.0) -> ProvisioningOrchestrationSe
     circuit_breaker_factory.return_value = cb
 
     return ProvisioningOrchestrationService(
-        container=container,
+        uow_factory=MagicMock(),
+        scheduler=MagicMock(),
         logger=logger,
         provider_selection_port=provider_selection_port,
         provider_config_port=provider_config_port,
@@ -93,7 +93,7 @@ class TestDispatchTimeout:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        cast(MagicMock, svc._container).get.return_value = scheduler
+        svc._scheduler = scheduler
 
         result = await svc._dispatch_single_attempt(
             _make_template(),
@@ -119,7 +119,7 @@ class TestDispatchTimeout:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        cast(MagicMock, svc._container).get.return_value = scheduler
+        svc._scheduler = scheduler
 
         await svc._dispatch_single_attempt(
             _make_template(),
@@ -152,7 +152,7 @@ class TestDispatchTimeout:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        cast(MagicMock, svc._container).get.return_value = scheduler
+        svc._scheduler = scheduler
 
         result = await svc._dispatch_single_attempt(
             _make_template(),
@@ -181,7 +181,7 @@ class TestDispatchTimeout:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        cast(MagicMock, svc._container).get.return_value = scheduler
+        svc._scheduler = scheduler
 
         request = _make_request(count=1)
         # Make update_metadata return a fresh mock that also has metadata={} and matching attrs
@@ -241,7 +241,7 @@ class TestAcceptedOutcomeBreaksRetryLoop:
 
         scheduler = MagicMock()
         scheduler.format_template_for_provider.return_value = {}
-        cast(MagicMock, svc._container).get.return_value = scheduler
+        svc._scheduler = scheduler
 
         request = MagicMock()
         request.request_id = "req-accepted-once"

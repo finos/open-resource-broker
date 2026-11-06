@@ -9,7 +9,7 @@ from orb.domain.base.exceptions import ApplicationError
 if TYPE_CHECKING:
     from orb.domain.template.template_aggregate import Template
 
-from orb.domain.base.ports import ContainerPort, LoggingPort, ProviderSelectionPort
+from orb.domain.base.ports import LoggingPort, ProviderSelectionPort
 from orb.domain.base.ports.provider_validation_port import ProviderValidationPort
 from orb.domain.base.results import ProviderSelectionResult
 
@@ -19,12 +19,10 @@ class ProviderValidationService:
 
     def __init__(
         self,
-        container: ContainerPort,
         logger: LoggingPort,
         provider_selection_port: ProviderSelectionPort,
         validator: Optional[ProviderValidationPort] = None,
     ) -> None:
-        self._container = container
         self.logger = logger
         self._provider_selection_port = provider_selection_port
         self._validator = validator

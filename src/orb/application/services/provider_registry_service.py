@@ -1,10 +1,13 @@
 """Application service interface for provider registry access."""
 
 import asyncio
+import concurrent.futures
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from orb.domain.base.exceptions import OperationNotSupportedError, ProviderNotReadyError
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 from orb.domain.base.results import ProviderSelectionResult, ValidationResult
@@ -50,6 +53,11 @@ class ProviderRegistryService:
         self._health_cache: dict[str, ProviderHealthSnapshot] = {}
         self._health_inflight: dict[str, asyncio.Task[ProviderHealthSnapshot]] = {}
         self._health_samples: dict[str, int] = {}
+        # The blocking check_health call of each provider's probe still running
+        # in its worker thread. A timed-out probe cannot be interrupted, so
+        # while it runs no further probe is started for that provider: thread
+        # use stays at one per provider however often a hung API is polled.
+        self._health_threads: dict[str, concurrent.futures.Future[Any]] = {}
 
     def select_provider_for_template(
         self, template: Template, provider_name: str | None = None
@@ -75,6 +83,13 @@ class ProviderRegistryService:
         strategy = self._registry.get_or_create_strategy(provider_id)
         if strategy is None:
             raise ValueError(f"No strategy found for provider: {provider_id}")
+        operation_type = getattr(operation, "operation_type", None)
+        # Read on every call: a cached strategy can lose readiness after it was
+        # first initialized (for example after a shutdown).
+        if not strategy.is_initialized:
+            raise ProviderNotReadyError(provider_id, operation_type)
+        if not strategy.get_capabilities().supports_operation(operation_type):
+            raise OperationNotSupportedError(provider_id, operation_type)
         return await strategy.execute_operation(operation)
 
     def get_strategy_capabilities(self, provider_id: str) -> Any:
@@ -136,11 +151,27 @@ class ProviderRegistryService:
                     checked_at=time.monotonic(),
                     sample_count=self._health_samples.get(provider_id, 0),
                 )
+            previous = self._health_threads.get(provider_id)
+            if previous is not None and not previous.done():
+                self._logger.warning(
+                    "Health probe for provider %s skipped: the previous probe is still running",
+                    provider_id,
+                )
+                return ProviderHealthSnapshot(
+                    provider_name=provider_id,
+                    status="unhealthy",
+                    message="Provider health check timed out",
+                    sample_count=self._health_samples.get(provider_id, 0),
+                    checked_at=time.monotonic(),
+                )
             started = time.monotonic()
             status = "unhealthy"
             message = "Provider health check failed"
             try:
-                health = await asyncio.wait_for(asyncio.to_thread(strategy.check_health), timeout)
+                health = await asyncio.wait_for(
+                    asyncio.wrap_future(self._start_health_probe(provider_id, strategy)),
+                    timeout,
+                )
                 if health is not None and getattr(health, "is_healthy", False):
                     status = "healthy"
                     message = "Provider is healthy"
@@ -179,6 +210,36 @@ class ProviderRegistryService:
             )
         finally:
             self._health_inflight.pop(provider_id, None)
+
+    def _start_health_probe(
+        self, provider_id: str, strategy: Any
+    ) -> "concurrent.futures.Future[Any]":
+        """Run ``strategy.check_health`` in its own daemon thread.
+
+        A dedicated thread (not the shared default executor) keeps a hung
+        provider API from starving other thread-offloaded work, and being a
+        daemon it never delays process exit.
+        """
+        future: concurrent.futures.Future[Any] = concurrent.futures.Future()
+
+        def _run() -> None:
+            if not future.set_running_or_notify_cancel():
+                return
+            try:
+                future.set_result(strategy.check_health())
+            except Exception as exc:  # delivered to the awaiting probe
+                future.set_exception(exc)
+
+        self._health_threads[provider_id] = future
+        future.add_done_callback(
+            lambda done: (
+                self._health_threads.pop(provider_id, None)
+                if self._health_threads.get(provider_id) is done
+                else None
+            )
+        )
+        threading.Thread(target=_run, name=f"orb-health-probe-{provider_id}", daemon=True).start()
+        return future
 
     def update_provider_health(self, provider_name: str, health_data: dict) -> None:
         """Persist health state for a provider into the registry."""

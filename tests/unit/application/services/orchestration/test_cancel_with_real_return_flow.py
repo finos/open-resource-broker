@@ -7,7 +7,7 @@ deprovisioning path; only the buses, stores and the provider call are faked.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -48,17 +48,18 @@ def _return_handler(deprovision_result: dict[str, Any], statuses: dict[str, str]
             statuses[command.request_id] = command.status.value
 
     inner_bus.execute = AsyncMock(side_effect=record_status)
-    container = MagicMock()
-    container.get = MagicMock(return_value=inner_bus)
+    domain_config = MagicMock(get_return_request_prefix=MagicMock(return_value="ret-"))
 
     handler = CreateReturnRequestHandler(
         uow_factory=uow_factory,
         logger=MagicMock(),
-        container=container,
         event_publisher=MagicMock(),
         error_handler=MagicMock(),
         query_bus=MagicMock(),
         provider_selection_port=MagicMock(),
+        command_bus=inner_bus,
+        domain_config=domain_config,
+        deprovisioning_orchestrator=MagicMock(),
     )
     handler._deprovisioning_orchestrator.execute_deprovisioning = AsyncMock(
         return_value=deprovision_result
@@ -142,7 +143,7 @@ class TestCancelWhenFailureCannotBeRecorded:
 
     @staticmethod
     def _broken_status_store(handler: CreateReturnRequestHandler, statuses: dict[str, str]):
-        inner_bus = handler._container.get.return_value
+        inner_bus = handler._command_bus
 
         async def record(command: Any) -> None:
             if isinstance(command, UpdateRequestStatusCommand):
@@ -152,7 +153,7 @@ class TestCancelWhenFailureCannotBeRecorded:
 
         inner_bus.execute = AsyncMock(side_effect=record)
         # The direct write fallback fails as well.
-        handler.uow_factory.create_unit_of_work.side_effect = None
+        cast(Any, handler.uow_factory).create_unit_of_work.side_effect = None
         uow = MagicMock()
         uow.requests.get_by_id.side_effect = RuntimeError("db down")
         uow.machines.get_by_id.return_value = MagicMock()
@@ -161,7 +162,7 @@ class TestCancelWhenFailureCannotBeRecorded:
         def _create():
             yield uow
 
-        handler.uow_factory.create_unit_of_work.side_effect = _create
+        cast(Any, handler.uow_factory).create_unit_of_work.side_effect = _create
 
     @pytest.mark.asyncio
     async def test_status_update_double_failure_raises_with_alert_record(self):
@@ -174,7 +175,7 @@ class TestCancelWhenFailureCannotBeRecorded:
         with pytest.raises(ApplicationError, match="could not be recorded"):
             await handler._update_request_status(request, RequestStatus.FAILED, "m")
 
-        extra = handler.logger.error.call_args_list[-1].kwargs["extra"]
+        extra = cast(Any, handler.logger).error.call_args_list[-1].kwargs["extra"]
         assert extra["event"] == "return.status_update_failed"
         assert extra["request_id"] == "ret-1"
 
@@ -187,14 +188,7 @@ class TestCancelWhenFailureCannotBeRecorded:
             return_value={("aws", "aws-prod", "RunInstances"): ["i-aaa"]}
         )
         handler._cancel_validate_and_persist = MagicMock()
-        handler._container.get = MagicMock(
-            side_effect=lambda key: (
-                MagicMock(get_return_request_prefix=MagicMock(return_value="ret-"))
-                if key.__name__ == "DomainConfigurationService"
-                else handler._container.get.bus
-            )
-        )
-        handler._container.get.bus = handler_bus = MagicMock()
+        handler._command_bus = handler_bus = MagicMock()
 
         async def record(command: Any) -> None:
             if isinstance(command, UpdateRequestStatusCommand):

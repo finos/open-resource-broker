@@ -21,7 +21,7 @@ from orb.application.queries.template_query_handlers import (
     ValidateTemplateHandler,
 )
 from orb.domain.base.exceptions import EntityNotFoundError
-from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
+from orb.domain.base.ports import ConfigurationPort, ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
 from orb.infrastructure.template.factories import TemplateDTOFactory
 
@@ -37,6 +37,12 @@ def _make_template_dto(template_id: str = "tpl-1") -> TemplateDTO:
         provider_api="EC2Fleet",
         image_id="ami-000",
     )
+
+
+def _passthrough_defaults() -> MagicMock:
+    defaults = MagicMock()
+    defaults.resolve_template_defaults.side_effect = lambda data, **_: data
+    return defaults
 
 
 def _make_container(template_manager=None, config_port=None, has_defaults: bool = False):
@@ -59,7 +65,8 @@ def _make_get_handler(container) -> GetTemplateHandler:
     return GetTemplateHandler(
         logger=Mock(spec=LoggingPort),
         error_handler=Mock(spec=ErrorHandlingPort),
-        container=container,
+        template_manager=container.get(TemplateConfigurationPort),
+        template_defaults_service=_passthrough_defaults(),
         template_factory=TemplateFactory(),
         template_dto_factory=TemplateDTOFactory(),
     )
@@ -68,7 +75,7 @@ def _make_get_handler(container) -> GetTemplateHandler:
 def _make_validate_handler(container) -> ValidateTemplateHandler:
     return ValidateTemplateHandler(
         logger=Mock(spec=LoggingPort),
-        container=container,
+        template_manager=container.get(TemplateConfigurationPort),
         error_handler=Mock(spec=ErrorHandlingPort),
     )
 
@@ -76,7 +83,7 @@ def _make_validate_handler(container) -> ValidateTemplateHandler:
 def _make_config_handler(container) -> GetConfigurationHandler:
     return GetConfigurationHandler(
         logger=Mock(spec=LoggingPort),
-        container=container,
+        config_manager=container.get(ConfigurationPort),
         error_handler=Mock(spec=ErrorHandlingPort),
     )
 
@@ -94,7 +101,7 @@ def _make_list_handler(template_manager, dtos) -> ListTemplatesHandler:
     return ListTemplatesHandler(
         logger=Mock(spec=LoggingPort),
         error_handler=Mock(spec=ErrorHandlingPort),
-        container=container,
+        template_manager=container.get(TemplateConfigurationPort),
         generic_filter_service=generic_filter_service,
     )
 
@@ -126,25 +133,15 @@ async def test_get_template_defaults_resolution_branch() -> None:
     # Return a dict that still has the required keys so TemplateFactory can build it
     defaults_service.resolve_template_defaults.side_effect = lambda data, **_: data
 
-    from orb.application.services.template_defaults_service import TemplateDefaultsService
     from orb.domain.template.factory import TemplateFactory
 
-    container = MagicMock()
-
-    def _get(service_type):
-        if service_type is TemplateConfigurationPort:
-            return template_manager
-        if service_type is TemplateDefaultsService:
-            return defaults_service
-        return None
-
-    container.get.side_effect = _get
-    container.has.return_value = True  # has TemplateDefaultsService
+    container = _make_container(template_manager=template_manager)
 
     handler = GetTemplateHandler(
         logger=Mock(spec=LoggingPort),
         error_handler=Mock(spec=ErrorHandlingPort),
-        container=container,
+        template_manager=container.get(TemplateConfigurationPort),
+        template_defaults_service=defaults_service,
         template_factory=TemplateFactory(),
         template_dto_factory=TemplateDTOFactory(),
     )

@@ -73,7 +73,6 @@ class TestGetMultipleRequestsInit:
                 uow_factory=MagicMock(),
                 logger=MagicMock(),
                 error_handler=MagicMock(),
-                container=MagicMock(),
             )
 
             result = await handler.execute_query(
@@ -99,7 +98,6 @@ class TestGetMultipleMachinesInit:
             uow_factory=MagicMock(),
             logger=MagicMock(),
             error_handler=MagicMock(),
-            container=MagicMock(),
             query_bus=query_bus,
         )
 
@@ -142,7 +140,6 @@ class TestGetMultipleTemplatesInit:
             uow_factory=MagicMock(),
             logger=MagicMock(),
             error_handler=MagicMock(),
-            container=MagicMock(),
             query_bus=query_bus,
         )
 

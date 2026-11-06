@@ -31,7 +31,6 @@ from orb.domain.base.operations import Operation, OperationResult, OperationType
 
 def _ports() -> dict:
     return {
-        "container": MagicMock(),
         "logger": MagicMock(),
         "event_publisher": MagicMock(),
         "error_handler": MagicMock(),

@@ -38,8 +38,6 @@ def _make_orchestrator(
         query_bus_result = MagicMock()
     uow_factory = MagicMock()
     logger = MagicMock()
-    container = MagicMock()
-    container.get.return_value = MagicMock()
 
     query_bus = MagicMock()
     query_bus.execute = AsyncMock(return_value=query_bus_result)
@@ -52,9 +50,10 @@ def _make_orchestrator(
     orchestrator = DeprovisioningOrchestrator(
         uow_factory=uow_factory,
         logger=logger,
-        container=container,
         query_bus=query_bus,
         provider_selection_port=provider_selection_port,
+        scheduler=MagicMock(),
+        config_manager=MagicMock(),
     )
     return orchestrator, provider_selection_port
 

@@ -127,3 +127,96 @@ class TestProbeStrategyHealth:
         await svc.probe_strategy_health("aws")
         task.cancel()
         assert ticks >= 5
+
+
+@pytest.mark.unit
+class TestHungProviderThreadBound:
+    """A provider API that never answers must not accumulate probe threads."""
+
+    @staticmethod
+    def _probe_threads() -> list[threading.Thread]:
+        return [t for t in threading.enumerate() if t.name.startswith("orb-health-probe")]
+
+    @pytest.mark.asyncio
+    async def test_repeated_probes_of_a_hung_provider_start_one_thread(self):
+        release = threading.Event()
+
+        def hang():
+            release.wait(10)
+            return ProviderHealthStatus.healthy()
+
+        strategy = _strategy(side_effect=hang)
+        svc, _ = _service(strategy)
+        try:
+            for _ in range(25):
+                snap = await svc.probe_strategy_health("aws", timeout=0.01, ttl=0)
+                assert snap.status == "unhealthy"
+            assert strategy.check_health.call_count == 1
+            assert len(self._probe_threads()) == 1
+        finally:
+            release.set()
+
+    @pytest.mark.asyncio
+    async def test_threads_are_bounded_per_provider_not_per_call(self):
+        release = threading.Event()
+        strategies = {
+            name: _strategy(side_effect=lambda: release.wait(10) or ProviderHealthStatus.healthy())
+            for name in ("a", "b", "c")
+        }
+        registry = MagicMock()
+        registry.get_or_create_strategy.side_effect = strategies.__getitem__
+        svc = ProviderRegistryService(registry, MagicMock(), MagicMock())
+        try:
+            for _ in range(10):
+                for name in strategies:
+                    await svc.probe_strategy_health(name, timeout=0.01, ttl=0)
+            assert len(self._probe_threads()) == len(strategies)
+            assert all(s.check_health.call_count == 1 for s in strategies.values())
+        finally:
+            release.set()
+
+    @pytest.mark.asyncio
+    async def test_a_new_probe_runs_once_the_hung_call_returns(self):
+        release = threading.Event()
+        calls = 0
+
+        def sometimes_hung():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                release.wait(10)
+            return ProviderHealthStatus.healthy()
+
+        svc, _ = _service(_strategy(side_effect=sometimes_hung))
+        first = await svc.probe_strategy_health("aws", timeout=0.01, ttl=0)
+        assert first.status == "unhealthy"
+
+        release.set()
+        for _ in range(100):
+            if not any(t.is_alive() for t in self._probe_threads()):
+                break
+            await asyncio.sleep(0.01)
+
+        second = await svc.probe_strategy_health("aws", timeout=1, ttl=0)
+        assert second.status == "healthy"
+        assert calls == 2
+
+    @pytest.mark.asyncio
+    async def test_hung_probe_does_not_use_the_default_executor(self):
+        release = threading.Event()
+        svc, _ = _service(_strategy(side_effect=lambda: release.wait(10)))
+        loop = asyncio.get_running_loop()
+        used: list[object] = []
+        original = loop.run_in_executor
+
+        def spy(executor, func, *args):
+            used.append(func)
+            return original(executor, func, *args)
+
+        loop.run_in_executor = spy  # type: ignore[method-assign]
+        try:
+            await svc.probe_strategy_health("aws", timeout=0.01, ttl=0)
+        finally:
+            loop.run_in_executor = original  # type: ignore[method-assign]
+            release.set()
+        assert used == []

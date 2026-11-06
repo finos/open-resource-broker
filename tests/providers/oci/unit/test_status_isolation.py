@@ -131,7 +131,7 @@ async def test_other_machine_error_fails_call_and_keeps_stored_machines(outcomes
 
     machines, _ = await service.fetch_provider_machines(request, stored)
 
-    assert machines is stored
+    assert machines == stored
     assert [(m.machine_id.value, m.status, m.version) for m in machines] == before
 
 
@@ -143,7 +143,7 @@ async def test_return_request_error_marks_nothing_terminated():
 
     machines, _ = await service.fetch_provider_machines(request, stored)
 
-    assert machines is stored
+    assert machines == stored
     assert all(m.status == MachineStatus.RUNNING for m in machines)
 
 
@@ -159,7 +159,7 @@ async def test_return_request_not_found_machine_is_never_marked_terminated(code)
 
     machines, _ = await service.fetch_provider_machines(request, stored)
 
-    assert machines is stored
+    assert machines == stored
     assert [(m.machine_id.value, m.status, m.version) for m in machines] == before
     assert all(m.status != MachineStatus.TERMINATED for m in machines)
 

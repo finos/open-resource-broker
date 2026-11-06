@@ -1,5 +1,6 @@
 """Health check command handler."""
 
+import asyncio
 from pathlib import Path
 from typing import Any, cast
 
@@ -7,6 +8,28 @@ from orb.application.ports.scheduler_port import SchedulerPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.console_port import ConsolePort
 from orb.domain.base.ports.health_check_port import HealthCheckPort
+from orb.infrastructure.logging.logger import get_logger
+
+logger = get_logger(__name__)
+
+# Health output is returned to API, CLI and MCP callers, so it carries generic
+# status text only. Exception text and provider messages (which can embed
+# account identifiers or credentials hints) are written to the log instead.
+_CHECK_FAILED = "Check failed; see server logs for details"
+_PROVIDER_UNHEALTHY = "unhealthy; see server logs for details"
+
+
+def _sanitize_details(details: Any) -> Any:
+    """Replace any raw error text in monitor details with a generic message."""
+    if isinstance(details, dict) and "error" in details:
+        return {**details, "error": _CHECK_FAILED}
+    return details
+
+
+async def _probe_all(registry_service: Any, provider_names: list[str]) -> list[Any]:
+    return list(
+        await asyncio.gather(*(registry_service.probe_strategy_health(n) for n in provider_names))
+    )
 
 
 def handle_health_check(args) -> dict[str, Any]:
@@ -35,23 +58,34 @@ def handle_health_check(args) -> dict[str, Any]:
                     cli_status = "warn"
                 else:
                     cli_status = "fail"
+                if cli_status == "fail" and isinstance(result.get("details"), dict):
+                    if result["details"].get("error"):
+                        logger.warning(
+                            "Health check %s failed: %s", name, result["details"]["error"]
+                        )
                 checks.append(
                     {
                         "name": name,
                         "status": cli_status,
-                        "details": result.get("details", {}),
+                        "details": _sanitize_details(result.get("details", {})),
                     }
                 )
         except Exception as e:
-            checks.append({"name": "health_monitor", "status": "warn", "error": str(e)})
+            logger.warning("Health monitor checks failed: %s", e)
+            checks.append({"name": "health_monitor", "status": "warn", "error": _CHECK_FAILED})
 
         # 1. Config file check
         config_path = config_port.get_config_file_path() or "./config/config.json"
+        config_exists = Path(config_path).exists()
+        if not config_exists:
+            logger.warning("Configuration file not found: %s", config_path)
         checks.append(
             {
                 "name": "config_file",
-                "status": "pass" if Path(config_path).exists() else "fail",
-                "details": config_path,
+                "status": "pass" if config_exists else "fail",
+                "details": "Configuration file found"
+                if config_exists
+                else "Configuration file not found",
             }
         )
 
@@ -68,19 +102,21 @@ def handle_health_check(args) -> dict[str, Any]:
                     {
                         "name": "templates_file",
                         "status": "pass",
-                        "details": f"{len(existing_paths)} template files found: {', '.join(existing_paths)}",
+                        "details": f"{len(existing_paths)} template files found",
                     }
                 )
             else:
+                logger.warning("No template files found. Checked: %s", ", ".join(template_paths))
                 checks.append(
                     {
                         "name": "templates_file",
                         "status": "fail",
-                        "details": f"No template files found. Checked: {', '.join(template_paths)}",
+                        "details": "No template files found",
                     }
                 )
         except Exception as e:
-            checks.append({"name": "templates_file", "status": "fail", "error": str(e)})
+            logger.warning("Templates file check failed: %s", e)
+            checks.append({"name": "templates_file", "status": "fail", "error": _CHECK_FAILED})
 
         # 3. Templates loaded check
         try:
@@ -96,7 +132,8 @@ def handle_health_check(args) -> dict[str, Any]:
                 }
             )
         except Exception as e:
-            checks.append({"name": "templates_loaded", "status": "fail", "error": str(e)})
+            logger.warning("Templates loaded check failed: %s", e)
+            checks.append({"name": "templates_loaded", "status": "fail", "error": _CHECK_FAILED})
 
         # 4. Provider health check (provider-agnostic)
         try:
@@ -117,19 +154,23 @@ def handle_health_check(args) -> dict[str, Any]:
                 # Check all configured providers
                 healthy_count = 0
                 total_count = len(all_providers)
-                errors = []
+                unhealthy: list[str] = []
 
-                for provider_name in all_providers:
-                    try:
-                        health_status = registry_service.check_strategy_health(provider_name)
-                        if health_status and health_status.is_healthy:
-                            healthy_count += 1
-                        elif health_status:
-                            errors.append(f"{provider_name}: {health_status.status_message}")
-                        else:
-                            errors.append(f"{provider_name}: No health data available")
-                    except Exception as e:
-                        errors.append(f"{provider_name}: {e!s}")
+                # One bounded, cached probe per provider, all at once, the same
+                # probe the REST endpoint uses: a hung provider API costs one
+                # time limit in total, not one per provider or per check.
+                snapshots = asyncio.run(_probe_all(registry_service, list(all_providers)))
+                for provider_name, snapshot in zip(all_providers, snapshots):
+                    if snapshot.status == "healthy":
+                        healthy_count += 1
+                    else:
+                        logger.warning(
+                            "Provider %s is %s: %s",
+                            provider_name,
+                            snapshot.status,
+                            snapshot.message,
+                        )
+                        unhealthy.append(provider_name)
 
                 if healthy_count == total_count:
                     status = "pass"
@@ -139,39 +180,54 @@ def handle_health_check(args) -> dict[str, Any]:
                     details = f"{healthy_count}/{total_count} providers healthy"
                 else:
                     status = "warn"
-                    details = f"No providers healthy. Errors: {'; '.join(errors)}"
+                    details = (
+                        f"No providers healthy ({', '.join(unhealthy)}): {_PROVIDER_UNHEALTHY}"
+                    )
 
                 checks.append({"name": "provider_health", "status": status, "details": details})
         except Exception as e:
-            checks.append({"name": "provider_health", "status": "warn", "error": str(e)})
+            logger.warning("Provider health check failed: %s", e)
+            checks.append({"name": "provider_health", "status": "warn", "error": _CHECK_FAILED})
 
         # 5. Work directory check
         try:
             scheduler = container.get(SchedulerPort)
             work_dir = scheduler.get_working_directory()
+            work_dir_exists = Path(work_dir).exists()
+            if not work_dir_exists:
+                logger.warning("Work directory not found: %s", work_dir)
             checks.append(
                 {
                     "name": "work_directory",
-                    "status": "pass" if Path(work_dir).exists() else "fail",
-                    "details": work_dir,
+                    "status": "pass" if work_dir_exists else "fail",
+                    "details": "Work directory found"
+                    if work_dir_exists
+                    else "Work directory not found",
                 }
             )
         except Exception as e:
-            checks.append({"name": "work_directory", "status": "fail", "error": str(e)})
+            logger.warning("Work directory check failed: %s", e)
+            checks.append({"name": "work_directory", "status": "fail", "error": _CHECK_FAILED})
 
         # 6. Logs directory check
         try:
             scheduler = container.get(SchedulerPort)
             logs_dir = scheduler.get_logs_directory()
+            logs_dir_exists = Path(logs_dir).exists()
+            if not logs_dir_exists:
+                logger.warning("Logs directory not found: %s", logs_dir)
             checks.append(
                 {
                     "name": "logs_directory",
-                    "status": "pass" if Path(logs_dir).exists() else "fail",
-                    "details": logs_dir,
+                    "status": "pass" if logs_dir_exists else "fail",
+                    "details": "Logs directory found"
+                    if logs_dir_exists
+                    else "Logs directory not found",
                 }
             )
         except Exception as e:
-            checks.append({"name": "logs_directory", "status": "fail", "error": str(e)})
+            logger.warning("Logs directory check failed: %s", e)
+            checks.append({"name": "logs_directory", "status": "fail", "error": _CHECK_FAILED})
 
         # Format response using scheduler strategy
         response = cast(Any, scheduler_strategy).format_health_response(checks)
@@ -200,5 +256,10 @@ def handle_health_check(args) -> dict[str, Any]:
         return response
 
     except Exception as e:
-        container.get(ConsolePort).error(f"Health check failed: {e}")
-        return {"success": False, "message": str(e), "error": str(e)}
+        logger.error("Health check failed: %s", e, exc_info=True)
+        container.get(ConsolePort).error("Health check failed; see server logs for details")
+        return {
+            "success": False,
+            "message": "Health check failed",
+            "error": "Health check failed",
+        }

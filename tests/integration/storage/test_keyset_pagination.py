@@ -108,7 +108,6 @@ def machines_orchestrator(make_uow):
         uow_factory=_UowFactory(make_uow),  # type: ignore[arg-type]
         logger=MagicMock(),
         error_handler=MagicMock(),
-        container=MagicMock(),
         command_bus=MagicMock(),
         generic_filter_service=GenericFilterService(),
         machine_sync_service=MagicMock(),

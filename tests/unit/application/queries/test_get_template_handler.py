@@ -6,9 +6,7 @@ import pytest
 from orb.application.dto.queries import GetTemplateQuery
 from orb.application.dto.template import TemplateDTO
 from orb.application.queries.template_query_handlers import GetTemplateHandler
-from orb.domain.base.ports.container_port import ContainerPort
 from orb.domain.base.ports.error_handling_port import ErrorHandlingPort
-from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
 from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.template.factories import TemplateDTOFactory
 
@@ -19,26 +17,6 @@ class _FakeTemplateManager:
 
     async def get_template_by_id(self, template_id: str) -> Optional[TemplateDTO]:
         return self._template if template_id == self._template.template_id else None
-
-
-class _FakeContainer(ContainerPort):
-    def __init__(self, services: dict) -> None:
-        self._services = services
-
-    def get(self, service_type):
-        return self._services[service_type]
-
-    def register(self, service_type, instance) -> None:
-        self._services[service_type] = instance
-
-    def register_factory(self, service_type, factory_func) -> None:
-        self._services[service_type] = factory_func()
-
-    def register_singleton(self, service_type, factory_func) -> None:
-        self._services[service_type] = factory_func()
-
-    def has(self, service_type) -> bool:
-        return service_type in self._services
 
 
 @pytest.mark.asyncio
@@ -62,16 +40,14 @@ async def test_get_template_handler_retains_existing_launch_template():
         max_instances=config["max_instances"],
     )
 
-    services = {
-        TemplateConfigurationPort: _FakeTemplateManager(template_dto),
-        TemplateFactory: TemplateFactory(),
-    }
-    container = _FakeContainer(services)
+    defaults_service = Mock()
+    defaults_service.resolve_template_defaults.side_effect = lambda data, **_: data
 
     handler = GetTemplateHandler(
         logger=Mock(),
         error_handler=Mock(spec=ErrorHandlingPort),
-        container=container,
+        template_manager=_FakeTemplateManager(template_dto),
+        template_defaults_service=defaults_service,
         template_factory=TemplateFactory(),
         template_dto_factory=TemplateDTOFactory(),
     )

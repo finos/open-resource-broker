@@ -60,7 +60,8 @@ def test_register_handles_exception_from_probe(tmp_path: Path) -> None:
     register_storage_health_checks(hc, CrashStorage())
     result = hc.run_check("database")
     assert result["status"] == "unhealthy"
-    assert "boom" in result["details"]["error"]
+    assert "boom" not in result["details"]["error"]
+    assert result["details"]["error"]
 
 
 def test_register_tolerates_bare_bool_return(tmp_path: Path) -> None:
@@ -178,7 +179,8 @@ def test_json_strategy_unhealthy_on_malformed_file(tmp_path: Path) -> None:
     )
     healthy, details = strategy.is_healthy()
     assert healthy is False
-    assert "error" in details
+    assert details["reason"] == "storage file could not be read"
+    assert str(p) not in repr(details)
 
 
 def test_json_strategy_unhealthy_on_non_object_root(tmp_path: Path) -> None:

@@ -18,6 +18,7 @@ from orb.application.queries.template_query_handlers import (
     ValidateTemplateHandler,
 )
 from orb.domain.base.exceptions import EntityNotFoundError
+from orb.domain.base.ports import ConfigurationPort, TemplateConfigurationPort
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -85,7 +86,10 @@ class TestGetTemplateHandler:
         return GetTemplateHandler(
             logger=_make_logger(),
             error_handler=_make_error_handler(),
-            container=container,
+            template_manager=container.get(TemplateConfigurationPort),
+            template_defaults_service=MagicMock(
+                resolve_template_defaults=MagicMock(side_effect=lambda data, **_: data)
+            ),
             template_factory=template_factory,
             template_dto_factory=template_dto_factory,
         )
@@ -109,7 +113,10 @@ class TestGetTemplateHandler:
         h = GetTemplateHandler(
             logger=_make_logger(),
             error_handler=_make_error_handler(),
-            container=container,
+            template_manager=container.get(TemplateConfigurationPort),
+            template_defaults_service=MagicMock(
+                resolve_template_defaults=MagicMock(side_effect=lambda data, **_: data)
+            ),
             template_factory=template_factory,
             template_dto_factory=template_dto_factory,
         )
@@ -143,7 +150,10 @@ class TestGetTemplateHandler:
         h = GetTemplateHandler(
             logger=logger,
             error_handler=_make_error_handler(),
-            container=container,
+            template_manager=container.get(TemplateConfigurationPort),
+            template_defaults_service=MagicMock(
+                resolve_template_defaults=MagicMock(side_effect=lambda data, **_: data)
+            ),
             template_factory=MagicMock(),
             template_dto_factory=MagicMock(),
         )
@@ -154,12 +164,17 @@ class TestGetTemplateHandler:
 
     @pytest.mark.asyncio
     async def test_generic_exception_propagates(self):
-        container = MagicMock()
-        container.get.side_effect = RuntimeError("container broken")
+        template_manager = MagicMock()
+        template_manager.get_template_by_id = AsyncMock(
+            side_effect=RuntimeError("container broken")
+        )
         h = GetTemplateHandler(
             logger=_make_logger(),
             error_handler=_make_error_handler(),
-            container=container,
+            template_manager=template_manager,
+            template_defaults_service=MagicMock(
+                resolve_template_defaults=MagicMock(side_effect=lambda data, **_: data)
+            ),
             template_factory=MagicMock(),
             template_dto_factory=MagicMock(),
         )
@@ -183,7 +198,7 @@ class TestListTemplatesHandler:
         return ListTemplatesHandler(
             logger=_make_logger(),
             error_handler=_make_error_handler(),
-            container=container,
+            template_manager=container.get(TemplateConfigurationPort),
             generic_filter_service=filter_svc,
         )
 
@@ -284,7 +299,7 @@ class TestListTemplatesHandler:
         h = ListTemplatesHandler(
             logger=_make_logger(),
             error_handler=_make_error_handler(),
-            container=container,
+            template_manager=container.get(TemplateConfigurationPort),
             generic_filter_service=filter_svc_pn,
         )
         q = ListTemplatesQuery(provider_name="aws", limit=None)
@@ -302,7 +317,7 @@ class TestListTemplatesHandler:
         h = ListTemplatesHandler(
             logger=_make_logger(),
             error_handler=_make_error_handler(),
-            container=container,
+            template_manager=container.get(TemplateConfigurationPort),
             generic_filter_service=filter_svc_pa,
         )
         q = ListTemplatesQuery(provider_api="SpotFleet", limit=None)
@@ -311,12 +326,12 @@ class TestListTemplatesHandler:
 
     @pytest.mark.asyncio
     async def test_exception_propagates(self):
-        container = MagicMock()
-        container.get.side_effect = RuntimeError("broken")
+        template_manager = MagicMock()
+        template_manager.load_templates = AsyncMock(side_effect=RuntimeError("broken"))
         h = ListTemplatesHandler(
             logger=_make_logger(),
             error_handler=_make_error_handler(),
-            container=container,
+            template_manager=template_manager,
             generic_filter_service=MagicMock(),
         )
         q = ListTemplatesQuery()
@@ -337,7 +352,7 @@ class TestValidateTemplateHandler:
         )
         return ValidateTemplateHandler(
             logger=_make_logger(),
-            container=container,
+            template_manager=container.get(TemplateConfigurationPort),
             error_handler=_make_error_handler(),
         )
 
@@ -390,7 +405,7 @@ class TestValidateTemplateHandler:
 
         h = ValidateTemplateHandler(
             logger=_make_logger(),
-            container=container,
+            template_manager=container.get(TemplateConfigurationPort),
             error_handler=_make_error_handler(),
         )
         q = ValidateTemplateQuery(template_id="t1", template_config={})
@@ -410,7 +425,7 @@ class TestValidateTemplateHandler:
 
         h = ValidateTemplateHandler(
             logger=_make_logger(),
-            container=container,
+            template_manager=container.get(TemplateConfigurationPort),
             error_handler=_make_error_handler(),
         )
         q = ValidateTemplateQuery(template_config={"template_id": "t1", "name": "test"})
@@ -436,7 +451,7 @@ class TestGetConfigurationHandler:
 
         h = GetConfigurationHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=container.get(ConfigurationPort),
             error_handler=_make_error_handler(),
         )
         q = GetConfigurationQuery(key="storage.strategy", default=None)
@@ -446,14 +461,14 @@ class TestGetConfigurationHandler:
 
     @pytest.mark.asyncio
     async def test_exception_propagates(self):
-        container = MagicMock()
-        container.get.side_effect = RuntimeError("no cfg")
+        config_manager = MagicMock()
+        config_manager.get_configuration_value.side_effect = RuntimeError("no cfg")
 
         from orb.application.dto.queries import GetConfigurationQuery
 
         h = GetConfigurationHandler(
             logger=_make_logger(),
-            container=container,
+            config_manager=config_manager,
             error_handler=_make_error_handler(),
         )
         q = GetConfigurationQuery(key="x")

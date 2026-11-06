@@ -10,10 +10,10 @@ from orb.application.dto.queries import SyncAndGetRequestQuery
 from orb.application.dto.responses import RequestDTO
 from orb.application.queries.request_query_handlers import SyncAndGetRequestHandler
 from orb.domain.base.exceptions import EntityNotFoundError
-from orb.domain.base.ports.container_port import ContainerPort
 from orb.domain.base.ports.error_handling_port import ErrorHandlingPort
 from orb.domain.request.aggregate import Request
 from orb.domain.request.exceptions import RequestNotFoundError
+from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
 from orb.domain.request.value_objects import RequestId, RequestStatus, RequestType
 
 # ---------------------------------------------------------------------------
@@ -36,28 +36,6 @@ def _make_request(request_id: str = "req-00000000-0000-0000-0000-000000000004") 
     )
 
 
-class _FakeContainer(ContainerPort):
-    def __init__(self, services: dict | None = None) -> None:
-        self._services: dict = services or {}
-
-    def get(self, service_type):
-        if service_type not in self._services:
-            raise KeyError(service_type)
-        return self._services[service_type]
-
-    def register(self, service_type, instance) -> None:
-        self._services[service_type] = instance
-
-    def register_factory(self, service_type, factory_func) -> None:
-        self._services[service_type] = factory_func()
-
-    def register_singleton(self, service_type, factory_func) -> None:
-        self._services[service_type] = factory_func()
-
-    def has(self, service_type) -> bool:
-        return service_type in self._services
-
-
 def _make_handler(
     request: Request,
     sync_side_effect=None,
@@ -68,7 +46,6 @@ def _make_handler(
     """
     logger = Mock()
     error_handler = Mock(spec=ErrorHandlingPort)
-    container = _FakeContainer()  # empty — cache/event publisher will fall back to None/noop
 
     # UoW factory — used by record_status_check save; configure context manager support
     uow_factory = Mock()
@@ -92,9 +69,11 @@ def _make_handler(
         uow_factory=uow_factory,
         logger=logger,
         error_handler=error_handler,
-        container=container,
         provider_registry_service=provider_registry_service,
         machine_sync_service=machine_sync_service,
+        cache_service=None,  # type: ignore[arg-type]
+        event_publisher=Mock(),
+        state_machine=FulfilmentStateMachine(grace_period_seconds=3600),
     )
 
     # Replace internal services with mocks so we control data flow

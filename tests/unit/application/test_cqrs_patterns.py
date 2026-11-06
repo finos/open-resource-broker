@@ -122,13 +122,13 @@ class TestCommandQuerySeparation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
+        mock_repository.get_by_id.return_value = None
 
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
         mock_uow_factory.create_unit_of_work.return_value.__exit__ = Mock(return_value=False)
 
         mock_logger = Mock()
-        mock_container = Mock()
         mock_event_publisher = Mock()
         mock_error_handler = Mock()
 
@@ -180,13 +180,13 @@ class TestCommandQuerySeparation:
         handler = CreateRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
-            container=mock_container,
             event_publisher=mock_event_publisher,
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
             provisioning_service=mock_provisioning_service,
             provider_validation_service=mock_provider_validation_service,
+            state_machine=Mock(),
         )
 
         # Execute command with dry_run — PENDING→COMPLETED is now valid
@@ -465,13 +465,13 @@ class TestCommandHandlerImplementation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
+        mock_repository.get_by_id.return_value = None
 
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
         mock_uow_factory.create_unit_of_work.return_value.__exit__ = Mock(return_value=False)
 
         mock_logger = Mock()
-        mock_container = Mock()
         mock_event_publisher = Mock()
         mock_error_handler = Mock()
 
@@ -494,13 +494,13 @@ class TestCommandHandlerImplementation:
         handler = CreateRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
-            container=mock_container,
             event_publisher=mock_event_publisher,
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
             provisioning_service=Mock(),
             provider_validation_service=mock_provider_validation_service,
+            state_machine=Mock(),
         )
 
         # Valid command
@@ -548,13 +548,13 @@ class TestCommandHandlerImplementation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
+        mock_repository.get_by_id.return_value = None
 
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
         mock_uow_factory.create_unit_of_work.return_value.__exit__ = Mock(return_value=False)
 
         mock_logger = Mock()
-        mock_container = Mock()
         mock_event_publisher = Mock()
         mock_error_handler = Mock()
 
@@ -583,13 +583,13 @@ class TestCommandHandlerImplementation:
         handler = CreateRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
-            container=mock_container,
             event_publisher=mock_event_publisher,
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
             provisioning_service=Mock(),
             provider_validation_service=mock_provider_validation_service,
+            state_machine=Mock(),
         )
 
         # Execute command with dry_run — PENDING→COMPLETED is now valid
@@ -607,13 +607,14 @@ class TestCommandHandlerImplementation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
+        mock_repository.get_by_id.return_value = None
 
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
         mock_uow_factory.create_unit_of_work.return_value.__exit__ = Mock(return_value=False)
 
         mock_logger = Mock()
-        mock_container = Mock()
+        Mock()
         mock_event_publisher = Mock()
         mock_error_handler = Mock()
 
@@ -625,13 +626,13 @@ class TestCommandHandlerImplementation:
         handler = CreateRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
-            container=mock_container,
             event_publisher=mock_event_publisher,
             error_handler=mock_error_handler,
             query_bus=mock_query_bus,
             provider_selection_port=mock_provider_selection,
             provisioning_service=Mock(),
             provider_validation_service=Mock(),
+            state_machine=Mock(),
         )
 
         # Should have event publisher
@@ -707,9 +708,11 @@ class TestQueryHandlerImplementation:
             uow_factory=mock_uow_factory,
             logger=mock_logger,
             error_handler=mock_error_handler,
-            container=mock_container,
             provider_registry_service=Mock(),
             machine_sync_service=Mock(),
+            cache_service=Mock(),
+            event_publisher=Mock(),
+            state_machine=Mock(),
         )
 
         # Mock UoW and repository with proper context manager
@@ -753,17 +756,17 @@ class TestQueryHandlerImplementation:
         mock_uow_factory = Mock()
         mock_logger = Mock()
         mock_error_handler = Mock()
-        mock_container = MagicMock()
         mock_provider_registry = Mock()
-        mock_container.get.return_value = Mock()
 
         handler = SyncAndGetRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
             error_handler=mock_error_handler,
-            container=mock_container,
             provider_registry_service=mock_provider_registry,
             machine_sync_service=Mock(),
+            cache_service=Mock(),
+            event_publisher=Mock(),
+            state_machine=Mock(),
         )
 
         # Mock UoW and repository with proper context manager

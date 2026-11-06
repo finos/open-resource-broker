@@ -17,9 +17,15 @@ from orb.application.ports.template_dto_factory_port import TemplateDTOFactoryPo
 from orb.application.ports.template_dto_port import TemplateDTOPort
 from orb.application.services.orchestration.dtos import Paginated
 from orb.domain.base.exceptions import EntityNotFoundError
-from orb.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from orb.domain.base.ports import (
+    ConfigurationPort,
+    ErrorHandlingPort,
+    LoggingPort,
+    TemplateConfigurationPort,
+)
 from orb.domain.services.generic_filter_service import GenericFilterService
 from orb.domain.template.factory import TemplateFactoryPort
+from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from orb.domain.template.template_aggregate import Template
 
 
@@ -31,23 +37,23 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
         self,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-        container: ContainerPort,
+        template_manager: TemplateConfigurationPort,
+        template_defaults_service: TemplateDefaultsPort,
         template_factory: TemplateFactoryPort,
         template_dto_factory: TemplateDTOFactoryPort,
     ) -> None:
         super().__init__(logger, error_handler)
-        self._container = container
+        self._template_manager = template_manager
+        self._template_defaults_service = template_defaults_service
         self._template_factory = template_factory
         self._template_dto_factory = template_dto_factory
 
     async def execute_query(self, query: GetTemplateQuery) -> Template:  # type: ignore[override]
         """Execute get template query."""
-        from orb.domain.base.ports import TemplateConfigurationPort
-
         self.logger.info("Getting template: %s", query.template_id)
 
         try:
-            template_manager = self._container.get(TemplateConfigurationPort)
+            template_manager = self._template_manager
             template_dto = await template_manager.get_template_by_id(query.template_id)
 
             if not template_dto:
@@ -58,16 +64,10 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
             template_data.setdefault("name", template_dto.name or template_dto.template_id)
             template_data.setdefault("provider_api", template_dto.provider_api)
 
-            from orb.application.services.template_defaults_service import TemplateDefaultsService
-
-            if self._container.has(TemplateDefaultsService):
-                template_defaults_service = self._container.get(TemplateDefaultsService)
-                resolved_data = template_defaults_service.resolve_template_defaults(
-                    template_data,
-                    provider_name=query.provider_name,  # type: ignore[call-arg]
-                )
-            else:
-                resolved_data = template_data
+            resolved_data = self._template_defaults_service.resolve_template_defaults(
+                template_data,
+                provider_instance_name=query.provider_name,
+            )
 
             resolved_template = self._template_factory.create_template(resolved_data)
 
@@ -90,11 +90,11 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, Paginated[Templa
         self,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-        container: ContainerPort,
+        template_manager: TemplateConfigurationPort,
         generic_filter_service: GenericFilterService,
     ) -> None:
         super().__init__(logger, error_handler)
-        self._container = container
+        self._template_manager = template_manager
         self._generic_filter_service = generic_filter_service
 
     async def execute_query(self, query: ListTemplatesQuery) -> Paginated[TemplateDTOPort]:
@@ -104,12 +104,10 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, Paginated[Templa
         Filter/sort/q all run on the FULL dataset so the slice is honest:
         if there are 200 q-matches in 10k rows, page 2 still shows them.
         """
-        from orb.domain.base.ports import TemplateConfigurationPort
-
         self.logger.info("Listing templates")
 
         try:
-            template_manager = self._container.get(TemplateConfigurationPort)
+            template_manager = self._template_manager
 
             if query.provider_name:
                 template_dtos = await template_manager.load_templates(
@@ -223,11 +221,11 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        template_manager: TemplateConfigurationPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         super().__init__(logger, error_handler)
-        self.container = container
+        self._template_manager = template_manager
 
     async def execute_query(self, query: ValidateTemplateQuery) -> dict[str, Any]:  # type: ignore[override]
         """Execute validate template query."""
@@ -240,9 +238,7 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
         if template_id and (not template_config or template_config == {"template_id": template_id}):
             self.logger.info("Loading template from storage: %s", template_id)
             try:
-                from orb.domain.base.ports import TemplateConfigurationPort
-
-                template_manager = self.container.get(TemplateConfigurationPort)
+                template_manager = self._template_manager
                 template_dto = await template_manager.get_template_by_id(template_id)
 
                 if not template_dto:
@@ -267,9 +263,7 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
         self.logger.info("Validating template: %s", template_id or "file-template")
 
         try:
-            from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
-
-            template_port = self.container.get(TemplateConfigurationPort)
+            template_port = self._template_manager
             validation_errors = template_port.validate_template_config(template_config)
 
             if validation_errors:
@@ -323,21 +317,19 @@ class GetConfigurationHandler(BaseQueryHandler[GetConfigurationQuery, dict[str, 
     def __init__(
         self,
         logger: LoggingPort,
-        container: ContainerPort,
+        config_manager: ConfigurationPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         """Initialize get configuration handler."""
         super().__init__(logger, error_handler)
-        self.container = container
+        self._config_manager = config_manager
 
     async def execute_query(self, query: GetConfigurationQuery) -> dict[str, Any]:
         """Execute get configuration query."""
         self.logger.info("Getting configuration value for key: %s", query.key)
 
         try:
-            from orb.domain.base.ports import ConfigurationPort
-
-            config_manager = self.container.get(ConfigurationPort)
+            config_manager = self._config_manager
             value = config_manager.get_configuration_value(query.key, query.default)
 
             return {

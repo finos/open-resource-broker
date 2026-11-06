@@ -22,7 +22,8 @@ class TestCircuitBreakerFactoryRequired:
 
     def _minimal_kwargs(self):
         return dict(
-            container=MagicMock(),
+            uow_factory=MagicMock(),
+            scheduler=MagicMock(),
             logger=MagicMock(),
             provider_selection_port=MagicMock(),
             provider_config_port=MagicMock(),
@@ -99,9 +100,10 @@ class TestDIWiringCircuitBreakerFactory:
         Call the factory function directly with a mock container and verify the
         returned service stores CircuitBreakerStrategy as its factory callable.
         """
+        from orb.application.ports.scheduler_port import SchedulerPort
+        from orb.domain.base import UnitOfWorkFactory
         from orb.domain.base.ports import (
             ConfigurationPort,
-            ContainerPort,
             LoggingPort,
             ProviderConfigPort,
         )
@@ -113,7 +115,8 @@ class TestDIWiringCircuitBreakerFactory:
         # Register the minimal stubs the factory needs
         from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
 
-        container.register_instance(ContainerPort, MagicMock(spec=ContainerPort))
+        container.register_instance(UnitOfWorkFactory, MagicMock(spec=UnitOfWorkFactory))
+        container.register_instance(SchedulerPort, MagicMock(spec=SchedulerPort))
         container.register_instance(LoggingPort, MagicMock(spec=LoggingPort))
         container.register_instance(ProviderSelectionPort, MagicMock(spec=ProviderSelectionPort))
         container.register_instance(ProviderConfigPort, MagicMock(spec=ProviderConfigPort))

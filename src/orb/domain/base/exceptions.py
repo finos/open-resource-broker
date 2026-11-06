@@ -102,3 +102,38 @@ class ProviderContractError(DomainException):
     application layer raises this error instead of silently falling back to
     count-based logic, which is always wrong for weighted fleets.
     """
+
+
+class ProviderNotReadyError(DomainException):
+    """Raised when an operation is dispatched to a provider that has not finished initializing.
+
+    Retrying immediately does not help: the provider only becomes ready once
+    its own initialization completes, so the retry/circuit layer treats this
+    as non-retryable.
+    """
+
+    def __init__(self, provider_id: str, operation_type: Any = None) -> None:
+        self.provider_id = provider_id
+        self.operation_type = operation_type
+        super().__init__(
+            f"Provider '{provider_id}' is not ready",
+            "PROVIDER_NOT_READY",
+            {"provider_id": provider_id, "operation_type": str(operation_type)},
+        )
+
+
+class OperationNotSupportedError(DomainException):
+    """Raised when a provider is asked for an operation it does not declare.
+
+    The mismatch is permanent for that provider, so the retry/circuit layer
+    treats it as non-retryable.
+    """
+
+    def __init__(self, provider_id: str, operation_type: Any = None) -> None:
+        self.provider_id = provider_id
+        self.operation_type = operation_type
+        super().__init__(
+            f"Provider '{provider_id}' does not support operation '{operation_type}'",
+            "OPERATION_NOT_SUPPORTED",
+            {"provider_id": provider_id, "operation_type": str(operation_type)},
+        )

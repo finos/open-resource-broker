@@ -122,9 +122,11 @@ def _run(loop: str, make_uow: Any) -> MagicMock:
             uow_factory=_SweepFactory(make_uow, request_id),  # type: ignore[arg-type]
             logger=MagicMock(),
             error_handler=MagicMock(),
-            container=MagicMock(),
             provider_registry_service=MagicMock(),
             machine_sync_service=MagicMock(),
+            cache_service=MagicMock(),
+            event_publisher=publisher,
+            state_machine=machine,
         )
         handler.event_publisher = publisher
         handler._state_machine = machine
