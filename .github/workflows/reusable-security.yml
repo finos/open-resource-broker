@@ -94,11 +94,22 @@ jobs:
             --error \
             .
 
+      # Semgrep still writes results silenced by `# nosemgrep` into the SARIF,
+      # and code scanning would keep them open. Drop them before upload. When
+      # Semgrep produced no SARIF there is no filtered file and the upload
+      # fails, instead of uploading an empty run that would close every alert.
+      - name: Drop suppressed Semgrep results
+        if: inputs.scan-type == 'semgrep' && inputs.enabled && always()
+        run: |
+          if [ -f semgrep.sarif ]; then
+            python3 dev-tools/ci/filter_sarif_suppressions.py semgrep.sarif semgrep-filtered.sarif
+          fi
+
       - name: Upload Semgrep SARIF results
         if: inputs.scan-type == 'semgrep' && inputs.enabled && always()
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
         with:
-          sarif_file: semgrep.sarif
+          sarif_file: semgrep-filtered.sarif
 
       # Trivy Filesystem Scan
       # Trivy reports CRITICAL and HIGH findings (severity plus
