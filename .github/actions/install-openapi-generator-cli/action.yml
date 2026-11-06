@@ -1,0 +1,50 @@
+name: Install openapi-generator-cli
+description: >-
+  Install the pinned openapi-generator-cli and its generator jar.  The jar
+  lives in ~/.openapi-generator (storageDir in openapitools.json) and is
+  restored from the Actions cache keyed on the generator version, so most runs
+  never contact Maven Central.  When the cache is cold the download is retried
+  with backoff, because Maven Central rate-limits shared runner IPs.  Requires
+  the repository to be checked out (openapitools.json) and Node.js to be set up.
+
+inputs:
+  openapi-generator-version:
+    description: Pinned openapi-generator version to install.
+    required: false
+    default: '7.23.0'
+  cli-version:
+    description: Version of the @openapitools/openapi-generator-cli npm wrapper.
+    required: false
+    default: '2.42.0'
+
+runs:
+  using: composite
+  steps:
+    - name: Cache openapi-generator jar
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
+      with:
+        path: ~/.openapi-generator
+        key: openapi-generator-jar-${{ runner.os }}-${{ inputs.openapi-generator-version }}
+
+    - name: Install openapi-generator-cli
+      shell: bash
+      env:
+        CLI_VERSION: ${{ inputs.cli-version }}
+        GENERATOR_VERSION: ${{ inputs.openapi-generator-version }}
+      run: |
+        set -u
+        max_attempts=4
+        delay=15
+        for attempt in $(seq 1 "$max_attempts"); do
+          if npx --yes "@openapitools/openapi-generator-cli@${CLI_VERSION}" version-manager set "$GENERATOR_VERSION" \
+            && [ -s "$HOME/.openapi-generator/${GENERATOR_VERSION}.jar" ]; then
+            exit 0
+          fi
+          if [ "$attempt" -lt "$max_attempts" ]; then
+            echo "openapi-generator download failed (attempt ${attempt}/${max_attempts}); retrying in ${delay}s"
+            sleep "$delay"
+            delay=$((delay * 2))
+          fi
+        done
+        echo "::error::could not install openapi-generator ${GENERATOR_VERSION} after ${max_attempts} attempts"
+        exit 1
