@@ -3,7 +3,7 @@
 import posixpath
 from typing import Optional
 
-from fastapi import HTTPException, Request, Response, status
+from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -91,6 +91,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             self.logger.debug("Authentication not required and disabled")
             return await call_next(request)
 
+        # Authentication, request-state stamping and audit logging fail closed: any
+        # error here yields a 500 and the request never reaches the route.
         try:
             # Create authentication context
             auth_context = self._create_auth_context(request)
@@ -120,36 +122,45 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 method=auth_context.method,
                 auth_strategy=self._strategy_name(),
             )
-
-            # Continue to next middleware/handler
-            response = await call_next(request)
-
-            # A downstream route dependency may reject an authenticated principal
-            # with a 403 (insufficient permission). Audit that as PERMISSION_DENIED
-            # so authorization failures are captured alongside authentication ones.
-            if response.status_code == status.HTTP_403_FORBIDDEN:
-                self.audit_logger.log_permission_denied(
-                    user_id=auth_result.user_id,
-                    client_ip=auth_context.client_ip,
-                    path=auth_context.path,
-                    method=auth_context.method,
-                    auth_strategy=self._strategy_name(),
-                )
-
-            # The token is not echoed back — it was supplied by the client in the
-            # Authorization request header and reflecting it in responses would expose
-            # it to proxy logs, browser devtools, and Referer header leakage.
-
-            return response
-
-        except HTTPException:
-            raise
         except Exception as e:
             self.logger.error("Authentication middleware error: %s", e, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal server error",
+            return self._internal_error_response()
+
+        # Route errors are deliberately outside the try block above: they propagate to
+        # the application's exception handlers and keep their own status codes.
+        response = await call_next(request)
+
+        # A downstream route dependency may reject an authenticated principal
+        # with a 403 (insufficient permission). Audit that as PERMISSION_DENIED
+        # so authorization failures are captured alongside authentication ones.
+        if response.status_code == status.HTTP_403_FORBIDDEN:
+            self.audit_logger.log_permission_denied(
+                user_id=auth_result.user_id,
+                client_ip=auth_context.client_ip,
+                path=auth_context.path,
+                method=auth_context.method,
+                auth_strategy=self._strategy_name(),
             )
+
+        # The token is not echoed back — it was supplied by the client in the
+        # Authorization request header and reflecting it in responses would expose
+        # it to proxy logs, browser devtools, and Referer header leakage.
+
+        return response
+
+    @staticmethod
+    def _internal_error_response() -> JSONResponse:
+        """500 response in the API's standard error envelope, without internal detail."""
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An internal server error occurred",
+                },
+            },
+        )
 
     def _normalize_path(self, path: str) -> str:
         """
