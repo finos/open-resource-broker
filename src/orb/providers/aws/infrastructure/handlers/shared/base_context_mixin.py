@@ -84,7 +84,7 @@ class BaseContextMixin:
 
         custom_tags = []
         if template.tags:
-            custom_tags = [{"key": k, "value": v} for k, v in template.tags.items()]
+            custom_tags = [{"key": str(k), "value": str(v)} for k, v in template.tags.items()]
 
         return {
             "base_tags": base_tags,

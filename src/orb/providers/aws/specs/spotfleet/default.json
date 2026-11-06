@@ -31,12 +31,12 @@
     {
       "ResourceType": "spot-fleet-request",
       "Tags": [
-        {"Key": "Name", "Value": "{{ fleet_name }}"}
+        {"Key": "Name", "Value": {{ fleet_name | tojson }}}
         {%- for tag in base_tags %},
-        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}
+        {"Key": {{ tag.key | tojson }}, "Value": {{ tag.value | tojson }}}
         {%- endfor %}
         {%- for tag in custom_tags %},
-        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}
+        {"Key": {{ tag.key | tojson }}, "Value": {{ tag.value | tojson }}}
         {%- endfor %}
       ]
     }
