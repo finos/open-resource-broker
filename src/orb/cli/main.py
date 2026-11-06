@@ -68,7 +68,8 @@ async def _drain_releases() -> None:
     try:
         from orb.application.services.deadline_release_service import DeadlineReleaseService
 
-        service = get_container().get_optional(DeadlineReleaseService)
+        # Only a command that already built the service can have started releases.
+        service = DeadlineReleaseService.active()
         if service is not None:
             await service.drain(_RELEASE_DRAIN_SECONDS)
     except Exception as e:

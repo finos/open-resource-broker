@@ -155,3 +155,20 @@ class TestVpcIdIsCarriedEndToEnd:
         strategy = DefaultSchedulerStrategy.__new__(DefaultSchedulerStrategy)
         out = strategy.format_machine_status_response([MachineDTO.from_domain(machine)])
         assert "vpc_id" not in out["machines"][0]
+
+
+class TestCreateMachineStatus:
+    def test_a_read_without_a_status_is_not_a_pending_machine(self):
+        data = _base_processed_data()
+        data.pop("status", None)
+
+        machine = _make_service()._create_machine_from_processed_data(data, _make_request())
+
+        assert machine.status.value == "unknown"
+
+    def test_a_reported_status_is_kept(self):
+        data = {**_base_processed_data(), "status": "running"}
+
+        machine = _make_service()._create_machine_from_processed_data(data, _make_request())
+
+        assert machine.status.value == "running"

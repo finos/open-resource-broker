@@ -873,6 +873,10 @@ class SyncAndListActiveRequestsHandler(
                 request_dtos.append(request_dto)
                 if DeadlineReleaseService.is_owed(request):
                     owed_release_ids.append(str(request.request_id.value))
+            # Only listings that read all requests (`all_resources`) include finished
+            # ones. Without background reconciliation, plain list handlers do not
+            # enqueue releases; those start from status polls, single reads, the
+            # startup scan and the next command that polls the request.
             if self._deadline_release is not None and owed_release_ids:
                 # A listing starts at most a few releases, never one per row.
                 self._deadline_release.enqueue_many(owed_release_ids)

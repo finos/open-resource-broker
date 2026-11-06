@@ -56,8 +56,19 @@ _STUCK_RETURN_AFTER_SECONDS = 3600
 _WARN_EVERY_SECONDS = 24 * 3600
 
 
+_TERMINAL_MACHINE = (MachineStatus.TERMINATED, MachineStatus.RETURNED, MachineStatus.FAILED)
+_MAX_TRACKED = 1024
+
+
 class DeadlineReleaseService:
     """Releases never-started machines of requests that reached their deadline."""
+
+    _active: Optional["DeadlineReleaseService"] = None
+
+    @classmethod
+    def active(cls) -> Optional["DeadlineReleaseService"]:
+        """The instance created in this process, None when none was built."""
+        return cls._active
 
     def __init__(
         self,
@@ -89,6 +100,7 @@ class DeadlineReleaseService:
         self._last_enqueued: dict[str, float] = {}
         self._last_warned: dict[tuple[str, str], float] = {}
         self._last_scan: Optional[float] = None
+        DeadlineReleaseService._active = self
 
     # ------------------------------------------------------------------
     # Scheduling
@@ -120,11 +132,23 @@ class DeadlineReleaseService:
             last is not None and now - last < self._throttle_seconds
         ):
             return False
+        self._prune(now)
         self._last_enqueued[request_id] = now
         self._in_flight.add(request_id)
         task = loop.create_task(self._run(request_id), name=f"orb-deadline-release-{request_id}")
         self._track(task)
         return True
+
+    def _prune(self, now: float) -> None:
+        """Keep the per-request bookkeeping bounded."""
+        if len(self._last_enqueued) > _MAX_TRACKED:
+            self._last_enqueued = {
+                k: t for k, t in self._last_enqueued.items() if now - t < self._throttle_seconds
+            }
+        if len(self._last_warned) > _MAX_TRACKED:
+            self._last_warned = {
+                k: t for k, t in self._last_warned.items() if now - t < _WARN_EVERY_SECONDS
+            }
 
     def enqueue_if_owed(self, request: Request) -> bool:
         """Enqueue a release when ``request`` owes one."""
@@ -181,13 +205,17 @@ class DeadlineReleaseService:
         task.add_done_callback(self._tasks.discard)
 
     async def _run(self, request_id: str) -> None:
+        # The release is shielded: cancelling this wrapper (for example at
+        # shutdown) leaves it running, and the in-flight mark and the concurrency
+        # slot are held by the release itself until it ends.
+        inner = asyncio.ensure_future(self._guarded(request_id))
+        self._track(inner)
+        await asyncio.shield(inner)
+
+    async def _guarded(self, request_id: str) -> None:
         try:
             async with self._semaphore:
-                # The release itself is shielded: cancelling this wrapper (for
-                # example at shutdown) does not interrupt a termination midway.
-                inner = asyncio.ensure_future(self._release_logged(request_id))
-                self._track(inner)
-                await asyncio.shield(inner)
+                await self._release_logged(request_id)
         finally:
             self._in_flight.discard(request_id)
 
@@ -224,11 +252,18 @@ class DeadlineReleaseService:
             return RELEASE_PENDING
 
         ours = set(request.machine_ids)
-        leftover = [
-            m.machine_id.value
-            for m in provider_machines
-            if m.machine_id.value in ours and m.status in _UNSTARTED
-        ]
+        mine = [m for m in provider_machines if m.machine_id.value in ours]
+        if not mine and not (
+            stored_machines and all(m.status in _TERMINAL_MACHINE for m in stored_machines)
+        ):
+            # A read that returned none of the request's machines may be a lookup
+            # that has not found them yet; it is not evidence that nothing is left.
+            self._logger.debug(
+                "Provider read returned none of request %s's machines; keeping the release pending",
+                request_id,
+            )
+            return RELEASE_PENDING
+        leftover = [m.machine_id.value for m in mine if m.status in _UNSTARTED]
         if not leftover:
             mark = (
                 RELEASE_DONE
