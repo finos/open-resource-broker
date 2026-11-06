@@ -271,12 +271,14 @@ class HTTPErrorResponseHandler:
             str(exception),
             extra={"details": getattr(exception, "details", {})},
         )
-        # The reason is the validator's description of what is wrong with the
-        # template, which the caller needs in order to fix it.
-        details = _safe_details(getattr(exception, "details", {}))
-        reason = str(getattr(exception, "message", "") or "")[:_MAX_REASON_LENGTH]
-        if reason:
-            details["reason"] = reason
+        # The exception message may carry internals, so it is never sent. A raiser
+        # that has a caller-safe description of what is wrong with the template
+        # passes it as ``details["reason"]``, which the caller needs to fix it.
+        raw_details = getattr(exception, "details", {})
+        details = _safe_details(raw_details)
+        reason = raw_details.get("reason")
+        if isinstance(reason, str) and reason:
+            details["reason"] = reason[:_MAX_REASON_LENGTH]
         return ErrorResponse(
             error_code=ErrorCode.INVALID_INPUT,
             message="Invalid input",

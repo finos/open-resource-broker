@@ -30,7 +30,28 @@ async def test_drain_events_never_raises():
 
 
 @pytest.mark.unit
+@pytest.mark.asyncio
+async def test_drain_releases_waits_a_bounded_time_for_started_releases():
+    service = MagicMock()
+    service.drain = AsyncMock()
+    container = MagicMock()
+    container.get_optional.return_value = service
+    with patch.object(cli_main, "get_container", return_value=container):
+        await cli_main._drain_releases()
+    service.drain.assert_awaited_once_with(cli_main._RELEASE_DRAIN_SECONDS)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_drain_releases_never_raises():
+    with patch.object(cli_main, "get_container", side_effect=RuntimeError("no container")):
+        await cli_main._drain_releases()
+
+
+@pytest.mark.unit
 def test_drain_runs_in_the_finally_block_of_command_execution():
     source = inspect.getsource(cli_main.main)
-    finally_block = source.split("finally:\n            await _drain_events()")
-    assert len(finally_block) == 2, "drain must be the first statement of the command's finally"
+    finally_block = source.split(
+        "finally:\n            await _drain_releases()\n            await _drain_events()"
+    )
+    assert len(finally_block) == 2, "drains must be the first statements of the command's finally"
