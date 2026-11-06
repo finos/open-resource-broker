@@ -305,15 +305,50 @@ def test_without_a_config_port_nothing_is_deleted(ec2, aws_client):
     assert _exists(ec2, orphan)
 
 
-def test_an_empty_resource_prefix_deletes_nothing(ec2, aws_client):
-    orphan = _template(ec2, "tpl", "req-1")
+def test_an_empty_resource_prefix_still_matches_the_exact_generated_name(ec2, aws_client):
+    """With no prefix ORB names templates '<request id>-<template id>'."""
+    generated = ec2.create_launch_template(
+        LaunchTemplateName="req-1-tpl",
+        LaunchTemplateData={"ImageId": "ami-12345678", "InstanceType": "t3.micro"},
+        TagSpecifications=[
+            {
+                "ResourceType": "launch-template",
+                "Tags": [
+                    *ORB_TAGS,
+                    {"Key": "orb:request-id", "Value": "req-1"},
+                    {"Key": "orb:template-id", "Value": "tpl"},
+                ],
+            }
+        ],
+    )["LaunchTemplate"]["LaunchTemplateId"]
+    customer = _template(ec2, "my-user-template", "req-2", orb_named=False)
     service = AWSLaunchTemplateSweepService(
         aws_client, _make_logger(), _make_cleanup_config_port("")
     )
 
     report = service.sweep(dry_run=False, min_age=timedelta(0))
 
-    assert report["deleted"] == [] and report["refused"] is True
+    assert [d["launch_template_id"] for d in report["deleted"]] == [generated]
+    assert _exists(ec2, customer)
+    assert {k["launch_template_id"]: k["reason"] for k in report["kept"]} == {
+        customer: "name is not ORB-generated"
+    }
+
+
+@pytest.mark.asyncio
+async def test_the_refusal_reason_is_in_the_result(ec2, aws_client):
+    from orb.domain.base.operations import Operation, OperationType
+
+    orphan = _template(ec2, "tpl", "req-1")
+    service = AWSLaunchTemplateSweepService(aws_client, _make_logger(), None)
+
+    result = await service.cleanup_orphaned_templates(
+        Operation(OperationType.CLEANUP_ORPHANED_RESOURCES, {"dry_run": False})
+    )
+
+    assert result.success is False
+    assert result.error_code == "LAUNCH_TEMPLATE_CLEANUP_REFUSED"
+    assert "nothing was deleted" in (result.error_message or "")
     assert _exists(ec2, orphan)
 
 

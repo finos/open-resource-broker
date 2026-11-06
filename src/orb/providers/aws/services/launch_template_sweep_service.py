@@ -12,7 +12,7 @@ A template is deleted only when every one of these holds:
 * its name is exactly the one ORB generates: the resource prefix, the value of its
   ``orb:request-id`` tag, ``-`` and the value of its ``orb:template-id`` tag (a
   template that merely carries the tags, such as a user's own copy, is never
-  deleted; without a configured, non-empty resource prefix nothing is deleted),
+  deleted; when the resource prefix configuration is unavailable nothing is deleted),
 * it is older than the minimum age, so a template created for a request that has
   not launched anything yet is not removed,
 * no pending, running, stopping or stopped instance was launched from it and no
@@ -172,7 +172,7 @@ class AWSLaunchTemplateSweepService:
                 "message": "Launch template cleanup is disabled in the provider configuration",
             }
         prefix = self._name_prefix()
-        if not prefix:
+        if prefix is None:
             return {
                 "deleted": [],
                 "would_delete": [],
@@ -180,8 +180,8 @@ class AWSLaunchTemplateSweepService:
                 "failed": [],
                 "refused": True,
                 "message": (
-                    "Launch template cleanup needs a non-empty launch template resource prefix "
-                    "to tell ORB-generated templates from others; nothing was deleted"
+                    "Launch template cleanup cannot tell which templates ORB generated "
+                    "without the resource prefix configuration; nothing was deleted"
                 ),
             }
         dry_run = dry_run or self._configured_dry_run()
@@ -253,11 +253,12 @@ class AWSLaunchTemplateSweepService:
             return "its request still has live instances"
         return ""
 
-    def _name_prefix(self) -> str:
+    def _name_prefix(self) -> Optional[str]:
+        """The configured launch template name prefix (may be empty), or None if unknown."""
         if self._config_port is None:
-            return ""
+            return None
         prefix = self._config_port.get_resource_prefix("launch_template")
-        return prefix if isinstance(prefix, str) else ""
+        return prefix if isinstance(prefix, str) else None
 
     # ------------------------------------------------------------------
     # AWS lookups (each raises SweepAborted on failure)
@@ -377,7 +378,7 @@ class AWSLaunchTemplateSweepService:
 
 def _is_orb_generated_name(name: str, prefix: str, request_id: str, template_id: str) -> bool:
     """True only for the exact name ORB generates for a request's launch template."""
-    if not (prefix and request_id and template_id):
+    if not (request_id and template_id):
         return False
     return name == f"{prefix}{request_id}-{template_id}"
 

@@ -282,9 +282,24 @@ def test_list_needs_no_operation():
     assert ns.operation is None
 
 
-def test_the_dedicated_cleanup_subcommand_no_longer_exists():
+def test_providers_has_no_cleanup_launch_templates_subcommand():
     from orb.cli.args import parse_args
 
     with patch.object(sys, "argv", ["orb", "providers", "cleanup-launch-templates"]):
         with pytest.raises(SystemExit):
             parse_args()
+
+
+@pytest.mark.asyncio
+async def test_a_refusal_reason_reaches_the_cli_output():
+    args, port = _args()
+    port.execute_operation.return_value = SimpleNamespace(
+        success=False,
+        data={"deleted": [], "refused": True, "message": "nothing was deleted: no prefix"},
+        error_message="nothing was deleted: no prefix",
+    )
+
+    response = await handle_execute_provider_operation(args)
+
+    assert response.exit_code == 1
+    assert response.data["message"] == "nothing was deleted: no prefix"
