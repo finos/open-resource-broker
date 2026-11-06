@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 from orb.application.ports.resilience_port import CircuitBreakerPort
+from orb.application.services.deadline_release_service import DeadlineReleaseService
 from orb.application.services.machine_sync_service import FailedProviderFetch, MachineSyncService
 from orb.application.services.request_query_service import RequestQueryService
 from orb.application.services.request_status_service import RequestStatusService
@@ -120,8 +121,10 @@ class RequestReconciler:
         config_port: ConfigurationPort,
         circuit_breaker_factory: Callable[[str], CircuitBreakerPort],
         logger: LoggingPort,
+        deadline_release: Optional[DeadlineReleaseService] = None,
     ) -> None:
         self._uow_factory = uow_factory
+        self._deadline_release = deadline_release
         self._machine_sync_service = machine_sync_service
         self._status_service = status_service
         self._config_port = config_port
@@ -274,6 +277,13 @@ class RequestReconciler:
 
         requests = await asyncio.to_thread(self._in_flight_requests)
         await asyncio.gather(*(_one(r) for r in requests))
+        if self._deadline_release is not None:
+            # After the per-request time limits: a release awaits provider
+            # termination and runs in the background, never inside those limits.
+            try:
+                await self._deadline_release.scan_and_enqueue(respect_interval=True)
+            except Exception as exc:
+                self._logger.warning("Scan for owed releases failed: %s", exc)
         # One outcome per provider per pass: a request whose resources are gone
         # fails on its own, so failures only count against the provider when it
         # answered none of its requests. Several broken requests then cannot
@@ -333,5 +343,9 @@ class RequestReconciler:
         )
         if new_status:
             await self._status_service.update_request_status(
-                request, new_status, status_message or "", provider_metadata
+                request,
+                new_status,
+                status_message or "",
+                provider_metadata,
+                provider_machines,
             )
