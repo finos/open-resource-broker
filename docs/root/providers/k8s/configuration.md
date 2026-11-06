@@ -100,6 +100,7 @@ which handler created it.  Per-template values, when present, win.
 | `watch_enabled`               | `bool` | `True`  | `ORB_K8S_WATCH_ENABLED`               | Operator-level kill switch for the asyncio watch task.  When `False` ORB falls back to polling.      |
 | `min_kubernetes_version`      | `str`  | `"1.28"`| `ORB_K8S_MIN_KUBERNETES_VERSION`      | Minimum kube-API server version the provider supports.  Validated on health check.                  |
 | `auto_cleanup_orphans`        | `bool` | `False` | `ORB_K8S_AUTO_CLEANUP_ORPHANS`        | When `True` the orphan GC deletes managed pods that have no record in ORB storage.    |
+| `orb_instance_id`             | `str`  | unset   | `ORB_K8S_ORB_INSTANCE_ID`             | Stable id of this ORB installation, stamped on every pod it creates as `<label_prefix>/orb-instance`.  The orphan GC only acts on pods carrying this id and does not run while it is unset.  Letters, digits, `-`, `_`, `.`; at most 63 characters. |
 | `orphan_gc_enabled`           | `bool` | `False` | `ORB_K8S_ORPHAN_GC_ENABLED`           | Enables the periodic orphan-GC task.  Default off so operators can dry-run reconciliation first.    |
 | `orphan_gc_interval_seconds`  | `int`  | `300`   | `ORB_K8S_ORPHAN_GC_INTERVAL_SECONDS`  | Poll interval for the orphan-GC task.                                                                |
 | `orphan_min_age_seconds`      | `int`  | `300`   | `ORB_K8S_ORPHAN_MIN_AGE_SECONDS`      | Orphan pods younger than this many seconds are skipped by the GC to avoid races against in-flight request commits. |
@@ -107,11 +108,35 @@ which handler created it.  Per-template values, when present, win.
 
 ### Operational note - orphan GC
 
-The orphan GC only ever touches resources stamped with
-`orb.io/managed=true` (or the customised `label_prefix`).  Cluster
-resources without that label are invisible to it, by design.  Even with
-`auto_cleanup_orphans=False`, orphans are logged at `WARNING` so
-operators can spot drift before enabling delete.
+The orphan GC only ever touches pods that carry both
+`orb.io/managed=true` (or the customised `label_prefix`) and
+`orb.io/orb-instance=<orb_instance_id>`.  Everything else is invisible to
+it by design, including pods created by other ORB installations that share
+the namespace or cluster, and pods created before `orb_instance_id` was
+set.  Those older pods are never deleted automatically.
+
+Set a distinct `orb_instance_id` for each ORB installation before enabling
+the GC.  The GC does not run, and the startup reconciler's report stays
+empty of orphans, while it is unset.
+
+A pod is an orphan only when its `orb.io/request-id` label names a request
+that is not in ORB storage.  The GC applies these rules:
+
+* The set of known requests is every stored request, whatever its status.
+  A completed request still owns live pods; those are released through the
+  return flow, never by the GC.
+* If the request store cannot be read, or returns no requests at all, the
+  sweep is skipped and nothing is deleted.
+* A managed pod without a request-id label is reported at `WARNING` and is
+  never deleted.
+* Immediately before each delete the request is looked up again, and the pod
+  is kept if the request now exists or the lookup fails.
+* Pods younger than `orphan_min_age_seconds` are skipped.
+
+If request history is purged from storage, the live pods of the purged
+requests become orphans, so keep request retention longer than the lifetime
+of the machines.  With `auto_cleanup_orphans=False`, orphans are logged at
+`WARNING` so operators can spot drift before enabling delete.
 
 ### Operational note - periodic resync backstop
 
@@ -272,6 +297,7 @@ export ORB_K8S_NAMING__PREFIX="my-orb"
       "delete_timed_out_pods": true,
       "watch_enabled": true,
       "min_kubernetes_version": "1.28",
+      "orb_instance_id": "orb-prod",
       "orphan_gc_enabled": true,
       "orphan_gc_interval_seconds": 600,
       "auto_cleanup_orphans": false,

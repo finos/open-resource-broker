@@ -416,6 +416,9 @@ class K8sNativeSpecService:
             f"{label_prefix}/template-id": str(request.template_id),
         }
 
+        if self._k8s_config is not None and self._k8s_config.orb_instance_id:
+            system_labels[f"{label_prefix}/orb-instance"] = self._k8s_config.orb_instance_id
+
         merged_labels: dict[str, str] = dict(operator_labels)
         merged_labels.update(system_labels)
 

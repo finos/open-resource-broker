@@ -260,6 +260,8 @@ class K8sPodHandler(K8sHandlerBase):
         labels[f"{self._config.label_prefix}/machine-id"] = machine_id
         labels[f"{self._config.label_prefix}/request-id"] = str(request.request_id)
         labels[f"{self._config.label_prefix}/managed"] = "true"
+        if self._config.orb_instance_id:
+            labels[f"{self._config.label_prefix}/orb-instance"] = self._config.orb_instance_id
         metadata["labels"] = labels
         return body
 

@@ -197,17 +197,18 @@ def test_run_outer_exception_captured_on_report() -> None:
 
 
 @pytest.mark.unit
-def test_run_async_known_ids_failure_treats_pods_as_orphans() -> None:
-    """run_async() treats all pods as orphans when known_request_ids() raises."""
+def test_run_async_known_ids_failure_classifies_nothing() -> None:
+    """run_async() classifies no pod when known_request_ids() raises."""
     reconciler, cache, _ = _make_reconciler(
         pods=[_pod(name="pod-x", request_id="req-x")],
         known_request_ids_raises=True,
     )
     report = asyncio.run(reconciler.run_async())
 
-    assert report.completed is True
-    # Pod should be classified as orphan because known_ids is empty
-    assert report.orphan_count == 1
+    assert report.completed is False
+    # An unreadable store says nothing about ownership: no orphans, no adoption.
+    assert report.orphan_count == 0
+    assert report.pods_adopted == 0
     reconciler._logger.warning.assert_called()
 
 

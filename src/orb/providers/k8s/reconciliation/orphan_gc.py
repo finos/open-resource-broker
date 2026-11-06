@@ -3,12 +3,19 @@
 Long-running asyncio task that walks the cluster every
 ``orphan_gc_interval_seconds`` and identifies pods that:
 
-* carry the ``orb.io/managed=true`` label (so ORB has stamped them
-  during a prior acquisition);
-* have a ``orb.io/request-id`` label whose value is not in ORB
+* carry the ``orb.io/managed=true`` label and this installation's
+  ``orb.io/orb-instance`` label (so this ORB stamped them during a prior
+  acquisition and no other installation sharing the cluster owns them);
+* have a non-empty ``orb.io/request-id`` label whose value is not in ORB
   storage.
 
 Such pods are "orphans": the controller plane has lost track of them.
+
+The collector fails safe.  It does nothing when the instance id is not
+configured, when the known-request-id lookup is missing, fails or returns
+an empty set, and it re-checks storage for the pod's request immediately
+before every delete.  Pods without a request-id label are reported but
+never deleted.
 Behaviour is governed by :attr:`K8sProviderConfig.auto_cleanup_orphans`:
 
 * ``False`` (default) — the GC logs a structured warning per orphan
@@ -36,7 +43,10 @@ from orb.infrastructure.di.injectable import injectable
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.reconciliation.startup_reconciler import OrphanPod
-from orb.providers.k8s.utilities.labels import build_label_selector as _build_label_selector
+from orb.providers.k8s.utilities.labels import (
+    build_owned_pods_selector as _build_owned_pods_selector,
+    instance_label_key as _instance_label_key,
+)
 
 if TYPE_CHECKING:
     from kubernetes.client import V1Pod
@@ -61,6 +71,8 @@ class OrphanGCStats:
     total_orphans_found: int = 0
     total_orphans_deleted: int = 0
     delete_failures: int = 0
+    skipped_unlabeled: int = 0
+    skipped_recheck: int = 0
     last_error: Optional[str] = None
     namespaces_checked: list[str] = field(default_factory=list)
 
@@ -73,10 +85,14 @@ class OrphanGarbageCollector:
         kubernetes_client: Provider API facade.
         config: Validated :class:`K8sProviderConfig`.
         logger: Logging port.
-        known_request_ids: Callable returning the request ids ORB knows
-            about, evaluated fresh on every run so the GC always sees
-            the latest storage view (decoupled from the storage layer
-            same way the startup reconciler is).
+        known_request_ids: Callable returning every request id ORB knows
+            about (any status), evaluated fresh on every run so the GC
+            always sees the latest storage view.  Must raise when storage
+            cannot be read.  ``None`` disables the GC.
+        existing_request_ids: Callable taking candidate request ids and
+            returning those that exist in storage right now.  Consulted
+            immediately before every delete.  Falls back to
+            ``known_request_ids`` when omitted.
         interval_seconds: Override for
             :attr:`K8sProviderConfig.orphan_gc_interval_seconds`
             (tests inject a much shorter interval).
@@ -88,13 +104,16 @@ class OrphanGarbageCollector:
         config: K8sProviderConfig,
         logger: LoggingPort,
         *,
-        known_request_ids: Callable[[], Iterable[str]],
+        known_request_ids: Optional[Callable[[], Iterable[str]]],
+        existing_request_ids: Optional[Callable[[Iterable[str]], Iterable[str]]] = None,
         interval_seconds: Optional[float] = None,
     ) -> None:
         self._client = kubernetes_client
         self._config = config
         self._logger = logger
         self._known_request_ids_fn = known_request_ids
+        self._existing_request_ids_fn = existing_request_ids
+        self._warned: set[str] = set()
         self._interval = float(
             interval_seconds if interval_seconds is not None else config.orphan_gc_interval_seconds
         )
@@ -157,8 +176,19 @@ class OrphanGarbageCollector:
         self.stats.last_orphans_found = 0
         self.stats.last_error = None
 
+        instance_id = self._config.orb_instance_id
+        if not instance_id:
+            self._skip(
+                "no_instance_id",
+                "orb_instance_id is not configured, so ownership of managed pods "
+                "cannot be established",
+            )
+            return []
+        if self._known_request_ids_fn is None:
+            self._skip("no_known_ids_fn", "no request-id lookup is available")
+            return []
         try:
-            known_ids = {str(rid) for rid in self._known_request_ids_fn()}
+            known_ids = await asyncio.to_thread(self._read_known_ids)
         except Exception as exc:
             self.stats.last_error = f"known_request_ids lookup failed: {exc}"
             self._logger.warning(
@@ -167,10 +197,13 @@ class OrphanGarbageCollector:
                 exc_info=True,
             )
             return []
+        if not known_ids:
+            self._skip("empty_known_ids", "the request store returned no request ids")
+            return []
 
         namespaces = self._resolve_namespaces()
         self.stats.namespaces_checked = [ns if ns is not None else "*" for ns in namespaces]
-        label_selector = _build_label_selector(self._config.label_prefix, "managed", "true")
+        label_selector = _build_owned_pods_selector(self._config.label_prefix, instance_id)
         request_id_label = f"{self._config.label_prefix}/request-id"
 
         results = await asyncio.gather(
@@ -213,6 +246,37 @@ class OrphanGarbageCollector:
 
         return orphans
 
+    def _read_known_ids(self) -> set[str]:
+        assert self._known_request_ids_fn is not None  # noqa: S101  # narrowed by caller
+        return {str(rid) for rid in self._known_request_ids_fn()}
+
+    def _skip(self, reason: str, detail: str) -> None:
+        """Record a refused sweep; warn the first time per reason, debug afterwards."""
+        self.stats.last_error = f"sweep skipped: {detail}"
+        log = self._logger.debug if reason in self._warned else self._logger.warning
+        self._warned.add(reason)
+        log("Orphan GC: skipping sweep and deleting nothing: %s", detail)
+
+    def _request_still_unknown(self, request_id: str) -> bool:
+        """Return True only when storage confirms *request_id* does not exist.
+
+        Any lookup failure counts as "unknown state" and returns False so the
+        pod is kept.
+        """
+        try:
+            if self._existing_request_ids_fn is not None:
+                existing = {str(rid) for rid in self._existing_request_ids_fn([request_id])}
+            elif self._known_request_ids_fn is not None:
+                existing = {str(rid) for rid in self._known_request_ids_fn()}
+            else:
+                return False
+        except Exception as exc:
+            self._logger.warning(
+                "Orphan GC: re-check of request %s failed; keeping pod: %s", request_id, exc
+            )
+            return False
+        return request_id not in existing
+
     async def _gc_namespace(
         self,
         namespace: Optional[str],
@@ -229,7 +293,17 @@ class OrphanGarbageCollector:
                 namespace=namespace,
                 known_ids=known_ids,
                 request_id_label=request_id_label,
+                instance_label=_instance_label_key(self._config.label_prefix),
+                instance_id=self._config.orb_instance_id or "",
             )
+            if orphan is not None and not orphan.request_id:
+                self.stats.skipped_unlabeled += 1
+                self._logger.warning(
+                    "Managed pod has no request-id label; not deleting: pod=%s namespace=%s",
+                    orphan.pod_name,
+                    orphan.namespace,
+                )
+                continue
             if orphan is not None:
                 orphans.append(orphan)
         return orphans
@@ -298,6 +372,8 @@ class OrphanGarbageCollector:
         namespace: Optional[str],
         known_ids: set[str],
         request_id_label: str,
+        instance_label: str,
+        instance_id: str,
     ) -> Optional[OrphanPod]:
         metadata = getattr(pod, "metadata", None)
         if metadata is None:
@@ -306,6 +382,8 @@ class OrphanGarbageCollector:
         if not pod_name:
             return None
         labels = dict(getattr(metadata, "labels", None) or {})
+        if not instance_id or labels.get(instance_label) != instance_id:
+            return None
         request_id = labels.get(request_id_label)
         if request_id is not None and request_id in known_ids:
             return None
@@ -361,6 +439,17 @@ class OrphanGarbageCollector:
                     min_age,
                 )
                 return
+        if not orphan.request_id:
+            return
+        if not self._request_still_unknown(orphan.request_id):
+            with self._stats_lock:
+                self.stats.skipped_recheck += 1
+            self._logger.info(
+                "Keeping pod %s: request %s exists in storage or could not be confirmed missing",
+                orphan.pod_name,
+                orphan.request_id,
+            )
+            return
         try:
             self._client.core_v1.delete_namespaced_pod(
                 name=orphan.pod_name,

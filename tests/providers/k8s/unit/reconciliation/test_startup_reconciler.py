@@ -178,14 +178,15 @@ def test_pod_without_known_request_id_is_classified_as_orphan() -> None:
     assert cache.get("req-stranger") is None
 
 
-def test_pod_missing_request_id_label_is_an_orphan() -> None:
+def test_pod_missing_request_id_label_is_not_classified() -> None:
     pods = [_pod(name="legacy-pod", request_id=None)]
-    reconciler, _, _ = _make_reconciler(pods=pods, known=["req-1"])
+    reconciler, cache, _ = _make_reconciler(pods=pods, known=["req-1"])
 
     report = reconciler.run()
 
-    assert report.orphan_count == 1
-    assert report.orphans[0].request_id is None
+    assert report.orphan_count == 0
+    assert report.pods_adopted == 0
+    assert cache.size() == 0
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +251,7 @@ def test_list_failure_does_not_crash_and_is_logged_on_report() -> None:
     assert report.orphan_count == 0
 
 
-def test_known_request_ids_failure_treats_every_pod_as_orphan() -> None:
+def test_known_request_ids_failure_classifies_nothing() -> None:
     pods = [
         _pod(name="adopt", request_id="req-1"),
         _pod(name="adopt-2", request_id="req-2"),
@@ -262,9 +263,10 @@ def test_known_request_ids_failure_treats_every_pod_as_orphan() -> None:
 
     report = reconciler.run()
 
-    # Known set was unavailable — every pod becomes an orphan.
-    assert report.orphan_count == 2
+    # Known set was unavailable — nothing may be called an orphan.
+    assert report.orphan_count == 0
     assert report.pods_adopted == 0
+    assert report.completed is False
     # Cache must remain empty since nothing was adopted.
     assert cache.size() == 0
 

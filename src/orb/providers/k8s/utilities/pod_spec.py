@@ -95,6 +95,7 @@ def build_pod_labels(
     label_prefix: str = _DEFAULT_LABEL_PREFIX,
     emit_legacy_labels: bool = True,
     extra_labels: Optional[dict[str, str]] = None,
+    instance_id: Optional[str] = None,
 ) -> dict[str, str]:
     """Construct the label map applied to every managed pod.
 
@@ -115,6 +116,8 @@ def build_pod_labels(
             f"{label_prefix}/template-id": str(request.template_id),
         }
     )
+    if instance_id:
+        labels[f"{label_prefix}/orb-instance"] = instance_id
     if emit_legacy_labels:
         labels[LEGACY_REQUEST_ID_LABEL] = str(request.request_id)
     return labels
@@ -468,6 +471,7 @@ def build_pod_spec(
         label_prefix=label_prefix,
         emit_legacy_labels=emit_legacy_labels,
         extra_labels=operator_labels,
+        instance_id=config.orb_instance_id if config is not None else None,
     )
 
     image = k8s_template.resolve_container_image()

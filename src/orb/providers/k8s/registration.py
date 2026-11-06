@@ -21,7 +21,7 @@ this module imports cleanly even when those modules are absent.
 from __future__ import annotations
 
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
 from orb.providers.k8s.configuration.template_extension import (
     K8sTemplateExtensionConfig,
@@ -75,6 +75,39 @@ def _strip_discriminator(config_data: Any) -> Any:
     if isinstance(config_data, dict):
         return {k: v for k, v in config_data.items() if k not in ("type", "provider_type")}
     return config_data
+
+
+def _build_request_id_readers() -> tuple[
+    Callable[[], set[str]], Callable[[Iterable[str]], set[str]]
+]:
+    """Return lookups over stored request ids for the reconciler and orphan GC.
+
+    Both resolve the request repository from the DI container at call time
+    (the container may not be ready when the strategy is built) and let any
+    failure propagate: an unreadable store must never look like an empty one,
+    because the callers treat "no known requests" as "nothing to delete".
+
+    * ``known_request_ids()`` returns the id of every stored request,
+      whatever its status, since a completed request still owns live pods.
+    * ``existing_request_ids(ids)`` returns the subset of *ids* that exist.
+    """
+
+    def _repository() -> Any:
+        from orb.domain.request.repository import RequestRepository
+        from orb.infrastructure.di.container import get_container
+
+        return get_container().get(RequestRepository)
+
+    def known_request_ids() -> set[str]:
+        return {str(request.request_id) for request in _repository().find_all()}
+
+    def existing_request_ids(request_ids: Iterable[str]) -> set[str]:
+        wanted = [str(rid) for rid in request_ids]
+        if not wanted:
+            return set()
+        return {str(request.request_id) for request in _repository().find_by_ids(wanted)}
+
+    return known_request_ids, existing_request_ids
 
 
 def create_k8s_strategy(provider_config: Any) -> Any:
@@ -179,9 +212,13 @@ def create_k8s_strategy(provider_config: Any) -> Any:
         except Exception as exc:
             logger.debug("Could not get native spec service from DI container: %s", exc)
 
+        known_request_ids, existing_request_ids = _build_request_id_readers()
+
         strategy = K8sProviderStrategy(
             config=k8s_config,
             logger=logger,
+            known_request_ids=known_request_ids,
+            existing_request_ids=existing_request_ids,
             provider_name=provider_name,
             provider_instance_config=provider_instance_config,
             config_port=config_port,

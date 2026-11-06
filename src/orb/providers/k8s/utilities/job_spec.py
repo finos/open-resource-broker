@@ -135,6 +135,7 @@ def build_job_spec(
         label_prefix=label_prefix,
         emit_legacy_labels=emit_legacy_labels,
         extra_labels=operator_labels,
+        instance_id=config.orb_instance_id if config is not None else None,
     )
     job_labels.pop(f"{label_prefix}/machine-id", None)
 
