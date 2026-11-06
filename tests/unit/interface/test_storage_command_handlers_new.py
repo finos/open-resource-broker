@@ -297,7 +297,7 @@ class TestHandleStorageHealth:
         assert isinstance(result, InterfaceResponse)
 
 
-def _container_with_config(fmt):
+def _container_with_config(fmt, database: str):
     """A container that resolves the formatter and a real SQL storage configuration."""
     from orb.config.manager import ConfigurationManager
     from orb.config.schemas.storage_schema import SqlStrategyConfig, StorageConfig
@@ -305,7 +305,7 @@ def _container_with_config(fmt):
     manager = MagicMock(spec=ConfigurationManager)
     manager.get_typed.return_value = StorageConfig(
         strategy="sql",
-        sql_strategy=SqlStrategyConfig(type="sqlite", name="/srv/orb/migrate.db"),  # type: ignore[arg-type]
+        sql_strategy=SqlStrategyConfig(type="sqlite", name=database),  # type: ignore[arg-type]
     )
     container = MagicMock()
     container.get.side_effect = lambda kind: fmt if kind is ResponseFormattingService else manager
@@ -421,11 +421,11 @@ class TestHandleStorageMigrate:
         assert "hunter2" not in message and "postgresql://" not in message
 
     @pytest.mark.asyncio
-    async def test_stamp_subcommand_uses_revision(self):
+    async def test_stamp_subcommand_uses_revision(self, tmp_path):
         """stamp subcommand must pass ['stamp', '<revision>'] through to alembic."""
         fmt = _make_formatter()
         fmt.format_success.return_value = InterfaceResponse(data={"message": "ok"})
-        container = _container_with_config(fmt)
+        container = _container_with_config(fmt, str(tmp_path / "migrate.db"))
 
         args = Namespace(_container=container, migrate_subcommand="stamp", revision="abc123")
 
@@ -451,10 +451,10 @@ class TestHandleStorageMigrate:
         assert argv.index("stamp") < argv.index("abc123")
 
     @pytest.mark.asyncio
-    async def test_successful_migration_returns_success(self):
+    async def test_successful_migration_returns_success(self, tmp_path):
         fmt = _make_formatter()
         fmt.format_success.return_value = InterfaceResponse(data={"message": "Migration complete"})
-        container = _container_with_config(fmt)
+        container = _container_with_config(fmt, str(tmp_path / "migrate.db"))
 
         args = Namespace(_container=container, migrate_subcommand="up")
 
@@ -493,9 +493,9 @@ class TestHandleStorageMigrate:
         assert isinstance(result, InterfaceResponse)
 
     @pytest.mark.asyncio
-    async def test_sql_strategy_migrates_the_configured_sql_database(self):
+    async def test_sql_strategy_migrates_the_configured_sql_database(self, tmp_path):
         fmt = _make_formatter()
-        container = _container_with_config(fmt)
+        container = _container_with_config(fmt, str(tmp_path / "migrate.db"))
         mock_exec, _proc = _successful_alembic()
 
         with (
@@ -505,7 +505,58 @@ class TestHandleStorageMigrate:
             await handle_storage_migrate(Namespace(_container=container, migrate_subcommand="up"))
 
         env = mock_exec.call_args.kwargs["env"]
-        assert env["ORB_SQL_URL"] == "sqlite:////srv/orb/migrate.db"
+        assert env["ORB_SQL_URL"] == f"sqlite:///{tmp_path / 'migrate.db'}"
+
+    @pytest.mark.asyncio
+    async def test_migrate_up_creates_a_missing_sqlite_directory(self, tmp_path):
+        """A fresh install's data directory does not exist yet; migrate up must still work."""
+        fmt = _make_formatter()
+        database = tmp_path / "missing" / "dir" / "orb.db"
+        container = _container_with_config(fmt, str(database))
+
+        await handle_storage_migrate(Namespace(_container=container, migrate_subcommand="up"))
+
+        fmt.format_error.assert_not_called()
+        fmt.format_success.assert_called_once()
+        assert database.is_file()
+
+    @pytest.mark.asyncio
+    async def test_unwritable_sqlite_directory_is_reported_without_running_alembic(self, tmp_path):
+        fmt = _make_formatter()
+        database = tmp_path / "locked" / "orb.db"
+        container = _container_with_config(fmt, str(database))
+        mock_exec = AsyncMock()
+
+        with (
+            patch("importlib.util.find_spec", return_value=MagicMock()),
+            patch("asyncio.create_subprocess_exec", mock_exec),
+            patch("pathlib.Path.mkdir", side_effect=PermissionError(13, "Permission denied")),
+        ):
+            await handle_storage_migrate(Namespace(_container=container, migrate_subcommand="up"))
+
+        mock_exec.assert_not_called()
+        message = fmt.format_error.call_args[0][0]
+        assert str(database.parent.resolve()) in message
+        assert "Permission denied" in message
+
+    @pytest.mark.asyncio
+    async def test_failed_sqlite_migration_names_the_database(self, tmp_path):
+        fmt = _make_formatter()
+        database = tmp_path / "orb.db"
+        container = _container_with_config(fmt, str(database))
+        proc = AsyncMock()
+        proc.returncode = 1
+        proc.communicate = AsyncMock(return_value=(b"", b"ERROR: boom"))
+
+        with (
+            patch("importlib.util.find_spec", return_value=MagicMock()),
+            patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)),
+        ):
+            await handle_storage_migrate(Namespace(_container=container, migrate_subcommand="up"))
+
+        message = fmt.format_error.call_args[0][0]
+        assert f"database: {database.resolve()}" in message
+        assert "ERROR: boom" in message
 
     @pytest.mark.asyncio
     async def test_aurora_strategy_migrates_the_aurora_database(self):

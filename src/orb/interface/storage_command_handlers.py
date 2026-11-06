@@ -209,15 +209,32 @@ async def handle_storage_migrate(
                 "migrate. 'orb storage migrate' applies to SQL storage (sql, aurora)."
             )
         try:
-            db_url = registry.get_migration_url(active_strategy, cfg).render_as_string(
-                hide_password=False
-            )
+            migration_url = registry.get_migration_url(active_strategy, cfg)
+            db_url = migration_url.render_as_string(hide_password=False)
         except Exception as exc:
             # Never fall back to a default database: migrating the wrong one is worse than failing
             raise ConfigurationError(
                 "Cannot determine the SQL database to migrate from the configuration "
                 f"({type(exc).__name__}). Check the '{active_strategy}' storage settings."
             ) from None
+
+        # SQLite creates the database file but not its directory; a fresh
+        # install points at a data directory that may not exist yet.
+        sqlite_path = None
+        if migration_url.get_backend_name() == "sqlite":
+            from orb.infrastructure.storage.sql.registration import (
+                _sqlite_file_path,
+                ensure_sqlite_parent_dir,
+            )
+
+            try:
+                sqlite_path = ensure_sqlite_parent_dir(migration_url)
+            except OSError as exc:
+                target = _sqlite_file_path(migration_url.database or "")
+                directory = target.parent if target is not None else migration_url.database
+                return formatter.format_error(
+                    f"Cannot create {directory} for SQLite database {target}: {exc.strerror or exc}"
+                )
 
         env = os.environ.copy()
         env["ORB_SQL_URL"] = db_url
@@ -273,7 +290,9 @@ async def handle_storage_migrate(
 
         output = _scrub((raw_stdout + raw_stderr).strip())
         if proc.returncode != 0:
-            return formatter.format_error(f"Alembic migration failed:\n{output}")
+            # SQLite URLs carry no credentials, so the database path is safe to show
+            database_line = f"database: {sqlite_path}\n" if sqlite_path is not None else ""
+            return formatter.format_error(f"Alembic migration failed:\n{database_line}{output}")
         return formatter.format_success(
             {"message": f"Migration '{subcommand}' completed", "output": output}
         )

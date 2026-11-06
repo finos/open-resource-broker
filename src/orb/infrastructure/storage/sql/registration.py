@@ -159,6 +159,25 @@ def _sqlite_file_path(database: str) -> Any:
     return Path(path).resolve()
 
 
+def ensure_sqlite_parent_dir(url: Any) -> Any:
+    """Create the directory a SQLite database file lives in.
+
+    Returns the resolved database file path, or None when the URL is not a
+    file-backed SQLite database. Raises ``OSError`` when the directory cannot
+    be created.
+    """
+    if url.get_backend_name() != "sqlite":
+        return None
+    database = url.database or ""
+    if not database or database == ":memory:":
+        return None
+    path = _sqlite_file_path(database)
+    if path is None:
+        return None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def _build_url(sql_config: Any) -> Any:
     """
     Build the SQLAlchemy URL for a SQL storage configuration.
@@ -234,15 +253,14 @@ def _new_engine(url: Any, sql_config: Any) -> Any:
                 connect_args={"check_same_thread": False},
             )
         path = _sqlite_file_path(database)
-        if path is not None:
-            if not path.exists():
-                get_logger(__name__).warning(
-                    "SQLite database %s not found; creating a new empty database. If you have "
-                    "an existing database, move or rename it to this path or set "
-                    "storage.sql_strategy.name to its absolute path.",
-                    path,
-                )
-            path.parent.mkdir(parents=True, exist_ok=True)
+        if path is not None and not path.exists():
+            get_logger(__name__).warning(
+                "SQLite database %s not found; creating a new empty database. If you have "
+                "an existing database, move or rename it to this path or set "
+                "storage.sql_strategy.name to its absolute path.",
+                path,
+            )
+        ensure_sqlite_parent_dir(url)
         return create_engine(
             url,
             pool_size=sql_config.pool_size,
