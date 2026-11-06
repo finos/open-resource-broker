@@ -578,3 +578,24 @@ async def test_per_request_bookkeeping_stays_bounded():
     await h.service.drain(2)
 
     assert len(h.service._last_enqueued) < 10
+
+
+@pytest.mark.asyncio
+async def test_a_read_of_only_unknown_status_machines_stays_pending():
+    h = _Harness(_request())
+    h.provider_machines = [_machine("i-1", MachineStatus.UNKNOWN)]
+
+    assert await h.service.release(h.request_id) == "pending"
+    assert h.stored.metadata[STAMP] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_status_machine_among_running_ones_keeps_the_mark_pending():
+    h = _Harness(_request())
+    h.provider_machines = [
+        _machine("i-1", MachineStatus.RUNNING),
+        _machine("i-2", MachineStatus.UNKNOWN),
+    ]
+
+    assert await h.service.release(h.request_id) == "pending"
+    assert h.stored.metadata[STAMP] == "pending"

@@ -263,6 +263,13 @@ class DeadlineReleaseService:
                 request_id,
             )
             return RELEASE_PENDING
+        if any(m.status == MachineStatus.UNKNOWN for m in mine):
+            self._logger.debug(
+                "Provider read of request %s has machines without a known status; "
+                "keeping the release pending",
+                request_id,
+            )
+            return RELEASE_PENDING
         leftover = [m.machine_id.value for m in mine if m.status in _UNSTARTED]
         if not leftover:
             mark = (

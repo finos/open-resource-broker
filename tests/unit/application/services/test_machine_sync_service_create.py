@@ -172,3 +172,29 @@ class TestCreateMachineStatus:
         machine = _make_service()._create_machine_from_processed_data(data, _make_request())
 
         assert machine.status.value == "running"
+
+
+class TestApplyProviderStateStatus:
+    def test_an_unknown_provider_status_keeps_the_stored_status(self):
+        svc = _make_service()
+        stored = svc._create_machine_from_processed_data(
+            {**_base_processed_data(), "status": "running"}, _make_request()
+        )
+        incoming = svc._create_machine_from_processed_data(
+            {k: v for k, v in _base_processed_data().items() if k != "status"}, _make_request()
+        )
+
+        merged = MachineSyncService._apply_provider_state(stored, incoming)
+
+        assert merged.status.value == "running"
+
+    def test_a_known_provider_status_replaces_the_stored_one(self):
+        svc = _make_service()
+        stored = svc._create_machine_from_processed_data(
+            {**_base_processed_data(), "status": "pending"}, _make_request()
+        )
+        incoming = svc._create_machine_from_processed_data(
+            {**_base_processed_data(), "status": "running"}, _make_request()
+        )
+
+        assert MachineSyncService._apply_provider_state(stored, incoming).status.value == "running"

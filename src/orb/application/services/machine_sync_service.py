@@ -240,7 +240,9 @@ class MachineSyncService:
         """
         # Create updated machine with all provider data
         machine_data = existing.model_dump()
-        machine_data["status"] = provider_machine.status
+        # A read that reports no usable status says nothing; keep what is stored.
+        if provider_machine.status != MachineStatus.UNKNOWN:
+            machine_data["status"] = provider_machine.status
         machine_data["private_ip"] = provider_machine.private_ip
         machine_data["public_ip"] = provider_machine.public_ip
         # Preserve explicitly-set name (e.g. SLURM node name);
