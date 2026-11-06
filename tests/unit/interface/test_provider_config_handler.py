@@ -639,4 +639,5 @@ class TestHandleProviderShowSupportedOperations:
             args._container = container
             result = await handle_provider_show(args)
 
+        assert isinstance(result, InterfaceResponse)
         assert result.data["supported_operations"] == ["cleanup_orphaned_resources"]
