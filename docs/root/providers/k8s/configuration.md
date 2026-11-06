@@ -115,9 +115,12 @@ it by design, including pods created by other ORB installations that share
 the namespace or cluster, and pods created before `orb_instance_id` was
 set.  Those older pods are never deleted automatically.
 
-Set a distinct `orb_instance_id` for each ORB installation before enabling
-the GC.  The GC does not run, and the startup reconciler's report stays
-empty of orphans, while it is unset.
+Set an `orb_instance_id` that is unique per ORB store (installation) among
+all installations sharing a cluster.  Two installations with different
+request stores must never use the same id: each would see the other's pods as
+orphans.  Installations that share one request store may share an id.  While
+the id is unset the GC does not run and the startup reconciler adopts and
+reports nothing.
 
 A pod is an orphan only when its `orb.io/request-id` label names a request
 that is not in ORB storage.  The GC applies these rules:
@@ -133,9 +136,12 @@ that is not in ORB storage.  The GC applies these rules:
   is kept if the request now exists or the lookup fails.
 * Pods younger than `orphan_min_age_seconds` are skipped.
 
-If request history is purged from storage, the live pods of the purged
-requests become orphans, so keep request retention longer than the lifetime
-of the machines.  With `auto_cleanup_orphans=False`, orphans are logged at
+ORB has no scheduled job that purges request history.  Requests are removed
+only when an operator runs the bulk cleanup (`POST /admin/database/cleanup`
+or the SDK `cleanup_old_requests`) or deletes the store.  Whenever you purge,
+keep request history longer than the lifetime of your pods: a pod whose
+request has been purged counts as an orphan, and is deleted when
+`auto_cleanup_orphans` is on.  With `auto_cleanup_orphans=False`, orphans are logged at
 `WARNING` so operators can spot drift before enabling delete.
 
 ### Operational note - periodic resync backstop

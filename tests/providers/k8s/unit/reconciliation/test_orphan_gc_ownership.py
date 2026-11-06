@@ -359,3 +359,14 @@ def test_orb_instance_id_must_be_a_valid_label_value():
     assert K8sProviderConfig(in_cluster=True, orb_instance_id="  ").orb_instance_id is None  # type: ignore[call-arg]
     with pytest.raises(ValueError):
         K8sProviderConfig(in_cluster=True, orb_instance_id="bad value!")  # type: ignore[call-arg]
+
+
+@pytest.mark.asyncio
+async def test_reconciler_classifies_nothing_without_instance_id():
+    pods = [_pod("owned", "req-1"), _pod("orphan", "req-gone", instance=None)]
+    with _container(_FakeRepo(["req-1"])):
+        strategy, _ = _strategy(pods, orb_instance_id=None)
+        report = await _reconcile(strategy)
+    assert report is not None and report.completed
+    assert report.pods_seen == 0 and report.pods_adopted == 0
+    assert report.orphans == []

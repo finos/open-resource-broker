@@ -40,7 +40,6 @@ from orb.infrastructure.di.injectable import injectable
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.utilities.labels import (
-    build_label_selector as _build_label_selector,
     build_owned_pods_selector as _build_owned_pods_selector,
     instance_label_key as _instance_label_key,
 )
@@ -106,7 +105,8 @@ class StartupReconciler:
             Decouples this module from the storage repository (which
             lives in ``infrastructure/storage/``) — callers supply a
             closure over their own ``request_repository``.  When it is
-            ``None``, raises, or returns an empty set the reconciler
+            ``None``, raises, or returns an empty set, or ``orb_instance_id`` is
+            unset, the reconciler
             classifies nothing: no pod is adopted or reported as an
             orphan, because an unreadable or empty store says nothing
             about which pods are owned.
@@ -148,6 +148,14 @@ class StartupReconciler:
         try:
             namespaces = self._resolve_namespaces()
             report.namespaces = [ns if ns is not None else "*" for ns in namespaces]
+
+            if not self._config.orb_instance_id:
+                report.completed = True
+                self._logger.warning(
+                    "StartupReconciler: orb_instance_id is not configured, so ownership of "
+                    "managed pods cannot be established; no pods classified"
+                )
+                return report
 
             known_ids = self._read_known_ids()
             if known_ids is None:
@@ -226,6 +234,14 @@ class StartupReconciler:
         try:
             namespaces = self._resolve_namespaces()
             report.namespaces = [ns if ns is not None else "*" for ns in namespaces]
+
+            if not self._config.orb_instance_id:
+                report.completed = True
+                self._logger.warning(
+                    "StartupReconciler: orb_instance_id is not configured, so ownership of "
+                    "managed pods cannot be established; no pods classified"
+                )
+                return report
 
             known_ids = await asyncio.to_thread(self._read_known_ids)
             if known_ids is None:
@@ -351,11 +367,10 @@ class StartupReconciler:
             return None
 
     def _list_selector(self) -> str:
-        """Select this installation's pods when an instance id is configured."""
-        instance_id = self._config.orb_instance_id
-        if instance_id:
-            return _build_owned_pods_selector(self._config.label_prefix, instance_id)
-        return _build_label_selector(self._config.label_prefix, "managed", "true")
+        """Select this installation's managed pods; callers ensure an id is set."""
+        return _build_owned_pods_selector(
+            self._config.label_prefix, self._config.orb_instance_id or ""
+        )
 
     def _resolve_namespaces(self) -> list[Optional[str]]:
         """Translate ``config.namespaces`` into a list of namespaces to list.
@@ -420,9 +435,10 @@ class StartupReconciler:
         creation_timestamp = getattr(metadata, "creation_timestamp", None)
 
         instance_id = self._config.orb_instance_id
-        if instance_id:
-            if labels.get(_instance_label_key(self._config.label_prefix)) != instance_id:
-                return None
+        if not instance_id:
+            return None
+        if labels.get(_instance_label_key(self._config.label_prefix)) != instance_id:
+            return None
         if not request_id:
             # A managed pod without a request-id label is not attributable to
             # any request; leave it alone rather than reporting it as an orphan.

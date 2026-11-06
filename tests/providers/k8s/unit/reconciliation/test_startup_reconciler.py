@@ -36,7 +36,7 @@ def _pod(
     ready: bool = True,
     creation_timestamp: str | None = None,
 ) -> SimpleNamespace:
-    labels: dict[str, str] = {"orb.io/managed": "true"}
+    labels: dict[str, str] = {"orb.io/managed": "true", "orb.io/orb-instance": "orb-a"}
     if request_id is not None:
         labels["orb.io/request-id"] = request_id
     metadata = SimpleNamespace(
@@ -92,7 +92,7 @@ def _make_reconciler(
         core_v1.list_namespaced_pod.side_effect = _list_ns
         core_v1.list_pod_for_all_namespaces.side_effect = _list_all
 
-    cfg = config or K8sProviderConfig(namespace="orb")
+    cfg = config or K8sProviderConfig(orb_instance_id="orb-a", namespace="orb")
 
     def _known_ids() -> list[str]:
         if known_raises is not None:
@@ -195,7 +195,7 @@ def test_pod_missing_request_id_label_is_not_classified() -> None:
 
 
 def test_explicit_namespace_list_runs_one_list_per_namespace() -> None:
-    cfg = K8sProviderConfig(namespace="orb", namespaces=["alpha", "beta"])
+    cfg = K8sProviderConfig(orb_instance_id="orb-a", namespace="orb", namespaces=["alpha", "beta"])
     pods_by_ns: dict[str | None, list[Any]] = {
         "alpha": [_pod(name="a1", request_id="r1", namespace="alpha")],
         "beta": [_pod(name="b1", request_id="r2", namespace="beta")],
@@ -216,7 +216,7 @@ def test_explicit_namespace_list_runs_one_list_per_namespace() -> None:
 
 
 def test_cluster_scoped_mode_uses_list_pod_for_all_namespaces() -> None:
-    cfg = K8sProviderConfig(namespace="orb", namespaces=["*"])
+    cfg = K8sProviderConfig(orb_instance_id="orb-a", namespace="orb", namespaces=["*"])
     pods = [_pod(name="any", request_id="r1", namespace="anywhere")]
     reconciler, _, core_v1 = _make_reconciler(
         config=cfg,
@@ -292,7 +292,9 @@ import pytest
 @pytest.mark.asyncio
 async def test_run_async_reconciles_all_three_namespaces() -> None:
     """run_async gathers all three namespace list calls concurrently."""
-    cfg = K8sProviderConfig(namespace="orb", namespaces=["alpha", "beta", "gamma"])
+    cfg = K8sProviderConfig(
+        orb_instance_id="orb-a", namespace="orb", namespaces=["alpha", "beta", "gamma"]
+    )
 
     ns_pods: dict[str, list[Any]] = {
         "alpha": [_pod(name="a1", request_id="r1", namespace="alpha")],
@@ -322,7 +324,9 @@ async def test_run_async_reconciles_all_three_namespaces() -> None:
 @pytest.mark.asyncio
 async def test_run_async_namespace_exception_skipped_others_continue() -> None:
     """A failing namespace in run_async is logged; the other namespaces are still reconciled."""
-    cfg = K8sProviderConfig(namespace="orb", namespaces=["good1", "bad", "good2"])
+    cfg = K8sProviderConfig(
+        orb_instance_id="orb-a", namespace="orb", namespaces=["good1", "bad", "good2"]
+    )
 
     def _list_ns(namespace: str, **_kw: Any) -> Any:
         if namespace == "bad":
@@ -393,7 +397,9 @@ async def test_run_async_fans_out_namespaces_in_parallel() -> None:
     """
     import threading
 
-    cfg = K8sProviderConfig(namespace="orb", namespaces=["alpha", "beta", "gamma"])
+    cfg = K8sProviderConfig(
+        orb_instance_id="orb-a", namespace="orb", namespaces=["alpha", "beta", "gamma"]
+    )
     barrier = threading.Barrier(parties=3, timeout=5)
 
     def _blocking_list(namespace: str, **_kw: Any) -> Any:

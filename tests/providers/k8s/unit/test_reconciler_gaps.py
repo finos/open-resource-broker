@@ -37,7 +37,7 @@ from orb.providers.k8s.watch.pod_state_cache import PodStateCache
 
 
 def _make_config(**kwargs: Any) -> K8sProviderConfig:
-    defaults: dict[str, Any] = {"namespace": "default"}
+    defaults: dict[str, Any] = {"namespace": "default", "orb_instance_id": "orb-a"}
     defaults.update(kwargs)
     return K8sProviderConfig(**defaults)  # type: ignore[call-arg]
 
@@ -86,6 +86,7 @@ def _pod(
 ) -> Any:
     labels = {
         "orb.io/managed": "true",
+        "orb.io/orb-instance": "orb-a",
         "orb.io/request-id": request_id,
     }
     metadata = SimpleNamespace(
@@ -117,7 +118,7 @@ def _pod_no_name() -> Any:
     metadata = SimpleNamespace(
         name=None,
         namespace="default",
-        labels={"orb.io/managed": "true"},
+        labels={"orb.io/managed": "true", "orb.io/orb-instance": "orb-a"},
         creation_timestamp=None,
     )
     return SimpleNamespace(metadata=metadata, status=None, spec=None)
