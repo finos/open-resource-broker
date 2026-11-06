@@ -347,10 +347,10 @@ sdk-kotlin-check-drift: sdk-kotlin-generate  ## Verify Kotlin SDK: generate from
 	@cd sdk/kotlin && ./gradlew --no-daemon compileKotlin
 	@echo "Kotlin SDK: spec → generate → build OK."
 
-sdk-typescript-check-drift: sdk-typescript-generate  ## Verify TypeScript SDK: generate from spec + build
+sdk-typescript-check-drift: sdk-typescript-generate  ## Verify TypeScript SDK: generate from spec + build + type-check
 	@echo "Verifying TypeScript SDK builds cleanly from the current spec..."
-	@cd sdk/typescript && npm ci && npm run build
-	@echo "TypeScript SDK: spec → generate → build OK."
+	@cd sdk/typescript && npm ci && npm run build && npm run typecheck
+	@echo "TypeScript SDK: spec → generate → build → type-check OK."
 
 sdk-csharp-check-drift: sdk-csharp-generate  ## Verify C# SDK: generate from spec + compile
 	@echo "Verifying C# SDK builds cleanly from the current spec..."
