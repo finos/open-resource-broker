@@ -410,6 +410,147 @@ vulnerabilities:
       package glibc, trixie 2.41-12+deb13u4: vulnerable; checked 2026-10-29).
     expired_at: 2027-01-27
 
+  - id: CVE-2026-76844
+    purls:
+      - pkg:deb/debian/zlib1g
+    statement: >-
+      zlib: vulnerability fixed upstream in zlib 1.4 (same fix as CVE-2026-85091). Debian security
+      tracker lists no fixed version for trixie (source package zlib, trixie
+      1:1.3.dfsg+really1.3.1-1: vulnerable; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-119373
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: Denial of service via heap-based buffer overflow in FTS5. Debian security tracker
+      lists no fixed version for trixie (source package sqlite3, trixie 3.46.1-7+deb13u2:
+      vulnerable, no-dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-119378
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: Denial of service via use-after-free in the R-Tree extension. Debian security tracker
+      lists no fixed version for trixie (source package sqlite3, trixie 3.46.1-7+deb13u2:
+      vulnerable, no-dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-119591
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: Denial of service via stack exhaustion in countOfViewOptimization(). Debian security
+      tracker lists no fixed version for trixie (source package sqlite3, trixie 3.46.1-7+deb13u2:
+      vulnerable, no-dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-119371
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: Denial of service via stack exhaustion from deeply nested common table expressions.
+      Debian security tracker lists no fixed version for trixie (source package sqlite3, trixie
+      3.46.1-7+deb13u2: vulnerable, no-dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-119372
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: Denial of service via use-after-free in full-text search. Debian security tracker
+      lists no fixed version for trixie (source package sqlite3, trixie 3.46.1-7+deb13u2:
+      vulnerable, no-dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-119374
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: Arbitrary code execution via a corrupted FTS5 index. Debian security tracker lists no
+      fixed version for trixie (source package sqlite3, trixie 3.46.1-7+deb13u2: vulnerable, no-dsa;
+      checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-119375
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: Information disclosure via an undersized WAL page size. Debian security tracker lists
+      no fixed version for trixie (source package sqlite3, trixie 3.46.1-7+deb13u2: vulnerable, no-
+      dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-119376
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: Denial of service via stack exhaustion from chained COLLATE operators. Debian security
+      tracker lists no fixed version for trixie (source package sqlite3, trixie 3.46.1-7+deb13u2:
+      vulnerable, no-dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-119379
+    purls:
+      - pkg:deb/debian/libsqlite3-0
+    statement: >-
+      sqlite: Arbitrary code execution via crafted session changesets. Debian security tracker lists
+      no fixed version for trixie (source package sqlite3, trixie 3.46.1-7+deb13u2: vulnerable, no-
+      dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-114690
+    purls:
+      - pkg:deb/debian/libgcc-s1
+      - pkg:deb/debian/libstdc++6
+      - pkg:deb/debian/gcc-14-base
+    statement: >-
+      gcc: Out-of-bounds read/write in the libstdc++ parallel algorithms. Debian security tracker
+      lists no fixed version for trixie (source package gcc-14, trixie 14.2.0-19: vulnerable, no-
+      dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-114691
+    purls:
+      - pkg:deb/debian/libgcc-s1
+      - pkg:deb/debian/libstdc++6
+      - pkg:deb/debian/gcc-14-base
+    statement: >-
+      gcc: Integer wrap in libstdc++. Debian security tracker lists no fixed version for trixie
+      (source package gcc-14, trixie 14.2.0-19: vulnerable, no-dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-115455
+    purls:
+      - pkg:deb/debian/libgcc-s1
+      - pkg:deb/debian/libstdc++6
+      - pkg:deb/debian/gcc-14-base
+    statement: >-
+      gcc: Stack overflow in std::bitset in libstdc++. Debian security tracker lists no fixed
+      version for trixie (source package gcc-14, trixie 14.2.0-19: vulnerable, no-dsa; checked
+      2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-84243
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: Arbitrary code execution via directory traversal in the LANGUAGE environment variable.
+      Debian security tracker lists no fixed version for trixie (source package glibc, trixie
+      2.41-12+deb13u4: vulnerable, no-dsa; checked 2026-11-06).
+    expired_at: 2027-02-06
+
+  - id: CVE-2026-82560
+    purls:
+      - pkg:deb/debian/perl-base
+    statement: >-
+      perl: Pod::Text before 6.1.1 allows CPU and memory exhaustion. Debian security tracker lists
+      no fixed version for trixie (source package perl, trixie 5.40.1-6+deb13u1: vulnerable, no-dsa;
+      checked 2026-11-06).
+    expired_at: 2027-02-06
+
   # ── filelock on Python 3.10 ────────────────────────────────────────────────
   #
   # filelock is not a runtime dependency of orb-py. It is pulled in only by dev
