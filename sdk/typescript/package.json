@@ -51,6 +51,7 @@
     "node": ">=22.0.0"
   },
   "overrides": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "minimatch": "^11.0.1"
   }
 }
