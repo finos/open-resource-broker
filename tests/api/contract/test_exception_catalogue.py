@@ -185,5 +185,5 @@ def test_exception_is_reported_with_its_expected_status(cls):
     else:
         # Provider and infrastructure subclasses inherit their base's mapping, except
         # that a more specific client-error base wins when one is mixed in.
-        assert response.http_status is not None
-        assert (response.http_status >= 500) == (expected >= 500) or response.http_status < 500
+        implied = {EXPECTED[ancestor] for ancestor in cls.__mro__ if ancestor in EXPECTED}
+        assert response.http_status in implied

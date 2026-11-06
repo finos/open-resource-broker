@@ -50,6 +50,10 @@ _SAFE_DETAIL_KEYS: frozenset[str] = frozenset(
 )
 
 
+# Longest validation reason sent to a caller.
+_MAX_REASON_LENGTH = 500
+
+
 def _safe_details(raw: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of *raw* containing only the keys safe to send to callers."""
     return {k: v for k, v in raw.items() if k in _SAFE_DETAIL_KEYS}
@@ -267,11 +271,17 @@ class HTTPErrorResponseHandler:
             str(exception),
             extra={"details": getattr(exception, "details", {})},
         )
+        # The reason is the validator's description of what is wrong with the
+        # template, which the caller needs in order to fix it.
+        details = _safe_details(getattr(exception, "details", {}))
+        reason = str(getattr(exception, "message", "") or "")[:_MAX_REASON_LENGTH]
+        if reason:
+            details["reason"] = reason
         return ErrorResponse(
             error_code=ErrorCode.INVALID_INPUT,
             message="Invalid input",
             category=ErrorCategory.VALIDATION,
-            details=_safe_details(getattr(exception, "details", {})),
+            details=details,
             http_status=HTTPStatus.BAD_REQUEST,
         )
 
