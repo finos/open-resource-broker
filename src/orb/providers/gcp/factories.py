@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Optional, Protocol
 
+from orb.providers.base.config_input import provider_config_mapping
+
 if TYPE_CHECKING:
     from orb.providers.gcp.configuration.config import GCPProviderConfig
     from orb.providers.gcp.infrastructure.adapters.gcp_validation_adapter import (
@@ -18,15 +20,6 @@ class GCPProviderInstanceProtocol(Protocol):
 
     name: str
     config: Mapping[str, Any]
-
-
-def _provider_config_data(
-    data: Mapping[str, Any] | GCPProviderInstanceProtocol,
-) -> Mapping[str, Any]:
-    """Return the raw provider config mapping from registry inputs."""
-    if isinstance(data, Mapping):
-        return data
-    return data.config
 
 
 def create_gcp_strategy(
@@ -43,7 +36,7 @@ def create_gcp_strategy(
     from orb.providers.gcp.configuration.config import GCPProviderConfig
     from orb.providers.gcp.strategy.gcp_provider_strategy import GCPProviderStrategy
 
-    config_data = _provider_config_data(provider_config)
+    config_data = provider_config_mapping(provider_config)
     gcp_config = GCPProviderConfig(**(config_data or {}))
     logger = LoggingAdapter()
     strategy = GCPProviderStrategy(
@@ -60,7 +53,7 @@ def create_gcp_config(data: Mapping[str, Any] | GCPProviderInstanceProtocol) -> 
     """Create typed GCP config."""
     from orb.providers.gcp.configuration.config import GCPProviderConfig
 
-    return GCPProviderConfig(**_provider_config_data(data))
+    return GCPProviderConfig(**provider_config_mapping(data))
 
 
 def create_gcp_validator(
