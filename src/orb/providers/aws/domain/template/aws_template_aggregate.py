@@ -468,7 +468,7 @@ class AWSTemplate(Template):
                 "subnet_ids", [data.get("subnet_id")] if data.get("subnet_id") else []
             ),
             "security_group_ids": data.get("security_group_ids", []),
-            "tags": AWSTags.from_dict(data.get("tags", data.get("instance_tags", {}))),
+            "tags": AWSTags.from_dict(data.get("tags", data.get("instance_tags", {}))).tags,
         }
 
         # Support multi-instance mappings (vmTypes/instance_types) when provided
@@ -504,7 +504,7 @@ class AWSTemplate(Template):
         if "allocation_strategy" in data:
             aws_data["allocation_strategy"] = AWSAllocationStrategy.from_string(
                 data["allocation_strategy"]
-            )
+            ).value
 
         if "allocation_strategy_on_demand" in data:
             aws_data["allocation_strategy_on_demand"] = AWSAllocationStrategy.from_string(
@@ -514,7 +514,7 @@ class AWSTemplate(Template):
         if "price_type" in data:
             from orb.domain.base.value_objects import PriceType
 
-            aws_data["price_type"] = PriceType(data["price_type"])
+            aws_data["price_type"] = PriceType(data["price_type"]).value
 
         if "max_spot_price" in data:
             aws_data["max_price"] = data["max_spot_price"]
