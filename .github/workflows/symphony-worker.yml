@@ -51,7 +51,7 @@ jobs:
         docker build --build-arg BASE_IMAGE=symphony-stub:ci \
           --tag symphony-worker:ci deploy/symphony-worker
 
-    - name: Liveness probe runs in the image
+    - name: Smoke-run the liveness probe and check the scripts are executable
       run: |
         set -euo pipefail
         docker run --rm symphony-worker:ci /opt/orb-worker/bin/compute-liveness
