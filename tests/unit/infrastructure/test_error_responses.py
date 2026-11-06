@@ -1,5 +1,6 @@
 """Unit tests for error/responses.py."""
 
+import json
 from http import HTTPStatus
 
 import pytest
@@ -11,7 +12,7 @@ from orb.domain.base.exceptions import (
     InfrastructureError,
     ValidationError,
 )
-from orb.infrastructure.error.categories import ErrorCategory
+from orb.infrastructure.error.categories import ErrorCategory, ErrorCode
 from orb.infrastructure.error.responses import (
     InfrastructureErrorResponse,
     _safe_details,
@@ -56,6 +57,35 @@ class TestSafeDetails:
     def test_all_unsafe_returns_empty(self) -> None:
         raw = {"original_error": "x", "stacktrace": "y", "hostname": "z"}
         assert _safe_details(raw) == {}
+
+    def test_unserialisable_safe_value_is_coerced_to_string(self) -> None:
+        class Opaque:
+            def __str__(self) -> str:
+                return "opaque-value"
+
+        result = _safe_details({"field": Opaque(), "original_error": "x"})
+
+        assert result == {"field": "opaque-value"}
+        json.dumps(result)
+
+    def test_nested_safe_value_keeps_its_structure(self) -> None:
+        result = _safe_details({"current_state": {"name": "running", "since": object()}})
+
+        assert result["current_state"]["name"] == "running"
+        assert isinstance(result["current_state"]["since"], str)
+
+    def test_http_envelope_serialises_with_unserialisable_safe_value(self) -> None:
+        from orb.infrastructure.error.http_response_handler import HTTPErrorResponseHandler
+
+        exc = ValidationError("bad input", details={"field": object(), "original_error": "x"})
+
+        response = HTTPErrorResponseHandler().handle_error_for_http(exc)
+
+        assert response.error_code == ErrorCode.INVALID_INPUT
+        assert response.message == "Invalid input"
+        assert isinstance(response.details["field"], str)
+        assert "original_error" not in response.details
+        json.dumps(response.details)
 
 
 @pytest.mark.unit

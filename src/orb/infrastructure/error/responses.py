@@ -1,5 +1,6 @@
 """Error response DTOs and HTTP response formatting."""
 
+import json
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any, Optional
@@ -36,8 +37,13 @@ _SAFE_DETAIL_KEYS: frozenset[str] = frozenset(
 
 
 def _safe_details(raw: dict[str, Any]) -> dict[str, Any]:
-    """Return a copy of *raw* containing only the keys safe to send to callers."""
-    return {k: v for k, v in raw.items() if k in _SAFE_DETAIL_KEYS}
+    """Return a JSON-serialisable copy of *raw* with only the keys safe to send to callers.
+
+    Values that JSON cannot encode are converted with ``str()``.
+    """
+    return {
+        k: json.loads(json.dumps(v, default=str)) for k, v in raw.items() if k in _SAFE_DETAIL_KEYS
+    }
 
 
 class InfrastructureErrorResponse(BaseDTO):

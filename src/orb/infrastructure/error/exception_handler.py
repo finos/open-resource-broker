@@ -66,6 +66,16 @@ __all__ = [
 ]
 
 
+def _context_str(context: ExceptionContext | str | None) -> str:
+    """Return the operation name for *context*, whether it is an ExceptionContext or a string."""
+    if context is None:
+        return ""
+    if isinstance(context, str):
+        return context
+    operation = getattr(context, "operation", None)
+    return operation if isinstance(operation, str) else ""
+
+
 class ExceptionHandler:
     """
     Centralized exception handling service following SRP.
@@ -469,14 +479,10 @@ class ExceptionHandler:
     # PYTHON BUILT-IN EXCEPTION HANDLERS (WRAP)
 
     def _wrap_json_decode_error(
-        self, exc: json.JSONDecodeError, context: Optional[str] = None, **kwargs
+        self, exc: json.JSONDecodeError, context: ExceptionContext | str | None = None, **kwargs
     ) -> InfrastructureError:
         """Wrap JSON decode error into appropriate domain exception based on context."""
-        # Handle both string context and ExceptionContext object
-        if hasattr(context, "operation"):
-            context_str = context.operation  # type: ignore[union-attr]
-        else:
-            context_str = context or ""
+        context_str = _context_str(context)
 
         context_lower = context_str.lower()
 
@@ -526,15 +532,16 @@ class ExceptionHandler:
             )
 
     def _wrap_connection_error(
-        self, exc: ConnectionError, context: Optional[str] = None, **kwargs
+        self, exc: ConnectionError, context: ExceptionContext | str | None = None, **kwargs
     ) -> InfrastructureError:
         """Wrap connection error into infrastructure exception."""
+        context_str = _context_str(context)
         return InfrastructureError(
             message=f"Connection failed: {exc!s}",
             details={
                 "original_error": str(exc),
                 "error_type": type(exc).__name__,
-                "context": context or "network_operation",
+                "context": context_str or "network_operation",
                 "handler": "connection_error_handler",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 **kwargs,
@@ -542,10 +549,11 @@ class ExceptionHandler:
         )
 
     def _wrap_file_not_found_error(
-        self, exc: FileNotFoundError, context: Optional[str] = None, **kwargs
+        self, exc: FileNotFoundError, context: ExceptionContext | str | None = None, **kwargs
     ) -> InfrastructureError:
         """Wrap file not found error into appropriate domain exception."""
-        context_lower = (context or "").lower()
+        context_str = _context_str(context)
+        context_lower = context_str.lower()
 
         if "config" in context_lower or "template" in context_lower:
             return ConfigurationError(  # type: ignore[return-value]
@@ -554,7 +562,7 @@ class ExceptionHandler:
                     "original_error": str(exc),
                     "filename": exc.filename,
                     "errno": exc.errno,
-                    "context": context or "file_access",
+                    "context": context_str or "file_access",
                     "handler": "file_not_found_error_handler",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     **kwargs,
@@ -567,7 +575,7 @@ class ExceptionHandler:
                     "original_error": str(exc),
                     "filename": exc.filename,
                     "errno": exc.errno,
-                    "context": context or "file_operation",
+                    "context": context_str or "file_operation",
                     "handler": "file_not_found_error_handler",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     **kwargs,
@@ -575,15 +583,16 @@ class ExceptionHandler:
             )
 
     def _wrap_value_error(
-        self, exc: ValueError, context: Optional[str] = None, **kwargs
+        self, exc: ValueError, context: ExceptionContext | str | None = None, **kwargs
     ) -> ValidationError:
         """Wrap value error into validation exception."""
+        context_str = _context_str(context)
         return ValidationError(
             message=f"Invalid value: {exc!s}",
             details={
                 "original_error": str(exc),
                 "error_type": type(exc).__name__,
-                "context": context or "value_validation",
+                "context": context_str or "value_validation",
                 "handler": "value_error_handler",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 **kwargs,
@@ -591,15 +600,16 @@ class ExceptionHandler:
         )
 
     def _wrap_key_error(
-        self, exc: KeyError, context: Optional[str] = None, **kwargs
+        self, exc: KeyError, context: ExceptionContext | str | None = None, **kwargs
     ) -> ValidationError:
         """Wrap key error into validation exception."""
+        context_str = _context_str(context)
         return ValidationError(
             message=f"Missing required key: {exc!s}",
             details={
                 "original_error": str(exc),
                 "missing_key": str(exc).strip("'\""),
-                "context": context or "key_access",
+                "context": context_str or "key_access",
                 "handler": "key_error_handler",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 **kwargs,
@@ -607,15 +617,16 @@ class ExceptionHandler:
         )
 
     def _wrap_type_error(
-        self, exc: TypeError, context: Optional[str] = None, **kwargs
+        self, exc: TypeError, context: ExceptionContext | str | None = None, **kwargs
     ) -> ValidationError:
         """Wrap type error into validation exception."""
+        context_str = _context_str(context)
         return ValidationError(
             message=f"Type error: {exc!s}",
             details={
                 "original_error": str(exc),
                 "error_type": type(exc).__name__,
-                "context": context or "type_validation",
+                "context": context_str or "type_validation",
                 "handler": "type_error_handler",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 **kwargs,
@@ -623,15 +634,16 @@ class ExceptionHandler:
         )
 
     def _wrap_attribute_error(
-        self, exc: AttributeError, context: Optional[str] = None, **kwargs
+        self, exc: AttributeError, context: ExceptionContext | str | None = None, **kwargs
     ) -> InfrastructureError:
         """Wrap attribute error into infrastructure exception."""
+        context_str = _context_str(context)
         return InfrastructureError(
             message=f"Attribute error: {exc!s}",
             details={
                 "original_error": str(exc),
                 "error_type": type(exc).__name__,
-                "context": context or "attribute_access",
+                "context": context_str or "attribute_access",
                 "handler": "attribute_error_handler",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 **kwargs,
@@ -639,14 +651,10 @@ class ExceptionHandler:
         )
 
     def _handle_generic_exception(
-        self, exc: Exception, context: Optional[str] = None, **kwargs
+        self, exc: Exception, context: ExceptionContext | str | None = None, **kwargs
     ) -> InfrastructureError:
         """Handle any unrecognized exception by wrapping in InfrastructureError."""
-        # Handle both string context and ExceptionContext object
-        if hasattr(context, "operation"):
-            context_str = context.operation  # type: ignore[union-attr]
-        else:
-            context_str = context or ""
+        context_str = _context_str(context)
 
         return InfrastructureError(
             message=f"Unexpected error: {exc!s}",
