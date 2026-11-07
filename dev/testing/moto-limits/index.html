@@ -5794,6 +5794,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#livemoto-pairing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live/moto pairing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#summary" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6171,6 +6182,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#livemoto-pairing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live/moto pairing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#summary" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6279,6 +6301,68 @@ disappear or flip to <code>terminated</code> with no intermediate lifecycle stat
 <p><strong>Consequence:</strong> Any logic that observes the <code>Terminating</code> / <code>shutting-down</code>
 window during ASG teardown cannot be exercised under moto.</p>
 <p><strong>Coverage:</strong> Live — <code>tests/providers/aws/live/test_multi_asg_termination.py</code>.</p>
+<h2 id="livemoto-pairing">Live/moto pairing<a class="headerlink" href="#livemoto-pairing" title="Permanent link">&para;</a></h2>
+<p>Every live test file under <code>tests/providers/aws/live/</code> is paired here with the
+moto (or unit) tests that cover the same behaviour, or with the reason no moto
+counterpart exists. Paths in the moto column are relative to
+<code>tests/providers/aws/</code>. When you add a live test file, add a row; the check in
+<code>tests/unit/test_moto_live_pairing_matrix.py</code> fails until you do.</p>
+<table>
+<thead>
+<tr>
+<th>Live test file</th>
+<th>Moto counterpart</th>
+<th>Not covered under moto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_onaws.py</code></td>
+<td><code>mocked/test_hf_contract.py</code>, <code>mocked/test_partial_return.py</code>, <code>mocked/test_cli_onmoto.py</code></td>
+<td>SpotFleet fulfilment (L1); partial-return scale-down mid-flight (L4)</td>
+</tr>
+<tr>
+<td><code>test_rest_api_onaws.py</code></td>
+<td><code>mocked/test_rest_api_onmoto.py</code>, <code>mocked/test_rest_real_container_flows.py</code></td>
+<td>SpotFleet fulfilment (L1); post-return consistency window (L3)</td>
+</tr>
+<tr>
+<td><code>test_sdk_onaws.py</code></td>
+<td><code>mocked/test_sdk_onmoto.py</code></td>
+<td>Post-return consistency window (L3)</td>
+</tr>
+<tr>
+<td><code>test_cleanup_e2e_onaws.py</code></td>
+<td><code>mocked/test_cleanup_e2e.py</code></td>
+<td>Stale reads after fleet or ASG deletion (L3)</td>
+</tr>
+<tr>
+<td><code>test_multi_asg_termination.py</code></td>
+<td><code>mocked/test_multi_resource_onmoto.py</code></td>
+<td>ASG <code>Terminating</code> / <code>shutting-down</code> window (L5)</td>
+</tr>
+<tr>
+<td><code>test_multi_ec2_fleet_termination.py</code></td>
+<td><code>mocked/test_cleanup_e2e.py</code>, <code>mocked/test_partial_return.py</code></td>
+<td>Fleet <code>modifying</code> transition (L4); moto tests cover one fleet per return, not two</td>
+</tr>
+<tr>
+<td><code>test_multi_spot_fleet_termination.py</code></td>
+<td><code>mocked/test_cleanup_e2e.py</code>, <code>mocked/test_partial_return.py</code></td>
+<td>Fulfilment (L1) and <code>cancelled_running</code> (L2); moto tests cover one fleet per return, not two</td>
+</tr>
+<tr>
+<td><code>test_multi_resource_termination.py</code></td>
+<td><code>mocked/test_multi_resource_onmoto.py</code></td>
+<td>SpotFleet and EC2 Fleet members of a mixed batch (L1, L4); moto batches cover RunInstances and ASG</td>
+</tr>
+<tr>
+<td><code>test_capacity_helpers_regex.py</code></td>
+<td>none</td>
+<td>Not a live test: it unit-tests the live suite's own helpers and runs without AWS</td>
+</tr>
+</tbody>
+</table>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
