@@ -38,10 +38,24 @@ def _make_app(*, role: str = "viewer") -> FastAPI:
         error_response = exception_handler.handle_error_for_http(exc)
         return JSONResponse(
             status_code=error_response.http_status or 500,
-            content={"detail": error_response.message},
+            content={
+                "success": False,
+                "error": {
+                    "code": str(error_response.error_code),
+                    "message": error_response.message,
+                },
+            },
         )
 
     return app
+
+
+def _assert_config_error(resp) -> None:
+    """Assert *resp* is the 500 configuration-error envelope."""
+    assert resp.status_code == 500
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["message"] == "A configuration error occurred"
 
 
 def _make_config_manager_with_no_providers() -> MagicMock:
@@ -172,20 +186,15 @@ class TestProvidersHealthUnhealthyPath:
             p1
         )
 
-        async def _probe_raises(name: str):
-            raise RuntimeError("connection refused")
-
-        with patch("orb.api.routers.providers._probe_provider_health", new=_probe_raises):
+        with patch(
+            "orb.api.routers.providers.get_di_container",
+            side_effect=RuntimeError("connection refused"),
+        ):
             client = TestClient(app, raise_server_exceptions=False)
-            body = client.get("/providers/health").json()
+            resp = client.get("/providers/health")
 
-        # The endpoint must return 200 regardless.
-        assert len(body["providers"]) == 0 or body["providers"][0]["status"] in (
-            "unknown",
-            "healthy",
-            "degraded",
-            "unhealthy",
-        )
+        assert resp.status_code == 200
+        assert resp.json()["providers"][0]["status"] == "unknown"
 
     def test_probe_error_not_in_response(self):
         """Probe error details must never appear in the client response (M4 fix)."""
@@ -219,9 +228,9 @@ class TestProvidersHealthUnhealthyPath:
         body = client.get("/providers/health").json()
         assert body["providers"][0]["status"] == "unhealthy"
 
-    def test_provider_config_exception_within_handler_returns_empty_providers(self):
-        """When get_provider_config() raises inside the handler, return empty-but-valid
-        response via the handler's own try/except."""
+    def test_provider_config_exception_returns_config_error(self):
+        """When get_provider_config() raises, the route returns the configuration
+        error envelope instead of an empty provider list."""
         config_mgr = MagicMock()
         config_mgr.get_provider_config.side_effect = RuntimeError("config blow up")
 
@@ -229,9 +238,7 @@ class TestProvidersHealthUnhealthyPath:
         app.dependency_overrides[get_config_manager] = lambda: config_mgr
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/providers/health")
-        # Must not 500 — the router's try/except swallows the error.
-        assert resp.status_code == 200
-        assert resp.json()["providers"] == []
+        _assert_config_error(resp)
 
 
 # ---------------------------------------------------------------------------
@@ -244,10 +251,9 @@ class TestProvidersHealthUnhealthyPath:
 class TestProvidersHealthLogging:
     """Verify WARNING log with exc_info is emitted for provider lookup failures."""
 
-    def test_get_active_providers_raises_logs_warning_with_stack_trace(self, caplog):
-        """When get_active_providers() raises, a WARNING with exc_info must be logged."""
-        import logging
-
+    def test_get_active_providers_raises_returns_config_error(self):
+        """When get_active_providers() raises, the route returns the configuration
+        error envelope instead of an empty provider list."""
         provider_config = MagicMock()
         provider_config.get_active_providers.side_effect = RuntimeError("registry-exploded-marker")
         provider_config.default_provider = None
@@ -258,21 +264,11 @@ class TestProvidersHealthLogging:
         app = _make_app()
         app.dependency_overrides[get_config_manager] = lambda: config_mgr
 
-        with caplog.at_level(logging.WARNING, logger="orb.api.routers.providers"):
-            client = TestClient(app, raise_server_exceptions=False)
-            resp = client.get("/providers/health")
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/providers/health")
 
-        # Endpoint still returns safe empty response
-        assert resp.status_code == 200
-        assert resp.json()["providers"] == []
-
-        warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
-        assert any("registry-exploded-marker" in r.message for r in warning_records), (
-            f"Expected warning log with exception text, got: {[r.message for r in warning_records]}"
-        )
-        # exc_info=True causes the record to carry exc_info tuple
-        records_with_exc = [r for r in warning_records if r.exc_info is not None]
-        assert records_with_exc, "WARNING record must carry exc_info (stack trace)"
+        _assert_config_error(resp)
+        assert "registry-exploded-marker" not in resp.text
 
     def test_default_provider_attr_raises_logs_warning_with_stack_trace(self, caplog):
         """When reading default_provider raises, a WARNING with exc_info must be logged.
@@ -313,8 +309,8 @@ class TestProvidersHealthLogging:
         records_with_exc = [r for r in warning_records if r.exc_info is not None]
         assert records_with_exc, "WARNING record must carry exc_info (stack trace)"
 
-    def test_outer_exception_logs_warning_with_stack_trace(self, caplog):
-        """When get_provider_config() raises (outer except), WARNING with exc_info logged."""
+    def test_provider_config_read_failure_is_logged_with_stack_trace(self, caplog):
+        """When get_provider_config() raises, the error is logged with its cause."""
         import logging
 
         config_mgr = MagicMock()
@@ -323,17 +319,58 @@ class TestProvidersHealthLogging:
         app = _make_app()
         app.dependency_overrides[get_config_manager] = lambda: config_mgr
 
-        with caplog.at_level(logging.WARNING, logger="orb.api.routers.providers"):
+        with caplog.at_level(logging.ERROR):
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get("/providers/health")
 
-        # Endpoint still returns safe empty response
-        assert resp.status_code == 200
-        assert resp.json()["providers"] == []
+        _assert_config_error(resp)
+        assert "outer-config-boom-marker" not in resp.text
 
-        warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
-        assert any("outer-config-boom-marker" in r.message for r in warning_records), (
-            f"Expected warning log with exception text, got: {[r.message for r in warning_records]}"
-        )
-        records_with_exc = [r for r in warning_records if r.exc_info is not None]
-        assert records_with_exc, "WARNING record must carry exc_info (stack trace)"
+        error_records = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert error_records, "configuration failure must be logged at ERROR"
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestListProvidersConfigFailures:
+    """GET /providers/ reports configuration read failures as errors."""
+
+    def test_provider_config_exception_returns_config_error(self):
+        config_mgr = MagicMock()
+        config_mgr.get_provider_config.side_effect = RuntimeError("config blow up")
+
+        app = _make_app()
+        app.dependency_overrides[get_config_manager] = lambda: config_mgr
+        client = TestClient(app, raise_server_exceptions=False)
+        _assert_config_error(client.get("/providers/"))
+
+    def test_get_active_providers_raises_returns_config_error(self):
+        provider_config = MagicMock()
+        provider_config.get_active_providers.side_effect = RuntimeError("registry-exploded")
+
+        config_mgr = MagicMock()
+        config_mgr.get_provider_config.return_value = provider_config
+
+        app = _make_app()
+        app.dependency_overrides[get_config_manager] = lambda: config_mgr
+        client = TestClient(app, raise_server_exceptions=False)
+        _assert_config_error(client.get("/providers/"))
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestProvidersHealthNoConfig:
+    def test_no_provider_config_returns_empty_list(self):
+        config_mgr = MagicMock()
+        config_mgr.get_provider_config.return_value = None
+
+        app = _make_app()
+        app.dependency_overrides[get_config_manager] = lambda: config_mgr
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/providers/health")
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "providers": [],
+            "active_provider": None,
+            "default_provider_instance": None,
+        }
