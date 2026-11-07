@@ -80,17 +80,14 @@ class TestTemplateProviderFields:
 
 @pytest.mark.unit
 class TestTemplateAllocationStrategy:
-    def test_spot_price_type_sets_price_capacity_optimized(self):
-        tpl = _tpl(price_type="spot")
-        assert tpl.allocation_strategy == "priceCapacityOptimized"
+    @pytest.mark.parametrize("price_type", ["spot", "ondemand", "heterogeneous"])
+    def test_base_template_does_not_default_strategy(self, price_type):
+        tpl = _tpl(price_type=price_type)
+        assert tpl.allocation_strategy is None
 
-    def test_ondemand_price_type_sets_lowest_price(self):
-        tpl = _tpl(price_type="ondemand")
-        assert tpl.allocation_strategy == "lowestPrice"
-
-    def test_heterogeneous_price_type_sets_lowest_price(self):
-        tpl = _tpl(price_type="heterogeneous")
-        assert tpl.allocation_strategy == "lowestPrice"
+    def test_explicit_strategy_is_kept(self):
+        tpl = _tpl(price_type="spot", allocation_strategy="diversified")
+        assert tpl.allocation_strategy == "diversified"
 
 
 # ---------------------------------------------------------------------------

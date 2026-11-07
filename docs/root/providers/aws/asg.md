@@ -142,7 +142,7 @@ ASG uses the hyphenated wire format. ORB accepts camelCase, hyphenated, or snake
 | `priceCapacityOptimized` | `price-capacity-optimized` |
 | `diversified` | `diversified` |
 
-`lowest-price` is the default when no strategy is set. Note that `prioritized` has no ASG spot equivalent and falls back to the default.
+When no strategy is set, spot and heterogeneous templates default to `price-capacity-optimized` and on-demand templates default to `lowest-price`. Note that `prioritized` has no ASG spot equivalent and falls back to `lowest-price`.
 
 ### Attribute-based instance selection
 

@@ -374,6 +374,35 @@ class AWSTemplate(Template):
 
         return self
 
+    @field_validator("allocation_strategy", mode="before")
+    @classmethod
+    def normalise_allocation_strategy_input(cls, value: Any) -> Any:
+        """Accept a value object or any known spelling and store the canonical string.
+
+        Unknown strings are kept unchanged so the template still loads; the
+        request path rejects them with the unknown-strategy error.
+        """
+        if isinstance(value, AWSAllocationStrategy):
+            return value.value
+        if isinstance(value, str) and value:
+            try:
+                return normalise_allocation_strategy(value)
+            except ValueError:
+                return value
+        return value
+
+    @model_validator(mode="after")
+    def apply_allocation_strategy_default(self) -> "AWSTemplate":
+        """Default the allocation strategy from the price type when none is set."""
+        if not self.allocation_strategy:
+            default = (
+                "priceCapacityOptimized"
+                if self.price_type in ("spot", "heterogeneous")
+                else "lowestPrice"
+            )
+            object.__setattr__(self, "allocation_strategy", default)
+        return self
+
     @field_validator("allocation_strategy_on_demand", mode="before")
     @classmethod
     def coerce_allocation_strategy_on_demand(cls, value: Any) -> Optional["AWSAllocationStrategy"]:
@@ -468,7 +497,7 @@ class AWSTemplate(Template):
                 "subnet_ids", [data.get("subnet_id")] if data.get("subnet_id") else []
             ),
             "security_group_ids": data.get("security_group_ids", []),
-            "tags": AWSTags.from_dict(data.get("tags", data.get("instance_tags", {}))),
+            "tags": AWSTags.from_dict(data.get("tags", data.get("instance_tags", {}))).tags,
         }
 
         # Support multi-instance mappings (vmTypes/instance_types) when provided
@@ -504,7 +533,7 @@ class AWSTemplate(Template):
         if "allocation_strategy" in data:
             aws_data["allocation_strategy"] = AWSAllocationStrategy.from_string(
                 data["allocation_strategy"]
-            )
+            ).value
 
         if "allocation_strategy_on_demand" in data:
             aws_data["allocation_strategy_on_demand"] = AWSAllocationStrategy.from_string(
@@ -514,7 +543,7 @@ class AWSTemplate(Template):
         if "price_type" in data:
             from orb.domain.base.value_objects import PriceType
 
-            aws_data["price_type"] = PriceType(data["price_type"])
+            aws_data["price_type"] = PriceType(data["price_type"]).value
 
         if "max_spot_price" in data:
             aws_data["max_price"] = data["max_spot_price"]

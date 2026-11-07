@@ -257,14 +257,14 @@ see the same spelling whichever provider serves the template.
   the SQL template model, the REST template models, the UI template pages and
   the template defaults service. Revisit only if a second provider needs a
   conflicting meaning for the same key.
-- **`allocation_strategy` default.** The shared aggregate defaults an unset
-  value from the price type (`priceCapacityOptimized` for spot, `lowestPrice`
-  otherwise). Stored templates and HostFactory input supply their own
-  spelling before that default can apply, and the EC2 Fleet request builder
-  only emits `AllocationStrategy` when the value is set, so removing the
-  default would drop the parameter from fleet requests. AWS normalises every
-  spelling (`lowestPrice`, `lowest_price`, `lowest-price`) when it uses the
-  value. Azure does not use the field and holds an empty value.
+- **`allocation_strategy`.** The field stays optional on the shared
+  aggregate, which applies no default. The default lives only in
+  `AWSTemplate`: when no strategy is set, spot and heterogeneous templates get
+  `priceCapacityOptimized` and on-demand templates get `lowestPrice`. Every
+  load path reaches the AWS request builders as an `AWSTemplate`, so the
+  builders always see a strategy. `AWSTemplate` normalises every known spelling
+  (`lowestPrice`, `lowest_price`, `lowest-price`) to the canonical camelCase
+  form. Azure and GCP leave the field unset.
 
 The behaviour above is pinned by the allocation-strategy golden tests, the
 template DTO field snapshot, the storage round-trip tests and the HostFactory

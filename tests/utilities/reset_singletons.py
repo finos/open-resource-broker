@@ -60,6 +60,19 @@ def reset_provider_registry() -> None:
     )
 
 
+def reset_scheduler_registry() -> None:
+    """Drop scheduler registrations so a test-registered stub cannot leak into later tests."""
+    try:
+        from orb.infrastructure.registry.base_registry import BaseRegistry
+
+        BaseRegistry._instances.pop("SchedulerRegistry", None)
+    except ImportError:
+        pass  # BaseRegistry not available; global variable reset below is sufficient
+    _safe_reset_global_variable(
+        "orb.infrastructure.scheduler.registry", "_scheduler_registry_instance"
+    )
+
+
 def _restore_canonical_container_factory() -> None:
     """Restore the composition-root factory hook to the canonical one.
 
@@ -123,6 +136,8 @@ def reset_all_singletons() -> None:
     _reset_circuit_breaker_states()
 
     reset_provider_registry()
+
+    reset_scheduler_registry()
 
     # Reset the provider-plugin initialization guard so that a fresh bootstrap
     # (triggered by create_container() or get_container() in subsequent tests)

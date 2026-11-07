@@ -329,40 +329,49 @@ class TestToAwsApiFormat:
 
 # ---------------------------------------------------------------------------
 # from_aws_format
-#
-# NOTE: from_aws_format() unconditionally builds
-# `core_data["tags"] = AWSTags.from_dict(...)`, but the inherited
-# `Template.tags` field is typed `dict[str, Any]`, not `AWSTags`. Passing an
-# AWSTags value object into `cls.model_validate(aws_data)` always raises
-#   pydantic_core.ValidationError: tags - Input should be a valid dictionary
-#     [type=dict_type, input_value=AWSTags(tags={}), input_type=AWSTags]
-# The tests below assert the correct behaviour (a valid AWSTemplate is
-# returned) and are marked xfail so they flip to passing once the bug is
-# fixed in src/.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-class TestFromAwsFormatTagsBug:
-    @pytest.mark.xfail(
-        strict=True,
-        reason="from_aws_format passes AWSTags where Template.tags expects a dict",
-    )
+class TestFromAwsFormat:
     def test_minimal_payload_returns_valid_template(self) -> None:
         """from_aws_format() should succeed for the smallest possible payload."""
         template = AWSTemplate.from_aws_format({"template_id": "t-minimal"})
         assert template.template_id == "t-minimal"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="from_aws_format passes AWSTags where Template.tags expects a dict",
-    )
     def test_payload_with_tags_returns_valid_template(self) -> None:
         template = AWSTemplate.from_aws_format(
             {"template_id": "t-with-tags", "instance_tags": {"Name": "x"}}
         )
         assert template.template_id == "t-with-tags"
         assert template.tags == {"Name": "x"}
+
+    def test_allocation_strategies_and_price_type_round_trip(self) -> None:
+        template = AWSTemplate.from_aws_format(
+            {
+                "template_id": "t-spot",
+                "provider_api": "SpotFleet",
+                "price_type": "spot",
+                "allocation_strategy": "capacity_optimized",
+                "allocation_strategy_on_demand": "prioritized",
+            }
+        )
+
+        assert isinstance(template, AWSTemplate)
+        assert template.price_type == "spot"
+        assert template.allocation_strategy == "capacityOptimized"
+        assert template.allocation_strategy_on_demand is not None
+        assert template.allocation_strategy_on_demand.value == "prioritized"
+
+        api_format = template.to_aws_api_format()
+        assert api_format["price_type"] == "spot"
+        assert api_format["allocation_strategy"] == "capacityOptimized"
+        assert api_format["allocation_strategy_on_demand"] == "prioritized"
+        assert api_format["provider_api"] == "SpotFleet"
+
+    def test_invalid_tags_are_still_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            AWSTemplate.from_aws_format({"template_id": "t-bad", "tags": {"Name": 1}})
 
 
 # ---------------------------------------------------------------------------

@@ -1,14 +1,16 @@
 """Golden outcomes for a template's allocation strategy per entry path.
 
-When a template carries no explicit ``allocation_strategy`` the value it ends
-up with depends on how it was built. These tests pin the current outcome for
-each path, plus what the EC2 Fleet request builder emits from it, so any change
-to where the default is decided is a visible, deliberate edit here.
+When a template carries no explicit ``allocation_strategy`` only the AWS
+template decides a default: spot and heterogeneous templates get
+``priceCapacityOptimized`` and on-demand templates ``lowestPrice``. Every other
+entry path leaves the value unset. These tests pin the outcome for each path,
+plus what the EC2 Fleet request builder emits from it, so any change to where
+the default is decided is a visible, deliberate edit here.
 """
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -57,20 +59,13 @@ def _fleet_request_options(template: Template) -> dict:
     return builder.build(aws_template, _request(), "lt-1", "1").get("SpotOptions", {})
 
 
-# (i) base aggregate built directly
+# (i) base aggregate built directly: no provider default
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    ("price_type", "expected"),
-    [
-        ("spot", "priceCapacityOptimized"),
-        ("ondemand", "lowestPrice"),
-        ("heterogeneous", "lowestPrice"),
-    ],
-)
-def test_base_template_default_follows_price_type(price_type: str, expected: str) -> None:
-    assert Template(template_id="t", price_type=price_type).allocation_strategy == expected
+@pytest.mark.parametrize("price_type", ["spot", "ondemand", "heterogeneous"])
+def test_base_template_leaves_strategy_unset(price_type: str) -> None:
+    assert Template(template_id="t", price_type=price_type).allocation_strategy is None
 
 
 # (ii) AWS aggregate built directly
@@ -82,7 +77,7 @@ def test_base_template_default_follows_price_type(price_type: str, expected: str
     [
         ("spot", "priceCapacityOptimized"),
         ("ondemand", "lowestPrice"),
-        ("heterogeneous", "lowestPrice"),
+        ("heterogeneous", "priceCapacityOptimized"),
     ],
 )
 def test_aws_template_default_follows_price_type(price_type: str, expected: str) -> None:
@@ -90,30 +85,26 @@ def test_aws_template_default_follows_price_type(price_type: str, expected: str)
     assert template.allocation_strategy == expected
 
 
-# (iii) stored template loaded without the key: snake_case, whatever the price type
+# (iii) stored template loaded without the key: left unset
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize("price_type", ["spot", "ondemand"])
-def test_stored_template_without_key_defaults_to_snake_case_lowest_price(
-    price_type: str,
-) -> None:
+def test_stored_template_without_key_leaves_strategy_unset(price_type: str) -> None:
     template = TemplateSerializer().from_dict({"template_id": "t", "price_type": price_type})
-    assert template.allocation_strategy == "lowest_price"
+    assert template.allocation_strategy is None
 
 
-# (iv) HostFactory input without allocationStrategy: camelCase, whatever the price type
+# (iv) HostFactory input without allocationStrategy: left unset
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize("price_type", ["spot", "ondemand"])
-def test_hostfactory_input_without_key_defaults_to_camel_case_lowest_price(
-    price_type: str,
-) -> None:
+def test_hostfactory_input_without_key_leaves_strategy_unset(price_type: str) -> None:
     dto = HostFactorySchedulerStrategy().parse_template_config(
         {"templateId": "t", "priceType": price_type}
     )
-    assert dto.allocation_strategy == "lowestPrice"
+    assert dto.allocation_strategy is None
 
 
 # (v) the AWS normaliser collapses every spelling to one canonical value
@@ -132,12 +123,12 @@ def test_aws_normaliser_maps_every_spelling_to_one_value(spellings: tuple[str, .
     assert len({normalise_allocation_strategy(s) for s in spellings}) == 1
 
 
-# non-AWS provider: Azure does not use the field and holds an inert empty value
+# non-AWS provider: Azure does not use the field and leaves it unset
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize("price_type", ["spot", "ondemand"])
-def test_azure_template_allocation_strategy_is_inert(price_type: str) -> None:
+def test_azure_template_allocation_strategy_is_unset(price_type: str) -> None:
     template = AzureTemplate(
         template_id="t",
         price_type=price_type,
@@ -148,12 +139,12 @@ def test_azure_template_allocation_strategy_is_inert(price_type: str) -> None:
         vm_size="Standard_D2s_v3",
         image_id="/subscriptions/s/resourceGroups/rg/providers/Microsoft.Compute/images/img",
     )
-    assert template.allocation_strategy == ""
+    assert template.allocation_strategy is None
 
 
 # (vi) the fleet request carries AllocationStrategy for each entry path; the
-# builder only emits it when the template value is truthy, so a path that
-# stopped supplying a default would silently drop the parameter.
+# builder only emits it when the template value is truthy, so the AWS template
+# default must reach it whichever way the template was built.
 
 
 def _template_via(path: str, price_type: str) -> Template:
@@ -174,10 +165,10 @@ def _template_via(path: str, price_type: str) -> Template:
     [
         ("base", "spot", "price-capacity-optimized"),
         ("aws", "spot", "price-capacity-optimized"),
-        ("stored", "spot", "lowest-price"),
-        ("base", "heterogeneous", "lowest-price"),
-        ("aws", "heterogeneous", "lowest-price"),
-        ("stored", "heterogeneous", "lowest-price"),
+        ("stored", "spot", "price-capacity-optimized"),
+        ("base", "heterogeneous", "price-capacity-optimized"),
+        ("aws", "heterogeneous", "price-capacity-optimized"),
+        ("stored", "heterogeneous", "price-capacity-optimized"),
     ],
 )
 def test_fleet_request_carries_allocation_strategy(
@@ -192,3 +183,64 @@ def test_fleet_request_carries_allocation_strategy(
 @pytest.mark.parametrize("path", ["base", "aws", "stored"])
 def test_on_demand_fleet_request_has_no_spot_options(path: str) -> None:
     assert _fleet_request_options(_template_via(path, "ondemand")) == {}
+
+
+# non-AWS providers in HostFactory output: an unset strategy is omitted, the same
+# way as any other absent optional field (maxSpotPrice here)
+
+
+def _azure_template() -> Template:
+    return AzureTemplate(
+        template_id="azure-t",
+        price_type="spot",
+        provider_api="VMSS",
+        location="eastus",
+        resource_group="rg",
+        ssh_key_name="key",
+        vm_size="Standard_D2s_v3",
+        image_id="/subscriptions/s/resourceGroups/rg/providers/Microsoft.Compute/images/img",
+    )
+
+
+def _gcp_template() -> Template:
+    from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
+
+    return GCPTemplate(
+        template_id="gcp-t",
+        price_type="spot",
+        provider_api="SingleVM",
+        project_id="orb-example-12345",
+        region="us-central1",
+        zones=["us-central1-a"],
+        instance_type="e2-standard-4",
+        max_instances=1,
+        source_image_family="debian-12",
+        source_image_project="debian-cloud",
+        boot_disk_type="pd-balanced",
+        boot_disk_size_gb=64,
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("build", "provider_type"),
+    [(_azure_template, "azure"), (_gcp_template, "gcp")],
+    ids=["azure", "gcp"],
+)
+def test_hostfactory_output_omits_unset_strategy_for_non_aws(build, provider_type: str) -> None:
+    from orb.infrastructure.template.factories import TemplateDTOFactory
+
+    template = build()
+    assert template.allocation_strategy is None
+
+    dto = TemplateDTOFactory().from_domain(template)
+    strategy = HostFactorySchedulerStrategy()
+    strategy._logger = MagicMock()
+    with patch.object(strategy, "_get_active_provider_type", return_value=provider_type):
+        formatted = strategy.format_templates_response([dto])["templates"][0]
+
+    assert formatted["templateId"] == template.template_id
+    assert "allocationStrategy" not in formatted
+    assert "allocation_strategy" not in formatted
+    assert "maxSpotPrice" not in formatted
+    assert formatted["priceType"] == "spot"

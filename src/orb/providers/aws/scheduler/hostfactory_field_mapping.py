@@ -55,7 +55,6 @@ class AWSFieldMapping:
         """
         mapped.setdefault("max_machines", 1)
         mapped.setdefault("price_type", "ondemand")
-        mapped.setdefault("allocation_strategy", "lowestPrice")
         if not mapped.get("launch_template_id"):
             mapped.setdefault("subnet_ids", [])
             mapped.setdefault("security_group_ids", [])

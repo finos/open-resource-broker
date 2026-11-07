@@ -6,7 +6,7 @@ Provides consistent HTTP status codes and response formatting for all exception 
 """
 
 from http import HTTPStatus
-from typing import Any, Callable
+from typing import Callable
 
 from orb.domain.base.exceptions import (
     BusinessRuleViolationError,
@@ -30,29 +30,8 @@ from orb.domain.template.exceptions import (
     TemplateValidationError,
 )
 from orb.infrastructure.error.categories import ErrorCategory, ErrorCode
-from orb.infrastructure.error.responses import ErrorResponse
+from orb.infrastructure.error.responses import ErrorResponse, _safe_details
 from orb.infrastructure.logging.logger import get_logger
-
-# Keys that are safe to forward to clients.  Everything else is stripped so that
-# wrap-chain internals (original_error, errno, filename, …) never reach the wire.
-_SAFE_DETAIL_KEYS: frozenset[str] = frozenset(
-    {
-        "entity_type",
-        "entity_id",
-        "field",
-        "field_name",
-        "rule",
-        "expected_version",
-        "new_version",
-        "current_state",
-        "attempted_state",
-    }
-)
-
-
-def _safe_details(raw: dict[str, Any]) -> dict[str, Any]:
-    """Return a copy of *raw* containing only the keys safe to send to callers."""
-    return {k: v for k, v in raw.items() if k in _SAFE_DETAIL_KEYS}
 
 
 class HTTPErrorResponseHandler:

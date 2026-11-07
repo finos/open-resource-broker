@@ -122,7 +122,7 @@ EC2 Fleet uses the hyphenated wire format. ORB accepts camelCase, hyphenated, or
 | `prioritized` | `prioritized` |
 | `diversified` | `diversified` |
 
-`lowest-price` is the default. `allocation_strategy_on_demand` follows the same conversion and falls back to the spot strategy when unset.
+When no strategy is set, spot and heterogeneous templates default to `price-capacity-optimized` and on-demand templates default to `lowest-price`. `allocation_strategy_on_demand` follows the same conversion and falls back to the spot strategy when unset.
 
 ### Overrides
 
