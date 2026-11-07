@@ -136,6 +136,9 @@ class TemplateConfigurationManager:
 
         Args:
             force_refresh: Force reload even if cached
+            provider_override: Load templates for this provider instead of the
+                active one. These loads bypass the cache, so they never replace
+                the cached templates for the active provider.
 
         Returns:
             List of TemplateDTO objects
@@ -143,9 +146,10 @@ class TemplateConfigurationManager:
         if force_refresh:
             self.cache_service.invalidate()
 
-        return await self.cache_service.get_or_load(
-            lambda: self._load_templates_from_scheduler(provider_override)  # type: ignore[return-value]
-        )
+        if provider_override:
+            return await self._load_templates_from_scheduler(provider_override)
+
+        return await self.cache_service.get_or_load(self._load_templates_from_scheduler)
 
     async def _load_templates_from_scheduler(
         self, provider_override: Optional[str] = None
