@@ -203,6 +203,10 @@ COPY src/orb/providers/k8s/hostfactory/providers/k8s-hf/scripts/ \
 RUN chmod +x /etc/hostfactory/providers/k8s-hf/scripts/*.sh
 ```
 
+These are the HostFactory provider scripts. For the image the Symphony
+compute workers run, including the liveness probe, see the
+[Symphony worker image guide](../../deployment/symphony-worker.md).
+
 **Confirming the correct `orb` binary is on `PATH`**
 
 The scripts call `orb` without an absolute path.  Before deploying, verify

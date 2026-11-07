@@ -79,6 +79,8 @@ Watches hostfactory provider return requests and deletes the pods.
 - `orb k8s-legacy watch pods`
 Watches the kubernetes event loop for new/modified/deleted pods and captures them on disk.
 
+The compute-worker scripts `compute-liveness`, `configure-pod-params` and `symphony-exporter-bootstrap` moved from `tools/` to [`deploy/symphony-worker/bin/`](../deploy/symphony-worker/bin/); see the [Symphony worker image guide](../docs/root/deployment/symphony-worker.md).
+
 
 ## Testing
 
