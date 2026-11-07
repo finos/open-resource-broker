@@ -209,26 +209,22 @@ class TestCreateBackup:
 
 
 # ---------------------------------------------------------------------------
-# recover_from_backup
+# list_backups
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-class TestRecoverFromBackup:
-    def test_returns_false_when_no_backup_files(self, tmp_path: Path) -> None:
+class TestListBackups:
+    def test_empty_when_no_backup_files(self, tmp_path: Path) -> None:
         fm = FileManager(str(tmp_path / "data.json"), backup_enabled=True)
-        result = fm.recover_from_backup()
-        assert result is False
+        assert fm.list_backups() == []
 
-    def test_recovers_from_backup(self, tmp_path: Path) -> None:
+    def test_lists_a_created_backup(self, tmp_path: Path) -> None:
         fm = FileManager(str(tmp_path / "data.json"), backup_enabled=True)
         fm.write_file("original content")
-        fm.create_backup()
-        # Now clobber the main file
-        fm.file_path.write_text("corrupted", encoding="utf-8")
-        ok = fm.recover_from_backup()
-        assert ok is True
-        assert "original content" in fm.file_path.read_text(encoding="utf-8")
+        created = fm.create_backup()
+        assert created is not None
+        assert fm.list_backups() == [Path(created)]
 
 
 # ---------------------------------------------------------------------------

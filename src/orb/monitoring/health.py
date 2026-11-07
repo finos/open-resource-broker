@@ -365,10 +365,20 @@ class HealthCheck(HealthCheckPort):
     def _check_disk_health(self) -> HealthStatus:
         """Check disk health."""
         try:
-            # Check write access
-            test_file = self.health_dir / "test.txt"
-            test_file.write_text("test")
-            test_file.unlink()
+            # Check write access with a file of this run's own, so overlapping
+            # runs (API threads, CLI) never remove each other's probe
+            import tempfile
+
+            probe_name = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    dir=self.health_dir, prefix=".orb-health-", delete=False
+                ) as probe:
+                    probe_name = probe.name
+                    probe.write(b"test")
+            finally:
+                if probe_name is not None:
+                    Path(probe_name).unlink(missing_ok=True)
 
             # Check disk space
             import shutil

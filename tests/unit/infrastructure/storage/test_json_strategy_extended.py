@@ -369,3 +369,149 @@ class TestLoadData:
         )
         result = strategy._load_data()
         assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# A storage file that does not parse
+# ---------------------------------------------------------------------------
+
+_CORRUPT = b'{"entities": {"e1": {"v": 1}'
+
+
+def _backed_up_strategy(tmp_path: Path) -> JSONStorageStrategy:
+    return JSONStorageStrategy(
+        file_path=str(tmp_path / "data.json"),
+        entity_type="entities",
+        backup_enabled=True,
+    )
+
+
+def _write_backup(tmp_path: Path, name: str, content: bytes, age: int) -> Path:
+    """A backup file ``age`` seconds old (larger is older)."""
+    import os
+    import time
+
+    backup = tmp_path / "backups" / f"data.backup_{name}.json"
+    backup.parent.mkdir(exist_ok=True)
+    backup.write_bytes(content)
+    stamp = time.time() - age
+    os.utime(backup, (stamp, stamp))
+    return backup
+
+
+def _backup_listing(tmp_path: Path) -> dict[str, bytes]:
+    return {p.name: p.read_bytes() for p in sorted((tmp_path / "backups").iterdir())}
+
+
+@pytest.mark.unit
+class TestCorruptStorageFile:
+    def test_no_backup_raises_and_leaves_the_file(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
+        strategy = _backed_up_strategy(tmp_path)
+        data_file = tmp_path / "data.json"
+        data_file.write_bytes(_CORRUPT)
+
+        with pytest.raises(StorageError, match="data.json"):
+            strategy.find_all()
+
+        assert data_file.read_bytes() == _CORRUPT
+        assert not list(tmp_path.glob("data.json.corrupt-*"))
+
+    def test_valid_backup_is_restored_and_the_damaged_file_kept(self, tmp_path: Path) -> None:
+        strategy = _backed_up_strategy(tmp_path)
+        data_file = tmp_path / "data.json"
+        data_file.write_bytes(_CORRUPT)
+        _write_backup(tmp_path, "1", json.dumps({"entities": {"b1": {"v": 2}}}).encode(), 10)
+
+        assert strategy.find_all() == {"b1": {"v": 2}}
+
+        assert json.loads(data_file.read_text())["entities"] == {"b1": {"v": 2}}
+        (corrupt_copy,) = tmp_path.glob("data.json.corrupt-*")
+        assert corrupt_copy.read_bytes() == _CORRUPT
+
+    def test_corrupt_newest_backup_falls_back_to_an_older_one(self, tmp_path: Path) -> None:
+        strategy = _backed_up_strategy(tmp_path)
+        (tmp_path / "data.json").write_bytes(_CORRUPT)
+        _write_backup(tmp_path, "new", b"{not json", 10)
+        _write_backup(tmp_path, "old", json.dumps({"entities": {"old": {"v": 3}}}).encode(), 100)
+
+        assert strategy.find_all() == {"old": {"v": 3}}
+
+    def test_every_backup_corrupt_raises_without_looping(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
+        strategy = _backed_up_strategy(tmp_path)
+        data_file = tmp_path / "data.json"
+        data_file.write_bytes(_CORRUPT)
+        _write_backup(tmp_path, "a", b"{not json", 10)
+        _write_backup(tmp_path, "b", b"\xff\xfe", 100)
+
+        with pytest.raises(StorageError, match="no valid backup"):
+            strategy.find_all()
+
+        assert data_file.read_bytes() == _CORRUPT
+        assert not list(tmp_path.glob("data.json.corrupt-*"))
+
+    def test_read_error_on_a_valid_file_never_restores(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
+        strategy = _backed_up_strategy(tmp_path)
+        data_file = tmp_path / "data.json"
+        good = json.dumps({"entities": {"live": {"v": 9}}}).encode()
+        data_file.write_bytes(good)
+        _write_backup(tmp_path, "1", json.dumps({"entities": {"stale": {"v": 1}}}).encode(), 10)
+
+        with (
+            patch.object(
+                strategy.file_manager,
+                "read_file_with_signature",
+                side_effect=OSError(5, "Input/output error"),
+            ),
+            pytest.raises(StorageError, match="Input/output error"),
+        ):
+            strategy.find_all()
+
+        assert data_file.read_bytes() == good
+        assert not list(tmp_path.glob("data.json.corrupt-*"))
+
+    def test_save_against_a_corrupt_file_writes_and_backs_up_nothing(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
+        strategy = _backed_up_strategy(tmp_path)
+        data_file = tmp_path / "data.json"
+        data_file.write_bytes(_CORRUPT)
+        _write_backup(tmp_path, "1", json.dumps({"entities": {"b1": {"v": 2}}}).encode(), 10)
+        before = _backup_listing(tmp_path)
+
+        with pytest.raises(StorageError):
+            strategy.save("e2", {"v": 5})
+
+        assert data_file.read_bytes() == _CORRUPT
+        assert _backup_listing(tmp_path) == before
+
+    def test_exists_and_count_raise_on_a_corrupt_file(self, tmp_path: Path) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
+        strategy = _backed_up_strategy(tmp_path)
+        (tmp_path / "data.json").write_bytes(_CORRUPT)
+
+        with pytest.raises(StorageError):
+            strategy.exists("e1")
+        with pytest.raises(StorageError):
+            strategy.count()
+
+    def test_unit_of_work_against_a_corrupt_file_backs_up_nothing(self, tmp_path: Path) -> None:
+        strategy = _backed_up_strategy(tmp_path)
+        data_file = tmp_path / "data.json"
+        data_file.write_bytes(_CORRUPT)
+        _write_backup(tmp_path, "1", json.dumps({"entities": {"b1": {"v": 2}}}).encode(), 10)
+        before = _backup_listing(tmp_path)
+
+        strategy.begin_transaction()
+        strategy.save("e2", {"v": 5})
+        with pytest.raises(ValueError):
+            strategy.commit_transaction()
+
+        assert data_file.read_bytes() == _CORRUPT
+        assert _backup_listing(tmp_path) == before

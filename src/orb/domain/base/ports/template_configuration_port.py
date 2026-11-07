@@ -12,8 +12,13 @@ class TemplateConfigurationPort(ABC):
         """Get template configuration manager."""
 
     @abstractmethod
-    async def load_templates(self, provider_override: Optional[str] = None) -> list[Any]:
-        """Load all templates from configuration."""
+    async def load_templates(
+        self, provider_override: Optional[str] = None, force_refresh: bool = False
+    ) -> list[Any]:
+        """Load all templates from configuration.
+
+        ``force_refresh`` discards any cached templates and reads the sources again.
+        """
 
     @abstractmethod
     def get_template_config(self, template_id: str) -> Optional[dict[str, Any]]:

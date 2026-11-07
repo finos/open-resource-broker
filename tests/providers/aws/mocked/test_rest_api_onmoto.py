@@ -608,3 +608,40 @@ class TestWaitOnRequest:
 
         status = await rest_client.get(f"/api/v1/requests/{request_id}/status")
         assert status.json()["requests"][0]["status"] == "complete", status.text
+
+
+class TestTemplatesRefresh:
+    @pytest.mark.asyncio
+    async def test_refresh_reloads_a_template_added_to_the_file(self, rest_client, orb_config_dir):
+        """POST /templates/refresh reads the templates file again and returns its templates."""
+
+        def _ids(body: dict) -> set[str]:
+            return {t.get("template_id") or t.get("templateId") for t in body["templates"]}
+
+        before = await rest_client.get("/api/v1/templates/")
+        assert before.status_code == 200
+        assert "Refreshed-Template" not in _ids(before.json())
+
+        templates_file = orb_config_dir / "aws_templates.json"
+        data = json.loads(templates_file.read_text())
+        added = dict(data["templates"][0])
+        added["templateId"] = "Refreshed-Template"
+        data["templates"].append(added)
+        templates_file.write_text(json.dumps(data))
+
+        def _entry(body: dict) -> dict:
+            return next(
+                t
+                for t in body["templates"]
+                if (t.get("template_id") or t.get("templateId")) == "Refreshed-Template"
+            )
+
+        refreshed = await rest_client.post("/api/v1/templates/refresh")
+        assert refreshed.status_code == 200, refreshed.text
+        assert "Refreshed-Template" in _ids(refreshed.json())
+
+        after = await rest_client.get("/api/v1/templates/")
+        assert after.status_code == 200
+        assert "Refreshed-Template" in _ids(after.json())
+        # Refresh renders the template exactly as the list does, provider fields included
+        assert _entry(refreshed.json()) == _entry(after.json())

@@ -30,9 +30,13 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         """Get template configuration manager."""
         return self._template_manager
 
-    async def load_templates(self, provider_override: Optional[str] = None) -> list[Any]:
-        """Load all templates from configuration."""
-        return await self._template_manager.load_templates(provider_override=provider_override)
+    async def load_templates(
+        self, provider_override: Optional[str] = None, force_refresh: bool = False
+    ) -> list[Any]:
+        """Load all templates from configuration (from the sources when ``force_refresh``)."""
+        return await self._template_manager.load_templates(
+            force_refresh=force_refresh, provider_override=provider_override
+        )
 
     def get_template_config(self, template_id: str) -> Optional[dict[str, Any]]:
         """Get configuration for specific template."""

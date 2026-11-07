@@ -51,9 +51,53 @@ if ! git rev-parse --verify "$COMMIT_HASH" >/dev/null 2>&1; then
     exit 1
 fi
 
-# Store current state
-CURRENT_BRANCH=$(git branch --show-current)
+# Store current state: the branch, or the commit for a detached HEAD
+ORIG_REF="$(git branch --show-current)"
+ORIG_IS_BRANCH=true
+if [ -z "$ORIG_REF" ]; then
+    ORIG_REF="$(git rev-parse HEAD)"
+    ORIG_IS_BRANCH=false
+fi
 TEMP_BRANCH="historical-build-$VERSION-$(date +%s)"
+
+# The historical checkout removes the lock file, so install from a copy
+lock_tmp="$(mktemp)"
+
+on_original() {
+    if [ "$ORIG_IS_BRANCH" = "true" ]; then
+        [ "$(git branch --show-current)" = "$ORIG_REF" ]
+    else
+        [ -z "$(git branch --show-current)" ] && [ "$(git rev-parse HEAD)" = "$ORIG_REF" ]
+    fi
+}
+
+# Restore a file the overlay changed: from HEAD when tracked there, else remove it
+restore_overlay_file() {
+    if git ls-files --error-unmatch -- "$1" >/dev/null 2>&1; then
+        git checkout -q -- "$1"
+    else
+        rm -f -- "$1"
+    fi
+}
+
+# Runs on every exit. Returns the caller to where it started when the build
+# stopped on the temporary branch; only the overlay files are restored, so
+# the caller's untracked files are left alone.
+cleanup() {
+    # Keep going on errors so every step gets its chance; the exit status of
+    # the script is not changed
+    set +e
+    rm -f "${lock_tmp:?}"
+    if ! on_original; then
+        restore_overlay_file pyproject.toml
+        restore_overlay_file setup.py
+        git checkout -q "$ORIG_REF"
+        git branch -D "$TEMP_BRANCH" -q 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+
+cp "$PACKAGE_BUILD_LOCK" "$lock_tmp"
 
 log_info "Creating temporary branch: $TEMP_BRANCH"
 git checkout -b "$TEMP_BRANCH" "$COMMIT_HASH" -q
@@ -94,11 +138,12 @@ fi
 
 # Build package
 log_info "Building package with overlay approach"
-python -m pip install --quiet --require-hashes --no-deps -r "$PACKAGE_BUILD_LOCK" 2>/dev/null || true
+python -m pip install --quiet --require-hashes --no-deps -r "$lock_tmp" || {
+    log_error "Installing the build tooling failed"
+    exit 1
+}
 python -m build --wheel --outdir dist/ || {
     log_error "Package build failed"
-    git checkout "$CURRENT_BRANCH" -q
-    git branch -D "$TEMP_BRANCH" -q 2>/dev/null || true
     exit 1
 }
 
@@ -111,7 +156,7 @@ if [ "${KEEP_ARTIFACTS:-false}" = "true" ]; then
     fi
     git clean -fd  # Remove untracked files including pyproject.toml
     git reset --hard HEAD  # Reset any tracked file changes
-    git checkout "$CURRENT_BRANCH" -q
+    git checkout "$ORIG_REF" -q
     git branch -D "$TEMP_BRANCH" -q
     # Restore wheel
     mkdir -p dist
@@ -122,7 +167,7 @@ else
     log_info "Cleaning up temporary branch"
     git clean -fd  # Remove untracked files
     git reset --hard HEAD  # Reset tracked files
-    git checkout "$CURRENT_BRANCH" -q
+    git checkout "$ORIG_REF" -q
     git branch -D "$TEMP_BRANCH" -q
 fi
 

@@ -367,35 +367,16 @@ class FileManager:
             self.logger.error("File integrity verification failed: %s", e)
             return False
 
-    def recover_from_backup(self) -> bool:
-        """
-        Recover file from most recent backup.
-
-        Returns:
-            True if recovery successful, False otherwise
-        """
+    def list_backups(self) -> list[Path]:
+        """This file's backups, newest first."""
+        backup_pattern = f"{self.file_path.stem}.backup_*{self.file_path.suffix}"
         try:
-            # Find most recent backup
-            backup_pattern = f"{self.file_path.stem}.backup_*{self.file_path.suffix}"
-            backup_files = list(self.backup_dir.glob(backup_pattern))
-
-            if not backup_files:
-                self.logger.warning("No backup files found for recovery")
-                return False
-
-            # Sort by modification time (newest first)
-            backup_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-            latest_backup = backup_files[0]
-
-            # Copy backup to main file
-            shutil.copy2(latest_backup, self.file_path)
-            self.logger.info("Recovered file from backup: %s", latest_backup)
-
-            return True
-
-        except Exception as e:
-            self.logger.error("Failed to recover from backup: %s", e)
-            return False
+            backups = list(self.backup_dir.glob(backup_pattern))
+            backups.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        except OSError as e:
+            self.logger.error("Failed to list backups in %s: %s", self.backup_dir, e)
+            return []
+        return backups
 
     def file_exists(self) -> bool:
         """Check if file exists."""

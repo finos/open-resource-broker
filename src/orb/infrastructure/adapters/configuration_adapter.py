@@ -187,6 +187,11 @@ class ConfigurationAdapter(ConfigurationPort):
             self._logger.warning("Failed to load metrics config, using defaults: %s", e)
             return defaults
 
+    def get_active_providers(self) -> list[Any]:
+        """The enabled provider instances from the provider configuration."""
+        provider_config = self._config_manager.get_provider_config()
+        return list(provider_config.get_active_providers()) if provider_config else []
+
     def get_loaded_config_file(self) -> str | None:
         """Get the path of the loaded configuration file."""
         return self._config_manager.get_loaded_config_file()

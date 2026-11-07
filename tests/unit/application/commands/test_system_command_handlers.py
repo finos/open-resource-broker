@@ -114,9 +114,13 @@ class TestRefreshTemplatesHandler:
 
         await handler.handle(command)
 
-        template_manager.load_templates.assert_awaited_once_with("aws")
+        template_manager.load_templates.assert_awaited_once_with(
+            provider_override="aws", force_refresh=True
+        )
         assert _res(command)["status"] == "success"
         assert _res(command)["template_count"] == 1
+        # The loaded template objects are passed on as they are
+        assert _res(command)["templates"] == [tmpl]
 
     @pytest.mark.asyncio
     async def test_failure_captured_in_result(self):
