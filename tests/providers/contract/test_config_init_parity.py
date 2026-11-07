@@ -17,7 +17,6 @@ import pytest
 from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
 from orb.domain.base.exceptions import ConfigurationError
 from orb.providers.base.strategy.provider_strategy import ProviderStrategy
-from orb.providers.registry.types import UnsupportedProviderError
 
 PROVIDERS = ("aws", "azure", "gcp", "k8s", "oci")
 
@@ -85,9 +84,7 @@ DISCRIMINATOR_CASES = [
     _tracked(
         "azure", {"azure"}, "#729", "azure config rejects the discriminator", ConfigurationError
     ),
-    _tracked(
-        "gcp", {"gcp"}, "#729", "gcp config rejects the discriminator", UnsupportedProviderError
-    ),
+    _tracked("gcp", {"gcp"}, "#729", "gcp config rejects the discriminator", ConfigurationError),
     _tracked("k8s", set(), "", ""),
     _tracked(
         "oci",
