@@ -407,8 +407,9 @@ jobs:
     # scanner, not an orb-py runtime dependency.
     #
     # NOTE: the dependency-review `allow-licenses` input above cannot call
-    # out to this script, so it must be kept in sync with the allowlist in
-    # dev-tools/ci/check_runtime_licenses.py by hand.
+    # out to this script, so it repeats the allowlist in
+    # dev-tools/ci/check_runtime_licenses.py. The unit test
+    # tests/unit/test_check_runtime_licenses.py fails if the two differ.
     - name: Check Python runtime dependency licenses
       run: |
         set -o pipefail
@@ -442,6 +443,49 @@ jobs:
           --excludePackages "@finos/open-resource-broker@0.1.0" \
           --json \
           | python3 ../../dev-tools/ci/check_runtime_licenses.py
+
+  # Weekly scan of the image users actually pull. Images are otherwise scanned
+  # only when they are built, so a CVE that gets a Debian fix after a release
+  # would go unnoticed until the next one. A new fixable CRITICAL/HIGH finding
+  # turns this run red as the signal to cut a release. Nothing is rebuilt or
+  # pushed here.
+  published-image-scan:
+    name: Published Image Scan
+    needs: [config]
+    if: ${{ github.event_name == 'schedule' && needs.config.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+    - name: Checkout code
+      # Only needed for .trivyignore.yaml.
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Run Trivy scan of the published latest image
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+      env:
+        # :latest is a multi-arch index; Trivy needs one concrete platform.
+        TRIVY_PLATFORM: linux/amd64
+      with:
+        image-ref: "${{ needs.config.outputs.container-registry }}/${{ needs.config.outputs.container-image }}:latest"
+        format: 'sarif'
+        output: 'trivy-published-image.sarif'
+        exit-code: '1'
+        severity: 'CRITICAL,HIGH'
+        limit-severities-for-sarif: true
+        trivyignores: .trivyignore.yaml
+
+    - name: Upload published image scan results
+      if: always()
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
+      with:
+        sarif_file: 'trivy-published-image.sarif'
+        category: published-image-latest
 
   codeql-analysis:
     name: CodeQL Analysis

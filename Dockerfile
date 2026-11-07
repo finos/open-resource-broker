@@ -15,8 +15,12 @@ COPY .github/requirements/build-tools.txt /tmp/build-tools.txt
 # DL3008: unpinned apt packages, because Debian drops superseded package versions
 # and exact pins break builds.
 # The pip, setuptools and wheel upgrade is hash-locked and removed again below.
+# APT_REFRESH changes the cache key of this layer: CI passes the build date, so
+# cached builds still pick up Debian security updates at least once a day.
+ARG APT_REFRESH=""
 # hadolint ignore=DL3008
-RUN apt-get update && \
+RUN echo "apt refresh: ${APT_REFRESH}" && \
+    apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         ca-certificates && \

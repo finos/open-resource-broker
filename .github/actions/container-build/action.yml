@@ -73,6 +73,8 @@ runs:
         # build-platforms (single source of truth from .project.yml).
         SCAN_PLATFORM=$(echo "$BUILD_PLATFORMS" | cut -d, -f1)
         TAG="$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION"
+        # Busts the cached apt-get upgrade layer once a day (see Dockerfile).
+        APT_REFRESH="$(date -u +%Y-%m-%d)"
 
         cache_args=(--cache-from type=gha)
         if [[ "$CACHE_TO" == "true" ]]; then
@@ -85,6 +87,7 @@ runs:
           --build-arg "VCS_REF=$(git rev-parse --short HEAD)"
           --build-arg "PYTHON_VERSION=$PYTHON_VERSION"
           --build-arg "PACKAGE_NAME_SHORT=$PACKAGE_NAME_SHORT"
+          --build-arg "APT_REFRESH=$APT_REFRESH"
         )
 
         if [[ "$PUSH" == "true" ]]; then
