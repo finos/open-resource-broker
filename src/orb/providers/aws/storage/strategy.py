@@ -439,10 +439,10 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Find by criteria")
-                return []
+                raise StorageError(f"Failed to search entities: {e}") from e
             except Exception as e:
                 self._logger.error("Failed to search entities: %s", e)
-                return []
+                raise StorageError(f"Failed to search entities: {e}") from e
 
     def save_batch(self, entities: dict[str, dict[str, Any]]) -> None:
         """

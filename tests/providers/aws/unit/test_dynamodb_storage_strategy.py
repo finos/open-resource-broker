@@ -294,20 +294,30 @@ class TestFindByCriteria:
         result = strat.find_by_criteria({"status": "active"})
         assert len(result) == 1
 
-    def test_returns_empty_on_client_error(self):
+    def test_raises_storage_error_on_client_error(self):
         strat = _make_strategy()
         strat.converter.build_filter_expression.return_value = ("f", {})
-        strat.client_manager.scan_table.side_effect = _client_error("ResourceNotFoundException")
+        error = _client_error("ResourceNotFoundException")
+        strat.client_manager.scan_table.side_effect = error
         strat.client_manager.handle_client_error.return_value = None
-        result = strat.find_by_criteria({"x": "y"})
-        assert result == []
+        with pytest.raises(StorageError) as exc_info:
+            strat.find_by_criteria({"x": "y"})
+        assert exc_info.value.__cause__ is error
+        strat.client_manager.handle_client_error.assert_called_once_with(error, "Find by criteria")
 
-    def test_returns_empty_on_generic_exception(self):
+    def test_raises_storage_error_on_scan_exception(self):
         strat = _make_strategy()
         strat.converter.build_filter_expression.return_value = ("f", {})
         strat.client_manager.scan_table.side_effect = RuntimeError("scan err")
-        result = strat.find_by_criteria({"x": "y"})
-        assert result == []
+        with pytest.raises(StorageError, match="scan err"):
+            strat.find_by_criteria({"x": "y"})
+
+    def test_raises_storage_error_on_filter_build_failure(self):
+        strat = _make_strategy()
+        strat.converter.build_filter_expression.side_effect = ValueError("bad filter")
+        with pytest.raises(StorageError, match="bad filter"):
+            strat.find_by_criteria({"x": "y"})
+        strat.client_manager.scan_table.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
