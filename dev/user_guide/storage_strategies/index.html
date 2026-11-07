@@ -1581,6 +1581,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#version-conflicts-and-retries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version Conflicts and Retries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#lock-management" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7706,6 +7717,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#version-conflicts-and-retries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version Conflicts and Retries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#lock-management" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8186,12 +8208,14 @@
 </code></pre></div>
 <h4 id="concurrent-access-control">Concurrent Access Control<a class="headerlink" href="#concurrent-access-control" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Optimistic locking prevents conflicts</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">storage</span><span class="o">.</span><span class="n">update_entity</span><span class="p">(</span><span class="s2">&quot;req-123&quot;</span><span class="p">,</span> <span class="n">updated_data</span><span class="p">,</span> <span class="n">expected_version</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">except</span> <span class="n">ConcurrencyConflictError</span><span class="p">:</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="c1"># Handle version conflict</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">current_data</span> <span class="o">=</span> <span class="n">storage</span><span class="o">.</span><span class="n">get_entity</span><span class="p">(</span><span class="s2">&quot;req-123&quot;</span><span class="p">)</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="c1"># Merge changes and retry</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.base.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConcurrencyError</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">storage</span><span class="o">.</span><span class="n">save_versioned</span><span class="p">(</span><span class="s2">&quot;req-123&quot;</span><span class="p">,</span> <span class="n">updated_data</span><span class="p">,</span> <span class="n">expected_version</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="k">except</span> <span class="n">ConcurrencyError</span><span class="p">:</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="c1"># Handle version conflict</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">current_data</span> <span class="o">=</span> <span class="n">storage</span><span class="o">.</span><span class="n">find_by_id</span><span class="p">(</span><span class="s2">&quot;req-123&quot;</span><span class="p">)</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="c1"># Re-apply the change to current_data and retry</span>
 </code></pre></div>
 <h4 id="transaction-management">Transaction Management<a class="headerlink" href="#transaction-management" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Transaction support with rollback</span>
@@ -8644,14 +8668,26 @@ in configuration dumps or logs.</p>
 <h3 id="optimistic-locking">Optimistic Locking<a class="headerlink" href="#optimistic-locking" title="Permanent link">&para;</a></h3>
 <p>All strategies support optimistic locking:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="c1"># Version-based concurrency control</span>
-<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>    <span class="n">storage</span><span class="o">.</span><span class="n">update_entity</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="n">request_id</span><span class="p">,</span> <span class="n">updated_data</span><span class="p">,</span> <span class="n">expected_version</span><span class="o">=</span><span class="n">current_version</span><span class="p">)</span>
-<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="k">except</span> <span class="n">ConcurrencyConflictError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>    <span class="c1"># Handle version conflict</span>
-<a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a>    <span class="n">latest_data</span> <span class="o">=</span> <span class="n">storage</span><span class="o">.</span><span class="n">get_entity</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="n">request_id</span><span class="p">)</span>
-<a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a>    <span class="n">merged_data</span> <span class="o">=</span> <span class="n">merge_changes</span><span class="p">(</span><span class="n">latest_data</span><span class="p">,</span> <span class="n">updated_data</span><span class="p">)</span>
-<a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a>    <span class="n">storage</span><span class="o">.</span><span class="n">update_entity</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="n">request_id</span><span class="p">,</span> <span class="n">merged_data</span><span class="p">)</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">orb.domain.base.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConcurrencyError</span>
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>    <span class="n">storage</span><span class="o">.</span><span class="n">save_versioned</span><span class="p">(</span><span class="n">request_id</span><span class="p">,</span> <span class="n">updated_data</span><span class="p">,</span> <span class="n">expected_version</span><span class="o">=</span><span class="n">current_version</span><span class="p">)</span>
+<a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a><span class="k">except</span> <span class="n">ConcurrencyError</span><span class="p">:</span>
+<a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a>    <span class="c1"># Handle version conflict</span>
+<a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a>    <span class="n">latest_data</span> <span class="o">=</span> <span class="n">storage</span><span class="o">.</span><span class="n">find_by_id</span><span class="p">(</span><span class="n">request_id</span><span class="p">)</span>
+<a id="__codelineno-32-9" name="__codelineno-32-9" href="#__codelineno-32-9"></a>    <span class="n">merged_data</span> <span class="o">=</span> <span class="n">merge_changes</span><span class="p">(</span><span class="n">latest_data</span><span class="p">,</span> <span class="n">updated_data</span><span class="p">)</span>
+<a id="__codelineno-32-10" name="__codelineno-32-10" href="#__codelineno-32-10"></a>    <span class="n">storage</span><span class="o">.</span><span class="n">save_versioned</span><span class="p">(</span><span class="n">request_id</span><span class="p">,</span> <span class="n">merged_data</span><span class="p">,</span> <span class="n">expected_version</span><span class="o">=</span><span class="n">latest_data</span><span class="p">[</span><span class="s2">&quot;version&quot;</span><span class="p">])</span>
 </code></pre></div>
+<p><code>save_versioned</code> returns the version it wrote.</p>
+<h3 id="version-conflicts-and-retries">Version Conflicts and Retries<a class="headerlink" href="#version-conflicts-and-retries" title="Permanent link">&para;</a></h3>
+<p>Requests, machines and templates carry a <code>version</code> field. A save that expects version <code>N</code> succeeds only if the stored record is still at version <code>N</code>. If another writer changed or deleted the record in between, the JSON, SQL and DynamoDB strategies raise <code>ConcurrencyError</code> (from <code>orb.domain.base.exceptions</code>) and leave the stored record unchanged. (A DynamoDB unit of work that commits more than 100 writes is sent as several transactions and is not atomic as a whole; a failure part-way raises <code>TransactionError</code> and the calls already applied stay applied.) Inside a unit of work the error is passed up as <code>ConcurrencyError</code>, not wrapped in a <code>TransactionError</code>, so callers can tell a conflict from a storage failure.</p>
+<p>ORB's own request handlers catch the conflict, re-read the record, re-apply the change and save again:</p>
+<ul>
+<li>Updating, cancelling and completing a request retry up to <code>request.concurrency_max_retries</code> times (default <code>3</code>).</li>
+<li>Status refreshes and machine sync retry once.</li>
+</ul>
+<p>When the retries on a write run out, the <code>ConcurrencyError</code> reaches the caller. The deadline check made while reading a request is the exception: if it keeps losing the race it returns the current state instead of raising. The REST API returns <code>409 Conflict</code> with error code <code>CONCURRENCY_ERROR</code> and the message "The resource was modified concurrently; please retry." Check the current state of the resource before repeating the call.</p>
+<p>Code that saves through the storage layer directly should handle <code>ConcurrencyError</code> the same way: re-read the record, re-apply the change and retry, rather than saving the copy it already holds.</p>
 <h3 id="lock-management">Lock Management<a class="headerlink" href="#lock-management" title="Permanent link">&para;</a></h3>
 <h4 id="file-based-locking-json">File-Based Locking (JSON)<a class="headerlink" href="#file-based-locking-json" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1"># Reader-writer locks for JSON files</span>
