@@ -1,5 +1,6 @@
 """Jinja2 implementation of spec rendering."""
 
+import base64
 from typing import Any
 
 from jinja2 import BaseLoader, select_autoescape
@@ -8,6 +9,11 @@ from jinja2.sandbox import SandboxedEnvironment
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.spec_rendering_port import SpecRenderingPort
 from orb.infrastructure.di.injectable import injectable
+
+
+def _b64encode(value: Any) -> str:
+    """Base64-encode the UTF-8 text form of ``value``."""
+    return base64.b64encode(str(value).encode("utf-8")).decode("ascii")
 
 
 @injectable
@@ -25,6 +31,10 @@ class JinjaSpecRenderer(SpecRenderingPort):
         self.jinja_env = SandboxedEnvironment(
             loader=BaseLoader(), autoescape=select_autoescape(["json", "yaml", "yml"])
         )
+        # Shipped specs encode user data with this filter (e.g. the AWS
+        # launch-template default spec). The output alphabet is
+        # [A-Za-z0-9+/=], so it is safe inside JSON strings and under autoescape.
+        self.jinja_env.filters["b64encode"] = _b64encode
 
     def render_spec_from_file(self, file_path: str, context: dict[str, Any]) -> dict[str, Any]:
         """Render specification from file with Jinja2 templating support.

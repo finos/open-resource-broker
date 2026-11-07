@@ -14,9 +14,6 @@ class TestJinjaAdvancedRendering:
         """Set up test fixtures."""
         self.mock_logger = Mock(spec=LoggingPort)
         self.renderer = JinjaSpecRenderer(self.mock_logger)
-        self.renderer.jinja_env.filters["b64encode"] = lambda s: base64.b64encode(
-            s.encode()
-        ).decode()
 
     def test_simple_variable_substitution(self):
         """Test basic variable substitution."""
@@ -133,8 +130,7 @@ class TestJinjaAdvancedRendering:
         result = self.renderer.render_spec(spec, context)
 
         # UserData should be base64 encoded
-        assert result["UserData"] != "#!/bin/bash\necho 'Hello World'"
-        assert len(result["UserData"]) > 0
+        assert base64.b64decode(result["UserData"]).decode() == "#!/bin/bash\necho 'Hello World'"
 
         # Capacity should be rounded
         assert result["TotalCapacity"] == "16"  # 10.7 * 1.5 = 16.05, rounded to 16
