@@ -311,10 +311,16 @@ class TestBuildSelectByCriteria:
         assert "LIKE :name_like" in query
         assert params["name_like"] == "Al%"
 
-    def test_unknown_columns_are_ignored(self, builder: SQLQueryBuilder) -> None:
-        query, _params = builder.build_select_by_criteria({"unknown_col": "x"})
-        # Falls back to SELECT all when all criteria columns are unknown
-        assert query == "SELECT * FROM resources"
+    def test_all_unknown_columns_raise(self, builder: SQLQueryBuilder) -> None:
+        with pytest.raises(ValueError, match="unknown_col"):
+            builder.build_select_by_criteria({"unknown_col": "x"})
+
+    def test_mixed_known_and_unknown_columns_raise(self, builder: SQLQueryBuilder) -> None:
+        with pytest.raises(ValueError) as exc_info:
+            builder.build_select_by_criteria({"status": "x", "ghost": "y"})
+        message = str(exc_info.value)
+        assert "ghost" in message
+        assert "status" not in message
 
 
 class TestBuildBatchInsert:

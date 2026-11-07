@@ -280,10 +280,11 @@ class TestScanTable:
         assert kwargs["FilterExpression"] == "attr"
         assert kwargs["ExpressionAttributeValues"] == {":v": "x"}
 
-    def test_scan_failure_returns_empty_list(self, manager) -> None:
-        """An exception during scan is caught and an empty list is returned."""
+    def test_scan_failure_propagates(self, manager) -> None:
+        """An exception during scan is logged and re-raised, not turned into []."""
         with mock.patch.object(manager, "get_table", side_effect=RuntimeError("boom")):
-            assert manager.scan_table("scan-table") == []
+            with pytest.raises(RuntimeError, match="boom"):
+                manager.scan_table("scan-table")
 
 
 class TestBatchWriteItems:
