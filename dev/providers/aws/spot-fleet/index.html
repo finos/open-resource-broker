@@ -6827,7 +6827,7 @@
 </thead>
 <tbody>
 <tr>
-<td><code>lowestPrice</code> (default)</td>
+<td><code>lowestPrice</code></td>
 <td><code>lowestPrice</code></td>
 </tr>
 <tr>
@@ -6848,7 +6848,7 @@
 </tr>
 </tbody>
 </table>
-<p><code>prioritized</code> is not a Spot Fleet spot strategy and falls back to <code>lowestPrice</code>.</p>
+<p>When no strategy is set, spot and heterogeneous templates default to <code>priceCapacityOptimized</code> and on-demand templates default to <code>lowestPrice</code>. <code>prioritized</code> is not a Spot Fleet spot strategy and falls back to <code>lowestPrice</code>.</p>
 <h3 id="overrides-priority-and-per-override-price">Overrides, priority, and per-override price<a class="headerlink" href="#overrides-priority-and-per-override-price" title="Permanent link">&para;</a></h3>
 <p><code>machine_types</code> and <code>subnet_ids</code> are expanded into the cartesian product of instance type and subnet. Spot Fleet overrides additionally carry:</p>
 <ul>

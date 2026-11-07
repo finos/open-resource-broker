@@ -6768,7 +6768,7 @@
 </tr>
 </tbody>
 </table>
-<p><code>lowest-price</code> is the default when no strategy is set. Note that <code>prioritized</code> has no ASG spot equivalent and falls back to the default.</p>
+<p>When no strategy is set, spot and heterogeneous templates default to <code>price-capacity-optimized</code> and on-demand templates default to <code>lowest-price</code>. Note that <code>prioritized</code> has no ASG spot equivalent and falls back to <code>lowest-price</code>.</p>
 <h3 id="attribute-based-instance-selection">Attribute-based instance selection<a class="headerlink" href="#attribute-based-instance-selection" title="Permanent link">&para;</a></h3>
 <p>Setting <code>abis_instance_requirements</code> replaces the instance-type overrides with a single <code>InstanceRequirements</code> override, letting AWS choose any matching type:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>

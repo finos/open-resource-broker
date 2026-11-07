@@ -6864,7 +6864,7 @@
 </tr>
 </tbody>
 </table>
-<p><code>lowest-price</code> is the default. <code>allocation_strategy_on_demand</code> follows the same conversion and falls back to the spot strategy when unset.</p>
+<p>When no strategy is set, spot and heterogeneous templates default to <code>price-capacity-optimized</code> and on-demand templates default to <code>lowest-price</code>. <code>allocation_strategy_on_demand</code> follows the same conversion and falls back to the spot strategy when unset.</p>
 <h3 id="overrides">Overrides<a class="headerlink" href="#overrides" title="Permanent link">&para;</a></h3>
 <p><code>machine_types</code> and <code>subnet_ids</code> expand into the cartesian product of instance type and subnet, each override carrying <code>InstanceType</code> and <code>WeightedCapacity</code>. Unlike Spot Fleet, EC2 Fleet overrides carry no <code>Priority</code> or per-override price.</p>
 <p>Weighted capacity means target capacity is measured in units, not instances: a fleet offering <code>{"c5.xlarge": 2, "r5.xlarge": 3}</code> can fill a 6-unit request with three <code>c5.xlarge</code>, two <code>r5.xlarge</code>, or a mix.</p>
