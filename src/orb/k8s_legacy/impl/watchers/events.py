@@ -13,6 +13,7 @@ requests and pods in a Kubernetes cluster.
 Top level events watcher
 """
 
+import contextlib
 import json
 import logging
 import pathlib
@@ -496,7 +497,8 @@ class SqliteEventBackend:
 
         def _progress_callback(status, remaining, total) -> None:
             """Callback function to report backup progress."""
-            percent = (total - remaining) / total * 100
+            # An empty source database has no pages to copy.
+            percent = (total - remaining) / total * 100 if total else 100.0
             # Write backup progress to a file under backup_dir using pathlib
             progress_file = backup_dir / f"backup_progress_{identifier}.log"
             progress_file.parent.mkdir(parents=True, exist_ok=True)
@@ -515,7 +517,7 @@ class SqliteEventBackend:
                 self.conn = sqlite3.connect(self.dbfile)
                 self.conn.execute("PRAGMA wal_checkpoint(FULL);")
                 self.conn.commit()
-            with sqlite3.connect(backup_path) as dest_conn:
+            with contextlib.closing(sqlite3.connect(backup_path)) as dest_conn:
                 self.conn.backup(dest_conn, pages=pages, progress=_progress_callback)
                 logger.info(
                     "Backup created at %s (source: %s)", backup_path, self.dbfile

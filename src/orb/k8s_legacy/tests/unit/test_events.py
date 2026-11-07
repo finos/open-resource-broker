@@ -759,10 +759,7 @@ def test_sqlite_backend_create_backup_opens_connection_when_none(tmp_path) -> No
     the backend has no connection yet (e.g. backup requested before any
     other event has been posted)."""
     dbfile = tmp_path / "events.db"
-    # Seed the file with a table/row via an independent connection first:
-    # sqlite3's backup progress callback divides by the source page count,
-    # so the file must not still be a brand-new, zero-page database when
-    # _create_backup() opens its own connection to it.
+    # Seed the file with a table/row via an independent connection first.
     with closing(sqlite3.connect(dbfile)) as seed_conn:
         seed_conn.execute("CREATE TABLE seed (x)")
         seed_conn.execute("INSERT INTO seed VALUES (1)")
@@ -779,10 +776,6 @@ def test_sqlite_backend_create_backup_opens_connection_when_none(tmp_path) -> No
     backend.close()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="backup progress callback divides by zero on an empty database",
-)
 def test_sqlite_backend_create_backup_succeeds_on_empty_database(tmp_path) -> None:
     """_create_backup() should succeed even when the source database file
     does not exist yet and has no pages (brand-new, never-written-to db)."""
@@ -816,6 +809,52 @@ def test_sqlite_backend_create_backup_logs_database_error(tmp_path, caplog) -> N
     assert "Failed to create backup" in caplog.text
     backend.close()
     real_conn.close()
+
+
+def _record_backup_connections(monkeypatch, backup_dir) -> list[sqlite3.Connection]:
+    """Wrap sqlite3.connect so every connection opened on a path under
+    backup_dir is recorded for the caller to inspect."""
+    real_connect = sqlite3.connect
+    opened: list[sqlite3.Connection] = []
+
+    def _connect(database, *args, **kwargs):
+        conn = real_connect(database, *args, **kwargs)
+        if str(database).startswith(str(backup_dir)):
+            opened.append(conn)
+        return conn
+
+    monkeypatch.setattr(events_impl.sqlite3, "connect", _connect)
+    return opened
+
+
+def _assert_closed(conn: sqlite3.Connection) -> None:
+    with pytest.raises(sqlite3.ProgrammingError):
+        conn.execute("SELECT 1")
+
+
+@pytest.mark.parametrize("backup_fails", [False, True], ids=["success", "database-error"])
+def test_create_backup_closes_destination_connection(tmp_path, monkeypatch, backup_fails) -> None:
+    """_create_backup() closes the backup file's connection whether the
+    backup succeeds or sqlite3 raises DatabaseError."""
+    dbfile = tmp_path / "events.db"
+    backend = SqliteEventBackend(str(dbfile), rotate=False)
+    backend.post([{"category": "pod", "id": "abcd-0", "request": "r1"}])
+    real_conn = backend.conn
+    try:
+        if backup_fails:
+            backend.conn = MagicMock()
+            backend.conn.backup.side_effect = sqlite3.DatabaseError("backup failed")
+
+        opened = _record_backup_connections(monkeypatch, tmp_path / "backups")
+        backend._create_backup({"sqlite_backup": "leak"})
+        monkeypatch.undo()
+
+        assert len(opened) == 1
+        for conn in opened:
+            _assert_closed(conn)
+    finally:
+        backend.conn = real_conn
+        backend.close()
 
 
 # ---------------------------------------------------------------------------
