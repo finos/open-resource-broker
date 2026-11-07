@@ -225,9 +225,16 @@ class TestBuildSelectByCriteria:
         assert "WHERE" not in sql
         assert params == {}
 
-    def test_unknown_columns_fall_back_to_select_all(self) -> None:
-        sql, _ = _builder().build_select_by_criteria({"ghost": "x"})
-        assert "WHERE" not in sql
+    def test_unknown_columns_raise(self) -> None:
+        with pytest.raises(ValueError, match="ghost"):
+            _builder().build_select_by_criteria({"ghost": "x"})
+
+    def test_mixed_known_and_unknown_columns_raise_naming_only_unknown(self) -> None:
+        with pytest.raises(ValueError) as exc_info:
+            _builder().build_select_by_criteria({"status": "x", "ghost": "y"})
+        message = str(exc_info.value)
+        assert "ghost" in message
+        assert "status" not in message
 
     def test_simple_equality_criteria(self) -> None:
         sql, params = _builder().build_select_by_criteria({"status": "running"})

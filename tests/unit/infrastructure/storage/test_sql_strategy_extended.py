@@ -259,6 +259,15 @@ class TestSQLStrategyFindByCriteria:
         with pytest.raises(StorageError):
             strategy.find_by_criteria({"data": "x"})
 
+    def test_unknown_column_raises_instead_of_returning_all_rows(self) -> None:
+        from orb.infrastructure.storage.exceptions import StorageError
+
+        strategy = _make_strategy()
+        strategy.save("fc4", {"id": "fc4", "data": "alpha"})
+        strategy.save("fc5", {"id": "fc5", "data": "beta"})
+        with pytest.raises(StorageError, match="ghost"):
+            strategy.find_by_criteria({"ghost": "x"})
+
 
 # ---------------------------------------------------------------------------
 # save_batch / delete_batch
