@@ -152,3 +152,34 @@ class TestTemplateSqlRoundTrip:
             assert getattr(reconstructed, attr) == getattr(template, attr), (
                 f"machine_* field {attr!r} was not reconstructed from its physical column on read"
             )
+
+
+@pytest.mark.unit
+class TestTemplateSerializerMachineTypes:
+    """``TemplateSerializer`` round trips keep the canonical ``machine_types``."""
+
+    def test_to_dict_then_from_dict_keeps_machine_types(self):
+        template = Template.model_validate(
+            {
+                "template_id": "tpl-dict",
+                "machine_image": "ami-0123456789abcdef0",
+                "machine_types": {"t3.medium": 1, "t3.large": 2},
+            }
+        )
+        serializer = TemplateSerializer()
+
+        restored = serializer.from_dict(serializer.to_dict(template))
+
+        assert restored.machine_types == {"t3.medium": 1, "t3.large": 2}
+
+    def test_null_instance_type_column_is_not_a_machine_type(self):
+        restored = TemplateSerializer().from_dict(
+            {
+                "template_id": "tpl-null-column",
+                "image_id": "ami-0123456789abcdef0",
+                "instance_type": None,
+                "machine_types": {"t3.medium": 1},
+            }
+        )
+
+        assert restored.machine_types == {"t3.medium": 1}

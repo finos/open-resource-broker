@@ -1,271 +1,50 @@
-#!/usr/bin/env python3
-"""
-Configuration Updates Test
-
-This test validates that the configuration updates for launch template
-management are working correctly.
-"""
+"""Default configuration file and AWS launch template configuration."""
 
 import json
-import os
-import sys
+from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, os.path.abspath("."))
+from orb.providers.aws.configuration.config import AWSProviderConfig, LaunchTemplateConfiguration
+
+_DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "config" / "default_config.json"
 
 
-def test_configuration_updates():
-    """Test configuration system updates and validation."""
-
-    print("CONFIGURATION UPDATES TEST")
-    print("=" * 60)
-
-    results = {
-        "default_config_validation": False,
-        "launch_template_config_present": False,
-        "aws_provider_config_class": False,
-        "configuration_loading": False,
-    }
-
-    try:
-        # Default configuration validation
-        print("\nTesting Default Configuration...")
-        results["default_config_validation"] = test_default_config_validation()
-
-        # Launch template configuration presence
-        print("\nTesting Launch Template Configuration...")
-        results["launch_template_config_present"] = test_launch_template_config_present()
-
-        # AWS provider configuration class
-        print("\nTesting AWS Provider Configuration Class...")
-        results["aws_provider_config_class"] = test_aws_provider_config_class()
-
-        # Configuration loading
-        print("\nTesting Configuration Loading...")
-        results["configuration_loading"] = test_configuration_loading()
-
-        # Summary
-        print("\n" + "=" * 60)
-        print("CONFIGURATION TEST RESULTS")
-        print("=" * 60)
-
-        passed = sum(1 for result in results.values() if result)
-        total = len(results)
-
-        for test_name, result in results.items():
-            status = "PASS: PASS" if result else "FAIL: FAIL"
-            print(f"{test_name.replace('_', ' ').title()}: {status}")
-
-        print(f"\nOverall: {passed}/{total} tests passed")
-
-        if passed == total:
-            print("ALL CONFIGURATION TESTS PASSED!")
-            return True
-        else:
-            print("WARN:  Some configuration tests failed")
-            return False
-
-    except Exception as e:
-        print(f"FAIL: Test execution failed: {e!s}")
-        import traceback
-
-        traceback.print_exc()
-        return False
+def _load_default_config() -> dict:
+    with _DEFAULT_CONFIG.open() as f:
+        return json.load(f)
 
 
 def test_default_config_validation():
-    """Test that default configuration file is valid JSON and contains expected structure."""
-    try:
-        print("   Testing default configuration file validation...")
+    """The shipped default config is valid JSON with a provider section."""
+    config = _load_default_config()
 
-        # Load and parse the configuration file
-        with open("config/default_config.json") as f:
-            config = json.load(f)
-
-        # Validate basic structure
-        if "provider" not in config:
-            print("   FAIL: Missing 'provider' section in config")
-            return False
-
-        if "provider_defaults" not in config["provider"]:
-            print("   FAIL: Missing 'provider_defaults' section")
-            return False
-
-        if "aws" not in config["provider"]["provider_defaults"]:
-            print("   FAIL: Missing 'aws' provider defaults")
-            return False
-
-        print("   PASS: Default configuration file is valid JSON")
-        print("   PASS: Basic configuration structure is present")
-
-        return True
-
-    except json.JSONDecodeError as e:
-        print(f"   FAIL: Configuration file is not valid JSON: {e!s}")
-        return False
-    except FileNotFoundError:
-        print("   FAIL: Configuration file not found")
-        return False
-    except Exception as e:
-        print(f"   FAIL: Configuration validation failed: {e!s}")
-        return False
-
-
-def test_launch_template_config_present():
-    """Test that launch template configuration is present in default config."""
-    try:
-        print("   Testing launch template configuration presence...")
-
-        # Load configuration
-        with open("config/default_config.json") as f:
-            config = json.load(f)
-
-        # Check for launch template configuration
-        aws_defaults = config["provider"]["provider_defaults"]["aws"]
-
-        if "launch_template" not in aws_defaults:
-            print("   FAIL: Launch template configuration not found in AWS defaults")
-            return False
-
-        lt_config = aws_defaults["launch_template"]
-
-        # Validate expected fields
-        expected_fields = [
-            "create_per_request",
-            "naming_strategy",
-            "version_strategy",
-            "reuse_existing",
-            "cleanup_old_versions",
-            "max_versions_per_template",
-        ]
-
-        for field in expected_fields:
-            if field not in lt_config:
-                print(f"   FAIL: Missing launch template field: {field}")
-                return False
-
-        print("   PASS: Launch template configuration found")
-        print(f"   Create per request: {lt_config['create_per_request']}")
-        print(f"   Naming strategy: {lt_config['naming_strategy']}")
-        print(f"   Version strategy: {lt_config['version_strategy']}")
-        print(f"   Reuse existing: {lt_config['reuse_existing']}")
-        print(f"   Max versions: {lt_config['max_versions_per_template']}")
-
-        return True
-
-    except Exception as e:
-        print(f"   FAIL: Launch template config test failed: {e!s}")
-        return False
+    assert "provider" in config
+    assert isinstance(config["provider"]["providers"], list)
+    assert isinstance(config["provider"]["provider_defaults"], dict)
 
 
 def test_aws_provider_config_class():
-    """Test that AWS provider configuration class includes launch template config."""
-    try:
-        print("   Testing AWS provider configuration class...")
+    """LaunchTemplateConfiguration defaults are carried by AWSProviderConfig."""
+    lt_config = LaunchTemplateConfiguration()  # type: ignore[call-arg]
 
-        # Import the configuration classes
-        from orb.providers.aws.configuration.config import (
-            AWSProviderConfig,
-            LaunchTemplateConfiguration,
-        )
+    assert lt_config.create_per_request is True
+    assert lt_config.naming_strategy == "request_based"
+    assert lt_config.max_versions_per_template == 10
 
-        # Test LaunchTemplateConfiguration class
-        lt_config = LaunchTemplateConfiguration()  # type: ignore[call-arg]
+    aws_config = AWSProviderConfig(profile="default")  # type: ignore[call-arg]
 
-        # Validate default values
-        if not lt_config.create_per_request:
-            print("   FAIL: LaunchTemplateConfiguration default create_per_request should be True")
-            return False
-
-        if lt_config.naming_strategy != "request_based":
-            print(
-                "   FAIL: LaunchTemplateConfiguration default naming_strategy should be 'request_based'"
-            )
-            return False
-
-        if lt_config.max_versions_per_template != 10:
-            print(
-                "   FAIL: LaunchTemplateConfiguration default max_versions_per_template should be 10"
-            )
-            return False
-
-        print("   PASS: LaunchTemplateConfiguration class working")
-
-        # Test AWSProviderConfig includes launch template
-        # Need to provide authentication for validation
-        aws_config = AWSProviderConfig(profile="default")  # type: ignore[call-arg]
-
-        if not hasattr(aws_config, "launch_template"):
-            print("   FAIL: AWSProviderConfig missing launch_template field")
-            return False
-
-        if not isinstance(aws_config.launch_template, LaunchTemplateConfiguration):
-            print(
-                "   FAIL: AWSProviderConfig.launch_template is not LaunchTemplateConfiguration instance"
-            )
-            return False
-
-        print("   PASS: AWSProviderConfig includes launch template configuration")
-        print(f"   Launch template config type: {type(aws_config.launch_template).__name__}")
-
-        return True
-
-    except ImportError as e:
-        print(f"   FAIL: Import error: {e!s}")
-        return False
-    except Exception as e:
-        print(f"   FAIL: AWS provider config class test failed: {e!s}")
-        return False
+    assert isinstance(aws_config.launch_template, LaunchTemplateConfiguration)
 
 
 def test_configuration_loading():
-    """Test that configuration can be loaded and parsed correctly."""
-    try:
-        print("   Testing configuration loading...")
+    """The default config's AWS provider entry builds an AWSProviderConfig."""
+    config = _load_default_config()
+    aws_entries = [p for p in config["provider"]["providers"] if p["type"] == "aws"]
+    assert aws_entries, "default config declares no aws provider"
 
-        # Test loading configuration through the system
-        from orb.providers.aws.configuration.config import AWSProviderConfig
+    aws_config = AWSProviderConfig(
+        **{"region": "us-east-1", "profile": "default", **aws_entries[0]["config"]}
+    )
 
-        # Load from JSON file
-        with open("config/default_config.json") as f:
-            config_data = json.load(f)
-
-        # Extract AWS provider defaults
-        aws_defaults = config_data["provider"]["provider_defaults"]["aws"]
-
-        # Create AWSProviderConfig from the loaded data
-        # Note: We need to provide required fields for validation
-        aws_config_data = {"region": "us-east-1", "profile": "default", **aws_defaults}
-
-        aws_config = AWSProviderConfig(**aws_config_data)
-
-        # Validate launch template configuration was loaded
-        if not aws_config.launch_template:
-            print("   FAIL: Launch template configuration not loaded")
-            return False
-
-        if not aws_config.launch_template.create_per_request:
-            print("   FAIL: Launch template create_per_request not loaded correctly")
-            return False
-
-        print("   PASS: Configuration loading successful")
-        print(f"   Loaded region: {aws_config.region}")
-        print(
-            f"   Launch template create_per_request: {aws_config.launch_template.create_per_request}"
-        )
-        print(f"   Launch template naming_strategy: {aws_config.launch_template.naming_strategy}")
-
-        return True
-
-    except Exception as e:
-        print(f"   FAIL: Configuration loading test failed: {e!s}")
-        import traceback
-
-        traceback.print_exc()
-        return False
-
-
-if __name__ == "__main__":
-    # Test configuration functionality
-    print("Configuration tests should be run via pytest")
-    sys.exit(0)
+    assert aws_config.region == "us-east-1"
+    assert isinstance(aws_config.launch_template, LaunchTemplateConfiguration)
+    assert aws_config.launch_template.create_per_request is True

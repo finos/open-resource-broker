@@ -104,6 +104,26 @@ window during ASG teardown cannot be exercised under moto.
 
 **Coverage:** Live — `tests/providers/aws/live/test_multi_asg_termination.py`.
 
+## Live/moto pairing
+
+Every live test file under `tests/providers/aws/live/` is paired here with the
+moto (or unit) tests that cover the same behaviour, or with the reason no moto
+counterpart exists. Paths in the moto column are relative to
+`tests/providers/aws/`. When you add a live test file, add a row; the check in
+`tests/unit/test_moto_live_pairing_matrix.py` fails until you do.
+
+| Live test file | Moto counterpart | Not covered under moto |
+|----------------|------------------|------------------------|
+| `test_onaws.py` | `mocked/test_hf_contract.py`, `mocked/test_partial_return.py`, `mocked/test_cli_onmoto.py` | SpotFleet fulfilment (L1); partial-return scale-down mid-flight (L4) |
+| `test_rest_api_onaws.py` | `mocked/test_rest_api_onmoto.py`, `mocked/test_rest_real_container_flows.py` | SpotFleet fulfilment (L1); post-return consistency window (L3) |
+| `test_sdk_onaws.py` | `mocked/test_sdk_onmoto.py` | Post-return consistency window (L3) |
+| `test_cleanup_e2e_onaws.py` | `mocked/test_cleanup_e2e.py` | Stale reads after fleet or ASG deletion (L3) |
+| `test_multi_asg_termination.py` | `mocked/test_multi_resource_onmoto.py` | ASG `Terminating` / `shutting-down` window (L5) |
+| `test_multi_ec2_fleet_termination.py` | `mocked/test_cleanup_e2e.py`, `mocked/test_partial_return.py` | Fleet `modifying` transition (L4); moto tests cover one fleet per return, not two |
+| `test_multi_spot_fleet_termination.py` | `mocked/test_cleanup_e2e.py`, `mocked/test_partial_return.py` | Fulfilment (L1) and `cancelled_running` (L2); moto tests cover one fleet per return, not two |
+| `test_multi_resource_termination.py` | `mocked/test_multi_resource_onmoto.py` | SpotFleet and EC2 Fleet members of a mixed batch (L1, L4); moto batches cover RunInstances and ASG |
+| `test_capacity_helpers_regex.py` | none | Not a live test: it unit-tests the live suite's own helpers and runs without AWS |
+
 ## Summary
 
 | Limit | AWS behaviour | Moto behaviour | Live coverage |

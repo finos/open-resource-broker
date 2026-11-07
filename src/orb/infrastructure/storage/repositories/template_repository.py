@@ -58,14 +58,22 @@ class TemplateSerializer(BaseEntitySerializer):
         return data
 
     def _normalize_machine_types(self, data: dict) -> dict[str, int]:
-        """Normalize machine types from various input formats."""
-        if "vmType" in data:
+        """Normalize machine types from various input formats.
+
+        The canonical ``machine_types`` key written by ``to_dict`` wins; the
+        legacy single-type and HostFactory keys are only consulted when it is
+        empty. Keys present with a null value (e.g. a NULL ``instance_type``
+        column) are ignored rather than read as a machine type.
+        """
+        if data.get("machine_types"):
+            return data["machine_types"]
+        if data.get("vmType"):
             return {data["vmType"]: 1}
-        if "vmTypes" in data:
+        if data.get("vmTypes"):
             return data["vmTypes"]
-        if "instance_type" in data:
+        if data.get("instance_type"):
             return {data["instance_type"]: 1}
-        if "instance_types" in data:
+        if data.get("instance_types"):
             return data["instance_types"]
         return {}
 
