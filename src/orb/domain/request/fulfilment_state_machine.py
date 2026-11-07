@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional
 
+from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.diagnostic import DiagnosticCategory, FulfilmentDiagnostic
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.request.aggregate import Request
@@ -51,8 +52,13 @@ _VERDICT_STATUS: dict[str, RequestStatus] = {
 class FulfilmentStateMachine:
     """Single entry point for every request status write."""
 
-    def __init__(self, grace_period_seconds: int) -> None:
+    def __init__(self, grace_period_seconds: int, clock: Optional[Clock] = None) -> None:
         self._grace_period = timedelta(seconds=max(0, int(grace_period_seconds)))
+        self._clock: Clock = clock or SystemClock()
+
+    def now(self) -> datetime:
+        """Current time from the machine's clock, for callers that pass ``now=``."""
+        return self._clock.now()
 
     # ------------------------------------------------------------------
     # Public API

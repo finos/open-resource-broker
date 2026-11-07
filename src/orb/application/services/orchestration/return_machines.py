@@ -18,6 +18,7 @@ from orb.application.services.orchestration.dtos import (
     ReturnMachinesInput,
     ReturnMachinesOutput,
 )
+from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.exceptions import ApplicationError
 from orb.domain.base.ports.logging_port import LoggingPort
 
@@ -38,8 +39,13 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
     """Orchestrator for returning machines to the provider."""
 
     def __init__(
-        self, command_bus: CommandBusPort, query_bus: QueryBusPort, logger: LoggingPort
+        self,
+        command_bus: CommandBusPort,
+        query_bus: QueryBusPort,
+        logger: LoggingPort,
+        clock: Clock | None = None,
     ) -> None:
+        self._clock = clock or SystemClock()
         self._command_bus = command_bus
         self._query_bus = query_bus
         self._logger = logger
@@ -182,6 +188,6 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
                         f"Polling request {request_id} aborted after "
                         f"{consecutive_errors} consecutive errors: {exc}"
                     ) from exc
-            await asyncio.sleep(interval)
+            await self._clock.async_sleep(interval)
             elapsed += interval
         return "timeout"

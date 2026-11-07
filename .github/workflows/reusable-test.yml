@@ -166,6 +166,14 @@ jobs:
           fi
         continue-on-error: ${{ inputs.continue-on-error }}
 
+      # The lifecycle invariant suite runs as its own non-blocking step while its
+      # duration and stability are measured. Its junit file is uploaded with the
+      # other results, so a failure still reaches the "Test Results Summary" check.
+      - name: Run lifecycle invariant tests (informational)
+        if: inputs.test-type == 'unit' && inputs.artifact-prefix == 'ci-tests-group'
+        run: make ci-tests-lifecycle
+        continue-on-error: true
+
       # When continue-on-error is true the overall job status stays green even
       # if tests fail, which can hide regressions in the PR summary view.
       # This step fires only on failure and writes a visible warning to the

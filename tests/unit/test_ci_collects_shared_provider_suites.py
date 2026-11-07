@@ -6,6 +6,8 @@ CI runs ``tests/providers/<name>`` once per provider that owns a
 cross-provider ``contract/`` suites, are not matrix entries, so they only run
 if another leg names them.  This test asks make which paths the unit leg
 passes to pytest and fails when a shared directory that holds tests is missing.
+The lifecycle suite is collected by its own informational target instead of the
+unit leg.
 """
 
 from __future__ import annotations
@@ -34,9 +36,9 @@ def _shared_suite_dirs() -> list[str]:
     return found
 
 
-def _unit_leg_pytest_args() -> list[str]:
+def _leg_pytest_args(target: str) -> list[str]:
     result = subprocess.run(
-        ["make", "-n", "ci-tests-unit"],
+        ["make", "-n", target],
         cwd=_REPO_ROOT,
         capture_output=True,
         text=True,
@@ -48,7 +50,7 @@ def _unit_leg_pytest_args() -> list[str]:
         argv = shlex.split(line)
         if "pytest" in argv:
             return argv[argv.index("pytest") + 1 :]
-    raise AssertionError(f"ci-tests-unit does not invoke pytest:\n{result.stdout}")
+    raise AssertionError(f"{target} does not invoke pytest:\n{result.stdout}")
 
 
 @pytest.mark.unit
@@ -60,7 +62,7 @@ def test_unit_leg_collects_shared_provider_suites() -> None:
     shared = _shared_suite_dirs()
     assert "tests/providers/contract" in shared
 
-    args = _unit_leg_pytest_args()
+    args = _leg_pytest_args("ci-tests-unit") + _leg_pytest_args("ci-tests-lifecycle")
     missing = [d for d in shared if d not in args]
     assert not missing, (
         f"suites under tests/providers/ with no testconf.mk are never run by CI: {missing}; "

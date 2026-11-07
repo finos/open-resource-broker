@@ -125,6 +125,10 @@ ci-tests-unit:  ## Run unit tests plus the cross-provider contract suites (match
 	@echo "Running unit tests (parallel)..."
 	$(call run-tool,pytest,$(TESTS_UNIT) $(TESTS_PROVIDERS_SHARED) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
 
+ci-tests-lifecycle:  ## Run the cross-provider lifecycle invariant suite (informational CI step)
+	@echo "Running lifecycle invariant tests (parallel)..."
+	$(call run-tool,pytest,$(TESTS_LIFECYCLE) $(PYTEST_PARALLEL) $(PYTEST_ARGS) --junitxml=junit-lifecycle.xml)
+
 ci-tests-contract:  ## Run contract tests only (tests/contract: wire formats, REST and scheduler contracts)
 	@echo "Running contract tests (parallel)..."
 	$(call run-tool,pytest,$(TESTS_CONTRACT) $(PYTEST_PARALLEL) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-contract.xml --junitxml=junit-contract.xml)

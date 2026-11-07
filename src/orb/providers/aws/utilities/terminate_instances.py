@@ -120,13 +120,14 @@ def wait_until_visible(
     instance_ids: list[str],
     attempts: int = VISIBILITY_ATTEMPTS,
     delay: float = VISIBILITY_DELAY_SECONDS,
-    sleep: Callable[[float], None] = time.sleep,
+    sleep: Callable[[float], None] | None = None,
 ) -> None:
     """Give just-launched instances a bounded window to become visible to EC2.
 
     Returns as soon as every id is known, or after *attempts* tries; the caller
     then terminates and treats any id still unknown as already gone.
     """
+    wait = sleep or time.sleep
     pending = list(instance_ids)
     for attempt in range(attempts):
         try:
@@ -139,4 +140,4 @@ def wait_until_visible(
             still_unknown = [i for i in pending if i in named]
             pending = still_unknown or pending
         if attempt < attempts - 1:
-            sleep(delay)
+            wait(delay)

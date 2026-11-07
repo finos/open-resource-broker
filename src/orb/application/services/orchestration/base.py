@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable
 from typing import Generic, TypeVar
 
+from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.ports.logging_port import LoggingPort
 
 InputT = TypeVar("InputT")
@@ -42,6 +43,9 @@ class OrchestratorBase(ABC, Generic[InputT, OutputT]):
 
     # Subclasses assign a LoggingPort to self._logger in their constructor.
     _logger: LoggingPort
+    # Time source for wait loops; subclasses that poll accept ``clock`` in their
+    # constructor and assign it here.
+    _clock: Clock = SystemClock()
 
     @abstractmethod
     async def execute(self, input: InputT) -> OutputT:  # type: ignore[return]

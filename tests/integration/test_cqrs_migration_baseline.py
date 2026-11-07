@@ -19,6 +19,7 @@ from orb.domain.base.ports import (
     LoggingPort,
     ProviderSelectionPort,
 )
+from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import DIContainer
 
@@ -224,7 +225,7 @@ class TestCQRSArchitectureIntegration:
             provider_selection_port=mock_provider_selection_port,
             provisioning_service=mock_provisioning_service,
             provider_validation_service=mock_provider_validation_service,
-            state_machine=Mock(),
+            state_machine=FulfilmentStateMachine(grace_period_seconds=3600),
         )
 
     @pytest.fixture
