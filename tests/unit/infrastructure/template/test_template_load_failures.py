@@ -95,8 +95,11 @@ class TestDefaultStrategyLoadFailures:
 
     def test_templates_not_a_list_raises(self, tmp_path):
         path = _write(tmp_path, {"templates": "x"})
-        with pytest.raises(TemplateConfigurationError, match="must be a list"):
+        with pytest.raises(TemplateConfigurationError, match="must be a list") as info:
             _default_strategy().load_templates_from_path(path)
+        # Raised as-is, not wrapped by the generic file-error handler.
+        assert "Cannot load templates file" not in str(info.value)
+        assert info.value.__cause__ is None
 
     def test_scalar_top_level_raises(self, tmp_path):
         path = _write(tmp_path, "42")
@@ -143,19 +146,31 @@ class TestHostFactoryStrategyLoadFailures:
 
 class TestDelegatedLoadFailures:
     def test_delegate_error_reaches_the_manager(self, tmp_path):
-        path = _write(tmp_path, {"scheduler_type": "hostfactory", "templates": "x"})
+        # The file is valid for the default strategy, so only the delegate's
+        # own error can make this load fail.
+        path = _write(tmp_path, {"scheduler_type": "hostfactory", **_VALID})
         strategy = _default_strategy()
         registry = MagicMock()
         registry.is_registered.return_value = True
         registry.get_strategy_class.return_value = HostFactorySchedulerStrategy
         mgr = _manager(strategy, [path])
 
-        with patch(
-            "orb.infrastructure.scheduler.registry.get_scheduler_registry",
-            return_value=registry,
+        with (
+            patch(
+                "orb.infrastructure.scheduler.registry.get_scheduler_registry",
+                return_value=registry,
+            ),
+            patch.object(
+                HostFactorySchedulerStrategy,
+                "load_templates_from_path",
+                side_effect=TemplateConfigurationError("delegate-marker"),
+            ) as delegate_load,
         ):
-            with pytest.raises(TemplateConfigurationError):
+            with pytest.raises(TemplateConfigurationError, match="delegate-marker"):
                 asyncio.run(mgr.load_templates())
+
+        delegate_load.assert_called_once()
+        assert delegate_load.call_args.args[0] == path
 
     def test_unregistered_scheduler_with_mismatch_fail_raises(self, tmp_path):
         path = _write(tmp_path, {"scheduler_type": "not-a-scheduler", "templates": []})

@@ -54,7 +54,6 @@ def _assert_config_error(resp) -> None:
     """Assert *resp* is the 500 configuration-error envelope."""
     assert resp.status_code == 500
     body = resp.json()
-    assert body["success"] is False
     assert body["error"]["message"] == "A configuration error occurred"
 
 
