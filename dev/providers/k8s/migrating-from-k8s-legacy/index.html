@@ -2491,6 +2491,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../deployment/symphony-worker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Symphony Worker Image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../deployment/cloud_platforms/" class="md-nav__link">
         
   
@@ -6605,6 +6633,9 @@ directly:</p>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">     </span>/etc/hostfactory/providers/k8s-hf/scripts/
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">RUN</span><span class="w"> </span>chmod<span class="w"> </span>+x<span class="w"> </span>/etc/hostfactory/providers/k8s-hf/scripts/*.sh
 </code></pre></div>
+<p>These are the HostFactory provider scripts. For the image the Symphony
+compute workers run, including the liveness probe, see the
+<a href="../../../deployment/symphony-worker/">Symphony worker image guide</a>.</p>
 <p><strong>Confirming the correct <code>orb</code> binary is on <code>PATH</code></strong></p>
 <p>The scripts call <code>orb</code> without an absolute path.  Before deploying, verify
 that <code>which orb</code> points to the installation that has the <code>k8s</code> extra:</p>
