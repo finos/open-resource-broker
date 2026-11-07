@@ -63,27 +63,31 @@ class TestTemplateLoadingErrors:
         result = strategy.load_templates_from_path("/tmp/does-not-exist-orb-hf.json")
         assert result == []
 
-    def test_malformed_json_returns_empty_list(self, tmp_path):
-        """load_templates_from_path on malformed JSON returns [] and logs the error."""
+    def test_malformed_json_raises(self, tmp_path):
+        """load_templates_from_path on malformed JSON raises a configuration error."""
+        from orb.infrastructure.template.configuration_manager import (
+            TemplateConfigurationError,
+        )
+
         bad_file = tmp_path / "bad_templates.json"
         bad_file.write_text("{ this is not valid json !!!")
 
         strategy = _make_strategy("default")
-        result = strategy.load_templates_from_path(str(bad_file))
+        with pytest.raises(TemplateConfigurationError, match="bad_templates.json"):
+            strategy.load_templates_from_path(str(bad_file))
 
-        assert result == []
-        strategy.logger.error.assert_called()
+    def test_malformed_json_hf_raises(self, tmp_path):
+        """HostFactory strategy also raises a configuration error for malformed JSON."""
+        from orb.infrastructure.template.configuration_manager import (
+            TemplateConfigurationError,
+        )
 
-    def test_malformed_json_hf_returns_empty_list(self, tmp_path):
-        """HostFactory strategy also returns [] for malformed JSON."""
         bad_file = tmp_path / "bad_hf_templates.json"
         bad_file.write_text("[[[not json")
 
         strategy = _make_strategy("hostfactory")
-        result = strategy.load_templates_from_path(str(bad_file))
-
-        assert result == []
-        strategy.logger.error.assert_called()
+        with pytest.raises(TemplateConfigurationError, match="bad_hf_templates.json"):
+            strategy.load_templates_from_path(str(bad_file))
 
     def test_unknown_scheduler_type_logs_warning_and_loads_best_effort(self, tmp_path):
         """A file with an unrecognised scheduler_type logs a warning and loads best-effort."""

@@ -149,17 +149,32 @@ class TestLoadSingleFile:
         result = strategy._load_single_file(str(f))
         assert len(result) == 1
 
-    def test_returns_empty_for_nonexistent_file(self):
+    def test_nonexistent_file_raises(self):
         strategy = DefaultSchedulerStrategy()
-        result = strategy._load_single_file("/no/such/file.json")
-        assert result == []
+        with pytest.raises(FileNotFoundError):
+            strategy._load_single_file("/no/such/file.json")
 
-    def test_returns_empty_for_invalid_json(self, tmp_path):
+    def test_invalid_json_raises(self, tmp_path):
+        import json
+
         f = tmp_path / "bad.json"
         f.write_text("{{{invalid json")
         strategy = DefaultSchedulerStrategy()
-        result = strategy._load_single_file(str(f))
-        assert result == []
+        with pytest.raises(json.JSONDecodeError):
+            strategy._load_single_file(str(f))
+
+    def test_templates_not_a_list_raises(self, tmp_path):
+        import json
+
+        from orb.infrastructure.template.configuration_manager import (
+            TemplateConfigurationError,
+        )
+
+        f = tmp_path / "t.json"
+        f.write_text(json.dumps({"templates": "x"}))
+        strategy = DefaultSchedulerStrategy()
+        with pytest.raises(TemplateConfigurationError):
+            strategy._load_single_file(str(f))
 
     def test_returns_empty_when_dict_lacks_templates_key(self, tmp_path):
         import json

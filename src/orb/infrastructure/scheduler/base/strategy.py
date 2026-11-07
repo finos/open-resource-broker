@@ -86,19 +86,52 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
             return PROVIDER_TYPE_AWS
 
     def _load_single_file(self, template_path: str) -> list[dict[str, Any]]:
-        """Load templates from a single file."""
-        try:
-            import json
+        """Load templates from a single file.
 
-            with open(template_path) as f:
-                data = json.load(f)
-            if isinstance(data, dict) and "templates" in data:
-                return data["templates"]
-            elif isinstance(data, list):
-                return data
-            return []
-        except Exception:
-            return []
+        Read and parse errors propagate to the caller. See
+        ``_templates_from_data`` for the accepted file shapes.
+        """
+        import json
+
+        with open(template_path) as f:
+            data = json.load(f)
+        return self._templates_from_data(data, template_path)
+
+    def _templates_from_data(self, data: Any, template_path: str = "") -> list[dict[str, Any]]:
+        """Extract the templates list from parsed templates-file data.
+
+        Accepted shapes:
+
+        * a dict whose ``templates`` value is a list -> that list
+        * a top-level list -> the list itself
+        * a dict without a ``templates`` key -> no templates (logged)
+
+        Any other shape raises ``TemplateConfigurationError``.
+        """
+        from orb.infrastructure.template.configuration_manager import (
+            TemplateConfigurationError,
+        )
+
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            if "templates" not in data:
+                self.logger.warning(
+                    "Templates file %s has no 'templates' key; no templates loaded",
+                    template_path,
+                )
+                return []
+            templates = data["templates"]
+            if not isinstance(templates, list):
+                raise TemplateConfigurationError(
+                    f"Invalid templates file {template_path}: 'templates' must be a list",
+                    details={"path": template_path},
+                )
+            return templates
+        raise TemplateConfigurationError(
+            f"Invalid templates file {template_path}: expected a JSON object or list",
+            details={"path": template_path},
+        )
 
     def get_storage_base_path(self) -> str:
         """Get storage base path within working directory."""
@@ -425,6 +458,9 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         allowing the caller to fall back to best-effort loading.
         """
         from orb.infrastructure.scheduler.registry import get_scheduler_registry
+        from orb.infrastructure.template.configuration_manager import (
+            TemplateConfigurationError,
+        )
 
         registry = get_scheduler_registry()
         if not registry.is_registered(scheduler_type):
@@ -441,10 +477,6 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
                     self.logger.debug("Could not read on_scheduler_mismatch config: %s", e)
 
             if mismatch_action == "fail":
-                from orb.infrastructure.template.configuration_manager import (
-                    TemplateConfigurationError,
-                )
-
                 raise TemplateConfigurationError(
                     f"Scheduler type '{scheduler_type}' not registered and on_scheduler_mismatch=fail"
                 )
@@ -466,6 +498,8 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
                 path_resolver=self._path_resolver,
             )
             return delegate.load_templates_from_path(template_path, provider_override)
+        except TemplateConfigurationError:
+            raise
         except Exception as e:
             self.logger.warning(
                 "Failed to delegate template loading to '%s' strategy: %s", scheduler_type, e
