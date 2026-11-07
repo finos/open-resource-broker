@@ -18,7 +18,11 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.config.managers.configuration_manager import ConfigurationManager
-from orb.domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
+from orb.domain.base.exceptions import (
+    ConfigurationError,
+    EntityNotFoundError,
+    ValidationError,
+)
 from orb.domain.base.ports.event_publisher_port import EventPublisherPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.di.injectable import injectable
@@ -34,7 +38,7 @@ if TYPE_CHECKING:
     from orb.domain.template.factory import TemplateFactoryPort
 
 
-class TemplateConfigurationError(DomainException):
+class TemplateConfigurationError(ConfigurationError):
     """Base exception for template configuration errors."""
 
 
@@ -146,56 +150,61 @@ class TemplateConfigurationManager:
     async def _load_templates_from_scheduler(
         self, provider_override: Optional[str] = None
     ) -> list[TemplateDTO]:
-        """Load templates using scheduler strategy with batch AMI resolution."""
-        try:
-            # Get template file paths from scheduler strategy
-            template_paths = self.scheduler_strategy.get_template_paths()  # type: ignore[attr-defined]
-            if not template_paths:
-                self.logger.warning("No template paths available from scheduler strategy")
-                return []
+        """Load templates using scheduler strategy with batch AMI resolution.
 
-            all_template_dicts = []
-
-            # Load templates from each path
-            for template_path in template_paths:
-                try:
-                    # Use scheduler strategy to load and parse templates
-                    template_dicts = self.scheduler_strategy.load_templates_from_path(  # type: ignore[attr-defined]
-                        template_path, provider_override
-                    )
-                    all_template_dicts.extend(template_dicts)
-
-                except Exception as e:
-                    self.logger.error("Failed to load templates from %s: %s", template_path, e)
-                    continue
-
-            # Drop templates whose declared provider_type is not in the active set.
-            # This prevents inactive-provider templates loaded from a shared
-            # templates.json from appearing in the listing.
-            all_template_dicts = self._filter_templates_by_active_providers(all_template_dicts)
-
-            # Apply batch image resolution before converting to DTOs
-            resolved_template_dicts = await self._batch_resolve_images(all_template_dicts)
-
-            # Apply deduplication to remove duplicate templates
-            resolved_template_dicts = self._deduplicate_template_dicts(resolved_template_dicts)
-
-            # Convert to DTOs with defaults applied
-            all_templates = []
-            for template_dict in resolved_template_dicts:
-                try:
-                    template_dto = self._convert_dict_to_template_dto(template_dict)
-                    all_templates.append(template_dto)
-                except Exception as e:
-                    self.logger.warning("Failed to convert template dict to DTO: %s", e)
-                    continue
-
-            self.logger.debug("Loaded %s templates from scheduler strategy", len(all_templates))
-            return all_templates
-
-        except Exception as e:
-            self.logger.error("Failed to load templates from scheduler: %s", e)
+        A templates file that cannot be read or parsed raises
+        ``TemplateConfigurationError``; a single template that cannot be
+        converted is logged and skipped.
+        """
+        # Get template file paths from scheduler strategy
+        template_paths = self.scheduler_strategy.get_template_paths()  # type: ignore[attr-defined]
+        if not template_paths:
+            self.logger.warning("No template paths available from scheduler strategy")
             return []
+
+        all_template_dicts = []
+
+        # Load templates from each path
+        for template_path in template_paths:
+            # Use scheduler strategy to load and parse templates
+            template_dicts = self.scheduler_strategy.load_templates_from_path(  # type: ignore[attr-defined]
+                template_path, provider_override
+            )
+            all_template_dicts.extend(template_dicts)
+
+        # Drop templates whose declared provider_type is not in the active set.
+        # This prevents inactive-provider templates loaded from a shared
+        # templates.json from appearing in the listing.
+        all_template_dicts = self._filter_templates_by_active_providers(all_template_dicts)
+
+        # Apply batch image resolution before converting to DTOs
+        resolved_template_dicts = await self._batch_resolve_images(all_template_dicts)
+
+        # Apply deduplication to remove duplicate templates
+        resolved_template_dicts = self._deduplicate_template_dicts(resolved_template_dicts)
+
+        all_templates = self._convert_template_dicts(resolved_template_dicts)
+        self.logger.debug("Loaded %s templates from scheduler strategy", len(all_templates))
+        return all_templates
+
+    def _convert_template_dicts(self, template_dicts: list[dict[str, Any]]) -> list[TemplateDTO]:
+        """Convert template dicts to DTOs, logging and skipping any that fail."""
+        all_templates = []
+        for template_dict in template_dicts:
+            try:
+                all_templates.append(self._convert_dict_to_template_dto(template_dict))
+            except Exception as e:
+                template_id = (
+                    template_dict.get("template_id") or template_dict.get("templateId")
+                    if isinstance(template_dict, dict)
+                    else None
+                )
+                self.logger.error(
+                    "Skipping template %s: cannot convert it to a template: %s",
+                    template_id or "unknown",
+                    e,
+                )
+        return all_templates
 
     def _convert_dict_to_template_dto(
         self, template_dict: dict[str, Any], file_metadata: Optional[TemplateFileMetadata] = None
@@ -518,37 +527,27 @@ class TemplateConfigurationManager:
         """Get all templates synchronously for adapter compatibility."""
         try:
             asyncio.get_running_loop()
-            # Loop is running — fall back to direct template loading
-            return self._load_templates_sync()
         except RuntimeError:
             return asyncio.run(self.get_all_templates())
+        # Loop is running — fall back to direct template loading
+        return self._load_templates_sync()
 
     def _load_templates_sync(self) -> list[TemplateDTO]:
-        """Load templates synchronously as fallback when event loop is running."""
-        try:
-            template_paths = self.scheduler_strategy.get_template_paths()  # type: ignore[attr-defined]
-            if not template_paths:
-                return []
-            all_template_dicts: list[dict[str, Any]] = []
-            for template_path in template_paths:
-                try:
-                    template_dicts = self.scheduler_strategy.load_templates_from_path(  # type: ignore[attr-defined]
-                        template_path, None
-                    )
-                    all_template_dicts.extend(template_dicts)
-                except Exception as e:
-                    self.logger.error("Failed to load templates from %s: %s", template_path, e)
-            all_templates = []
-            for template_dict in all_template_dicts:
-                try:
-                    template_dto = self._convert_dict_to_template_dto(template_dict)
-                    all_templates.append(template_dto)
-                except Exception as e:
-                    self.logger.warning("Failed to convert template dict to DTO: %s", e)
-            return all_templates
-        except Exception as e:
-            self.logger.error("Failed to load templates synchronously: %s", e)
+        """Load templates synchronously as fallback when event loop is running.
+
+        Raises ``TemplateConfigurationError`` when a templates file cannot be
+        read or parsed, as the async path does.
+        """
+        template_paths = self.scheduler_strategy.get_template_paths()  # type: ignore[attr-defined]
+        if not template_paths:
             return []
+        all_template_dicts: list[dict[str, Any]] = []
+        for template_path in template_paths:
+            template_dicts = self.scheduler_strategy.load_templates_from_path(  # type: ignore[attr-defined]
+                template_path, None
+            )
+            all_template_dicts.extend(template_dicts)
+        return self._convert_template_dicts(all_template_dicts)
 
     async def save_template(self, template: TemplateDTO) -> None:
         """
@@ -592,11 +591,11 @@ class TemplateConfigurationManager:
         """Get template by ID synchronously for compatibility."""
         try:
             asyncio.get_running_loop()
-            # Loop already running — use sync fallback to avoid nested asyncio.run()
-            templates = self._load_templates_sync()
-            return next((t for t in templates if t.template_id == template_id), None)
         except RuntimeError:
             return asyncio.run(self.get_template_by_id(template_id))
+        # Loop already running — use sync fallback to avoid nested asyncio.run()
+        templates = self._load_templates_sync()
+        return next((t for t in templates if t.template_id == template_id), None)
 
     async def validate_template(
         self, template: TemplateDTO, provider_instance: Optional[str] = None

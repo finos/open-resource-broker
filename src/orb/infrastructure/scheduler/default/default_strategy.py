@@ -65,6 +65,10 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             self.logger.debug("Template file not found: %s", template_path)
             return []
 
+        from orb.infrastructure.template.configuration_manager import (
+            TemplateConfigurationError,
+        )
+
         try:
             import json
 
@@ -84,22 +88,28 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
                     file_scheduler_type,
                 )
 
-            raw_templates = self._load_single_file_from_data(data)
+            raw_templates = self._load_single_file_from_data(data, template_path)
             provider_name = provider_override or self._get_provider_name()
             templates = [self._apply_template_defaults(t, provider_name) for t in raw_templates]
             self.logger.debug("Loaded %d templates from %s", len(templates), template_path)
             return templates
-        except Exception as e:
-            self.logger.error("Error loading templates from %s: %s", template_path, e)
+        except FileNotFoundError:
+            # Removed between the exists check and the read: treat as missing.
+            self.logger.debug("Template file disappeared: %s", template_path)
             return []
+        except TemplateConfigurationError:
+            raise
+        except Exception as e:
+            raise TemplateConfigurationError(
+                f"Cannot load templates file {template_path}: {e}",
+                details={"path": template_path},
+            ) from e
 
-    def _load_single_file_from_data(self, data: Any) -> list[dict[str, Any]]:
+    def _load_single_file_from_data(
+        self, data: Any, template_path: str = ""
+    ) -> list[dict[str, Any]]:
         """Extract templates list from already-parsed JSON data."""
-        if isinstance(data, dict) and "templates" in data:
-            return data["templates"]
-        elif isinstance(data, list):
-            return data
-        return []
+        return self._templates_from_data(data, template_path)
 
     def get_config_file_path(self) -> str:
         """Get config file path - using default configuration."""

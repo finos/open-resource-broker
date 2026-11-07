@@ -61,6 +61,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             self.logger.debug("Template file not found: %s", template_path)
             return []
 
+        from orb.infrastructure.template.configuration_manager import (
+            TemplateConfigurationError,
+        )
+
         try:
             with open(template_path) as f:
                 raw_data = json.load(f)
@@ -93,17 +97,30 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                     processed_template = self._map_template_fields(template, provider_override)
                     processed_templates.append(processed_template)
                 except Exception as e:
+                    template_id = (
+                        template.get("templateId") or template.get("template_id")
+                        if isinstance(template, dict)
+                        else None
+                    )
                     self.logger.warning(
                         "Skipping invalid template %s: %s",
-                        template.get("id", "unknown"),
+                        template_id or "unknown",
                         e,
                     )
                     continue
 
             return processed_templates
-        except Exception as e:
-            self.logger.error("Error loading templates from %s: %s", template_path, e)
+        except FileNotFoundError:
+            # Removed between the exists check and the read: treat as missing.
+            self.logger.debug("Template file disappeared: %s", template_path)
             return []
+        except TemplateConfigurationError:
+            raise
+        except Exception as e:
+            raise TemplateConfigurationError(
+                f"Cannot load templates file {template_path}: {e}",
+                details={"path": template_path},
+            ) from e
 
     def _map_template_fields(
         self, template: dict[str, Any], provider_override=None

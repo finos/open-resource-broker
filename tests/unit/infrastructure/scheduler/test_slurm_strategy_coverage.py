@@ -298,11 +298,14 @@ def test_load_templates_from_path_happy_path(strategy, tmp_path):
     assert templates[0]["templateId"] == "gpu"
 
 
-def test_load_templates_from_path_malformed_json_returns_empty(strategy, tmp_path):
+def test_load_templates_from_path_malformed_json_raises(strategy, tmp_path):
+    from orb.infrastructure.template.configuration_manager import TemplateConfigurationError
+
     path = tmp_path / "broken.json"
     path.write_text("{not valid json")
 
-    assert strategy.load_templates_from_path(str(path)) == []
+    with pytest.raises(TemplateConfigurationError):
+        strategy.load_templates_from_path(str(path))
 
 
 def test_load_templates_from_path_delegates_to_other_scheduler(strategy, tmp_path, monkeypatch):

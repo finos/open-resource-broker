@@ -174,6 +174,10 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
             self.logger.debug("Template file not found: %s", template_path)
             return []
 
+        from orb.infrastructure.template.configuration_manager import (
+            TemplateConfigurationError,
+        )
+
         try:
             import json
 
@@ -207,9 +211,17 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
                 templates.append(self._apply_template_defaults(t, provider_name))
             self.logger.debug("Loaded %d templates from %s", len(templates), template_path)
             return templates
-        except Exception as e:
-            self.logger.error("Error loading templates from %s: %s", template_path, e)
+        except FileNotFoundError:
+            # Removed between the exists check and the read: treat as missing.
+            self.logger.debug("Template file disappeared: %s", template_path)
             return []
+        except TemplateConfigurationError:
+            raise
+        except Exception as e:
+            raise TemplateConfigurationError(
+                f"Cannot load templates file {template_path}: {e}",
+                details={"path": template_path},
+            ) from e
 
     def parse_template_config(self, raw_data: dict[str, Any]) -> Any:
         """Parse SLURM template config to TemplateDTO.
