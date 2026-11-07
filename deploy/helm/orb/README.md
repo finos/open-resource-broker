@@ -163,7 +163,7 @@ Each probe can be tuned or given its own `path`; `probes.pathOverride` replaces 
 
 | Mode | Behaviour |
 |---|---|
-| `embedded` | One process serves the API and UI; the API is at `/orb/api/v1`, the UI at `/orb` |
+| `embedded` | One process serves the API and UI; the API is at `/orb/api/v1`, the UI at `/` |
 | `split` | API only at `/api/v1`; the UI is served elsewhere |
 | `disabled` | API only at `/api/v1`, no UI |
 
@@ -189,6 +189,26 @@ ingress:
 TLS ends at the ingress and the pod serves plain HTTP inside the cluster. A path may set
 `serviceName` and `servicePort` to send it to another Service, for example a UI hosted outside
 the chart when `ui.mode` is `split`.
+
+With `ui.mode: embedded`, the UI keeps its state in sync over a WebSocket on `/_event`. That path,
+together with `/_upload`, `/assets` and the UI pages, is served at the root of the same Service
+port, not under `/orb`. An ingress that routes only `/orb` paths to ORB breaks the UI. Route `/`
+(the default path) to ORB, or at least `/_event`, `/_upload`, `/assets` and `/` as well as `/orb`.
+The ingress controller must allow WebSocket upgrades on that path; ingress-nginx does by default.
+
+The server sends a heartbeat on the WebSocket every 25 seconds (`REFLEX_SOCKET_INTERVAL`). Any idle
+or stream timeout on the path, in the ingress controller or a load balancer in front of it, must be
+longer than that interval. If your controller or load balancer closes connections sooner, or you
+raise `REFLEX_SOCKET_INTERVAL`, raise those timeouts. For ingress-nginx:
+
+```yaml
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+```
+
+Other controllers need their equivalent idle or stream timeout.
 
 ## Container User
 
