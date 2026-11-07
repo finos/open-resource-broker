@@ -34,7 +34,11 @@ def register_infrastructure_services(container: DIContainer) -> None:
 
 def _register_fulfilment_state_machine(container: DIContainer) -> None:
     """Register the FulfilmentStateMachine with the configured grace period."""
+    from orb.domain.base.clock import Clock, SystemClock
     from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
+
+    if not container.is_registered(Clock):
+        container.register_instance(Clock, SystemClock())
 
     def create_fulfilment_state_machine(c: DIContainer) -> FulfilmentStateMachine:
         config_port = c.get(ConfigurationPort)
@@ -42,7 +46,7 @@ def _register_fulfilment_state_machine(container: DIContainer) -> None:
         grace_period = int(request_config.get("default_timeout", 3600))
         logger = c.get(LoggingPort)
         logger.info("FulfilmentStateMachine grace period resolved to %ds", grace_period)
-        return FulfilmentStateMachine(grace_period_seconds=grace_period)
+        return FulfilmentStateMachine(grace_period_seconds=grace_period, clock=c.get(Clock))
 
     container.register_singleton(FulfilmentStateMachine, create_fulfilment_state_machine)
 

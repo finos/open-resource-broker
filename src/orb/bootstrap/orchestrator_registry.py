@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from orb.domain.base.clock import Clock
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import DIContainer
@@ -66,6 +67,7 @@ def register_orchestrators(container: DIContainer) -> None:
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
                 logger=c.get(LoggingPort),
+                clock=c.get_optional(Clock),
             ),
         )
     if not container.is_registered(GetRequestStatusOrchestrator):
@@ -75,6 +77,7 @@ def register_orchestrators(container: DIContainer) -> None:
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
                 logger=c.get(LoggingPort),
+                clock=c.get_optional(Clock),
             ),
         )
     if not container.is_registered(ListRequestsOrchestrator):
@@ -93,6 +96,7 @@ def register_orchestrators(container: DIContainer) -> None:
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
                 logger=c.get(LoggingPort),
+                clock=c.get_optional(Clock),
             ),
         )
     if not container.is_registered(CancelRequestOrchestrator):

@@ -2,7 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Callable
 
 from typing_extensions import assert_never
@@ -174,7 +174,7 @@ class ProvisioningOrchestrationService:
         dispatch_timeout_seconds: float = float(config["dispatch_timeout_seconds"])
         batch_size: int = int(config["batch_size"])
 
-        started_at = datetime.now(timezone.utc)
+        started_at = self._state_machine.now()
         remaining = request.requested_count
         attempt_number = 0
         consecutive_zero_fulfillments = 0
@@ -186,7 +186,7 @@ class ProvisioningOrchestrationService:
         last_result: ProvisioningResult | None = None
 
         while remaining > 0 and attempt_number <= max_retries:
-            elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+            elapsed = (self._state_machine.now() - started_at).total_seconds()
             if elapsed >= timeout_seconds:
                 self._logger.warning(
                     "Provisioning timeout after %.1fs for request %s",
@@ -197,7 +197,7 @@ class ProvisioningOrchestrationService:
 
             attempt_number += 1
             attempt_count = min(remaining, batch_size)
-            attempt_started = datetime.now(timezone.utc)
+            attempt_started = self._state_machine.now()
 
             self._logger.info(
                 "Provisioning attempt %d/%d: requesting %d of %d remaining instances",
@@ -225,7 +225,7 @@ class ProvisioningOrchestrationService:
                 self._record_provider_failure(selection_result.provider_name)
                 break
 
-            attempt_completed = datetime.now(timezone.utc)
+            attempt_completed = self._state_machine.now()
 
             # Accumulate results
             accumulated_resource_ids.extend(last_result.resource_ids)
@@ -367,7 +367,7 @@ class ProvisioningOrchestrationService:
                 updated = self._state_machine.apply(
                     updated,
                     FulfilmentEvent.RESOURCES_CREATED,
-                    now=datetime.now(timezone.utc),
+                    now=self._state_machine.now(),
                 )
             saved, _ = save_provisioning_state(self._uow_factory, updated)
             return saved, True
@@ -393,7 +393,7 @@ class ProvisioningOrchestrationService:
                 updated = self._state_machine.apply(
                     request,
                     FulfilmentEvent.RESOURCES_CREATED,
-                    now=datetime.now(timezone.utc),
+                    now=self._state_machine.now(),
                     message="Partial fulfillment, retrying",
                 )
             else:
@@ -455,7 +455,7 @@ class ProvisioningOrchestrationService:
         """
         from orb.domain.request.repository import RequestRepository
 
-        now: datetime = datetime.now(timezone.utc)
+        now: datetime = self._state_machine.now()
         cutoff: datetime = now - timedelta(seconds=timeout_seconds)
         failed_count = 0
 

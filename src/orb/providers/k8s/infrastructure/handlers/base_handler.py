@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Callable, Generator, Optional, TypeVar
 
+from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
 from orb.domain.request.aggregate import Request
@@ -88,7 +89,9 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
         native_spec_service: Optional[Any] = None,
         node_state_cache: Optional[K8sNodeStateCache] = None,
         metrics: Optional[K8sMetrics] = None,
+        clock: Optional[Clock] = None,
     ) -> None:
+        self._clock: Clock = clock or SystemClock()
         self._kubernetes_client = kubernetes_client
         self._config = config
         self._logger = logger
@@ -397,6 +400,7 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
         rewritten = apply_pod_timeout(
             instances,
             pod_timeout_seconds=float(self._config.pod_timeout_seconds),
+            now=self._clock.time(),
         )
 
         if self._config.delete_timed_out_pods:
