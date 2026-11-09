@@ -67,7 +67,6 @@ from orb.providers.aws.infrastructure.launch_template.manager import (
     LTNetworkingState,
 )
 from orb.providers.aws.infrastructure.tags import build_system_tags, merge_tags
-from orb.providers.aws.resilience.retry_classifier import is_retryable_client_error
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 from orb.providers.aws.utilities.terminate_instances import wait_until_visible
 
@@ -202,15 +201,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 **run_params,
             )
         except ClientError as e:
-            # Only a rejection that AWS will not retry proves nothing launched.
-            # A transient error that outlasted the retries may follow a lost
-            # response, so the version is left alone then.
-            if not is_retryable_client_error(e):
-                self._lt_cleanup.delete_override_version(
-                    launch_template_result.template_id,
-                    launch_template_result.override_version or "",
-                    str(request.request_id),
-                )
+            self._discard_override_version_if_rejected(e, launch_template_result, request)
             raise self._convert_client_error(e, "run_instances") from e
 
         # Validate response

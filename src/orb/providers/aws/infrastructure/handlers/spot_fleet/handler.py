@@ -198,12 +198,16 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         fleet_config.setdefault("ClientToken", uuid.uuid4().hex)
 
         # Request spot fleet with circuit breaker for critical operation
-        response = self._retry_with_backoff(
-            self.aws_client.ec2_client.request_spot_fleet,
-            operation_type="critical",
-            operation_name="request_spot_fleet",
-            SpotFleetRequestConfig=fleet_config,
-        )
+        try:
+            response = self._retry_with_backoff(
+                self.aws_client.ec2_client.request_spot_fleet,
+                operation_type="critical",
+                operation_name="request_spot_fleet",
+                SpotFleetRequestConfig=fleet_config,
+            )
+        except Exception as e:
+            self._discard_override_version_if_rejected(e, launch_template_result, request)
+            raise
 
         fleet_id = response["SpotFleetRequestId"]
         self._logger.info("Successfully created Spot Fleet request: %s", fleet_id)
