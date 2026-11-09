@@ -55,6 +55,7 @@ def _preload_pod(
                 "orb.io/managed": "true",
                 "orb.io/request-id": request_id,
                 "orb.io/provider-api": "Pod",
+                "orb.io/orb-instance": "orb-a",
             },
         },
         "spec": {
@@ -168,8 +169,8 @@ async def test_startup_reconciler_classifies_unknown_pod_as_orphan(
         config=k8s_config,
         cache=cache,
         logger=MagicMock(),
-        # Provide an empty known set so every pod is an orphan.
-        known_request_ids=lambda: [],
+        # The known set holds only an unrelated request, so the pod is an orphan.
+        known_request_ids=lambda: ["req-other"],
     )
 
     report = await asyncio.to_thread(reconciler.run)
@@ -205,12 +206,14 @@ async def test_orphan_gc_detects_orphan_pod(
     orphan_id = str(uuid.uuid4())
     _preload_pod(kmock_k8s, name="orb-orphan-gc-0000", request_id=orphan_id)
 
-    config = K8sProviderConfig(namespace="orb-test", auto_cleanup_orphans=False)  # type: ignore[call-arg]
+    config = K8sProviderConfig(  # type: ignore[call-arg]
+        namespace="orb-test", auto_cleanup_orphans=False, orb_instance_id="orb-a"
+    )
     gc = OrphanGarbageCollector(
         kubernetes_client=k8s_client_facade,
         config=config,
         logger=MagicMock(),
-        known_request_ids=lambda: [],
+        known_request_ids=lambda: ["req-other"],
         interval_seconds=9999,
     )
 
@@ -248,13 +251,14 @@ async def test_orphan_gc_deletes_orphan_via_kmock(
     config = K8sProviderConfig(  # type: ignore[call-arg]
         namespace="orb-test",
         auto_cleanup_orphans=True,
+        orb_instance_id="orb-a",
         orphan_min_age_seconds=0,  # skip age guard so the test pod is eligible
     )
     gc = OrphanGarbageCollector(
         kubernetes_client=k8s_client_facade,
         config=config,
         logger=MagicMock(),
-        known_request_ids=lambda: [],
+        known_request_ids=lambda: ["req-other"],
         interval_seconds=9999,
     )
 
@@ -286,6 +290,7 @@ async def test_orphan_gc_skips_known_pod(
     config = K8sProviderConfig(  # type: ignore[call-arg]
         namespace="orb-test",
         auto_cleanup_orphans=True,
+        orb_instance_id="orb-a",
         orphan_min_age_seconds=0,
     )
     gc = OrphanGarbageCollector(

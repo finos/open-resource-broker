@@ -8,6 +8,7 @@ integrates with the configuration loader and the provider settings registry.
 from __future__ import annotations
 
 import contextlib
+import re
 import urllib.parse
 from pathlib import Path
 from typing import Any, Optional
@@ -23,6 +24,9 @@ from orb.providers.k8s.utilities.dns_names import (
 )
 
 _SA_NAMESPACE_FILE = Path("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+
+# Kubernetes label value: alphanumeric ends, ``-``/``_``/``.`` inside.
+_LABEL_VALUE_RE = re.compile(r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?")
 
 # Symphony-era field names that were renamed when the k8s provider was
 # introduced.  Keys are the legacy names; values are the canonical names.
@@ -259,6 +263,9 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     * ``orphan_gc_enabled`` — kill-switch for the periodic orphan-GC
       asyncio task.  Default ``False``; turn on once the operator is
       comfortable with the reconciler's behaviour in their environment.
+    * ``orb_instance_id`` — stable id of this ORB installation, stamped on
+      every created pod as ``<label_prefix>/orb-instance``.  The orphan GC
+      only acts on pods carrying this id and is disabled while it is unset.
     * ``orphan_gc_interval_seconds`` — how often the orphan GC task
       polls the cluster for managed pods.  Default 300 seconds (5 minutes).
     * ``orphan_min_age_seconds`` — orphan pods younger than this many
@@ -418,6 +425,20 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
             "When True the orphan garbage collector deletes managed pods that "
             "have no matching record in ORB storage.  Default False so operators "
             "can debug orphans; they are always logged regardless of this flag."
+        ),
+    )
+    orb_instance_id: Optional[str] = Field(
+        None,
+        description=(
+            "Stable identifier of this ORB installation.  When set, every pod ORB "
+            "creates is stamped with the ``<label_prefix>/orb-instance`` label and "
+            "the orphan garbage collector only considers pods carrying this exact "
+            "value, so several ORB installations can share a namespace or cluster "
+            "without deleting each other's pods.  Required for the orphan GC to "
+            "run: when unset the GC and its deletes are disabled.  Pods created "
+            "before this setting was introduced carry no such label and are never "
+            "deleted automatically.  Must be a valid Kubernetes label value "
+            "(letters, digits, '-', '_' or '.', at most 63 characters)."
         ),
     )
     orphan_gc_enabled: bool = Field(
@@ -842,6 +863,23 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
                 "letters are not permitted."
             )
         return self
+
+    @field_validator("orb_instance_id")
+    @classmethod
+    def _validate_orb_instance_id(cls, value: Optional[str]) -> Optional[str]:
+        """``orb_instance_id`` must be usable as a Kubernetes label value."""
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            return None
+        if len(value) > 63 or not _LABEL_VALUE_RE.fullmatch(value):
+            raise ValueError(
+                f"orb_instance_id {value!r} is not a valid Kubernetes label value.  "
+                "Use letters, digits, '-', '_' or '.', start and end with an "
+                "alphanumeric character, and keep it at most 63 characters."
+            )
+        return value
 
     @model_validator(mode="after")
     def _validate_native_spec_requires_rejection(self) -> K8sProviderConfig:

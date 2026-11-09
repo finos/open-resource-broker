@@ -187,8 +187,30 @@ def build_label_selector(prefix: str, key: str, value: str) -> str:
     return f"{prefix}/{key}={value}"
 
 
+INSTANCE_LABEL_KEY = "orb-instance"
+
+
+def instance_label_key(prefix: str) -> str:
+    """Return the label key that identifies the owning ORB installation."""
+    return f"{prefix}/{INSTANCE_LABEL_KEY}"
+
+
+def build_owned_pods_selector(prefix: str, instance_id: str) -> str:
+    """Build the selector matching managed pods owned by one ORB installation.
+
+    Combines ``prefix/managed=true`` with ``prefix/orb-instance=<instance_id>``
+    after validating every component.
+    """
+    managed = build_label_selector(prefix, "managed", "true")
+    owner = build_label_selector(prefix, INSTANCE_LABEL_KEY, instance_id)
+    return f"{managed},{owner}"
+
+
 __all__ = [
+    "INSTANCE_LABEL_KEY",
     "K8sValidationError",
     "build_label_selector",
+    "build_owned_pods_selector",
+    "instance_label_key",
     "validate_namespace",
 ]

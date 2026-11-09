@@ -121,6 +121,7 @@ ORB instances can coexist in the same cluster:
 |------------------------------------|----------------------------------------------------------|
 | `orb.io/managed: "true"`           | Resource is owned by ORB.  The orphan-GC reconciler only considers resources carrying this label. |
 | `orb.io/request-id: "<request>"`   | The ORB request this resource belongs to.                |
+| `orb.io/orb-instance: "<id>"`      | The ORB installation that created the resource (`orb_instance_id`).  The orphan GC only acts on pods carrying its own id. |
 | `orb.io/machine-id: "<machine>"`   | The ORB machine ID for this resource.                    |
 | `orb.io/provider-api: "<api>"`     | Which handler created the resource.                      |
 

@@ -202,7 +202,7 @@ async def test_orphan_gc_swallows_404_during_delete() -> None:
         kubernetes_client=client,
         config=config,
         logger=MagicMock(),
-        known_request_ids=lambda: [],
+        known_request_ids=lambda: ["req-unrelated"],
         interval_seconds=0.5,
     )
     orphans = await gc.run_once()

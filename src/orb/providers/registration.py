@@ -209,8 +209,8 @@ def _provider_load_failure(
             "Provider '%s' is not available (optional dependency missing?): %s",
             name,
             exc,
-            exc_info=exc,
         )
+        _logger.debug("Provider '%s' import failure detail", name, exc_info=exc)
     else:
         _logger.error("Provider '%s' failed to register: %s", name, exc, exc_info=exc)
 

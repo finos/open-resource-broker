@@ -173,6 +173,7 @@ class K8sProviderStrategy(ProviderStrategy):
         handler_overrides: Optional[dict[str, K8sHandlerBase]] = None,
         watch_manager: Optional[MultiNamespaceWatcher] = None,
         known_request_ids: Optional[Callable[[], Iterable[str]]] = None,
+        existing_request_ids: Optional[Callable[[Iterable[str]], Iterable[str]]] = None,
         startup_reconciler: Optional[StartupReconciler] = None,
         orphan_gc: Optional[OrphanGarbageCollector] = None,
         node_watcher: Optional[K8sNodeWatcher] = None,
@@ -193,10 +194,15 @@ class K8sProviderStrategy(ProviderStrategy):
         self._config_port = config_port
         self._kubernetes_client: Optional[K8sClient] = kubernetes_client
         # ``known_request_ids`` is the storage closure the strategy hands
-        # to the reconciler + orphan GC — when the caller does not supply
-        # it the reconciler treats every managed pod as an orphan (safest
-        # signal) and the GC is wired to an empty set.
-        self._known_request_ids_fn: Callable[[], Iterable[str]] = known_request_ids or (lambda: ())
+        # to the reconciler + orphan GC.  When the caller does not supply
+        # it, the orphan GC does not start and the reconciler classifies
+        # nothing: without a view of stored requests no pod can be called
+        # an orphan.  ``existing_request_ids`` is the narrow per-id lookup
+        # the GC uses to re-check a request right before deleting its pod.
+        self._known_request_ids_fn: Optional[Callable[[], Iterable[str]]] = known_request_ids
+        self._existing_request_ids_fn: Optional[Callable[[Iterable[str]], Iterable[str]]] = (
+            existing_request_ids
+        )
         # ------------------------------------------------------------------
         # Lifecycle sub-services — mirror the AWS provider's delegation
         # layout.  Each owns one cohesive background subsystem so the
@@ -217,6 +223,7 @@ class K8sProviderStrategy(ProviderStrategy):
             client_provider=lambda: self.kubernetes_client,
             watch_lifecycle=self._watch_lifecycle,
             known_request_ids=self._known_request_ids_fn,
+            existing_request_ids=self._existing_request_ids_fn,
             startup_reconciler=startup_reconciler,
             orphan_gc=orphan_gc,
         )

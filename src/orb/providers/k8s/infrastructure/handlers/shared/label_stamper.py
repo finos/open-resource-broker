@@ -20,7 +20,7 @@ status resolver can find the pods.
 from __future__ import annotations
 
 import copy
-from typing import Any
+from typing import Any, Optional
 
 
 def stamp_native_workload_body(
@@ -31,6 +31,7 @@ def stamp_native_workload_body(
     replicas: int,
     request: Any,
     label_prefix: str,
+    instance_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """Stamp per-request identity onto a rendered native workload body.
 
@@ -77,6 +78,8 @@ def stamp_native_workload_body(
     labels[f"{label_prefix}/managed"] = "true"
     labels[f"{label_prefix}/request-id"] = str(request.request_id)
     labels[f"{label_prefix}/template-id"] = str(request.template_id)
+    if instance_id:
+        labels[f"{label_prefix}/orb-instance"] = instance_id
     metadata["labels"] = labels
 
     spec = body.setdefault("spec", {})
@@ -102,6 +105,8 @@ def stamp_native_workload_body(
     template_labels[f"{label_prefix}/request-id"] = str(request.request_id)
     template_labels[f"{label_prefix}/managed"] = "true"
     template_labels[f"{label_prefix}/template-id"] = str(request.template_id)
+    if instance_id:
+        template_labels[f"{label_prefix}/orb-instance"] = instance_id
     template_metadata["labels"] = template_labels
 
     # Stamp spec.selector.matchLabels for Deployment/StatefulSet kinds so the

@@ -61,6 +61,7 @@ def make_namespaced_config(
     """
     return K8sProviderConfig(
         namespace=namespace,
+        orb_instance_id="orb-it",
         orphan_gc_enabled=orphan_gc_enabled,
         auto_cleanup_orphans=auto_cleanup_orphans,
         watch_enabled=watch_enabled,
@@ -150,6 +151,7 @@ def make_pod_object(
         f"{label_prefix}/request-id": request_id,
         f"{label_prefix}/machine-id": machine_id or name,
         f"{label_prefix}/provider-type": "k8s",
+        f"{label_prefix}/orb-instance": "orb-it",
     }
     if extra_labels:
         labels.update(extra_labels)
