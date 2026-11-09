@@ -192,18 +192,19 @@ class TestLoadTemplatesFromScheduler:
 
         assert result == []
 
-    def test_continues_when_path_load_raises(self):
+    def test_raises_when_path_load_raises(self):
         mgr = _make_manager()
         mgr.scheduler_strategy.get_template_paths.return_value = ["/bad/path.json"]  # type: ignore[misc,attr-defined,union-attr,assignment]
-        mgr.scheduler_strategy.load_templates_from_path.side_effect = RuntimeError("io error")  # type: ignore[misc,attr-defined,union-attr,assignment]
+        mgr.scheduler_strategy.load_templates_from_path.side_effect = TemplateConfigurationError(  # type: ignore[misc,attr-defined,union-attr,assignment]
+            "Cannot load templates file /bad/path.json"
+        )
 
         loop = asyncio.new_event_loop()
         try:
-            result = loop.run_until_complete(mgr._load_templates_from_scheduler())
+            with pytest.raises(TemplateConfigurationError):
+                loop.run_until_complete(mgr._load_templates_from_scheduler())
         finally:
             loop.close()
-
-        assert result == []
 
     def test_skips_invalid_template_dicts(self):
         mgr = _make_manager(
@@ -221,6 +222,23 @@ class TestLoadTemplatesFromScheduler:
             loop.close()
 
         assert result == []
+
+    def test_logs_template_id_when_conversion_fails(self):
+        bad = {"template_id": "bad-tpl", "price_type": 123}
+        mgr = _make_manager(templates=[bad])
+        mgr._filter_templates_by_active_providers = lambda x: x  # type: ignore[misc,attr-defined,union-attr,assignment]
+
+        loop = asyncio.new_event_loop()
+        try:
+            with patch.object(mgr, "_batch_resolve_images", new_callable=AsyncMock) as mock_batch:
+                mock_batch.return_value = [bad]
+                result = loop.run_until_complete(mgr._load_templates_from_scheduler())
+        finally:
+            loop.close()
+
+        assert result == []
+        mgr.logger.error.assert_called_once()  # type: ignore[attr-defined]
+        assert "bad-tpl" in str(mgr.logger.error.call_args)  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------

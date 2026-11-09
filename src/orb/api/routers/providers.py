@@ -15,7 +15,11 @@ except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
 from orb.api.dependencies import get_config_manager, get_di_container, require_role
-from orb.domain.base.exceptions import EntityNotFoundError, InfrastructureError
+from orb.domain.base.exceptions import (
+    ConfigurationError,
+    EntityNotFoundError,
+    InfrastructureError,
+)
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 from orb.infrastructure.logging.logger import get_logger
 
@@ -98,6 +102,22 @@ def _discovery_cache_put(key: tuple[str, str, str], value: list[dict[str, Any]])
         # Enforce the hard cap by evicting the oldest entries.
         while len(_discovery_cache) > _DISCOVERY_CACHE_MAX_ENTRIES:
             _discovery_cache.popitem(last=False)
+
+
+def _read_provider_config(config_manager: Any) -> tuple[Any, list[Any]]:
+    """Read the provider config and its active provider instances.
+
+    Returns ``(None, [])`` when no provider config is set. A failure to read
+    either one raises ``ConfigurationError``, so the caller gets an error
+    response instead of an empty provider list.
+    """
+    try:
+        provider_config: Any = cast(Any, config_manager.get_provider_config())
+        if not provider_config:
+            return None, []
+        return provider_config, list(provider_config.get_active_providers())
+    except Exception as e:
+        raise ConfigurationError("Failed to read provider configuration") from e
 
 
 async def _probe_provider_health(provider_name: str) -> tuple[str, dict[str, Any]]:
@@ -289,34 +309,22 @@ async def list_providers(
     """
     providers_list: list[dict[str, Any]] = []
 
-    try:
-        provider_config: Any = cast(Any, config_manager.get_provider_config())
+    provider_config, active_providers = _read_provider_config(config_manager)
+    if provider_config:
+        for provider_instance in active_providers:
+            name: str = getattr(provider_instance, "name", "")
+            ptype: str = getattr(provider_instance, "type", "unknown")
+            enabled: bool = bool(getattr(provider_instance, "enabled", True))
+            instance_config: dict[str, Any] = getattr(provider_instance, "config", {}) or {}
 
-        if provider_config:
-            try:
-                active_providers = provider_config.get_active_providers()
-            except Exception as exc:
-                logger.warning("Failed to retrieve active providers: %s", exc, exc_info=True)
-                active_providers = []
-
-            for provider_instance in active_providers:
-                name: str = getattr(provider_instance, "name", "")
-                ptype: str = getattr(provider_instance, "type", "unknown")
-                enabled: bool = bool(getattr(provider_instance, "enabled", True))
-                instance_config: dict[str, Any] = getattr(provider_instance, "config", {}) or {}
-
-                providers_list.append(
-                    {
-                        "name": name,
-                        "type": ptype,
-                        "enabled": enabled,
-                        "config": instance_config,
-                    }
-                )
-
-    except Exception as exc:
-        logger.warning("Unhandled error building providers list response: %s", exc, exc_info=True)
-        providers_list = []
+            providers_list.append(
+                {
+                    "name": name,
+                    "type": ptype,
+                    "enabled": enabled,
+                    "config": instance_config,
+                }
+            )
 
     return JSONResponse(
         content={"providers": providers_list, "total_count": len(providers_list)},
@@ -352,79 +360,58 @@ async def get_providers_health(
     active_provider_name: str | None = None
     default_provider_instance: str | None = None
 
-    try:
-        provider_config: Any = cast(Any, config_manager.get_provider_config())
+    provider_config, active_providers = _read_provider_config(config_manager)
+    if provider_config:
+        # Determine active / default provider name from selection policy config
+        try:
+            default_provider_instance = getattr(provider_config, "default_provider", None)
+        except Exception as e:
+            logger.warning(
+                "Failed to read default_provider from provider config: %s",
+                e,
+                exc_info=True,
+            )
+            default_provider_instance = None
 
-        if provider_config:
-            # Determine active / default provider name from selection policy config
-            try:
-                default_provider_instance = getattr(provider_config, "default_provider", None)
-            except Exception as e:
-                logger.warning(
-                    "Failed to read default_provider from provider config: %s",
-                    e,
-                    exc_info=True,
-                )
-                default_provider_instance = None
+        for provider_instance in active_providers:
+            name: str = getattr(provider_instance, "name", "")
+            ptype: str = getattr(provider_instance, "type", "unknown")
+            enabled: bool = bool(getattr(provider_instance, "enabled", True))
 
-            try:
-                active_providers = provider_config.get_active_providers()
-            except Exception as e:
-                logger.warning(
-                    "Failed to retrieve active providers: %s",
-                    e,
-                    exc_info=True,
-                )
-                active_providers = []
+            details: dict[str, Any] = {}
+            if enabled:
+                status, probe_details = await _probe_provider_health(name)
+                details.update(probe_details)
+            else:
+                status = "unhealthy"
 
-            for provider_instance in active_providers:
-                name: str = getattr(provider_instance, "name", "")
-                ptype: str = getattr(provider_instance, "type", "unknown")
-                enabled: bool = bool(getattr(provider_instance, "enabled", True))
+            # region and profile are operator-only fields — strip them so
+            # viewer-role callers cannot enumerate AWS profiles or regions.
+            # Operators see the full details via the operator-scoped
+            # /providers/health?details=full endpoint (future) or by
+            # checking provider config directly.
 
-                details: dict[str, Any] = {}
-                if enabled:
-                    status, probe_details = await _probe_provider_health(name)
-                    details.update(probe_details)
-                else:
-                    status = "unhealthy"
+            is_active = active_provider_name is None and enabled
+            if is_active:
+                active_provider_name = name
 
-                # region and profile are operator-only fields — strip them so
-                # viewer-role callers cannot enumerate AWS profiles or regions.
-                # Operators see the full details via the operator-scoped
-                # /providers/health?details=full endpoint (future) or by
-                # checking provider config directly.
+            providers_info.append(
+                {
+                    "name": name,
+                    "type": ptype,
+                    "enabled": enabled,
+                    "active": is_active,
+                    "status": status,
+                    "details": details,
+                }
+            )
 
-                is_active = active_provider_name is None and enabled
-                if is_active:
-                    active_provider_name = name
-
-                providers_info.append(
-                    {
-                        "name": name,
-                        "type": ptype,
-                        "enabled": enabled,
-                        "active": is_active,
-                        "status": status,
-                        "details": details,
-                    }
-                )
-
-            # Mark the first enabled provider as active if we found one
-            if active_provider_name and providers_info:
-                for p in providers_info:
-                    if p["name"] == active_provider_name:
-                        p["active"] = True
-                        break
-
-    except Exception as e:
-        # Return empty-but-valid response; never 500 from a read-only status endpoint
-        logger.warning(
-            "Unhandled error building providers health response: %s",
-            e,
-            exc_info=True,
-        )
-        providers_info = []
+        # Mark the first enabled provider as active if we found one
+        if active_provider_name and providers_info:
+            for p in providers_info:
+                if p["name"] == active_provider_name:
+                    p["active"] = True
+                    break
 
     return JSONResponse(
         content={

@@ -342,12 +342,9 @@ class TestRefactoredTemplateSystem:
             logger=mock_logger,
         )
 
-        # Test that system handles errors gracefully
-        templates = await config_manager.load_templates()
-        assert templates == []  # Should return empty list on error
-
-        # Verify error was logged
-        mock_logger.error.assert_called()
+        # A failure to find the template files is reported, not hidden
+        with pytest.raises(Exception, match="Template path error"):
+            await config_manager.load_templates()
 
     def test_backward_compatibility(
         self, mock_config_manager, mock_scheduler_strategy, mock_logger

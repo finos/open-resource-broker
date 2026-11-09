@@ -402,7 +402,7 @@ class TestListProviders:
         assert resp.json()["providers"] == []
         assert resp.json()["total_count"] == 0
 
-    def test_active_providers_exception_returns_empty_list(self):
+    def test_active_providers_exception_returns_config_error(self):
         provider_config = MagicMock()
         provider_config.get_active_providers.side_effect = RuntimeError("provider list error")
 
@@ -415,8 +415,8 @@ class TestListProviders:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/providers/")
 
-        assert resp.status_code == 200
-        assert resp.json()["providers"] == []
+        assert resp.status_code == 500
+        assert resp.json()["detail"] == "A configuration error occurred"
 
     def test_returns_configured_providers(self):
         p1 = _provider_instance(name="aws-main", ptype="aws")
@@ -434,7 +434,7 @@ class TestListProviders:
         assert body["providers"][0]["name"] == "aws-main"
         assert body["providers"][0]["type"] == "aws"
 
-    def test_provider_config_exception_returns_empty_list(self):
+    def test_provider_config_exception_returns_config_error(self):
         config_mgr = MagicMock()
         config_mgr.get_provider_config.side_effect = RuntimeError("config error")
 
@@ -444,8 +444,8 @@ class TestListProviders:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/providers/")
 
-        assert resp.status_code == 200
-        assert resp.json()["providers"] == []
+        assert resp.status_code == 500
+        assert resp.json()["detail"] == "A configuration error occurred"
 
 
 # ---------------------------------------------------------------------------
