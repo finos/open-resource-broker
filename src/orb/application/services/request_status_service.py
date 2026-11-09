@@ -18,7 +18,7 @@ The return path is unchanged.
 """
 
 import dataclasses
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional, Tuple
 
 from orb.application.services.deadline_release_service import DeadlineReleaseService
@@ -238,7 +238,7 @@ class RequestStatusService:
         deadline applies; the flip is applied to a fresh read taken inside the
         write, with one re-read on a concurrent write.
         """
-        now = datetime.now(timezone.utc)
+        now = self._state_machine.now()
         for attempt in range(_WRITE_ATTEMPTS):
             try:
                 with self.uow_factory.create_unit_of_work() as uow:
@@ -292,7 +292,7 @@ class RequestStatusService:
         """
         from orb.domain.request.exceptions import InvalidRequestStateError
 
-        now = datetime.now(timezone.utc)
+        now = self._state_machine.now()
         fulfilment: Optional[ProviderFulfilment] = (
             provider_metadata.get("provider_fulfilment") if provider_metadata else None
         )

@@ -35,8 +35,12 @@ def register_infrastructure_services(container: DIContainer) -> None:
 
 def _register_fulfilment_state_machine(container: DIContainer) -> None:
     """Register the FulfilmentStateMachine with the configured grace period."""
+    from orb.domain.base.clock import Clock, SystemClock
     from orb.domain.request.fulfillment_config import fulfillment_defaults_from_request_config
     from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
+
+    if not container.is_registered(Clock):
+        container.register_instance(Clock, SystemClock())
 
     def create_fulfilment_state_machine(c: DIContainer) -> FulfilmentStateMachine:
         config_port = c.get(ConfigurationPort)
@@ -47,6 +51,7 @@ def _register_fulfilment_state_machine(container: DIContainer) -> None:
         return FulfilmentStateMachine(
             grace_period_seconds=grace_period,
             fulfilment_defaults=fulfillment_defaults_from_request_config(request_config),
+            clock=c.get(Clock),
         )
 
     container.register_singleton(FulfilmentStateMachine, create_fulfilment_state_machine)
@@ -278,13 +283,17 @@ def _register_deadline_release_service(container: DIContainer) -> None:
     from orb.application.services.deadline_release_service import DeadlineReleaseService
     from orb.application.services.machine_sync_service import MachineSyncService
     from orb.domain.base import UnitOfWorkFactory
+    from orb.domain.base.clock import Clock, SystemClock
 
     def create_deadline_release_service(c: DIContainer) -> DeadlineReleaseService:
+        clock = c.get_optional(Clock) or SystemClock()
         return DeadlineReleaseService(
             uow_factory=c.get(UnitOfWorkFactory),
             machine_sync_service=c.get(MachineSyncService),
             command_bus=c.get(CommandBusPort),
             logger=c.get(LoggingPort),
+            clock=clock.now,
+            monotonic=clock.monotonic,
         )
 
     container.register_singleton(DeadlineReleaseService, create_deadline_release_service)

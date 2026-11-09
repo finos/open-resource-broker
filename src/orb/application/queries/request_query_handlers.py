@@ -219,7 +219,6 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
         not surface a raw ConcurrencyError on a read path. A persist failure is
         logged and the in-memory swept request is still returned.
         """
-        from datetime import datetime, timezone
 
         from orb.domain.base.exceptions import ConcurrencyError
 
@@ -229,7 +228,7 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
 
         state_machine = self._state_machine
         try:
-            swept = state_machine.evaluate_deadline(request, now=datetime.now(timezone.utc))
+            swept = state_machine.evaluate_deadline(request, now=state_machine.now())
         except Exception as exc:
             # A malformed / test-double request whose deadline_at is not a real
             # datetime must never break the read path — skip the sweep.
@@ -260,7 +259,7 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
                 reloaded = await self._query_service.get_request(str(request.request_id.value))
                 if reloaded is None or reloaded.status.is_terminal():
                     return reloaded or swept
-                swept = state_machine.evaluate_deadline(reloaded, now=datetime.now(timezone.utc))
+                swept = state_machine.evaluate_deadline(reloaded, now=state_machine.now())
                 if swept is reloaded or swept.status == reloaded.status:
                     return reloaded
             except Exception as exc:

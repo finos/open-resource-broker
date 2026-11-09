@@ -86,62 +86,25 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-    - name: Setup Python and UV
-      uses: ./.github/actions/setup-uv-cached
+    - name: Build the wheel
+      uses: ./.github/actions/build-release-wheel
       with:
-        cache-key: prod-wheel-${{ needs.config.outputs.package-version }}
-        fail-on-cache-miss: false
+        version: ${{ needs.config.outputs.package-version }}
 
-    - name: Setup Bun (for UI static bundle)
-      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
-      with:
-        bun-version: "1.4.0"  # pinned; update intentionally to avoid surprise breakage
-
-    # Restores the SPA's installed frontend packages (and reflex's own install
-    # fingerprint) so reflex's internal `bun install` can skip straight to its
-    # build step instead of redownloading ~280 packages every run. Keyed on
-    # the lockfile/manifest reflex installs from plus uv.lock (which pins the
-    # reflex version); never on build output, which is excluded before saving
-    # below and always regenerated fresh regardless of cache state.
-    - name: Restore SPA frontend dependencies cache
-      id: spa-web-cache
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
-      with:
-        path: src/orb/ui/.web
-        key: spa-web-${{ runner.os }}-bun1.4.0-${{ hashFiles('src/orb/ui/reflex.lock/bun.lock', 'src/orb/ui/reflex.lock/package.json', 'uv.lock') }}
-
-    # The SPA bundle is built by build.sh's explicit step (python -m build no
-    # longer triggers it via the editable-install hook).
-    - name: Build package wheel
-      run: make build
-
-    - name: Save SPA frontend dependencies cache
-      # Drop build output before saving -- it is never meant to be cached and
-      # is always regenerated from scratch next run regardless.
-      if: steps.spa-web-cache.outputs.cache-hit != 'true'
-      run: rm -rf src/orb/ui/.web/build
-
-    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
-      if: steps.spa-web-cache.outputs.cache-hit != 'true'
-      with:
-        path: src/orb/ui/.web
-        # Reuse the restore step's own resolved key rather than
-        # re-evaluating hashFiles() here -- the build in between rewrites
-        # src/orb/ui/reflex.lock/bun.lock and package.json in place (reflex
-        # syncs its resolved lockfile back to them), so re-hashing now would
-        # save under a key no future restore step would ever request.
-        key: ${{ steps.spa-web-cache.outputs.cache-primary-key }}
-
-    - name: Upload wheel artifact
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
-      with:
-        name: release-wheel-${{ needs.config.outputs.package-version }}
-        path: dist/
-        retention-days: 1
+  # Installs the wheel that is about to be published and drives it as a user
+  # would. Nothing is published unless this passes.
+  release-smoke:
+    name: Release Smoke
+    needs: [config, build-wheel]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-smoke.yml
+    with:
+      artifact-name: release-wheel-${{ needs.config.outputs.package-version }}
 
   prod-containers:
     name: Build Production Containers
-    needs: [config, build-wheel]
+    needs: [config, build-wheel, release-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # Only push/sign/attest images on a real GitHub Release.
@@ -475,7 +438,7 @@ jobs:
 
   prod-pypi:
     name: Publish to PyPI
-    needs: [config, build-wheel]
+    needs: [config, build-wheel, release-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Only publish to production PyPI on a real GitHub Release.
@@ -564,7 +527,7 @@ jobs:
     # A container base-image CVE (Trivy gate) must not prevent the Python
     # wheel/sdist from being signed and published.  prod-manifests (which
     # legitimately needs the pushed images) retains its prod-containers dep.
-    needs: [config, build-wheel, prod-pypi]
+    needs: [config, build-wheel, release-smoke, prod-pypi]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Only upload assets and create gh release upload on a real GitHub Release.
@@ -880,6 +843,8 @@ jobs:
     if: always()
     needs:
       - config
+      - build-wheel
+      - release-smoke
       - prod-containers
       - prod-manifests
       - prod-pypi
@@ -900,6 +865,8 @@ jobs:
           echo ""
           echo "| Job | Result |"
           echo "| --- | --- |"
+          echo "| build-wheel | ${{ needs.build-wheel.result }} |"
+          echo "| release-smoke | ${{ needs.release-smoke.result }} |"
           echo "| prod-containers | ${{ needs.prod-containers.result }} |"
           echo "| prod-manifests | ${{ needs.prod-manifests.result }} |"
           echo "| prod-pypi | ${{ needs.prod-pypi.result }} |"
@@ -919,6 +886,10 @@ jobs:
       uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35  # v1.3.0
       with:
         jobs: ${{ toJSON(needs) }}
+        # build-wheel and release-smoke are deliberately not allowed to skip: when
+        # the smoke fails the publish jobs are skipped, and the failure must still
+        # fail this gate.
+        #
         # sdk-bootstrap is an ALLOWED SKIP: on a normal release it never runs
         # (dispatch-gated), so it must not fail the gate. alls-green still fails
         # on a 'failure' result regardless of allowed-skips, so a dispatch where

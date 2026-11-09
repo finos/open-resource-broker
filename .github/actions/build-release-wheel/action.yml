@@ -1,0 +1,106 @@
+name: 'Build Release Wheel'
+description: >-
+  Build the wheel and sdist with the compiled UI bundle, exactly as a release
+  does, and upload them. The repository must already be checked out. The
+  distributions go to the artifact release-wheel-<version> (dist/ only, so it
+  can be published as is); the wheel's SHA-256 goes to its own artifact
+  release-wheel-<version>-sha256.
+inputs:
+  version:
+    description: >-
+      Package version. Used for the uv cache key and the artifact names (a
+      composite action cannot read the caller's job outputs).
+    required: true
+outputs:
+  wheel-name:
+    description: 'File name of the built wheel'
+    value: ${{ steps.checksum.outputs.wheel-name }}
+  sha256:
+    description: 'SHA-256 of the built wheel'
+    value: ${{ steps.checksum.outputs.sha256 }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Python and UV
+      uses: ./.github/actions/setup-uv-cached
+      with:
+        cache-key: prod-wheel-${{ inputs.version }}
+        fail-on-cache-miss: false
+
+    - name: Setup Bun (for UI static bundle)
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
+      with:
+        bun-version: "1.4.0"  # pinned; update intentionally to avoid surprise breakage
+
+    # Restores the SPA's installed frontend packages (and reflex's own install
+    # fingerprint) so reflex's internal `bun install` can skip straight to its
+    # build step instead of redownloading ~280 packages every run. Keyed on
+    # the lockfile/manifest reflex installs from plus uv.lock (which pins the
+    # reflex version); never on build output, which is excluded before saving
+    # below and always regenerated fresh regardless of cache state.
+    - name: Restore SPA frontend dependencies cache
+      id: spa-web-cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
+      with:
+        path: src/orb/ui/.web
+        key: spa-web-${{ runner.os }}-bun1.4.0-${{ hashFiles('src/orb/ui/reflex.lock/bun.lock', 'src/orb/ui/reflex.lock/package.json', 'uv.lock') }}
+
+    # The SPA bundle is built by build.sh's explicit step (python -m build no
+    # longer triggers it via the editable-install hook).
+    - name: Build package wheel
+      shell: bash
+      run: make build
+
+    - name: Save SPA frontend dependencies cache
+      # Drop build output before saving -- it is never meant to be cached and
+      # is always regenerated from scratch next run regardless.
+      if: steps.spa-web-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: rm -rf src/orb/ui/.web/build
+
+    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5
+      if: steps.spa-web-cache.outputs.cache-hit != 'true'
+      with:
+        path: src/orb/ui/.web
+        # Reuse the restore step's own resolved key rather than
+        # re-evaluating hashFiles() here -- the build in between rewrites
+        # src/orb/ui/reflex.lock/bun.lock and package.json in place (reflex
+        # syncs its resolved lockfile back to them), so re-hashing now would
+        # save under a key no future restore step would ever request.
+        key: ${{ steps.spa-web-cache.outputs.cache-primary-key }}
+
+    # The checksum is written outside dist/ so the distributions artifact holds
+    # nothing but what a package index accepts.
+    - name: Record wheel checksum
+      id: checksum
+      shell: bash
+      run: |
+        set -euo pipefail
+        shopt -s nullglob
+        wheels=(dist/*.whl)
+        if [ "${#wheels[@]}" -ne 1 ]; then
+          echo "Expected exactly one wheel in dist/, found ${#wheels[@]}" >&2
+          exit 1
+        fi
+        wheel="${wheels[0]}"
+        sha="$(sha256sum "$wheel" | cut -d' ' -f1)"
+        printf '%s  %s\n' "$sha" "$(basename "$wheel")" > "$RUNNER_TEMP/orb-wheel.sha256"
+        {
+          echo "wheel-name=$(basename "$wheel")"
+          echo "sha256=$sha"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Upload wheel artifact
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
+      with:
+        name: release-wheel-${{ inputs.version }}
+        path: dist/
+        retention-days: 1
+
+    - name: Upload wheel checksum
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
+      with:
+        name: release-wheel-${{ inputs.version }}-sha256
+        path: ${{ runner.temp }}/orb-wheel.sha256
+        retention-days: 1

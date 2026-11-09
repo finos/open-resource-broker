@@ -1,6 +1,6 @@
 """Service for managing request status updates and persistence."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 from orb.domain.base import UnitOfWorkFactory
@@ -68,7 +68,7 @@ class RequestStatusManagementService:
         from orb.domain.request.exceptions import InvalidRequestStateError
         from orb.domain.request.request_types import RequestStatus
 
-        now = datetime.now(timezone.utc)
+        now = self._state_machine.now()
         if isinstance(request, Request):
             try:
                 if event == FulfilmentEvent.PROVIDER_VERDICT:
@@ -345,7 +345,7 @@ class RequestStatusManagementService:
         from orb.domain.base.diagnostic import DiagnosticCategory, FulfilmentDiagnostic
         from orb.domain.base.error_classification import classify_provider_errors
 
-        now = datetime.now(timezone.utc)
+        now = self._state_machine.now()
         provider_error_code = getattr(provisioning_result, "provider_error_code", None)
         provider_error_message = getattr(provisioning_result, "provider_error_message", None)
         detail = provider_error_code if isinstance(provider_error_code, str) else None
@@ -548,7 +548,6 @@ class RequestStatusManagementService:
         self, instance_data: Dict[str, Any], request: Any, template_id: str
     ) -> Machine:
         """Create machine aggregate from instance data."""
-        from datetime import datetime
 
         from orb.domain.base.value_objects import InstanceType
         from orb.domain.machine.machine_identifiers import MachineId

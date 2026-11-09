@@ -12,7 +12,9 @@
 #      compile step can be slow).
 #   5. GET each SPA route, an ``/orb`` REST endpoint, and a hashed asset;
 #      require 200 on all of them.
-#   6. ``orb server stop`` no matter what.
+#   6. Require the bundle's build manifest version to equal the version the
+#      running backend reports.
+#   7. ``orb server stop`` no matter what.
 set -eo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -90,6 +92,22 @@ probe() {
         FAILED=1
     fi
 }
+
+echo "INFO: Checking the SPA bundle version against the running backend..."
+BUNDLE_VERSION=$("${PY[@]}" -c "import json; print(json.load(open('src/orb/ui/_static/orb-build.json'))['version'])" 2>/dev/null || echo "")
+BACKEND_VERSION=$(curl -sf "${BASE}/orb/info" 2>/dev/null | "${PY[@]}" -c "import json, sys; print(json.load(sys.stdin)['version'])" 2>/dev/null || echo "")
+if [ -z "$BUNDLE_VERSION" ] || [ -z "$BACKEND_VERSION" ]; then
+    echo "  FAIL could not read the bundle version (${BUNDLE_VERSION:-none}) or the backend version (${BACKEND_VERSION:-none})"
+    FAILED=1
+elif [ "$BUNDLE_VERSION" = "0.1.0.dev0" ] || [ "$BACKEND_VERSION" = "0.1.0.dev0" ]; then
+    echo "  FAIL version is the 0.1.0.dev0 fallback (bundle ${BUNDLE_VERSION}, backend ${BACKEND_VERSION})"
+    FAILED=1
+elif [ "$BUNDLE_VERSION" != "$BACKEND_VERSION" ]; then
+    echo "  FAIL bundle version ${BUNDLE_VERSION} does not match backend version ${BACKEND_VERSION}"
+    FAILED=1
+else
+    echo "  OK   bundle and backend report version ${BUNDLE_VERSION}"
+fi
 
 echo "INFO: Curling SPA routes..."
 probe "/"

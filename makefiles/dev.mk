@@ -49,6 +49,15 @@ install: venv-setup  ## Install dependencies (auto-detects UV/pip, environment-a
 
 dev-install: generate-pyproject venv-setup  ## Install dev dependencies (preserves CI usage)
 	@$(MAKE) install _dev UV_SYNC_ENV="$(UV_SYNC_ENV)" UV_SYNC_GROUPS="$(UV_SYNC_GROUPS)" UV_SYNC_LABEL="$(UV_SYNC_LABEL)"
+	@# An ``orb`` installed elsewhere on PATH can shadow the project's own
+	@# console script when the venv is not activated; say so once.
+	@_here="$$(cd $(VENV)/bin 2>/dev/null && pwd -P)"; \
+	for _orb in $$(which -a orb 2>/dev/null); do \
+		case "$$(cd "$$(dirname "$$_orb")" && pwd -P)" in \
+			"$$_here") ;; \
+			*) echo "WARNING: another orb is on PATH at $$_orb and can shadow $(VENV)/bin/orb; activate $(VENV) or run 'uv run orb'." >&2 ;; \
+		esac; \
+	done
 
 requirements: ## Generate/clean requirements (usage: make requirements _clean)
 	@if echo "$(MAKECMDGOALS)" | grep -q "_clean"; then \

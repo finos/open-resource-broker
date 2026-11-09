@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from orb.application.base.handlers import BaseCommandHandler
 from orb.application.decorators import command_handler
 from orb.application.dto.commands import (
@@ -57,7 +55,7 @@ def _apply_status_via_state_machine(
     """
     from orb.domain.base.provider_fulfilment import ProviderFulfilment
 
-    now = datetime.now(timezone.utc)
+    now = state_machine.now()
     if status == RequestStatus.CANCELLED:
         return state_machine.apply(
             request, FulfilmentEvent.CANCEL, now=now, reason=message or "Request cancelled"
@@ -246,7 +244,7 @@ class CancelRequestHandler(BaseCommandHandler[CancelRequestCommand, None]):  # t
                         cancelled_request = self._state_machine.apply(
                             request,
                             FulfilmentEvent.CANCEL,
-                            now=datetime.now(timezone.utc),
+                            now=self._state_machine.now(),
                             reason=command.reason,
                         )
                     except InvalidRequestStateError:
@@ -355,7 +353,7 @@ class CompleteRequestHandler(BaseCommandHandler[CompleteRequestCommand, None]): 
                 completed = self._state_machine.apply(
                     request,
                     FulfilmentEvent.PROVIDER_VERDICT,
-                    now=datetime.now(timezone.utc),
+                    now=self._state_machine.now(),
                     fulfilment=ProviderFulfilment(state="fulfilled", message="Request completed"),
                     message="Request completed",
                 )

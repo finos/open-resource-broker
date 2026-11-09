@@ -48,6 +48,7 @@ def _register_fastapi_services(container: DIContainer, server_config: ServerConf
 def _register_orchestrators(container: DIContainer) -> None:
     """Register orchestrators with dependency injection."""
     try:
+        from orb.domain.base.clock import Clock
         from orb.domain.base.ports.logging_port import LoggingPort
         from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
         from orb.infrastructure.di.buses import CommandBus, QueryBus
@@ -67,6 +68,7 @@ def _register_orchestrators(container: DIContainer) -> None:
                     command_bus=c.get(CommandBus),
                     query_bus=c.get(QueryBus),
                     logger=c.get(LoggingPort),
+                    clock=c.get_optional(Clock),
                 ),
             )
     except ImportError:
@@ -84,6 +86,7 @@ def _register_orchestrators(container: DIContainer) -> None:
                     command_bus=c.get(CommandBus),
                     query_bus=c.get(QueryBus),
                     logger=c.get(LoggingPort),
+                    clock=c.get_optional(Clock),
                 ),
             )
     except ImportError:
@@ -116,6 +119,7 @@ def _register_orchestrators(container: DIContainer) -> None:
                     command_bus=c.get(CommandBus),
                     query_bus=c.get(QueryBus),
                     logger=c.get(LoggingPort),
+                    clock=c.get_optional(Clock),
                 ),
             )
     except ImportError:

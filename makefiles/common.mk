@@ -53,6 +53,9 @@ TESTS_PROVIDERS := $(TESTS)/providers
 # in the unit leg.  tests/unit/test_ci_collects_shared_provider_suites.py fails
 # when a directory with tests is missing from this list.
 TESTS_PROVIDERS_SHARED := $(TESTS_PROVIDERS)/base $(TESTS_PROVIDERS)/contract
+# Cross-provider lifecycle invariants.  Run by their own non-blocking CI step, not
+# by ci-tests-unit.
+TESTS_LIFECYCLE := $(TESTS_PROVIDERS)/lifecycle
 CONFIG := config/config.json
 
 # Coverage settings

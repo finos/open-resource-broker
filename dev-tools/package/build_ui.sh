@@ -294,6 +294,24 @@ if [ ! -f "$STATIC_DIR/index.html" ]; then
     exit 1
 fi
 
+# Record which release this bundle belongs to. ``version`` is the
+# ``[project].version`` in pyproject.toml, the value ``python -m build`` writes
+# into the wheel METADATA; build.sh runs this script after any version rewrite,
+# so the two only differ when the bundle is stale. Consumers compare it with
+# the wheel METADATA and with the version the running backend reports.
+_project_version="$(awk '
+    /^\[project\]/ { in_project = 1; next }
+    /^\[/           { in_project = 0 }
+    in_project && /^version[[:space:]]*=/ {
+        gsub(/^version[[:space:]]*=[[:space:]]*"/, ""); gsub(/".*$/, ""); print; exit
+    }' pyproject.toml)"
+if [ -z "$_project_version" ]; then
+    echo "ERROR: could not read [project].version from pyproject.toml" >&2
+    exit 1
+fi
+_git_sha="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+printf '{"version": "%s", "git_sha": "%s"}\n' "$_project_version" "$_git_sha" > "$STATIC_DIR/orb-build.json"
+
 # Verify the SPA bundle baked the expected backend port. If someone runs
 # ORB_UI_BACKEND_PORT=<other> make ui-build the resulting bundle only
 # works on that port; catching this at build-time is easier than

@@ -1,0 +1,73 @@
+name: Release Smoke (pull requests)
+
+# Builds the release wheel exactly as a release does and runs the smoke on it.
+# Limited to the paths that can change what the wheel contains or how the
+# installed package behaves.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.project.yml'
+      - 'Makefile'
+      - 'makefiles/**'
+      - 'dev-tools/package/**'
+      - 'tests/package_smoke/**'
+      - 'tests/unit/deploy/test_wheel_contents.py'
+      - '.github/actions/build-release-wheel/**'
+      - '.github/workflows/release-smoke.yml'
+      - '.github/workflows/release-smoke-pr.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    name: Read the package version
+    runs-on: ubuntu-latest
+    outputs:
+      package-version: ${{ steps.version.outputs.package-version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Read version from .project.yml
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^  version:[[:space:]]*\([^[:space:]#]*\).*/\1/p' .project.yml | head -n 1)"
+          if [ -z "$version" ]; then
+            echo "could not read project.version from .project.yml" >&2
+            exit 1
+          fi
+          echo "package-version=$version" >> "$GITHUB_OUTPUT"
+
+  build-wheel:
+    name: Build release wheel
+    needs: [version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Build the wheel
+        uses: ./.github/actions/build-release-wheel
+        with:
+          version: ${{ needs.version.outputs.package-version }}
+
+  smoke:
+    name: Smoke
+    needs: [version, build-wheel]
+    uses: ./.github/workflows/release-smoke.yml
+    with:
+      artifact-name: release-wheel-${{ needs.version.outputs.package-version }}
