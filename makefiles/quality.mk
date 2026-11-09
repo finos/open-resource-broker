@@ -107,6 +107,11 @@ sbom-generate: dev-install ## Generate Software Bill of Materials (SBOM)
 security-report: security sbom-generate  ## Generate comprehensive security report
 	@echo "## Security Report Generated" > security-report.md
 
+# Dry run unless APPLY=1 (APPLY=0 or anything else stays a dry run); APPLY=1 pushes a branch and opens the pull request, YES=1 skips the prompt.
+# Plain python3: the tool only needs git, gh and PyYAML and never invokes uv.
+security-exception-fixes:  ## Remove fixed Debian Trivy exceptions and open a PR (APPLY=1 to act, YES=1 to skip the prompt)
+	@python3 ./dev-tools/ci/check_security_exceptions.py --apply $(if $(filter 1,$(APPLY)),,--dry-run) $(if $(filter 1,$(YES)),--yes,)
+
 # Backward compatibility aliases
 security-quick: ; @$(MAKE) security quick
 security-all: ; @$(MAKE) security all
