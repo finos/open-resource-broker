@@ -244,6 +244,19 @@ async def test_release_hosts_deletes_whole_job_with_background_propagation() -> 
 
 
 @pytest.mark.asyncio
+async def test_release_of_the_controller_name_deletes_nothing() -> None:
+    batch_v1 = MagicMock()
+    handler = _make_handler(client=_make_client(batch_v1=batch_v1))
+    request = _make_request(
+        requested_count=1, job_name="orb-deadbeef", namespace="orb-test", parallelism=1
+    )
+
+    await handler.release_hosts(["orb-deadbeef"], request.provider_data)
+
+    batch_v1.delete_namespaced_job.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_release_hosts_full_release_lists_all_machine_ids() -> None:
     """Passing all machine_ids (matching parallelism) triggers whole-Job delete."""
     from orb.providers.k8s.exceptions.k8s_exceptions import K8sError

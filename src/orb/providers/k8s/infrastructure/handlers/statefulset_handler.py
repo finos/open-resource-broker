@@ -283,6 +283,9 @@ class K8sStatefulSetHandler(K8sHandlerBase):
 
         namespace = self._resolve_namespace_from_provider_data(provider_data)
         statefulset_name = self._resolve_statefulset_name_from_provider_data(provider_data)
+        machine_ids = self._without_controller_name(machine_ids, statefulset_name, request_id)
+        if not machine_ids:
+            return
         self._record_release(namespace=namespace, spec_kind=self.PROVIDER_API)
 
         statefulset, current_replicas = await asyncio.to_thread(

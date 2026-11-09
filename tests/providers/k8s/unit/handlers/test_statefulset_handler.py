@@ -350,6 +350,24 @@ async def test_release_hosts_full_release_scales_to_zero_then_deletes() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("replicas", [1, 3])
+async def test_release_of_the_controller_name_changes_nothing(replicas: int) -> None:
+    apps_v1 = MagicMock()
+    apps_v1.read_namespaced_stateful_set.return_value = _make_statefulset_status(
+        spec_replicas=replicas
+    )
+    handler = _make_handler(client=_make_client(core_v1=MagicMock(), apps_v1=apps_v1))
+    request = _make_request(
+        requested_count=replicas, statefulset_name="orb-deadbeef", namespace="orb-test"
+    )
+
+    await handler.release_hosts(["orb-deadbeef"], request.provider_data)
+
+    apps_v1.patch_namespaced_stateful_set_scale.assert_not_called()
+    apps_v1.delete_namespaced_stateful_set.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_release_hosts_empty_machine_ids_is_noop() -> None:
     core_v1 = MagicMock()
     apps_v1 = MagicMock()

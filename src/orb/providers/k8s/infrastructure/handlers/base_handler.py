@@ -343,6 +343,26 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
         """
         return _resolve_ns(template, self._config)
 
+    def _without_controller_name(
+        self, machine_ids: list[str], controller_name: str, request_id: str
+    ) -> list[str]:
+        """Drop the controller's own name from the ids a release targets.
+
+        A pod can never carry the name of the controller that owns it, so such an
+        id is not a machine and releasing it must not scale or delete anything.
+        Requests recorded by earlier releases listed the controller as a machine,
+        so a return can still carry it.
+        """
+        kept = [mid for mid in machine_ids if mid != controller_name]
+        if len(kept) != len(machine_ids):
+            self._logger.warning(
+                "Ignoring controller name in release: request_id=%s controller=%s "
+                "(a controller is not a machine)",
+                request_id,
+                controller_name,
+            )
+        return kept
+
     def build_label_selector(self, request: Request) -> str:
         """Convenience: build the ``label_selector=orb.io/request-id=<id>`` string."""
         return request_id_label_selector(request, label_prefix=self._config.label_prefix)

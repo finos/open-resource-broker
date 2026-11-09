@@ -198,7 +198,7 @@ async def test_job_handler_release_deletes_job(
     # Single-pod Job (parallelism=1): releasing the one machine_id is a full
     # release, which the handler honours by deleting the whole Job.
     request = _make_request(requested_count=1, job_name=job_name)
-    await handler.release_hosts([job_name], request.provider_data)
+    await handler.release_hosts([f"{job_name}-x7k2p"], request.provider_data)
 
     stored = kmock_k8s.objects[job_res, "orb-test", job_name]
     assert stored.deleted

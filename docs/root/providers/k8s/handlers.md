@@ -122,6 +122,16 @@ condition.  If you find yourself needing to keep some Job pods running
 after others succeed, the workload is conceptually a Deployment, not a
 Job - switch handlers.
 
+## Machines of a controller request
+
+For `Deployment`, `StatefulSet` and `Job` the controller is the request's resource and
+the pods it runs are its machines. A request lists no machine until its pods exist.
+
+Known limitation: requests created before this behaviour listed the controller's name as
+a machine id. ORB ignores that id when machines are returned, so returning it scales and
+deletes nothing. Such a request keeps listing the controller name until it is cancelled
+or its real pods are returned.
+
 ## Cross-handler defaults
 
 All handlers honour the provider-level defaults from
