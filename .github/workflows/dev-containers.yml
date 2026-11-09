@@ -42,6 +42,7 @@ on:
       - 'makefiles/dev.mk'
       - 'Makefile'
       - 'setup.py'
+      - '.trivyignore.yaml'
       - '.github/workflows/dev-containers.yml'
   workflow_dispatch:
     inputs:
