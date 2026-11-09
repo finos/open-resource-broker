@@ -6783,6 +6783,13 @@ which handler created it.  Per-template values, when present, win.</p>
 <td>When <code>True</code> the orphan GC deletes managed pods that have no record in ORB storage.</td>
 </tr>
 <tr>
+<td><code>orb_instance_id</code></td>
+<td><code>str</code></td>
+<td>unset</td>
+<td><code>ORB_K8S_ORB_INSTANCE_ID</code></td>
+<td>Stable id of this ORB installation, stamped on every pod it creates as <code>&lt;label_prefix&gt;/orb-instance</code>.  The orphan GC only acts on pods carrying this id and does not run while it is unset.  Letters, digits, <code>-</code>, <code>_</code>, <code>.</code>; at most 63 characters.</td>
+</tr>
+<tr>
 <td><code>orphan_gc_enabled</code></td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
@@ -6813,11 +6820,39 @@ which handler created it.  Per-template values, when present, win.</p>
 </tbody>
 </table>
 <h3 id="operational-note-orphan-gc">Operational note - orphan GC<a class="headerlink" href="#operational-note-orphan-gc" title="Permanent link">&para;</a></h3>
-<p>The orphan GC only ever touches resources stamped with
-<code>orb.io/managed=true</code> (or the customised <code>label_prefix</code>).  Cluster
-resources without that label are invisible to it, by design.  Even with
-<code>auto_cleanup_orphans=False</code>, orphans are logged at <code>WARNING</code> so
-operators can spot drift before enabling delete.</p>
+<p>The orphan GC only ever touches pods that carry both
+<code>orb.io/managed=true</code> (or the customised <code>label_prefix</code>) and
+<code>orb.io/orb-instance=&lt;orb_instance_id&gt;</code>.  Everything else is invisible to
+it by design, including pods created by other ORB installations that share
+the namespace or cluster, and pods created before <code>orb_instance_id</code> was
+set.  Those older pods are never deleted automatically.</p>
+<p>Set an <code>orb_instance_id</code> that is unique per ORB store (installation) among
+all installations sharing a cluster.  Two installations with different
+request stores must never use the same id: each would see the other's pods as
+orphans.  Installations that share one request store may share an id.  While
+the id is unset the GC does not run and the startup reconciler adopts and
+reports nothing.</p>
+<p>A pod is an orphan only when its <code>orb.io/request-id</code> label names a request
+that is not in ORB storage.  The GC applies these rules:</p>
+<ul>
+<li>The set of known requests is every stored request, whatever its status.
+  A completed request still owns live pods; those are released through the
+  return flow, never by the GC.</li>
+<li>If the request store cannot be read, or returns no requests at all, the
+  sweep is skipped and nothing is deleted.</li>
+<li>A managed pod without a request-id label is reported at <code>WARNING</code> and is
+  never deleted.</li>
+<li>Immediately before each delete the request is looked up again, and the pod
+  is kept if the request now exists or the lookup fails.</li>
+<li>Pods younger than <code>orphan_min_age_seconds</code> are skipped.</li>
+</ul>
+<p>ORB has no scheduled job that purges request history.  Requests are removed
+only when an operator runs the bulk cleanup (<code>POST /admin/database/cleanup</code>
+or the SDK <code>cleanup_old_requests</code>) or deletes the store.  Whenever you purge,
+keep request history longer than the lifetime of your pods: a pod whose
+request has been purged counts as an orphan, and is deleted when
+<code>auto_cleanup_orphans</code> is on.  With <code>auto_cleanup_orphans=False</code>, orphans are logged at
+<code>WARNING</code> so operators can spot drift before enabling delete.</p>
 <h3 id="operational-note-periodic-resync-backstop">Operational note - periodic resync backstop<a class="headerlink" href="#operational-note-periodic-resync-backstop" title="Permanent link">&para;</a></h3>
 <p>The <code>periodic_resync_interval_seconds</code> field enables a background task
 that periodically issues a full LIST of managed pods and reconciles the
@@ -7137,19 +7172,20 @@ overflow the per-kind budget.</p>
 <a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">      </span><span class="nt">&quot;delete_timed_out_pods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
 <a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">      </span><span class="nt">&quot;watch_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
 <a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">      </span><span class="nt">&quot;min_kubernetes_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.28&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">      </span><span class="nt">&quot;orphan_gc_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">      </span><span class="nt">&quot;orphan_gc_interval_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">,</span>
-<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">      </span><span class="nt">&quot;auto_cleanup_orphans&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">      </span><span class="nt">&quot;periodic_resync_interval_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">180</span><span class="p">,</span>
-<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">      </span><span class="nt">&quot;events_watch_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">      </span><span class="nt">&quot;reject_high_risk_pod_fields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">      </span><span class="nt">&quot;naming&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">        </span><span class="nt">&quot;prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;orb&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">        </span><span class="nt">&quot;uuid_chars&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span>
-<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="w">      </span><span class="p">}</span>
-<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="p">}</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">      </span><span class="nt">&quot;orb_instance_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;orb-prod&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">      </span><span class="nt">&quot;orphan_gc_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">      </span><span class="nt">&quot;orphan_gc_interval_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">,</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">      </span><span class="nt">&quot;auto_cleanup_orphans&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">      </span><span class="nt">&quot;periodic_resync_interval_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">180</span><span class="p">,</span>
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">      </span><span class="nt">&quot;events_watch_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">      </span><span class="nt">&quot;reject_high_risk_pod_fields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">      </span><span class="nt">&quot;naming&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">        </span><span class="nt">&quot;prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;orb&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="w">        </span><span class="nt">&quot;uuid_chars&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span>
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="w">      </span><span class="p">}</span>
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="p">}</span>
 </code></pre></div>
 <p>This is the configuration of a production deployment that:</p>
 <ul>

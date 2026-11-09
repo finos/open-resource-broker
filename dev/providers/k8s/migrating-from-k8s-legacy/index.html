@@ -6524,6 +6524,10 @@ ORB instances can coexist in the same cluster:</p>
 <td>The ORB request this resource belongs to.</td>
 </tr>
 <tr>
+<td><code>orb.io/orb-instance: "&lt;id&gt;"</code></td>
+<td>The ORB installation that created the resource (<code>orb_instance_id</code>).  The orphan GC only acts on pods carrying its own id.</td>
+</tr>
+<tr>
 <td><code>orb.io/machine-id: "&lt;machine&gt;"</code></td>
 <td>The ORB machine ID for this resource.</td>
 </tr>
