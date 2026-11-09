@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import re
 import tracemalloc
 from datetime import datetime, timedelta, timezone
@@ -334,18 +335,39 @@ class TestPageSizeGuarantee:
         limit_params = [p for s, p in statements if "LIMIT" in s.upper()][0]
         assert 51 in (limit_params if isinstance(limit_params, tuple) else limit_params.values())
 
-    def test_peak_memory_is_a_small_fraction_of_loading_everything(self, tmp_path: Path) -> None:
-        engine, unit = self._seed(tmp_path)
+    @staticmethod
+    def _measured_peak(call: Any) -> Any:
+        """Peak traced memory above the pre-call baseline, and the call's result.
 
+        Collecting first and subtracting the baseline keeps garbage left over from
+        earlier work out of the figure, whatever the cyclic collector's timing.
+        """
+        gc.collect()
         tracemalloc.start()
-        tracemalloc.reset_peak()
-        full = unit.requests.find_all()
-        _, full_peak = tracemalloc.get_traced_memory()
+        try:
+            baseline, _ = tracemalloc.get_traced_memory()
+            tracemalloc.reset_peak()
+            result = call()
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        return result, peak - baseline
+
+    def test_peak_memory_is_a_small_fraction_of_loading_everything(self, tmp_path: Path) -> None:
+        _, unit = self._seed(tmp_path)
+        sort = SortSpec("created_at", True)
+
+        def first_page() -> Any:
+            return unit.requests.find_page({}, sort, None, 50)
+
+        # Warm one-time work (statement compilation, caches) so only the steady-state
+        # cost of a page is measured
+        first_page()
+        page, page_peak = self._measured_peak(first_page)
+        full, full_peak = self._measured_peak(unit.requests.find_all)
         del full
-        tracemalloc.reset_peak()
-        page = unit.requests.find_page({}, SortSpec("created_at", True), None, 50)
-        _, page_peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
 
         assert page is not None and len(page.items) == 50
-        assert page_peak < full_peak / 10
+        # Loading every row costs well over an order of magnitude more than one page;
+        # a 10x bound sits far from the measured ratio (well over 100x), so allocator noise on shared runners cannot reach it
+        assert page_peak < full_peak / 10, (page_peak, full_peak)
