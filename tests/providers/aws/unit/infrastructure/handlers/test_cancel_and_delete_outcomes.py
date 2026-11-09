@@ -448,7 +448,7 @@ class TestPostTerminateFleetTeardown:
         mgr._cleanup_launch_template = MagicMock()
         decision = MagicMock(has_fleet_record=False, requires_capacity_reduction=False)
 
-        mgr._handle_post_terminate("f-1", {}, decision, False, {}, "req-1", "Spot Fleet")
+        mgr._handle_post_terminate("f-1", {}, decision, True, {}, "req-1", "Spot Fleet")
 
         assert _events(mgr._logger) == ["aws.fleet_delete_failed"]
         mgr._cleanup_launch_template.assert_called_once()

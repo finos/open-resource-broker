@@ -18,8 +18,11 @@ The flow implemented here:
      _fleet_has_no_remaining_instances confirms nothing outside the returned
      set is still running (the delete terminates every member); the same
      check is the fallback for the weighted-capacity edge case.
-   - Instant-type (has_fleet_record=False): always attempt deletion.
-7. Clean up the associated ORB launch template.
+   - Instant-type (has_fleet_record=False): delete only on a full return
+     (deleting an instant fleet terminates every instance it still holds).
+7. Clean up the associated ORB launch template. For instant fleets this runs
+   on every return; the cleanup keeps the template while other instances of
+   the request are live and removes it on the return of the last one.
 
 Parts that differ between fleet types (AWS API shape, API calls, tag keys) are
 delegated to abstract methods implemented by each subclass.
@@ -251,8 +254,9 @@ class BaseFleetReleaseManager(ABC):
         (is_full_return=False) but the fleet may be physically empty — a
         weighted-capacity edge case.
 
-        Instant fleets (has_fleet_record=False) bypass this logic entirely and
-        are handled unconditionally in _handle_post_terminate.
+        Instant fleets (has_fleet_record=False) use the capacity arithmetic alone:
+        the fleet is only deleted on a full return, because deleting an instant
+        fleet terminates every instance it still holds.
         """
         should_teardown = decision.is_full_return
 
@@ -344,22 +348,36 @@ class BaseFleetReleaseManager(ABC):
                 return
             self._cleanup_launch_template(fleet_details, request_id, released_instance_ids)
         elif not decision.has_fleet_record:
-            # Instant fleet — AWS may not have auto-deleted the fleet record.
-            # Attempt an explicit delete; "already gone" responses count as success
-            # and any other failure is alerted without failing the release.
-            try:
-                self._cancel_or_delete_fleet(
-                    fleet_id,
-                    terminate_instances=True,
-                    is_maintain=False,
-                )
+            if should_teardown:
+                # Instant fleet fully returned — AWS may not have auto-deleted the
+                # fleet record. Attempt an explicit delete; "already gone" responses
+                # count as success and any other failure is alerted without failing
+                # the release. The returned instances are already terminated, so the
+                # delete must not terminate anything else.
+                try:
+                    self._cancel_or_delete_fleet(
+                        fleet_id,
+                        terminate_instances=False,
+                        is_maintain=False,
+                    )
+                    self._logger.info(
+                        "Deleted instant %s %s (instances already terminated)",
+                        fleet_label,
+                        fleet_id,
+                    )
+                except Exception as exc:
+                    self._alert_fleet_delete_failed(fleet_id, fleet_label, request_id, exc)
+            else:
+                # Deleting an instant fleet terminates every instance it still
+                # holds, so a partial return leaves the fleet alone.
                 self._logger.info(
-                    "Deleted instant %s %s (instances already terminated)",
+                    "Partial return from instant %s %s; keeping the fleet",
                     fleet_label,
                     fleet_id,
                 )
-            except Exception as exc:
-                self._alert_fleet_delete_failed(fleet_id, fleet_label, request_id, exc)
+            # Runs on every return: the cleanup keeps the template while other
+            # instances of the request are live, so the return of the last one
+            # removes it even when the capacity arithmetic never reads as full.
             self._cleanup_launch_template(fleet_details, request_id, released_instance_ids)
 
     def _alert_fleet_delete_failed(
