@@ -347,7 +347,10 @@ async def init_orb(
         "given status filter and optional age filter. "
         "Requires `allow_destructive_admin=true` in config AND environment != production. "
         "Body must contain `confirm: 'CLEANUP'` and a non-empty `request_statuses` list "
-        "containing only terminal statuses."
+        "containing only terminal statuses. "
+        "A warning is logged for each Kubernetes provider instance whose orphan GC "
+        "deletes pods without a request record (orphan_gc_enabled, "
+        "auto_cleanup_orphans and orb_instance_id all set)."
     ),
     responses={
         200: {"description": "Cleanup completed."},
@@ -409,7 +412,7 @@ async def cleanup_database(
     caller_id = getattr(request.state, "user_id", "anonymous") or "anonymous"
 
     container = get_di_container()
-    service = CleanupDatabaseService(uow_factory=container.get(UnitOfWorkFactory))
+    service = container.get(CleanupDatabaseService)
 
     try:
         loop = asyncio.get_running_loop()

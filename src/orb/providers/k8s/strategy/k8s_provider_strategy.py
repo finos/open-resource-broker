@@ -251,7 +251,9 @@ class K8sProviderStrategy(ProviderStrategy):
         # :meth:`_get_discovery_service` on first use.
         self._discovery_service: Optional[K8sInfrastructureDiscoveryService] = None
         # Focused service objects — mirror the AWS provider's layout.
-        self._capability_service = K8sCapabilityService(logger=self._logger)
+        self._capability_service = K8sCapabilityService(
+            logger=self._logger, config=self._k8s_config
+        )
         self._template_service = K8sTemplateValidationService(logger=self._logger)
         self._health_check_service = K8sHealthCheckService(
             config=self._k8s_config,

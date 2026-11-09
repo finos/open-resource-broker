@@ -328,11 +328,24 @@ def register_orchestrators(container: DIContainer) -> None:
             ),
         )
 
+    from orb.application.services.admin.cleanup_database import CleanupDatabaseService
     from orb.application.services.orchestration.dashboard_summary import (
         DashboardSummaryOrchestrator,
     )
     from orb.domain.base import UnitOfWorkFactory
+    from orb.domain.base.ports.configuration_port import ConfigurationPort
     from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
+
+    if not container.is_registered(CleanupDatabaseService):
+        container.register_singleton(
+            CleanupDatabaseService,
+            lambda c: CleanupDatabaseService(
+                uow_factory=c.get(UnitOfWorkFactory),
+                configuration_port=c.get(ConfigurationPort),
+                provider_registry=c.get(ProviderRegistryPort),
+                logger=c.get(LoggingPort),
+            ),
+        )
 
     if not container.is_registered(DashboardSummaryOrchestrator):
         container.register_singleton(

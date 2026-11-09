@@ -175,13 +175,15 @@ def _make_uow_factory(uow):
     return factory
 
 
-def _make_container(config_port, uow_factory):
+def _make_container(config_port, uow_factory, cleanup_service=None):
+    from orb.application.services.admin.cleanup_database import CleanupDatabaseService
     from orb.domain.base import UnitOfWorkFactory
     from orb.domain.base.ports.configuration_port import ConfigurationPort
 
     type_map = {
         ConfigurationPort: config_port,
         UnitOfWorkFactory: uow_factory,
+        CleanupDatabaseService: cleanup_service or CleanupDatabaseService(uow_factory=uow_factory),
     }
     container = MagicMock()
     container.get.side_effect = lambda t: type_map[t]

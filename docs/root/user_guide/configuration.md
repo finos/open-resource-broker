@@ -841,6 +841,8 @@ return **HTTP 403** unconditionally:
 | `POST /api/v1/admin/database/cleanup` | Removes stale or orphaned records that no longer match known templates |
 | `POST /api/v1/admin/init` | Re-initialises default config and data directories from a wiped state |
 
+> **Note:** The bulk cleanup, request purge and SDK cleanup methods log a warning for each Kubernetes provider instance whose orphan GC deletes pods without a request record, that is, one with `orphan_gc_enabled`, `auto_cleanup_orphans` and `orb_instance_id` all set. See the Kubernetes provider configuration for details.
+
 > **Note:** `POST /api/v1/admin/reload-config` is **not** gated by this flag —
 > reloading config is non-destructive and requires only the `admin` role.
 

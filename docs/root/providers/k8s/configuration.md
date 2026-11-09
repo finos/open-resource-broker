@@ -144,6 +144,11 @@ request has been purged counts as an orphan, and is deleted when
 `auto_cleanup_orphans` is on.  With `auto_cleanup_orphans=False`, orphans are logged at
 `WARNING` so operators can spot drift before enabling delete.
 
+The bulk cleanup, the request purge and the SDK cleanup methods log a `WARNING` naming
+each Kubernetes provider instance on which the GC deletes pods without a request record,
+that is, one with `orphan_gc_enabled`, `auto_cleanup_orphans` and `orb_instance_id` all
+set. Prune with the GC disabled, or keep `auto_cleanup_orphans` off while pruning.
+
 ### Operational note - periodic resync backstop
 
 The `periodic_resync_interval_seconds` field enables a background task

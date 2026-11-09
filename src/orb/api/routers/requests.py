@@ -41,7 +41,6 @@ from orb.application.services.orchestration.dtos import (
     ListRequestsInput,
     ListReturnRequestsInput,
 )
-from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import EntityNotFoundError, ValidationError
 from orb.domain.request.request_types import RequestStatus
 from orb.domain.request.termination_confirmation import (
@@ -566,7 +565,10 @@ async def confirm_terminated(
     description=(
         "Hard-delete a request row from storage. Requires "
         "allow_destructive_admin=true in config, a non-production environment, "
-        "and the request must already be in a terminal state."
+        "and the request must already be in a terminal state. A warning is logged for "
+        "each Kubernetes provider instance whose orphan GC deletes pods without a "
+        "request record (orphan_gc_enabled, auto_cleanup_orphans and orb_instance_id "
+        "all set)."
     ),
 )
 async def purge_request(
@@ -576,7 +578,7 @@ async def purge_request(
     _destructive=Depends(_check_destructive_admin_allowed),
 ) -> JSONResponse:
     container = get_di_container()
-    service = CleanupDatabaseService(uow_factory=container.get(UnitOfWorkFactory))
+    service = container.get(CleanupDatabaseService)
 
     try:
         cleanup_result = service.delete_request(request_id, cascade_machines=True)
