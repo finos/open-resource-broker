@@ -460,6 +460,23 @@ storage.update_entity(
 )
 ```
 
+## Search Criteria Operators
+
+`find_by_criteria` takes a dict of field to value. A plain value, or a dict without
+`$` keys, is compared by equality. A dict with a single `$` key applies that
+operator. The operators differ per backend:
+
+| Backend | Operators |
+|---------|-----------|
+| JSON | `$in`, `$regex` |
+| SQL | `$in`, `$like` |
+| DynamoDB | `$eq`, `$ne`, `$in`, `$gt`, `$gte`, `$lt`, `$lte`, `$contains`, `$begins_with` |
+
+Only `$in` is available on all three. A backend raises `StorageError` for an
+operator outside its set, for a value that combines several operators, and for a
+value that mixes operator keys with literal keys. SQL does not support dict-valued
+equality, while JSON and DynamoDB compare dict values by equality.
+
 ## Read Errors
 
 Reads never turn a failure into an empty answer. `find_by_id`, `find_all`,
