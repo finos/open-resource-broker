@@ -22,25 +22,41 @@ project supports (`requires-python` in pyproject.toml): a fixed release whose
 PyPI `requires_python` has a lower bound above that minimum is not actionable.
 If PyPI cannot be queried or the metadata cannot be parsed, the fix is reported.
 
+Every package name and version that reaches an issue body or a proposed change
+first passes a per-ecosystem validator (full match, length capped). An entry
+that fails validation, or that is not a Debian entry, is reported as a manual
+case with a fixed reason code, and nothing from the OSV record is echoed.
+
 With --dry-run, findings are printed and no GitHub issue is created or
 updated.
+
+With --apply, the fixed Debian entries are removed from `.trivyignore.yaml` and
+a pull request is opened (see security_exception_fixes.py). Add --dry-run to
+print the plan and diff only.
 """
 
 import argparse
+import importlib
 import json
+import os
 import re
 import subprocess
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
+from enum import Enum
 from functools import lru_cache
 from pathlib import Path
+from typing import Callable
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TRIVYIGNORE_PATH = REPO_ROOT / ".trivyignore.yaml"
 SECURITY_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "security-code.yml"
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
+REPO_SLUG = "finos/open-resource-broker"
+AUDIT_ISSUE_AUTHOR = "app/github-actions"
 OSV_API_BASE = "https://api.osv.dev/v1/vulns/"
 PYPI_API_BASE = "https://pypi.org/pypi/"
 REQUEST_TIMEOUT_SECONDS = 15
@@ -50,9 +66,23 @@ REQUEST_TIMEOUT_SECONDS = 15
 # DEBIAN-<CVE-ID> records Debian publishes, and PyPI advisories (PYSEC).
 # query_osv() refuses to build a request URL for anything that doesn't
 # match, since the ID ultimately comes from parsing local config files.
+#
+# The pattern ends in \Z rather than $ (which also accepts a trailing newline)
+# and callers go through is_valid_vuln_id(), which adds a length cap.
+MAX_TOKEN_LENGTH = 100
 VULN_ID_RE = re.compile(
-    r"^(CVE-\d{4}-\d+|GHSA(-[23456789cfghjmpqrvwx]{4}){3}|DEBIAN-CVE-\d{4}-\d+|PYSEC-\d{4}-\d+)$"
+    r"^(CVE-\d{4}-\d+|GHSA(-[23456789cfghjmpqrvwx]{4}){3}|DEBIAN-CVE-\d{4}-\d+|PYSEC-\d{4}-\d+)\Z"
 )
+
+
+def is_valid_vuln_id(value: object) -> bool:
+    """True for a string that fully matches VULN_ID_RE and is at most 100 characters."""
+    return (
+        isinstance(value, str)
+        and len(value) <= MAX_TOKEN_LENGTH
+        and VULN_ID_RE.fullmatch(value) is not None
+    )
+
 
 # The Dockerfile builds on python:<version>-slim, which is Debian 13
 # (trixie) for every supported Python version. A fix published for a
@@ -163,7 +193,7 @@ def query_osv(vuln_id: str) -> dict | None:
     another unexpected scheme even though it is built from a value that
     ultimately comes from local config files.
     """
-    if not VULN_ID_RE.match(vuln_id):
+    if not is_valid_vuln_id(vuln_id):
         print(f"skipping {vuln_id!r}: not a recognised OSV vulnerability ID", file=sys.stderr)
         return None
 
@@ -182,8 +212,8 @@ def query_osv(vuln_id: str) -> dict | None:
         raise
 
 
-_PYPI_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-_PYPI_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+!-]*$")
+_PYPI_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+_PYPI_VERSION_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+!-]*")
 
 
 _LOWER_BOUND_CLAUSE_RE = re.compile(r"^(?:>=|~=|===|==|>)\s*(\d+)(?:\.(\d+|\*))?")
@@ -223,7 +253,7 @@ def fetch_requires_python(name: str, version: str) -> str | None:
     to the fixed https:// PYPI_API_BASE, and the request goes through the same
     HTTPS-only opener as OSV lookups.
     """
-    if not _PYPI_NAME_RE.match(name) or not _PYPI_VERSION_RE.match(version):
+    if not _PYPI_NAME_RE.fullmatch(name) or not _PYPI_VERSION_RE.fullmatch(version):
         return None
     url = (
         f"{PYPI_API_BASE}{urllib.parse.quote(name, safe='')}/"
@@ -303,7 +333,7 @@ def _linked_advisory_ids(record: dict) -> list[str]:
     return [
         linked_id
         for linked_id in dict.fromkeys(linked)
-        if VULN_ID_RE.match(linked_id) and not linked_id.upper().startswith(("CVE-", "DEBIAN-"))
+        if is_valid_vuln_id(linked_id) and not linked_id.upper().startswith(("CVE-", "DEBIAN-"))
     ]
 
 
@@ -342,17 +372,181 @@ def check_exception(vuln_id: str, purls: list[str] | None = None) -> list[tuple[
     return [] if record is None else find_fixes(record)
 
 
+# Per-ecosystem validators. Every package name and version that is printed in
+# an issue, a pull request or a commit passes one of these first. They use
+# fullmatch (a trailing newline never passes) and a length cap, so a hostile
+# OSV record cannot smuggle markdown, mentions or extra lines into the text.
+_DEB_PACKAGE_RE = re.compile(r"[a-z0-9][a-z0-9+.\-]*")
+_DEB_VERSION_RE = re.compile(r"[0-9][A-Za-z0-9.+~:\-]*")
+_PYPI_NORMALISED_NAME_RE = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
+# Used only when the `packaging` library is not importable.
+_PYPI_FALLBACK_VERSION_RE = re.compile(r"[0-9][0-9A-Za-z.+!\-]*")
+
+
+def valid_deb_package(name: object) -> bool:
+    return (
+        isinstance(name, str)
+        and len(name) <= MAX_TOKEN_LENGTH
+        and _DEB_PACKAGE_RE.fullmatch(name) is not None
+    )
+
+
+def valid_deb_version(version: object) -> bool:
+    return (
+        isinstance(version, str)
+        and len(version) <= MAX_TOKEN_LENGTH
+        and _DEB_VERSION_RE.fullmatch(version) is not None
+    )
+
+
+def valid_pypi_package(name: object) -> bool:
+    if not isinstance(name, str) or len(name) > MAX_TOKEN_LENGTH:
+        return False
+    return _PYPI_NORMALISED_NAME_RE.fullmatch(_normalise_package_name(name)) is not None
+
+
+def valid_pypi_version(version: object) -> bool:
+    if not isinstance(version, str) or not version or len(version) > MAX_TOKEN_LENGTH:
+        return False
+    try:
+        from packaging.version import InvalidVersion, Version
+    except ImportError:
+        return _PYPI_FALLBACK_VERSION_RE.fullmatch(version) is not None
+    try:
+        return str(Version(version)) == version
+    except InvalidVersion:
+        return False
+
+
+class ManualReason(str, Enum):
+    """Why an entry cannot be changed mechanically. Values are fixed strings."""
+
+    GHSA_ALLOWLIST = "GHSA_ALLOWLIST"
+    NON_DEB_ECOSYSTEM = "NON_DEB_ECOSYSTEM"
+    INVALID_PACKAGE = "INVALID_PACKAGE"
+    INVALID_VERSION = "INVALID_VERSION"
+    NO_PURL = "NO_PURL"
+
+
+@dataclass(frozen=True)
+class Proposal:
+    """A classified exception with a published fix.
+
+    `fixes` holds only (package, version) pairs that passed validation and
+    `deb_packages` only validated Debian binary package names, so everything
+    here is safe to print. `reason` is None for a mechanical (Debian) entry.
+    """
+
+    vuln_id: str
+    fixes: tuple[tuple[str, str], ...]
+    deb_packages: tuple[str, ...]
+    reason: ManualReason | None
+
+    @property
+    def mechanical(self) -> bool:
+        return self.reason is None
+
+
+def classify_exception(
+    vuln_id: str,
+    purls: list[str],
+    fixes: list[tuple[str, str]],
+    *,
+    in_trivyignore: bool = True,
+) -> Proposal:
+    """Classify an exception that has a fix as mechanical (Debian) or manual."""
+    if not is_valid_vuln_id(vuln_id):
+        raise ValueError("refusing to classify an invalid vulnerability ID")
+    kinds = {purl_ecosystem_and_name(purl) for purl in purls}
+    ecosystems = {kind for kind, _ in kinds}
+    validate_package, validate_version = (
+        (valid_deb_package, valid_deb_version)
+        if ecosystems == {"deb"}
+        else (valid_pypi_package, valid_pypi_version)
+    )
+    shown_fixes = tuple(
+        (package, version)
+        for package, version in dict.fromkeys(fixes)
+        if validate_package(package) and validate_version(version)
+    )
+    deb_packages = tuple(
+        dict.fromkeys(
+            name for kind, name in sorted(kinds) if kind == "deb" and valid_deb_package(name)
+        )
+    )
+
+    def proposal(reason: ManualReason | None) -> Proposal:
+        return Proposal(vuln_id, shown_fixes, deb_packages, reason)
+
+    if not in_trivyignore or not vuln_id.startswith("CVE-"):
+        return proposal(ManualReason.GHSA_ALLOWLIST)
+    if not purls or "" in ecosystems:
+        return proposal(ManualReason.NO_PURL)
+    if ecosystems != {"deb"}:
+        if any(not validate_package(pkg) for pkg, _ in fixes):
+            return proposal(ManualReason.INVALID_PACKAGE)
+        if any(not validate_version(ver) for _, ver in fixes):
+            return proposal(ManualReason.INVALID_VERSION)
+        return proposal(ManualReason.NON_DEB_ECOSYSTEM)
+    if any(not valid_deb_package(name) for kind, name in kinds if kind == "deb"):
+        return proposal(ManualReason.INVALID_PACKAGE)
+    if any(not valid_deb_package(pkg) for pkg, _ in fixes):
+        return proposal(ManualReason.INVALID_PACKAGE)
+    if any(not valid_deb_version(ver) for _, ver in fixes):
+        return proposal(ManualReason.INVALID_VERSION)
+    return proposal(None)
+
+
+def plan_exceptions(
+    purls_by_id: dict[str, list[str]],
+    trivyignore_ids: set[str],
+    lookup: Callable[[str, list[str]], list[tuple[str, str]]] | None = None,
+) -> list[Proposal]:
+    """Look up every exception and classify those that now have a fix."""
+    lookup = lookup or check_exception
+    proposals = []
+    for vuln_id in sorted(purls_by_id):
+        fixes = lookup(vuln_id, purls_by_id[vuln_id])
+        if fixes:
+            proposals.append(
+                classify_exception(
+                    vuln_id,
+                    purls_by_id[vuln_id],
+                    fixes,
+                    in_trivyignore=vuln_id in trivyignore_ids,
+                )
+            )
+    return proposals
+
+
 def issue_title(vuln_id: str) -> str:
     return f"Security exception {vuln_id} now has a fix"
 
 
-def issue_body(vuln_id: str, fixes: list[tuple[str, str]]) -> str:
+def proposed_change_line(proposal: Proposal) -> str:
+    if proposal.mechanical:
+        packages = ", ".join(proposal.deb_packages)
+        return f"remove .trivyignore.yaml entry {proposal.vuln_id} (deb: {packages})"
+    return f"manual: {proposal.reason.value if proposal.reason else ''}"
+
+
+def issue_body(proposal: Proposal) -> str:
     lines = [
-        f"OSV reports a fix for the package(s) covered by the `{vuln_id}` security exception:",
+        "OSV reports a fix for the package(s) covered by the "
+        f"`{proposal.vuln_id}` security exception:",
         "",
     ]
-    lines.extend(f"- `{package}` fixed in `{fixed_version}`" for package, fixed_version in fixes)
-    lines.append("")
+    lines.extend(
+        f"- `{package}` fixed in `{fixed_version}`" for package, fixed_version in proposal.fixes
+    )
+    if not proposal.fixes:
+        lines.append("- (package or version details withheld: failed validation)")
+    lines += ["", "Proposed change:", "", f"- {proposed_change_line(proposal)}", ""]
+    if proposal.mechanical:
+        lines += [
+            "Run `make security-exception-fixes` (dry run), then `make security-exception-fixes APPLY=1`.",
+            "",
+        ]
     lines.append(
         "Re-evaluate the exception in `.trivyignore.yaml` or "
         "`.github/workflows/security-code.yml` and remove it if it is no "
@@ -361,29 +555,66 @@ def issue_body(vuln_id: str, fixes: list[tuple[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def ensure_issue(vuln_id: str, fixes: list[tuple[str, str]], *, dry_run: bool) -> None:
+def _capture(argv: list[str]) -> "subprocess.CompletedProcess[str]":
+    return subprocess.run(argv, capture_output=True, text=True, check=True)
+
+
+def find_audit_issues(repo: str, title: str, *, run: Callable = _capture) -> list[int]:
+    """Numbers of open issues authored by the audit bot whose title is exactly `title`.
+
+    `gh issue list --search` is fuzzy, so the exact-title and author checks are applied
+    to the result; only the integer number is taken from it.
+    """
+    result = run(
+        [
+            "gh", "issue", "list", "--repo", repo, "--state", "open",
+            "--author", AUDIT_ISSUE_AUTHOR, "--search", f"{title} in:title",
+            "--json", "number,title,author", "--limit", "20",
+        ]
+    )  # fmt: skip
+    numbers = []
+    for item in json.loads(result.stdout or "[]"):
+        author = (item.get("author") or {}).get("login")
+        number = item.get("number")
+        if item.get("title") == title and author == AUDIT_ISSUE_AUTHOR and isinstance(number, int):
+            numbers.append(number)
+    return numbers
+
+
+def ensure_issue(proposal: Proposal, *, dry_run: bool) -> None:
     """Create a new issue, or update the existing one with the same title."""
-    title = issue_title(vuln_id)
-    body = issue_body(vuln_id, fixes)
+    title = issue_title(proposal.vuln_id)
+    body = issue_body(proposal)
 
     if dry_run:
         print(f"[dry-run] would create/update issue: {title}")
         print(body)
         return
 
-    existing = subprocess.run(
-        ["gh", "issue", "list", "--state", "open", "--search", title, "--json", "number,title"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    matches = [item for item in json.loads(existing.stdout or "[]") if item["title"] == title]
+    repo = os.environ.get("GITHUB_REPOSITORY", REPO_SLUG)
+    matches = find_audit_issues(repo, title)
     if matches:
         subprocess.run(
-            ["gh", "issue", "edit", str(matches[0]["number"]), "--body", body], check=True
+            ["gh", "issue", "edit", str(matches[0]), "--repo", repo, "--body", body], check=True
         )
     else:
-        subprocess.run(["gh", "issue", "create", "--title", title, "--body", body], check=True)
+        subprocess.run(
+            ["gh", "issue", "create", "--repo", repo, "--title", title, "--body", body],
+            check=True,
+        )
+
+
+def collect_exceptions(
+    trivyignore_path: Path = TRIVYIGNORE_PATH, workflow_path: Path = SECURITY_WORKFLOW_PATH
+) -> tuple[dict[str, list[str]], set[str]]:
+    """Return ({id: purls}, ids listed in .trivyignore.yaml) from the given files."""
+    purls_by_id: dict[str, list[str]] = {}
+    for vuln_id, purls in load_trivyignore_entries(trivyignore_path):
+        purls_by_id.setdefault(vuln_id, []).extend(purls)
+    trivyignore_ids = set(purls_by_id)
+    for vuln_id in load_allow_ghsas(workflow_path):
+        purls_by_id.setdefault(vuln_id, [])
+    return purls_by_id, trivyignore_ids
 
 
 def main() -> int:
@@ -393,26 +624,37 @@ def main() -> int:
         action="store_true",
         help="Print findings without creating or updating GitHub issues",
     )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Fix mode: remove fixed Debian entries from .trivyignore.yaml in a temporary "
+        "worktree and open a pull request. Without --dry-run, --apply really pushes and "
+        "opens the PR (after a prompt unless --yes). With --dry-run it only prints the "
+        "plan and diff.",
+    )
+    parser.add_argument("--yes", action="store_true", help="With --apply: skip the prompt")
     args = parser.parse_args()
 
-    purls_by_id: dict[str, list[str]] = {}
-    for vuln_id, purls in load_trivyignore_entries(TRIVYIGNORE_PATH):
-        purls_by_id.setdefault(vuln_id, []).extend(purls)
-    for vuln_id in load_allow_ghsas(SECURITY_WORKFLOW_PATH):
-        purls_by_id.setdefault(vuln_id, [])
-    ids = sorted(purls_by_id)
-    if not ids:
+    if args.apply:
+        # Loaded on demand: the fix tool builds on this module, and the scheduled
+        # audit never needs it.
+        fix_tool = importlib.import_module("security_exception_fixes")
+        return fix_tool.run_fixes(dry_run=args.dry_run, assume_yes=args.yes)
+
+    purls_by_id, trivyignore_ids = collect_exceptions()
+    if not purls_by_id:
         print("No security exceptions found to check.")
         return 0
 
-    print(f"Checking {len(ids)} security exception(s): {', '.join(ids)}")
-    for vuln_id in ids:
-        fixes = check_exception(vuln_id, purls_by_id[vuln_id])
-        if fixes:
-            print(f"{vuln_id}: fix available -> {fixes}")
-            ensure_issue(vuln_id, fixes, dry_run=args.dry_run)
-        else:
+    print(f"Checking {len(purls_by_id)} security exception(s): {', '.join(sorted(purls_by_id))}")
+    proposals = plan_exceptions(purls_by_id, trivyignore_ids)
+    fixed = {p.vuln_id for p in proposals}
+    for vuln_id in sorted(purls_by_id):
+        if vuln_id not in fixed:
             print(f"{vuln_id}: no fix found")
+    for proposal in proposals:
+        print(f"{proposal.vuln_id}: fix available -> {proposed_change_line(proposal)}")
+        ensure_issue(proposal, dry_run=args.dry_run)
 
     return 0
 
