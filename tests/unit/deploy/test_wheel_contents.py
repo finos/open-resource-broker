@@ -40,6 +40,10 @@ def _build_command() -> list[str] | None:
 
 @pytest.fixture(scope="module")
 def built_wheel(tmp_path_factory) -> Path:
+    prebuilt = os.environ.get("ORB_SMOKE_WHEEL")
+    if prebuilt:
+        # Check an already built wheel (the release artifact) instead of building one.
+        return Path(prebuilt)
     cmd = _build_command()
     if cmd is None:
         if os.environ.get("CI"):
