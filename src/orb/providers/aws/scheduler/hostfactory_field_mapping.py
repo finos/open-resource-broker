@@ -55,7 +55,6 @@ class AWSFieldMapping:
         should not be defaulted to empty lists.
         """
         mapped.setdefault("max_machines", 1)
-        mapped.setdefault("price_type", "ondemand")
         if not mapped.get("launch_template_id"):
             mapped.setdefault("subnet_ids", [])
             mapped.setdefault("security_group_ids", [])

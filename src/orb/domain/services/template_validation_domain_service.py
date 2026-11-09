@@ -169,7 +169,7 @@ class TemplateValidationDomainService:
 
         api_capabilities = capabilities.get_feature("api_capabilities", {})
         api_caps = api_capabilities.get(template.provider_api, {})
-        price_type = getattr(template, "price_type", "ondemand")
+        price_type = template.price_type
 
         if price_type == "spot":
             if not api_caps.get("supports_spot", False):

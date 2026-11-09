@@ -348,7 +348,7 @@ def _template_to_display(raw: Any) -> dict[str, Any]:
         "instance_type": _safe_str(raw.get("instance_type", "")),
         "image_id": _safe_str(raw.get("image_id", "")),
         "max_instances": raw.get("max_instances") or raw.get("max_capacity") or 1,
-        "price_type": _safe_str(raw.get("price_type", "ondemand")),
+        "price_type": _safe_str(raw.get("price_type", "")),
         "allocation_strategy": _safe_str(raw.get("allocation_strategy", "")),
         "key_name": _safe_str(raw.get("key_name", "")),
         "subnet_ids": raw.get("subnet_ids") or [],
