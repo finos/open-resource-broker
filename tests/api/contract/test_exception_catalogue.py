@@ -193,3 +193,21 @@ def test_exception_is_reported_with_its_expected_status(cls):
         # that a more specific client-error base wins when one is mixed in.
         implied = {EXPECTED[ancestor] for ancestor in cls.__mro__ if ancestor in EXPECTED}
         assert response.http_status in implied
+
+
+@pytest.mark.parametrize(
+    ("exc_cls", "code"),
+    [
+        (InstanceStillVisibleError, "INSTANCE_STILL_VISIBLE"),
+        (TerminationNotVerifiedError, "TERMINATION_NOT_VERIFIED"),
+    ],
+)
+def test_termination_conflict_body_matches_confirm_route(exc_cls, code):
+    response = HTTPErrorResponseHandler().handle_error_for_http(
+        exc_cls("specific reason", details={"machine_ids": ["i-1", "i-2"]})
+    )
+
+    assert response.http_status == CONFLICT
+    assert response.error_code == code
+    assert response.message == "specific reason"
+    assert response.details["machine_ids"] == ["i-1", "i-2"]

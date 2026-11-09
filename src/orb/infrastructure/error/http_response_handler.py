@@ -166,11 +166,15 @@ class HTTPErrorResponseHandler:
             extra={"details": getattr(exception, "details", {})},
         )
         still_visible = isinstance(exception, InstanceStillVisibleError)
+        raw_details = getattr(exception, "details", {})
+        details = _safe_details(raw_details)
+        machine_ids = raw_details.get("machine_ids")
+        details["machine_ids"] = list(machine_ids) if isinstance(machine_ids, (list, tuple)) else []
         return ErrorResponse(
             error_code="INSTANCE_STILL_VISIBLE" if still_visible else "TERMINATION_NOT_VERIFIED",
-            message="The instance termination could not be confirmed",
+            message=exception.message,
             category=ErrorCategory.BUSINESS_RULE,
-            details=_safe_details(getattr(exception, "details", {})),
+            details=details,
             http_status=HTTPStatus.CONFLICT,
         )
 
