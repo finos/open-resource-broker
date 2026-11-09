@@ -259,7 +259,7 @@ class TestRegistryClient:
                 return FakeResponse(b'{"token": "abc"}')
             return FakeResponse(body)
 
-        with patch("urllib.request.urlopen", fake_urlopen):
+        with patch.object(cks._OPENER, "open", fake_urlopen):
             assert self.client().fetch(digest) == body
         manifest_request = seen[-1]
         assert manifest_request.get_header("Authorization") == "Bearer abc"
@@ -273,7 +273,7 @@ class TestRegistryClient:
             return FakeResponse(b'{"token": "abc"}' if "/token" in request.full_url else b"{}")
 
         with (
-            patch("urllib.request.urlopen", fake_urlopen),
+            patch.object(cks._OPENER, "open", fake_urlopen),
             pytest.raises(cks.KeepSetError, match="content with digest"),
         ):
             self.client().fetch(d(1))
@@ -288,7 +288,7 @@ class TestRegistryClient:
             raise urllib.error.HTTPError(request.full_url, 404, "nf", {}, None)  # type: ignore[arg-type]
 
         with (
-            patch("urllib.request.urlopen", fake_urlopen),
+            patch.object(cks._OPENER, "open", fake_urlopen),
             pytest.raises(cks.KeepSetError, match="404"),
         ):
             self.client().fetch(d(1))
@@ -307,17 +307,17 @@ class TestRegistryClient:
                 raise urllib.error.HTTPError(request.full_url, 503, "busy", {}, None)  # type: ignore[arg-type]
             return FakeResponse(body)
 
-        with patch("urllib.request.urlopen", fake_urlopen):
+        with patch.object(cks._OPENER, "open", fake_urlopen):
             assert self.client().fetch(digest) == body
 
     def test_missing_token_aborts(self):
         with (
-            patch("urllib.request.urlopen", lambda r, timeout: FakeResponse(b"{}")),
+            patch.object(cks._OPENER, "open", lambda r, timeout: FakeResponse(b"{}")),
             pytest.raises(cks.KeepSetError, match="no token"),
         ):
             self.client().fetch(d(1))
 
     def test_rejects_invalid_digest_before_any_request(self):
-        with patch("urllib.request.urlopen") as urlopen, pytest.raises(cks.KeepSetError):
+        with patch.object(cks._OPENER, "open") as urlopen, pytest.raises(cks.KeepSetError):
             self.client().fetch("sha256:../../x")
         urlopen.assert_not_called()

@@ -60,6 +60,23 @@ ACCEPT = ", ".join(
 ManifestFetcher = Callable[[str], bytes]
 
 
+def _build_https_only_opener() -> urllib.request.OpenerDirector:
+    """Return an opener that only speaks HTTPS (no file:// or ftp:// handlers)."""
+    opener = urllib.request.OpenerDirector()
+    for handler in (
+        urllib.request.HTTPSHandler(),
+        urllib.request.HTTPRedirectHandler(),
+        urllib.request.UnknownHandler(),
+        urllib.request.HTTPDefaultErrorHandler(),
+        urllib.request.HTTPErrorProcessor(),
+    ):
+        opener.add_handler(handler)
+    return opener
+
+
+_OPENER = _build_https_only_opener()
+
+
 class KeepSetError(Exception):
     """The keep-set could not be computed reliably; nothing may be deleted."""
 
@@ -138,9 +155,9 @@ class RegistryClient:
             raise KeepSetError(f"refusing non-https URL {url}")
         last: Exception | None = None
         for attempt in range(MAX_ATTEMPTS):
-            request = urllib.request.Request(url, headers=headers, method="GET")  # noqa: S310
+            request = urllib.request.Request(url, headers=headers, method="GET")  # noqa: S310 - https-only, see _OPENER
             try:
-                with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as resp:  # noqa: S310  # nosec B310
+                with _OPENER.open(request, timeout=HTTP_TIMEOUT_SECONDS) as resp:
                     return resp.read()
             except urllib.error.HTTPError as exc:
                 last = exc
