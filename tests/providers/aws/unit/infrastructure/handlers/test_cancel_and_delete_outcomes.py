@@ -298,6 +298,7 @@ class TestFleetCancelPartialFailures:
         }
         mgr._fetch_fleet_details = MagicMock(return_value={"Type": "request"})
         mgr._cleanup_launch_template = MagicMock()
+        mgr._list_fleet_instance_ids = MagicMock(return_value=[])
         return handler
 
     def test_ec2_fleet_partial_failure_is_error(self):
@@ -618,7 +619,7 @@ class TestFleetDeleteAlertCarriesRequestId:
             "ActiveInstances": []
         }
         mgr._aws_client.ec2_client.describe_spot_fleet_requests.return_value = {
-            "SpotFleetRequestConfigs": []
+            "SpotFleetRequestConfigs": [fleet_details]
         }
         mgr._cleanup_launch_template = MagicMock()
         mgr.release("sfr-1", ["i-1"], fleet_details)
@@ -666,6 +667,7 @@ class TestFleetDeleteAlertCarriesRequestId:
             "TargetCapacitySpecification": {"TotalTargetCapacity": 1},
             "Tags": [{"Key": "orb:request-id", "Value": "req-ec2-3"}],
         }
+        mgr._fetch_fleet_details = MagicMock(return_value=details)
 
         mgr.release("fleet-1", ["i-1"], details)
 

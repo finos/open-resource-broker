@@ -70,17 +70,17 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
     # Public interface
     # ------------------------------------------------------------------
 
-    def release(
+    def _release_locked(
         self,
         fleet_id: str,
         instance_ids: list[str],
         fleet_details: dict[str, Any],
-        request_id: str = "",
+        request_id: str,
     ) -> bool:
-        """Release hosts for a single EC2 Fleet.
+        """Release hosts for a single EC2 Fleet (the release lock is held).
 
-        Delegates to BaseFleetReleaseManager.release after handling the
-        EC2-Fleet-specific case where the fleet record is not found.
+        Handles the EC2-Fleet-specific case where the fleet record cannot be
+        found, then continues with BaseFleetReleaseManager's flow.
 
         For maintain fleets, reduces target capacity before terminating
         instances to prevent AWS from replacing them. Deletes the fleet
@@ -98,45 +98,21 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         runs on every return and keeps the template while other instances of
         the request are live.
 
-        Args:
-            fleet_id: The EC2 Fleet ID to operate on.
-            instance_ids: Specific instance IDs to terminate. When empty,
-                the entire fleet is deleted.
-            fleet_details: Pre-fetched DescribeFleets entry for this fleet,
-                or an empty dict to trigger a fresh lookup.
-            request_id: ORB request ID used for launch template cleanup when
-                the fleet record is no longer available (instant fleet case).
-
         Returns:
             True when the fleet was already deleted or no longer exists.
         """
-        # EC2 Fleet has a special fast-path when the fleet record cannot be
-        # found at all (e.g. already deleted by another process).  Handle this
-        # before delegating to the base-class flow which assumes a valid record.
         if not fleet_details:
-            fleet_list = self._retry(
-                lambda: self._paginate(
-                    self._aws_client.ec2_client.describe_fleets,
-                    "Fleets",
-                    FleetIds=[fleet_id],
-                ),
-                operation_type="read_only",
+            self._logger.warning("EC2 Fleet %s not found, terminating instances directly", fleet_id)
+            self._aws_ops.terminate_instances_with_fallback(
+                instance_ids,
+                self._request_adapter,
+                f"EC2Fleet-{fleet_id} instances",
             )
-            if not fleet_list:
-                self._logger.warning(
-                    "EC2 Fleet %s not found, terminating instances directly", fleet_id
-                )
-                self._aws_ops.terminate_instances_with_fallback(
-                    instance_ids,
-                    self._request_adapter,
-                    f"EC2Fleet-{fleet_id} instances",
-                )
-                if request_id:
-                    self._cleanup_on_zero_capacity("ec2_fleet", request_id, instance_ids)
-                return True
-            fleet_details = fleet_list[0]
+            if request_id:
+                self._cleanup_on_zero_capacity("ec2_fleet", request_id, instance_ids)
+            return True
 
-        return super().release(fleet_id, instance_ids, fleet_details, request_id)
+        return super()._release_locked(fleet_id, instance_ids, fleet_details, request_id)
 
     def find_fleet_for_instance(self, instance_id: str) -> Optional[str]:
         """Find the EC2 Fleet ID that owns the given instance.
@@ -206,11 +182,6 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         return fleet_details.get("FleetState") == "deleted_running"
 
     def _fetch_fleet_details(self, fleet_id: str) -> dict[str, Any]:
-        # The pre-flight lookup in release() has already fetched the fleet record
-        # by the time _fetch_fleet_details could be called; this method exists to
-        # satisfy the abstract contract and will only be reached if fleet_details
-        # was empty when passed to the base-class release() (which does not happen
-        # because EC2FleetReleaseManager.release() populates fleet_details first).
         fleet_list = self._retry(
             lambda: self._paginate(
                 self._aws_client.ec2_client.describe_fleets,
@@ -259,8 +230,8 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         fleet_type = extra["fleet_type"]
         # Re-read the target right before changing it: the details passed in may be
         # seconds old, and a concurrent return would otherwise be overwritten with a
-        # value computed from the stale target. This narrows the window; the API has
-        # no compare-and-set, so concurrent returns on one fleet are not serialised.
+        # value computed from the stale target. The API has no compare-and-set; returns
+        # of one fleet are serialised within this process only.
         current_capacity = self._read_target_capacity(fleet_id, extra["current_capacity"])
         weighted = extra["weighted_capacity_to_return"]
         new_capacity = max(0, current_capacity - weighted)
@@ -286,19 +257,29 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
             # drops, and the maintain fleet then launches a replacement.
             ExcessCapacityTerminationPolicy="no-termination",
         )
+        # Read the target back: a different value means another process changed it.
+        try:
+            observed: Optional[int] = self._describe_target_capacity(fleet_id)
+        except Exception as exc:
+            self._logger.debug("Could not read back target capacity of %s: %s", fleet_id, exc)
+            observed = None
+        self._warn_if_target_changed(fleet_id, new_capacity, observed)
+
+    def _describe_target_capacity(self, fleet_id: str) -> int:
+        fleets = self._retry(
+            self._aws_client.ec2_client.describe_fleets,
+            operation_type="read_only",
+            FleetIds=[fleet_id],
+        ).get("Fleets", [])
+        value = fleets[0]["TargetCapacitySpecification"]["TotalTargetCapacity"]
+        if not isinstance(value, int):
+            raise TypeError(f"unexpected TotalTargetCapacity {value!r}")
+        return value
 
     def _read_target_capacity(self, fleet_id: str, fallback: int) -> int:
         """Return the fleet's current total target capacity, or *fallback* if unreadable."""
         try:
-            fleets = self._retry(
-                self._aws_client.ec2_client.describe_fleets,
-                operation_type="read_only",
-                FleetIds=[fleet_id],
-            ).get("Fleets", [])
-            value = fleets[0]["TargetCapacitySpecification"]["TotalTargetCapacity"]
-            if not isinstance(value, int):
-                raise TypeError(f"unexpected TotalTargetCapacity {value!r}")
-            return value
+            return self._describe_target_capacity(fleet_id)
         except Exception as exc:
             self._logger.warning(
                 "Could not re-read target capacity of EC2 Fleet %s (%s); using %s",

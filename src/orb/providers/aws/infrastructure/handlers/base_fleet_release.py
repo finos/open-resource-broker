@@ -6,7 +6,9 @@ have a tested template to follow without duplicating decision logic.
 
 The flow implemented here:
 
-1. Fetch fleet details if not supplied.
+0. Take the per-fleet release lock (see ``fleet_release_lock``).
+1. Fetch fresh fleet details under the lock; details supplied by the caller may
+   predate a concurrent return and are used only when the fetch raises.
 2. Extract fleet_type, target_capacity, and weighted-capacity sum from details.
 3. Build a FleetCapacityInput and call compute_fleet_release_decision.
 4. Optionally reduce capacity (maintain-type only).
@@ -35,6 +37,10 @@ from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.infrastructure.handlers.fleet_release_lock import (
+    DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
+    fleet_release_lock,
+)
 from orb.providers.aws.infrastructure.handlers.fleet_release_policy import (
     FleetCapacityInput,
     FleetReleaseDecision,
@@ -70,6 +76,7 @@ class BaseFleetReleaseManager(ABC):
         self._cleanup_on_zero_capacity = cleanup_on_zero_capacity_fn
         self._logger = logger
         self._retry = retry_fn
+        self._lock_timeout = DEFAULT_ACQUIRE_TIMEOUT_SECONDS
 
     # ------------------------------------------------------------------
     # Public interface
@@ -84,6 +91,19 @@ class BaseFleetReleaseManager(ABC):
     ) -> bool:
         """Release hosts for a single fleet with proper fleet lifecycle management.
 
+        Releases of the same fleet are serialised, so each capacity reduction is
+        computed from the target the previous return left behind. The fleet is
+        described again once the lock is held and that description, not
+        ``fleet_details``, decides capacity, because ``fleet_details`` may predate a
+        return that finished while this one waited. An empty description means the
+        fleet no longer exists.
+
+        The serialisation holds within one process only. The EC2 API offers no
+        compare-and-set, so returns made from another process (another server
+        worker, or ``orb return`` beside a server) can still interleave; after
+        lowering the target the new value is read back and a warning is logged if
+        it is not the value just set.
+
         A fleet that is already deleted or cancelled is never modified or deleted
         again: capacity reduction and the fleet delete are skipped, the named
         instances are still terminated and the launch template is still tidied.
@@ -92,23 +112,63 @@ class BaseFleetReleaseManager(ABC):
             fleet_id: The fleet identifier (EC2 Fleet ID or Spot Fleet request ID).
             instance_ids: Instance IDs to terminate within this fleet.  Pass an
                 empty list to cancel/delete the entire fleet unconditionally.
-            fleet_details: Pre-fetched fleet description dict, or an empty dict
-                to trigger a live fetch via :meth:`_fetch_fleet_details`.
+            fleet_details: Fleet description known to the caller. Used only when
+                describing the fleet under the lock raises.
             request_id: ORB request ID used for launch-template cleanup when
                 the fleet record is no longer available (instant-fleet case).
 
         Returns:
             True when the fleet was already deleted or cancelled before this call.
+
+        Raises:
+            FleetReleaseBusyError: Another release of this fleet did not finish
+                within the lock timeout; the return can be retried.
         """
+        with fleet_release_lock(fleet_id, self._lock_timeout):
+            return self._release_locked(
+                fleet_id,
+                instance_ids,
+                self._fleet_details_under_lock(fleet_id, fleet_details),
+                request_id,
+            )
+
+    def _fleet_details_under_lock(self, fleet_id: str, supplied: dict[str, Any]) -> dict[str, Any]:
+        """Describe the fleet now that the lock is held.
+
+        A describe that succeeds is authoritative, including an empty result: the
+        fleet is gone, and the release must see that. The caller's description is
+        used only when the describe raises, so a failing describe does not by
+        itself block a return that the supplied details would have allowed.
+        """
+        try:
+            fresh = self._fetch_fleet_details(fleet_id)
+        except Exception as exc:
+            if not supplied:
+                raise
+            self._logger.warning(
+                "Could not describe %s %s under the release lock (%s); using the details "
+                "the caller supplied",
+                self._fleet_label(),
+                fleet_id,
+                exc,
+            )
+            return supplied
+        return fresh if isinstance(fresh, dict) else supplied
+
+    def _release_locked(
+        self,
+        fleet_id: str,
+        instance_ids: list[str],
+        fleet_details: dict[str, Any],
+        request_id: str,
+    ) -> bool:
+        """Release body; runs with the fleet's release lock held and fresh *fleet_details*."""
         fleet_label = self._fleet_label()
         self._logger.info(
             "Processing %s %s with %d instances", fleet_label, fleet_id, len(instance_ids)
         )
 
         try:
-            if not fleet_details:
-                fleet_details = self._fetch_fleet_details(fleet_id)
-
             request_id = self._resolve_request_id(fleet_details, request_id)
             already_gone = self._is_fleet_terminal(fleet_details)
 
@@ -407,6 +467,26 @@ class BaseFleetReleaseManager(ABC):
             reason=reason,
         )
 
+    def _warn_if_target_changed(
+        self, fleet_id: str, expected: int, observed: Optional[int]
+    ) -> None:
+        """Log a warning when the target read back after a reduction is not the value set.
+
+        Concurrent returns from another process are not serialised, so this is the
+        only trace such an interleaving leaves. *observed* is None when the read
+        failed, which says nothing.
+        """
+        if observed is not None and observed != expected:
+            self._logger.warning(
+                "%s %s target capacity reads %s after being set to %s; another release or "
+                "modification of this fleet may have run at the same time (returns are "
+                "serialised within one process only)",
+                self._fleet_label(),
+                fleet_id,
+                observed,
+                expected,
+            )
+
     def _zero_capacity_before_teardown(self, fleet_id: str) -> None:
         """Attempt to zero fleet capacity before cancellation to prevent replacement launches.
 
@@ -446,7 +526,7 @@ class BaseFleetReleaseManager(ABC):
 
     @abstractmethod
     def _fetch_fleet_details(self, fleet_id: str) -> dict[str, Any]:
-        """Fetch the fleet description from AWS when not supplied by the caller.
+        """Fetch the current fleet description from AWS (an empty dict when not found).
 
         Returns:
             The raw fleet details dict (the structure varies by fleet type).

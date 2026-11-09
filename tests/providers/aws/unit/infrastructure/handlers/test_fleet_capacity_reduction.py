@@ -81,10 +81,12 @@ def _spot_fleet(fleet_type: str, target: int, on_demand: int = 0) -> dict:
 
 
 class TestEC2FleetReduction:
-    def _ec2(self, live_target: int, instance_ids: list[str]) -> MagicMock:
+    def _ec2(
+        self, live_target: int, instance_ids: list[str], fleet_type: str = "maintain"
+    ) -> MagicMock:
         ec2 = MagicMock()
         ec2.describe_fleets.return_value = {
-            "Fleets": [_ec2_fleet("maintain", live_target) | {"FleetId": "fleet-1"}]
+            "Fleets": [_ec2_fleet(fleet_type, live_target) | {"FleetId": "fleet-1"}]
         }
         ec2.describe_fleet_instances.return_value = {
             "ActiveInstances": [{"InstanceId": i, "InstanceType": "t3.micro"} for i in instance_ids]
@@ -146,7 +148,7 @@ class TestEC2FleetReduction:
 
     @pytest.mark.parametrize("fleet_type", ["request", "instant"])
     def test_request_and_instant_fleets_never_reach_the_modify(self, fleet_type):
-        ec2 = self._ec2(3, ["i-1", "i-2", "i-3"])
+        ec2 = self._ec2(3, ["i-1", "i-2", "i-3"], fleet_type)
         manager, _ = _ec2_manager(ec2)
 
         manager.release("fleet-1", ["i-1"], _ec2_fleet(fleet_type, 3))
@@ -165,10 +167,12 @@ class TestEC2FleetReduction:
 
 
 class TestSpotFleetReduction:
-    def _ec2(self, live_target: int, live_on_demand: int = 0) -> MagicMock:
+    def _ec2(
+        self, live_target: int, live_on_demand: int = 0, fleet_type: str = "maintain"
+    ) -> MagicMock:
         ec2 = MagicMock()
         ec2.describe_spot_fleet_requests.return_value = {
-            "SpotFleetRequestConfigs": [_spot_fleet("maintain", live_target, live_on_demand)]
+            "SpotFleetRequestConfigs": [_spot_fleet(fleet_type, live_target, live_on_demand)]
         }
         ec2.describe_spot_fleet_instances.return_value = {
             "ActiveInstances": [
@@ -220,7 +224,7 @@ class TestSpotFleetReduction:
         assert order == ["modify", "terminate:['i-2']"]
 
     def test_request_fleets_never_reach_the_modify(self):
-        ec2 = self._ec2(3)
+        ec2 = self._ec2(3, fleet_type="request")
         manager, _ = _spot_manager(ec2)
 
         manager.release("sfr-1", ["i-1"], _spot_fleet("request", 3))

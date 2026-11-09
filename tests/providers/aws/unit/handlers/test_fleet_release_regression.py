@@ -187,6 +187,7 @@ class TestEC2FleetRequestPartialReturn:
         """
         manager, aws_client = _make_ec2_fleet_manager()
         fleet_details = _request_fleet_details_ec2(total_target_capacity=1)
+        manager._fetch_fleet_details = Mock(return_value=fleet_details)  # type: ignore[method-assign]
 
         manager.release(
             fleet_id="fleet-001",
