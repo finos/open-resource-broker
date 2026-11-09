@@ -45,6 +45,7 @@ from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunI
 from orb.providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
 from orb.providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
 from orb.providers.aws.utilities.aws_operations import AWSOperations
+from tests.shared.moto_network import seed_moto_network
 from tests.utilities.reset_singletons import reset_all_singletons
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
@@ -198,25 +199,7 @@ def moto_aws(monkeypatch):
 @pytest.fixture
 def moto_vpc_resources(moto_aws):
     """Create a VPC, 2 subnets, and 1 security group in moto eu-west-2."""
-    ec2 = boto3.client("ec2", region_name=REGION)
-
-    vpc = ec2.create_vpc(CidrBlock="10.0.0.0/16")
-    vpc_id = vpc["Vpc"]["VpcId"]
-
-    subnet_a = ec2.create_subnet(
-        VpcId=vpc_id, CidrBlock="10.0.1.0/24", AvailabilityZone=f"{REGION}a"
-    )
-    subnet_b = ec2.create_subnet(
-        VpcId=vpc_id, CidrBlock="10.0.2.0/24", AvailabilityZone=f"{REGION}b"
-    )
-    subnet_ids = [subnet_a["Subnet"]["SubnetId"], subnet_b["Subnet"]["SubnetId"]]
-
-    sg = ec2.create_security_group(
-        GroupName="orb-test-sg", Description="ORB moto integration test SG", VpcId=vpc_id
-    )
-    sg_id = sg["GroupId"]
-
-    return {"vpc_id": vpc_id, "subnet_ids": subnet_ids, "sg_id": sg_id}
+    return seed_moto_network(boto3.client("ec2", region_name=REGION), REGION)
 
 
 # ---------------------------------------------------------------------------

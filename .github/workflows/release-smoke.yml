@@ -1,0 +1,76 @@
+name: Release Smoke
+
+# Installs a built wheel into a fresh virtual environment and drives it as a
+# user would: CLI against a moto server, server start, UI over its websocket.
+# The wheel is an artifact produced by the build-release-wheel action; this
+# workflow never builds one.
+
+on:
+  workflow_call:
+    inputs:
+      artifact-name:
+        description: >-
+          Artifact holding the distributions (release-wheel-<version>). The wheel
+          checksum is read from the artifact named <artifact-name>-sha256.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke the built wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Download wheel
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: dist/
+
+      - name: Download wheel checksum
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8
+        with:
+          name: ${{ inputs.artifact-name }}-sha256
+          path: checksum/
+
+      - name: Verify the wheel is the one that was built
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          wheels=(dist/*.whl)
+          if [ "${#wheels[@]}" -ne 1 ]; then
+            echo "Expected exactly one wheel in dist/, found ${#wheels[@]}" >&2
+            exit 1
+          fi
+          expected="$(cut -d' ' -f1 checksum/orb-wheel.sha256)"
+          actual="$(sha256sum "${wheels[0]}" | cut -d' ' -f1)"
+          if [ "$expected" != "$actual" ]; then
+            echo "Wheel checksum $actual does not match the recorded $expected" >&2
+            exit 1
+          fi
+          echo "ORB_SMOKE_WHEEL=$GITHUB_WORKSPACE/${wheels[0]}" >> "$GITHUB_ENV"
+
+      - name: Setup Python and UV
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          group: test
+          cache-key: smoke-test-${{ hashFiles('uv.lock') }}
+          fail-on-cache-miss: false
+
+      - name: Wheel contents
+        shell: bash
+        run: .venv/bin/python -m pytest tests/unit/deploy/test_wheel_contents.py -p no:xdist -q
+
+      - name: Smoke the installed package
+        shell: bash
+        env:
+          ORB_SMOKE_REQUIRED: "1"
+          ORB_SMOKE_MOTO_SERVER: ${{ github.workspace }}/.venv/bin/moto_server
+        run: .venv/bin/python -m pytest tests/package_smoke -p no:xdist -q

@@ -300,7 +300,7 @@ dev = [
     "coverage>=7.3.2,<8.0.0",
     "httpx>=0.27.0",
     "httpx2>=2.13,<3",
-    "moto[all,server]>=5.1.19,<6.0.0",  # moto_server for the package smoke
+    "moto[all]>=5.1.19,<6.0.0",
     "responses>=0.24.0,<1.0.0",
     "requests-mock>=1.11.0,<2.0.0",
     "joserfc>=1.6.1",
@@ -423,7 +423,7 @@ test = [
     "mcp>=2.3,<3",
     "httpx2>=2.13,<3",  # HTTP client of the MCP SDK; the transport tests drive it directly
     # AWS Testing
-    "moto[all]>=5.1.19,<6.0.0",
+    "moto[all,server]>=5.1.19,<6.0.0",  # moto_server for the package smoke
     "responses>=0.24.0,<1.0.0",
     "requests-mock>=1.11.0,<2.0.0",
     # Security overrides for vulnerable transitive deps pulled in by test tooling
@@ -605,6 +605,8 @@ norecursedirs = [
     # pytest tests); atheris is only installed in the ``fuzz`` group.
     "tests/fuzz",
     "tests/providers/aws/live",
+    # Process-level smoke on the built wheel; run it by path (see tests/package_smoke).
+    "tests/package_smoke",
     # k8s live tests require a real cluster; the parallel ci-tests-providers
     # target passes -m "not serial" which would deselect every test if
     # live/conftest.py's pytest_collection_modifyitems hook is allowed to run
