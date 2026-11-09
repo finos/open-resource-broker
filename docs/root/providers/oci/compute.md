@@ -94,7 +94,7 @@ orb requests status <return-request-id>
 | `shape_config` | Explicit in shipped VM examples | object | `ocpus` and `memoryInGBs`; DenseIO requires a supported pair. Omit for bare metal. |
 | `ocpus`, `memory_gbs` | No | number | Alternate top-level sizing inputs; override the corresponding `shape_config` values. |
 | `capacity_type` | No | string | `ondemand` (default) or `preemptible`. |
-| `fallback_to_ondemand` | No | boolean | Retry a failed preemptible launch as on-demand using the same shape and image. Default `false`. |
+| `fallback_to_ondemand` | No | boolean | Retry a failed preemptible launch as on-demand using the same shape and image. Default from `template.default_fallback_to_ondemand` (`false`), overridable per provider type, provider instance, template and request. |
 | `preemptible_preserve_boot_volume` | No | boolean | Preserve the boot disk on preemption. Default `false`; does not configure ordinary worker return. |
 | `boot_volume_gbs` | No | number | Boot disk size in GB, independent of DenseIO local NVMe. |
 | `max_machines` | No | integer | Maximum machines for the template; accepts `max_instances`. |

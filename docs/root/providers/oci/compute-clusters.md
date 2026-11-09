@@ -71,8 +71,7 @@ create a single template object with `templates create --file rdma-template.json
   },
   "ssh_authorized_keys": "<ssh-public-key>",
   "boot_volume_gbs": 200,
-  "capacity_type": "ondemand",
-  "fallback_to_ondemand": false
+  "capacity_type": "ondemand"
 }
 ```
 

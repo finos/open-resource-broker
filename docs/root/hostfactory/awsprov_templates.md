@@ -114,6 +114,10 @@ Each host template represents a class of instances that share some attributes, s
 
   - Optional. Allocation strategy for On-Demand pools, for every priceType. Valid values are `lowestPrice` or `prioritized`. Default is `lowestPrice`, from the AWS provider defaults (`provider_defaults.aws.template_defaults.allocation_strategy_on_demand`); a provider instance's `template_defaults` can override it.
 
+- **fallbackToOndemand**
+
+  - Optional. For RunInstances templates with priceType `spot`: when spot capacity is unavailable, launch the request on-demand instead. Default is `false`, from `template.default_fallback_to_ondemand`; provider type and provider instance `template_defaults`, the template and a request override can change it. See [RunInstances on-demand fallback](../providers/aws/run-instances.md#on-demand-fallback).
+
 - **percentOnDemand**
 
   - Optional. When priceType is set to `spot`, specifies the percentage of On-Demand capacity to be requested in a Spot Fleet request to meet the target capacity. Valid value is an integer from 0 to 100. Default value is 0.

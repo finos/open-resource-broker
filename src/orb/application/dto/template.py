@@ -52,6 +52,7 @@ class TemplateDTO(BaseDTO):
     price_type: str = "ondemand"
     allocation_strategy: Optional[str] = None
     allocation_strategy_on_demand: Optional[str] = None
+    fallback_to_ondemand: bool = False
     max_price: Optional[float] = None
 
     # Network configuration

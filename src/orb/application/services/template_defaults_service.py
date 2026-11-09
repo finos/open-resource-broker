@@ -541,6 +541,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             default_fields = [
                 "max_number",
                 "default_price_type",
+                "default_fallback_to_ondemand",
                 "default_provider_api",
             ]
 

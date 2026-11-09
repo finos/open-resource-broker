@@ -94,7 +94,8 @@
       "provider_type": "{provider_type}_templates.json",
       "generic": "templates.json"
     },
-    "default_price_type": "ondemand"
+    "default_price_type": "ondemand",
+    "default_fallback_to_ondemand": false
   },
   "events": {
     "enabled": true,

@@ -18,6 +18,7 @@ _TEMPLATE_DTO_FIELDS = [
     "created_at",
     "description",
     "encryption_key",
+    "fallback_to_ondemand",
     "image_id",
     "instance_profile",
     "iops",

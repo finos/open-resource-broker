@@ -76,6 +76,7 @@ class TemplateDTOFactory(TemplateDTOFactoryPort):
             allocation_strategy_on_demand=_strategy_value(
                 getattr(template, "allocation_strategy_on_demand", None)
             ),
+            fallback_to_ondemand=template.fallback_to_ondemand,
             max_price=getattr(template, "max_price", None),
             # Network configuration
             network_zones=getattr(template, "network_zones", []),

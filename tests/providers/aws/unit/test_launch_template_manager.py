@@ -305,7 +305,7 @@ class TestAWSLaunchTemplateManager:
             ]
         }
 
-        result = self.manager.inspect_launch_template_networking("lt-x", "$Latest")
+        result = self.manager.inspect_launch_template("lt-x", "$Latest").networking
 
         assert result == LTNetworkingState.HAS_NETWORKING
 
@@ -317,7 +317,7 @@ class TestAWSLaunchTemplateManager:
             "LaunchTemplateVersions": [{"LaunchTemplateData": {"ImageId": "ami-x"}}]
         }
 
-        result = self.manager.inspect_launch_template_networking("lt-x", "$Latest")
+        result = self.manager.inspect_launch_template("lt-x", "$Latest").networking
 
         assert result == LTNetworkingState.NO_NETWORKING
 
@@ -332,7 +332,7 @@ class TestAWSLaunchTemplateManager:
             operation_name="DescribeLaunchTemplateVersions",
         )
 
-        result = self.manager.inspect_launch_template_networking("lt-x", "$Latest")
+        result = self.manager.inspect_launch_template("lt-x", "$Latest").networking
 
         assert result == LTNetworkingState.UNKNOWN_UNAUTHORIZED
         cast(Mock, self.manager._logger).warning.assert_called()
@@ -348,7 +348,7 @@ class TestAWSLaunchTemplateManager:
 
         with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
             with pytest.raises(ClientError):
-                self.manager.inspect_launch_template_networking("lt-x", "$Latest")
+                self.manager.inspect_launch_template("lt-x", "$Latest").networking
 
     def test_error_handling_wraps_client_error(self):
         """Test that AWS ClientError is wrapped in InfrastructureError."""

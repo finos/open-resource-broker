@@ -377,6 +377,18 @@ class AWSTemplate(Template):
                         "launch_template_version must be a positive integer, '$Latest', or '$Default'"
                     )
 
+        if (
+            self.fallback_to_ondemand
+            and self.provider_api is not None
+            and self.provider_api != ProviderApi.RUN_INSTANCES
+        ):
+            _logger.warning(
+                "Template %s sets fallback_to_ondemand, which applies to RunInstances only; "
+                "%s mixes spot and on-demand capacity with price_type 'heterogeneous'",
+                self.template_id,
+                self.provider_api.value,
+            )
+
         return self
 
     @field_validator("allocation_strategy", mode="before")

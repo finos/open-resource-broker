@@ -62,6 +62,7 @@ The handler uses `provider_api: "RunInstances"`. Every request creates (or reuse
 | `security_group_ids` | No | `list[string]` | Security groups to attach. |
 | `price_type` | No | `string` | `"ondemand"` (default) or `"spot"`. |
 | `max_price` | No | `float` | Maximum spot price per hour. Only applied when `price_type` is `"spot"`. |
+| `fallback_to_ondemand` | No | `boolean` | Relaunch a spot request on-demand when spot capacity is unavailable. See [On-demand fallback](#on-demand-fallback). |
 | `max_machines` | No | `integer` | Maximum instances this template may provision (default: 1). |
 | `machine_ssh_key` | No | `string` | EC2 key pair name. |
 | `machine_bootstrap` | No | `string` | User data script. |
@@ -115,9 +116,19 @@ Setting `price_type: "spot"` adds `InstanceMarketOptions: {"MarketType": "spot"}
 }
 ```
 
-`allocation_strategy` is accepted but has little effect: RunInstances has no allocation-strategy parameter, so every strategy maps to the `one-time` spot request type. Use a fleet handler if you need real allocation strategies.
+`allocation_strategy` is accepted but has no effect: RunInstances has no allocation-strategy parameter. Use a fleet handler if you need real allocation strategies.
 
 The shipped handler defaults in `aws_defaults.json` declare `RunInstances` with `supports_spot: true`, so spot templates are accepted without extra configuration. Set `supports_spot: false` under the handler in the provider configuration to reject them.
+
+### On-demand fallback
+
+With `fallback_to_ondemand: true`, a spot launch that fails with `InsufficientInstanceCapacity`, `SpotMaxPriceTooLow`, `MaxSpotInstanceCountExceeded` or `UnfulfillableCapacity` is launched again on-demand. The retry is built from the same template with `price_type` set to `ondemand`, on the same launch template version, with a new client token. The request's `provider_data` then carries `capacity_fallback: {"from": "spot", "to": "ondemand", "reason": <error code>}`, each machine reports its real price type, and a warning with `event: aws.spot_fallback` is logged.
+
+The default comes from `template.default_fallback_to_ondemand` (`false`) and can be set per provider type and provider instance (`template_defaults`), per template and per request. On-demand capacity costs more than spot, so the setting is off unless chosen.
+
+RunInstances cannot override a market type set outside the template, so the fallback is skipped, with a warning, when a provider API spec sets `InstanceMarketOptions`, or when the launch template version being launched sets it or cannot be read. Other errors, and retryable errors, never fall back.
+
+The setting applies to RunInstances only. EC2 Fleet, Spot Fleet and ASG mix spot and on-demand capacity with `price_type: "heterogeneous"`; a template for them that sets it logs a warning when it is loaded.
 
 ### Native spec
 
@@ -198,7 +209,7 @@ Launch template management (`ec2:CreateLaunchTemplate`, `ec2:CreateLaunchTemplat
 - **One instance type per template** — extra `machine_types` entries are ignored.
 - **No weighted capacity** — every instance is one unit.
 - **No ABIS** — `RunInstances` has no `InstanceRequirements` parameter.
-- **No allocation strategies** — all strategies collapse to a `one-time` spot request.
+- **No allocation strategies** — RunInstances has no allocation-strategy parameter.
 - **One subnet when injecting networking** — only relevant when pinning a launch template that owns no networking.
 - **No capacity reconciliation** — a short launch stays short; nothing replaces failed or interrupted instances.
 

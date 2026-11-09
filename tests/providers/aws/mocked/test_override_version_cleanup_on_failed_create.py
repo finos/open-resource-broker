@@ -227,3 +227,32 @@ def test_instant_fleet_that_returned_only_errors_deletes_the_version(make_setup)
     setup.recorded.delete_launch_template_versions.assert_called_once_with(
         LaunchTemplateId=setup.user_lt, Versions=[setup.our_version()]
     )
+
+
+def test_failed_fallback_check_raises_the_spot_error_and_deletes_the_version(make_setup) -> None:
+    setup = make_setup("RunInstances")
+    setup.template = setup.template.model_copy(
+        update={"price_type": "spot", "fallback_to_ondemand": True}
+    )
+    spot_error = _client_error("InsufficientInstanceCapacity", "RunInstances")
+    expected = setup.handler._convert_client_error(spot_error, "run_instances")
+
+    with (
+        setup.fail_create_with(spot_error),
+        patch.object(
+            setup.handler.launch_template_manager,
+            "inspect_launch_template",
+            side_effect=_client_error("RequestLimitExceeded", "DescribeLaunchTemplateVersions"),
+        ) as inspect,
+        pytest.raises(type(expected)) as raised,
+    ):
+        setup.acquire()
+
+    inspect.assert_called_once()
+
+    # The acquire path prefixes the converted error; the spot error text must survive intact.
+    assert str(expected) in str(raised.value)
+    assert "RequestLimitExceeded" not in str(raised.value)
+    setup.recorded.delete_launch_template_versions.assert_called_once_with(
+        LaunchTemplateId=setup.user_lt, Versions=[setup.our_version()]
+    )

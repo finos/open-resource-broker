@@ -44,6 +44,10 @@ class TemplateConfig(BaseModel):
     default_price_type: str = Field(
         "ondemand", description="Default pricing type (ondemand, spot, heterogeneous)"
     )
+    default_fallback_to_ondemand: bool = Field(
+        False,
+        description="Retry a spot or preemptible launch as on-demand when capacity is unavailable",
+    )
 
     # Note: All AWS-specific fields have been moved to AWS provider extensions:
     # - AMI resolution configuration -> AWS provider extensions

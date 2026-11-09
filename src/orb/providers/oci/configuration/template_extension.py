@@ -20,7 +20,6 @@ class OCITemplateExtensionConfig(ProviderTemplateExtensionBase):
     memory_gbs: float | None = Field(default=None, gt=0)
     boot_volume_gbs: float | None = Field(default=None, gt=0)
     capacity_type: Literal["ondemand", "preemptible"] = "ondemand"
-    fallback_to_ondemand: bool = False
     preemptible_preserve_boot_volume: bool = False
     ssh_authorized_keys: str | None = None
     form_factor: str | None = None

@@ -24,6 +24,7 @@ class AWSFieldMapping:
         # AWS pricing configurations
         "percentOnDemand": "percent_on_demand",
         "allocationStrategyOnDemand": "allocation_strategy_on_demand",
+        "fallbackToOndemand": "fallback_to_ondemand",
         # AWS fleet configurations
         "fleetRole": "fleet_role",
         "spotFleetRequestExpiry": "spot_fleet_request_expiry",

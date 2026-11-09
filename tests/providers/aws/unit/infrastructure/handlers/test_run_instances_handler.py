@@ -9,7 +9,10 @@ from botocore.exceptions import ClientError
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError, AWSValidationError
 from orb.providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
-from orb.providers.aws.infrastructure.launch_template.manager import LTNetworkingState
+from orb.providers.aws.infrastructure.launch_template.manager import (
+    LTInspection,
+    LTNetworkingState,
+)
 
 
 def _make_handler() -> Any:
@@ -419,7 +422,9 @@ class TestRunInstancesHandlerNetworkingInject:
     )
     def test_inject_respects_lt_state(self, lt_state, expect_subnet, expect_sgs, expect_raises):
         handler = _handler_with_config_port()
-        handler.launch_template_manager.inspect_launch_template_networking.return_value = lt_state
+        handler.launch_template_manager.inspect_launch_template.return_value = LTInspection(
+            networking=lt_state, sets_market_options=False
+        )
 
         aws_template = _make_aws_template(
             subnet_ids=["subnet-1"],
