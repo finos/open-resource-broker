@@ -6,7 +6,12 @@ name: Container Cleanup (Dev Tags)
 #   - The newest N dev builds per Python version
 # Deletes:
 #   - Older dev builds beyond the keep-window
-#   - Untagged orphan manifests
+#   - Untagged orphan manifests -- but never an untagged version that a tagged
+#     image index still references.  The per-platform and attestation manifests
+#     of a multi-arch image are stored as tagless package versions; deleting
+#     them makes the tagged image unpullable.  dev-tools/ci/container_keep_set.py
+#     reads every tagged manifest from the registry to find them, and the run
+#     aborts without deleting anything if any of them cannot be read.
 #
 # Production-release-driven cleanup of pre-release dev builds is handled
 # separately in container-cleanup-on-release.yml.
@@ -41,14 +46,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      contents: read
       packages: write
     steps:
+      - name: Checkout cleanup script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: dev-tools/ci/container_keep_set.py
+          sparse-checkout-cone-mode: false
+
       - name: Cleanup dev container versions
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           PACKAGE: ${{ github.event.repository.name }}
+          REPOSITORY: ${{ github.repository }}
           DRY_RUN: ${{ inputs.dry-run || 'false' }}
           KEEP_PER_PYTHON: ${{ inputs.keep-per-python || '5' }}
         run: |
@@ -105,18 +119,19 @@ jobs:
           : > /tmp/delete.txt
           : > /tmp/keep_protected.txt
           : > /tmp/keep_recent_dev.txt
-          : > /tmp/untagged.txt
           : > /tmp/dev_by_py.tsv
 
-          # Classify each manifest: untagged orphan, protected, dev (bucketed by
-          # python version), or unknown (kept defensively).
+          # Untagged versions are classified by container_keep_set.py below: a
+          # tagless version is only an orphan if no tagged index references it.
+          # Here, classify the tagged ones: protected, dev (bucketed by python
+          # version), or unknown (kept defensively).
           while IFS= read -r row; do
             id=$(echo "$row" | jq -r '.id')
             created_at=$(echo "$row" | jq -r '.created_at')
+            digest=$(echo "$row" | jq -r '.name')
             tags=$(echo "$row" | jq -r '.metadata.container.tags // [] | join(",")')
 
             if [[ -z "$tags" ]]; then
-              echo "$id ($created_at) [untagged]" >> /tmp/untagged.txt
               continue
             fi
 
@@ -144,7 +159,7 @@ jobs:
               fi
             done
             if [[ "$dev" == "true" ]]; then
-              printf '%s\t%s\t%s\t%s\n' "$py_bucket" "$created_at" "$id" "$tags" >> /tmp/dev_by_py.tsv
+              printf '%s\t%s\t%s\t%s\t%s\n' "$py_bucket" "$created_at" "$id" "$tags" "$digest" >> /tmp/dev_by_py.tsv
               continue
             fi
 
@@ -158,7 +173,7 @@ jobs:
             sort -k1,1 -k2,2r /tmp/dev_by_py.tsv > /tmp/dev_by_py_sorted.tsv
             current_py=""
             kept_in_bucket=0
-            while IFS=$'\t' read -r py_bucket created_at id tags; do
+            while IFS=$'\t' read -r py_bucket created_at id tags digest; do
               if [[ "$py_bucket" != "$current_py" ]]; then
                 current_py="$py_bucket"
                 kept_in_bucket=0
@@ -167,10 +182,36 @@ jobs:
                 echo "$id ($created_at) [py: $py_bucket] [tags: ${tags}]" >> /tmp/keep_recent_dev.txt
                 kept_in_bucket=$((kept_in_bucket + 1))
               else
-                echo "$id ($created_at) [py: $py_bucket] [tags: ${tags}]" >> /tmp/delete.txt
+                echo "$id ($created_at) [py: $py_bucket] [tags: ${tags}] [digest: ${digest}]" >> /tmp/delete.txt
               fi
             done < /tmp/dev_by_py_sorted.tsv
           fi
+
+          # Build the keep-set from every tagged manifest and split the untagged
+          # versions into orphans and referenced children.  Exits non-zero (and
+          # writes no delete list) if any tagged manifest cannot be read, which
+          # stops the run here under `set -e` before anything is deleted.
+          python3 -I dev-tools/ci/container_keep_set.py \
+            --versions /tmp/versions.jsonl \
+            --repository "${REPOSITORY}" \
+            --keep-out /tmp/keep_set.txt \
+            --untagged-delete-out /tmp/untagged.txt \
+            --untagged-kept-out /tmp/untagged_kept.txt
+
+          # A tagged candidate that is itself referenced by another tagged
+          # index (e.g. a per-arch tag) is not deleted either.
+          : > /tmp/delete_final.txt
+          : > /tmp/delete_referenced.txt
+          while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            digest=$(echo "$line" | sed -n 's/.*\[digest: \(sha256:[0-9a-f]*\)\]$/\1/p')
+            if [[ -n "$digest" ]] && grep -qxF -- "$digest" /tmp/keep_set.txt; then
+              echo "$line" >> /tmp/delete_referenced.txt
+            else
+              echo "$line" >> /tmp/delete_final.txt
+            fi
+          done < /tmp/delete.txt
+          mv /tmp/delete_final.txt /tmp/delete.txt
 
           echo
           echo "== Protected (always kept) =="
@@ -179,11 +220,22 @@ jobs:
           echo "== Recent dev kept (per-python window of ${KEEP_PER_PYTHON}) =="
           cat /tmp/keep_recent_dev.txt || true
           echo
-          echo "== Untagged (will delete) =="
+          echo "== Untagged kept (referenced by a tagged index, or too recent) =="
+          cat /tmp/untagged_kept.txt || true
+          echo
+          echo "== Old dev kept (referenced by another tagged index) =="
+          cat /tmp/delete_referenced.txt || true
+          echo
+          echo "== Untagged orphans (will delete) =="
           cat /tmp/untagged.txt || true
           echo
           echo "== Old dev (will delete) =="
           cat /tmp/delete.txt || true
+          echo
+          echo "Counts: kept-as-referenced untagged=$(grep -c 'referenced by a tagged index' /tmp/untagged_kept.txt || true)," \
+               "kept-as-referenced old-dev=$(wc -l < /tmp/delete_referenced.txt)," \
+               "untagged orphans to delete=$(wc -l < /tmp/untagged.txt)," \
+               "old dev to delete=$(wc -l < /tmp/delete.txt)"
           echo
 
           if [[ "$DRY_RUN" == "true" ]]; then
@@ -192,24 +244,33 @@ jobs:
           fi
 
           deleted=0
+          failed=0
           while IFS= read -r line; do
             [[ -z "$line" ]] && continue
             id=$(echo "$line" | awk '{print $1}')
             echo "Deleting version ${id}"
-            gh api -X DELETE "${PACKAGES_API}/${id}" || {
+            if gh api -X DELETE "${PACKAGES_API}/${id}"; then
+              deleted=$((deleted + 1))
+            else
               echo "  failed to delete ${id} (continuing)"
-            }
-            deleted=$((deleted + 1))
+              failed=$((failed + 1))
+            fi
           done < /tmp/untagged.txt
           while IFS= read -r line; do
             [[ -z "$line" ]] && continue
             id=$(echo "$line" | awk '{print $1}')
             echo "Deleting version ${id}"
-            gh api -X DELETE "${PACKAGES_API}/${id}" || {
+            if gh api -X DELETE "${PACKAGES_API}/${id}"; then
+              deleted=$((deleted + 1))
+            else
               echo "  failed to delete ${id} (continuing)"
-            }
-            deleted=$((deleted + 1))
+              failed=$((failed + 1))
+            fi
           done < /tmp/delete.txt
 
           echo
-          echo "Deleted ${deleted} version(s)."
+          echo "Deleted ${deleted} version(s); ${failed} failed."
+          if (( failed > 0 )); then
+            echo "ERROR: ${failed} deletion(s) failed" >&2
+            exit 1
+          fi

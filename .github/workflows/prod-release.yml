@@ -557,24 +557,6 @@ jobs:
     - name: Smoke-check deployed site
       run: bash dev-tools/docs/smoke_check_pages.sh "${{ steps.deployment.outputs.page_url }}"
 
-  container-cleanup:
-    name: Cleanup Old Container Images
-    needs: [config, prod-manifests]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    permissions:
-      packages: write
-
-    steps:
-    - name: Delete untagged container images
-      uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55  # v5
-      with:
-        package-name: ${{ github.event.repository.name }}
-        package-type: container
-        min-versions-to-keep: 0
-        delete-only-untagged-versions: true
-
   github-assets:
     name: Upload GitHub Release Assets
     # prod-containers intentionally removed from needs: wheel signing + GH release
@@ -937,7 +919,6 @@ jobs:
       - sdk-publish
       - sdk-bootstrap
       - sdk-assets
-      - container-cleanup
 
     steps:
     - name: Write release train summary
@@ -958,7 +939,6 @@ jobs:
           echo "| sdk-publish | ${{ needs.sdk-publish.result }} |"
           echo "| sdk-bootstrap | ${{ needs.sdk-bootstrap.result }} |"
           echo "| sdk-assets | ${{ needs.sdk-assets.result }} |"
-          echo "| container-cleanup | ${{ needs.container-cleanup.result }} |"
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Fail if any release job failed or was cancelled
@@ -973,4 +953,4 @@ jobs:
         # (dispatch-gated), so it must not fail the gate. alls-green still fails
         # on a 'failure' result regardless of allowed-skips, so a dispatch where
         # the bootstrap actually runs and FAILS still fails the release gate.
-        allowed-skips: prod-containers, prod-manifests, prod-pypi, prod-docs, github-assets, sdk-spec-conformance, sdk-publish, sdk-bootstrap, sdk-assets, container-cleanup
+        allowed-skips: prod-containers, prod-manifests, prod-pypi, prod-docs, github-assets, sdk-spec-conformance, sdk-publish, sdk-bootstrap, sdk-assets
