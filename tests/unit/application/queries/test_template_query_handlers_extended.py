@@ -58,6 +58,7 @@ def _make_container_with_template_port(
     container = MagicMock()
     template_port = MagicMock()
 
+    template_port.get_template_rejection = AsyncMock(return_value=None)
     template_port.get_template_by_id = AsyncMock(return_value=template_dto)
     template_port.load_templates = AsyncMock(return_value=template_dtos or [])
     template_port.get_templates_by_provider = AsyncMock(return_value=template_dtos or [])
@@ -165,6 +166,7 @@ class TestGetTemplateHandler:
     @pytest.mark.asyncio
     async def test_generic_exception_propagates(self):
         template_manager = MagicMock()
+        template_manager.get_template_rejection = AsyncMock(return_value=None)
         template_manager.get_template_by_id = AsyncMock(
             side_effect=RuntimeError("container broken")
         )
@@ -399,6 +401,7 @@ class TestValidateTemplateHandler:
     async def test_exception_during_load_returns_error(self):
         container = MagicMock()
         port = MagicMock()
+        port.get_template_rejection = AsyncMock(return_value=None)
         port.get_template_by_id = AsyncMock(side_effect=RuntimeError("load failed"))
         port.validate_template_config = MagicMock(return_value=[])
         container.get.return_value = port

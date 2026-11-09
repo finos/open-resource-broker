@@ -18,6 +18,13 @@ from orb.application.ports.template_dto_factory_port import TemplateDTOFactoryPo
 from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 
 
+def _strategy_value(value: Any) -> Optional[str]:
+    """Plain string form of a strategy that may be held as a value object."""
+    if value is None:
+        return None
+    return str(getattr(value, "value", value))
+
+
 class TemplateDTOFactory(TemplateDTOFactoryPort):
     """Converts domain Template aggregates to TemplateDTO instances.
 
@@ -64,8 +71,11 @@ class TemplateDTOFactory(TemplateDTOFactoryPort):
             subnet_ids=getattr(template, "subnet_ids", []),
             security_group_ids=getattr(template, "security_group_ids", []),
             # Pricing and allocation
-            price_type=getattr(template, "price_type", "ondemand"),
+            price_type=template.price_type,
             allocation_strategy=getattr(template, "allocation_strategy", None),
+            allocation_strategy_on_demand=_strategy_value(
+                getattr(template, "allocation_strategy_on_demand", None)
+            ),
             max_price=getattr(template, "max_price", None),
             # Network configuration
             network_zones=getattr(template, "network_zones", []),

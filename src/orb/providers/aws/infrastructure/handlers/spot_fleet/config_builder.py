@@ -18,6 +18,11 @@ from orb.providers.aws.infrastructure.handlers.shared.base_config_builder import
 from orb.providers.aws.infrastructure.tags import build_resource_tags
 
 
+def _has_on_demand_target(price_type: str, on_demand_count: int) -> bool:
+    """True when the request sets an on-demand target capacity."""
+    return price_type in ("ondemand", "heterogeneous") or on_demand_count > 0
+
+
 class SpotFleetConfigBuilder(BaseConfigBuilder):
     """Builds the SpotFleetRequestConfig dict passed to request_spot_fleet."""
 
@@ -96,7 +101,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
     ) -> dict[str, Any]:
         """Delegate capacity distribution to the template's own logic."""
         # Mirrors BaseContextMixin._calculate_capacity_distribution
-        price_type = getattr(template, "price_type", "spot") or "spot"
+        price_type = template.price_type
         percent_on_demand = getattr(template, "percent_on_demand", None)
 
         if price_type == "ondemand":
@@ -182,7 +187,15 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
             "fleet_role": template.fleet_role,
             "fleet_type": fleet_type,
             "is_heterogeneous": template.price_type == "heterogeneous",
+            "has_on_demand_target": _has_on_demand_target(
+                template.price_type, capacity["on_demand_count"]
+            ),
             "allocation_strategy": template.get_spot_fleet_allocation_strategy(),
+            "allocation_strategy_on_demand": (
+                template.get_spot_fleet_on_demand_allocation_strategy()
+                if capacity["on_demand_count"] > 0
+                else None
+            ),
             "instance_interruption_behavior": getattr(
                 template, "instance_interruption_behavior", "terminate"
             ),
@@ -257,16 +270,21 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
             ],
             "TargetCapacity": target_capacity,
             "IamFleetRole": fleet_role,
-            "AllocationStrategy": template.get_spot_fleet_allocation_strategy(),
             "Type": fleet_type_value,
             "TagSpecifications": [
                 {"ResourceType": "spot-fleet-request", "Tags": common_tags},
             ],
         }
 
-        price_type = template.price_type or "spot"
-        if price_type in ("ondemand", "heterogeneous") or on_demand_capacity > 0:
+        spot_strategy = template.get_spot_fleet_allocation_strategy()
+        if spot_strategy:
+            fleet_config["AllocationStrategy"] = spot_strategy
+        if _has_on_demand_target(template.price_type, on_demand_capacity):
             fleet_config["OnDemandTargetCapacity"] = on_demand_capacity
+        if on_demand_capacity > 0:
+            on_demand_strategy = template.get_spot_fleet_on_demand_allocation_strategy()
+            if on_demand_strategy:
+                fleet_config["OnDemandAllocationStrategy"] = on_demand_strategy
 
         if template.fleet_type == AWSFleetType.MAINTAIN:
             fleet_config["ReplaceUnhealthyInstances"] = True

@@ -1,8 +1,9 @@
 {
-  "IamFleetRole": "{{ fleet_role }}",
-  "AllocationStrategy": "{{ allocation_strategy }}",
-  "TargetCapacity": {{ target_capacity }}{% if is_heterogeneous %},
-  "OnDemandTargetCapacity": {{ on_demand_count }}{% endif %},
+  "IamFleetRole": "{{ fleet_role }}",{% if allocation_strategy %}
+  "AllocationStrategy": "{{ allocation_strategy }}",{% endif %}
+  "TargetCapacity": {{ target_capacity }}{% if has_on_demand_target %},
+  "OnDemandTargetCapacity": {{ on_demand_count }}{% endif %}{% if allocation_strategy_on_demand %},
+  "OnDemandAllocationStrategy": "{{ allocation_strategy_on_demand }}"{% endif %},
   "Type": "{{ fleet_type | default('request') }}",
   "LaunchTemplateConfigs": [
     {

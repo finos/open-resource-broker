@@ -36,11 +36,14 @@ class ProviderRegistration(BaseRegistration):
         default_api: Optional[str] = None,
         display_name: Optional[str] = None,
         strategy_class_loader: Optional[Callable[[], type]] = None,
+        template_row_migration: Optional[Callable[..., Any]] = None,
     ) -> None:
         """Initialize the instance.
 
         ``strategy_class_loader`` lets a provider defer importing its strategy
         (and the cloud SDK behind it) until ``strategy_class`` is first read.
+        ``template_row_migration`` rewrites legacy template rows during
+        template default resolution (see ``ProviderRegistryPort``).
         """
         super().__init__(
             type_name,
@@ -55,6 +58,7 @@ class ProviderRegistration(BaseRegistration):
         self._strategy_class_loader = strategy_class_loader
         self.default_api = default_api
         self.display_name = display_name
+        self.template_row_migration = template_row_migration
 
     @property
     def strategy_class(self) -> Optional[type]:

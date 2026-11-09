@@ -277,29 +277,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 if template.price_type == "spot"
                 else ["instance"]
             ),
-            "has_spot_options": bool(template.allocation_strategy or template.max_price),
+            "has_spot_options": template.price_type == "spot",
             "max_spot_price": (str(template.max_price) if template.max_price is not None else None),
-            "spot_instance_type": (
-                self._get_spot_instance_type(template.allocation_strategy)
-                if template.allocation_strategy
-                else None
-            ),
         }
-
-    def _get_spot_instance_type(self, allocation_strategy: str) -> str:
-        """Convert allocation strategy to spot instance type for RunInstances."""
-        # RunInstances doesn't support all EC2Fleet allocation strategies
-        # Map to supported spot instance types
-        strategy_map = {
-            "lowest_price": "one-time",
-            "diversified": "one-time",  # RunInstances doesn't support diversified directly
-            "capacity_optimized": "one-time",  # RunInstances doesn't support capacity-optimized directly
-            "lowestPrice": "one-time",
-            "capacityOptimized": "one-time",
-            "capacityOptimizedPrioritized": "one-time",
-            "priceCapacityOptimized": "one-time",
-        }
-        return strategy_map.get(allocation_strategy, "one-time")
 
     def _create_run_instances_params(
         self,

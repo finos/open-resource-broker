@@ -22,7 +22,9 @@
     }{% if spot_count > 0 %},
     "InstancesDistribution": {
       "OnDemandBaseCapacity": 0,
-      "OnDemandPercentageAboveBaseCapacity": {{ percent_on_demand }}
+      "OnDemandPercentageAboveBaseCapacity": {{ percent_on_demand }}{% if spot_allocation_strategy %},
+      "SpotAllocationStrategy": {{ spot_allocation_strategy | tojson }}{% endif %}{% if on_demand_allocation_strategy %},
+      "OnDemandAllocationStrategy": {{ on_demand_allocation_strategy | tojson }}{% endif %}
     }{% endif %}
   }{% else %}"LaunchTemplate": {
     "LaunchTemplateId": "{{ launch_template_id }}",

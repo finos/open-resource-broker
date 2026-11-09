@@ -15,6 +15,18 @@ from orb.providers.aws.exceptions.aws_exceptions import AWSConfigurationError
 from orb.providers.aws.infrastructure.handlers.shared.base_config_builder import BaseConfigBuilder
 
 
+def _distribution_strategies(template: AWSTemplate) -> dict[str, str]:
+    """Spot and on-demand allocation strategies for an ASG InstancesDistribution."""
+    strategies: dict[str, str] = {}
+    spot_strategy = template.get_asg_allocation_strategy()
+    if spot_strategy:
+        strategies["SpotAllocationStrategy"] = spot_strategy
+    on_demand_strategy = template.get_asg_on_demand_allocation_strategy()
+    if on_demand_strategy:
+        strategies["OnDemandAllocationStrategy"] = on_demand_strategy
+    return strategies
+
+
 class ASGConfigBuilder(BaseConfigBuilder):
     """Builds the CreateAutoScalingGroup API parameter dict for a given request."""
 
@@ -175,7 +187,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
                 "Version": lt_version,
             }
 
-        price_type = getattr(template, "price_type", "ondemand") or "ondemand"
+        price_type = template.price_type
         percent_on_demand = getattr(template, "percent_on_demand", None)
         needs_spot_distribution = percent_on_demand is not None or price_type in (
             "spot",
@@ -200,10 +212,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
             }
             asg_config["MixedInstancesPolicy"]["InstancesDistribution"] = instances_distribution
 
-            if getattr(template, "allocation_strategy", None):
-                instances_distribution["SpotAllocationStrategy"] = (
-                    template.get_asg_allocation_strategy()
-                )
+            instances_distribution.update(_distribution_strategies(template))
 
             if "LaunchTemplate" in asg_config:
                 asg_config.pop("LaunchTemplate", None)
@@ -264,7 +273,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
             "has_subnets": bool(template.subnet_ids),
             "security_group_ids": template.security_group_ids or [],
             "tags": template.tags or {},
-            "price_type": getattr(template, "price_type", "ondemand"),
+            "price_type": template.price_type,
             "asg_name": f"{self._config_port.get_resource_prefix('asg')}{request.request_id}",
             "min_size": 0,
             "max_size": request.requested_count * 2,
@@ -286,6 +295,8 @@ class ASGConfigBuilder(BaseConfigBuilder):
             "percent_on_demand": percent_on_demand,
             "on_demand_count": on_demand_count,
             "spot_count": spot_count,
+            "spot_allocation_strategy": template.get_asg_allocation_strategy(),
+            "on_demand_allocation_strategy": template.get_asg_on_demand_allocation_strategy(),
             **tag_context,
         }
 
@@ -294,7 +305,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
     ) -> dict[str, Any]:
         """Calculate on-demand / spot capacity split."""
         percent_on_demand = getattr(template, "percent_on_demand", None)
-        price_type = getattr(template, "price_type", "ondemand") or "ondemand"
+        price_type = template.price_type
 
         if percent_on_demand is not None:
             on_demand_count = int(requested_count * percent_on_demand / 100)

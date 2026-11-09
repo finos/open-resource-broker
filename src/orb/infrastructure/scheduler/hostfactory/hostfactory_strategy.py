@@ -506,8 +506,8 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "subnet_ids": raw_data.get("subnetIds", []),
             "security_group_ids": raw_data.get("securityGroupIds", []),
             # Pricing and allocation
-            "price_type": raw_data.get("priceType", "ondemand"),
             "allocation_strategy": raw_data.get("allocationStrategy"),
+            "allocation_strategy_on_demand": raw_data.get("allocationStrategyOnDemand"),
             "max_price": raw_data.get("maxPrice"),
             # Tags and metadata
             "tags": raw_data.get("tags", {}),
@@ -527,6 +527,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "provider_api_spec": raw_data.get("provider_api_spec"),
             "provider_api_spec_file": raw_data.get("provider_api_spec_file"),
         }
+
+        # An absent priceType leaves the configured default in place.
+        if raw_data.get("priceType") is not None:
+            domain_data["price_type"] = raw_data["priceType"]
 
         # Map vmType/vmTypes → machine_types (same logic as _transform_machine_types_input)
         domain_data.update(self._transform_machine_types_input(raw_data))

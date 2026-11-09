@@ -16,6 +16,16 @@ from orb.providers.aws.infrastructure.handlers.shared.base_config_builder import
 from orb.providers.aws.infrastructure.tags import build_resource_tags
 
 
+def _has_spot_pools(template: AWSTemplate) -> bool:
+    """True when the fleet launches spot capacity."""
+    return template.price_type in ("spot", "heterogeneous")
+
+
+def _has_on_demand_pools(template: AWSTemplate) -> bool:
+    """True when the fleet launches on-demand capacity."""
+    return template.price_type in ("ondemand", "heterogeneous")
+
+
 class EC2FleetConfigBuilder(BaseConfigBuilder):
     """Builds the create_fleet API payload from a template and request.
 
@@ -134,40 +144,32 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
             fleet_config["ReplaceUnhealthyInstances"] = True
             fleet_config["ExcessCapacityTerminationPolicy"] = "termination"
 
-        price_type = template.price_type or "ondemand"
-        if price_type == "ondemand":
-            fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = "on-demand"
-        elif price_type == "spot":
-            fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = "spot"
-            if template.allocation_strategy:
-                fleet_config["SpotOptions"] = {
-                    "AllocationStrategy": template.get_ec2_fleet_allocation_strategy()
-                }
-            if template.max_price is not None:
-                if "SpotOptions" not in fleet_config:
-                    fleet_config["SpotOptions"] = {}
-                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_price)
-        elif price_type == "heterogeneous":
+        price_type = template.price_type
+        target = fleet_config["TargetCapacitySpecification"]
+        if price_type == "spot":
+            target["DefaultTargetCapacityType"] = "spot"
+        else:
+            target["DefaultTargetCapacityType"] = "on-demand"
+        if price_type == "heterogeneous":
             percent_on_demand = template.percent_on_demand or 0
             on_demand_count = int(request.requested_count * percent_on_demand / 100)
-            spot_count = request.requested_count - on_demand_count
+            target["OnDemandTargetCapacity"] = on_demand_count
+            target["SpotTargetCapacity"] = request.requested_count - on_demand_count
 
-            fleet_config["TargetCapacitySpecification"]["OnDemandTargetCapacity"] = on_demand_count
-            fleet_config["TargetCapacitySpecification"]["SpotTargetCapacity"] = spot_count
-            fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = "on-demand"
-
-            if template.allocation_strategy:
-                fleet_config["SpotOptions"] = {
-                    "AllocationStrategy": template.get_ec2_fleet_allocation_strategy()
-                }
-            if template.allocation_strategy_on_demand:
-                fleet_config["OnDemandOptions"] = {
-                    "AllocationStrategy": template.get_ec2_fleet_on_demand_allocation_strategy()
-                }
+        # Each pool type gets its own options, and only when the fleet has that pool.
+        if _has_spot_pools(template):
+            spot_options: dict[str, Any] = {}
+            spot_strategy = template.get_ec2_fleet_allocation_strategy()
+            if spot_strategy:
+                spot_options["AllocationStrategy"] = spot_strategy
             if template.max_price is not None:
-                if "SpotOptions" not in fleet_config:
-                    fleet_config["SpotOptions"] = {}
-                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_price)
+                spot_options["MaxTotalPrice"] = str(template.max_price)
+            if spot_options:
+                fleet_config["SpotOptions"] = spot_options
+        if _has_on_demand_pools(template):
+            on_demand_strategy = template.get_ec2_fleet_on_demand_allocation_strategy()
+            if on_demand_strategy:
+                fleet_config["OnDemandOptions"] = {"AllocationStrategy": on_demand_strategy}
 
         instance_requirements_payload = template.get_instance_requirements_payload()
         if instance_requirements_payload:
@@ -263,14 +265,10 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
                     }
                 )
 
-        price_type = template.price_type or "ondemand"
-        default_capacity_type: str
-        if price_type == "spot":
-            default_capacity_type = "spot"
-        elif price_type == "ondemand":
-            default_capacity_type = "on-demand"
-        else:
-            default_capacity_type = "on-demand"
+        default_capacity_type = "spot" if template.price_type == "spot" else "on-demand"
+        spot_strategy = template.get_ec2_fleet_allocation_strategy()
+        on_demand_strategy = template.get_ec2_fleet_on_demand_allocation_strategy()
+        has_spot_pools = _has_spot_pools(template)
 
         tag_context = self._build_tag_context(
             request_id=str(request.request_id),
@@ -289,24 +287,17 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
             "is_maintain_fleet": template.fleet_type == AWSFleetType.MAINTAIN,
             "is_instant_fleet": template.fleet_type == AWSFleetType.INSTANT,
             "replace_unhealthy": template.fleet_type == AWSFleetType.MAINTAIN,
-            "has_spot_options": bool(template.allocation_strategy or template.max_price),
-            "has_ondemand_options": bool(template.allocation_strategy_on_demand),
+            "has_spot_options": has_spot_pools
+            and bool(spot_strategy or template.max_price is not None),
+            "has_ondemand_options": _has_on_demand_pools(template) and bool(on_demand_strategy),
             "is_heterogeneous": template.price_type == "heterogeneous",
             "abis_instance_requirements": abis_instance_requirements,
             "has_abis": has_abis,
             "percent_on_demand": percent_on_demand,
             "on_demand_count": on_demand_count,
             "spot_count": spot_count,
-            "allocation_strategy": (
-                template.get_ec2_fleet_allocation_strategy()
-                if template.allocation_strategy
-                else None
-            ),
-            "allocation_strategy_on_demand": (
-                template.get_ec2_fleet_on_demand_allocation_strategy()
-                if template.allocation_strategy_on_demand
-                else None
-            ),
+            "allocation_strategy": spot_strategy,
+            "allocation_strategy_on_demand": on_demand_strategy,
             "max_spot_price": (str(template.max_price) if template.max_price is not None else None),
             "default_capacity_type": default_capacity_type,
             **tag_context,

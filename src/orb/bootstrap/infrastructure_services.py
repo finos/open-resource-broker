@@ -66,6 +66,7 @@ def _register_template_services(container: DIContainer):
         from orb.application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
+        from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
         from orb.domain.template.factory import TemplateFactoryPort
         from orb.infrastructure.registry.template_extension_registry import (
             TemplateExtensionRegistryAdapter,
@@ -86,6 +87,7 @@ def _register_template_services(container: DIContainer):
             logger=c.get(LoggingPort),
             template_factory=template_factory,  # type: ignore[arg-type]
             extension_registry=TemplateExtensionRegistryAdapter(),
+            provider_registry=c.get_optional(ProviderRegistryPort),
         )
 
     from orb.application.services.template_defaults_service import TemplateDefaultsService

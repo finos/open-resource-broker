@@ -45,6 +45,7 @@ def _make_template_port(manager: Mock, validation_errors: list[str] | None = Non
     port = Mock()
     port.get_template_manager.return_value = manager
     port.validate_template_config.return_value = validation_errors or []
+    port.get_template_rejection = AsyncMock(return_value=None)
     return port
 
 

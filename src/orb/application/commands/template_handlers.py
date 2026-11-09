@@ -1,12 +1,14 @@
 """Template command handlers for CQRS pattern."""
 
 import logging
+from typing import Any, Optional
 
 from orb.application.base.handlers import BaseCommandHandler
 
 _logger = logging.getLogger(__name__)
 from orb.application.decorators import command_handler
 from orb.application.dto.template import TemplateDTO
+from orb.application.ports.template_dto_factory_port import TemplateDTOFactoryPort
 from orb.application.template.commands import (
     CreateTemplateCommand,
     DeleteTemplateCommand,
@@ -19,6 +21,17 @@ from orb.domain.base.ports import (
     LoggingPort,
 )
 from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
+from orb.domain.template.factory import TemplateFactoryPort
+from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
+
+
+def _resolve_candidate(
+    defaults_service: Optional[TemplateDefaultsPort], candidate: dict[str, Any]
+) -> dict[str, Any]:
+    """Apply template defaults to a candidate so it is validated as a load would see it."""
+    if defaults_service is None:
+        return candidate
+    return defaults_service.resolve_template_defaults(candidate)
 
 
 @command_handler(CreateTemplateCommand)  # type: ignore[arg-type]
@@ -41,10 +54,12 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
+        template_defaults_service: Optional[TemplateDefaultsPort] = None,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
         self._template_port = template_port
+        self._template_defaults_service = template_defaults_service
 
     async def validate_command(self, command: CreateTemplateCommand) -> None:
         """Validate create template command."""
@@ -61,14 +76,15 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
         """Create new template via TemplateConfigurationManager."""
         self.logger.info("Creating template: %s", command.template_id)
 
-        # Validate configuration first
+        # Validate configuration first, after default resolution as on load
+        candidate = {
+            "template_id": command.template_id,
+            "provider_api": command.provider_api,
+            "image_id": command.image_id,
+            **command.configuration,
+        }
         validation_errors = self._template_port.validate_template_config(
-            {
-                "template_id": command.template_id,
-                "provider_api": command.provider_api,
-                "image_id": command.image_id,
-                **command.configuration,
-            }
+            _resolve_candidate(self._template_defaults_service, candidate)
         )
         if validation_errors:
             self.logger.warning(
@@ -82,8 +98,10 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
 
         template_manager = self._template_port.get_template_manager()
 
-        # Duplicate check
+        # Duplicate check; a template rejected at load still owns its id
         existing = await template_manager.get_template_by_id(command.template_id)
+        if not existing:
+            existing = await self._template_port.get_template_rejection(command.template_id)
         if existing:
             raise DuplicateError(
                 f"Template {command.template_id} already exists",
@@ -135,9 +153,15 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
+        template_defaults_service: Optional[TemplateDefaultsPort] = None,
+        template_factory: Optional[TemplateFactoryPort] = None,
+        template_dto_factory: Optional[TemplateDTOFactoryPort] = None,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self._template_port = template_port
+        self._template_defaults_service = template_defaults_service
+        self._template_factory = template_factory
+        self._template_dto_factory = template_dto_factory
 
     async def validate_command(self, command: UpdateTemplateCommand) -> None:
         """Validate update template command."""
@@ -152,11 +176,12 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
         template_manager = self._template_port.get_template_manager()
 
         existing = await template_manager.get_template_by_id(command.template_id)
+        rejection = None
         if not existing:
-            raise EntityNotFoundError("Template", command.template_id)
-
-        # Apply updates onto the existing DTO
-        from typing import Any
+            # A template rejected at load is fixed by patching its stored row.
+            rejection = await self._template_port.get_template_rejection(command.template_id)
+            if rejection is None:
+                raise EntityNotFoundError("Template", command.template_id)
 
         update_fields: dict[str, Any] = {}
 
@@ -183,13 +208,15 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
             )
             update_fields["machine_types"] = {command.instance_type: 1}
 
-        if update_fields:
-            updated = existing.model_copy(update=update_fields)
+        if existing is not None:
+            candidate = existing.model_copy(update=update_fields).model_dump()
         else:
-            updated = existing
+            candidate = {**rejection.row, **update_fields}  # type: ignore[union-attr]
 
-        # Validate the fully-merged DTO (not the raw partial patch)
-        validation_errors = self._template_port.validate_template_config(updated.model_dump())
+        # Validate the fully-merged template (not the raw partial patch)
+        validation_errors = self._template_port.validate_template_config(
+            _resolve_candidate(self._template_defaults_service, candidate)
+        )
         if validation_errors:
             self.logger.warning(
                 "Template update validation failed for %s: %s",
@@ -200,9 +227,21 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
             command.updated = False
             return
 
+        if existing is not None:
+            updated = existing.model_copy(update=update_fields) if update_fields else existing
+        else:
+            updated = self._template_from_row(
+                _resolve_candidate(self._template_defaults_service, candidate)
+            )
         await template_manager.save_template(updated)
         self.logger.info("Template updated successfully: %s", command.template_id)
         command.updated = True
+
+    def _template_from_row(self, row: dict[str, Any]) -> Any:
+        """Build the template DTO for a repaired row, as GetTemplate builds it."""
+        if self._template_factory is None or self._template_dto_factory is None:
+            raise RuntimeError("template factories are required to repair a rejected template")
+        return self._template_dto_factory.from_domain(self._template_factory.create_template(row))
 
 
 @command_handler(DeleteTemplateCommand)  # type: ignore[arg-type]
@@ -241,6 +280,9 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, None]):  #
         template_manager = self._template_port.get_template_manager()
 
         existing = await template_manager.get_template_by_id(command.template_id)
+        if not existing:
+            # A template rejected at load can still be deleted.
+            existing = await self._template_port.get_template_rejection(command.template_id)
         if not existing:
             raise EntityNotFoundError("Template", command.template_id)
 

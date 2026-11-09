@@ -39,6 +39,14 @@ class TemplateConfigurationPort(ABC):
                 return t
         return None
 
+    async def get_template_rejection(self, template_id: str) -> Optional[Any]:
+        """Return the rejection recorded for a template skipped at load, or None.
+
+        A rejected template is absent from ``get_template_by_id``; this reports
+        why. Implementations that do not record rejections return None.
+        """
+        return None
+
     async def get_templates_by_provider(self, provider_api: str) -> list[Any]:
         """Get templates filtered by provider API. Override in implementations."""
         templates = await self.load_templates()

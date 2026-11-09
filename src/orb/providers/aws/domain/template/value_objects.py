@@ -245,6 +245,7 @@ class AWSAllocationStrategy:
             "diversified": "diversified",
             "lowestPrice": "lowestPrice",
             "priceCapacityOptimized": "priceCapacityOptimized",
+            "prioritized": "prioritized",
         },
         "asg": {
             "capacityOptimized": "capacity-optimized",
@@ -252,13 +253,8 @@ class AWSAllocationStrategy:
             "diversified": "diversified",
             "lowestPrice": "lowest-price",
             "priceCapacityOptimized": "price-capacity-optimized",
+            "prioritized": "prioritized",
         },
-    }
-
-    _DEFAULTS: ClassVar[dict[str, str]] = {
-        "ec2_fleet": "lowest-price",
-        "spot_fleet": "lowestPrice",
-        "asg": "lowest-price",
     }
 
     def __init__(self, strategy: str) -> None:
@@ -284,9 +280,19 @@ class AWSAllocationStrategy:
         return cls(str(strategy.value) if hasattr(strategy, "value") else str(strategy))
 
     def to_api_format(self, api: str) -> str:
-        """Convert to the wire format for the given AWS API."""
-        fmt_map = self._FORMAT_MAPS.get(api, {})
-        return fmt_map.get(self._canonical, self._DEFAULTS.get(api, self._canonical))
+        """Convert to the wire format for the given AWS API.
+
+        Raises:
+            ValueError: if *api* is unknown or the strategy has no wire value
+                for it. A strategy is never swapped for another one.
+        """
+        fmt_map = self._FORMAT_MAPS.get(api)
+        if fmt_map is None:
+            raise ValueError(f"Unknown AWS API {api!r} for allocation strategy formatting")
+        wire = fmt_map.get(self._canonical)
+        if wire is None:
+            raise ValueError(f"Allocation strategy {self._canonical!r} is not supported by {api}")
+        return wire
 
     def to_ec2_fleet_format(self) -> str:
         """Convert to EC2 Fleet API format (hyphenated)."""
@@ -313,6 +319,12 @@ CANONICAL_ALLOCATION_STRATEGIES: frozenset[str] = frozenset(
         "prioritized",
     }
 )
+
+# Strategies that apply to spot pools (``allocation_strategy``).
+SPOT_ALLOCATION_STRATEGIES: frozenset[str] = CANONICAL_ALLOCATION_STRATEGIES - {"prioritized"}
+
+# Strategies that apply to on-demand pools (``allocation_strategy_on_demand``).
+ON_DEMAND_ALLOCATION_STRATEGIES: frozenset[str] = frozenset({"lowestPrice", "prioritized"})
 
 # Maps every accepted input variant to its canonical camelCase form.
 _ALLOCATION_STRATEGY_NORMALISATION_MAP: dict[str, str] = {
@@ -359,6 +371,98 @@ def normalise_allocation_strategy(value: str) -> str:
     return canonical
 
 
+def normalise_spot_allocation_strategy(value: str) -> str:
+    """Return the canonical spot-pool strategy, rejecting on-demand-only values."""
+    canonical = normalise_allocation_strategy(value)
+    if canonical not in SPOT_ALLOCATION_STRATEGIES:
+        raise ValueError(
+            f"allocation_strategy {value!r} does not apply to spot pools; "
+            "set it as allocation_strategy_on_demand instead"
+        )
+    return canonical
+
+
+def normalise_on_demand_allocation_strategy(value: str) -> str:
+    """Return the canonical on-demand-pool strategy, rejecting spot-only values."""
+    canonical = normalise_allocation_strategy(value)
+    if canonical not in ON_DEMAND_ALLOCATION_STRATEGIES:
+        valid = ", ".join(sorted(ON_DEMAND_ALLOCATION_STRATEGIES))
+        raise ValueError(
+            f"allocation_strategy_on_demand {value!r} does not apply to on-demand pools; "
+            f"valid values are: {valid}"
+        )
+    return canonical
+
+
+def _canonical_or_none(value: Any) -> Optional[str]:
+    """Canonical strategy for *value*, or None when it is unset or unknown."""
+    if isinstance(value, AWSAllocationStrategy):
+        return value.value
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return normalise_allocation_strategy(value)
+    except ValueError:
+        return None
+
+
+def migrate_legacy_on_demand_strategy(
+    *,
+    row: dict[str, Any],
+    defaults: dict[str, Any],
+    merged: dict[str, Any],
+) -> tuple[dict[str, Any], Optional[str]]:
+    """Move an on-demand strategy a template row set in ``allocation_strategy``.
+
+    ``allocation_strategy`` is the spot-pool strategy and
+    ``allocation_strategy_on_demand`` the on-demand-pool strategy. Templates
+    written before that split put the on-demand strategy in
+    ``allocation_strategy``. Such a row is migrated when it sets
+    ``allocation_strategy`` itself, does not set
+    ``allocation_strategy_on_demand``, its value differs from the lower-layer
+    default, and the value is ``prioritized`` (on-demand only) or
+    ``lowestPrice`` on an ``ondemand`` template. The value moves to
+    ``allocation_strategy_on_demand`` and the spot strategy reverts to the
+    lower-layer default.
+
+    Args:
+        row: The template row as written, before defaults.
+        defaults: The merged lower layers (global, provider type, instance).
+        merged: The row merged over *defaults*.
+
+    Returns:
+        The (possibly new) merged dict and a deprecation message when the row
+        was migrated, else None.
+    """
+    row_value = row.get("allocation_strategy")
+    strategy = _canonical_or_none(row_value)
+    if strategy is None:
+        return merged, None
+    if row.get("allocation_strategy_on_demand") not in (None, ""):
+        return merged, None
+    default_value = defaults.get("allocation_strategy")
+    if strategy == _canonical_or_none(default_value):
+        return merged, None
+    price_type = merged.get("price_type")
+    price_type = getattr(price_type, "value", price_type)
+    if not (strategy == "prioritized" or (strategy == "lowestPrice" and price_type == "ondemand")):
+        return merged, None
+
+    migrated = dict(merged)
+    migrated["allocation_strategy_on_demand"] = strategy
+    if default_value in (None, ""):
+        migrated.pop("allocation_strategy", None)
+    else:
+        migrated["allocation_strategy"] = default_value
+    message = (
+        f"Template {row.get('template_id', 'unknown')!r} sets the on-demand strategy "
+        f"{strategy!r} in allocation_strategy; it is applied as allocation_strategy_on_demand. "
+        "allocation_strategy is the spot-pool strategy: move the value to "
+        "allocation_strategy_on_demand."
+    )
+    return migrated, message
+
+
 class AWSConfiguration(ValueObject):
     """AWS-specific configuration value object - clean domain object without infrastructure dependencies."""
 
@@ -378,14 +482,6 @@ class AWSConfiguration(ValueObject):
         if not self.fleet_type:
             # Use simple default without configuration dependency
             object.__setattr__(self, "fleet_type", AWSFleetType.REQUEST)
-
-        # Set default allocation strategy if not provided
-        if not self.allocation_strategy:
-            object.__setattr__(self, "allocation_strategy", "lowestPrice")
-
-        # Set default price type if not provided
-        if not self.price_type:
-            object.__setattr__(self, "price_type", PriceType.ONDEMAND)
 
         return self
 

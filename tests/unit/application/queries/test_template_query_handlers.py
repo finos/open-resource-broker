@@ -114,6 +114,7 @@ def _make_list_handler(template_manager, dtos) -> ListTemplatesHandler:
 @pytest.mark.asyncio
 async def test_get_template_not_found_raises_entity_not_found_error() -> None:
     template_manager = MagicMock()
+    template_manager.get_template_rejection = AsyncMock(return_value=None)
     template_manager.get_template_by_id = AsyncMock(return_value=None)
     container = _make_container(template_manager=template_manager)
     handler = _make_get_handler(container)
@@ -127,6 +128,7 @@ async def test_get_template_defaults_resolution_branch() -> None:
     """When TemplateDefaultsService is registered, resolve_template_defaults is called."""
     dto = _make_template_dto("tpl-defaults")
     template_manager = MagicMock()
+    template_manager.get_template_rejection = AsyncMock(return_value=None)
     template_manager.get_template_by_id = AsyncMock(return_value=dto)
 
     defaults_service = MagicMock()
@@ -155,6 +157,7 @@ async def test_get_template_defaults_resolution_branch() -> None:
 @pytest.mark.asyncio
 async def test_get_template_generic_exception_reraises() -> None:
     template_manager = MagicMock()
+    template_manager.get_template_rejection = AsyncMock(return_value=None)
     template_manager.get_template_by_id = AsyncMock(side_effect=RuntimeError("storage down"))
     container = _make_container(template_manager=template_manager)
     handler = _make_get_handler(container)
@@ -173,6 +176,7 @@ async def test_validate_handler_loads_by_template_id() -> None:
     """When only template_id is given, handler loads from storage."""
     dto = _make_template_dto("tpl-stored")
     template_manager = MagicMock()
+    template_manager.get_template_rejection = AsyncMock(return_value=None)
     template_manager.get_template_by_id = AsyncMock(return_value=dto)
     template_manager.validate_template_config = MagicMock(return_value=[])
 
@@ -194,6 +198,7 @@ async def test_validate_handler_loads_by_template_id() -> None:
 async def test_validate_handler_not_found_propagates() -> None:
     """EntityNotFoundError from storage is re-raised, not swallowed."""
     template_manager = MagicMock()
+    template_manager.get_template_rejection = AsyncMock(return_value=None)
     template_manager.get_template_by_id = AsyncMock(return_value=None)
 
     container = MagicMock()

@@ -36,9 +36,9 @@ class TestGetEc2FleetAllocationStrategy:
         template = _make_template(input_strategy)
         assert template.get_ec2_fleet_allocation_strategy() == expected
 
-    def test_no_strategy_defaults_to_lowest_price(self) -> None:
+    def test_no_strategy_is_omitted(self) -> None:
         template = _make_template("")
-        assert template.get_ec2_fleet_allocation_strategy() == "lowest-price"
+        assert template.get_ec2_fleet_allocation_strategy() is None
 
 
 class TestGetEc2FleetOnDemandAllocationStrategy:
@@ -54,9 +54,9 @@ class TestGetEc2FleetOnDemandAllocationStrategy:
         template = _make_template("lowest_price", allocation_strategy_on_demand=input_strategy)
         assert template.get_ec2_fleet_on_demand_allocation_strategy() == expected
 
-    def test_falls_back_to_spot_strategy_when_no_ondemand(self) -> None:
+    def test_does_not_fall_back_to_the_spot_strategy(self) -> None:
         template = _make_template("capacity_optimized")
-        assert template.get_ec2_fleet_on_demand_allocation_strategy() == "capacity-optimized"
+        assert template.get_ec2_fleet_on_demand_allocation_strategy() is None
 
 
 class TestGetSpotFleetAllocationStrategy:
@@ -76,9 +76,9 @@ class TestGetSpotFleetAllocationStrategy:
         template = _make_template(input_strategy)
         assert template.get_spot_fleet_allocation_strategy() == expected
 
-    def test_no_strategy_defaults_to_lowest_price(self) -> None:
+    def test_no_strategy_is_omitted(self) -> None:
         template = _make_template("")
-        assert template.get_spot_fleet_allocation_strategy() == "lowestPrice"
+        assert template.get_spot_fleet_allocation_strategy() is None
 
     def test_ec2_fleet_and_spot_fleet_use_different_formats(self) -> None:
         template = _make_template("capacity_optimized")

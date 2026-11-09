@@ -33,7 +33,7 @@
   "ReplaceUnhealthyInstances": {{ replace_unhealthy | tojson }},
   "ExcessCapacityTerminationPolicy": "termination"{% endif %}{% if has_spot_options %},
   "SpotOptions": {
-    "AllocationStrategy": "{{ allocation_strategy }}"{% if max_spot_price %},
+    {% if allocation_strategy %}"AllocationStrategy": "{{ allocation_strategy }}"{% if max_spot_price %},{% endif %}{% endif %}{% if max_spot_price %}
     "MaxTotalPrice": "{{ max_spot_price }}"{% endif %}
   }{% endif %}{% if has_ondemand_options %},
   "OnDemandOptions": {

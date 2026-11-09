@@ -221,9 +221,13 @@ class TestAWSTemplateValidationErrors:
 @pytest.mark.unit
 class TestAllocationStrategyOnDemand:
     def test_string_is_coerced_to_value_object(self) -> None:
-        template = AWSTemplate(template_id="t1", allocation_strategy_on_demand="capacity-optimized")
+        template = AWSTemplate(template_id="t1", allocation_strategy_on_demand="lowest-price")
         assert isinstance(template.allocation_strategy_on_demand, AWSAllocationStrategy)
-        assert template.allocation_strategy_on_demand.value == "capacityOptimized"
+        assert template.allocation_strategy_on_demand.value == "lowestPrice"
+
+    def test_spot_only_strategy_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="does not apply to on-demand pools"):
+            AWSTemplate(template_id="t1", allocation_strategy_on_demand="capacity-optimized")
 
     def test_none_is_preserved(self) -> None:
         template = AWSTemplate(template_id="t1", allocation_strategy_on_demand=None)
@@ -245,12 +249,12 @@ class TestAllocationStrategyOnDemand:
         assert dumped["allocation_strategy_on_demand"] is None
 
     def test_get_ec2_fleet_on_demand_allocation_strategy_uses_value(self) -> None:
-        template = AWSTemplate(template_id="t1", allocation_strategy_on_demand="capacityOptimized")
-        assert template.get_ec2_fleet_on_demand_allocation_strategy() == "capacity-optimized"
+        template = AWSTemplate(template_id="t1", allocation_strategy_on_demand="prioritized")
+        assert template.get_ec2_fleet_on_demand_allocation_strategy() == "prioritized"
 
-    def test_get_ec2_fleet_on_demand_allocation_strategy_falls_back(self) -> None:
-        template = AWSTemplate(template_id="t1")
-        assert template.get_ec2_fleet_on_demand_allocation_strategy() == "lowest-price"
+    def test_get_ec2_fleet_on_demand_allocation_strategy_unset_is_none(self) -> None:
+        template = AWSTemplate(template_id="t1", allocation_strategy="capacityOptimized")
+        assert template.get_ec2_fleet_on_demand_allocation_strategy() is None
 
 
 # ---------------------------------------------------------------------------
@@ -260,11 +264,11 @@ class TestAllocationStrategyOnDemand:
 
 @pytest.mark.unit
 class TestAllocationStrategyResolution:
-    def test_default_allocation_strategies_when_unset(self) -> None:
+    def test_no_allocation_strategies_when_unset(self) -> None:
         template = AWSTemplate(template_id="t1")
-        assert template.get_ec2_fleet_allocation_strategy() == "lowest-price"
-        assert template.get_spot_fleet_allocation_strategy() == "lowestPrice"
-        assert template.get_asg_allocation_strategy() == "lowest-price"
+        assert template.get_ec2_fleet_allocation_strategy() is None
+        assert template.get_spot_fleet_allocation_strategy() is None
+        assert template.get_asg_allocation_strategy() is None
 
     def test_string_allocation_strategy_resolves_via_each_api_format(self) -> None:
         template = AWSTemplate(template_id="t1", allocation_strategy="capacity_optimized")
@@ -416,12 +420,12 @@ class TestGetAwsConfiguration:
         config = template.get_aws_configuration()
         assert config.price_type == PriceType.SPOT
 
-    def test_invalid_price_type_string_falls_back_to_none_then_default(self) -> None:
+    def test_invalid_price_type_string_is_left_unset(self) -> None:
         template = AWSTemplate(template_id="t1", provider_api=ProviderApi.RUN_INSTANCES)
         object.__setattr__(template, "price_type", "not-a-real-price-type")
         config = template.get_aws_configuration()
-        # AWSConfiguration defaults price_type to ONDEMAND when None is passed.
-        assert config.price_type == PriceType.ONDEMAND
+        # AWSConfiguration has no price_type default of its own.
+        assert config.price_type is None
 
 
 # ---------------------------------------------------------------------------

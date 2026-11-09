@@ -16,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
+from pydantic import ValidationError as PydanticValidationError
+
 from orb.application.ports.scheduler_port import SchedulerPort
 from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.domain.base.exceptions import (
@@ -25,6 +27,7 @@ from orb.domain.base.exceptions import (
 )
 from orb.domain.base.ports.event_publisher_port import EventPublisherPort
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.template.rejection import TemplateRejection
 from orb.infrastructure.di.injectable import injectable
 
 from .dtos import TemplateDTO
@@ -48,6 +51,18 @@ class TemplateNotFoundError(EntityNotFoundError):
 
 class TemplateValidationError(ValidationError):
     """Exception raised when template validation fails."""
+
+
+def _rejection_reason(error: Exception) -> str:
+    """One-line reason for a template conversion failure."""
+    if isinstance(error, PydanticValidationError):
+        parts = [
+            f"{'.'.join(str(p) for p in item['loc']) or 'template'}: {item['msg']}"
+            for item in error.errors()
+        ]
+        if parts:
+            return "; ".join(parts)
+    return str(error)
 
 
 @dataclass
@@ -120,6 +135,9 @@ class TemplateConfigurationManager:
             template_factory = TemplateFactory()
         self.template_factory = template_factory
 
+        # Templates the last load skipped, by id. Replaced on every load.
+        self._rejections: dict[str, TemplateRejection] = {}
+
         # Initialize services
         self.cache_service = cache_service or create_template_cache_service("ttl", logger)
         self.storage_service = storage_service or TemplateStorageService(
@@ -187,13 +205,24 @@ class TemplateConfigurationManager:
         # Apply deduplication to remove duplicate templates
         resolved_template_dicts = self._deduplicate_template_dicts(resolved_template_dicts)
 
-        all_templates = self._convert_template_dicts(resolved_template_dicts)
+        all_templates = self._convert_template_dicts(
+            resolved_template_dicts, record_rejections=provider_override is None
+        )
         self.logger.debug("Loaded %s templates from scheduler strategy", len(all_templates))
         return all_templates
 
-    def _convert_template_dicts(self, template_dicts: list[dict[str, Any]]) -> list[TemplateDTO]:
-        """Convert template dicts to DTOs, logging and skipping any that fail."""
+    def _convert_template_dicts(
+        self, template_dicts: list[dict[str, Any]], record_rejections: bool = True
+    ) -> list[TemplateDTO]:
+        """Convert template dicts to DTOs, logging and skipping any that fail.
+
+        Each skipped template is recorded as a ``TemplateRejection`` so lookups
+        can report why it is missing. Only the load behind the cached active
+        templates replaces the recorded rejections; a provider-scoped load
+        leaves them alone.
+        """
         all_templates = []
+        rejections: dict[str, TemplateRejection] = {}
         for template_dict in template_dicts:
             try:
                 all_templates.append(self._convert_dict_to_template_dto(template_dict))
@@ -208,7 +237,20 @@ class TemplateConfigurationManager:
                     template_id or "unknown",
                     e,
                 )
+                if template_id:
+                    rejections[str(template_id)] = TemplateRejection(
+                        template_id=str(template_id),
+                        reason=_rejection_reason(e),
+                        row=dict(template_dict),
+                    )
+        if record_rejections:
+            self._rejections = rejections
         return all_templates
+
+    async def get_template_rejection(self, template_id: str) -> Optional[TemplateRejection]:
+        """Return why *template_id* was skipped at load, or None if it was not."""
+        await self.load_templates()
+        return self._rejections.get(template_id)
 
     def _convert_dict_to_template_dto(
         self, template_dict: dict[str, Any], file_metadata: Optional[TemplateFileMetadata] = None
@@ -551,7 +593,7 @@ class TemplateConfigurationManager:
                 template_path, None
             )
             all_template_dicts.extend(template_dicts)
-        return self._convert_template_dicts(all_template_dicts)
+        return self._convert_template_dicts(all_template_dicts, record_rejections=False)
 
     async def save_template(self, template: TemplateDTO) -> None:
         """

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from orb.application.base.handlers import BaseQueryHandler
 from orb.application.decorators import query_handler
@@ -24,9 +24,29 @@ from orb.domain.base.ports import (
     TemplateConfigurationPort,
 )
 from orb.domain.services.generic_filter_service import GenericFilterService
+from orb.domain.template.exceptions import TemplateValidationError
 from orb.domain.template.factory import TemplateFactoryPort
 from orb.domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from orb.domain.template.template_aggregate import Template
+
+
+def resolve_candidate(
+    defaults_service: Optional[TemplateDefaultsPort], candidate: dict[str, Any]
+) -> dict[str, Any]:
+    """Apply template defaults to a candidate template before it is validated."""
+    if defaults_service is None or not isinstance(candidate, dict):
+        return candidate
+    return defaults_service.resolve_template_defaults(candidate)
+
+
+async def raise_if_rejected(template_manager: TemplateConfigurationPort, template_id: str) -> None:
+    """Raise when *template_id* was skipped at load because it is invalid."""
+    rejection = await template_manager.get_template_rejection(template_id)
+    if rejection is not None:
+        raise TemplateValidationError(
+            f"template {template_id} is invalid: {rejection.reason}",
+            details={"template_id": template_id, "reason": rejection.reason},
+        )
 
 
 @query_handler(GetTemplateQuery)
@@ -57,6 +77,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
             template_dto = await template_manager.get_template_by_id(query.template_id)
 
             if not template_dto:
+                await raise_if_rejected(template_manager, query.template_id)
                 raise EntityNotFoundError("Template", query.template_id)
 
             template_data = template_dto.model_dump()
@@ -223,9 +244,11 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
         logger: LoggingPort,
         template_manager: TemplateConfigurationPort,
         error_handler: ErrorHandlingPort,
+        template_defaults_service: Optional[TemplateDefaultsPort] = None,
     ) -> None:
         super().__init__(logger, error_handler)
         self._template_manager = template_manager
+        self._template_defaults_service = template_defaults_service
 
     async def execute_query(self, query: ValidateTemplateQuery) -> dict[str, Any]:  # type: ignore[override]
         """Execute validate template query."""
@@ -242,6 +265,17 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
                 template_dto = await template_manager.get_template_by_id(template_id)
 
                 if not template_dto:
+                    rejection = await template_manager.get_template_rejection(template_id)
+                    if rejection is not None:
+                        reason = f"template {template_id} is invalid: {rejection.reason}"
+                        return {
+                            "template_id": template_id,
+                            "success": False,
+                            "valid": False,
+                            "message": f"Template validation failed: {reason}",
+                            "validation_errors": [reason],
+                            "configuration": rejection.row,
+                        }
                     raise EntityNotFoundError("Template", template_id)
 
                 template_config = template_dto.model_dump(exclude_none=True)
@@ -260,9 +294,18 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
                     "error": f"Failed to load template: {e}",
                 }
 
+            is_file_template = False
+        else:
+            is_file_template = True
+
         self.logger.info("Validating template: %s", template_id or "file-template")
 
         try:
+            if is_file_template:
+                # A file template is judged after default resolution, as on load.
+                template_config = resolve_candidate(
+                    self._template_defaults_service, template_config
+                )
             template_port = self._template_manager
             validation_errors = template_port.validate_template_config(template_config)
 

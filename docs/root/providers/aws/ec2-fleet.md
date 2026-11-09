@@ -68,8 +68,8 @@ The handler uses `provider_api: "EC2Fleet"`. Each request creates a launch templ
 | `security_group_ids` | No | `list[string]` | Security groups. |
 | `price_type` | No | `string` | `"ondemand"` (default), `"spot"`, or `"heterogeneous"`. |
 | `percent_on_demand` | No | `integer` | 0–100. On-demand share for heterogeneous fleets. |
-| `allocation_strategy` | No | `string` | Spot allocation strategy. Converted to the hyphenated EC2 Fleet form. |
-| `allocation_strategy_on_demand` | No | `string` | On-demand allocation strategy, used for heterogeneous fleets. |
+| `allocation_strategy` | No | `string` | Allocation strategy for spot pools. Converted to the hyphenated EC2 Fleet form. |
+| `allocation_strategy_on_demand` | No | `string` | Allocation strategy for on-demand pools (`lowestPrice` or `prioritized`). |
 | `max_price` | No | `float` | Becomes `SpotOptions.MaxTotalPrice` — a total spend cap, not a per-instance price. |
 | `abis_instance_requirements` | No | `object` | Attribute-based instance selection, replacing instance-type overrides. |
 | `max_machines` | No | `integer` | Maximum capacity this template may provision. |
@@ -101,9 +101,9 @@ Note that the shipped `aws_defaults.json` declares `default_fleet_type: instant`
 
 | `price_type` | Generated `TargetCapacitySpecification` and options |
 |---|---|
-| `ondemand` | `DefaultTargetCapacityType: on-demand`. |
-| `spot` | `DefaultTargetCapacityType: spot`, plus `SpotOptions.AllocationStrategy` when a strategy is set and `SpotOptions.MaxTotalPrice` when `max_price` is set. |
-| `heterogeneous` | `OnDemandTargetCapacity: requested * percent_on_demand / 100` (floored), `SpotTargetCapacity` for the remainder, and `DefaultTargetCapacityType: on-demand`. Both `SpotOptions` and `OnDemandOptions` allocation strategies apply. |
+| `ondemand` | `DefaultTargetCapacityType: on-demand`, plus `OnDemandOptions.AllocationStrategy`. No `SpotOptions`. |
+| `spot` | `DefaultTargetCapacityType: spot`, plus `SpotOptions.AllocationStrategy` and `SpotOptions.MaxTotalPrice` when `max_price` is set. No `OnDemandOptions`. |
+| `heterogeneous` | `OnDemandTargetCapacity: requested * percent_on_demand / 100` (floored), `SpotTargetCapacity` for the remainder, and `DefaultTargetCapacityType: on-demand`. Both `SpotOptions` and `OnDemandOptions` apply. |
 
 `max_price` maps to `MaxTotalPrice`, which caps total spend for the fleet rather than the price of any one instance. This differs from [Spot Fleet](spot-fleet.md), where `max_price` becomes a per-override `SpotPrice`.
 
@@ -122,7 +122,9 @@ EC2 Fleet uses the hyphenated wire format. ORB accepts camelCase, hyphenated, or
 | `prioritized` | `prioritized` |
 | `diversified` | `diversified` |
 
-When no strategy is set, spot and heterogeneous templates default to `price-capacity-optimized` and on-demand templates default to `lowest-price`. `allocation_strategy_on_demand` follows the same conversion and falls back to the spot strategy when unset.
+`allocation_strategy` is the strategy for spot pools and `allocation_strategy_on_demand` the strategy for on-demand pools. Their defaults come from the AWS provider defaults (`provider_defaults.aws.template_defaults`): `priceCapacityOptimized` for spot pools and `lowestPrice` for on-demand pools, whatever the template's `price_type`. A provider instance's `template_defaults` and the template itself override them; there is no per-request override.
+
+`prioritized` applies only to on-demand pools. A template that sets an invalid or unknown strategy is rejected and reported by `templates show` and `templates validate`. A template that sets `prioritized`, or `lowestPrice` with `price_type: ondemand`, in `allocation_strategy` is read as its on-demand strategy, with a deprecation warning; move the value to `allocation_strategy_on_demand`.
 
 ### Overrides
 

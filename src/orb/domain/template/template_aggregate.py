@@ -48,7 +48,10 @@ class Template(BaseModel):
 
     # Pricing and allocation
     price_type: str = "ondemand"
-    allocation_strategy: Optional[str] = None  # Provider templates apply their own default
+    # Spot-pool and on-demand-pool allocation strategies. Defaults come from the
+    # provider template defaults; provider templates validate the values.
+    allocation_strategy: Optional[str] = None
+    allocation_strategy_on_demand: Optional[str] = None
     max_price: Optional[float] = None
 
     # Machine types configuration (unified for all providers)

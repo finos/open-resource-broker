@@ -35,8 +35,6 @@ class AWSHandlerDefaults:
 
     ec2_fleet_type: str = "request"
     spot_fleet_type: str = "request"
-    allocation_strategy: str = "lowest_price"
-    price_type: str = "ondemand"
 
 
 @dataclass
