@@ -1866,7 +1866,7 @@
           "Requests"
         ],
         "summary": "Purge Request",
-        "description": "Hard-delete a request row from storage. Requires allow_destructive_admin=true in config, a non-production environment, and the request must already be in a terminal state.",
+        "description": "Hard-delete a request row from storage. Requires allow_destructive_admin=true in config, a non-production environment, and the request must already be in a terminal state. A warning is logged for each Kubernetes provider instance whose orphan GC deletes pods without a request record (orphan_gc_enabled, auto_cleanup_orphans and orb_instance_id all set).",
         "operationId": "purgeRequest",
         "parameters": [
           {
@@ -2410,7 +2410,7 @@
           "Admin"
         ],
         "summary": "Bulk cleanup terminal request and machine rows",
-        "description": "Hard-delete requests (and optionally their machine rows) that match the given status filter and optional age filter. Requires `allow_destructive_admin=true` in config AND environment != production. Body must contain `confirm: 'CLEANUP'` and a non-empty `request_statuses` list containing only terminal statuses.",
+        "description": "Hard-delete requests (and optionally their machine rows) that match the given status filter and optional age filter. Requires `allow_destructive_admin=true` in config AND environment != production. Body must contain `confirm: 'CLEANUP'` and a non-empty `request_statuses` list containing only terminal statuses. A warning is logged for each Kubernetes provider instance whose orphan GC deletes pods without a request record (orphan_gc_enabled, auto_cleanup_orphans and orb_instance_id all set).",
         "operationId": "cleanupDatabase",
         "requestBody": {
           "content": {
