@@ -418,6 +418,45 @@ class LaunchTemplateCleanupService:
                 e,
             )
 
+    def delete_override_version(
+        self, launch_template_id: str, version: str, request_id: str
+    ) -> None:
+        """Delete the single version ORB added to a user's template for a failed launch.
+
+        Used when the launch call was definitively rejected, so no instance can be
+        using the version. The version is deleted only when it is the recorded
+        one, is neither the default nor the first version, and carries exactly the
+        description ORB writes for this request. All failures are warning-only.
+        """
+        if self._config_port is None:
+            return
+        try:
+            cleanup = self.get_cleanup_config()
+            if not cleanup.enabled or not cleanup.delete_launch_template:
+                return
+            if not str(version).isdigit() or int(version) == 1:
+                return
+            description = f"Override for request {request_id}"
+            if not self._version_is_orbs(launch_template_id, str(version), description):
+                return
+            if cleanup.dry_run:
+                self._logger.info(
+                    "[dry-run] Would delete version %s of launch template %s for request %s",
+                    version,
+                    launch_template_id,
+                    request_id,
+                )
+                return
+            self._delete_versions(launch_template_id, [str(version)], request_id)
+        except Exception as e:
+            self._logger.warning(
+                "Could not clean up version %s of launch template %s for request %s: %s",
+                version,
+                launch_template_id,
+                request_id,
+                e,
+            )
+
     def _launch_template_versions_of(self, instance_ids: list[str]) -> dict[str, set[str]]:
         """Return ``{launch template id: {version}}`` read from the instances' EC2 tags."""
         used: dict[str, set[str]] = {}

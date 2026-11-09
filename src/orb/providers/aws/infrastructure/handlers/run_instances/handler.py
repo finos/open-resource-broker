@@ -67,6 +67,7 @@ from orb.providers.aws.infrastructure.launch_template.manager import (
     LTNetworkingState,
 )
 from orb.providers.aws.infrastructure.tags import build_system_tags, merge_tags
+from orb.providers.aws.resilience.retry_classifier import is_retryable_client_error
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 from orb.providers.aws.utilities.terminate_instances import wait_until_visible
 
@@ -192,12 +193,25 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         run_params.setdefault("ClientToken", uuid.uuid4().hex)
 
         # Execute RunInstances API call with circuit breaker for critical operation
-        response = self._retry_with_backoff(
-            self.aws_client.ec2_client.run_instances,
-            operation_type="critical",
-            operation_name="run_instances",
-            **run_params,
-        )
+        try:
+            response = self._retry_with_backoff(
+                self.aws_client.ec2_client.run_instances,
+                operation_type="critical",
+                operation_name="run_instances",
+                preserve_client_error=True,
+                **run_params,
+            )
+        except ClientError as e:
+            # Only a rejection that AWS will not retry proves nothing launched.
+            # A transient error that outlasted the retries may follow a lost
+            # response, so the version is left alone then.
+            if not is_retryable_client_error(e):
+                self._lt_cleanup.delete_override_version(
+                    launch_template_result.template_id,
+                    launch_template_result.override_version or "",
+                    str(request.request_id),
+                )
+            raise self._convert_client_error(e, "run_instances") from e
 
         # Validate response
         reservation_id = response.get("ReservationId")

@@ -622,3 +622,151 @@ class TestReasonlessEndingIsWarned:
         handler._compute_run_instances_fulfilment(instances, 2, "req-77")
 
         handler._logger.warning.assert_not_called()
+
+
+def _launch_template_result(override_version="4"):
+    from orb.providers.aws.infrastructure.launch_template.manager import LaunchTemplateResult
+
+    return LaunchTemplateResult(
+        template_id="lt-user",
+        version=override_version or "1",
+        template_name="user-lt",
+        is_new_version=override_version is not None,
+        override_version=override_version,
+    )
+
+
+def _handler_failing_run_instances(error: Exception, override_version="4"):
+    handler = _handler_with_config_port()
+    handler.launch_template_manager.create_or_update_launch_template.return_value = (
+        _launch_template_result(override_version)
+    )
+    handler._create_run_instances_params = MagicMock(  # type: ignore[method-assign]
+        return_value={"MinCount": 1, "MaxCount": 1}
+    )
+    handler._retry_with_backoff = MagicMock(side_effect=error)  # type: ignore[method-assign]
+    handler._lt_cleanup = MagicMock()
+    return handler
+
+
+class TestRunInstancesOverrideVersionCleanup:
+    """A version added for a launch that AWS rejected is removed; an unknown outcome keeps it."""
+
+    def test_definitive_rejection_deletes_the_recorded_version_once(self):
+        error = ClientError(
+            {"Error": {"Code": "InvalidParameterValue", "Message": "bad"}}, "RunInstances"
+        )
+        handler = _handler_failing_run_instances(error)
+
+        with pytest.raises(Exception) as raised:
+            handler._create_instances_with_response(_make_request(), _make_aws_template())
+
+        assert raised.value.__cause__ is error
+        handler._lt_cleanup.delete_override_version.assert_called_once_with(
+            "lt-user", "4", "req-ri-123"
+        )
+
+    @pytest.mark.parametrize(
+        "code", ["InternalError", "RequestLimitExceeded", "ServiceUnavailable"]
+    )
+    def test_transient_error_keeps_the_version(self, code):
+        error = ClientError({"Error": {"Code": code, "Message": "m"}}, "RunInstances")
+        handler = _handler_failing_run_instances(error)
+
+        with pytest.raises(Exception):
+            handler._create_instances_with_response(_make_request(), _make_aws_template())
+
+        handler._lt_cleanup.delete_override_version.assert_not_called()
+
+    def test_timeout_keeps_the_version(self):
+        from botocore.exceptions import ReadTimeoutError
+
+        handler = _handler_failing_run_instances(
+            ReadTimeoutError(endpoint_url="https://ec2.example")
+        )
+
+        with pytest.raises(ReadTimeoutError):
+            handler._create_instances_with_response(_make_request(), _make_aws_template())
+
+        handler._lt_cleanup.delete_override_version.assert_not_called()
+
+    def test_without_an_override_version_nothing_is_recorded_to_delete(self):
+        error = ClientError(
+            {"Error": {"Code": "InvalidParameterValue", "Message": "bad"}}, "RunInstances"
+        )
+        handler = _handler_failing_run_instances(error, override_version=None)
+
+        with pytest.raises(Exception):
+            handler._create_instances_with_response(_make_request(), _make_aws_template())
+
+        handler._lt_cleanup.delete_override_version.assert_called_once_with(
+            "lt-user", "", "req-ri-123"
+        )
+
+
+class TestDeleteOverrideVersion:
+    def _service(self, *, description="Override for request req-1", default=False, enabled=True):
+        from orb.config.schemas.cleanup_schema import CleanupConfig
+        from orb.providers.aws.infrastructure.handlers.launch_template_cleanup import (
+            LaunchTemplateCleanupService,
+        )
+
+        aws_client = MagicMock()
+        ec2 = aws_client.ec2_client
+        ec2.describe_launch_template_versions.return_value = {
+            "LaunchTemplateVersions": [
+                {"VersionDescription": description, "DefaultVersion": default}
+            ]
+        }
+        ec2.delete_launch_template_versions.return_value = {}
+        service = LaunchTemplateCleanupService(aws_client, MagicMock(), MagicMock())
+        service.get_cleanup_config = lambda: CleanupConfig(  # type: ignore[method-assign]
+            enabled=enabled
+        )
+        return service, ec2
+
+    def test_deletes_the_recorded_version_of_this_request(self):
+        service, ec2 = self._service()
+
+        service.delete_override_version("lt-user", "4", "req-1")
+
+        ec2.delete_launch_template_versions.assert_called_once_with(
+            LaunchTemplateId="lt-user", Versions=["4"]
+        )
+
+    def test_another_requests_version_is_untouched(self):
+        service, ec2 = self._service(description="Override for request req-2")
+
+        service.delete_override_version("lt-user", "4", "req-1")
+
+        ec2.delete_launch_template_versions.assert_not_called()
+
+    def test_default_version_is_untouched(self):
+        service, ec2 = self._service(default=True)
+
+        service.delete_override_version("lt-user", "4", "req-1")
+
+        ec2.delete_launch_template_versions.assert_not_called()
+
+    @pytest.mark.parametrize("version", ["1", "", "abc"])
+    def test_first_and_unrecorded_versions_are_untouched(self, version):
+        service, ec2 = self._service()
+
+        service.delete_override_version("lt-user", version, "req-1")
+
+        ec2.delete_launch_template_versions.assert_not_called()
+
+    def test_cleanup_disabled_deletes_nothing(self):
+        service, ec2 = self._service(enabled=False)
+
+        service.delete_override_version("lt-user", "4", "req-1")
+
+        ec2.delete_launch_template_versions.assert_not_called()
+
+    def test_a_failing_delete_is_swallowed(self):
+        service, ec2 = self._service()
+        ec2.delete_launch_template_versions.side_effect = ClientError(
+            {"Error": {"Code": "UnauthorizedOperation", "Message": "no"}}, "Delete"
+        )
+
+        service.delete_override_version("lt-user", "4", "req-1")
