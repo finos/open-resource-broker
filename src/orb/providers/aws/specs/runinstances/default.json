@@ -16,12 +16,12 @@
     {
       "ResourceType": "{{ resource_type }}",
       "Tags": [
-        {"Key": "Name", "Value": "{{ instance_name }}"},
+        {"Key": "Name", "Value": {{ instance_name | tojson }}},
         {% for tag in base_tags %}
-        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last or has_custom_tags %},{% endif %}
+        {"Key": {{ tag.key | tojson }}, "Value": {{ tag.value | tojson }}}{% if not loop.last or has_custom_tags %},{% endif %}
         {% endfor %}{% if has_custom_tags %}
         {% for tag in custom_tags %}
-        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
+        {"Key": {{ tag.key | tojson }}, "Value": {{ tag.value | tojson }}}{% if not loop.last %},{% endif %}
         {% endfor %}{% endif %}
       ]
     }{% if not loop.last %},{% endif %}

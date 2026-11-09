@@ -16,8 +16,7 @@ import orb
 from orb.infrastructure.template.jinja_spec_renderer import JinjaSpecRenderer
 
 _SPECS = Path(orb.__file__).parent / "providers" / "aws" / "specs"
-# The RunInstances spec is covered once its template is brought in line.
-_SPEC_FILES = sorted(p for p in _SPECS.glob("*/default.json") if p.parent.name != "runinstances")
+_SPEC_FILES = sorted(_SPECS.glob("*/default.json"))
 
 HOSTILE = 'a"b\\c\nd</x>&e'
 
@@ -42,6 +41,7 @@ _QUOTED_ALLOW_LIST = {
     "mt.weighted_capacity",
     "override.instance_type",
     "override.subnet_id",
+    "resource_type",
     "subnet_id",
     "user_data | b64encode",
     "volume_type",
@@ -80,6 +80,8 @@ def _context(path: Path, flag: bool) -> dict[str, Any]:
             context[name] = HOSTILE
         elif name in ("base_tags", "custom_tags"):
             context[name] = pairs
+        elif name == "tag_resource_types":
+            context[name] = ["instance", "volume"]
         elif name == "security_group_ids":
             context[name] = ["sg-1"]
         elif name in ("instance_overrides", "ondemand_overrides", "machine_types_overrides"):
