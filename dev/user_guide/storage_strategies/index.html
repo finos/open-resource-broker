@@ -1341,6 +1341,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#search-criteria-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search Criteria Operators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read Errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#generic-repository-pattern" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7505,6 +7527,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#search-criteria-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search Criteria Operators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read Errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#generic-repository-pattern" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8504,6 +8548,40 @@ in configuration dumps or logs.</p>
 <a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>    <span class="n">expression_values</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;:expected_version&quot;</span><span class="p">:</span> <span class="n">current_version</span><span class="p">},</span>
 <a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="p">)</span>
 </code></pre></div>
+<h2 id="search-criteria-operators">Search Criteria Operators<a class="headerlink" href="#search-criteria-operators" title="Permanent link">&para;</a></h2>
+<p><code>find_by_criteria</code> takes a dict of field to value. A plain value, or a dict without
+<code>$</code> keys, is compared by equality. A dict with a single <code>$</code> key applies that
+operator. The operators differ per backend:</p>
+<table>
+<thead>
+<tr>
+<th>Backend</th>
+<th>Operators</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JSON</td>
+<td><code>$in</code>, <code>$regex</code></td>
+</tr>
+<tr>
+<td>SQL</td>
+<td><code>$in</code>, <code>$like</code></td>
+</tr>
+<tr>
+<td>DynamoDB</td>
+<td><code>$eq</code>, <code>$ne</code>, <code>$in</code>, <code>$gt</code>, <code>$gte</code>, <code>$lt</code>, <code>$lte</code>, <code>$contains</code>, <code>$begins_with</code></td>
+</tr>
+</tbody>
+</table>
+<p>Only <code>$in</code> is available on all three. A backend raises <code>StorageError</code> for an
+operator outside its set, for a value that combines several operators, and for a
+value that mixes operator keys with literal keys. SQL does not support dict-valued
+equality, while JSON and DynamoDB compare dict values by equality.</p>
+<h2 id="read-errors">Read Errors<a class="headerlink" href="#read-errors" title="Permanent link">&para;</a></h2>
+<p>Reads never turn a failure into an empty answer. <code>find_by_id</code>, <code>find_all</code>,
+<code>exists</code> and <code>count</code> raise <code>StorageError</code> when the backend cannot be read; a
+missing record is still <code>None</code> / <code>False</code>, and an empty store still counts as <code>0</code>.</p>
 <h2 id="generic-repository-pattern">Generic Repository Pattern<a class="headerlink" href="#generic-repository-pattern" title="Permanent link">&para;</a></h2>
 <h3 id="repository-interface">Repository Interface<a class="headerlink" href="#repository-interface" title="Permanent link">&para;</a></h3>
 <p>All storage strategies implement the same interface:</p>

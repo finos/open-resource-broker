@@ -3874,6 +3874,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#machines-of-a-controller-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Machines of a controller request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-handler-defaults" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6247,6 +6258,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#machines-of-a-controller-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Machines of a controller request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-handler-defaults" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6469,6 +6491,13 @@ complete.</p>
 condition.  If you find yourself needing to keep some Job pods running
 after others succeed, the workload is conceptually a Deployment, not a
 Job - switch handlers.</p>
+<h2 id="machines-of-a-controller-request">Machines of a controller request<a class="headerlink" href="#machines-of-a-controller-request" title="Permanent link">&para;</a></h2>
+<p>For <code>Deployment</code>, <code>StatefulSet</code> and <code>Job</code> the controller is the request's resource and
+the pods it runs are its machines. A request lists no machine until its pods exist.</p>
+<p>Known limitation: older requests list the controller's name as a machine. ORB ignores
+that id when machines are returned, so returning it scales and deletes nothing. Such a
+request keeps listing the controller name until it is cancelled or its real pods are
+returned.</p>
 <h2 id="cross-handler-defaults">Cross-handler defaults<a class="headerlink" href="#cross-handler-defaults" title="Permanent link">&para;</a></h2>
 <p>All handlers honour the provider-level defaults from
 <a href="../configuration/"><code>K8sProviderConfig</code></a>:</p>

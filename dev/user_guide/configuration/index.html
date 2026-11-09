@@ -9114,6 +9114,7 @@ return <strong>HTTP 403</strong> unconditionally:</p>
 </tbody>
 </table>
 <blockquote>
+<p><strong>Note:</strong> The bulk cleanup, request purge and SDK cleanup methods log a warning for each Kubernetes provider instance whose orphan GC deletes pods without a request record, that is, one with <code>orphan_gc_enabled</code>, <code>auto_cleanup_orphans</code> and <code>orb_instance_id</code> all set. See the Kubernetes provider configuration for details.</p>
 <p><strong>Note:</strong> <code>POST /api/v1/admin/reload-config</code> is <strong>not</strong> gated by this flag —
 reloading config is non-destructive and requires only the <code>admin</code> role.</p>
 </blockquote>
