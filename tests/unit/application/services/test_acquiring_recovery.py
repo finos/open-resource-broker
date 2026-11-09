@@ -214,7 +214,8 @@ class TestRecoverSweepsAllActiveStatuses:
         now = datetime.now(timezone.utc)
         req = self._make_active_request(
             RequestStatus.PARTIAL_PENDING,
-            deadline_at=now - timedelta(seconds=10),
+            # Past the backstop, so it is finalised from what is stored.
+            deadline_at=now - timedelta(hours=2),
             machine_ids=["i-1"],  # 1/3 capacity → terminal PARTIAL
         )
         uow_factory, saved = _make_uow_factory([req])

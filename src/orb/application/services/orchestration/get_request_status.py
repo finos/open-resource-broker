@@ -21,10 +21,6 @@ from orb.application.services.orchestration.dtos import (
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports.logging_port import LoggingPort
 
-# Interval between status polls when ``wait=True``. Wall-clock time is tracked
-# against ``timeout_seconds`` so the total wait never exceeds the caller's cap.
-_POLL_INTERVAL_SECONDS = 2
-
 
 class GetRequestStatusOrchestrator(OrchestratorBase[GetRequestStatusInput, GetRequestStatusOutput]):
     """Orchestrator for retrieving request status."""
@@ -109,7 +105,7 @@ class GetRequestStatusOrchestrator(OrchestratorBase[GetRequestStatusInput, GetRe
         deltas from the first poll against ``input.timeout_seconds``, so the real
         latency of each ``_fetch_once`` counts toward the budget and the total
         wait never overruns the caller's cap. (An interval-counting approach that
-        added a constant ``_POLL_INTERVAL_SECONDS`` per loop ignored fetch
+        added a constant interval per loop ignored fetch
         latency and could overshoot the timeout substantially.) The last snapshot
         is returned when the cap is reached even if some requests are still
         non-terminal, so callers always get the freshest known state.
@@ -134,7 +130,7 @@ class GetRequestStatusOrchestrator(OrchestratorBase[GetRequestStatusInput, GetRe
                 # Persistent transient failures — stop retrying and surface the
                 # last snapshot rather than blocking until timeout.
                 break
-            await asyncio.sleep(_POLL_INTERVAL_SECONDS)
+            await asyncio.sleep(self._poll_delay(start, input.timeout_seconds))
             request_dicts = await self._fetch_once(input)
             if self._has_transient_error(request_dicts):
                 consecutive_errors += 1

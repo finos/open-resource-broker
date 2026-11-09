@@ -240,7 +240,9 @@ class MachineSyncService:
         """
         # Create updated machine with all provider data
         machine_data = existing.model_dump()
-        machine_data["status"] = provider_machine.status
+        # A read that reports no usable status says nothing; keep what is stored.
+        if provider_machine.status != MachineStatus.UNKNOWN:
+            machine_data["status"] = provider_machine.status
         machine_data["private_ip"] = provider_machine.private_ip
         machine_data["public_ip"] = provider_machine.public_ip
         # Preserve explicitly-set name (e.g. SLURM node name);
@@ -343,7 +345,9 @@ class MachineSyncService:
             instance_type=InstanceType(value=instance_type_str),
             image_id=processed_data.get("image_id", "unknown"),
             price_type=processed_data.get("price_type"),
-            status=MachineStatus(processed_data.get("status", "pending")),
+            # A provider read without a status says nothing about the machine; it must not
+            # look like a machine that has not started.
+            status=MachineStatus(processed_data.get("status") or "unknown"),
             status_reason=processed_data.get("status_reason"),
             private_ip=processed_data.get("private_ip"),
             public_ip=processed_data.get("public_ip"),

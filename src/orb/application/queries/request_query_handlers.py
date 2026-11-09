@@ -16,6 +16,7 @@ from orb.application.dto.responses import RequestDTO
 from orb.application.factories.request_dto_factory import RequestDTOFactory
 from orb.application.ports.cache_service_port import CacheServicePort
 from orb.application.request.queries import ListRequestsQuery
+from orb.application.services.deadline_release_service import DeadlineReleaseService
 from orb.application.services.machine_sync_service import MachineSyncService
 from orb.application.services.orchestration.dtos import Paginated
 from orb.application.services.orchestration.page_cursor import KeysetPaginated
@@ -45,6 +46,8 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
     provider and persists any changes before returning. See ADR-0001.
     """
 
+    _deadline_release: Optional[DeadlineReleaseService] = None
+
     def __init__(
         self,
         uow_factory: UnitOfWorkFactory,
@@ -55,10 +58,12 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
         cache_service: CacheServicePort,
         event_publisher: EventPublisherPort,
         state_machine: FulfilmentStateMachine,
+        deadline_release: Optional[DeadlineReleaseService] = None,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
+        self._deadline_release = deadline_release
         self._provider_registry_service = provider_registry_service
         self._machine_sync_service = machine_sync_service
         self._cache_service = cache_service
@@ -67,7 +72,11 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
         self._query_service = RequestQueryService(uow_factory, logger)
         self._state_machine = state_machine
         self._status_service = RequestStatusService(
-            uow_factory, logger, state_machine=self._state_machine
+            uow_factory,
+            logger,
+            state_machine=self._state_machine,
+            event_publisher=event_publisher,
+            deadline_release=deadline_release,
         )
         self._dto_factory = RequestDTOFactory()
 
@@ -115,6 +124,7 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
                 # Nothing to poll, but an expired deadline can still end it.
                 request = await self._evaluate_deadline_and_persist(request)
             if request.status.is_terminal() or request.awaiting_resources:
+                self._enqueue_owed_release(request)
                 db_machines = await self._query_service.get_machines_for_request(request)
                 # Terminal requests skip the live provider sync — return persisted data.
                 # first/last_status_check are stamped by MachineSyncService during the
@@ -142,7 +152,11 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
                 )
                 if new_status:
                     await self._status_service.update_request_status(
-                        request, new_status, status_message or "", provider_metadata
+                        request,
+                        new_status,
+                        status_message or "",
+                        provider_metadata,
+                        provider_machines,
                     )
                 request = await self._query_service.get_request(query.request_id)
 
@@ -192,6 +206,11 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
             self.logger.error("Failed to get request: %s", e)
             raise
 
+    def _enqueue_owed_release(self, request) -> None:
+        """Start the background release a terminal request owes; reads never wait for it."""
+        if self._deadline_release is not None:
+            self._deadline_release.enqueue_if_owed(request)
+
     async def _evaluate_deadline_and_persist(self, request):
         """Lazily sweep an expired request to terminal and persist the flip.
 
@@ -205,6 +224,7 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
         from orb.domain.base.exceptions import ConcurrencyError
 
         if request.status.is_terminal():
+            self._enqueue_owed_release(request)
             return request
 
         state_machine = self._state_machine
@@ -227,6 +247,7 @@ class SyncAndGetRequestHandler(BaseQueryHandler[SyncAndGetRequestQuery, RequestD
                 # same transition twice.
                 for event in events or []:
                     self.event_publisher.publish(event)
+                self._enqueue_owed_release(swept)
                 return swept
             except ConcurrencyError:
                 if attempt >= _MAX_RETRIES:
@@ -460,12 +481,15 @@ class SyncAndListReturnRequestsHandler(
         generic_filter_service: GenericFilterService,
         machine_sync_service: MachineSyncService,
         config: ConfigurationPort | None = None,
+        event_publisher: Optional[EventPublisherPort] = None,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._generic_filter_service = generic_filter_service
         self._machine_sync_service = machine_sync_service
-        self._status_service = RequestStatusService(uow_factory, logger)
+        self._status_service = RequestStatusService(
+            uow_factory, logger, event_publisher=event_publisher
+        )
         self._query_service = RequestQueryService(uow_factory, logger)
         self._dto_factory = RequestDTOFactory()
         self._config = config
@@ -516,7 +540,11 @@ class SyncAndListReturnRequestsHandler(
                     )
                     if new_status:
                         await self._status_service.update_request_status(
-                            request, new_status, status_message or "", provider_metadata
+                            request,
+                            new_status,
+                            status_message or "",
+                            provider_metadata,
+                            provider_machines,
                         )
                 except Exception as sync_err:
                     self.logger.warning(
@@ -657,6 +685,7 @@ class SyncAndListActiveRequestsHandler(
 
     _DEFAULT_SYNC_TIMEOUT: float = 30.0
     _config: ConfigurationPort | None = None
+    _deadline_release: Optional[DeadlineReleaseService] = None
 
     def __init__(
         self,
@@ -667,13 +696,20 @@ class SyncAndListActiveRequestsHandler(
         machine_sync_service: MachineSyncService,
         state_machine: FulfilmentStateMachine,
         config: ConfigurationPort | None = None,
+        event_publisher: Optional[EventPublisherPort] = None,
+        deadline_release: Optional[DeadlineReleaseService] = None,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
+        self._deadline_release = deadline_release
         self._generic_filter_service = generic_filter_service
         self._machine_sync_service = machine_sync_service
         self._status_service = RequestStatusService(
-            uow_factory, logger, state_machine=state_machine
+            uow_factory,
+            logger,
+            state_machine=state_machine,
+            event_publisher=event_publisher,
+            deadline_release=deadline_release,
         )
         self._query_service = RequestQueryService(uow_factory, logger)
         self._dto_factory = RequestDTOFactory()
@@ -781,7 +817,11 @@ class SyncAndListActiveRequestsHandler(
                         )
                         if new_status:
                             await self._status_service.update_request_status(
-                                request, new_status, status_message or "", provider_metadata
+                                request,
+                                new_status,
+                                status_message or "",
+                                provider_metadata,
+                                provider_machines,
                             )
 
                     try:
@@ -824,12 +864,22 @@ class SyncAndListActiveRequestsHandler(
                     raise _sync_exc
 
             request_dtos = []
+            owed_release_ids: list[str] = []
             for request in requests:
                 request = await self._query_service.get_request(str(request.request_id.value))
                 db_machines = await self._query_service.get_machines_for_request(request)
 
                 request_dto = self._dto_factory.create_from_domain(request, db_machines)
                 request_dtos.append(request_dto)
+                if DeadlineReleaseService.is_owed(request):
+                    owed_release_ids.append(str(request.request_id.value))
+            # Only listings that read all requests (`all_resources`) include finished
+            # ones. Without background reconciliation, plain list handlers do not
+            # enqueue releases; those start from status polls, single reads, the
+            # startup scan and the next command that polls the request.
+            if self._deadline_release is not None and owed_release_ids:
+                # A listing starts at most a few releases, never one per row.
+                self._deadline_release.enqueue_many(owed_release_ids)
 
             if query.provider_name:
                 request_dtos = [r for r in request_dtos if r.provider_name == query.provider_name]

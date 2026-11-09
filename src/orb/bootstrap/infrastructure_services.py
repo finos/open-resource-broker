@@ -26,6 +26,7 @@ def register_infrastructure_services(container: DIContainer) -> None:
     _register_provisioning_orchestration_service(container)
 
     # Register the background request reconciler
+    _register_deadline_release_service(container)
     _register_request_reconciler(container)
 
     # Register caching services
@@ -34,6 +35,7 @@ def register_infrastructure_services(container: DIContainer) -> None:
 
 def _register_fulfilment_state_machine(container: DIContainer) -> None:
     """Register the FulfilmentStateMachine with the configured grace period."""
+    from orb.domain.request.fulfillment_config import fulfillment_defaults_from_request_config
     from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
 
     def create_fulfilment_state_machine(c: DIContainer) -> FulfilmentStateMachine:
@@ -42,7 +44,10 @@ def _register_fulfilment_state_machine(container: DIContainer) -> None:
         grace_period = int(request_config.get("default_timeout", 3600))
         logger = c.get(LoggingPort)
         logger.info("FulfilmentStateMachine grace period resolved to %ds", grace_period)
-        return FulfilmentStateMachine(grace_period_seconds=grace_period)
+        return FulfilmentStateMachine(
+            grace_period_seconds=grace_period,
+            fulfilment_defaults=fulfillment_defaults_from_request_config(request_config),
+        )
 
     container.register_singleton(FulfilmentStateMachine, create_fulfilment_state_machine)
 
@@ -239,6 +244,7 @@ def _register_provisioning_orchestration_service(container: DIContainer) -> None
     from orb.domain.base import UnitOfWorkFactory
     from orb.domain.base.ports import (
         ConfigurationPort,
+        EventPublisherPort,
         LoggingPort,
         ProviderConfigPort,
         ProviderSelectionPort,
@@ -258,6 +264,7 @@ def _register_provisioning_orchestration_service(container: DIContainer) -> None
             config_port=c.get(ConfigurationPort),
             circuit_breaker_factory=CircuitBreakerStrategy,
             state_machine=c.get(FulfilmentStateMachine),
+            event_publisher=c.get(EventPublisherPort),
         )
 
     container.register_singleton(
@@ -265,8 +272,27 @@ def _register_provisioning_orchestration_service(container: DIContainer) -> None
     )
 
 
+def _register_deadline_release_service(container: DIContainer) -> None:
+    """Register the service that releases machines a deadline outcome left unstarted."""
+    from orb.application.ports.command_bus_port import CommandBusPort
+    from orb.application.services.deadline_release_service import DeadlineReleaseService
+    from orb.application.services.machine_sync_service import MachineSyncService
+    from orb.domain.base import UnitOfWorkFactory
+
+    def create_deadline_release_service(c: DIContainer) -> DeadlineReleaseService:
+        return DeadlineReleaseService(
+            uow_factory=c.get(UnitOfWorkFactory),
+            machine_sync_service=c.get(MachineSyncService),
+            command_bus=c.get(CommandBusPort),
+            logger=c.get(LoggingPort),
+        )
+
+    container.register_singleton(DeadlineReleaseService, create_deadline_release_service)
+
+
 def _register_request_reconciler(container: DIContainer) -> None:
     """Register the background request reconciler (started by long-running servers)."""
+    from orb.application.services.deadline_release_service import DeadlineReleaseService
     from orb.application.services.machine_sync_service import MachineSyncService
     from orb.application.services.request_reconciler import RequestReconciler
     from orb.application.services.request_status_service import RequestStatusService
@@ -281,6 +307,7 @@ def _register_request_reconciler(container: DIContainer) -> None:
             config_port=c.get(ConfigurationPort),
             circuit_breaker_factory=CircuitBreakerStrategy,
             logger=c.get(LoggingPort),
+            deadline_release=c.get_optional(DeadlineReleaseService),
         )
 
     container.register_singleton(RequestReconciler, create_request_reconciler)

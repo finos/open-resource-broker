@@ -434,3 +434,15 @@ async def test_a_provider_that_answers_nothing_counts_one_failure_per_pass() -> 
 
     breaker.record_failure.assert_called_once()
     breaker.record_success.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_pass_scans_for_owed_releases_after_the_per_request_work():
+    harness = _Harness([_request(1)])
+    release = MagicMock()
+    release.scan_and_enqueue = AsyncMock(return_value=0)
+    harness.reconciler._deadline_release = release
+
+    await harness.reconciler.reconcile_once()
+
+    release.scan_and_enqueue.assert_awaited_once_with(respect_interval=True)

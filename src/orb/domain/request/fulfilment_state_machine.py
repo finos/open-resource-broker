@@ -17,15 +17,40 @@ Pure domain — no infra imports.
 
 from __future__ import annotations
 
+import logging
+import math
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from orb.domain.base.diagnostic import DiagnosticCategory, FulfilmentDiagnostic
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.request.aggregate import Request
+from orb.domain.request.deadline_release import DEADLINE_RELEASE_KEY, RELEASE_PENDING
 from orb.domain.request.exceptions import InvalidRequestStateError
+from orb.domain.request.fulfillment_config import merged_fulfillment_config
 from orb.domain.request.request_types import RequestStatus, RequestType
+
+logger = logging.getLogger(__name__)
+
+# Settings used when the state machine is built without configured defaults. They
+# match the configuration defaults for provisioning and dispatch timeouts.
+_BUILTIN_FULFILMENT_DEFAULTS: dict[str, Any] = {
+    "timeout_seconds": 300,
+    "dispatch_timeout_seconds": 300,
+}
+
+# Margin added to the longest a live create can run before it persists its
+# resource ids, so a request still being created is never judged abandoned.
+_ABANDON_MARGIN_SECONDS = 300
+
+_ABANDONED_MESSAGE = "Request abandoned before provisioning started"
+
+# Without a fresh provider read an expired request that already has machine ids
+# waits this long past its deadline (or its grace period when longer) before it is
+# finalised from what is stored, so a poll or reconcile pass can decide it first.
+_BACKSTOP_FLOOR = timedelta(minutes=10)
 
 
 class FulfilmentEvent(str, Enum):
@@ -51,8 +76,24 @@ _VERDICT_STATUS: dict[str, RequestStatus] = {
 class FulfilmentStateMachine:
     """Single entry point for every request status write."""
 
-    def __init__(self, grace_period_seconds: int) -> None:
+    def __init__(
+        self,
+        grace_period_seconds: int,
+        fulfilment_defaults: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        """Create the state machine.
+
+        Args:
+            grace_period_seconds: How long a request may take before its deadline.
+            fulfilment_defaults: Configured provisioning settings
+                (``timeout_seconds``, ``dispatch_timeout_seconds``) that a request's
+                own ``fulfillment_config`` metadata may override.
+        """
         self._grace_period = timedelta(seconds=max(0, int(grace_period_seconds)))
+        defaults = {**_BUILTIN_FULFILMENT_DEFAULTS, **(fulfilment_defaults or {})}
+        if self._timeouts(defaults) is None:
+            defaults = dict(_BUILTIN_FULFILMENT_DEFAULTS)
+        self._fulfilment_defaults = defaults
 
     # ------------------------------------------------------------------
     # Public API
@@ -68,8 +109,14 @@ class FulfilmentStateMachine:
         diagnostic: Optional[FulfilmentDiagnostic] = None,
         message: Optional[str] = None,
         reason: Optional[str] = None,
+        running_count: Optional[int] = None,
+        fresh_read: bool = False,
     ) -> Request:
         """Apply a semantic event and return the resulting Request.
+
+        ``running_count`` and ``fresh_read`` describe the provider read the caller
+        just made; they only matter when the deadline has passed (see
+        :meth:`evaluate_deadline`).
 
         Raises ``InvalidRequestStateError`` only for genuinely illegal
         transitions — never for an idempotent re-application of the current
@@ -85,7 +132,9 @@ class FulfilmentStateMachine:
         #    back-compat PARTIAL→COMPLETED upgrade still works and genuinely
         #    illegal transitions still raise.
         if event not in (FulfilmentEvent.CANCEL, FulfilmentEvent.FAIL):
-            swept = self.evaluate_deadline(request, now=now)
+            swept = self.evaluate_deadline(
+                request, now=now, running_count=running_count, fresh_read=fresh_read
+            )
             deadline_flipped = swept is not request
             if deadline_flipped and swept.status.is_terminal():
                 return swept
@@ -137,23 +186,43 @@ class FulfilmentStateMachine:
             clear_diagnostic=clear_diagnostic,
         )
 
-    def evaluate_deadline(self, request: Request, *, now: datetime) -> Request:
+    def evaluate_deadline(
+        self,
+        request: Request,
+        *,
+        now: datetime,
+        running_count: Optional[int] = None,
+        fresh_read: bool = False,
+    ) -> Request:
         """Lazily resolve an expired request to a terminal outcome.
 
         Idempotent and safe on read paths: returns the request unchanged when
         it is already terminal, has no deadline, or the deadline has not passed.
-        An expired non-terminal request is classified against
-        ``effective_count = max(successful_count, len(machine_ids))`` — the same
-        authoritative capacity signal used elsewhere.  ``successful_count`` alone
-        lags (it is not healed for ACQUIRING), so a request whose machine_ids are
-        already populated must not be judged solely by the stale counter.
 
-          - COMPLETED (no DEADLINE diagnostic — the capacity was actually met)
-            when ``requested_count > 0`` and ``effective_count >= requested_count``.
-            A fully-fulfilled request that merely missed its ``fulfilled`` verdict
-            before the deadline must not be downgraded to a failure-like PARTIAL.
-          - PARTIAL  (DEADLINE diagnostic) when ``0 < effective_count < requested_count``.
-          - TIMEOUT  (DEADLINE diagnostic) when ``effective_count == 0``.
+        The outcome compares the number of machines actually running with the
+        requested count:
+
+          - COMPLETED (no DEADLINE diagnostic) when the running count reaches the
+            requested count.
+          - PARTIAL  (DEADLINE diagnostic) when some, but not all, are running.
+          - TIMEOUT  (DEADLINE diagnostic) when none are running.
+
+        Where the running count comes from:
+
+          - ``running_count`` given (with ``fresh_read``): the caller counted the
+            running machines in a provider read it just made.
+          - Not given: the count is unknown, never zero. With ``fresh_read`` or
+            without machine ids the older rule applies,
+            ``max(successful_count, len(machine_ids))``, so a provider that never
+            reports a count keeps its outcome. Without a fresh read and with
+            machine ids the outcome waits for a read to decide it, until the
+            backstop (deadline plus the longer of the grace period and ten
+            minutes), when the count stored from the last read is used. A stored
+            zero with machine ids gives PARTIAL, because TIMEOUT cannot be
+            upgraded later.
+
+        A PARTIAL or TIMEOUT outcome that has machine ids is stamped in the same
+        transition as owing release of machines that may never have started.
         """
         if request.status.is_terminal():
             return request
@@ -163,6 +232,8 @@ class FulfilmentStateMachine:
         # by the deadline machinery.
         if request.request_type != RequestType.ACQUIRE:
             return request
+        if request.status == RequestStatus.PENDING:
+            return self._fail_if_abandoned(request, now=now)
         if request.deadline_at is None or now < request.deadline_at:
             return request
         if request.status not in (
@@ -172,12 +243,30 @@ class FulfilmentStateMachine:
         ):
             return request
 
-        # Authoritative capacity: the healed successful_count OR the populated
-        # machine_ids, whichever is larger.  machine_ids is populated even in
-        # ACQUIRING (where successful_count is not yet reconciled), so relying on
-        # successful_count alone would misclassify a request that already has its
-        # instances.
-        effective_count = max(request.successful_count, len(request.machine_ids))
+        # Older rule: the healed successful_count OR the populated machine_ids,
+        # whichever is larger. Used when no running count is known.
+        legacy_count = max(request.successful_count, len(request.machine_ids))
+        has_machine_ids = bool(request.machine_ids)
+
+        effective_count: int
+        partial_floor = False
+        if running_count is not None:
+            effective_count = running_count
+        elif fresh_read or not has_machine_ids:
+            effective_count = legacy_count
+        else:
+            if now < request.deadline_at + max(self._grace_period, _BACKSTOP_FLOOR):
+                return request
+            stored = self._stored_running_count(request)
+            if stored is None:
+                effective_count = legacy_count
+            elif stored == 0:
+                # Stored zero is weak evidence (providers report 0 while a lookup
+                # is still failing). With ids present call it PARTIAL.
+                effective_count = 0
+                partial_floor = True
+            else:
+                effective_count = stored
 
         diagnostic: Optional[FulfilmentDiagnostic]
         if request.requested_count > 0 and effective_count >= request.requested_count:
@@ -187,7 +276,7 @@ class FulfilmentStateMachine:
             target = RequestStatus.COMPLETED
             summary = f"Fully fulfilled: {effective_count}/{request.requested_count} at deadline"
             diagnostic = None
-        elif effective_count > 0:
+        elif effective_count > 0 or partial_floor:
             target = RequestStatus.PARTIAL
             summary = f"Deadline exceeded: {effective_count}/{request.requested_count} fulfilled"
             diagnostic = FulfilmentDiagnostic(
@@ -212,13 +301,95 @@ class FulfilmentStateMachine:
         # just never got its 'fulfilled' verdict) has no diagnostic — clear any
         # stale shortfall diagnostic so the completed request stays clean.
         clear_diagnostic = target == RequestStatus.COMPLETED and diagnostic is None
+        owes_release = target in (RequestStatus.PARTIAL, RequestStatus.TIMEOUT) and has_machine_ids
         return request._transition(
             target,
             now=now,
             message=summary,
             diagnostic=diagnostic,
             clear_diagnostic=clear_diagnostic,
+            metadata_updates={DEADLINE_RELEASE_KEY: RELEASE_PENDING} if owes_release else None,
         )
+
+    @staticmethod
+    def _stored_running_count(request: Request) -> Optional[int]:
+        """The running count stored from the last provider read, None when unknown."""
+        snapshot = request.metadata.get("last_fulfilment")
+        if not isinstance(snapshot, Mapping):
+            return None
+        count = snapshot.get("running_count")
+        if isinstance(count, bool) or not isinstance(count, int):
+            return None
+        return count
+
+    def abandon_after(self, request: Request) -> timedelta:
+        """How long a request may stay PENDING before it counts as abandoned.
+
+        A live create runs its elapsed check only when an attempt starts, so it
+        lasts at most the provisioning timeout plus one dispatch timeout, followed
+        by persistence. Settings come from the same merge provisioning uses, so a
+        per-request override widens this bound too. Never shorter than the grace
+        period. Unusable overrides fall back to the configured defaults.
+        """
+        timeouts: Optional[tuple[float, float]] = None
+        try:
+            timeouts = self._timeouts(merged_fulfillment_config(self._fulfilment_defaults, request))
+        except Exception as exc:
+            logger.warning("Unusable fulfillment_config on request %s: %s", request.request_id, exc)
+        if timeouts is None:
+            logger.warning(
+                "Using the configured fulfilment timeouts for request %s", request.request_id
+            )
+            timeouts = self._timeouts(self._fulfilment_defaults) or (300.0, 300.0)
+        timeout_seconds, dispatch_timeout_seconds = timeouts
+        longest_create = timeout_seconds + dispatch_timeout_seconds + _ABANDON_MARGIN_SECONDS
+        return max(self._grace_period, timedelta(seconds=longest_create))
+
+    @staticmethod
+    def _timeouts(config: Mapping[str, Any]) -> Optional[tuple[float, float]]:
+        """Return (timeout_seconds, dispatch_timeout_seconds), or None if unusable."""
+        try:
+            timeout_seconds = float(config["timeout_seconds"])
+            dispatch_timeout_seconds = float(config["dispatch_timeout_seconds"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if not (math.isfinite(timeout_seconds) and math.isfinite(dispatch_timeout_seconds)):
+            return None
+        # Bound the sum so it always fits in a timedelta.
+        timeout_seconds = min(max(timeout_seconds, 0.0), 1e9)
+        dispatch_timeout_seconds = min(max(dispatch_timeout_seconds, 0.0), 1e9)
+        return timeout_seconds, dispatch_timeout_seconds
+
+    def _fail_if_abandoned(self, request: Request, *, now: datetime) -> Request:
+        """Fail a PENDING request whose create flow never recorded anything.
+
+        Only a request still awaiting resources can be abandoned: one that has
+        resource or machine ids is owned by the status sync, not by a create.
+        Never raises on a read path.
+        """
+        if not request.awaiting_resources:
+            return request
+        created_at = request.created_at
+        if created_at is None:
+            return request
+        try:
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=now.tzinfo)
+            if now - created_at < self.abandon_after(request):
+                return request
+            return request._transition(
+                RequestStatus.FAILED,
+                now=now,
+                message=_ABANDONED_MESSAGE,
+                diagnostic=FulfilmentDiagnostic(
+                    category=DiagnosticCategory.INTERNAL,
+                    summary=_ABANDONED_MESSAGE,
+                    occurred_at=now,
+                ),
+            )
+        except Exception as exc:
+            logger.debug("Abandoned-request check skipped for %s: %s", request.request_id, exc)
+            return request
 
     # ------------------------------------------------------------------
     # Internals

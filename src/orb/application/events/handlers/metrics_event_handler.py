@@ -9,10 +9,14 @@ instruments bridged via ``PrometheusMetricReader``.
 Instruments used
 ----------------
 - ``orb.requests.pending`` (UpDownCounter) — incremented on
-  ``RequestCreatedEvent``, decremented on BOTH ``RequestCompletedEvent``
-  AND ``RequestFailedEvent``.  This lifecycle is preserved exactly.
+  ``RequestCreatedEvent`` and decremented exactly once when the request reaches
+  a terminal state, whichever event reports it (``RequestCompletedEvent``,
+  ``RequestFailedEvent`` or a ``RequestStatusChangedEvent`` into a terminal
+  status).  Only requests whose creation this handler saw are released, so a
+  terminal event for an unknown request (for example one created before a
+  restart) changes nothing.
 - ``orb.requests.total`` (Counter) — incremented on
-  ``RequestCompletedEvent``.
+  ``RequestCompletedEvent`` for a tracked request.
 - ``orb.active.instances`` (UpDownCounter) — set to the absolute machine
   count on ``RequestCompletedEvent``.  Absolute-set semantics are
   preserved by computing the delta from a tracked previous value.
@@ -20,8 +24,11 @@ Instruments used
   duration from ``RequestCreatedEvent`` to ``RequestCompletedEvent``,
   measured via the ``_request_start_times`` dict.  The dict is kept as the
   intermediary feeding ``Histogram.record()``.
-- ``orb.requests.failed.total`` (Counter) — incremented on
-  ``RequestFailedEvent``.
+- ``orb.requests.failed.total`` (Counter) — incremented when a tracked request
+  fails or times out.
+
+The per-request start-time map is capped at ``_MAX_TRACKED_REQUESTS``; evicting
+the oldest entry also releases its pending count so the gauge stays consistent.
 
 Graceful no-op
 --------------
@@ -36,6 +43,15 @@ from typing import Optional
 from orb.application.events.base.event_handler import EventHandler
 from orb.domain.base.events import DomainEvent
 from orb.domain.base.ports import LoggingPort
+
+# Upper bound on requests tracked between creation and a terminal event.
+_MAX_TRACKED_REQUESTS = 10_000
+
+# Terminal request statuses reported by RequestStatusChangedEvent.  "complete" is
+# deliberately absent: a transition to COMPLETED always travels with a
+# RequestCompletedEvent, which records the completion metrics.
+_FAILED_STATUSES = frozenset({"failed", "timeout"})
+_RELEASING_STATUSES = frozenset({"failed", "timeout", "cancelled", "partial"})
 
 
 def _get_meter():
@@ -78,6 +94,9 @@ class MetricsEventHandler(EventHandler):
                                records ``orb.provisioning.duration`` histogram
     - RequestFailedEvent   -> increments ``orb.requests.failed.total``,
                                decrements ``orb.requests.pending``
+    - RequestStatusChangedEvent into failed / timeout / cancelled / partial
+                           -> decrements ``orb.requests.pending`` (and counts
+                               failed / timeout in ``orb.requests.failed.total``)
     """
 
     def __init__(
@@ -138,6 +157,8 @@ class MetricsEventHandler(EventHandler):
             self._handle_request_completed(event)
         elif event_type == "RequestFailedEvent":
             self._handle_request_failed(event)
+        elif event_type == "RequestStatusChangedEvent":
+            self._handle_status_changed(event)
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -145,10 +166,32 @@ class MetricsEventHandler(EventHandler):
 
     def _handle_request_created(self, event: DomainEvent) -> None:
         request_id = getattr(event, "request_id", event.aggregate_id)
+        if request_id in self._request_start_times:
+            return
         self._request_start_times[request_id] = time.time()
         self._pending_requests.add(1)
+        if len(self._request_start_times) > _MAX_TRACKED_REQUESTS:
+            oldest = next(iter(self._request_start_times))
+            del self._request_start_times[oldest]
+            self._pending_requests.add(-1)
+
+    def _finish(self, request_id: str) -> Optional[float]:
+        """Stop tracking ``request_id`` and release its pending count.
+
+        Returns the creation time, or ``None`` when the request was not tracked
+        (never seen, already finished, or evicted); nothing is recorded then.
+        """
+        start = self._request_start_times.pop(request_id, None)
+        if start is not None:
+            self._pending_requests.add(-1)
+        return start
 
     def _handle_request_completed(self, event: DomainEvent) -> None:
+        request_id = getattr(event, "request_id", event.aggregate_id)
+        start = self._finish(request_id)
+        if start is None:
+            return
+
         self._requests_total.add(1)
 
         machine_ids: list[str] = getattr(event, "machine_ids", [])
@@ -158,17 +201,17 @@ class MetricsEventHandler(EventHandler):
         self._active_instances_current = new_count
         self._active_instances.add(delta)
 
-        request_id = getattr(event, "request_id", event.aggregate_id)
-        start = self._request_start_times.pop(request_id, None)
-        if start is not None:
-            self._provisioning_duration.record(time.time() - start)
-
-        self._pending_requests.add(-1)
+        self._provisioning_duration.record(time.time() - start)
 
     def _handle_request_failed(self, event: DomainEvent) -> None:
-        self._requests_failed_total.add(1)
-
         request_id = getattr(event, "request_id", event.aggregate_id)
-        self._request_start_times.pop(request_id, None)
+        if self._finish(request_id) is not None:
+            self._requests_failed_total.add(1)
 
-        self._pending_requests.add(-1)
+    def _handle_status_changed(self, event: DomainEvent) -> None:
+        new_status = str(getattr(event, "new_status", "")).lower()
+        if new_status not in _RELEASING_STATUSES:
+            return
+        request_id = getattr(event, "request_id", event.aggregate_id)
+        if self._finish(request_id) is not None and new_status in _FAILED_STATUSES:
+            self._requests_failed_total.add(1)

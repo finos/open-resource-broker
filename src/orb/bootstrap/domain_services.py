@@ -1,6 +1,7 @@
 """Domain services registration for dependency injection container."""
 
 from orb.application.ports.scheduler_port import SchedulerPort
+from orb.application.services.deadline_release_service import DeadlineReleaseService
 from orb.application.services.deprovisioning_orchestrator import DeprovisioningOrchestrator
 from orb.application.services.machine_grouping_service import MachineGroupingService
 from orb.application.services.provider_validation_service import ProviderValidationService
@@ -8,6 +9,7 @@ from orb.application.services.request_status_service import RequestStatusService
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.configuration_service import DomainConfigurationService
 from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.base.ports.event_publisher_port import EventPublisherPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 from orb.domain.services.filter_service import FilterService
@@ -77,6 +79,8 @@ def register_domain_services(container: DIContainer) -> None:
             uow_factory=c.get(UnitOfWorkFactory),
             logger=c.get(LoggingPort),
             state_machine=c.get(FulfilmentStateMachine),
+            event_publisher=c.get(EventPublisherPort),
+            deadline_release=c.get_optional(DeadlineReleaseService),
         )
 
     container.register_singleton(RequestStatusService, create_request_status_service)
