@@ -322,7 +322,7 @@ class DynamoDBClientManager(ResourceManager):
 
         except Exception as e:
             self.logger.error("Failed to scan table %s: %s", table_name, e)
-            return []
+            raise
 
     def batch_write_items(self, table_name: str, items: list) -> bool:
         """

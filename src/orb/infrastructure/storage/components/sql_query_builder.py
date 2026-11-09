@@ -343,20 +343,22 @@ class SQLQueryBuilder(QueryManager):
         if not criteria:
             return self.build_select_all(), {}
 
-        # Filter criteria to only include known columns
-        filtered_criteria = {k: v for k, v in criteria.items() if k in self.columns}
-
-        if not filtered_criteria:
-            return self.build_select_all(), {}
+        # An unknown column must not be dropped: that would widen the filter,
+        # up to selecting every row when no known column remains.
+        unknown = sorted(k for k in criteria if k not in self.columns)
+        if unknown:
+            raise ValueError(
+                f"Unknown column(s) in criteria for {self.table_name}: {', '.join(unknown)}"
+            )
 
         # Validate all column names
-        for column in filtered_criteria.keys():
+        for column in criteria.keys():
             self._validate_identifier(column)
 
         where_clauses = []
         parameters = {}
 
-        for column, value in filtered_criteria.items():
+        for column, value in criteria.items():
             if isinstance(value, dict):
                 # Handle special operators
                 if "$in" in value:
