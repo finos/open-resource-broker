@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-import time
-
 from orb.application.dto.queries import SyncAndGetRequestQuery, SyncAndListActiveRequestsQuery
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.ports.query_bus_port import QueryBusPort
@@ -18,6 +15,7 @@ from orb.application.services.orchestration.dtos import (
     GetRequestStatusOutput,
     Paginated,
 )
+from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports.logging_port import LoggingPort
 
@@ -26,8 +24,13 @@ class GetRequestStatusOrchestrator(OrchestratorBase[GetRequestStatusInput, GetRe
     """Orchestrator for retrieving request status."""
 
     def __init__(
-        self, command_bus: CommandBusPort, query_bus: QueryBusPort, logger: LoggingPort
+        self,
+        command_bus: CommandBusPort,
+        query_bus: QueryBusPort,
+        logger: LoggingPort,
+        clock: Clock | None = None,
     ) -> None:
+        self._clock = clock or SystemClock()
         self._command_bus = command_bus
         self._query_bus = query_bus
         self._logger = logger
@@ -101,7 +104,7 @@ class GetRequestStatusOrchestrator(OrchestratorBase[GetRequestStatusInput, GetRe
     async def _poll_until_terminal(self, input: GetRequestStatusInput) -> list[dict]:
         """Poll every requested ID until all reach a terminal state or timeout.
 
-        Elapsed time is measured as true wall-clock via ``time.monotonic()``
+        Elapsed time is measured as true wall-clock via ``self._clock.monotonic()``
         deltas from the first poll against ``input.timeout_seconds``, so the real
         latency of each ``_fetch_once`` counts toward the budget and the total
         wait never overruns the caller's cap. (An interval-counting approach that
@@ -119,18 +122,18 @@ class GetRequestStatusOrchestrator(OrchestratorBase[GetRequestStatusInput, GetRe
         ``failed``/``complete`` status, or ``not_found``) still stops the poll
         immediately.
         """
-        start = time.monotonic()
+        start = self._clock.monotonic()
         request_dicts = await self._fetch_once(input)
         consecutive_errors = 1 if self._has_transient_error(request_dicts) else 0
         while (
             not self._all_terminal(request_dicts)
-            and (time.monotonic() - start) < input.timeout_seconds
+            and (self._clock.monotonic() - start) < input.timeout_seconds
         ):
             if consecutive_errors >= _MAX_CONSECUTIVE_POLL_ERRORS:
                 # Persistent transient failures — stop retrying and surface the
                 # last snapshot rather than blocking until timeout.
                 break
-            await asyncio.sleep(self._poll_delay(start, input.timeout_seconds))
+            await self._clock.async_sleep(self._poll_delay(start, input.timeout_seconds))
             request_dicts = await self._fetch_once(input)
             if self._has_transient_error(request_dicts):
                 consecutive_errors += 1

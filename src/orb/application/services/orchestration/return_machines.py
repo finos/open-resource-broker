@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 
 from orb.application.dto.commands import CreateReturnRequestCommand
 from orb.application.dto.queries import ListMachinesQuery, SyncAndGetRequestQuery
@@ -19,6 +18,7 @@ from orb.application.services.orchestration.dtos import (
     ReturnMachinesInput,
     ReturnMachinesOutput,
 )
+from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.exceptions import ApplicationError
 from orb.domain.base.ports.logging_port import LoggingPort
 
@@ -39,8 +39,13 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
     """Orchestrator for returning machines to the provider."""
 
     def __init__(
-        self, command_bus: CommandBusPort, query_bus: QueryBusPort, logger: LoggingPort
+        self,
+        command_bus: CommandBusPort,
+        query_bus: QueryBusPort,
+        logger: LoggingPort,
+        clock: Clock | None = None,
     ) -> None:
+        self._clock = clock or SystemClock()
         self._command_bus = command_bus
         self._query_bus = query_bus
         self._logger = logger
@@ -151,9 +156,9 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
 
     async def _poll_until_terminal(self, request_id: str, timeout_seconds: int) -> str:
         """Poll SyncAndGetRequestQuery until terminal status or timeout."""
-        start = time.monotonic()
+        start = self._clock.monotonic()
         consecutive_errors = 0
-        while time.monotonic() - start < timeout_seconds:
+        while self._clock.monotonic() - start < timeout_seconds:
             try:
                 query = SyncAndGetRequestQuery(
                     request_id=request_id, lightweight=False, skip_cache=True
@@ -182,5 +187,5 @@ class ReturnMachinesOrchestrator(OrchestratorBase[ReturnMachinesInput, ReturnMac
                         f"Polling request {request_id} aborted after "
                         f"{consecutive_errors} consecutive errors: {exc}"
                     ) from exc
-            await asyncio.sleep(self._poll_delay(start, timeout_seconds))
+            await self._clock.async_sleep(self._poll_delay(start, timeout_seconds))
         return "timeout"

@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Optional
 
+from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.diagnostic import DiagnosticCategory, FulfilmentDiagnostic
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.domain.request.aggregate import Request
@@ -80,6 +81,7 @@ class FulfilmentStateMachine:
         self,
         grace_period_seconds: int,
         fulfilment_defaults: Optional[Mapping[str, Any]] = None,
+        clock: Optional[Clock] = None,
     ) -> None:
         """Create the state machine.
 
@@ -88,12 +90,18 @@ class FulfilmentStateMachine:
             fulfilment_defaults: Configured provisioning settings
                 (``timeout_seconds``, ``dispatch_timeout_seconds``) that a request's
                 own ``fulfillment_config`` metadata may override.
+            clock: Time source; defaults to the system clock.
         """
         self._grace_period = timedelta(seconds=max(0, int(grace_period_seconds)))
+        self._clock: Clock = clock or SystemClock()
         defaults = {**_BUILTIN_FULFILMENT_DEFAULTS, **(fulfilment_defaults or {})}
         if self._timeouts(defaults) is None:
             defaults = dict(_BUILTIN_FULFILMENT_DEFAULTS)
         self._fulfilment_defaults = defaults
+
+    def now(self) -> datetime:
+        """Current time from the machine's clock, for callers that pass ``now=``."""
+        return self._clock.now()
 
     # ------------------------------------------------------------------
     # Public API

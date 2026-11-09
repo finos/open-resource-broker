@@ -19,7 +19,7 @@ class _FakeClock:
     """Deterministic monotonic clock for wall-clock timeout tests.
 
     ``monotonic()`` returns virtual seconds; ``advance()`` moves it forward.
-    Patching both ``asyncio.sleep`` (to advance) and ``time.monotonic`` (to
+    Patching both the clock's ``async_sleep`` (to advance) and ``monotonic`` (to
     read) lets the timeout logic be exercised without any real waiting.
     """
 
@@ -343,9 +343,7 @@ class TestGetRequestStatusOrchestratorWait:
         async def _no_sleep(_seconds):
             return None
 
-        monkeypatch.setattr(
-            "orb.application.services.orchestration.get_request_status.asyncio.sleep", _no_sleep
-        )
+        monkeypatch.setattr(orchestrator._clock, "async_sleep", _no_sleep)
         input = GetRequestStatusInput(request_ids=["req-1"], wait=True, timeout_seconds=300)
         result = await orchestrator.execute(input)
         assert mock_query_bus.execute.call_count == 3
@@ -367,13 +365,8 @@ class TestGetRequestStatusOrchestratorWait:
         async def _fake_sleep(seconds):
             clock.advance(seconds)
 
-        monkeypatch.setattr(
-            "orb.application.services.orchestration.get_request_status.asyncio.sleep", _fake_sleep
-        )
-        monkeypatch.setattr(
-            "orb.application.services.orchestration.get_request_status.time.monotonic",
-            clock.monotonic,
-        )
+        monkeypatch.setattr(orchestrator._clock, "async_sleep", _fake_sleep)
+        monkeypatch.setattr(orchestrator._clock, "monotonic", clock.monotonic)
         # timeout_seconds=2 with a 2s interval → initial fetch (t=0), one poll
         # (sleep advances t to 2), then t-start=2 is not < 2 → stop.
         input = GetRequestStatusInput(request_ids=["req-1"], wait=True, timeout_seconds=2)
@@ -411,13 +404,8 @@ class TestGetRequestStatusOrchestratorWait:
             clock.advance(seconds)
 
         monkeypatch.setattr(orchestrator, "_fetch_once", _slow_fetch)
-        monkeypatch.setattr(
-            "orb.application.services.orchestration.get_request_status.asyncio.sleep", _fake_sleep
-        )
-        monkeypatch.setattr(
-            "orb.application.services.orchestration.get_request_status.time.monotonic",
-            clock.monotonic,
-        )
+        monkeypatch.setattr(orchestrator._clock, "async_sleep", _fake_sleep)
+        monkeypatch.setattr(orchestrator._clock, "monotonic", clock.monotonic)
 
         # timeout=5. start=monotonic() at t=0 (before first fetch).  Initial fetch
         # advances t to 10. Loop check: 10-0=10 < 5 is False → no further polls.
@@ -448,9 +436,7 @@ class TestGetRequestStatusOrchestratorWait:
         async def _no_sleep(_seconds):
             return None
 
-        monkeypatch.setattr(
-            "orb.application.services.orchestration.get_request_status.asyncio.sleep", _no_sleep
-        )
+        monkeypatch.setattr(orchestrator._clock, "async_sleep", _no_sleep)
         input = GetRequestStatusInput(request_ids=["req-1"], wait=True, timeout_seconds=300)
         result = await orchestrator.execute(input)
 
@@ -470,9 +456,7 @@ class TestGetRequestStatusOrchestratorWait:
         async def _no_sleep(_seconds):
             return None
 
-        monkeypatch.setattr(
-            "orb.application.services.orchestration.get_request_status.asyncio.sleep", _no_sleep
-        )
+        monkeypatch.setattr(orchestrator._clock, "async_sleep", _no_sleep)
         input = GetRequestStatusInput(request_ids=["req-1"], wait=True, timeout_seconds=300)
         result = await orchestrator.execute(input)
 
@@ -493,9 +477,7 @@ class TestGetRequestStatusOrchestratorWait:
         async def _no_sleep(_seconds):
             return None
 
-        monkeypatch.setattr(
-            "orb.application.services.orchestration.get_request_status.asyncio.sleep", _no_sleep
-        )
+        monkeypatch.setattr(orchestrator._clock, "async_sleep", _no_sleep)
         input = GetRequestStatusInput(request_ids=["req-1"], wait=True, timeout_seconds=300)
         result = await orchestrator.execute(input)
 

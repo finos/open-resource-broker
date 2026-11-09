@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable
 from typing import Generic, TypeVar
 
+from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.ports.logging_port import LoggingPort
 
 InputT = TypeVar("InputT")
@@ -57,6 +57,9 @@ class OrchestratorBase(ABC, Generic[InputT, OutputT]):
 
     # Subclasses assign a LoggingPort to self._logger in their constructor.
     _logger: LoggingPort
+    # Time source for wait loops; subclasses that poll accept ``clock`` in their
+    # constructor and assign it here.
+    _clock: Clock = SystemClock()
 
     @abstractmethod
     async def execute(self, input: InputT) -> OutputT:  # type: ignore[return]
@@ -83,11 +86,10 @@ class OrchestratorBase(ABC, Generic[InputT, OutputT]):
             self._logger.error("%s failed: %s", operation, exc)
             raise
 
-    @staticmethod
-    def _poll_delay(start: float, timeout_seconds: float) -> float:
+    def _poll_delay(self, start: float, timeout_seconds: float) -> float:
         """Return how long to sleep before the next poll without passing the timeout.
 
-        ``start`` is the ``time.monotonic()`` reading taken when the wait began.
+        ``start`` is the ``self._clock.monotonic()`` reading taken when the wait began.
         """
-        elapsed = time.monotonic() - start
+        elapsed = self._clock.monotonic() - start
         return max(min(next_poll_interval(elapsed), timeout_seconds - elapsed), 0.0)

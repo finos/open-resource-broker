@@ -54,6 +54,7 @@ def _register_application_services(container: DIContainer) -> None:
     def create_machine_sync_service(c):
         from orb.application.services.provider_registry_service import ProviderRegistryService
         from orb.domain.base import UnitOfWorkFactory
+        from orb.domain.base.clock import Clock
         from orb.domain.base.ports.configuration_port import ConfigurationPort
 
         command_bus = c.get(CommandBus)
@@ -62,7 +63,12 @@ def _register_application_services(container: DIContainer) -> None:
         logger = c.get(LoggingPort)
         provider_registry_service = c.get(ProviderRegistryService)
         return MachineSyncService(
-            command_bus, uow_factory, config_port, logger, provider_registry_service
+            command_bus,
+            uow_factory,
+            config_port,
+            logger,
+            provider_registry_service,
+            clock=c.get_optional(Clock),
         )
 
     container.register_singleton(MachineSyncService, create_machine_sync_service)

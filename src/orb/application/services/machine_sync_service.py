@@ -1,6 +1,6 @@
 """Machine sync service for provider integration."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Tuple
 
 if TYPE_CHECKING:
@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.services.machine_coordinates import load_machine_coordinates
 from orb.domain.base import UnitOfWorkFactory
+from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.exceptions import ConcurrencyError
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
@@ -41,7 +42,9 @@ class MachineSyncService:
         config_port: ConfigurationPort,
         logger: LoggingPort,
         provider_registry_service: Optional["ProviderRegistryService"] = None,
+        clock: Optional[Clock] = None,
     ) -> None:
+        self._clock: Clock = clock or SystemClock()
         self.command_bus = command_bus
         self.uow_factory = uow_factory
         self._config_port = config_port
@@ -482,7 +485,7 @@ class MachineSyncService:
                 )
                 return updated_machines, {}
             try:
-                self._stamp_status_check(request, now or datetime.now(timezone.utc))
+                self._stamp_status_check(request, now or self._clock.now())
             except ConcurrencyError:
                 # Persistent write conflict: do not hide it as a stale-looking
                 # success; the caller decides (the loop counts it as failed).
