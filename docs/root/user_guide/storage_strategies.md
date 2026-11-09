@@ -460,6 +460,12 @@ storage.update_entity(
 )
 ```
 
+## Read Errors
+
+Reads never turn a failure into an empty answer. `find_by_id`, `find_all`,
+`exists` and `count` raise `StorageError` when the backend cannot be read; a
+missing record is still `None` / `False`, and an empty store still counts as `0`.
+
 ## Generic Repository Pattern
 
 ### Repository Interface

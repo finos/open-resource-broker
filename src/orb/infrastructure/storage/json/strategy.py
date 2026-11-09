@@ -337,7 +337,9 @@ class JSONStorageStrategy(BaseStorageStrategy):
                     entity_id,
                     e,
                 )
-                return False
+                raise StorageError(
+                    f"Failed to check existence of {self.entity_type} entity {entity_id}: {e}"
+                ) from e
 
     @instrument_storage(lambda self: cast("JSONStorageStrategy", self)._metrics, "find_by_criteria")
     def find_by_criteria(self, criteria: dict[str, Any]) -> list[dict[str, Any]]:
@@ -565,7 +567,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 raise
             except Exception as e:
                 self.logger.error(f"Failed to count {self.entity_type} entities: {e}")
-                return 0
+                raise StorageError(f"Failed to count {self.entity_type} entities: {e}") from e
 
     def drop_cache(self) -> None:
         """Forget the cached records (the files changed behind this strategy)."""

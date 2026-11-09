@@ -699,7 +699,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
         except Exception as e:
             self.logger.error("Failed to check existence of entity %s: %s", entity_id, e)
-            return False
+            raise StorageError(f"Failed to check existence of entity {entity_id}: {e}") from e
 
     def find_by_criteria(self, criteria: dict[str, Any]) -> list[dict[str, Any]]:
         """
@@ -905,7 +905,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 return int(row[0]) if row else 0
         except Exception as e:
             self.logger.error("Failed to count entities: %s", e)
-            return 0
+            raise StorageError(f"Failed to count entities: {e}") from e
 
     def cleanup(self) -> None:
         """Clean up resources."""

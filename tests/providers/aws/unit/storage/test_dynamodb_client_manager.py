@@ -233,10 +233,11 @@ class TestItemOperations:
         with mock.patch.object(self.manager, "get_table", side_effect=RuntimeError("boom")):
             assert self.manager.put_item("items-table", {"id": "3"}) is False
 
-    def test_get_item_failure_returns_none(self) -> None:
-        """An exception during get_item is caught and reported as None."""
+    def test_get_item_failure_propagates(self) -> None:
+        """A failed read is an error, not "item not found"."""
         with mock.patch.object(self.manager, "get_table", side_effect=RuntimeError("boom")):
-            assert self.manager.get_item("items-table", {"id": "3"}) is None
+            with pytest.raises(RuntimeError):
+                self.manager.get_item("items-table", {"id": "3"})
 
     def test_delete_item_failure_returns_false(self) -> None:
         """An exception during delete_item is caught and reported as failure."""
