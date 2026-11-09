@@ -180,6 +180,37 @@ class StorageStrategy(StoragePort[T], ABC, Generic[T]):
         """
 
 
+def reject_unsupported_criteria(
+    criteria: dict[str, Any], supported: tuple[str, ...], backend: str
+) -> None:
+    """Raise StorageError for a criteria operator the backend does not interpret.
+
+    Called first in ``find_by_criteria``, on the raw criteria, so an operator dict
+    is never silently compared as a literal value. Dict values without ``$`` keys
+    are left alone: each backend keeps its own handling of them.
+
+    Raises:
+        StorageError: A value uses an operator outside *supported*, combines
+            several operators, or mixes operator and literal keys.
+    """
+    for field, value in criteria.items():
+        if not isinstance(value, dict):
+            continue
+        operators = [key for key in value if isinstance(key, str) and key.startswith("$")]
+        if not operators:
+            continue
+        unknown = [op for op in operators if op not in supported]
+        if unknown:
+            raise StorageError(
+                f"Unsupported criteria operator '{unknown[0]}' for {backend}; "
+                f"supported: {list(supported)}"
+            )
+        if len(operators) > 1:
+            raise StorageError(f"Criteria for '{field}' combine several operators; use one")
+        if len(operators) != len(value):
+            raise StorageError(f"Criteria for '{field}' mix operator and literal keys")
+
+
 class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
     """Base storage strategy implementation with common functionality."""
 

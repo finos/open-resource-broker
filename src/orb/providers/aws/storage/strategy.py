@@ -7,7 +7,10 @@ from botocore.exceptions import ClientError
 from orb.domain.base.exceptions import ConcurrencyError
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.di.injectable import injectable
-from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
+from orb.infrastructure.storage.base.strategy import (
+    BaseStorageStrategy,
+    reject_unsupported_criteria,
+)
 
 # Import components
 from orb.infrastructure.storage.components import LockManager
@@ -17,6 +20,7 @@ from orb.providers.aws.storage.components import (
     DynamoDBConverter,
     DynamoDBTransactionManager,
 )
+from orb.providers.aws.storage.components.dynamodb_converter import SUPPORTED_OPERATORS
 
 
 @injectable
@@ -421,7 +425,11 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
 
         Returns:
             List of matching entities
+
+        Raises:
+            StorageError: An operator in *criteria* is not in ``SUPPORTED_OPERATORS``
         """
+        reject_unsupported_criteria(criteria, SUPPORTED_OPERATORS, "DynamoDB storage")
         with self.lock_manager.read_lock():
             try:
                 # Build filter expression

@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,7 +11,10 @@ from typing import Any, Callable, Optional, TypeVar, cast
 
 from orb.domain.base.exceptions import ConcurrencyError
 from orb.infrastructure.logging.logger import get_logger
-from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
+from orb.infrastructure.storage.base.strategy import (
+    BaseStorageStrategy,
+    reject_unsupported_criteria,
+)
 
 # Import components
 from orb.infrastructure.storage.components import (
@@ -23,6 +27,23 @@ from orb.infrastructure.storage.json.transaction_scope import JSONTransactionSco
 from orb.infrastructure.storage.metrics_decorators import instrument_storage
 
 _R = TypeVar("_R")
+
+
+def _in_list(actual: Any, expected: Any) -> bool:
+    return actual in expected
+
+
+def _matches_regex(actual: Any, expected: Any) -> bool:
+    return re.search(expected, str(actual)) is not None
+
+
+# The criteria operators ``_matches_criteria`` interprets; ``find_by_criteria``
+# rejects every other ``$`` operator.
+_CRITERIA_OPERATORS: dict[str, Callable[[Any, Any], bool]] = {
+    "$in": _in_list,
+    "$regex": _matches_regex,
+}
+SUPPORTED_OPERATORS: tuple[str, ...] = tuple(_CRITERIA_OPERATORS)
 
 
 @dataclass
@@ -351,7 +372,11 @@ class JSONStorageStrategy(BaseStorageStrategy):
 
         Returns:
             List of matching entities
+
+        Raises:
+            StorageError: An operator in *criteria* is not in ``SUPPORTED_OPERATORS``
         """
+        reject_unsupported_criteria(criteria, SUPPORTED_OPERATORS, "JSON storage")
         with self.lock_manager.read_lock():
             try:
                 all_data = self._visible_records()
@@ -758,15 +783,13 @@ class JSONStorageStrategy(BaseStorageStrategy):
 
             actual_value = entity_data[key]
 
-            # Handle different comparison types
-            if isinstance(expected_value, dict) and "$in" in expected_value:
-                if actual_value not in expected_value["$in"]:
-                    return False
-            elif isinstance(expected_value, dict) and "$regex" in expected_value:
-                import re
-
-                pattern = expected_value["$regex"]
-                if not re.search(pattern, str(actual_value)):
+            operator = (
+                next((op for op in _CRITERIA_OPERATORS if op in expected_value), None)
+                if isinstance(expected_value, dict)
+                else None
+            )
+            if operator is not None:
+                if not _CRITERIA_OPERATORS[operator](actual_value, expected_value[operator]):
                     return False
             elif actual_value != expected_value:
                 return False

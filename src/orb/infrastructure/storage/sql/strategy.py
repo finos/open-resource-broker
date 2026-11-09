@@ -10,7 +10,10 @@ from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from orb.application.ports.exceptions import RepositoryQueryError
 from orb.domain.base.exceptions import ConcurrencyError
 from orb.infrastructure.logging.logger import get_logger
-from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
+from orb.infrastructure.storage.base.strategy import (
+    BaseStorageStrategy,
+    reject_unsupported_criteria,
+)
 
 # Import components
 from orb.infrastructure.storage.components import (
@@ -19,6 +22,7 @@ from orb.infrastructure.storage.components import (
     SQLQueryBuilder,
     SQLSerializer,
 )
+from orb.infrastructure.storage.components.sql_query_builder import SUPPORTED_OPERATORS
 from orb.infrastructure.storage.exceptions import StorageError
 
 # The last revision before machines.launch_time became TEXT
@@ -710,7 +714,11 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
         Returns:
             List of matching entities
+
+        Raises:
+            StorageError: An operator in *criteria* is not in ``SUPPORTED_OPERATORS``
         """
+        reject_unsupported_criteria(criteria, SUPPORTED_OPERATORS, "SQL storage")
         with self.lock_manager.read_lock():
             try:
                 prepared_criteria = self.serializer.prepare_criteria(criteria)
