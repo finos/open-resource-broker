@@ -3790,6 +3790,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cancelling-a-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancelling a request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#iam-permissions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6567,6 +6578,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cancelling-a-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancelling a request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#iam-permissions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6985,6 +7007,9 @@
 <li><strong>Clean up the launch template</strong> ORB created for the request.</li>
 </ol>
 <p>Cancelling a request with no instances named cancels the whole fleet and terminates whatever it holds.</p>
+<p>When a <code>maintain</code> fleet shrinks, ORB passes <code>ExcessCapacityTerminationPolicy: NoTermination</code> to <code>modify_spot_fleet_request</code>, and reads the current target again immediately before lowering it. The returned instances are terminated explicitly, and only those, so the fleet does not terminate an extra instance and then launch a replacement. As for EC2 Fleet, this narrows rather than closes the window in which two returns on one fleet overwrite each other. A fleet that is already cancelled is not modified or cancelled again by a later return.</p>
+<h2 id="cancelling-a-request">Cancelling a request<a class="headerlink" href="#cancelling-a-request" title="Permanent link">&para;</a></h2>
+<p>Cancelling a request that is still being fulfilled calls <code>cancel_spot_fleet_requests</code> with <code>TerminateInstances: true</code>, which cancels pending requests and terminates the instances already launched (<code>cancelled_terminating</code>). A request AWS reports as not cancellable counts as stopped only when a describe confirms it is cancelled. Instances still attached afterwards are found with the <code>aws:ec2spot:fleet-request-id</code> tag and returned with the recorded machines.</p>
 <h2 id="iam-permissions">IAM permissions<a class="headerlink" href="#iam-permissions" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">&quot;Version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2012-10-17&quot;</span><span class="p">,</span>

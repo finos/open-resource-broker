@@ -3835,6 +3835,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cancelling-a-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancelling a request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#iam-permissions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6590,6 +6601,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cancelling-a-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancelling a request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#iam-permissions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7014,6 +7036,12 @@
 </ol>
 <p>Instant fleets are a special case: AWS deletes the fleet record itself, so there is no capacity to modify. ORB still attempts an explicit delete and swallows the error if the record is already gone. Because the record may be missing, ORB recovers the request id for launch template cleanup from the <code>orb:request-id</code> instance tag — which is why instant fleets tag instances with <code>orb:fleet-type: instant</code> at creation.</p>
 <p>If any fleet in a multi-fleet return fails to release, the whole return raises after the other fleets are processed.</p>
+<p>When a <code>maintain</code> fleet shrinks, ORB passes <code>ExcessCapacityTerminationPolicy: no-termination</code> to <code>modify_fleet</code>. The returned instances are terminated explicitly, and only those: without the policy a fleet that still counts an instance that is already terminating would pick another instance to terminate when its target drops, and then launch a replacement. The current target is read again immediately before it is lowered. That narrows, but cannot close, the window in which two returns on the same fleet overwrite each other, because the API has no compare-and-set. A returned instance the fleet does not list yet still counts as one unit, so a freshly launched instance never leaves capacity behind; after a failed terminate, retrying the return can therefore lower the target further than needed, which errs towards less capacity rather than a relaunch.</p>
+<p>A fleet that is already deleted is not modified or deleted again by a later return: its instances are terminated and the launch template is cleaned up.</p>
+<h2 id="cancelling-a-request">Cancelling a request<a class="headerlink" href="#cancelling-a-request" title="Permanent link">&para;</a></h2>
+<p>Cancelling a request that is still being fulfilled calls <code>delete_fleets</code> with <code>TerminateInstances: true</code> for every fleet of the request. That single call stops further launches and terminates the members of <code>request</code>, <code>maintain</code> and <code>instant</code> fleets alike, so capacity is not reduced first. The result is <code>aborted</code>, or <code>already_gone</code> when the fleet is already deleted or no longer exists; entries that AWS reports as unsuccessful make the cancel fail unless a describe confirms the fleet is deleted.</p>
+<p>An <code>instant</code> fleet has nothing in flight: its instances are part of the create response, so the return of those machines is what tears it down, and the delete is harmless.</p>
+<p>Instances that are still attached to the fleet after it was deleted are found with the <code>aws:ec2:fleet-id</code> tag, limited to instances that are pending, running, stopping, stopped or shutting down, and returned together with the machines already recorded.</p>
 <h2 id="iam-permissions">IAM permissions<a class="headerlink" href="#iam-permissions" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">&quot;Version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2012-10-17&quot;</span><span class="p">,</span>

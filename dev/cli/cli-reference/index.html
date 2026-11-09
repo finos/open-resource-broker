@@ -5184,6 +5184,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="providers exec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cleanup-orphaned-resources-aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cleanup-orphaned-resources (AWS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -7897,6 +7914,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="providers exec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cleanup-orphaned-resources-aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cleanup-orphaned-resources (AWS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -8974,6 +9008,32 @@
 | Flag | Description | Example |
 |------|-------------|---------|
 | <code>--force</code> | Force cancellation | <code>--force</code> |</p>
+<p>Cancelling a request that has not settled stops its provisioning at the provider first, whether or not any machine has been recorded yet, and then returns the machines it already has. A fleet that is still fulfilling a partially filled request is stopped too, so it cannot keep launching capacity after the request reads cancelled. A <code>partial</code> or <code>timeout</code> request is aborted the same way and keeps reporting its true status; a completed, failed or cancelled request is left as it is.</p>
+<p>The output lists what happened to each resource in <code>provider_abort</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>aborted</code></td>
+<td>The provider stopped the resource.</td>
+</tr>
+<tr>
+<td><code>already_gone</code></td>
+<td>The resource was already deleted or never existed. Cancelling again is safe.</td>
+</tr>
+<tr>
+<td><code>unsupported</code></td>
+<td>The provider cannot abort in-flight provisioning; the machines are still returned.</td>
+</tr>
+</tbody>
+</table>
+<p>If any resource cannot be stopped the command fails with a non-zero exit code and the request keeps its current state, so the cancel can be repeated. Resources that were already stopped report <code>already_gone</code> on the retry. The command exits 0 whenever the cancel took effect, including for a <code>partial</code> or <code>timeout</code> request whose resources were aborted.</p>
+<p>How each provider API is stopped is described in the AWS provider pages: <a href="../../providers/aws/ec2-fleet/#cancelling-a-request">EC2 Fleet</a>, <a href="../../providers/aws/spot-fleet/#cancelling-a-request">Spot Fleet</a>, <a href="../../providers/aws/asg/#cancelling-a-request">Auto Scaling group</a> and <a href="../../providers/aws/run-instances/#release-behaviour">RunInstances</a>.</p>
 <h4 id="requests-status"><code>requests status</code><a class="headerlink" href="#requests-status" title="Permanent link">&para;</a></h4>
 <p>Check request status.</p>
 <p><strong>Usage:</strong>
@@ -9220,23 +9280,55 @@ the parent.</p>
 |------|-------------|---------|
 | <code>--strategy</code> | Specific strategy to select | <code>--strategy ec2fleet</code> |</p>
 <h4 id="providers-exec"><code>providers exec</code><a class="headerlink" href="#providers-exec" title="Permanent link">&para;</a></h4>
-<p>Execute provider operation.</p>
+<p>Run a provider-side maintenance operation. <code>exec</code> accepts only operator-safe operations; operations that create, start, stop or terminate machines have their own commands and are refused here. Today the only operation is <code>cleanup-orphaned-resources</code>.</p>
 <p><strong>Usage:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>orb<span class="w"> </span>providers<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>OPERATION<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a>orb<span class="w"> </span>providers<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>--list<span class="w"> </span><span class="o">[</span>--provider-name<span class="w"> </span>NAME<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Arguments:</strong>
 | Argument | Description | Required |
 |----------|-------------|----------|
-| <code>OPERATION</code> | Operation to execute | Yes |</p>
+| <code>OPERATION</code> | Operation to execute, in kebab-case or snake_case | Yes, unless <code>--list</code> is used |</p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
 |------|-------------|---------|
-| <code>--provider-name</code> | Provider to execute operation on | <code>--provider-name aws_prod_us-east-1</code> |
-| <code>--params</code> | Operation parameters (JSON format) | <code>--params '{"count":5}'</code> |</p>
+| <code>--provider-name</code> | Provider instance to run the operation on | <code>--provider-name aws_prod_us-east-1</code> |
+| <code>--list</code> | List the operations each provider instance supports instead of running one | <code>--list</code> |
+| <code>--dry-run</code> | Ask the operation to report what it would do without changing anything | <code>--dry-run</code> |
+| <code>--param</code> | Operation parameter as <code>KEY=VALUE</code>; repeat for several. Values are read as JSON when possible | <code>--param min_age_hours=48</code> |
+| <code>--params</code> | Operation parameters as a JSON object | <code>--params '{"min_age_hours":48}'</code> |</p>
+<p>A provider that does not declare the operation causes exit code 1 and a message listing what it does support. <code>orb providers show</code> also lists a provider instance's <code>supported_operations</code>.</p>
+<h5 id="cleanup-orphaned-resources-aws"><code>cleanup-orphaned-resources</code> (AWS)<a class="headerlink" href="#cleanup-orphaned-resources-aws" title="Permanent link">&para;</a></h5>
+<p>Delete the launch templates ORB created that nothing uses any more. This is an explicit maintenance operation; ORB never runs it in the background.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>orb<span class="w"> </span>providers<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>cleanup-orphaned-resources<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1<span class="w"> </span>--dry-run
+<a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a>orb<span class="w"> </span>providers<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>cleanup-orphaned-resources<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1<span class="w"> </span>--param<span class="w"> </span><span class="nv">min_age_hours</span><span class="o">=</span><span class="m">48</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>min_age_hours</code></td>
+<td>Only consider templates at least this old (default 24, minimum 1)</td>
+</tr>
+<tr>
+<td><code>force</code></td>
+<td>Allow <code>min_age_hours</code> below 1. A template created moments ago may belong to a request that has not launched anything yet, so this can delete a template that request still needs. Example: <code>--param force=true --param min_age_hours=0</code></td>
+</tr>
+</tbody>
+</table>
+<p>A template is deleted only if it carries the <code>orb:managed-by</code> tag, has exactly the name ORB generates for it (the resource prefix, its <code>orb:request-id</code> tag, <code>-</code>, its <code>orb:template-id</code> tag), is old enough, has no pending, running, stopping or stopped instance, and is not referenced by an active Auto Scaling group, EC2 Fleet or Spot Fleet request. The operation does nothing when <code>cleanup.enabled</code> or <code>cleanup.delete_launch_template</code> is false in the provider configuration, and <code>cleanup.dry_run</code> makes it a dry run.</p>
+<p>The sweep covers all ORB-generated templates in the account and region of the selected provider instance, so other regions need a run per provider instance. The <code>orb:managed-by</code> tag has the same value for every ORB installation, so the sweep also sees templates created by other ORB installations that share the account and region, and deletes the unused ones among them. Templates whose name ORB did not generate are always kept, even when they carry ORB tags.</p>
+<p>The result names the <code>provider</code>, <code>region</code> and <code>account_id</code> the sweep ran against. When more than one provider is configured, a run that changes anything needs an explicit <code>--provider-name</code>; a <code>--dry-run</code> may use the default provider. Boolean parameters (<code>force</code>) accept <code>true</code> or <code>false</code> only, and unknown parameters are rejected. If <code>cleanup.enabled</code> or <code>cleanup.delete_launch_template</code> is false, the command exits non-zero and says so.</p>
+<p>Every template is judged before the first one is deleted. If a lookup fails, the command exits non-zero and nothing has been deleted. If a delete fails part-way, the command exits non-zero and the output lists the templates in <code>deleted</code>, <code>failed</code> (with the error) and <code>kept</code> (with the reason), so the result is never reported as all-or-nothing when it was not. The permissions it needs are listed in the <a href="../../deployment/iam-permissions/">IAM permissions guide</a>.</p>
 <h4 id="providers-metrics"><code>providers metrics</code><a class="headerlink" href="#providers-metrics" title="Permanent link">&para;</a></h4>
 <p>Show provider metrics.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>orb<span class="w"> </span>providers<span class="w"> </span>metrics<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>orb<span class="w"> </span>providers<span class="w"> </span>metrics<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9254,7 +9346,7 @@ the parent.</p>
 <h4 id="storage-list"><code>storage list</code><a class="headerlink" href="#storage-list" title="Permanent link">&para;</a></h4>
 <p>List available storage strategies.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>orb<span class="w"> </span>storage<span class="w"> </span>list<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>orb<span class="w"> </span>storage<span class="w"> </span>list<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9263,7 +9355,7 @@ the parent.</p>
 <h4 id="storage-show"><code>storage show</code><a class="headerlink" href="#storage-show" title="Permanent link">&para;</a></h4>
 <p>Show current storage configuration.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>orb<span class="w"> </span>storage<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>orb<span class="w"> </span>storage<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9273,7 +9365,7 @@ the parent.</p>
 <h4 id="storage-validate"><code>storage validate</code><a class="headerlink" href="#storage-validate" title="Permanent link">&para;</a></h4>
 <p>Validate storage configuration.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>orb<span class="w"> </span>storage<span class="w"> </span>validate<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>orb<span class="w"> </span>storage<span class="w"> </span>validate<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9282,7 +9374,7 @@ the parent.</p>
 <h4 id="storage-test"><code>storage test</code><a class="headerlink" href="#storage-test" title="Permanent link">&para;</a></h4>
 <p>Test storage connectivity.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>orb<span class="w"> </span>storage<span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a>orb<span class="w"> </span>storage<span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Default | Example |
@@ -9292,7 +9384,7 @@ the parent.</p>
 <h4 id="storage-health"><code>storage health</code><a class="headerlink" href="#storage-health" title="Permanent link">&para;</a></h4>
 <p>Check storage health.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a>orb<span class="w"> </span>storage<span class="w"> </span>health<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a>orb<span class="w"> </span>storage<span class="w"> </span>health<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9302,7 +9394,7 @@ the parent.</p>
 <h4 id="storage-metrics"><code>storage metrics</code><a class="headerlink" href="#storage-metrics" title="Permanent link">&para;</a></h4>
 <p>Show storage performance metrics.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a>orb<span class="w"> </span>storage<span class="w"> </span>metrics<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>orb<span class="w"> </span>storage<span class="w"> </span>metrics<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9314,7 +9406,7 @@ the parent.</p>
 <h4 id="scheduler-list"><code>scheduler list</code><a class="headerlink" href="#scheduler-list" title="Permanent link">&para;</a></h4>
 <p>List available scheduler strategies.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>orb<span class="w"> </span>scheduler<span class="w"> </span>list<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a>orb<span class="w"> </span>scheduler<span class="w"> </span>list<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9324,7 +9416,7 @@ the parent.</p>
 <h4 id="scheduler-show"><code>scheduler show</code><a class="headerlink" href="#scheduler-show" title="Permanent link">&para;</a></h4>
 <p>Show scheduler configuration.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a>orb<span class="w"> </span>scheduler<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>orb<span class="w"> </span>scheduler<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9334,7 +9426,7 @@ the parent.</p>
 <h4 id="scheduler-validate"><code>scheduler validate</code><a class="headerlink" href="#scheduler-validate" title="Permanent link">&para;</a></h4>
 <p>Validate scheduler configuration.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>orb<span class="w"> </span>scheduler<span class="w"> </span>validate<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a>orb<span class="w"> </span>scheduler<span class="w"> </span>validate<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9351,7 +9443,7 @@ client or the MCP Inspector, not a server-side command.</p>
 <p>Start the MCP server. Defaults to stdio, the transport local MCP clients expect;
 pass <code>--transport http</code> to serve over Streamable HTTP.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a>orb<span class="w"> </span>mcp<span class="w"> </span>serve<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-71-1" name="__codelineno-71-1" href="#__codelineno-71-1"></a>orb<span class="w"> </span>mcp<span class="w"> </span>serve<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Default | Example |
@@ -9365,7 +9457,7 @@ pass <code>--transport http</code> to serve over Streamable HTTP.</p>
 MCP interface produces a tool with a resolvable input schema. Runs without
 starting a server or client, so it is safe in CI.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-71-1" name="__codelineno-71-1" href="#__codelineno-71-1"></a>orb<span class="w"> </span>mcp<span class="w"> </span>validate
+<div class="highlight"><pre><span></span><code><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a>orb<span class="w"> </span>mcp<span class="w"> </span>validate
 </code></pre></div></p>
 <p>Reports the tool count and names, exiting non-zero if any tool fails to resolve.</p>
 <h3 id="infrastructure">Infrastructure<a class="headerlink" href="#infrastructure" title="Permanent link">&para;</a></h3>
@@ -9374,8 +9466,8 @@ starting a server or client, so it is safe in CI.</p>
 <h4 id="infrastructure-discover"><code>infrastructure discover</code><a class="headerlink" href="#infrastructure-discover" title="Permanent link">&para;</a></h4>
 <p>Scan your AWS account for available VPCs, subnets, and security groups.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a>orb<span class="w"> </span>infrastructure<span class="w"> </span>discover<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
-<a id="__codelineno-72-2" name="__codelineno-72-2" href="#__codelineno-72-2"></a>orb<span class="w"> </span>infra<span class="w"> </span>discover<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-73-1" name="__codelineno-73-1" href="#__codelineno-73-1"></a>orb<span class="w"> </span>infrastructure<span class="w"> </span>discover<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<a id="__codelineno-73-2" name="__codelineno-73-2" href="#__codelineno-73-2"></a>orb<span class="w"> </span>infra<span class="w"> </span>discover<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9386,21 +9478,21 @@ starting a server or client, so it is safe in CI.</p>
 <h4 id="infrastructure-show"><code>infrastructure show</code><a class="headerlink" href="#infrastructure-show" title="Permanent link">&para;</a></h4>
 <p>Display the infrastructure ORB is currently configured to use.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-73-1" name="__codelineno-73-1" href="#__codelineno-73-1"></a>orb<span class="w"> </span>infrastructure<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
-<a id="__codelineno-73-2" name="__codelineno-73-2" href="#__codelineno-73-2"></a>orb<span class="w"> </span>infra<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-74-1" name="__codelineno-74-1" href="#__codelineno-74-1"></a>orb<span class="w"> </span>infrastructure<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<a id="__codelineno-74-2" name="__codelineno-74-2" href="#__codelineno-74-2"></a>orb<span class="w"> </span>infra<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <h4 id="infrastructure-validate"><code>infrastructure validate</code><a class="headerlink" href="#infrastructure-validate" title="Permanent link">&para;</a></h4>
 <p>Verify that the configured infrastructure still exists in AWS.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-74-1" name="__codelineno-74-1" href="#__codelineno-74-1"></a>orb<span class="w"> </span>infrastructure<span class="w"> </span>validate<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
-<a id="__codelineno-74-2" name="__codelineno-74-2" href="#__codelineno-74-2"></a>orb<span class="w"> </span>infra<span class="w"> </span>validate<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-75-1" name="__codelineno-75-1" href="#__codelineno-75-1"></a>orb<span class="w"> </span>infrastructure<span class="w"> </span>validate<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<a id="__codelineno-75-2" name="__codelineno-75-2" href="#__codelineno-75-2"></a>orb<span class="w"> </span>infra<span class="w"> </span>validate<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <h3 id="init">Init<a class="headerlink" href="#init" title="Permanent link">&para;</a></h3>
 <p>Initialize ORB configuration.</p>
 <h4 id="init_1"><code>init</code><a class="headerlink" href="#init_1" title="Permanent link">&para;</a></h4>
 <p>Initialize ORB configuration.</p>
 <p><strong>Usage:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-75-1" name="__codelineno-75-1" href="#__codelineno-75-1"></a>orb<span class="w"> </span>init<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-76-1" name="__codelineno-76-1" href="#__codelineno-76-1"></a>orb<span class="w"> </span>init<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
 <p><strong>Options:</strong>
 | Flag | Description | Example |
@@ -9419,55 +9511,55 @@ starting a server or client, so it is safe in CI.</p>
 - <code>--subnet-ids</code>, <code>--security-group-ids</code>, and <code>--fleet-role</code> are only used with <code>--non-interactive</code>. In interactive mode, ORB discovers these values from your AWS account automatically.
 - These values are stored in <code>template_defaults</code> in <code>config.json</code> and applied at runtime when provisioning machines — they are not baked into template files.</p>
 <p><strong>Examples:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-76-1" name="__codelineno-76-1" href="#__codelineno-76-1"></a><span class="c1"># Interactive init (discovers infrastructure from AWS)</span>
-<a id="__codelineno-76-2" name="__codelineno-76-2" href="#__codelineno-76-2"></a>orb<span class="w"> </span>init<span class="w"> </span>--scheduler<span class="w"> </span>hostfactory<span class="w"> </span>--provider-type<span class="w"> </span>aws<span class="w"> </span>--region<span class="w"> </span>us-east-1
-<a id="__codelineno-76-3" name="__codelineno-76-3" href="#__codelineno-76-3"></a>
-<a id="__codelineno-76-4" name="__codelineno-76-4" href="#__codelineno-76-4"></a><span class="c1"># Non-interactive init with pre-known infrastructure values</span>
-<a id="__codelineno-76-5" name="__codelineno-76-5" href="#__codelineno-76-5"></a>orb<span class="w"> </span>init<span class="w"> </span>--non-interactive<span class="w"> </span>--region<span class="w"> </span>us-east-1<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-76-6" name="__codelineno-76-6" href="#__codelineno-76-6"></a><span class="w">  </span>--subnet-ids<span class="w"> </span>subnet-aaa111,subnet-bbb222<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-76-7" name="__codelineno-76-7" href="#__codelineno-76-7"></a><span class="w">  </span>--security-group-ids<span class="w"> </span>sg-11111111<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-76-8" name="__codelineno-76-8" href="#__codelineno-76-8"></a><span class="w">  </span>--fleet-role<span class="w"> </span>arn:aws:iam::123456789012:role/SpotFleetRole
+<div class="highlight"><pre><span></span><code><a id="__codelineno-77-1" name="__codelineno-77-1" href="#__codelineno-77-1"></a><span class="c1"># Interactive init (discovers infrastructure from AWS)</span>
+<a id="__codelineno-77-2" name="__codelineno-77-2" href="#__codelineno-77-2"></a>orb<span class="w"> </span>init<span class="w"> </span>--scheduler<span class="w"> </span>hostfactory<span class="w"> </span>--provider-type<span class="w"> </span>aws<span class="w"> </span>--region<span class="w"> </span>us-east-1
+<a id="__codelineno-77-3" name="__codelineno-77-3" href="#__codelineno-77-3"></a>
+<a id="__codelineno-77-4" name="__codelineno-77-4" href="#__codelineno-77-4"></a><span class="c1"># Non-interactive init with pre-known infrastructure values</span>
+<a id="__codelineno-77-5" name="__codelineno-77-5" href="#__codelineno-77-5"></a>orb<span class="w"> </span>init<span class="w"> </span>--non-interactive<span class="w"> </span>--region<span class="w"> </span>us-east-1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-77-6" name="__codelineno-77-6" href="#__codelineno-77-6"></a><span class="w">  </span>--subnet-ids<span class="w"> </span>subnet-aaa111,subnet-bbb222<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-77-7" name="__codelineno-77-7" href="#__codelineno-77-7"></a><span class="w">  </span>--security-group-ids<span class="w"> </span>sg-11111111<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-77-8" name="__codelineno-77-8" href="#__codelineno-77-8"></a><span class="w">  </span>--fleet-role<span class="w"> </span>arn:aws:iam::123456789012:role/SpotFleetRole
 </code></pre></div></p>
 <h2 id="argument-patterns">Argument Patterns<a class="headerlink" href="#argument-patterns" title="Permanent link">&para;</a></h2>
 <h3 id="positional-vs-flag-arguments">Positional vs Flag Arguments<a class="headerlink" href="#positional-vs-flag-arguments" title="Permanent link">&para;</a></h3>
 <p>Many commands support both positional and flag arguments for flexibility:</p>
 <h4 id="templates_1">Templates<a class="headerlink" href="#templates_1" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-77-1" name="__codelineno-77-1" href="#__codelineno-77-1"></a><span class="c1"># Both work the same</span>
-<a id="__codelineno-77-2" name="__codelineno-77-2" href="#__codelineno-77-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>aws-basic
-<a id="__codelineno-77-3" name="__codelineno-77-3" href="#__codelineno-77-3"></a>orb<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>--template-id<span class="w"> </span>aws-basic
-<a id="__codelineno-77-4" name="__codelineno-77-4" href="#__codelineno-77-4"></a>
-<a id="__codelineno-77-5" name="__codelineno-77-5" href="#__codelineno-77-5"></a>orb<span class="w"> </span>templates<span class="w"> </span>delete<span class="w"> </span>old-template
-<a id="__codelineno-77-6" name="__codelineno-77-6" href="#__codelineno-77-6"></a>orb<span class="w"> </span>templates<span class="w"> </span>delete<span class="w"> </span>--template-id<span class="w"> </span>old-template
+<div class="highlight"><pre><span></span><code><a id="__codelineno-78-1" name="__codelineno-78-1" href="#__codelineno-78-1"></a><span class="c1"># Both work the same</span>
+<a id="__codelineno-78-2" name="__codelineno-78-2" href="#__codelineno-78-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>aws-basic
+<a id="__codelineno-78-3" name="__codelineno-78-3" href="#__codelineno-78-3"></a>orb<span class="w"> </span>templates<span class="w"> </span>show<span class="w"> </span>--template-id<span class="w"> </span>aws-basic
+<a id="__codelineno-78-4" name="__codelineno-78-4" href="#__codelineno-78-4"></a>
+<a id="__codelineno-78-5" name="__codelineno-78-5" href="#__codelineno-78-5"></a>orb<span class="w"> </span>templates<span class="w"> </span>delete<span class="w"> </span>old-template
+<a id="__codelineno-78-6" name="__codelineno-78-6" href="#__codelineno-78-6"></a>orb<span class="w"> </span>templates<span class="w"> </span>delete<span class="w"> </span>--template-id<span class="w"> </span>old-template
 </code></pre></div>
 <h4 id="machines_1">Machines<a class="headerlink" href="#machines_1" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-78-1" name="__codelineno-78-1" href="#__codelineno-78-1"></a><span class="c1"># Both work the same</span>
-<a id="__codelineno-78-2" name="__codelineno-78-2" href="#__codelineno-78-2"></a>orb<span class="w"> </span>machines<span class="w"> </span>show<span class="w"> </span>i-1234567890abcdef0
-<a id="__codelineno-78-3" name="__codelineno-78-3" href="#__codelineno-78-3"></a>orb<span class="w"> </span>machines<span class="w"> </span>show<span class="w"> </span>--machine-id<span class="w"> </span>i-1234567890abcdef0
-<a id="__codelineno-78-4" name="__codelineno-78-4" href="#__codelineno-78-4"></a>
-<a id="__codelineno-78-5" name="__codelineno-78-5" href="#__codelineno-78-5"></a>orb<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>aws-basic<span class="w"> </span><span class="m">5</span>
-<a id="__codelineno-78-6" name="__codelineno-78-6" href="#__codelineno-78-6"></a>orb<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>--template-id<span class="w"> </span>aws-basic<span class="w"> </span>--count<span class="w"> </span><span class="m">5</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a><span class="c1"># Both work the same</span>
+<a id="__codelineno-79-2" name="__codelineno-79-2" href="#__codelineno-79-2"></a>orb<span class="w"> </span>machines<span class="w"> </span>show<span class="w"> </span>i-1234567890abcdef0
+<a id="__codelineno-79-3" name="__codelineno-79-3" href="#__codelineno-79-3"></a>orb<span class="w"> </span>machines<span class="w"> </span>show<span class="w"> </span>--machine-id<span class="w"> </span>i-1234567890abcdef0
+<a id="__codelineno-79-4" name="__codelineno-79-4" href="#__codelineno-79-4"></a>
+<a id="__codelineno-79-5" name="__codelineno-79-5" href="#__codelineno-79-5"></a>orb<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>aws-basic<span class="w"> </span><span class="m">5</span>
+<a id="__codelineno-79-6" name="__codelineno-79-6" href="#__codelineno-79-6"></a>orb<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>--template-id<span class="w"> </span>aws-basic<span class="w"> </span>--count<span class="w"> </span><span class="m">5</span>
 </code></pre></div>
 <h4 id="requests_1">Requests<a class="headerlink" href="#requests_1" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a><span class="c1"># Multiple request IDs - both patterns work</span>
-<a id="__codelineno-79-2" name="__codelineno-79-2" href="#__codelineno-79-2"></a>orb<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>req-123<span class="w"> </span>req-456<span class="w"> </span>req-789
-<a id="__codelineno-79-3" name="__codelineno-79-3" href="#__codelineno-79-3"></a>orb<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>--request-id<span class="w"> </span>req-123<span class="w"> </span>--request-id<span class="w"> </span>req-456<span class="w"> </span>--request-id<span class="w"> </span>req-789
-<a id="__codelineno-79-4" name="__codelineno-79-4" href="#__codelineno-79-4"></a>
-<a id="__codelineno-79-5" name="__codelineno-79-5" href="#__codelineno-79-5"></a><span class="c1"># Mixed usage also works</span>
-<a id="__codelineno-79-6" name="__codelineno-79-6" href="#__codelineno-79-6"></a>orb<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>req-123<span class="w"> </span>--request-id<span class="w"> </span>req-456
+<div class="highlight"><pre><span></span><code><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a><span class="c1"># Multiple request IDs - both patterns work</span>
+<a id="__codelineno-80-2" name="__codelineno-80-2" href="#__codelineno-80-2"></a>orb<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>req-123<span class="w"> </span>req-456<span class="w"> </span>req-789
+<a id="__codelineno-80-3" name="__codelineno-80-3" href="#__codelineno-80-3"></a>orb<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>--request-id<span class="w"> </span>req-123<span class="w"> </span>--request-id<span class="w"> </span>req-456<span class="w"> </span>--request-id<span class="w"> </span>req-789
+<a id="__codelineno-80-4" name="__codelineno-80-4" href="#__codelineno-80-4"></a>
+<a id="__codelineno-80-5" name="__codelineno-80-5" href="#__codelineno-80-5"></a><span class="c1"># Mixed usage also works</span>
+<a id="__codelineno-80-6" name="__codelineno-80-6" href="#__codelineno-80-6"></a>orb<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>req-123<span class="w"> </span>--request-id<span class="w"> </span>req-456
 </code></pre></div>
 <h3 id="required-arguments">Required Arguments<a class="headerlink" href="#required-arguments" title="Permanent link">&para;</a></h3>
 <p>Arguments marked with <code>*</code> in the tables above are required, but can be provided either as positional arguments OR as flags (not both).</p>
 <h2 id="global-overrides">Global Overrides<a class="headerlink" href="#global-overrides" title="Permanent link">&para;</a></h2>
 <h3 id="scheduler-override">Scheduler Override<a class="headerlink" href="#scheduler-override" title="Permanent link">&para;</a></h3>
 <p>Use <code>--scheduler</code> to override the configured scheduler for any command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a><span class="c1"># Use HostFactory scheduler for this command</span>
-<a id="__codelineno-80-2" name="__codelineno-80-2" href="#__codelineno-80-2"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>hostfactory<span class="w"> </span>templates<span class="w"> </span>list
-<a id="__codelineno-80-3" name="__codelineno-80-3" href="#__codelineno-80-3"></a>
-<a id="__codelineno-80-4" name="__codelineno-80-4" href="#__codelineno-80-4"></a><span class="c1"># Use default scheduler for this command  </span>
-<a id="__codelineno-80-5" name="__codelineno-80-5" href="#__codelineno-80-5"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>default<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>aws-basic<span class="w"> </span><span class="m">3</span>
-<a id="__codelineno-80-6" name="__codelineno-80-6" href="#__codelineno-80-6"></a>
-<a id="__codelineno-80-7" name="__codelineno-80-7" href="#__codelineno-80-7"></a><span class="c1"># Use Slurm scheduler for this command</span>
-<a id="__codelineno-80-8" name="__codelineno-80-8" href="#__codelineno-80-8"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>slurm<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>req-123
+<div class="highlight"><pre><span></span><code><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a><span class="c1"># Use HostFactory scheduler for this command</span>
+<a id="__codelineno-81-2" name="__codelineno-81-2" href="#__codelineno-81-2"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>hostfactory<span class="w"> </span>templates<span class="w"> </span>list
+<a id="__codelineno-81-3" name="__codelineno-81-3" href="#__codelineno-81-3"></a>
+<a id="__codelineno-81-4" name="__codelineno-81-4" href="#__codelineno-81-4"></a><span class="c1"># Use default scheduler for this command  </span>
+<a id="__codelineno-81-5" name="__codelineno-81-5" href="#__codelineno-81-5"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>default<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>aws-basic<span class="w"> </span><span class="m">3</span>
+<a id="__codelineno-81-6" name="__codelineno-81-6" href="#__codelineno-81-6"></a>
+<a id="__codelineno-81-7" name="__codelineno-81-7" href="#__codelineno-81-7"></a><span class="c1"># Use Slurm scheduler for this command</span>
+<a id="__codelineno-81-8" name="__codelineno-81-8" href="#__codelineno-81-8"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>slurm<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>req-123
 </code></pre></div>
 <p><strong>Available Schedulers:</strong>
 - <code>default</code> - Native domain format, CLI-friendly output
@@ -9475,14 +9567,14 @@ starting a server or client, so it is safe in CI.</p>
 - <code>slurm</code> - Slurm scheduler integration</p>
 <h3 id="provider-override">Provider Override<a class="headerlink" href="#provider-override" title="Permanent link">&para;</a></h3>
 <p>Use <code>--provider-name</code> to override the selected provider instance for any command:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a><span class="c1"># Use specific provider instance</span>
-<a id="__codelineno-81-2" name="__codelineno-81-2" href="#__codelineno-81-2"></a>orb<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1<span class="w"> </span>templates<span class="w"> </span>list
-<a id="__codelineno-81-3" name="__codelineno-81-3" href="#__codelineno-81-3"></a>
-<a id="__codelineno-81-4" name="__codelineno-81-4" href="#__codelineno-81-4"></a><span class="c1"># Override for machine requests</span>
-<a id="__codelineno-81-5" name="__codelineno-81-5" href="#__codelineno-81-5"></a>orb<span class="w"> </span>--provider-name<span class="w"> </span>aws_dev_us-east-1<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>template-id<span class="w"> </span><span class="m">3</span>
-<a id="__codelineno-81-6" name="__codelineno-81-6" href="#__codelineno-81-6"></a>
-<a id="__codelineno-81-7" name="__codelineno-81-7" href="#__codelineno-81-7"></a><span class="c1"># Combined with scheduler override</span>
-<a id="__codelineno-81-8" name="__codelineno-81-8" href="#__codelineno-81-8"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>hostfactory<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>req-123
+<div class="highlight"><pre><span></span><code><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a><span class="c1"># Use specific provider instance</span>
+<a id="__codelineno-82-2" name="__codelineno-82-2" href="#__codelineno-82-2"></a>orb<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1<span class="w"> </span>templates<span class="w"> </span>list
+<a id="__codelineno-82-3" name="__codelineno-82-3" href="#__codelineno-82-3"></a>
+<a id="__codelineno-82-4" name="__codelineno-82-4" href="#__codelineno-82-4"></a><span class="c1"># Override for machine requests</span>
+<a id="__codelineno-82-5" name="__codelineno-82-5" href="#__codelineno-82-5"></a>orb<span class="w"> </span>--provider-name<span class="w"> </span>aws_dev_us-east-1<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>template-id<span class="w"> </span><span class="m">3</span>
+<a id="__codelineno-82-6" name="__codelineno-82-6" href="#__codelineno-82-6"></a>
+<a id="__codelineno-82-7" name="__codelineno-82-7" href="#__codelineno-82-7"></a><span class="c1"># Combined with scheduler override</span>
+<a id="__codelineno-82-8" name="__codelineno-82-8" href="#__codelineno-82-8"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>hostfactory<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>req-123
 </code></pre></div>
 <p><strong>Provider Instance Names:</strong>
 Provider instances are defined in your configuration file. Common patterns:
@@ -9494,18 +9586,18 @@ Provider instances are defined in your configuration file. Common patterns:
 <h2 id="multi-provider-template-generation">Multi-Provider Template Generation<a class="headerlink" href="#multi-provider-template-generation" title="Permanent link">&para;</a></h2>
 <p>The <code>templates generate</code> command supports generating templates for multiple providers:</p>
 <h3 id="default-behavior">Default Behavior<a class="headerlink" href="#default-behavior" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a><span class="c1"># Generates templates for ALL active providers</span>
-<a id="__codelineno-82-2" name="__codelineno-82-2" href="#__codelineno-82-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate
+<div class="highlight"><pre><span></span><code><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a><span class="c1"># Generates templates for ALL active providers</span>
+<a id="__codelineno-83-2" name="__codelineno-83-2" href="#__codelineno-83-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate
 </code></pre></div>
 <h3 id="provider-specific-generation">Provider-Specific Generation<a class="headerlink" href="#provider-specific-generation" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a><span class="c1"># Generate for specific provider instance</span>
-<a id="__codelineno-83-2" name="__codelineno-83-2" href="#__codelineno-83-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1
-<a id="__codelineno-83-3" name="__codelineno-83-3" href="#__codelineno-83-3"></a>
-<a id="__codelineno-83-4" name="__codelineno-83-4" href="#__codelineno-83-4"></a><span class="c1"># Generate for specific provider API</span>
-<a id="__codelineno-83-5" name="__codelineno-83-5" href="#__codelineno-83-5"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate<span class="w"> </span>--provider-api<span class="w"> </span>EC2Fleet
-<a id="__codelineno-83-6" name="__codelineno-83-6" href="#__codelineno-83-6"></a>
-<a id="__codelineno-83-7" name="__codelineno-83-7" href="#__codelineno-83-7"></a><span class="c1"># Explicitly generate for all providers</span>
-<a id="__codelineno-83-8" name="__codelineno-83-8" href="#__codelineno-83-8"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate<span class="w"> </span>--all-providers
+<div class="highlight"><pre><span></span><code><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a><span class="c1"># Generate for specific provider instance</span>
+<a id="__codelineno-84-2" name="__codelineno-84-2" href="#__codelineno-84-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1
+<a id="__codelineno-84-3" name="__codelineno-84-3" href="#__codelineno-84-3"></a>
+<a id="__codelineno-84-4" name="__codelineno-84-4" href="#__codelineno-84-4"></a><span class="c1"># Generate for specific provider API</span>
+<a id="__codelineno-84-5" name="__codelineno-84-5" href="#__codelineno-84-5"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate<span class="w"> </span>--provider-api<span class="w"> </span>EC2Fleet
+<a id="__codelineno-84-6" name="__codelineno-84-6" href="#__codelineno-84-6"></a>
+<a id="__codelineno-84-7" name="__codelineno-84-7" href="#__codelineno-84-7"></a><span class="c1"># Explicitly generate for all providers</span>
+<a id="__codelineno-84-8" name="__codelineno-84-8" href="#__codelineno-84-8"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate<span class="w"> </span>--all-providers
 </code></pre></div>
 <h3 id="provider-naming-conventions">Provider Naming Conventions<a class="headerlink" href="#provider-naming-conventions" title="Permanent link">&para;</a></h3>
 <p>Templates are generated using provider-specific naming patterns:</p>
@@ -9549,17 +9641,17 @@ Provider instances are defined in your configuration file. Common patterns:
 </tbody>
 </table>
 <p><strong>Examples:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a><span class="c1"># JSON output (default)</span>
-<a id="__codelineno-84-2" name="__codelineno-84-2" href="#__codelineno-84-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>list
-<a id="__codelineno-84-3" name="__codelineno-84-3" href="#__codelineno-84-3"></a>
-<a id="__codelineno-84-4" name="__codelineno-84-4" href="#__codelineno-84-4"></a><span class="c1"># Table format for terminal</span>
-<a id="__codelineno-84-5" name="__codelineno-84-5" href="#__codelineno-84-5"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>table
-<a id="__codelineno-84-6" name="__codelineno-84-6" href="#__codelineno-84-6"></a>
-<a id="__codelineno-84-7" name="__codelineno-84-7" href="#__codelineno-84-7"></a><span class="c1"># YAML for configuration</span>
-<a id="__codelineno-84-8" name="__codelineno-84-8" href="#__codelineno-84-8"></a>orb<span class="w"> </span>config<span class="w"> </span>show<span class="w"> </span>--format<span class="w"> </span>yaml
-<a id="__codelineno-84-9" name="__codelineno-84-9" href="#__codelineno-84-9"></a>
-<a id="__codelineno-84-10" name="__codelineno-84-10" href="#__codelineno-84-10"></a><span class="c1"># List for simple output</span>
-<a id="__codelineno-84-11" name="__codelineno-84-11" href="#__codelineno-84-11"></a>orb<span class="w"> </span>providers<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>list
+<div class="highlight"><pre><span></span><code><a id="__codelineno-85-1" name="__codelineno-85-1" href="#__codelineno-85-1"></a><span class="c1"># JSON output (default)</span>
+<a id="__codelineno-85-2" name="__codelineno-85-2" href="#__codelineno-85-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>list
+<a id="__codelineno-85-3" name="__codelineno-85-3" href="#__codelineno-85-3"></a>
+<a id="__codelineno-85-4" name="__codelineno-85-4" href="#__codelineno-85-4"></a><span class="c1"># Table format for terminal</span>
+<a id="__codelineno-85-5" name="__codelineno-85-5" href="#__codelineno-85-5"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>table
+<a id="__codelineno-85-6" name="__codelineno-85-6" href="#__codelineno-85-6"></a>
+<a id="__codelineno-85-7" name="__codelineno-85-7" href="#__codelineno-85-7"></a><span class="c1"># YAML for configuration</span>
+<a id="__codelineno-85-8" name="__codelineno-85-8" href="#__codelineno-85-8"></a>orb<span class="w"> </span>config<span class="w"> </span>show<span class="w"> </span>--format<span class="w"> </span>yaml
+<a id="__codelineno-85-9" name="__codelineno-85-9" href="#__codelineno-85-9"></a>
+<a id="__codelineno-85-10" name="__codelineno-85-10" href="#__codelineno-85-10"></a><span class="c1"># List for simple output</span>
+<a id="__codelineno-85-11" name="__codelineno-85-11" href="#__codelineno-85-11"></a>orb<span class="w"> </span>providers<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>list
 </code></pre></div></p>
 <h2 id="exit-codes">Exit Codes<a class="headerlink" href="#exit-codes" title="Permanent link">&para;</a></h2>
 <p>Commands return appropriate exit codes for scripting:</p>
@@ -9605,54 +9697,54 @@ Provider instances are defined in your configuration file. Common patterns:
 </ul>
 <h2 id="shell-completion">Shell Completion<a class="headerlink" href="#shell-completion" title="Permanent link">&para;</a></h2>
 <p>Generate shell completion scripts:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-85-1" name="__codelineno-85-1" href="#__codelineno-85-1"></a><span class="c1"># Bash completion</span>
-<a id="__codelineno-85-2" name="__codelineno-85-2" href="#__codelineno-85-2"></a>orb<span class="w"> </span>--completion<span class="w"> </span>bash<span class="w"> </span>&gt;<span class="w"> </span>/etc/bash_completion.d/orb
-<a id="__codelineno-85-3" name="__codelineno-85-3" href="#__codelineno-85-3"></a>
-<a id="__codelineno-85-4" name="__codelineno-85-4" href="#__codelineno-85-4"></a><span class="c1"># Zsh completion  </span>
-<a id="__codelineno-85-5" name="__codelineno-85-5" href="#__codelineno-85-5"></a>orb<span class="w"> </span>--completion<span class="w"> </span>zsh<span class="w"> </span>&gt;<span class="w"> </span>~/.zsh/completions/_orb
+<div class="highlight"><pre><span></span><code><a id="__codelineno-86-1" name="__codelineno-86-1" href="#__codelineno-86-1"></a><span class="c1"># Bash completion</span>
+<a id="__codelineno-86-2" name="__codelineno-86-2" href="#__codelineno-86-2"></a>orb<span class="w"> </span>--completion<span class="w"> </span>bash<span class="w"> </span>&gt;<span class="w"> </span>/etc/bash_completion.d/orb
+<a id="__codelineno-86-3" name="__codelineno-86-3" href="#__codelineno-86-3"></a>
+<a id="__codelineno-86-4" name="__codelineno-86-4" href="#__codelineno-86-4"></a><span class="c1"># Zsh completion  </span>
+<a id="__codelineno-86-5" name="__codelineno-86-5" href="#__codelineno-86-5"></a>orb<span class="w"> </span>--completion<span class="w"> </span>zsh<span class="w"> </span>&gt;<span class="w"> </span>~/.zsh/completions/_orb
 </code></pre></div>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <h3 id="basic-workflow">Basic Workflow<a class="headerlink" href="#basic-workflow" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-86-1" name="__codelineno-86-1" href="#__codelineno-86-1"></a><span class="c1"># Initialize configuration</span>
-<a id="__codelineno-86-2" name="__codelineno-86-2" href="#__codelineno-86-2"></a>orb<span class="w"> </span>init<span class="w"> </span>--scheduler<span class="w"> </span>hostfactory<span class="w"> </span>--provider-type<span class="w"> </span>aws<span class="w"> </span>--region<span class="w"> </span>us-east-1
-<a id="__codelineno-86-3" name="__codelineno-86-3" href="#__codelineno-86-3"></a>
-<a id="__codelineno-86-4" name="__codelineno-86-4" href="#__codelineno-86-4"></a><span class="c1"># Generate example templates</span>
-<a id="__codelineno-86-5" name="__codelineno-86-5" href="#__codelineno-86-5"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate
-<a id="__codelineno-86-6" name="__codelineno-86-6" href="#__codelineno-86-6"></a>
-<a id="__codelineno-86-7" name="__codelineno-86-7" href="#__codelineno-86-7"></a><span class="c1"># List available templates</span>
-<a id="__codelineno-86-8" name="__codelineno-86-8" href="#__codelineno-86-8"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>table
-<a id="__codelineno-86-9" name="__codelineno-86-9" href="#__codelineno-86-9"></a>
-<a id="__codelineno-86-10" name="__codelineno-86-10" href="#__codelineno-86-10"></a><span class="c1"># Request machines</span>
-<a id="__codelineno-86-11" name="__codelineno-86-11" href="#__codelineno-86-11"></a>orb<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>aws-basic<span class="w"> </span><span class="m">3</span>
-<a id="__codelineno-86-12" name="__codelineno-86-12" href="#__codelineno-86-12"></a>
-<a id="__codelineno-86-13" name="__codelineno-86-13" href="#__codelineno-86-13"></a><span class="c1"># Check request status</span>
-<a id="__codelineno-86-14" name="__codelineno-86-14" href="#__codelineno-86-14"></a>orb<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>req-123
-<a id="__codelineno-86-15" name="__codelineno-86-15" href="#__codelineno-86-15"></a>
-<a id="__codelineno-86-16" name="__codelineno-86-16" href="#__codelineno-86-16"></a><span class="c1"># Check system health</span>
-<a id="__codelineno-86-17" name="__codelineno-86-17" href="#__codelineno-86-17"></a>orb<span class="w"> </span>system<span class="w"> </span>health<span class="w"> </span>--detailed
+<div class="highlight"><pre><span></span><code><a id="__codelineno-87-1" name="__codelineno-87-1" href="#__codelineno-87-1"></a><span class="c1"># Initialize configuration</span>
+<a id="__codelineno-87-2" name="__codelineno-87-2" href="#__codelineno-87-2"></a>orb<span class="w"> </span>init<span class="w"> </span>--scheduler<span class="w"> </span>hostfactory<span class="w"> </span>--provider-type<span class="w"> </span>aws<span class="w"> </span>--region<span class="w"> </span>us-east-1
+<a id="__codelineno-87-3" name="__codelineno-87-3" href="#__codelineno-87-3"></a>
+<a id="__codelineno-87-4" name="__codelineno-87-4" href="#__codelineno-87-4"></a><span class="c1"># Generate example templates</span>
+<a id="__codelineno-87-5" name="__codelineno-87-5" href="#__codelineno-87-5"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate
+<a id="__codelineno-87-6" name="__codelineno-87-6" href="#__codelineno-87-6"></a>
+<a id="__codelineno-87-7" name="__codelineno-87-7" href="#__codelineno-87-7"></a><span class="c1"># List available templates</span>
+<a id="__codelineno-87-8" name="__codelineno-87-8" href="#__codelineno-87-8"></a>orb<span class="w"> </span>templates<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>table
+<a id="__codelineno-87-9" name="__codelineno-87-9" href="#__codelineno-87-9"></a>
+<a id="__codelineno-87-10" name="__codelineno-87-10" href="#__codelineno-87-10"></a><span class="c1"># Request machines</span>
+<a id="__codelineno-87-11" name="__codelineno-87-11" href="#__codelineno-87-11"></a>orb<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>aws-basic<span class="w"> </span><span class="m">3</span>
+<a id="__codelineno-87-12" name="__codelineno-87-12" href="#__codelineno-87-12"></a>
+<a id="__codelineno-87-13" name="__codelineno-87-13" href="#__codelineno-87-13"></a><span class="c1"># Check request status</span>
+<a id="__codelineno-87-14" name="__codelineno-87-14" href="#__codelineno-87-14"></a>orb<span class="w"> </span>requests<span class="w"> </span>status<span class="w"> </span>req-123
+<a id="__codelineno-87-15" name="__codelineno-87-15" href="#__codelineno-87-15"></a>
+<a id="__codelineno-87-16" name="__codelineno-87-16" href="#__codelineno-87-16"></a><span class="c1"># Check system health</span>
+<a id="__codelineno-87-17" name="__codelineno-87-17" href="#__codelineno-87-17"></a>orb<span class="w"> </span>system<span class="w"> </span>health<span class="w"> </span>--detailed
 </code></pre></div>
 <h3 id="multi-provider-setup">Multi-Provider Setup<a class="headerlink" href="#multi-provider-setup" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-87-1" name="__codelineno-87-1" href="#__codelineno-87-1"></a><span class="c1"># Generate templates for all providers</span>
-<a id="__codelineno-87-2" name="__codelineno-87-2" href="#__codelineno-87-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate<span class="w"> </span>--all-providers
-<a id="__codelineno-87-3" name="__codelineno-87-3" href="#__codelineno-87-3"></a>
-<a id="__codelineno-87-4" name="__codelineno-87-4" href="#__codelineno-87-4"></a><span class="c1"># Use specific provider</span>
-<a id="__codelineno-87-5" name="__codelineno-87-5" href="#__codelineno-87-5"></a>orb<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>template-id<span class="w"> </span><span class="m">5</span>
-<a id="__codelineno-87-6" name="__codelineno-87-6" href="#__codelineno-87-6"></a>
-<a id="__codelineno-87-7" name="__codelineno-87-7" href="#__codelineno-87-7"></a><span class="c1"># Check provider health</span>
-<a id="__codelineno-87-8" name="__codelineno-87-8" href="#__codelineno-87-8"></a>orb<span class="w"> </span>providers<span class="w"> </span>health<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-88-1" name="__codelineno-88-1" href="#__codelineno-88-1"></a><span class="c1"># Generate templates for all providers</span>
+<a id="__codelineno-88-2" name="__codelineno-88-2" href="#__codelineno-88-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate<span class="w"> </span>--all-providers
+<a id="__codelineno-88-3" name="__codelineno-88-3" href="#__codelineno-88-3"></a>
+<a id="__codelineno-88-4" name="__codelineno-88-4" href="#__codelineno-88-4"></a><span class="c1"># Use specific provider</span>
+<a id="__codelineno-88-5" name="__codelineno-88-5" href="#__codelineno-88-5"></a>orb<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1<span class="w"> </span>machines<span class="w"> </span>request<span class="w"> </span>template-id<span class="w"> </span><span class="m">5</span>
+<a id="__codelineno-88-6" name="__codelineno-88-6" href="#__codelineno-88-6"></a>
+<a id="__codelineno-88-7" name="__codelineno-88-7" href="#__codelineno-88-7"></a><span class="c1"># Check provider health</span>
+<a id="__codelineno-88-8" name="__codelineno-88-8" href="#__codelineno-88-8"></a>orb<span class="w"> </span>providers<span class="w"> </span>health<span class="w"> </span>--provider-name<span class="w"> </span>aws_prod_us-east-1
 </code></pre></div>
 <h3 id="development-workflow">Development Workflow<a class="headerlink" href="#development-workflow" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-88-1" name="__codelineno-88-1" href="#__codelineno-88-1"></a><span class="c1"># Use different scheduler for testing</span>
-<a id="__codelineno-88-2" name="__codelineno-88-2" href="#__codelineno-88-2"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>default<span class="w"> </span>templates<span class="w"> </span>list
-<a id="__codelineno-88-3" name="__codelineno-88-3" href="#__codelineno-88-3"></a>
-<a id="__codelineno-88-4" name="__codelineno-88-4" href="#__codelineno-88-4"></a><span class="c1"># Validate configuration</span>
-<a id="__codelineno-88-5" name="__codelineno-88-5" href="#__codelineno-88-5"></a>orb<span class="w"> </span>config<span class="w"> </span>validate
-<a id="__codelineno-88-6" name="__codelineno-88-6" href="#__codelineno-88-6"></a>
-<a id="__codelineno-88-7" name="__codelineno-88-7" href="#__codelineno-88-7"></a><span class="c1"># Test storage connectivity</span>
-<a id="__codelineno-88-8" name="__codelineno-88-8" href="#__codelineno-88-8"></a>orb<span class="w"> </span>storage<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--timeout<span class="w"> </span><span class="m">60</span>
-<a id="__codelineno-88-9" name="__codelineno-88-9" href="#__codelineno-88-9"></a>
-<a id="__codelineno-88-10" name="__codelineno-88-10" href="#__codelineno-88-10"></a><span class="c1"># Start API server for development</span>
-<a id="__codelineno-88-11" name="__codelineno-88-11" href="#__codelineno-88-11"></a>orb<span class="w"> </span>server<span class="w"> </span>start<span class="w"> </span>--foreground<span class="w"> </span>--reload<span class="w"> </span>--port<span class="w"> </span><span class="m">9000</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-89-1" name="__codelineno-89-1" href="#__codelineno-89-1"></a><span class="c1"># Use different scheduler for testing</span>
+<a id="__codelineno-89-2" name="__codelineno-89-2" href="#__codelineno-89-2"></a>orb<span class="w"> </span>--scheduler<span class="w"> </span>default<span class="w"> </span>templates<span class="w"> </span>list
+<a id="__codelineno-89-3" name="__codelineno-89-3" href="#__codelineno-89-3"></a>
+<a id="__codelineno-89-4" name="__codelineno-89-4" href="#__codelineno-89-4"></a><span class="c1"># Validate configuration</span>
+<a id="__codelineno-89-5" name="__codelineno-89-5" href="#__codelineno-89-5"></a>orb<span class="w"> </span>config<span class="w"> </span>validate
+<a id="__codelineno-89-6" name="__codelineno-89-6" href="#__codelineno-89-6"></a>
+<a id="__codelineno-89-7" name="__codelineno-89-7" href="#__codelineno-89-7"></a><span class="c1"># Test storage connectivity</span>
+<a id="__codelineno-89-8" name="__codelineno-89-8" href="#__codelineno-89-8"></a>orb<span class="w"> </span>storage<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--timeout<span class="w"> </span><span class="m">60</span>
+<a id="__codelineno-89-9" name="__codelineno-89-9" href="#__codelineno-89-9"></a>
+<a id="__codelineno-89-10" name="__codelineno-89-10" href="#__codelineno-89-10"></a><span class="c1"># Start API server for development</span>
+<a id="__codelineno-89-11" name="__codelineno-89-11" href="#__codelineno-89-11"></a>orb<span class="w"> </span>server<span class="w"> </span>start<span class="w"> </span>--foreground<span class="w"> </span>--reload<span class="w"> </span>--port<span class="w"> </span><span class="m">9000</span>
 </code></pre></div>
 
 

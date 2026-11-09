@@ -3729,6 +3729,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cancelling-a-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancelling a request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#iam-permissions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6490,6 +6501,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cancelling-a-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancelling a request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#iam-permissions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6865,7 +6887,9 @@
 <li><strong>Clamp <code>MinSize</code>.</strong> The group is re-described to read live <code>DesiredCapacity</code>, and <code>MinSize</code> is lowered if it now exceeds it.</li>
 <li><strong>Delete when empty.</strong> <code>DesiredCapacity</code> of zero means the group is empty, so ORB deletes the ASG (<code>ForceDelete: true</code>) and cleans up the launch template.</li>
 </ol>
-<p>Cancelling a request deletes the ASG directly.</p>
+<h2 id="cancelling-a-request">Cancelling a request<a class="headerlink" href="#cancelling-a-request" title="Permanent link">&para;</a></h2>
+<p>Cancelling a request that is still being fulfilled scales the group to <code>MinSize: 0</code> and <code>DesiredCapacity: 0</code>, which narrows the window in which an in-flight scale-out launches instances, and then force-deletes it. The scale-down is best effort because the force delete follows. A group that is absent or already <code>Delete in progress</code> counts as stopped and is not touched again. A group whose lifecycle hooks hold instances in <code>Terminating:Wait</code> stays in <code>Delete in progress</code> until the hook heartbeat times out, and those instances can keep billing until then. Instances still attached afterwards are found with the <code>aws:autoscaling:groupName</code> tag and returned with the recorded machines.</p>
+<p>A later return of instances that belonged to a group that is being deleted or is gone terminates them directly and does not detach them from the group.</p>
 <p>A separate pre-termination path (<code>reduce_capacity</code>) lowers <code>DesiredCapacity</code> and <code>MinSize</code> before instances are terminated by other means. Every failure in that path is warning-only, so a capacity-reduction hiccup never blocks a return.</p>
 <h2 id="iam-permissions">IAM permissions<a class="headerlink" href="#iam-permissions" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
