@@ -321,3 +321,37 @@ class TestRegistryClient:
         with patch.object(cks._OPENER, "open") as urlopen, pytest.raises(cks.KeepSetError):
             self.client().fetch("sha256:../../x")
         urlopen.assert_not_called()
+
+    def test_expired_token_is_refreshed_once(self):
+        body = image()
+        digest = "sha256:" + hashlib.sha256(body).hexdigest()
+        state = {"tokens": 0, "manifest_calls": 0}
+
+        def fake_open(request, timeout):
+            if "/token" in request.full_url:
+                state["tokens"] += 1
+                return FakeResponse(b'{"token": "t%d"}' % state["tokens"])
+            state["manifest_calls"] += 1
+            if request.get_header("Authorization") == "Bearer t1":
+                raise urllib.error.HTTPError(request.full_url, 401, "expired", {}, None)  # type: ignore[arg-type]
+            return FakeResponse(body)
+
+        with patch.object(cks._OPENER, "open", fake_open):
+            assert self.client().fetch(digest) == body
+        assert state == {"tokens": 2, "manifest_calls": 2}
+
+    def test_persistent_401_aborts_after_one_refresh(self):
+        state = {"tokens": 0}
+
+        def fake_open(request, timeout):
+            if "/token" in request.full_url:
+                state["tokens"] += 1
+                return FakeResponse(b'{"token": "t"}')
+            raise urllib.error.HTTPError(request.full_url, 401, "denied", {}, None)  # type: ignore[arg-type]
+
+        with (
+            patch.object(cks._OPENER, "open", fake_open),
+            pytest.raises(cks.KeepSetError, match="401"),
+        ):
+            self.client().fetch(d(1))
+        assert state["tokens"] == 2

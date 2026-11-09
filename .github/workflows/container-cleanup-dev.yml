@@ -244,6 +244,7 @@ jobs:
           fi
 
           deleted=0
+          failed=0
           while IFS= read -r line; do
             [[ -z "$line" ]] && continue
             id=$(echo "$line" | awk '{print $1}')
@@ -252,6 +253,7 @@ jobs:
               deleted=$((deleted + 1))
             else
               echo "  failed to delete ${id} (continuing)"
+              failed=$((failed + 1))
             fi
           done < /tmp/untagged.txt
           while IFS= read -r line; do
@@ -262,8 +264,13 @@ jobs:
               deleted=$((deleted + 1))
             else
               echo "  failed to delete ${id} (continuing)"
+              failed=$((failed + 1))
             fi
           done < /tmp/delete.txt
 
           echo
-          echo "Deleted ${deleted} version(s)."
+          echo "Deleted ${deleted} version(s); ${failed} failed."
+          if (( failed > 0 )); then
+            echo "ERROR: ${failed} deletion(s) failed" >&2
+            exit 1
+          fi

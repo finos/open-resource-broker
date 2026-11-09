@@ -81,6 +81,14 @@ class KeepSetError(Exception):
     """The keep-set could not be computed reliably; nothing may be deleted."""
 
 
+class RegistryHttpError(KeepSetError):
+    """A registry request failed with an HTTP status."""
+
+    def __init__(self, message: str, status: int):
+        super().__init__(message)
+        self.status = status
+
+
 def _check_digest(value: object, context: str) -> str:
     if not isinstance(value, str) or not DIGEST_RE.match(value):
         raise KeepSetError(f"{context}: invalid digest {value!r}")
@@ -154,6 +162,7 @@ class RegistryClient:
         if not url.startswith("https://"):
             raise KeepSetError(f"refusing non-https URL {url}")
         last: Exception | None = None
+        status: int | None = None
         for attempt in range(MAX_ATTEMPTS):
             request = urllib.request.Request(url, headers=headers, method="GET")  # noqa: S310 - https-only, see _OPENER
             try:
@@ -161,12 +170,16 @@ class RegistryClient:
                     return resp.read()
             except urllib.error.HTTPError as exc:
                 last = exc
+                status = exc.code
                 if exc.code not in RETRY_STATUSES:
                     break
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 last = exc
             self._sleep(2**attempt)
-        raise KeepSetError(f"GET {url} failed: {last}")
+        message = f"GET {url} failed: {last}"
+        if status is not None:
+            raise RegistryHttpError(message, status)
+        raise KeepSetError(message)
 
     def _bearer(self) -> str:
         if self._token is None:
@@ -185,7 +198,14 @@ class RegistryClient:
     def fetch(self, digest: str) -> bytes:
         _check_digest(digest, "fetch")
         url = f"https://{self.registry}/v2/{self.repository}/manifests/{digest}"
-        raw = self._open(url, {"Authorization": f"Bearer {self._bearer()}", "Accept": ACCEPT})
+        try:
+            raw = self._open(url, {"Authorization": f"Bearer {self._bearer()}", "Accept": ACCEPT})
+        except RegistryHttpError as exc:
+            if exc.status != 401:
+                raise
+            # The pull token expired mid-run: fetch a fresh one and retry once.
+            self._token = None
+            raw = self._open(url, {"Authorization": f"Bearer {self._bearer()}", "Accept": ACCEPT})
         actual = "sha256:" + hashlib.sha256(raw).hexdigest()
         if actual != digest:
             raise KeepSetError(f"{digest}: registry returned content with digest {actual}")
