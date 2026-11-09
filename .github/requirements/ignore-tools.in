@@ -1,0 +1,2 @@
+# Parses .trivyignore.yaml for the published-image scan helper (dev-tools/ci/published_image_ignore.py).
+PyYAML==6.0.3

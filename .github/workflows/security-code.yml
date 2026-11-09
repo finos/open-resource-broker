@@ -48,6 +48,10 @@ on:
     types: [checks_requested]
   schedule:
     - cron: '0 3 * * 0'
+  # Manual runs start only the published-image jobs: `changes` reports nothing
+  # as relevant for this event and no other job names it. Only runs on main (or
+  # the schedule) maintain the tracking issue; other refs write the job summary.
+  workflow_dispatch:
 
 # Per-ref concurrency: a rapid series of pushes to the same branch only runs
 # one security scan at a time; the newer push cancels the older. Pushes to
@@ -75,14 +79,15 @@ jobs:
   # depending on it are never skipped by a skipped dependency; on events other
   # than pull_request there is no diff to inspect, so it reports everything as
   # relevant and each job's own trigger gating (push paths filter, schedule)
-  # decides whether it runs.
+  # decides whether it runs. A manual run (workflow_dispatch) reports nothing as
+  # relevant, so it only starts the jobs that opt in to that event explicitly.
   changes:
     name: Detect Relevant Changes
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      relevant: ${{ github.event_name != 'pull_request' && 'true' || steps.filter.outputs.relevant }}
+      relevant: ${{ github.event_name == 'workflow_dispatch' && 'false' || (github.event_name != 'pull_request' && 'true' || steps.filter.outputs.relevant) }}
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -446,25 +451,51 @@ jobs:
 
   # Weekly scan of the image users actually pull. Images are otherwise scanned
   # only when they are built, so a CVE that gets a Debian fix after a release
-  # would go unnoticed until the next one. A new fixable CRITICAL/HIGH finding
-  # turns this run red as the signal to cut a release. Nothing is rebuilt or
-  # pushed here.
+  # would go unnoticed until the next one.
+  #
+  # The gate scan uses the union of main's .trivyignore.yaml and the one at the
+  # release :latest was built from, so removing an exception on main (because
+  # Debian now ships a fix) does not turn this run red for an image that cannot
+  # contain the fix yet. (The union keeps entries main has removed until the next
+  # release replaces the image.) If the release cannot be resolved, the gate falls back
+  # to main's file alone and says so in the job summary.
+  #
+  # The advisory scan uses main's file alone and never fails the job. Its report
+  # is handed to published-image-release-needed, which holds the only
+  # `issues: write` permission.
   published-image-scan:
     name: Published Image Scan
     needs: [config]
-    if: ${{ github.event_name == 'schedule' && needs.config.result == 'success' }}
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.config.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
       packages: read
       security-events: write
+    outputs:
+      release: ${{ steps.ignore.outputs.release }}
+    env:
+      IMAGE: ${{ needs.config.outputs.container-registry }}/${{ needs.config.outputs.container-image }}
     steps:
     - name: Checkout code
-      # Only needed for .trivyignore.yaml.
+      # Only needed for .trivyignore.yaml and the helper script.
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         persist-credentials: false
+
+    - name: Install the helper's dependencies (hash-locked)
+      run: |
+        python3 -m venv "$RUNNER_TEMP/ignore-tools"
+        . "$RUNNER_TEMP/ignore-tools/bin/activate"
+        pip install --require-hashes --no-deps -r .github/requirements/ignore-tools.txt
+        echo "$RUNNER_TEMP/ignore-tools/bin" >> "$GITHUB_PATH"
+
+    - name: Build the ignore file for the published image
+      id: ignore
+      # Writes the union of main's entries and those of the release behind
+      # :latest into the workspace (uncommitted); falls back to main's file.
+      run: python dev-tools/ci/published_image_ignore.py build --image "$IMAGE" --out .trivyignore.published.yaml
 
     - name: Run Trivy scan of the published latest image
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
@@ -472,13 +503,13 @@ jobs:
         # :latest is a multi-arch index; Trivy needs one concrete platform.
         TRIVY_PLATFORM: linux/amd64
       with:
-        image-ref: "${{ needs.config.outputs.container-registry }}/${{ needs.config.outputs.container-image }}:latest"
+        image-ref: "${{ env.IMAGE }}:latest"
         format: 'sarif'
         output: 'trivy-published-image.sarif'
         exit-code: '1'
         severity: 'CRITICAL,HIGH'
         limit-severities-for-sarif: true
-        trivyignores: .trivyignore.yaml
+        trivyignores: .trivyignore.published.yaml
 
     - name: Upload published image scan results
       if: always()
@@ -486,6 +517,73 @@ jobs:
       with:
         sarif_file: 'trivy-published-image.sarif'
         category: published-image-latest
+
+    - name: Advisory scan with main's ignore file
+      if: ${{ !cancelled() }}
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+      env:
+        TRIVY_PLATFORM: linux/amd64
+      with:
+        image-ref: "${{ env.IMAGE }}:latest"
+        format: 'json'
+        output: 'trivy-published-image-advisory.json'
+        exit-code: '0'
+        severity: 'CRITICAL,HIGH'
+        trivyignores: .trivyignore.yaml
+
+    - name: Keep the advisory report for the release-needed job
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: published-image-advisory
+        path: trivy-published-image-advisory.json
+        if-no-files-found: ignore
+        retention-days: 1
+
+  # Reports fixable findings that only the release's ignore file suppresses
+  # ("release needed") in the job summary and keeps one tracking issue up to
+  # date. Separate from the scan so that the scanner and install steps never
+  # hold `issues: write`.
+  published-image-release-needed:
+    name: Published Image Release Needed
+    needs: [published-image-scan]
+    if: ${{ !cancelled() && needs.published-image-scan.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Install the helper's dependencies (hash-locked)
+      run: |
+        python3 -m venv "$RUNNER_TEMP/ignore-tools"
+        . "$RUNNER_TEMP/ignore-tools/bin/activate"
+        pip install --require-hashes --no-deps -r .github/requirements/ignore-tools.txt
+        echo "$RUNNER_TEMP/ignore-tools/bin" >> "$GITHUB_PATH"
+
+    - name: Download the advisory report
+      continue-on-error: true
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+      with:
+        name: published-image-advisory
+
+    - name: Report fixes available on main but not in the published image
+      env:
+        GH_TOKEN: ${{ github.token }}
+        RELEASE: ${{ needs.published-image-scan.outputs.release }}
+        # The tracking issue is only maintained from main and the schedule.
+        MANAGE_ISSUE: ${{ (github.event_name == 'schedule' || github.ref == 'refs/heads/main') && 'true' || 'false' }}
+      run: |
+        args=(--report trivy-published-image-advisory.json --release "$RELEASE")
+        if [ "$MANAGE_ISSUE" = "true" ]; then
+          args+=(--manage-issue)
+        fi
+        python dev-tools/ci/published_image_ignore.py summarize "${args[@]}"
 
   codeql-analysis:
     name: CodeQL Analysis
