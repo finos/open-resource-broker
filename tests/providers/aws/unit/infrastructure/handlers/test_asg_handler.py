@@ -327,7 +327,7 @@ class TestASGHandlerNameTag:
             handler,
             "_retry_with_backoff",
             side_effect=lambda fn, **kw: fn(
-                **{k: v for k, v in kw.items() if k != "operation_type"}
+                **{k: v for k, v in kw.items() if k not in ("operation_type", "operation_name")}
             ),
         ):
             with patch.object(handler, "_get_instance_details", return_value=[]) as mock_details:

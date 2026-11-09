@@ -129,9 +129,32 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
             provisioning_result = await self._provisioning_service.execute_provisioning(
                 template, request, selection_result
             )
+            if provisioning_result.cancelled:
+                # Cancelled while creating: the resources were aborted and the
+                # stored cancelled status must stay as it is.
+                self.logger.info(
+                    "Request %s was cancelled during creation; keeping its cancelled status",
+                    request.request_id,
+                )
+                return
             request = await self._status_service.update_request_from_provisioning(
                 request, provisioning_result
             )
+
+            # A cancel may also land after the last checkpoint and before the final
+            # persist below, which would overwrite it.
+            if await self._provisioning_service.abort_if_cancelled(
+                request,
+                selection_result,
+                provisioning_result.resource_ids,
+                template.provider_api,
+                provisioning_result.machine_ids,
+            ):
+                self.logger.info(
+                    "Request %s was cancelled during creation; keeping its cancelled status",
+                    request.request_id,
+                )
+                return
 
             # Sync per-machine tags (e.g. orb:node-name) to cloud resources
             if provisioning_result.success and request.metadata.get("node_names"):

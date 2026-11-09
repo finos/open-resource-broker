@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 from orb.providers.aws.infrastructure.handlers.asg.capacity_manager import ASGCapacityManager
 
 
-def _identity_retry(fn, operation_type="standard", **kwargs):  # noqa: ARG001
+def _identity_retry(fn, operation_type="standard", operation_name=None, **kwargs):  # noqa: ARG001
     return fn(**kwargs)
 
 

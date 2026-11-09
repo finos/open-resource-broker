@@ -163,6 +163,10 @@ class CancelRequestOutput:
     request_id: str
     status: str
     requests: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    # True when the cancel took effect: the request was flipped to cancelled, or it
+    # had already settled as partial/timeout and its provisioning was aborted. The
+    # status still reports the request's true state.
+    cancel_effective: bool = False
 
 
 @dataclasses.dataclass(frozen=True)

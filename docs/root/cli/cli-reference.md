@@ -542,6 +542,20 @@ orb requests cancel REQUEST_ID [OPTIONS]
 |------|-------------|---------|
 | `--force` | Force cancellation | `--force` |
 
+Cancelling a request that has not settled stops its provisioning at the provider first, whether or not any machine has been recorded yet, and then returns the machines it already has. A fleet that is still fulfilling a partially filled request is stopped too, so it cannot keep launching capacity after the request reads cancelled. A `partial` or `timeout` request is aborted the same way and keeps reporting its true status; a completed, failed or cancelled request is left as it is.
+
+The output lists what happened to each resource in `provider_abort`:
+
+| Outcome | Meaning |
+|---------|---------|
+| `aborted` | The provider stopped the resource. |
+| `already_gone` | The resource was already deleted or never existed. Cancelling again is safe. |
+| `unsupported` | The provider cannot abort in-flight provisioning; the machines are still returned. |
+
+If any resource cannot be stopped the command fails with a non-zero exit code and the request keeps its current state, so the cancel can be repeated. Resources that were already stopped report `already_gone` on the retry. The command exits 0 whenever the cancel took effect, including for a `partial` or `timeout` request whose resources were aborted.
+
+How each provider API is stopped is described in the AWS provider pages: [EC2 Fleet](../providers/aws/ec2-fleet.md#cancelling-a-request), [Spot Fleet](../providers/aws/spot-fleet.md#cancelling-a-request), [Auto Scaling group](../providers/aws/asg.md#cancelling-a-request) and [RunInstances](../providers/aws/run-instances.md#release-behaviour).
+
 #### `requests status`
 
 Check request status.
@@ -918,23 +932,51 @@ orb providers select PROVIDER [OPTIONS]
 
 #### `providers exec`
 
-Execute provider operation.
+Run a provider-side maintenance operation. `exec` accepts only operator-safe operations; operations that create, start, stop or terminate machines have their own commands and are refused here. Today the only operation is `cleanup-orphaned-resources`.
 
 **Usage:**
 ```bash
 orb providers exec OPERATION [OPTIONS]
+orb providers exec --list [--provider-name NAME]
 ```
 
 **Arguments:**
 | Argument | Description | Required |
 |----------|-------------|----------|
-| `OPERATION` | Operation to execute | Yes |
+| `OPERATION` | Operation to execute, in kebab-case or snake_case | Yes, unless `--list` is used |
 
 **Options:**
 | Flag | Description | Example |
 |------|-------------|---------|
-| `--provider-name` | Provider to execute operation on | `--provider-name aws_prod_us-east-1` |
-| `--params` | Operation parameters (JSON format) | `--params '{"count":5}'` |
+| `--provider-name` | Provider instance to run the operation on | `--provider-name aws_prod_us-east-1` |
+| `--list` | List the operations each provider instance supports instead of running one | `--list` |
+| `--dry-run` | Ask the operation to report what it would do without changing anything | `--dry-run` |
+| `--param` | Operation parameter as `KEY=VALUE`; repeat for several. Values are read as JSON when possible | `--param min_age_hours=48` |
+| `--params` | Operation parameters as a JSON object | `--params '{"min_age_hours":48}'` |
+
+A provider that does not declare the operation causes exit code 1 and a message listing what it does support. `orb providers show` also lists a provider instance's `supported_operations`.
+
+##### `cleanup-orphaned-resources` (AWS)
+
+Delete the launch templates ORB created that nothing uses any more. This is an explicit maintenance operation; ORB never runs it in the background.
+
+```bash
+orb providers exec cleanup-orphaned-resources --provider-name aws_prod_us-east-1 --dry-run
+orb providers exec cleanup-orphaned-resources --provider-name aws_prod_us-east-1 --param min_age_hours=48
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `min_age_hours` | Only consider templates at least this old (default 24, minimum 1) |
+| `force` | Allow `min_age_hours` below 1. A template created moments ago may belong to a request that has not launched anything yet, so this can delete a template that request still needs. Example: `--param force=true --param min_age_hours=0` |
+
+A template is deleted only if it carries the `orb:managed-by` tag, has exactly the name ORB generates for it (the resource prefix, its `orb:request-id` tag, `-`, its `orb:template-id` tag), is old enough, has no pending, running, stopping or stopped instance, and is not referenced by an active Auto Scaling group, EC2 Fleet or Spot Fleet request. The operation does nothing when `cleanup.enabled` or `cleanup.delete_launch_template` is false in the provider configuration, and `cleanup.dry_run` makes it a dry run.
+
+The sweep covers all ORB-generated templates in the account and region of the selected provider instance, so other regions need a run per provider instance. The `orb:managed-by` tag has the same value for every ORB installation, so the sweep also sees templates created by other ORB installations that share the account and region, and deletes the unused ones among them. Templates whose name ORB did not generate are always kept, even when they carry ORB tags.
+
+The result names the `provider`, `region` and `account_id` the sweep ran against. When more than one provider is configured, a run that changes anything needs an explicit `--provider-name`; a `--dry-run` may use the default provider. Boolean parameters (`force`) accept `true` or `false` only, and unknown parameters are rejected. If `cleanup.enabled` or `cleanup.delete_launch_template` is false, the command exits non-zero and says so.
+
+Every template is judged before the first one is deleted. If a lookup fails, the command exits non-zero and nothing has been deleted. If a delete fails part-way, the command exits non-zero and the output lists the templates in `deleted`, `failed` (with the error) and `kept` (with the reason), so the result is never reported as all-or-nothing when it was not. The permissions it needs are listed in the [IAM permissions guide](../deployment/iam-permissions.md).
 
 #### `providers metrics`
 

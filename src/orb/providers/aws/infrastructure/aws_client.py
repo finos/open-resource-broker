@@ -56,6 +56,7 @@ def _mask_config_dict(config: dict) -> dict:
     return masked
 
 
+from botocore import __version__ as botocore_version
 from botocore.exceptions import ClientError
 
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
@@ -67,7 +68,12 @@ from orb.providers.aws.exceptions.aws_exceptions import (
     NetworkError,
 )
 from orb.providers.aws.infrastructure.instrumentation.botocore_metrics import BotocoreMetricsHandler
-from orb.providers.aws.utilities.boto_config import get_boto3_config
+from orb.providers.aws.resilience.botocore_retry_gate import install_retry_gate
+from orb.providers.aws.utilities.boto_config import (
+    BOTOCORE_DEFAULT_RETRIES,
+    DYNAMODB_BOTOCORE_MAX_ATTEMPTS,
+    get_boto3_config,
+)
 
 if TYPE_CHECKING:
     from orb.providers.aws.configuration.config import AWSProviderConfig
@@ -113,18 +119,35 @@ class AWSClient:
         self._logger.debug("AWS client region determined: %s", self.region_name)
 
         aws_provider_config = self.get_selected_aws_provider_config()
-        max_attempts = (
-            int(aws_provider_config.request_retry_attempts) + 1 if aws_provider_config else 1
-        )
         connect_timeout = int(aws_provider_config.aws_connect_timeout) if aws_provider_config else 5
         read_timeout = int(aws_provider_config.aws_read_timeout) if aws_provider_config else 10
+        self._timeout_config = TimeoutConfig(connect=connect_timeout, read=read_timeout)
 
-        # Configure retry settings
+        # Every client keeps botocore's own retries, sized by a constant rather than
+        # by request_retry_attempts (which sizes the ORB executor's retries). Calls
+        # that go through the AWS call executor are the only ones that skip them: the
+        # retry gate on the EC2 and Auto Scaling clients switches botocore retries off
+        # for the duration of an executor call, so each call has exactly one retry layer.
+        self._botocore_max_attempts = BOTOCORE_DEFAULT_RETRIES
         self.boto_config = get_boto3_config(
-            timeout=TimeoutConfig(connect=connect_timeout, read=read_timeout),
-            max_retries=max_attempts,
+            timeout=self._timeout_config,
+            max_retries=BOTOCORE_DEFAULT_RETRIES,
             region_name=self.region_name,
         )
+        # Fallback for EC2 and Auto Scaling when the retry gate cannot be installed.
+        self.single_attempt_boto_config = get_boto3_config(
+            timeout=self._timeout_config,
+            single_attempt=True,
+            region_name=self.region_name,
+        )
+        # DynamoDB is retried by botocore.
+        self.dynamodb_boto_config = get_boto3_config(
+            timeout=self._timeout_config,
+            max_retries=DYNAMODB_BOTOCORE_MAX_ATTEMPTS,
+            retry_mode="standard",
+            region_name=self.region_name,
+        )
+        self._call_executors: dict[str, Any] = {}
 
         # Load performance configuration
         self.perf_config = self._load_performance_config()
@@ -196,7 +219,7 @@ class AWSClient:
                 "AWS client initialized with region: %s, profile: %s, retries: %d, timeouts: connect=%ds, read=%ds",
                 self.region_name,
                 self.profile_name or "credential-chain",
-                max_attempts,
+                self.retry_attempts()[0],
                 connect_timeout,
                 read_timeout,
             )
@@ -410,13 +433,34 @@ class AWSClient:
             "max_workers": 10,
         }
 
+    def _executor_ready_client(self, service: str) -> Any:
+        """Build an EC2 or Auto Scaling client the AWS call executor can use.
+
+        The client keeps botocore's retry for calls outside the executor, and the
+        retry gate switches it off inside executor calls. If the installed botocore
+        cannot honour the gate, the client is built with botocore retries off
+        instead: executor calls then still have exactly one retry layer, and calls
+        outside the executor make a single attempt.
+        """
+        client = self.session.client(service, config=self.boto_config)
+        if install_retry_gate(client):
+            return client
+        self._logger.warning(
+            "botocore %s cannot skip its own retries inside ORB's retry layer (needs "
+            "1.43.3 or later); the %s client makes one attempt per call outside ORB's "
+            "retry layer",
+            botocore_version,
+            service,
+        )
+        return self.session.client(service, config=self.single_attempt_boto_config)
+
     # Property getters for lazy initialization of AWS service clients
     @property
     def ec2_client(self):
         """Lazy initialization of EC2 client."""
         if self._ec2_client is None:
             self._logger.debug("Initializing EC2 client on first use")
-            self._ec2_client = self.session.client("ec2", config=self.boto_config)
+            self._ec2_client = self._executor_ready_client("ec2")
         return self._ec2_client
 
     @property
@@ -432,7 +476,7 @@ class AWSClient:
         """Lazy initialization of Auto Scaling client."""
         if self._autoscaling_client is None:
             self._logger.debug("Initializing Auto Scaling client on first use")
-            self._autoscaling_client = self.session.client("autoscaling", config=self.boto_config)
+            self._autoscaling_client = self._executor_ready_client("autoscaling")
         return self._autoscaling_client
 
     @property
@@ -464,7 +508,9 @@ class AWSClient:
         """Lazy initialization of DynamoDB client."""
         if self._dynamodb_client is None:
             self._logger.debug("Initializing DynamoDB client on first use")
-            self._dynamodb_client = self.session.client("dynamodb", config=self.boto_config)
+            self._dynamodb_client = self.session.client(
+                "dynamodb", config=self.dynamodb_boto_config
+            )
         return self._dynamodb_client
 
     @property
@@ -472,7 +518,9 @@ class AWSClient:
         """Lazy initialization of DynamoDB resource."""
         if self._dynamodb_resource is None:
             self._logger.debug("Initializing DynamoDB resource on first use")
-            self._dynamodb_resource = self.session.resource("dynamodb", config=self.boto_config)
+            self._dynamodb_resource = self.session.resource(
+                "dynamodb", config=self.dynamodb_boto_config
+            )
         return self._dynamodb_resource
 
     @property
@@ -516,8 +564,68 @@ class AWSClient:
             return stats
         return {"metrics_enabled": False}
 
+    def retry_attempts(self) -> tuple[int, int]:
+        """Return ``(request_retries, describe_retries)`` for executor-routed calls.
+
+        The totals are the retries after the first call; botocore retries are
+        disabled on those clients, so ``retries + 1`` HTTP requests is the most
+        a failing call makes.
+        """
+        from orb.providers.aws.resilience.call_executor import (
+            DEFAULT_DESCRIBE_RETRY_ATTEMPTS,
+            DEFAULT_REQUEST_RETRY_ATTEMPTS,
+        )
+
+        config = self.get_selected_aws_provider_config()
+        # getattr: the selected config may be absent or a loosely typed stand-in
+        request_retries = getattr(config, "request_retry_attempts", None)
+        # getattr: the selected config may be absent or a loosely typed stand-in
+        describe_retries = getattr(config, "describe_request_retry_attempts", None)
+        return (
+            request_retries if isinstance(request_retries, int) else DEFAULT_REQUEST_RETRY_ATTEMPTS,
+            (
+                describe_retries
+                if isinstance(describe_retries, int)
+                else DEFAULT_DESCRIBE_RETRY_ATTEMPTS
+            ),
+        )
+
+    def get_call_executor(self, service: str) -> Any:
+        """Return the retry/circuit-breaker executor for a non-handler caller.
+
+        The executor preserves the original ``ClientError`` for callers that
+        interpret AWS error codes themselves; pass ``preserve_client_error=True``.
+        """
+        executor = self._call_executors.get(service)
+        if executor is None:
+            from orb.providers.aws.resilience.call_executor import AWSCallExecutor
+
+            with self._cache_lock:
+                executor = self._call_executors.get(service)
+                if executor is None:
+                    executor = AWSCallExecutor(
+                        self._logger,
+                        handler_type=service,
+                        provider_name=self._provider_name,
+                        config_port=self._config_manager,
+                        attempts_provider=self.retry_attempts,
+                    )
+                    self._call_executors[service] = executor
+        return executor
+
     def execute_with_circuit_breaker(
         self, service: str, operation: str, func: Any, *args: Any, **kwargs: Any
     ) -> Any:
-        """Execute an AWS operation with circuit breaker protection."""
-        return func(*args, **kwargs)
+        """Execute an AWS operation with retry and per-operation circuit breaker protection.
+
+        Raises the original ``ClientError`` on failure so callers can keep
+        interpreting AWS error codes.
+        """
+        return self.get_call_executor(service).execute(
+            func,
+            *args,
+            operation_type="read_only",
+            operation_name=operation,
+            preserve_client_error=True,
+            **kwargs,
+        )

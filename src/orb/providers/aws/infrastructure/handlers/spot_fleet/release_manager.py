@@ -19,6 +19,10 @@ from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
 )
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 
+_SPOT_FLEET_CANCELLED_STATES = frozenset(
+    {"cancelled", "cancelled_running", "cancelled_terminating"}
+)
+
 
 class SpotFleetReleaseManager(BaseFleetReleaseManager):
     """Handles release and teardown of Spot Fleet resources.
@@ -108,6 +112,12 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
     def _fleet_label(self) -> str:
         return "Spot Fleet"
 
+    def _is_fleet_terminal(self, fleet_details: dict[str, Any]) -> bool:
+        return fleet_details.get("SpotFleetRequestState") in _SPOT_FLEET_CANCELLED_STATES
+
+    def _fleet_instances_still_running(self, fleet_details: dict[str, Any]) -> bool:
+        return fleet_details.get("SpotFleetRequestState") == "cancelled_running"
+
     def _fetch_fleet_details(self, fleet_id: str) -> dict[str, Any]:
         fleet_response = self._retry(
             self._aws_client.ec2_client.describe_spot_fleet_requests,
@@ -156,8 +166,13 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         extra: dict[str, Any],
         decision: FleetReleaseDecision,
     ) -> None:
-        target_capacity = extra["target_capacity"]
-        on_demand_capacity = extra["on_demand_capacity"]
+        # Re-read the targets right before changing them: the details passed in may
+        # be seconds old, and a concurrent return would otherwise be overwritten with
+        # a value computed from the stale target. This narrows the window; the API has
+        # no compare-and-set, so concurrent returns on one fleet are not serialised.
+        target_capacity, on_demand_capacity = self._read_target_capacities(
+            fleet_id, extra["target_capacity"], extra["on_demand_capacity"]
+        )
         weighted = extra["weighted_capacity_to_return"]
         fleet_type = extra["fleet_type"]
 
@@ -177,10 +192,36 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         self._retry(
             self._aws_client.ec2_client.modify_spot_fleet_request,
             operation_type="critical",
+            operation_name="modify_spot_fleet_request",
             SpotFleetRequestId=fleet_id,
             TargetCapacity=new_target_capacity,
             OnDemandTargetCapacity=new_on_demand_capacity,
+            # The instances being returned are terminated explicitly afterwards.
+            # Without this, a fleet that still counts an instance that is already
+            # terminating picks an extra instance to terminate when the target
+            # drops, and the maintain fleet then launches a replacement.
+            ExcessCapacityTerminationPolicy="noTermination",
         )
+
+    def _read_target_capacities(
+        self, fleet_id: str, fallback_target: int, fallback_on_demand: int
+    ) -> tuple[int, int]:
+        """Return the fleet's current ``(target, on-demand target)``, or the fallbacks."""
+        try:
+            config = self._fetch_fleet_details(fleet_id)["SpotFleetRequestConfig"]
+            target = config["TargetCapacity"]
+            on_demand = config.get("OnDemandTargetCapacity", 0) or 0
+            if not isinstance(target, int) or not isinstance(on_demand, int):
+                raise TypeError(f"unexpected capacities {target!r}/{on_demand!r}")
+            return target, on_demand
+        except Exception as exc:
+            self._logger.warning(
+                "Could not re-read target capacity of Spot Fleet %s (%s); using %s",
+                fleet_id,
+                exc,
+                fallback_target,
+            )
+            return int(fallback_target), int(fallback_on_demand)
 
     def _terminate_instances(self, fleet_id: str, instance_ids: list[str]) -> None:
         self._aws_ops.terminate_instances_with_fallback(
@@ -196,8 +237,11 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         response = self._retry(
             self._aws_client.ec2_client.cancel_spot_fleet_requests,
             operation_type="critical",
+            operation_name="cancel_spot_fleet_requests",
             SpotFleetRequestIds=[fleet_id],
-            TerminateInstances=terminate_instances,
+            # A maintain fleet can launch an instance between the return and the
+            # cancel; terminating on cancel keeps it from being left running.
+            TerminateInstances=terminate_instances or is_maintain,
         )
         check_unsuccessful_fleet_response(response, "spot_fleet", self._fleet_is_cancelled)
 
@@ -209,9 +253,7 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
             SpotFleetRequestIds=[fleet_id],
         ).get("SpotFleetRequestConfigs", [])
         return bool(configs) and all(
-            c.get("SpotFleetRequestState")
-            in ("cancelled", "cancelled_running", "cancelled_terminating")
-            for c in configs
+            c.get("SpotFleetRequestState") in _SPOT_FLEET_CANCELLED_STATES for c in configs
         )
 
     def _list_fleet_instance_ids(self, fleet_id: str) -> Optional[list[str]]:
@@ -261,6 +303,7 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
         self._retry(
             self._aws_client.ec2_client.modify_spot_fleet_request,
             operation_type="critical",
+            operation_name="modify_spot_fleet_request",
             SpotFleetRequestId=fleet_id,
             TargetCapacity=0,
             OnDemandTargetCapacity=0,

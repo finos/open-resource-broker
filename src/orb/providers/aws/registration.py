@@ -547,6 +547,9 @@ def initialize_aws_provider(
         register_aws_auth_strategies(log)
 
     def _register_storage(log: Optional["LoggingPort"]) -> None:
+        from orb.providers.aws.resilience.retry_classifier import register_aws_retry_classifier
+
+        register_aws_retry_classifier()
         try:
             from orb.infrastructure.storage.registry import get_storage_registry
             from orb.providers.aws.storage.registration import (

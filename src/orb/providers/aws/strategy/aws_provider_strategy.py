@@ -28,6 +28,7 @@ from orb.providers.aws.services.infrastructure_discovery_service import (
 
 # Import focused services
 from orb.providers.aws.services.instance_operation_service import AWSInstanceOperationService
+from orb.providers.aws.services.launch_template_sweep_service import AWSLaunchTemplateSweepService
 from orb.providers.aws.services.template_validation_service import AWSTemplateValidationService
 
 if TYPE_CHECKING:
@@ -89,6 +90,7 @@ class AWSProviderStrategy(ProviderStrategy):
 
         # Initialize services (lazy)
         self._instance_service: Optional[AWSInstanceOperationService] = None
+        self._launch_template_sweep_service: Optional[AWSLaunchTemplateSweepService] = None
         self._health_service: Optional[AWSHealthCheckService] = None
         self._template_service: Optional[AWSTemplateValidationService] = None
         self._infrastructure_service: Optional[AWSInfrastructureDiscoveryService] = None
@@ -399,7 +401,9 @@ class AWSProviderStrategy(ProviderStrategy):
                 self._get_instance_service().terminate_instances, operation
             )
         elif operation.operation_type == ProviderOperationType.GET_INSTANCE_STATUS:
-            return self._get_instance_service().get_instance_status(operation)
+            return await asyncio.to_thread(
+                self._get_instance_service().get_instance_status, operation
+            )
         elif operation.operation_type == ProviderOperationType.VALIDATE_TEMPLATE:
             return self._get_template_service().validate_template(operation)
         elif operation.operation_type == ProviderOperationType.HEALTH_CHECK:
@@ -417,15 +421,25 @@ class AWSProviderStrategy(ProviderStrategy):
         elif operation.operation_type == ProviderOperationType.RESOLVE_IMAGE:
             return await self._handle_resolve_image(operation)
         elif operation.operation_type == ProviderOperationType.START_INSTANCES:
-            return self._get_instance_service().start_instances(operation)
+            return await asyncio.to_thread(self._get_instance_service().start_instances, operation)
         elif operation.operation_type == ProviderOperationType.STOP_INSTANCES:
-            return self._get_instance_service().stop_instances(operation)
+            return await asyncio.to_thread(self._get_instance_service().stop_instances, operation)
         elif operation.operation_type == ProviderOperationType.CLEANUP_MACHINE_RESOURCES:
-            return self._get_instance_service().cleanup_machine_resources(operation)
+            return await asyncio.to_thread(
+                self._get_instance_service().cleanup_machine_resources, operation
+            )
         elif operation.operation_type == ProviderOperationType.GET_MACHINE_HEALTH:
-            return self._get_instance_service().get_machine_health(operation)
+            return await asyncio.to_thread(
+                self._get_instance_service().get_machine_health, operation
+            )
         elif operation.operation_type == ProviderOperationType.TAG_INSTANCES:
             return await self._tag_instances(operation)
+        elif operation.operation_type == ProviderOperationType.CANCEL_PROVISIONING:
+            return await self._get_instance_service().cancel_provisioning(operation)
+        elif operation.operation_type == ProviderOperationType.CLEANUP_ORPHANED_RESOURCES:
+            return await self._get_launch_template_sweep_service().cleanup_orphaned_templates(
+                operation
+            )
         else:
             return ProviderResult.error_result(
                 f"Unsupported operation: {operation.operation_type}", "UNSUPPORTED_OPERATION"
@@ -559,6 +573,16 @@ class AWSProviderStrategy(ProviderStrategy):
                 provider_type=self.provider_type,
             )
         return self._instance_service
+
+    def _get_launch_template_sweep_service(self) -> AWSLaunchTemplateSweepService:
+        """Get the launch template sweep service with lazy initialization."""
+        if self._launch_template_sweep_service is None:
+            self._launch_template_sweep_service = AWSLaunchTemplateSweepService(
+                aws_client=self.aws_client,  # type: ignore[arg-type]
+                logger=self._logger,
+                config_port=self._config_port,
+            )
+        return self._launch_template_sweep_service
 
     def _get_health_service(self) -> AWSHealthCheckService:
         """Get health check service with lazy initialization."""

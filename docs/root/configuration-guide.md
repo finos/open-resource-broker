@@ -90,7 +90,8 @@ The consolidated configuration format provides comprehensive provider management
       "enabled": true,
       "failure_threshold": 5,
       "recovery_timeout": 60,
-      "half_open_max_calls": 3
+      "half_open_max_calls": 3,
+      "half_open_timeout": 30
     },
     "providers": [
       {
@@ -356,6 +357,22 @@ ORB_AWS_MAX_RETRIES=5                  # Maximum API retry attempts (integer, 0-
 ORB_AWS_TIMEOUT=120                    # AWS API timeout in seconds (integer, 1-300)
 ```
 
+##### AWS retries
+
+The provider settings `request_retry_attempts` (default 3) and
+`describe_request_retry_attempts` (default 2) set how many times ORB retries a
+failed EC2 or Auto Scaling call, so a failing call makes at most the setting plus
+one HTTP requests. The first applies to calls that change state and the second to
+read-only calls. botocore's own retries are disabled for those clients, so these
+settings are the complete retry budget.
+
+Only throttling, server-side (5xx) and connection errors, and clock-skew errors
+are retried. Validation, authorisation, quota and not-found errors fail on the
+first attempt. Failures of one operation do not open the circuit breaker of
+another: breakers are kept per provider, handler type and operation, and one
+failure is counted per call that exhausted its retries. Retries for health checks
+and launch-template cleanup are not governed by these settings.
+
 #### Nested Configuration Variables
 
 For complex configuration objects, use double underscores (`__`) to separate levels:
@@ -366,6 +383,7 @@ ORB_CIRCUIT_BREAKER__ENABLED=true                    # Enable circuit breaker (b
 ORB_CIRCUIT_BREAKER__FAILURE_THRESHOLD=10            # Failures before opening circuit (integer)
 ORB_CIRCUIT_BREAKER__RECOVERY_TIMEOUT=120            # Recovery timeout in seconds (integer)
 ORB_CIRCUIT_BREAKER__HALF_OPEN_MAX_CALLS=3           # Max calls in half-open state (integer)
+ORB_CIRCUIT_BREAKER__HALF_OPEN_TIMEOUT=30            # Seconds a half-open probe may run before a new probe is admitted (integer)
 
 # Retry configuration
 ORB_RETRY__MAX_ATTEMPTS=5              # Maximum retry attempts (integer)
@@ -485,14 +503,9 @@ orb providers select --data '{
   "require_healthy": true
 }'
 
-# Execute provider operation
-orb providers exec --data '{
-  "operation_type": "CREATE_INSTANCES",
-  "operation_data": {
-    "instance_count": 2,
-    "instance_type": "t2.micro"
-  }
-}'
+# Run a provider maintenance operation (list what each provider supports first)
+orb providers exec --list
+orb providers exec cleanup-orphaned-resources --provider-name aws-prod --dry-run
 
 # Get provider health status
 orb providers health

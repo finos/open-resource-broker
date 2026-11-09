@@ -1,15 +1,21 @@
 """Orchestrator for cancelling a request.
 
 Cancel semantics in ORB are "tear down everything associated with this
-request": if the request has allocated machines, those machines are
-returned to the provider (terminated at AWS) before the request itself
-is flipped to ``CANCELLED``. Without this, marking the request cancelled
-would orphan the running instances and silently rack up cost.
+request". For a request that is not yet settled this runs in three steps:
 
-Provider-level abort of an in-flight fleet/ASG that has *not yet*
-produced any machines (the resource exists but is still fulfilling) is
-out of scope here — that requires a new ``CANCEL_PROVISIONING`` op on
-every provider handler. Tracked separately.
+1. Provider-side provisioning is aborted for every resource of the request
+   (fleet, Spot Fleet, Auto Scaling group, ...) with the ``CANCEL_PROVISIONING``
+   operation. This stops capacity from growing, whether or not any machine has
+   been recorded yet, and also covers partially fulfilled requests whose fleet
+   would otherwise keep fulfilling after the request reads cancelled. The
+   instances still attached to the aborted resources are listed read-only by
+   the provider.
+2. Those machines, together with the machines already recorded for the request,
+   are returned to the provider.
+3. The request itself is flipped to ``CANCELLED``.
+
+If any step fails, the request is left in its current state so the cancel can
+be retried; aborting a resource that is already gone is a success.
 """
 
 from __future__ import annotations
@@ -17,7 +23,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from orb.application.dto.commands import CancelRequestCommand
-from orb.application.dto.queries import SyncAndGetRequestQuery
+from orb.application.dto.queries import GetMachineQuery, SyncAndGetRequestQuery
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.ports.query_bus_port import QueryBusPort
 from orb.application.services.orchestration.base import OrchestratorBase
@@ -27,24 +33,46 @@ from orb.application.services.orchestration.dtos import (
     ReturnMachinesInput,
 )
 from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
-from orb.domain.base.exceptions import ApplicationError, EntityNotFoundError
+from orb.domain.base.exceptions import (
+    ApplicationError,
+    EntityNotFoundError,
+    ProviderContractError,
+)
+from orb.domain.base.operations import Operation, OperationType
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 from orb.domain.request.request_types import RequestStatus
 
 # Return outcomes that mean some machines may still be running; the request
 # must not be marked cancelled in that case so the cancel can be retried.
 _BLOCKING_RETURN_STATUSES = frozenset({"failed", "error", "partial", "timeout"})
 
+# Requests in these states have no provisioning left to abort: the return flow
+# deletes the resources of a completed request, and a failed one has nothing
+# running. A cancelled request is not listed: if an earlier abort did not take
+# effect (a throttled call, an open breaker) its resources are still recorded on
+# it, and cancelling again aborts them once more. Aborting is idempotent.
+_SETTLED_STATUSES = frozenset(
+    {
+        RequestStatus.COMPLETED.value,
+        RequestStatus.FAILED.value,
+    }
+)
+
+# Outcomes of aborting one resource that mean no more capacity will be added.
+_ABORT_OK_OUTCOMES = frozenset({"aborted", "already_gone"})
+
 
 class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelRequestOutput]):
     """Orchestrator for cancelling a request.
 
-    Composes ``ReturnMachinesOrchestrator`` for the machines-already-
-    allocated case, then dispatches ``CancelRequestCommand`` to flip
-    the request status. The request is only flipped when its machines are
-    known and were returned (or there are none): an unknown machine set or
-    a failed / partial return raises ``ApplicationError`` and leaves the
-    request in its current state so the cancel can be retried.
+    Aborts provider-side provisioning for requests that are not settled, composes
+    ``ReturnMachinesOrchestrator`` for the machines to return, then dispatches
+    ``CancelRequestCommand`` to flip the request status. The request is only
+    flipped when the abort succeeded and its machines are known and were
+    returned (or there are none): a failed abort, an unknown machine set or a
+    failed / partial return raises ``ApplicationError`` and leaves the request in
+    its current state so the cancel can be retried.
     """
 
     def __init__(
@@ -53,11 +81,13 @@ class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelReque
         query_bus: QueryBusPort,
         return_orchestrator: ReturnMachinesOrchestrator,
         logger: LoggingPort,
+        provider_selection_port: Optional[ProviderSelectionPort] = None,
     ) -> None:
         self._command_bus = command_bus
         self._query_bus = query_bus
         self._return_orchestrator = return_orchestrator
         self._logger = logger
+        self._provider_selection_port = provider_selection_port
 
     async def execute(self, input: CancelRequestInput) -> CancelRequestOutput:  # type: ignore[return]
         self._logger.info(
@@ -67,9 +97,24 @@ class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelReque
         )
 
         context: dict[str, Any] = {}
-        machine_ids = await self._collect_machine_ids(input.request_id, context)
+        loaded = await self._load_request(input.request_id, context)
+        machine_ids = list(loaded["machine_ids"])
         return_status: str | None = None
         return_message: str = ""
+
+        provider_abort: list[dict[str, Any]] = []
+        abort_ran = False
+        if self._needs_abort(loaded):
+            provider_abort, listed_ids = await self._abort_provisioning(
+                input.request_id, loaded, context
+            )
+            abort_ran = any(o["outcome"] in _ABORT_OK_OUTCOMES for o in provider_abort)
+            # Machines listed on the aborted resources join the recorded ones when
+            # ORB knows them; returning is idempotent, so overlap is fine.
+            extra_ids = await self._known_machines(
+                input.request_id, [i for i in listed_ids if i not in machine_ids]
+            )
+            machine_ids.extend(extra_ids)
 
         if machine_ids:
             self._logger.info(
@@ -107,21 +152,189 @@ class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelReque
         command = CancelRequestCommand(request_id=input.request_id, reason=input.reason)
         await self._dispatch("CancelRequest", self._command_bus.execute(command))
 
-        status = (
-            command.final_status
-            if command.cancelled and command.final_status
-            else RequestStatus.CANCELLED.value
+        # A request that had already settled (partial / timeout / complete) stays in
+        # that state; report its true status rather than claiming it was cancelled.
+        status = command.final_status or RequestStatus.CANCELLED.value
+
+        # Creation may have recorded resources after this cancel loaded the request
+        # (a store without versioning can even have put the request back in progress).
+        # Re-read it and abort anything that appeared.
+        late = await self._abort_resources_recorded_since(
+            input.request_id, loaded, provider_abort, context
         )
+        if late:
+            provider_abort.extend(late)
+            abort_ran = True
         request_dict: dict = {"request_id": input.request_id, "status": status}
         if return_status is not None:
             request_dict["return_status"] = return_status
         if return_message:
             request_dict["return_message"] = return_message
+        if provider_abort:
+            request_dict["provider_abort"] = provider_abort
         return CancelRequestOutput(
             request_id=input.request_id,
             status=status,
             requests=[request_dict],
+            # The cancel took effect when the request was flipped, or when it was
+            # already settled as partial/timeout but its provisioning was aborted
+            # and its machines returned.
+            cancel_effective=bool(command.cancelled or abort_ran),
         )
+
+    async def _known_machines(self, request_id: str, candidate_ids: list[str]) -> list[str]:
+        """Return the candidates ORB has a machine record for.
+
+        The return flow rejects machines it has no record of. Instances launched by an
+        aborted resource that ORB never recorded are terminated by the abort itself
+        (fleet delete with termination, forced group delete), so they are reported
+        and left out of the return rather than failing the cancel.
+        """
+        known: list[str] = []
+        unknown: list[str] = []
+        for machine_id in candidate_ids:
+            try:
+                machine = await self._query_bus.execute(GetMachineQuery(machine_id=machine_id))
+            except Exception:
+                machine = None
+            (known if machine else unknown).append(machine_id)
+        if unknown:
+            self._logger.warning(
+                "CancelRequestOrchestrator: %s instance(s) of request %s have no machine record "
+                "and are left to the provider-side abort: %s",
+                len(unknown),
+                request_id,
+                unknown,
+                extra={
+                    "event": "request.cancel_unrecorded_members",
+                    "request_id": request_id,
+                    "instance_ids": unknown,
+                },
+            )
+        return known
+
+    async def _abort_resources_recorded_since(
+        self,
+        request_id: str,
+        loaded: dict[str, Any],
+        done: list[dict[str, Any]],
+        context: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Abort resources that appeared on the request after it was loaded.
+
+        Returns the outcomes for those resources (empty when there are none).
+        """
+        try:
+            reloaded = await self._load_request(request_id, {}, lightweight=True)
+        except Exception as exc:
+            self._logger.warning(
+                "CancelRequestOrchestrator: could not re-read %s after cancelling: %s",
+                request_id,
+                exc,
+            )
+            return []
+        known = set(loaded["resource_ids"]) | {str(o.get("resource_id")) for o in done}
+        new_ids = [r for r in reloaded["resource_ids"] if r not in known]
+        if not new_ids or not reloaded.get("provider_api"):
+            return []
+        if (reloaded.get("status") or "").lower() != RequestStatus.CANCELLED.value:
+            # The request was put back in progress; cancel it again.
+            await self._dispatch(
+                "CancelRequest",
+                self._command_bus.execute(
+                    CancelRequestCommand(request_id=request_id, reason="Cancelled during creation")
+                ),
+            )
+        outcomes, _ = await self._abort_provisioning(
+            request_id, {**reloaded, "resource_ids": new_ids}, context
+        )
+        return outcomes
+
+    @staticmethod
+    def _needs_abort(loaded: dict[str, Any]) -> bool:
+        """True when the request has resources whose provisioning may still be running."""
+        status = loaded.get("status")
+        return (
+            isinstance(status, str)
+            and status.lower() not in _SETTLED_STATUSES
+            and bool(loaded.get("resource_ids"))
+            and bool(loaded.get("provider_api"))
+        )
+
+    async def _abort_provisioning(
+        self, request_id: str, loaded: dict[str, Any], context: dict[str, Any]
+    ) -> tuple[list[dict[str, Any]], list[str]]:
+        """Abort provider-side provisioning; return per-resource outcomes and listed machine ids.
+
+        A provider that cannot abort is recorded as ``unsupported`` and the cancel
+        continues. Any failed resource raises, leaving the request unchanged.
+        """
+        resource_ids = list(loaded["resource_ids"])
+        provider_name = loaded.get("provider_name")
+        provider_api = loaded["provider_api"]
+
+        def recorded(outcome: str, message: str) -> list[dict[str, Any]]:
+            return [
+                {"resource_id": rid, "outcome": outcome, "message": message} for rid in resource_ids
+            ]
+
+        if self._provider_selection_port is None or not provider_name:
+            reason = "no provider is bound to this request"
+            self._logger.warning(
+                "CancelRequestOrchestrator: cannot abort provisioning of %s: %s", request_id, reason
+            )
+            return recorded("unsupported", reason), []
+
+        capabilities = self._provider_selection_port.get_strategy_capabilities(provider_name)
+        supports = getattr(capabilities, "supports_operation", None)
+        if supports is None or not supports(OperationType.CANCEL_PROVISIONING):
+            reason = f"provider '{provider_name}' cannot abort in-flight provisioning"
+            self._logger.warning(
+                "CancelRequestOrchestrator: cannot abort provisioning of %s: %s", request_id, reason
+            )
+            return recorded("unsupported", reason), []
+
+        operation = Operation(
+            operation_type=OperationType.CANCEL_PROVISIONING,
+            parameters={
+                "request_id": request_id,
+                "provider_api": provider_api,
+                "resource_ids": resource_ids,
+            },
+            context={"correlation_id": request_id, "request_id": request_id},
+        )
+        try:
+            result = await self._provider_selection_port.execute_operation(provider_name, operation)
+        except Exception as exc:
+            raise self._cancel_failed(
+                request_id,
+                f"aborting provisioning failed ({exc}); resources may still be launching",
+                context,
+            ) from exc
+
+        data = getattr(result, "data", None)
+        resources = data.get("resources") if isinstance(data, dict) else None
+        outcomes: list[dict[str, Any]] = []
+        listed: list[str] = []
+        for entry in resources or []:
+            members = entry.get("members") or []
+            listed.extend(str(m) for m in members)
+            outcomes.append({k: v for k, v in entry.items() if k != "members"})
+        if not getattr(result, "success", False):
+            message = getattr(result, "error_message", None) or "provider reported a failure"
+            raise self._cancel_failed(
+                request_id,
+                f"aborting provisioning failed ({message}); resources may still be launching",
+                {**context, "provider_abort": outcomes},
+            )
+        if not outcomes:
+            outcomes = recorded("aborted", "")
+        self._logger.info(
+            "CancelRequestOrchestrator: aborted provisioning of %s (%s)",
+            request_id,
+            ", ".join(f"{o['resource_id']}={o['outcome']}" for o in outcomes),
+        )
+        return outcomes, listed
 
     async def _worst_return_request_status(self, return_result: Any, default: str) -> str:
         """Return the first blocking status among the created return requests.
@@ -169,12 +382,16 @@ class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelReque
         )
         return ApplicationError(f"Cancel of request {request_id} aborted: {reason}")
 
-    async def _collect_machine_ids(
-        self, request_id: str, context: Optional[dict[str, Any]] = None
-    ) -> list[str]:
-        """Resolve the current machine_ids for ``request_id`` via the query bus.
+    async def _load_request(
+        self,
+        request_id: str,
+        context: Optional[dict[str, Any]] = None,
+        lightweight: bool = False,
+    ) -> dict[str, Any]:
+        """Load the request through the query bus.
 
-        Returns an empty list only when the request was loaded and has no
+        Returns its status, machine ids, resource ids and provider coordinates.
+        The machine ids are empty only when the request was loaded and has no
         machines. A failed or empty lookup raises ``ApplicationError``:
         cancelling without knowing the machine set would flip the request
         while its machines keep running. Provider details of the loaded request
@@ -182,8 +399,25 @@ class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelReque
         """
         context = context if context is not None else {}
         try:
-            query = SyncAndGetRequestQuery(request_id=request_id, verbose=False)
-            request = await self._query_bus.execute(query)
+            query = SyncAndGetRequestQuery(
+                request_id=request_id, verbose=False, lightweight=lightweight
+            )
+            try:
+                request = await self._query_bus.execute(query)
+            except ProviderContractError:
+                if lightweight:
+                    raise
+                # A request whose creation is still in flight has no provider verdict
+                # to sync yet. Its stored state is enough to cancel it: the creation
+                # path aborts whatever it creates once it sees the cancel.
+                self._logger.warning(
+                    "CancelRequestOrchestrator: %s has no provider status yet; "
+                    "cancelling from its stored state",
+                    request_id,
+                )
+                request = await self._query_bus.execute(
+                    SyncAndGetRequestQuery(request_id=request_id, verbose=False, lightweight=True)
+                )
         except EntityNotFoundError:
             # An unknown request is a not-found outcome, not a failed cancel.
             raise
@@ -193,15 +427,29 @@ class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelReque
             ) from exc
         if request is None:
             raise self._cancel_failed(request_id, "request could not be loaded", context)
+
+        def field(key: str) -> Any:
+            # getattr: aggregate, DTO and dict shapes differ
+            return request.get(key) if isinstance(request, dict) else getattr(request, key, None)
+
         # Accept aggregate, DTO, or dict shapes — the query bus returns
         # whichever the handler emits.
         for key in ("provider_name", "provider_type", "provider_api", "resource_id", "region"):
-            value = (
-                request.get(key) if isinstance(request, dict) else getattr(request, key, None)
-            )  # getattr: aggregate, DTO and dict shapes differ
+            value = field(key)
             if isinstance(value, str):
                 context[key] = value
-        ids = getattr(request, "machine_ids", None)
-        if ids is None and isinstance(request, dict):
-            ids = request.get("machine_ids")
-        return list(ids) if ids else []
+        ids = field("machine_ids")
+        status = field("status")
+        status_value = getattr(status, "value", status)
+        resource_ids = field("resource_ids")
+        provider_name = field("provider_name")
+        provider_api = field("provider_api")
+        return {
+            "machine_ids": list(ids) if ids else [],
+            "status": status_value if isinstance(status_value, str) else None,
+            "resource_ids": (
+                [str(r) for r in resource_ids] if isinstance(resource_ids, (list, tuple)) else []
+            ),
+            "provider_name": provider_name if isinstance(provider_name, str) else None,
+            "provider_api": provider_api if isinstance(provider_api, str) else None,
+        }

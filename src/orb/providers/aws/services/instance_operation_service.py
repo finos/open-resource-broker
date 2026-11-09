@@ -1,10 +1,13 @@
 """AWS Instance Operation Service - Handles instance creation and termination."""
 
+import asyncio
 import re
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import emit_alert, region_of
+from orb.providers.aws.resilience.call_executor import AWSCallExecutor
 from orb.providers.aws.utilities.terminate_instances import (
     recently_launched_ids,
     terminate_skipping_missing,
@@ -37,6 +40,28 @@ class AWSInstanceOperationService:
         self._machine_adapter = machine_adapter
         self._provider_name = provider_name
         self._provider_type = provider_type
+        self._executor = AWSCallExecutor.for_client(aws_client, "instance_operation", logger)
+
+    def _call(
+        self,
+        func,
+        operation_name: str,
+        operation_type: str = "standard",
+        **kwargs,
+    ):
+        """Run one EC2 call through the shared retry framework.
+
+        The original ``ClientError`` is preserved so the callers below keep
+        interpreting AWS error codes and the error text they report.
+        """
+        return self._executor.execute(
+            func,
+            operation_type=operation_type,
+            operation_name=operation_name,
+            preserve_client_error=True,
+            log_response=False,
+            **kwargs,
+        )
 
     async def create_instances(
         self, operation: ProviderOperation, handlers: dict
@@ -138,6 +163,121 @@ class AWSInstanceOperationService:
             self._logger.error("Failed to create instances: %s", e, exc_info=True)
             return ProviderResult.error_result(str(e), "CREATE_INSTANCES_ERROR")
 
+    # Tag (or filter) that ties an instance to the resource that launched it, per provider API.
+    _MEMBER_FILTERS = {
+        "EC2Fleet": "tag:aws:ec2:fleet-id",
+        "SpotFleet": "tag:aws:ec2spot:fleet-request-id",
+        "ASG": "tag:aws:autoscaling:groupName",
+        "RunInstances": "reservation-id",
+    }
+    # Instances that still exist or are on their way out; terminated ones that
+    # share the tag are history and must not be returned again.
+    _LIVE_INSTANCE_STATES = ["pending", "running", "stopping", "stopped", "shutting-down"]
+
+    async def cancel_provisioning(self, operation: ProviderOperation) -> ProviderResult:
+        """Abort in-flight provisioning of a request's resources.
+
+        Each resource (fleet, Spot Fleet request, Auto Scaling group, reservation)
+        is aborted, then the instances still attached to it are listed read-only
+        so the caller can return them. Aborting is idempotent: a resource that is
+        already gone reports ``already_gone``. A failed abort, or a failed member
+        listing after a successful abort, returns an error result carrying the
+        per-resource outcomes; nothing is reported as cancelled in that case.
+        """
+        params = operation.parameters
+        provider_api = params.get("provider_api")
+        resource_ids = [str(r) for r in params.get("resource_ids") or []]
+        instance_ids = [str(i) for i in params.get("instance_ids") or []]
+        request_id = str(params.get("request_id") or "")
+        if not provider_api or not resource_ids:
+            return ProviderResult.error_result(
+                "provider_api and resource_ids are required to cancel provisioning",
+                "MISSING_CANCEL_PARAMETERS",
+            )
+
+        try:
+            outcomes = await asyncio.to_thread(
+                self._provisioning_adapter.cancel_resources,
+                provider_api,
+                resource_ids,
+                request_id,
+                instance_ids,
+            )
+        except Exception as e:
+            return ProviderResult.error_result(
+                f"Failed to cancel provisioning: {e}", "CANCEL_PROVISIONING_ERROR"
+            )
+
+        failed = [o for o in outcomes if o["outcome"] == "failed"]
+        data: dict[str, Any] = {"resources": outcomes}
+        if failed:
+            details = "; ".join(f"{o['resource_id']}: {o['message']}" for o in failed)
+            return ProviderResult.error_result(
+                f"Failed to abort {len(failed)} of {len(outcomes)} resource(s): {details}",
+                "CANCEL_PROVISIONING_FAILED",
+            ).model_copy(update={"data": data})
+
+        for outcome in outcomes:
+            if outcome["outcome"] == "aborted":
+                emit_alert(
+                    self._logger,
+                    "aws.cancel_aborted",
+                    f"Aborted {provider_api} {outcome['resource_id']}",
+                    resource_type=provider_api,
+                    resource_id=outcome["resource_id"],
+                    request_id=request_id,
+                    region=region_of(self._aws_client),
+                    level="info",
+                )
+
+        try:
+            for outcome in outcomes:
+                outcome["members"] = await asyncio.to_thread(
+                    self._list_live_members, provider_api, outcome["resource_id"]
+                )
+        except Exception as e:
+            return ProviderResult.error_result(
+                f"Aborted the resources but could not list their instances: {e}",
+                "CANCEL_PROVISIONING_LISTING_FAILED",
+            ).model_copy(update={"data": data})
+
+        return ProviderResult.success_result(data, {"operation": "cancel_provisioning"})
+
+    def _list_live_members(self, provider_api: str, resource_id: str) -> list[str]:
+        """Return the live instances launched by a resource, using read-only describes.
+
+        The listing is by tag (or reservation id), so it also finds instances the
+        resource launched after the request was last synced. A describe that lags
+        behind a very recent launch is covered by the return flow terminating
+        idempotently on a retry.
+        """
+        filter_name = self._MEMBER_FILTERS.get(provider_api)
+        if filter_name is None:
+            return []
+        filters = [
+            {"Name": filter_name, "Values": [resource_id]},
+            {"Name": "instance-state-name", "Values": self._LIVE_INSTANCE_STATES},
+        ]
+        instance_ids: list[str] = []
+        next_token: Optional[str] = None
+        while True:
+            kwargs: dict[str, Any] = {"Filters": filters}
+            if next_token:
+                kwargs["NextToken"] = next_token
+            response = self._call(
+                self._aws_client.ec2_client.describe_instances,
+                "describe_instances",
+                operation_type="read_only",
+                **kwargs,
+            )
+            for reservation in response.get("Reservations", []):
+                for instance in reservation.get("Instances", []):
+                    if instance.get("InstanceId"):
+                        instance_ids.append(instance["InstanceId"])
+            next_token = response.get("NextToken")
+            if not isinstance(next_token, str) or not next_token:
+                return instance_ids
+
     def terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
         """Handle instance termination operation."""
         try:
@@ -191,7 +331,11 @@ class AWSInstanceOperationService:
 
             # Fallback to direct termination
             outcome = terminate_skipping_missing(
-                lambda ids: self._aws_client.ec2_client.terminate_instances(InstanceIds=ids),
+                lambda ids: self._call(
+                    self._aws_client.ec2_client.terminate_instances,
+                    "terminate_instances",
+                    InstanceIds=ids,
+                ),
                 instance_ids,
             )
             terminated_count = len(outcome["TerminatingInstances"]) + len(
@@ -274,8 +418,16 @@ class AWSInstanceOperationService:
         def is_not_found(exc: ClientError) -> bool:
             return exc.response.get("Error", {}).get("Code") == "InvalidInstanceID.NotFound"
 
+        def describe(**kwargs):
+            return self._call(
+                ec2.describe_instances,
+                "describe_instances",
+                operation_type="read_only",
+                **kwargs,
+            )
+
         try:
-            return list(ec2.describe_instances(InstanceIds=instance_ids)["Reservations"])
+            return list(describe(InstanceIds=instance_ids)["Reservations"])
         except ClientError as exc:
             if not is_not_found(exc):
                 raise
@@ -287,7 +439,7 @@ class AWSInstanceOperationService:
             if not remaining:
                 return []
             try:
-                return list(ec2.describe_instances(InstanceIds=remaining)["Reservations"])
+                return list(describe(InstanceIds=remaining)["Reservations"])
             except ClientError as exc:
                 if not is_not_found(exc):
                     raise
@@ -296,7 +448,12 @@ class AWSInstanceOperationService:
         size = self._STATUS_FILTER_BATCH_SIZE
         for start in range(0, len(instance_ids), size):
             batch = instance_ids[start : start + size]
-            response = ec2.describe_instances(Filters=[{"Name": "instance-id", "Values": batch}])
+            response = self._call(
+                ec2.describe_instances,
+                "describe_instances",
+                operation_type="read_only",
+                Filters=[{"Name": "instance-id", "Values": batch}],
+            )
             reservations.extend(response["Reservations"])
         return reservations
 
@@ -308,7 +465,11 @@ class AWSInstanceOperationService:
                 return ProviderResult.error_result(
                     "Instance IDs are required for start operation", "MISSING_INSTANCE_IDS"
                 )
-            response = self._aws_client.ec2_client.start_instances(InstanceIds=instance_ids)
+            response = self._call(
+                self._aws_client.ec2_client.start_instances,
+                "start_instances",
+                InstanceIds=instance_ids,
+            )
             results = {}
             for instance in response.get("StartingInstances", []):
                 instance_id = instance["InstanceId"]
@@ -331,7 +492,11 @@ class AWSInstanceOperationService:
                 return ProviderResult.error_result(
                     "Instance IDs are required for stop operation", "MISSING_INSTANCE_IDS"
                 )
-            response = self._aws_client.ec2_client.stop_instances(InstanceIds=instance_ids)
+            response = self._call(
+                self._aws_client.ec2_client.stop_instances,
+                "stop_instances",
+                InstanceIds=instance_ids,
+            )
             results = {}
             for instance in response.get("StoppingInstances", []):
                 instance_id = instance["InstanceId"]

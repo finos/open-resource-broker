@@ -1,7 +1,7 @@
 """Unit tests for AWSRequestAdapter.
 
-Covers get_request_status, terminate_instances, and cancel_fleet_request
-across all provider API types and error paths.
+Covers get_request_status and terminate_instances across all provider API
+types and error paths.
 
 All AWS client calls are replaced with MagicMock — no real AWS connections.
 """
@@ -23,10 +23,10 @@ def _client_error(code: str, message: str = "some message") -> ClientError:
     return ClientError({"Error": {"Code": code, "Message": message}}, "Op")
 
 
-def _make_adapter(handler_factory=None):
+def _make_adapter():
     aws_client = MagicMock()
     logger = MagicMock()
-    return AWSRequestAdapter(aws_client=aws_client, logger=logger, handler_factory=handler_factory)
+    return AWSRequestAdapter(aws_client=aws_client, logger=logger)
 
 
 def _make_request(
@@ -436,116 +436,3 @@ class TestTerminateInstances:
         result = adapter.terminate_instances(["i-001"])
         assert result["status"] == "error"
         assert "bang" in result["message"]
-
-
-# ---------------------------------------------------------------------------
-# cancel_fleet_request — precondition checks
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestCancelFleetRequestPreconditions:
-    def test_missing_provider_api_returns_error(self):
-        adapter = _make_adapter()
-        req = _make_request(provider_api=None, resource_id="res-001")
-        result = adapter.cancel_fleet_request(req)
-        assert result["status"] == "error"
-        assert "provider API" in result["message"]
-
-    def test_missing_resource_id_returns_error(self):
-        adapter = _make_adapter()
-        req = _make_request(provider_api="EC2Fleet", resource_id=None)
-        result = adapter.cancel_fleet_request(req)
-        assert result["status"] == "error"
-        assert "resource ID" in result["message"]
-
-    def test_delegates_to_handler_factory_when_present(self):
-        handler = MagicMock()
-        handler.cancel_resource.return_value = {"status": "success"}
-        factory = MagicMock()
-        factory.create_handler.return_value = handler
-
-        adapter = _make_adapter(handler_factory=factory)
-        req = _make_request(provider_api="EC2Fleet", resource_id="fleet-001")
-        result = adapter.cancel_fleet_request(req)
-        factory.create_handler.assert_called_once_with("EC2Fleet")
-        handler.cancel_resource.assert_called_once()
-        assert result["status"] == "success"
-
-    def test_handler_factory_exception_returns_error(self):
-        factory = MagicMock()
-        factory.create_handler.side_effect = RuntimeError("factory broke")
-        adapter = _make_adapter(handler_factory=factory)
-        req = _make_request(provider_api="EC2Fleet", resource_id="fleet-001")
-        result = adapter.cancel_fleet_request(req)
-        assert result["status"] == "error"
-        assert "factory broke" in result["message"]
-
-
-# ---------------------------------------------------------------------------
-# cancel_fleet_request — _cancel_direct paths
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestCancelDirect:
-    def _req_no_factory(self, provider_api, resource_id="res-001"):
-        return _make_request(provider_api=provider_api, resource_id=resource_id)
-
-    def test_ec2_fleet_cancel_returns_success(self):
-        adapter = _make_adapter()  # no handler_factory
-        adapter._aws_client.ec2_client.delete_fleets.return_value = {
-            "SuccessfulFleetDeletions": [{"FleetId": "fleet-001"}],
-            "UnsuccessfulFleetDeletions": [],
-        }
-        req = self._req_no_factory("EC2Fleet", "fleet-001")
-        result = adapter.cancel_fleet_request(req)
-        assert result["status"] == "success"
-        assert "fleet-001" in result["successful_fleets"]
-
-    def test_ec2_fleet_with_unsuccessful_deletions(self):
-        adapter = _make_adapter()
-        adapter._aws_client.ec2_client.delete_fleets.return_value = {
-            "SuccessfulFleetDeletions": [],
-            "UnsuccessfulFleetDeletions": [
-                {"FleetId": "fleet-bad", "Error": {"Message": "already deleted"}}
-            ],
-        }
-        req = self._req_no_factory("EC2Fleet", "fleet-bad")
-        result = adapter.cancel_fleet_request(req)
-        assert result["status"] == "success"
-        assert len(result["unsuccessful_fleets"]) == 1
-
-    def test_spot_fleet_cancel_returns_success(self):
-        adapter = _make_adapter()
-        adapter._aws_client.ec2_client.cancel_spot_fleet_requests.return_value = {
-            "SuccessfulFleetRequests": [{"SpotFleetRequestId": "sfr-001"}],
-            "UnsuccessfulFleetRequests": [],
-        }
-        req = self._req_no_factory("SpotFleet", "sfr-001")
-        result = adapter.cancel_fleet_request(req)
-        assert result["status"] == "success"
-        assert "sfr-001" in result["successful_fleets"]
-
-    def test_asg_cancel_returns_success(self):
-        adapter = _make_adapter()
-        adapter._aws_client.autoscaling_client.delete_auto_scaling_group.return_value = {}
-        req = self._req_no_factory("ASG", "my-asg")
-        result = adapter.cancel_fleet_request(req)
-        assert result["status"] == "success"
-        assert "my-asg" in result["message"]
-
-    def test_unsupported_provider_api_returns_error(self):
-        adapter = _make_adapter()
-        req = self._req_no_factory("FancyCloud", "res-001")
-        result = adapter.cancel_fleet_request(req)
-        assert result["status"] == "error"
-        assert "Unsupported" in result["message"]
-
-    def test_exception_during_direct_cancel_returns_error(self):
-        adapter = _make_adapter()
-        adapter._aws_client.ec2_client.delete_fleets.side_effect = RuntimeError("net err")
-        req = self._req_no_factory("EC2Fleet", "fleet-001")
-        result = adapter.cancel_fleet_request(req)
-        assert result["status"] == "error"
-        assert "net err" in result["message"]

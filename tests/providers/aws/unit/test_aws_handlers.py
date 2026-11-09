@@ -872,7 +872,7 @@ class TestEC2FleetHandler:
 
         # Mock capacity lookup calls to avoid Moto fleet state issues
         handler._retry_with_backoff = lambda func, **kwargs: func(
-            **{k: v for k, v in kwargs.items() if k != "operation_type"}
+            **{k: v for k, v in kwargs.items() if k not in ("operation_type", "operation_name")}
         )
         from typing import Any
 
@@ -1633,7 +1633,7 @@ class TestSpotFleetHandler:
         }
 
         handler._retry_with_backoff = lambda func, **kwargs: func(
-            **{k: v for k, v in kwargs.items() if k != "operation_type"}
+            **{k: v for k, v in kwargs.items() if k not in ("operation_type", "operation_name")}
         )
         from typing import Any
 
@@ -1743,7 +1743,7 @@ class TestSpotFleetHandler:
 
         # Avoid real AWS calls for nonexistent fleet IDs
         handler._retry_with_backoff = lambda func, **kwargs: func(
-            **{k: v for k, v in kwargs.items() if k != "operation_type"}
+            **{k: v for k, v in kwargs.items() if k not in ("operation_type", "operation_name")}
         )
         cast(Any, handler.aws_client.ec2_client).modify_spot_fleet_request = Mock()  # type: ignore[misc]
         cast(Any, handler.aws_client.ec2_client).cancel_spot_fleet_requests = Mock()  # type: ignore[misc]
@@ -1810,7 +1810,7 @@ class TestSpotFleetHandler:
             handler._release_manager,
             "_retry",
             lambda func, **kwargs: func(
-                **{k: v for k, v in kwargs.items() if k != "operation_type"}
+                **{k: v for k, v in kwargs.items() if k not in ("operation_type", "operation_name")}
             ),
         )
 

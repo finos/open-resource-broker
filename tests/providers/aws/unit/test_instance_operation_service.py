@@ -1,7 +1,7 @@
 """Unit tests for AWSInstanceOperationService — terminate, status, start, stop."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -144,7 +144,8 @@ class TestGetInstanceStatus:
         svc = _make_service()
         svc._aws_client.ec2_client.describe_instances.side_effect = RuntimeError("aws err")
         op = _op(ProviderOperationType.GET_INSTANCE_STATUS, {"instance_ids": ["i-001"]})
-        result = svc.get_instance_status(op)
+        with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
+            result = svc.get_instance_status(op)
         assert not result.success
         assert result.error_code == "GET_INSTANCE_STATUS_ERROR"
 
@@ -194,7 +195,8 @@ class TestStartInstances:
         svc = _make_service()
         svc._aws_client.ec2_client.start_instances.side_effect = RuntimeError("aws err")
         op = _op(ProviderOperationType.START_INSTANCES, {"instance_ids": ["i-001"]})
-        result = svc.start_instances(op)
+        with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
+            result = svc.start_instances(op)
         assert not result.success
         assert result.error_code == "START_INSTANCES_ERROR"
 
@@ -244,7 +246,8 @@ class TestStopInstances:
         svc = _make_service()
         svc._aws_client.ec2_client.stop_instances.side_effect = RuntimeError("aws err")
         op = _op(ProviderOperationType.STOP_INSTANCES, {"instance_ids": ["i-001"]})
-        result = svc.stop_instances(op)
+        with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
+            result = svc.stop_instances(op)
         assert not result.success
         assert result.error_code == "STOP_INSTANCES_ERROR"
 

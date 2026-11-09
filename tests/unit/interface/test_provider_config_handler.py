@@ -603,3 +603,41 @@ class TestHandleProviderShow:
             result = await handle_provider_show(_show_args3)
 
         assert exit_code(result) == 1
+
+
+@pytest.mark.unit
+class TestHandleProviderShowSupportedOperations:
+    @pytest.mark.asyncio
+    async def test_show_lists_the_operations_the_provider_declares(self, tmp_path):
+        from unittest.mock import MagicMock as _MG
+
+        from orb.application.dto.interface_response import InterfaceResponse
+        from orb.domain.base.operations import OperationType
+        from orb.domain.base.ports import ProviderSelectionPort
+        from orb.interface.provider_config_handler import handle_provider_show
+        from orb.interface.response_formatting_service import ResponseFormattingService
+
+        formatter = _MG(spec=ResponseFormattingService)
+        formatter.format_provider_detail.return_value = InterfaceResponse(
+            data={"name": "aws-default", "type": "aws"}
+        )
+        port = _MG()
+        port.get_strategy_capabilities.return_value = _MG(
+            supported_operations=[OperationType.CLEANUP_ORPHANED_RESOURCES]
+        )
+        container = _MG()
+        container.get.side_effect = lambda t: {
+            ResponseFormattingService: formatter,
+            ProviderSelectionPort: port,
+        }.get(t, _MG())
+
+        _write_config(tmp_path, _base_config())
+        with patch(
+            "orb.interface.provider_config_handler.get_config_location", return_value=tmp_path
+        ):
+            args = _ns(provider_name="aws-default")
+            args._container = container
+            result = await handle_provider_show(args)
+
+        assert isinstance(result, InterfaceResponse)
+        assert result.data["supported_operations"] == ["cleanup_orphaned_resources"]

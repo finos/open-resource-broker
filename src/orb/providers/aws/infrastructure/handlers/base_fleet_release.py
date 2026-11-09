@@ -14,8 +14,10 @@ The flow implemented here:
 6. Decide whether to cancel/delete the fleet:
    - Request-type: call _fleet_has_no_remaining_instances as an
      eventual-consistency guard before deleting.
-   - Maintain-type: is_full_return=True → delete directly; secondary
-     _fleet_has_no_remaining_instances check for weighted-capacity edge case.
+   - Maintain-type: is_full_return=True → delete only when
+     _fleet_has_no_remaining_instances confirms nothing outside the returned
+     set is still running (the delete terminates every member); the same
+     check is the fallback for the weighted-capacity edge case.
    - Instant-type (has_fleet_record=False): always attempt deletion.
 7. Clean up the associated ORB launch template.
 
@@ -76,8 +78,12 @@ class BaseFleetReleaseManager(ABC):
         instance_ids: list[str],
         fleet_details: dict[str, Any],
         request_id: str = "",
-    ) -> None:
+    ) -> bool:
         """Release hosts for a single fleet with proper fleet lifecycle management.
+
+        A fleet that is already deleted or cancelled is never modified or deleted
+        again: capacity reduction and the fleet delete are skipped, the named
+        instances are still terminated and the launch template is still tidied.
 
         Args:
             fleet_id: The fleet identifier (EC2 Fleet ID or Spot Fleet request ID).
@@ -87,6 +93,9 @@ class BaseFleetReleaseManager(ABC):
                 to trigger a live fetch via :meth:`_fetch_fleet_details`.
             request_id: ORB request ID used for launch-template cleanup when
                 the fleet record is no longer available (instant-fleet case).
+
+        Returns:
+            True when the fleet was already deleted or cancelled before this call.
         """
         fleet_label = self._fleet_label()
         self._logger.info(
@@ -98,6 +107,13 @@ class BaseFleetReleaseManager(ABC):
                 fleet_details = self._fetch_fleet_details(fleet_id)
 
             request_id = self._resolve_request_id(fleet_details, request_id)
+            already_gone = self._is_fleet_terminal(fleet_details)
+
+            if already_gone:
+                self._release_from_terminal_fleet(
+                    fleet_id, instance_ids, fleet_details, request_id, fleet_label
+                )
+                return True
 
             capacity_input, extra = self._extract_capacity_input(
                 fleet_id, fleet_details, instance_ids
@@ -146,10 +162,71 @@ class BaseFleetReleaseManager(ABC):
                     )
                 else:
                     self._cleanup_launch_template(fleet_details, request_id, member_ids)
+            return False
 
         except Exception as exc:
             self._logger.error("Failed to terminate %s %s: %s", fleet_label, fleet_id, exc)
             raise
+
+    def _release_from_terminal_fleet(
+        self,
+        fleet_id: str,
+        instance_ids: list[str],
+        fleet_details: dict[str, Any],
+        request_id: str,
+        fleet_label: str,
+    ) -> None:
+        """Release instances of a fleet that is already deleted or cancelled.
+
+        The fleet must not be modified or deleted again: a modify on a deleted
+        fleet fails, and the delete has already happened. The named instances
+        are terminated directly and the launch template is tidied.
+        """
+        self._logger.info(
+            "%s %s is already deleted or cancelled; skipping capacity reduction and fleet deletion",
+            fleet_label,
+            fleet_id,
+        )
+        if instance_ids:
+            self._terminate_instances(fleet_id, instance_ids)
+            self._logger.info("Terminated %s %s instances: %s", fleet_label, fleet_id, instance_ids)
+            self._cleanup_launch_template(fleet_details, request_id, instance_ids)
+            return
+        member_ids = self._list_fleet_instance_ids(fleet_id)
+        if self._fleet_instances_still_running(fleet_details):
+            # The fleet was deleted without terminating its instances, so they keep
+            # running and billing. Ask for them to be terminated again, then terminate
+            # the members directly in case the repeated request is ignored.
+            try:
+                self._cancel_or_delete_fleet(fleet_id, terminate_instances=True)
+            except Exception as exc:
+                self._logger.warning(
+                    "Could not re-issue the delete of %s %s with termination: %s",
+                    fleet_label,
+                    fleet_id,
+                    exc,
+                )
+            if member_ids is None:
+                raise AWSInfrastructureError(
+                    f"{fleet_label} {fleet_id} was deleted without terminating its instances "
+                    "and they could not be listed; they may still be running"
+                )
+            if member_ids:
+                self._terminate_instances(fleet_id, member_ids)
+                self._logger.info(
+                    "Terminated instances of %s %s left running: %s",
+                    fleet_label,
+                    fleet_id,
+                    member_ids,
+                )
+        if member_ids is None:
+            self._logger.warning(
+                "Skipping launch template cleanup for %s %s (members unknown)",
+                fleet_label,
+                fleet_id,
+            )
+        else:
+            self._cleanup_launch_template(fleet_details, request_id, member_ids)
 
     # ------------------------------------------------------------------
     # Shared helpers (non-abstract)
@@ -168,9 +245,11 @@ class BaseFleetReleaseManager(ABC):
         the _fleet_has_no_remaining_instances guard is consulted to prevent
         stranding running instances due to AWS API eventual-consistency lag.
 
-        For maintain-type fleets the secondary guard is only used when capacity
-        arithmetic alone says partial (is_full_return=False) but the fleet may
-        be physically empty — a weighted-capacity edge case.
+        For maintain-type fleets the same guard gates a full return, since the
+        maintain delete terminates every member and the target can be below the
+        live count. It is also used when capacity arithmetic alone says partial
+        (is_full_return=False) but the fleet may be physically empty — a
+        weighted-capacity edge case.
 
         Instant fleets (has_fleet_record=False) bypass this logic entirely and
         are handled unconditionally in _handle_post_terminate.
@@ -187,6 +266,21 @@ class BaseFleetReleaseManager(ABC):
             if should_teardown:
                 self._logger.info(
                     "%s %s has no remaining active instances; cancelling/deleting request-type fleet",
+                    fleet_label,
+                    fleet_id,
+                )
+        elif should_teardown and decision.has_fleet_record and decision.requires_capacity_reduction:
+            # Maintain-type full return by arithmetic. The target can sit below the
+            # live count (no-termination capacity reductions, returned instances the
+            # fleet no longer lists), and the maintain delete terminates every member,
+            # so only delete when nothing outside the returned set is still running.
+            # Otherwise the fleet stays at its reduced target, which keeps the other
+            # instances and launches nothing; their own return deletes the fleet.
+            should_teardown = self._fleet_has_no_remaining_instances(fleet_id, set(instance_ids))
+            if not should_teardown:
+                self._logger.warning(
+                    "%s %s still has instances outside the returned set; "
+                    "keeping the maintain fleet instead of deleting it",
                     fleet_label,
                     fleet_id,
                 )
@@ -320,6 +414,17 @@ class BaseFleetReleaseManager(ABC):
     @abstractmethod
     def _fleet_label(self) -> str:
         """Return a human-readable fleet type label for log messages (e.g. "Spot Fleet")."""
+
+    def _is_fleet_terminal(self, fleet_details: dict[str, Any]) -> bool:
+        """Return True when the described fleet is already deleted or cancelled.
+
+        Fleet types override this; the default treats every fleet as live.
+        """
+        return False
+
+    def _fleet_instances_still_running(self, fleet_details: dict[str, Any]) -> bool:
+        """Return True when the fleet was deleted or cancelled but kept its instances running."""
+        return False
 
     @abstractmethod
     def _fetch_fleet_details(self, fleet_id: str) -> dict[str, Any]:

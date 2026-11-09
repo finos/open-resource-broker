@@ -47,6 +47,8 @@ class AWSCapabilityService:
                 ProviderOperationType.TAG_INSTANCES,
                 ProviderOperationType.CLEANUP_MACHINE_RESOURCES,
                 ProviderOperationType.GET_MACHINE_HEALTH,
+                ProviderOperationType.CANCEL_PROVISIONING,
+                ProviderOperationType.CLEANUP_ORPHANED_RESOURCES,
             ],
             supported_apis=supported_apis,
             features={

@@ -232,6 +232,12 @@ Releases follow the shared fleet release flow, with the branch determined by fle
 
 Cancelling a request with no instances named cancels the whole fleet and terminates whatever it holds.
 
+When a `maintain` fleet shrinks, ORB passes `ExcessCapacityTerminationPolicy: NoTermination` to `modify_spot_fleet_request`, and reads the current target again immediately before lowering it. The returned instances are terminated explicitly, and only those, so the fleet does not terminate an extra instance and then launch a replacement. As for EC2 Fleet, this narrows rather than closes the window in which two returns on one fleet overwrite each other. A fleet that is already cancelled is not modified or cancelled again by a later return.
+
+## Cancelling a request
+
+Cancelling a request that is still being fulfilled calls `cancel_spot_fleet_requests` with `TerminateInstances: true`, which cancels pending requests and terminates the instances already launched (`cancelled_terminating`). A request AWS reports as not cancellable counts as stopped only when a describe confirms it is cancelled. Instances still attached afterwards are found with the `aws:ec2spot:fleet-request-id` tag and returned with the recorded machines.
+
 ## IAM permissions
 
 ```json

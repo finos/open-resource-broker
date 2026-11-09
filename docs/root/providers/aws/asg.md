@@ -214,7 +214,11 @@ Returning instances from an ASG is more involved than terminating them, because 
 4. **Clamp `MinSize`.** The group is re-described to read live `DesiredCapacity`, and `MinSize` is lowered if it now exceeds it.
 5. **Delete when empty.** `DesiredCapacity` of zero means the group is empty, so ORB deletes the ASG (`ForceDelete: true`) and cleans up the launch template.
 
-Cancelling a request deletes the ASG directly.
+## Cancelling a request
+
+Cancelling a request that is still being fulfilled scales the group to `MinSize: 0` and `DesiredCapacity: 0`, which narrows the window in which an in-flight scale-out launches instances, and then force-deletes it. The scale-down is best effort because the force delete follows. A group that is absent or already `Delete in progress` counts as stopped and is not touched again. A group whose lifecycle hooks hold instances in `Terminating:Wait` stays in `Delete in progress` until the hook heartbeat times out, and those instances can keep billing until then. Instances still attached afterwards are found with the `aws:autoscaling:groupName` tag and returned with the recorded machines.
+
+A later return of instances that belonged to a group that is being deleted or is gone terminates them directly and does not detach them from the group.
 
 A separate pre-termination path (`reduce_capacity`) lowers `DesiredCapacity` and `MinSize` before instances are terminated by other means. Every failure in that path is warning-only, so a capacity-reduction hiccup never blocks a return.
 

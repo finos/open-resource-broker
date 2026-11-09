@@ -26,6 +26,7 @@ Note:
     that can benefit from significant cost savings through Spot pricing.
 """
 
+import uuid
 from typing import Any, Optional
 
 from orb.domain.base.ports import LoggingPort
@@ -192,10 +193,15 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             lt_version=launch_template_result.version,
         )
 
+        # One idempotency token per logical call, reused by every retry attempt. For
+        # Spot Fleet it belongs inside SpotFleetRequestConfig, not at the top level.
+        fleet_config.setdefault("ClientToken", uuid.uuid4().hex)
+
         # Request spot fleet with circuit breaker for critical operation
         response = self._retry_with_backoff(
             self.aws_client.ec2_client.request_spot_fleet,
             operation_type="critical",
+            operation_name="request_spot_fleet",
             SpotFleetRequestConfig=fleet_config,
         )
 
@@ -712,8 +718,12 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             Dictionary with ``status`` of ``"success"`` or ``"error"``.
         """
         try:
-            self._release_manager.release(resource_id, [], {}, request_id=request_id)
-            return {"status": "success", "message": f"Spot Fleet {resource_id} cancelled"}
+            already_gone = self._release_manager.release(resource_id, [], {}, request_id=request_id)
+            return {
+                "status": "success",
+                "already_gone": already_gone is True,
+                "message": f"Spot Fleet {resource_id} cancelled",
+            }
         except Exception as e:
             emit_alert(
                 self._logger,

@@ -204,7 +204,7 @@ class TestAWSAPIErrors:
             # Moto may raise on terminate of non-existent IDs — that is acceptable
             # as long as it is a known AWS error, not an unhandled internal crash.
             msg = str(exc).lower()
-            assert "invalidinstanceid" in msg or "does not exist" in msg
+            assert "invalidinstanceid" in msg or "does not exist" in msg or "do not exist" in msg
 
     def test_check_hosts_status_nonexistent_asg_returns_empty(self, asg_handler):
         """check_hosts_status for a non-existent ASG returns [] without crashing."""

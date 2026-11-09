@@ -77,7 +77,9 @@ def _make_machine_handler(
     if selection_result is None:
         selection_result = MagicMock()
     if provisioning_result is None:
-        provisioning_result = SimpleNamespace(success=True, errors=[])
+        provisioning_result = SimpleNamespace(
+            success=True, errors=[], cancelled=False, resource_ids=[], machine_ids=[]
+        )
 
     uow_factory = _make_uow_factory(request_agg)
     query_bus = AsyncMock()
@@ -85,6 +87,7 @@ def _make_machine_handler(
 
     provisioning_service = AsyncMock()
     provisioning_service.execute_provisioning = AsyncMock(return_value=provisioning_result)
+    provisioning_service.abort_if_cancelled = AsyncMock(return_value=False)
 
     provider_validation = AsyncMock()
     provider_validation.select_and_validate_provider = AsyncMock(return_value=selection_result)
@@ -272,7 +275,9 @@ class TestCreateMachineRequestHandlerProvisioning:
     async def test_execute_command_calls_status_update_with_provisioning_result(self):
         request_agg = _make_request_aggregate()
         request_agg.metadata = {}
-        prov_result = SimpleNamespace(success=True, errors=[])
+        prov_result = SimpleNamespace(
+            success=True, errors=[], cancelled=False, resource_ids=[], machine_ids=[]
+        )
         handler, _ = _make_machine_handler(request_agg=request_agg, provisioning_result=prov_result)
 
         cmd = CreateRequestCommand(template_id=_TEMPLATE_ID, requested_count=1)
@@ -1306,6 +1311,43 @@ class TestMachinesAreReleasedAfterFailedReturn:
         await handler._execute_deprovisioning_for_request(["vm-3"], request, "aws")
 
         assert store["vm-3"].return_request_id == "ret-other"
+
+
+@pytest.mark.unit
+class TestCancelDuringCreation:
+    @pytest.mark.asyncio
+    async def test_a_result_flagged_cancelled_keeps_the_stored_status(self):
+        prov_result = SimpleNamespace(
+            success=True, errors=[], cancelled=True, resource_ids=["fleet-1"], machine_ids=[]
+        )
+        handler, _ = _make_machine_handler(provisioning_result=prov_result)
+        persisted = []
+        handler._persist_and_publish = AsyncMock(side_effect=lambda r: persisted.append(r))  # type: ignore[method-assign]
+
+        await handler.execute_command(
+            CreateRequestCommand(template_id=_TEMPLATE_ID, requested_count=1)
+        )
+
+        handler._status_service.update_request_from_provisioning.assert_not_awaited()  # type: ignore[attr-defined]
+        # Only the initial persist (before provisioning) happened; no final overwrite.
+        assert len(persisted) == 1
+
+    @pytest.mark.asyncio
+    async def test_a_cancel_after_the_last_checkpoint_is_not_overwritten_by_the_final_persist(self):
+        prov_result = SimpleNamespace(
+            success=True, errors=[], cancelled=False, resource_ids=["fleet-1"], machine_ids=[]
+        )
+        handler, _ = _make_machine_handler(provisioning_result=prov_result)
+        handler._provisioning_service.abort_if_cancelled = AsyncMock(return_value=True)  # type: ignore[attr-defined]
+        persisted = []
+        handler._persist_and_publish = AsyncMock(side_effect=lambda r: persisted.append(r))  # type: ignore[method-assign]
+
+        await handler.execute_command(
+            CreateRequestCommand(template_id=_TEMPLATE_ID, requested_count=1)
+        )
+
+        handler._provisioning_service.abort_if_cancelled.assert_awaited_once()  # type: ignore[attr-defined]
+        assert len(persisted) == 1
 
 
 @pytest.mark.unit

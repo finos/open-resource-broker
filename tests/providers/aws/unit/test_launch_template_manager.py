@@ -9,7 +9,7 @@ that was moved out of the base handler to fix architectural violations.
 import os
 import sys
 from typing import cast
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -287,8 +287,9 @@ class TestAWSLaunchTemplateManager:
             operation_name="DescribeLaunchTemplates",
         )
 
-        with pytest.raises(ClientError):
-            self.manager._use_existing_template_strategy(self.aws_template)
+        with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
+            with pytest.raises(ClientError):
+                self.manager._use_existing_template_strategy(self.aws_template)
 
     def test_inspect_lt_networking_has_networking(self):
         """LT version with NetworkInterfaces returns HAS_NETWORKING."""
@@ -345,8 +346,9 @@ class TestAWSLaunchTemplateManager:
             operation_name="DescribeLaunchTemplateVersions",
         )
 
-        with pytest.raises(ClientError):
-            self.manager.inspect_launch_template_networking("lt-x", "$Latest")
+        with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
+            with pytest.raises(ClientError):
+                self.manager.inspect_launch_template_networking("lt-x", "$Latest")
 
     def test_error_handling_wraps_client_error(self):
         """Test that AWS ClientError is wrapped in InfrastructureError."""

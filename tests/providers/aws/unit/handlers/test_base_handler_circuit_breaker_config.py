@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
+from orb.providers.aws.exceptions.aws_exceptions import NetworkError
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
 
 # ---------------------------------------------------------------------------
@@ -53,11 +54,12 @@ def _make_handler(config_port=None) -> _ConcreteHandler:
     )
 
 
-def _make_config_port(failure_threshold: int, recovery_timeout: int):
+def _make_config_port(failure_threshold: int, recovery_timeout: int, half_open_timeout: int = 30):
     """Build a mock ConfigurationPort with circuit_breaker fields set."""
     cb = MagicMock()
     cb.failure_threshold = failure_threshold
     cb.recovery_timeout = recovery_timeout
+    cb.half_open_timeout = half_open_timeout
 
     app_config = MagicMock()
     app_config.circuit_breaker = cb
@@ -95,7 +97,13 @@ class TestGetCircuitBreakerConfigFromPort:
 
         assert result["failure_threshold"] == 10
         assert result["reset_timeout"] == 120  # recovery_timeout → reset_timeout mapping
-        assert result["half_open_timeout"] == 30  # still hardcoded
+        assert result["half_open_timeout"] == 30
+
+    def test_half_open_timeout_is_read_from_config(self):
+        port = _make_config_port(failure_threshold=5, recovery_timeout=60, half_open_timeout=7)
+        handler = _make_handler(config_port=port)
+
+        assert handler._get_circuit_breaker_config()["half_open_timeout"] == 7
 
     def test_custom_values_are_reflected(self):
         port = _make_config_port(failure_threshold=3, recovery_timeout=45)
@@ -150,19 +158,27 @@ class TestRetryStrategyConfigCritical:
     def test_critical_uses_config_port_values(self):
         port = _make_config_port(failure_threshold=8, recovery_timeout=90)
         handler = _make_handler(config_port=port)
-        config = handler._get_retry_strategy_config("critical", "ec2")
+        config = handler._get_retry_strategy_config("critical", "ec2", "run_instances")
 
         assert config["strategy"] == "circuit_breaker"
         assert config["failure_threshold"] == 8
         assert config["reset_timeout"] == 90
-        assert config["half_open_timeout"] == 30  # still hardcoded
+        assert config["half_open_timeout"] == 30
+        assert config["count_per_call"] is True
+        assert config["service"].endswith(":run_instances")
 
     def test_critical_uses_defaults_when_no_config_port(self):
         handler = _make_handler(config_port=None)
-        config = handler._get_retry_strategy_config("critical", "ec2")
+        config = handler._get_retry_strategy_config("critical", "ec2", "run_instances")
 
         assert config["failure_threshold"] == 5
         assert config["reset_timeout"] == 60
+
+    def test_critical_requires_an_operation_name(self):
+        handler = _make_handler(config_port=None)
+
+        with pytest.raises(ValueError):
+            handler._get_retry_strategy_config("critical", "ec2")
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +264,7 @@ class TestRetryRuntimeBehaviour:
         assert sleep.call_count == 0
 
     def test_circuit_opens_after_failure_threshold(self):
-        """Critical operations trip the circuit breaker OPEN once the threshold is hit."""
+        """Critical operations trip the breaker after the threshold of exhausted calls."""
         from orb.infrastructure.resilience.exceptions import CircuitBreakerOpenError
         from orb.infrastructure.resilience.strategy.circuit_breaker import (
             CircuitBreakerStrategy,
@@ -257,15 +273,20 @@ class TestRetryRuntimeBehaviour:
 
         port = _make_config_port(failure_threshold=3, recovery_timeout=60)
         handler = _make_handler(config_port=port)
-
-        def always_fail():
-            raise _service_unavailable()
+        func = MagicMock(side_effect=_service_unavailable())
+        func.__name__ = "run_instances"
 
         with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
+            for _ in range(3):
+                with pytest.raises(NetworkError):
+                    handler._retry_with_backoff(func, operation_type="critical")
+            calls_before = func.call_count
             with pytest.raises(CircuitBreakerOpenError):
-                handler._retry_with_backoff(always_fail, operation_type="critical")
+                handler._retry_with_backoff(func, operation_type="critical")
 
-        service = handler._get_service_name()
-        circuit = CircuitBreakerStrategy._circuit_states[service]
+        # The fourth call is rejected before the function is invoked.
+        assert func.call_count == calls_before
+        key = handler._call_executor.circuit_breaker_key("run_instances")
+        circuit = CircuitBreakerStrategy._circuit_states[key]
         assert circuit["state"] == CircuitState.OPEN
-        assert circuit["failure_count"] >= 3
+        assert circuit["failure_count"] == 3

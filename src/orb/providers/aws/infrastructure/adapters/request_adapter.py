@@ -6,7 +6,7 @@ It extracts AWS-specific logic from the domain layer.
 """
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any
 
 from botocore.exceptions import ClientError
 
@@ -16,33 +16,40 @@ from orb.domain.request.value_objects import RequestType
 from orb.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.aws.infrastructure.aws_client import AWSClient
+from orb.providers.aws.resilience.call_executor import AWSCallExecutor
 from orb.providers.aws.utilities.terminate_instances import terminate_skipping_missing
-
-if TYPE_CHECKING:
-    from orb.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
 
 
 @injectable
 class AWSRequestAdapter(RequestAdapterPort):
     """Adapter for AWS-specific request operations."""
 
-    def __init__(
-        self,
-        aws_client: AWSClient,
-        logger: LoggingPort,
-        handler_factory: Optional["AWSHandlerFactory"] = None,
-    ) -> None:
+    def __init__(self, aws_client: AWSClient, logger: LoggingPort) -> None:
         """
         Initialize the adapter.
 
         Args:
             aws_client: AWS client instance
             logger: Logger for logging messages
-            handler_factory: Optional handler factory for delegating cancel operations
         """
         self._aws_client = aws_client
         self._logger = logger
-        self._handler_factory = handler_factory
+        self._executor = AWSCallExecutor.for_client(aws_client, "request_adapter", logger)
+
+    def _call(self, func, operation_name: str, operation_type: str = "read_only", **kwargs):
+        """Run one AWS call through the shared retry framework.
+
+        The original ``ClientError`` is preserved: this adapter reports failures
+        as result dicts built from the AWS error text.
+        """
+        return self._executor.execute(
+            func,
+            operation_type=operation_type,
+            operation_name=operation_name,
+            preserve_client_error=True,
+            log_response=False,
+            **kwargs,
+        )
 
     def get_request_status(self, request: Request) -> dict[str, Any]:
         """
@@ -110,7 +117,11 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with status information
         """
         try:
-            response = self._aws_client.ec2_client.describe_fleets(FleetIds=[request.resource_id])
+            response = self._call(
+                self._aws_client.ec2_client.describe_fleets,
+                "describe_fleets",
+                FleetIds=[request.resource_id],
+            )
 
             if not response["Fleets"]:
                 return {
@@ -121,8 +132,10 @@ class AWSRequestAdapter(RequestAdapterPort):
             fleet = response["Fleets"][0]
 
             # Get instance information
-            instances_response = self._aws_client.ec2_client.describe_fleet_instances(
-                FleetId=request.resource_id
+            instances_response = self._call(
+                self._aws_client.ec2_client.describe_fleet_instances,
+                "describe_fleet_instances",
+                FleetId=request.resource_id,
             )
 
             return {
@@ -161,8 +174,10 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with status information
         """
         try:
-            response = self._aws_client.ec2_client.describe_spot_fleet_requests(
-                SpotFleetRequestIds=[request.resource_id]
+            response = self._call(
+                self._aws_client.ec2_client.describe_spot_fleet_requests,
+                "describe_spot_fleet_requests",
+                SpotFleetRequestIds=[request.resource_id],
             )
 
             if not response["SpotFleetRequestConfigs"]:
@@ -174,8 +189,10 @@ class AWSRequestAdapter(RequestAdapterPort):
             fleet = response["SpotFleetRequestConfigs"][0]
 
             # Get instance information
-            instances_response = self._aws_client.ec2_client.describe_spot_fleet_instances(
-                SpotFleetRequestId=request.resource_id
+            instances_response = self._call(
+                self._aws_client.ec2_client.describe_spot_fleet_instances,
+                "describe_spot_fleet_instances",
+                SpotFleetRequestId=request.resource_id,
             )
 
             return {
@@ -212,8 +229,10 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with status information
         """
         try:
-            response = self._aws_client.autoscaling_client.describe_auto_scaling_groups(
-                AutoScalingGroupNames=[request.resource_id]
+            response = self._call(
+                self._aws_client.autoscaling_client.describe_auto_scaling_groups,
+                "describe_auto_scaling_groups",
+                AutoScalingGroupNames=[request.resource_id],
             )
 
             if not response["AutoScalingGroups"]:
@@ -261,7 +280,11 @@ class AWSRequestAdapter(RequestAdapterPort):
 
             instance_ids = request.resource_id.split(",")
 
-            response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
+            response = self._call(
+                self._aws_client.ec2_client.describe_instances,
+                "describe_instances",
+                InstanceIds=instance_ids,
+            )
 
             instances = []
             for reservation in response["Reservations"]:
@@ -306,7 +329,11 @@ class AWSRequestAdapter(RequestAdapterPort):
 
             instance_ids = request.resource_id.split(",")
 
-            response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
+            response = self._call(
+                self._aws_client.ec2_client.describe_instances,
+                "describe_instances",
+                InstanceIds=instance_ids,
+            )
 
             instances = []
             for reservation in response["Reservations"]:
@@ -346,7 +373,12 @@ class AWSRequestAdapter(RequestAdapterPort):
         """
         try:
             outcome = terminate_skipping_missing(
-                lambda ids: self._aws_client.ec2_client.terminate_instances(InstanceIds=ids),
+                lambda ids: self._call(
+                    self._aws_client.ec2_client.terminate_instances,
+                    "terminate_instances",
+                    operation_type="standard",
+                    InstanceIds=ids,
+                ),
                 instance_ids,
             )
             if outcome["already_terminated"]:
@@ -380,107 +412,4 @@ class AWSRequestAdapter(RequestAdapterPort):
             return {
                 "status": "error",
                 "message": f"Failed to terminate instances: {e!s}",
-            }
-
-    def cancel_fleet_request(self, request: Request) -> dict[str, Any]:
-        """
-        Cancel fleet request.
-
-        Delegates to the appropriate handler's cancel_resource method when a
-        handler factory is available. Falls back to direct AWS API calls
-        otherwise.
-
-        Args:
-            request: Request domain entity
-
-        Returns:
-            Dictionary with cancellation results
-        """
-        if not request.provider_api:
-            return {
-                "status": "error",
-                "message": "No provider API specified on request",
-            }
-
-        if not request.resource_id:
-            return {
-                "status": "error",
-                "message": "No resource ID specified on request",
-            }
-
-        if self._handler_factory is not None:
-            try:
-                handler = self._handler_factory.create_handler(request.provider_api)
-                return handler.cancel_resource(
-                    resource_id=request.resource_id,
-                    request_id=str(request.request_id) if request.request_id else "",
-                )
-            except Exception as e:
-                self._logger.error("Failed to cancel fleet request via handler: %s", str(e))
-                return {
-                    "status": "error",
-                    "message": f"Failed to cancel fleet request: {e!s}",
-                }
-
-        # Fallback: no handler factory — use direct AWS API calls
-        self._logger.warning(
-            "No handler factory available; using direct AWS API for cancel of %s %s",
-            request.provider_api,
-            request.resource_id,
-        )
-        return self._cancel_direct(request)
-
-    def _cancel_direct(self, request: Request) -> dict[str, Any]:
-        """Cancel a fleet resource via direct AWS API calls (no handler factory)."""
-        try:
-            provider_api = request.provider_api or ""
-            if "EC2Fleet" in provider_api:
-                response = self._aws_client.ec2_client.delete_fleets(
-                    FleetIds=[request.resource_id], TerminateInstances=True
-                )
-                return {
-                    "status": "success",
-                    "successful_fleets": [
-                        fleet["FleetId"] for fleet in response["SuccessfulFleetDeletions"]
-                    ],
-                    "unsuccessful_fleets": [
-                        {"fleet_id": fleet["FleetId"], "error": fleet["Error"]["Message"]}
-                        for fleet in response["UnsuccessfulFleetDeletions"]
-                    ],
-                }
-            elif "SpotFleet" in provider_api:
-                response = self._aws_client.ec2_client.cancel_spot_fleet_requests(
-                    SpotFleetRequestIds=[request.resource_id], TerminateInstances=True
-                )
-                return {
-                    "status": "success",
-                    "successful_fleets": [
-                        fleet["SpotFleetRequestId"] for fleet in response["SuccessfulFleetRequests"]
-                    ],
-                    "unsuccessful_fleets": [
-                        {
-                            "fleet_id": fleet["SpotFleetRequestId"],
-                            "error": fleet["Error"]["Message"],
-                        }
-                        for fleet in response["UnsuccessfulFleetRequests"]
-                    ],
-                }
-            elif provider_api == "ASG":
-                self._aws_client.autoscaling_client.delete_auto_scaling_group(
-                    AutoScalingGroupName=request.resource_id, ForceDelete=True
-                )
-                return {
-                    "status": "success",
-                    "message": f"Auto Scaling Group {request.resource_id} deleted",
-                }
-            else:
-                return {
-                    "status": "error",
-                    "message": f"Unsupported provider API for cancellation: {request.provider_api}",
-                }
-        except Exception as e:
-            self._logger.error("Failed to cancel fleet request: %s", str(e))
-            return {
-                "status": "error",
-                "message": f"Failed to cancel fleet request: {e!s}",
             }
