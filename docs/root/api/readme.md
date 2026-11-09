@@ -33,6 +33,7 @@ The API supports multiple authentication methods:
 - `GET /requests` - List provisioning requests
 - `GET /requests/{id}` - Get request status
 - `POST /requests/{id}/cancel` - Cancel request
+- `POST /requests/{id}/confirm-terminated` - Confirm return-request machines are terminated (operator role)
 
 ### Response Format
 All API responses follow a consistent format:

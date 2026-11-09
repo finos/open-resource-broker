@@ -556,6 +556,34 @@ If any resource cannot be stopped the command fails with a non-zero exit code an
 
 How each provider API is stopped is described in the AWS provider pages: [EC2 Fleet](../providers/aws/ec2-fleet.md#cancelling-a-request), [Spot Fleet](../providers/aws/spot-fleet.md#cancelling-a-request), [Auto Scaling group](../providers/aws/asg.md#cancelling-a-request) and [RunInstances](../providers/aws/run-instances.md#release-behaviour).
 
+#### `requests confirm-terminated`
+
+Record that machines of a return request are terminated, for instances the
+provider reports as not found. The provider is asked whether each machine is
+gone; machines it confirms are recorded as `verified`. If it still shows a
+machine, or cannot tell, the command fails unless `--force` is given, which
+records the unverified machines as `operator_attested`. Providers with no
+termination check always need `--force`. See also
+[Confirm termination](../providers/oci/compute.md#confirm-termination).
+
+**Usage:**
+```bash
+orb requests confirm-terminated REQUEST_ID --machine-id ID [--machine-id ID...] --reason TEXT [--force]
+```
+
+**Options:**
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--machine-id`, `-m` | Machine verified terminated (required, repeatable, at most 100) | `-m ocid1.instance.oc1...` |
+| `--reason` | Why the machines are known to be terminated (required, up to 500 characters) | `--reason "deleted in console"` |
+| `--force` | Record machines the provider cannot verify as operator-attested | `--force` |
+
+The operator is recorded as `cli:<user>@<host>`; this comes from the local
+environment and is advisory only. Exits 1 when a machine is not part of the
+request, the request is not a return request in progress, the provider still shows
+an instance that is not terminated, or the provider cannot verify a machine and
+`--force` was not given.
+
 #### `requests status`
 
 Check request status.

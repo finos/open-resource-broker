@@ -13,8 +13,10 @@ except ImportError:
 import logging as _logging
 
 from orb.api.dependencies import (
+    CurrentUser,
     check_destructive_admin_allowed as _check_destructive_admin_allowed,
     get_cancel_request_orchestrator,
+    get_confirm_terminated_orchestrator,
     get_di_container,
     get_list_requests_orchestrator,
     get_list_return_requests_orchestrator,
@@ -23,20 +25,29 @@ from orb.api.dependencies import (
     require_role,
 )
 from orb.api.models.base import APIRequest
-from orb.api.models.responses import RequestOperationResponse, RequestStatusResponse
+from orb.api.models.responses import (
+    ConfirmTerminatedResponse,
+    RequestOperationResponse,
+    RequestStatusResponse,
+)
 from orb.application.services.admin.cleanup_database import (
     CleanupDatabaseService,
     NonTerminalStatusError,
 )
 from orb.application.services.orchestration.dtos import (
     CancelRequestInput,
+    ConfirmTerminatedInput,
     GetRequestStatusInput,
     ListRequestsInput,
     ListReturnRequestsInput,
 )
 from orb.domain.base import UnitOfWorkFactory
-from orb.domain.base.exceptions import EntityNotFoundError
+from orb.domain.base.exceptions import EntityNotFoundError, ValidationError
 from orb.domain.request.request_types import RequestStatus
+from orb.domain.request.termination_confirmation import (
+    InstanceStillVisibleError,
+    TerminationNotVerifiedError,
+)
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 from orb.interface.catalog import OPERATION_CATALOG, Interface
 
@@ -65,6 +76,7 @@ STATUS_ORCHESTRATOR = Depends(get_request_status_orchestrator)
 LIST_ORCHESTRATOR = Depends(get_list_requests_orchestrator)
 RETURN_LIST_ORCHESTRATOR = Depends(get_list_return_requests_orchestrator)
 CANCEL_ORCHESTRATOR = Depends(get_cancel_request_orchestrator)
+CONFIRM_TERMINATED_ORCHESTRATOR = Depends(get_confirm_terminated_orchestrator)
 FORMATTER = Depends(get_request_formatter)
 STATUS_QUERY = Query(None, description="Filter by request status")
 LIMIT_QUERY = Query(50, ge=1, le=1000, description="Limit number of results")
@@ -458,6 +470,92 @@ async def cancel_request(
         )
     )
     entry = OPERATION_CATALOG["cancel_request"]
+    return JSONResponse(content=entry.renderer_for(Interface.REST)(formatter, result).data)
+
+
+class ConfirmTerminatedBody(APIRequest):
+    """Body for ``POST /api/v1/requests/{request_id}/confirm-terminated``."""
+
+    machine_ids: list[str]
+    reason: str
+    # Accept machines the provider could not verify, recorded as operator-attested.
+    force: bool = False
+
+
+@router.post(
+    "/{request_id}/confirm-terminated",
+    operation_id="confirmTerminated",
+    summary="Confirm Machines Terminated",
+    description=(
+        "Record that the named machines of a return request are terminated, for "
+        "instances the provider reports as not found. The provider is asked whether "
+        "each machine is gone; confirmed machines are recorded as verified. Rejected "
+        "with 409 when the provider still shows a machine that is not terminated, "
+        "or when it cannot tell and force is not set. With force, machines the "
+        "provider cannot verify are recorded as operator-attested and the caller "
+        "takes responsibility for the claim. Repeating a confirmation changes "
+        "nothing."
+    ),
+    response_model=ConfirmTerminatedResponse,
+    responses={
+        400: {
+            "description": "Invalid request: the request is not a return request in progress, or a machine is not part of it"
+        },
+        404: {"description": "Request not found"},
+        409: {
+            "description": "A machine is still present at the provider, or the provider could not verify it and force was not set"
+        },
+    },
+)
+@handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}/confirm-terminated", method="POST")
+async def confirm_terminated(
+    request_id: str,
+    body: ConfirmTerminatedBody,
+    user: CurrentUser = Depends(require_role("operator")),
+    orchestrator=CONFIRM_TERMINATED_ORCHESTRATOR,
+    formatter=FORMATTER,
+) -> JSONResponse:
+    try:
+        result = await orchestrator.execute(
+            ConfirmTerminatedInput(
+                request_id=request_id,
+                machine_ids=body.machine_ids,
+                reason=body.reason,
+                operator=user.username,
+                role=user.role,
+                force=body.force,
+            )
+        )
+    except (ValidationError, EntityNotFoundError) as exc:
+        # Answered here rather than re-raised: with bearer authentication the
+        # auth middleware turns an exception escaping a route into a 500.
+        missing = isinstance(exc, EntityNotFoundError)
+        return JSONResponse(
+            status_code=404 if missing else 400,
+            content={
+                "success": False,
+                "error": {
+                    "code": "NOT_FOUND" if missing else "INVALID_INPUT",
+                    "message": "Request not found" if missing else exc.message,
+                },
+            },
+        )
+    except (InstanceStillVisibleError, TerminationNotVerifiedError) as exc:
+        still_visible = isinstance(exc, InstanceStillVisibleError)
+        return JSONResponse(
+            status_code=409,
+            content={
+                "success": False,
+                "error": {
+                    "code": "INSTANCE_STILL_VISIBLE"
+                    if still_visible
+                    else "TERMINATION_NOT_VERIFIED",
+                    "message": exc.message,
+                    "machine_ids": exc.details.get("machine_ids", []),
+                },
+            },
+        )
+    entry = OPERATION_CATALOG["confirm_terminated"]
     return JSONResponse(content=entry.renderer_for(Interface.REST)(formatter, result).data)
 
 

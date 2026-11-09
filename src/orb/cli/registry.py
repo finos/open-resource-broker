@@ -212,6 +212,7 @@ def build_registry() -> None:
     # --- requests ---
     from orb.interface.request_command_handlers import (
         handle_cancel_request,
+        handle_confirm_terminated,
         handle_get_multiple_requests,
         handle_get_request_status,
         handle_get_return_requests,
@@ -225,6 +226,7 @@ def build_registry() -> None:
     register("requests", "status", handle_get_request_status)
     register("requests", "list", handle_list_requests)
     register("requests", "cancel", handle_cancel_request)
+    register("requests", "confirm-terminated", handle_confirm_terminated)
     register("requests", "list-returns", handle_get_return_requests)
     register("requests", "watch", handle_watch_request_status)
     register("requests", "get-bulk", handle_get_multiple_requests)

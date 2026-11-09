@@ -13,6 +13,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.provider_fulfilment import FulfilmentState, ProviderFulfilment
+from orb.domain.request.termination_confirmation import confirmed_machine_ids
 from orb.infrastructure.mocking.dry_run_context import is_dry_run_active
 from orb.providers.base.strategy import ProviderOperation, ProviderResult
 from orb.providers.oci.async_utils import run_blocking_operation
@@ -20,6 +21,11 @@ from orb.providers.oci.cli_client import OCICommandError, run_oci, service_error
 from orb.providers.oci.configuration.realms import is_allowed_realm_domain
 from orb.providers.oci.mapping import OCITemplateMapper
 from orb.providers.oci.services import OCIPricingService
+
+# The confirm-time probe batches IDs into one search per chunk and stops after
+# a fixed budget; an unfinished probe is reported unavailable.
+_PROBE_IDS_PER_QUERY = 10
+_PROBE_TIME_BUDGET_SECONDS = 30.0
 
 
 class OCIComputeHandler:
@@ -712,10 +718,20 @@ class OCIComputeHandler:
                 "MISSING_MACHINE_IDS",
             )
 
+        if params.get("visibility_probe"):
+            return self._probe_visibility(operation, machine_ids)
+
         # getattr: direct status calls need not carry a request aggregate.
         request_type = getattr(params.get("request"), "request_type", None)
         # getattr: adapters may pass an enum or a string request type.
         is_return = getattr(request_type, "value", request_type) == "return"
+        # Machines an operator has confirmed terminated; honoured below only
+        # when OCI itself answers 404 for them.
+        confirmed = (
+            confirmed_machine_ids(getattr(params.get("request"), "metadata", None))
+            if is_return
+            else set()
+        )
         instances: list[dict[str, Any]] = []
         if self._use_live_cli(operation):
             try:
@@ -731,6 +747,28 @@ class OCIComputeHandler:
                             # Any other per-machine failure fails the whole call so
                             # stored machine state is kept and retried on the next poll.
                             raise
+                        if is_return and machine_id in confirmed:
+                            # The operator verified this instance is gone. Only a 404
+                            # reaches here, so an instance OCI can read always wins.
+                            self._logger.warning(
+                                "OCI instance %s not found; using operator confirmation "
+                                "that it is terminated",
+                                machine_id,
+                            )
+                            instances.append(
+                                {
+                                    "instance_id": machine_id,
+                                    "resource_id": machine_id,
+                                    "status": "terminated",
+                                    "provider_type": "oci",
+                                    "provider_api": "OCICompute",
+                                    "provider_data": {
+                                        "lifecycle_state": "TERMINATED",
+                                        "operator_confirmed": True,
+                                    },
+                                }
+                            )
+                            continue
                         if is_return:
                             # Omitting the machine would let a return request treat it
                             # as terminated, and OCI answers 404 both for a deleted
@@ -869,6 +907,74 @@ class OCIComputeHandler:
                 "provider": "oci",
                 "provider_fulfilment": fulfilment,
             },
+        )
+
+    def _probe_visibility(
+        self, operation: ProviderOperation, machine_ids: list[str]
+    ) -> ProviderResult:
+        """Best-effort check of which instances OCI can still see.
+
+        Uses the tenancy search service rather than get-by-ID, so it is a
+        different signal from the 404 being overridden. Every requested
+        instance gets a state: ``terminated`` when the search lists it as
+        terminated, ``visible`` when it lists it in any other state, and
+        ``unknown`` when the search does not list it. The search shows only what
+        this principal can see, so an unlisted instance may be deleted or merely
+        unreadable; the operator has to attest to it.
+        """
+        if not self._use_live_cli(operation):
+            return ProviderResult.error_result(
+                "Visibility probe needs a live OCI CLI", "OCI_PROBE_UNAVAILABLE"
+            )
+        found: dict[str, str] = {}
+        deadline = time.monotonic() + _PROBE_TIME_BUDGET_SECONDS
+        try:
+            for machine_id in machine_ids:
+                self._validate_resource_regions([machine_id])
+                if not re.fullmatch(r"[A-Za-z0-9._-]+", machine_id):
+                    raise ValueError("Unsupported machine ID for visibility probe")
+            wanted = set(machine_ids)
+            for start in range(0, len(machine_ids), _PROBE_IDS_PER_QUERY):
+                if time.monotonic() > deadline:
+                    raise TimeoutError("visibility probe exceeded its time budget")
+                batch = machine_ids[start : start + _PROBE_IDS_PER_QUERY]
+                clause = " || ".join(f"identifier = '{machine_id}'" for machine_id in batch)
+                response = self._run_oci(
+                    [
+                        "search",
+                        "resource",
+                        "structured-search",
+                        "--query-text",
+                        f"query instance resources where ({clause})",
+                    ]
+                )
+                for item in (response.get("data") or {}).get("items") or []:
+                    machine_id = item.get("identifier")
+                    if machine_id in wanted:
+                        # A missing lifecycle-state is kept as "UNKNOWN", which is reported
+                        # as visible: the instance is listed, so it is never treated as gone.
+                        found[machine_id] = str(item.get("lifecycle-state", "unknown")).upper()
+        except Exception as exc:
+            self._logger.warning("OCI visibility probe failed: %s", exc)
+            return ProviderResult.error_result(
+                "OCI visibility probe failed", "OCI_PROBE_UNAVAILABLE"
+            )
+        instances = [
+            {
+                "instance_id": machine_id,
+                "status": (
+                    "unknown"
+                    if machine_id not in found
+                    else "terminated"
+                    if found[machine_id] == "TERMINATED"
+                    else "visible"
+                ),
+                "provider_data": {"lifecycle_state": found.get(machine_id)},
+            }
+            for machine_id in machine_ids
+        ]
+        return ProviderResult.success_result(
+            {"instances": instances}, {"operation": "visibility_probe", "provider": "oci"}
         )
 
     async def describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:

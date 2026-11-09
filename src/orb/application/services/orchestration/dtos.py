@@ -170,6 +170,26 @@ class CancelRequestOutput:
 
 
 @dataclasses.dataclass(frozen=True)
+class ConfirmTerminatedInput:
+    request_id: str
+    machine_ids: list[str]
+    reason: str
+    operator: str
+    role: str = "cli"
+    # Accept machines the provider could not verify, recorded as operator-attested.
+    force: bool = False
+
+
+@dataclasses.dataclass(frozen=True)
+class ConfirmTerminatedOutput:
+    request_id: str
+    confirmed: list[str] = dataclasses.field(default_factory=list)
+    already_confirmed: list[str] = dataclasses.field(default_factory=list)
+    records: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    warnings: list[str] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass(frozen=True)
 class ListMachinesInput:
     status: Optional[str] = None
     provider_name: Optional[str] = None
