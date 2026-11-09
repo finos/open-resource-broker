@@ -1,12 +1,14 @@
 """AWS Provider Registration - Register AWS provider with the provider registry."""
 
 import json
+from collections.abc import Mapping
 from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 # Use TYPE_CHECKING to avoid direct infrastructure import
 if TYPE_CHECKING:
+    from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
     from orb.domain.base.ports import LoggingPort
     from orb.providers.registry import ProviderRegistry
 
@@ -16,6 +18,11 @@ from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 from orb.providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
 from orb.providers.aws.domain.template.aws_template_dto_config import AWSTemplateDTOConfig
+from orb.providers.base.config_input import (
+    provider_config_mapping,
+    provider_instance_name,
+    warn_unknown_config_keys,
+)
 
 _module_logger = get_logger(__name__)
 
@@ -138,7 +145,7 @@ def create_aws_strategy(provider_config: Any) -> Any:
         raise RuntimeError(f"Failed to create AWS strategy: {e!s}")
 
 
-def create_aws_config(data: dict[str, Any]) -> Any:
+def create_aws_config(data: "ProviderInstanceConfig | Mapping[str, Any]") -> Any:
     """
     Create AWS configuration from data dictionary.
 
@@ -152,7 +159,16 @@ def create_aws_config(data: dict[str, Any]) -> Any:
         from orb.providers.aws.configuration.config import AWSProviderConfig
 
         # AWSProviderConfig inherits from BaseSettings, so env vars are automatically loaded
-        return AWSProviderConfig(**data)
+        settings = provider_config_mapping(data)
+        if isinstance(settings, Mapping):
+            warn_unknown_config_keys(
+                AWSProviderConfig,
+                settings,
+                provider_instance_name(data),
+                _module_logger,
+                consumed_keys=("aws_connection_timeout", "connection_timeout_ms"),
+            )
+        return AWSProviderConfig(**settings)
     except ImportError as e:
         raise ImportError(f"AWS configuration not available: {e!s}")
     except Exception as e:

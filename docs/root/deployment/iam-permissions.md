@@ -79,7 +79,7 @@ ec2:DeleteLaunchTemplateVersions
 
 `ec2:DeleteLaunchTemplate` and `ec2:DeleteLaunchTemplateVersions` are only exercised when cleanup is enabled (`cleanup.enabled: true` and `cleanup.delete_launch_template: true` in provider config). They can be omitted if you disable launch template cleanup. Before deleting a template, cleanup also calls `ec2:DescribeInstances` to confirm no live instance still uses it; if that call fails the template is kept.
 
-`ec2:DeleteLaunchTemplateVersions` removes the versions ORB adds to a launch template you provide when a template sets overrides. Once the last instance of the request is returned, ORB deletes only the version it created for that request: it must carry the description ORB wrote for the request and must not be the default version. Versions you created, and the template itself, are never touched. Without the permission the versions stay in place and a warning is logged.
+`ec2:DeleteLaunchTemplateVersions` removes the versions ORB adds to a launch template you provide when a template sets overrides. Once the last instance of the request is returned, ORB deletes only the version it created for that request: it must carry the description ORB wrote for the request and must not be the default version. The same version is deleted right away when AWS rejects the launch outright, since nothing can be using it; after a timeout or a transient error the launch may have succeeded, so the version is kept until the request is returned. Versions you created, and the template itself, are never touched. Without the permission the versions stay in place and a warning is logged.
 
 ### Cleaning up unused ORB launch templates
 

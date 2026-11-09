@@ -114,8 +114,11 @@ class TestDeleteOrbLaunchTemplate:
             "LaunchTemplates": [
                 {
                     "LaunchTemplateId": "lt-abc123",
-                    "LaunchTemplateName": "req-test-id",
-                    "Tags": [{"Key": "orb:managed-by", "Value": "open-resource-broker"}],
+                    "LaunchTemplateName": "req-test-id-tpl",
+                    "Tags": [
+                        {"Key": "orb:managed-by", "Value": "open-resource-broker"},
+                        {"Key": "orb:request-id", "Value": "req-test-id"},
+                    ],
                 }
             ]
         }
@@ -130,7 +133,7 @@ class TestDeleteOrbLaunchTemplate:
             "LaunchTemplates": [
                 {
                     "LaunchTemplateId": "lt-xyz",
-                    "LaunchTemplateName": "req-test-id",
+                    "LaunchTemplateName": "req-test-id-tpl",
                     "Tags": [{"Key": "Name", "Value": "something-else"}],
                 }
             ]
@@ -152,8 +155,11 @@ class TestDeleteOrbLaunchTemplate:
             "LaunchTemplates": [
                 {
                     "LaunchTemplateId": "lt-dry",
-                    "LaunchTemplateName": "req-dry-id",
-                    "Tags": [{"Key": "orb:managed-by", "Value": "open-resource-broker"}],
+                    "LaunchTemplateName": "req-dry-id-tpl",
+                    "Tags": [
+                        {"Key": "orb:managed-by", "Value": "open-resource-broker"},
+                        {"Key": "orb:request-id", "Value": "req-dry-id"},
+                    ],
                 }
             ]
         }
@@ -470,15 +476,18 @@ class TestDeleteOrbLaunchTemplateTagBased:
         }
         return handler
 
-    def _orb_lt(self, lt_id, lt_name="lt-name"):
+    def _orb_lt(self, lt_id, request_id):
         return {
             "LaunchTemplateId": lt_id,
-            "LaunchTemplateName": lt_name,
-            "Tags": [{"Key": "orb:managed-by", "Value": "open-resource-broker"}],
+            "LaunchTemplateName": f"{request_id}-tpl",
+            "Tags": [
+                {"Key": "orb:managed-by", "Value": "open-resource-broker"},
+                {"Key": "orb:request-id", "Value": request_id},
+            ],
         }
 
     def test_single_lt_found_is_deleted(self):
-        handler = self._make_handler_with_tag_describe([self._orb_lt("lt-aaa")])
+        handler = self._make_handler_with_tag_describe([self._orb_lt("lt-aaa", "req-1")])
         handler._delete_orb_launch_template("req-1")
         handler.aws_client.ec2_client.delete_launch_template.assert_called_once_with(
             LaunchTemplateId="lt-aaa"
@@ -486,7 +495,7 @@ class TestDeleteOrbLaunchTemplateTagBased:
 
     def test_multiple_lts_all_deleted(self):
         handler = self._make_handler_with_tag_describe(
-            [self._orb_lt("lt-aaa"), self._orb_lt("lt-bbb")]
+            [self._orb_lt("lt-aaa", "req-multi"), self._orb_lt("lt-bbb", "req-multi")]
         )
         # Current implementation deletes only the first match — this test documents
         # the expected fixed behaviour where all matching LTs are deleted.
@@ -514,7 +523,7 @@ class TestDeleteOrbLaunchTemplateTagBased:
         handler._logger.warning.assert_called()
 
     def test_delete_client_error_logs_warning_no_raise(self):
-        handler = self._make_handler_with_tag_describe([self._orb_lt("lt-del-err")])
+        handler = self._make_handler_with_tag_describe([self._orb_lt("lt-del-err", "req-del-err")])
         handler.aws_client.ec2_client.delete_launch_template.side_effect = _client_error(
             "InternalError"
         )
@@ -524,7 +533,7 @@ class TestDeleteOrbLaunchTemplateTagBased:
     def test_delete_client_error_continues_to_next_lt(self):
         """When deleting the first LT fails, the second LT should still be attempted."""
         handler = self._make_handler_with_tag_describe(
-            [self._orb_lt("lt-fail"), self._orb_lt("lt-ok")]
+            [self._orb_lt("lt-fail", "req-partial"), self._orb_lt("lt-ok", "req-partial")]
         )
         handler.aws_client.ec2_client.delete_launch_template.side_effect = [
             _client_error("InternalError"),

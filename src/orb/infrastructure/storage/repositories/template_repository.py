@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
+from orb.domain.base.exceptions import ConfigurationError
 from orb.domain.template.repository import TemplateRepository as TemplateRepositoryInterface
 from orb.domain.template.template_aggregate import Template
 from orb.domain.template.value_objects import TemplateId
@@ -156,12 +157,16 @@ class TemplateSerializer(BaseEntitySerializer):
             processed_data = data
             if self.defaults_service:
                 try:
-                    processed_data = self.defaults_service.resolve_template_defaults(
-                        data, provider_name="default"
-                    )
+                    processed_data = self.defaults_service.resolve_template_defaults(data)
                     self.logger.debug("Applied configuration defaults to template data")
-                except Exception as e:
+                except (ValueError, KeyError, ConfigurationError) as e:
                     self.logger.warning("Failed to apply defaults, using original data: %s", e)
+                    processed_data = data
+                except Exception:
+                    # A malformed defaults configuration must not abort loading every template.
+                    self.logger.warning(
+                        "Unexpected error applying defaults, using original data", exc_info=True
+                    )
                     processed_data = data
 
             now = datetime.now()
@@ -184,7 +189,10 @@ class TemplateSerializer(BaseEntitySerializer):
                     "max_machines",
                     processed_data.get("maxNumber", processed_data.get("max_instances", 1)),
                 ),
-                "machine_types": self._normalize_machine_types(data),
+                # The row's own spelling of the pools wins; a default fills in only
+                # when the row has none, whichever key the row used.
+                "machine_types": self._normalize_machine_types(data)
+                or self._normalize_machine_types(processed_data),
                 "machine_types_ondemand": self._first_present(
                     processed_data, "machine_types_ondemand", "vmTypesOnDemand"
                 ),
@@ -201,24 +209,33 @@ class TemplateSerializer(BaseEntitySerializer):
                 ),
                 "network_zones": processed_data.get("network_zones", []),
                 "public_ip_assignment": processed_data.get("public_ip_assignment"),
-                "machine_disk_size_gb": data.get(
+                "machine_disk_size_gb": processed_data.get(
                     "machine_disk_size_gb",
-                    data.get("root_device_volume_size", data.get("root_volume_size")),
+                    processed_data.get(
+                        "root_device_volume_size", processed_data.get("root_volume_size")
+                    ),
                 ),
-                "machine_disk_type": data.get(
-                    "machine_disk_type", data.get("volume_type", data.get("root_volume_type"))
+                "machine_disk_type": processed_data.get(
+                    "machine_disk_type",
+                    processed_data.get("volume_type", processed_data.get("root_volume_type")),
                 ),
-                "iops": data.get("iops", data.get("root_volume_iops")),
+                "iops": processed_data.get("iops", processed_data.get("root_volume_iops")),
                 "throughput": data.get("throughput", data.get("root_volume_throughput")),
                 "storage_encryption": data.get("storage_encryption"),
                 "encryption_key": data.get("encryption_key"),
-                "machine_ssh_key": data.get(
+                "machine_ssh_key": processed_data.get(
                     "machine_ssh_key",
-                    data.get("keyName", data.get("key_name", data.get("key_pair_name"))),
+                    processed_data.get(
+                        "keyName",
+                        processed_data.get("key_name", processed_data.get("key_pair_name")),
+                    ),
                 ),
-                "machine_bootstrap": data.get("machine_bootstrap", data.get("user_data")),
-                "machine_role": data.get("machine_role") or data.get("instance_profile"),
-                "monitoring_enabled": data.get("monitoring_enabled"),
+                "machine_bootstrap": processed_data.get(
+                    "machine_bootstrap", processed_data.get("user_data")
+                ),
+                "machine_role": processed_data.get("machine_role")
+                or processed_data.get("instance_profile"),
+                "monitoring_enabled": processed_data.get("monitoring_enabled"),
                 "price_type": data.get("price_type", "ondemand"),
                 "allocation_strategy": data.get("allocation_strategy"),
                 "max_price": data.get("max_price"),

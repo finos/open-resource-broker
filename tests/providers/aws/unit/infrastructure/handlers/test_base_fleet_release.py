@@ -270,6 +270,7 @@ class TestBaseFleetReleaseManagerSharedFlow:
         mgr = _ConcreteFleetReleaseManager()
         mgr._list_fleet_instance_ids = MagicMock(return_value=["i-1", "i-2"])
         mgr._cleanup_launch_template = MagicMock()
+        mgr._fetch_fleet_details_mock.return_value = {"Type": "maintain"}
 
         mgr.release("fleet-1", [], {"Type": "maintain"}, request_id="req-1")
 

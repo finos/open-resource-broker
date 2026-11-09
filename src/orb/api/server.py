@@ -534,6 +534,14 @@ def create_fastapi_app(server_config: Any) -> Any:
 
     # Workers count is used by both the rate-limit and SSE multi-worker warnings below.
     _workers = getattr(server_config, "workers", 1) or 1
+    if _workers > 1:
+        logger.warning(
+            "MULTI_WORKER_FLEET_RELEASE: server.workers=%d. Returns of one fleet are "
+            "serialised within a single process only, so returns handled by different "
+            "workers (or by `orb return` beside the server) can interleave their capacity "
+            "reductions. Use server.workers=1 if returns of the same fleet can overlap.",
+            _workers,
+        )
 
     # Add rate-limit middleware. Registered before AuthMiddleware below so Auth
     # ends up outside it (see the effective-order note above) and always runs

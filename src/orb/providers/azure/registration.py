@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar
 
 from orb.config import PerformanceConfig
 from orb.config.schemas.provider_strategy_schema import ProviderInstanceConfig
+from orb.providers.base.config_input import provider_config_mapping
 
 if TYPE_CHECKING:
     from orb.domain.base.ports import LoggingPort
@@ -151,8 +152,7 @@ def create_azure_config(data: ProviderInstanceConfig | Mapping[str, Any]) -> "Az
     try:
         from orb.providers.azure.configuration.config import AzureProviderConfig
 
-        config_data = data.config if isinstance(data, ProviderInstanceConfig) else data
-        return AzureProviderConfig(**config_data)
+        return AzureProviderConfig(**provider_config_mapping(data))
     except ImportError as exc:
         raise ImportError(f"Azure configuration not available: {exc!s}")
     except Exception as exc:

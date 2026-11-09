@@ -55,6 +55,9 @@ class LaunchTemplateResult:
     template_name: str
     is_new_template: bool = False
     is_new_version: bool = False
+    # Set only when ORB added a version carrying this request's overrides to a
+    # launch template the user owns; the version number as a string.
+    override_version: Optional[str] = None
 
 
 class LTNetworkingState(Enum):
@@ -442,6 +445,7 @@ class AWSLaunchTemplateManager:
             template_name=template_name,
             is_new_template=False,
             is_new_version=True,
+            override_version=new_version,
         )
 
     def _get_lt_update_failure_mode(self) -> str:
@@ -624,7 +628,7 @@ class AWSLaunchTemplateManager:
         # Process custom tags
         custom_tags = []
         if template.tags:
-            custom_tags = [{"key": k, "value": v} for k, v in template.tags.items()]
+            custom_tags = [{"key": str(k), "value": str(v)} for k, v in template.tags.items()]
 
         # Get instance name
         if self.config_port is None:

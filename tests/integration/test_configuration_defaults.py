@@ -4,8 +4,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import Mock
 
-import pytest
-
 from orb.application.services.template_defaults_service import TemplateDefaultsService
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
@@ -31,10 +29,6 @@ def _defaults_service(instance_defaults: dict[str, Any]) -> TemplateDefaultsServ
     return TemplateDefaultsService(cast(ConfigurationPort, config), cast(LoggingPort, Mock()))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="#809: TemplateSerializer calls resolve_template_defaults with a keyword it does not accept",
-)
 def test_serializer_applies_provider_instance_defaults():
     """Fields missing from stored data are filled from the provider instance defaults."""
     serializer = TemplateSerializer(defaults_service=_defaults_service(_INSTANCE_DEFAULTS))

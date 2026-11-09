@@ -168,8 +168,8 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
     ) -> None:
         # Re-read the targets right before changing them: the details passed in may
         # be seconds old, and a concurrent return would otherwise be overwritten with
-        # a value computed from the stale target. This narrows the window; the API has
-        # no compare-and-set, so concurrent returns on one fleet are not serialised.
+        # a value computed from the stale target. The API has no compare-and-set;
+        # returns of one fleet are serialised within this process only.
         target_capacity, on_demand_capacity = self._read_target_capacities(
             fleet_id, extra["target_capacity"], extra["on_demand_capacity"]
         )
@@ -202,6 +202,15 @@ class SpotFleetReleaseManager(BaseFleetReleaseManager):
             # drops, and the maintain fleet then launches a replacement.
             ExcessCapacityTerminationPolicy="noTermination",
         )
+        # Read the target back: a different value means another process changed it.
+        try:
+            observed: Optional[int] = self._fetch_fleet_details(fleet_id)["SpotFleetRequestConfig"][
+                "TargetCapacity"
+            ]
+        except Exception as exc:
+            self._logger.debug("Could not read back target capacity of %s: %s", fleet_id, exc)
+            observed = None
+        self._warn_if_target_changed(fleet_id, new_target_capacity, observed)
 
     def _read_target_capacities(
         self, fleet_id: str, fallback_target: int, fallback_on_demand: int

@@ -281,6 +281,7 @@ class TestExistingLTWithImageIdOverride:
 
         assert result.template_id == real_lt_id
         assert result.is_new_version is True
+        assert result.override_version == result.version
         # Version 2 was created (version 1 was the original)
         assert int(result.version) >= 2
 

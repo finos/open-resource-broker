@@ -98,6 +98,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         "SpotFleet": "aws",
         "ASG": "aws",
         "RunInstances": "aws",
+        "OCICompute": "oci",
     }
 
     def _provider_validation_errors(self, provider_type: Any, domain_template: Any) -> list[str]:
@@ -128,7 +129,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         try:
             result = validator.validate(domain_template)
         except Exception as e:  # pragma: no cover — defensive
-            self._logger.debug("%s validator raised: %s", provider_type, e)
+            self._logger.warning("%s template validator raised: %s", provider_type, e)
             return []
 
         raw_errors = getattr(result, "errors", None)
