@@ -3455,6 +3455,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Release behaviour">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#confirm-termination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Confirm termination
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -6355,6 +6372,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Release behaviour">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#confirm-termination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Confirm termination
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -6722,9 +6756,41 @@ scope is fixed.</p>
    readable and reports a terminal state.</li>
 <li>If the instance is not listed at all, it was deleted and has aged out of OCI.
    The broker cannot tell that apart from an unreadable instance, so it does not
-   complete the return on its own and the request stays in progress until the
-   machine state is reconciled by hand.</li>
+   complete the return on its own. Confirm the termination yourself, as described
+   below.</li>
 </ol>
+<h3 id="confirm-termination">Confirm termination<a class="headerlink" href="#confirm-termination" title="Permanent link">&para;</a></h3>
+<p>Once you have verified in OCI that the instances are gone, record that on the
+return request:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>orb<span class="w"> </span>requests<span class="w"> </span>confirm-terminated<span class="w"> </span>RETURN_REQUEST_ID<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--machine-id<span class="w"> </span>ocid1.instance.oc1...<span class="w"> </span>--reason<span class="w"> </span><span class="s2">&quot;verified deleted in console&quot;</span>
+</code></pre></div>
+<p>or <code>POST /api/v1/requests/{id}/confirm-terminated</code> with
+<code>{"machine_ids": [...], "reason": "...", "force": false}</code>. The next status poll treats exactly
+those machines as terminated and the return completes.</p>
+<ul>
+<li>Only machines named in the return request can be confirmed, at most 100 at a
+  time, with a reason of up to 500 characters. There is no wildcard.</li>
+<li>OCI cannot tell a deleted instance from one the broker may not read. Before
+  accepting, the broker searches OCI for the instances through the tenancy search
+  service. An instance the search lists as terminated is recorded as <code>verified</code>.
+  If one is listed in any other state, the confirmation is rejected (REST status
+  409). The search lists only what the broker can read, so an instance it does
+  not list may be deleted or merely unreadable, and the same applies when the
+  search is unavailable, for example because the policy does not allow it: the
+  confirmation is rejected unless <code>--force</code> (REST: <code>"force": true</code>) is given. The
+  machines are then recorded as <code>operator_attested</code> and the claim is yours.
+  The search index can lag behind deletion, so a just-deleted instance may still
+  be reported and the confirmation rejected with 409; retry after a short wait.</li>
+<li>The confirmation only replaces a 404. An instance OCI can read is reported as it
+  is, so an instance that turns out to be running is never hidden.</li>
+<li>Each confirmation is stored on the request with the operator, role, reason, time
+  and how it was established (<code>verified</code> or <code>operator_attested</code>). Confirming the same machine again changes nothing.</li>
+<li>The REST endpoint requires the <code>operator</code> role; the principal ID and role are
+  recorded, or <code>anonymous</code> when authentication is off. The CLI records
+  <code>cli:&lt;user&gt;@&lt;host&gt;</code> taken from the local environment, which is advisory and not
+  an identity.</li>
+</ul>
 <p>Any other error for an instance, including a failed VNIC lookup, fails the whole
 status call; stored machine state is kept and the call is retried on the next poll.</p>
 <p>Termination attempts every requested instance and reports per-instance outcomes.
