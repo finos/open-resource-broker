@@ -217,7 +217,7 @@ ingress:
   # -- Ingress annotations (cert-manager issuers, controller options).
   annotations: {}
   # -- Hosts and paths. Paths default to "/" routed to the ORB Service. In embedded
-  # mode the API is served at /orb/api/v1 and the UI at /orb. A path may carry
+  # mode the API is served at /orb/api/v1 and the UI at /. A path may carry
   # `serviceName` and `servicePort` to route it to a different Service, for
   # example an externally hosted UI in split mode.
   hosts: []

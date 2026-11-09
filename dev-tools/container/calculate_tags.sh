@@ -21,8 +21,9 @@ if [[ "$IS_RELEASE" == "true" ]]; then
     # Release tags
     PRIMARY_TAGS="latest,$VERSION"
 elif [[ "${GITHUB_REF:-}" == "refs/heads/main" ]]; then
-    # Main branch tags
+    # Main branch tags; pythonX.Y tags are release-only
     PRIMARY_TAGS="main,dev"
+    PYTHON_TAGS=""
 else
     # Feature/PR branches - no special tags
     PRIMARY_TAGS=""

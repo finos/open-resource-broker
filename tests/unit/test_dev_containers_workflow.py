@@ -6,6 +6,10 @@ YAML so a later edit cannot silently reintroduce a ``workflow_run`` trigger, an
 ungated publish job, or write permissions on pull-request builds.
 """
 
+import os
+import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -13,6 +17,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
+CALCULATE_TAGS = ROOT / "dev-tools" / "container" / "calculate_tags.sh"
 
 PUBLISH_CONDITION = (
     "(github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) || "
@@ -141,3 +146,91 @@ def test_container_push_paths_are_covered_by_unit_tests_push_paths(workflow: dic
     tests = _load("ci-tests.yml")
     assert set(workflow["on"]["push"]["branches"]) <= set(tests["on"]["push"]["branches"])
     assert set(workflow["on"]["push"]["paths"]) <= set(tests["on"]["push"]["paths"])
+
+
+@pytest.mark.unit
+def test_calculate_tags_outputs_are_written_by_script(workflow: dict) -> None:
+    script = CALCULATE_TAGS.read_text()
+    declared = workflow["jobs"]["calculate-tags"]["outputs"]
+    for output, expr in declared.items():
+        refs = re.findall(r"steps\.tags\.outputs\.([A-Za-z0-9_-]+)", expr)
+        assert refs, f"{output} does not read the tags step"
+        for name in refs:
+            pattern = rf'^\s*echo\s+"?{re.escape(name)}='
+            assert re.search(pattern, script, re.MULTILINE), (
+                f"calculate-tags output {output} reads steps.tags.outputs.{name}, "
+                "which calculate_tags.sh never writes"
+            )
+    consumed = set(
+        re.findall(
+            r"needs\.calculate-tags\.outputs\.([A-Za-z0-9_-]+)",
+            (WORKFLOWS / "dev-containers.yml").read_text(),
+        )
+    )
+    assert consumed, "no job consumes the calculated tags"
+    assert consumed <= set(declared), consumed - set(declared)
+
+
+@pytest.mark.unit
+def test_calculate_tags_keys_are_shell_identifiers() -> None:
+    # prod-release.yml sources these keys as shell variables, so they must stay
+    # valid identifiers.
+    keys = re.findall(r'^\s*echo\s+"?([^=\s"]+)=', CALCULATE_TAGS.read_text(), re.MULTILINE)
+    assert keys
+    for key in keys:
+        assert re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key), key
+
+
+STUB_MAKE = """#!/bin/sh
+case "$*" in
+  "-s get-version") echo "1.2.3" ;;
+  "-s print-PYTHON_VERSIONS") echo "3.12 3.13" ;;
+  *) echo "unexpected make target: $*" >&2 ;;
+esac
+exit 0
+"""
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("context", "expected"),
+    [
+        (
+            {"IS_RELEASE": "true", "GITHUB_REF": "refs/tags/v1.2.3"},
+            {"primary_tags": "latest,1.2.3", "python_tags": "python3.12,python3.13"},
+        ),
+        (
+            {"IS_RELEASE": "false", "GITHUB_REF": "refs/heads/main"},
+            {"primary_tags": "main,dev", "python_tags": ""},
+        ),
+        (
+            {"IS_RELEASE": "false", "GITHUB_REF": "refs/heads/feature/x"},
+            {"primary_tags": "", "python_tags": ""},
+        ),
+    ],
+    ids=["release", "main", "feature"],
+)
+def test_calculate_tags_per_context(
+    tmp_path: Path, context: dict[str, str], expected: dict[str, str]
+) -> None:
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is not available")
+    stub = tmp_path / "make"
+    stub.write_text(STUB_MAKE)
+    stub.chmod(0o755)
+    env = {
+        "PATH": f"{tmp_path}{os.pathsep}{os.environ.get('PATH', '')}",
+        **context,
+    }
+    result = subprocess.run(
+        [bash, str(CALCULATE_TAGS)],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    outputs = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+    assert outputs == expected
