@@ -28,6 +28,7 @@ on:
       - 'makefiles/dev.mk'
       - 'Makefile'
       - 'setup.py'
+      - '.trivyignore.yaml'
       - '.github/workflows/dev-containers.yml'
   pull_request:
     branches: [ main, develop ]
@@ -42,6 +43,7 @@ on:
       - 'makefiles/dev.mk'
       - 'Makefile'
       - 'setup.py'
+      - '.trivyignore.yaml'
       - '.github/workflows/dev-containers.yml'
   workflow_dispatch:
     inputs:
