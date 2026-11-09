@@ -7,6 +7,10 @@ from typing import Any, Optional
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.storage.components.resource_manager import QueryManager
 
+# The criteria operators ``build_select_by_criteria`` interprets; the SQL strategy's
+# ``find_by_criteria`` rejects every other ``$`` operator.
+SUPPORTED_OPERATORS: tuple[str, ...] = ("$in", "$like")
+
 
 class QueryType(str, Enum):
     """SQL query type enumeration."""

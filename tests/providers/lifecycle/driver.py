@@ -83,9 +83,6 @@ class Lifecycle:
         self.scenario.requested = count
         self.scenario.dry_run = dry_run
         self.scenario.request_ids.add(request_id)
-        with self.uow_factory.create_unit_of_work() as uow:
-            stored = uow.requests.find_by_request_id(request_id)
-        self.scenario.resource_ids |= {str(r) for r in (stored.resource_ids or [])}
         if not dry_run:
             assert len(self.cloud.call_log) > calls_before, "create reached no cloud call"
         self._check(handle, phase="created")
@@ -140,9 +137,13 @@ class Lifecycle:
             self.scenario.return_ids |= set(machine_ids)
         command = CreateReturnRequestCommand(machine_ids=machine_ids)
         await self.command_bus.execute(command)
+        created = list(command.created_request_ids or [])
+        note = getattr(self.cloud, "note_return_requests", None)
+        if note is not None:
+            note(created)
         for handle in self.handles.values():
             self._check(handle, phase="return")
-        return list(command.created_request_ids or [])
+        return created
 
     async def sync_return(self, return_request_id: str) -> Any:
         return await self.query_bus.execute(

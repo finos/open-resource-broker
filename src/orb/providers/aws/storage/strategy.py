@@ -7,7 +7,10 @@ from botocore.exceptions import ClientError
 from orb.domain.base.exceptions import ConcurrencyError
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.di.injectable import injectable
-from orb.infrastructure.storage.base.strategy import BaseStorageStrategy
+from orb.infrastructure.storage.base.strategy import (
+    BaseStorageStrategy,
+    reject_unsupported_criteria,
+)
 
 # Import components
 from orb.infrastructure.storage.components import LockManager
@@ -17,6 +20,7 @@ from orb.providers.aws.storage.components import (
     DynamoDBConverter,
     DynamoDBTransactionManager,
 )
+from orb.providers.aws.storage.components.dynamodb_converter import SUPPORTED_OPERATORS
 
 
 @injectable
@@ -319,10 +323,10 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Find by ID")
-                return None
+                raise StorageError(f"Failed to find entity {entity_id}: {e}") from e
             except Exception as e:
                 self._logger.error("Failed to find entity %s: %s", entity_id, e)
-                return None
+                raise StorageError(f"Failed to find entity {entity_id}: {e}") from e
 
     def find_all(self) -> dict[str, dict[str, Any]]:
         """
@@ -348,10 +352,10 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Find all")
-                return {}
+                raise StorageError(f"Failed to load all entities: {e}") from e
             except Exception as e:
                 self._logger.error("Failed to load all entities: %s", e)
-                return {}
+                raise StorageError(f"Failed to load all entities: {e}") from e
 
     def delete(self, entity_id: str) -> None:
         """
@@ -405,9 +409,12 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
             self._logger.debug("Entity %s exists: %s", entity_id, exists)
             return exists
 
+        except ClientError as e:
+            self.client_manager.handle_client_error(e, "Exists")
+            raise StorageError(f"Failed to check existence of entity {entity_id}: {e}") from e
         except Exception as e:
             self._logger.error("Failed to check existence of entity %s: %s", entity_id, e)
-            return False
+            raise StorageError(f"Failed to check existence of entity {entity_id}: {e}") from e
 
     def find_by_criteria(self, criteria: dict[str, Any]) -> list[dict[str, Any]]:
         """
@@ -418,7 +425,11 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
 
         Returns:
             List of matching entities
+
+        Raises:
+            StorageError: An operator in *criteria* is not in ``SUPPORTED_OPERATORS``
         """
+        reject_unsupported_criteria(criteria, SUPPORTED_OPERATORS, "DynamoDB storage")
         with self.lock_manager.read_lock():
             try:
                 # Build filter expression
@@ -528,9 +539,12 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         try:
             items = self.client_manager.scan_table(self.table_name)
             return len(items)
+        except ClientError as e:
+            self.client_manager.handle_client_error(e, "Count")
+            raise StorageError(f"Failed to count entities: {e}") from e
         except Exception as e:
             self._logger.error("Failed to count entities: %s", e)
-            return 0
+            raise StorageError(f"Failed to count entities: {e}") from e
 
     def cleanup(self) -> None:
         """Clean up resources."""

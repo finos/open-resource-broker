@@ -86,4 +86,9 @@ async def test_create_then_read_back_through_buses(buses, kmock_k8s, kind) -> No
     entry = scheduler.format_request_status_response([request_dto])["requests"][0]
     assert entry["requestId"] == request_id
     assert entry["status"] in _WIRE_STATUSES
-    assert entry["machines"], entry
+    if kind == "Pod":
+        assert entry["machines"], entry
+    else:
+        # The emulated apiserver runs no controller, so a workload has no pods yet and
+        # the request lists no machine; the workload itself is not one.
+        assert entry["machines"] == [], entry

@@ -4,6 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from orb.infrastructure.storage.exceptions import StorageError
+
 
 def _make_strategy(table_name="test_entities", columns=None):
     """Create an in-memory SQLStorageStrategy for tests."""
@@ -223,11 +225,11 @@ class TestSQLStrategyExists:
         strategy = _make_strategy()
         assert strategy.exists("nope") is False
 
-    def test_exists_returns_false_on_exception(self) -> None:
+    def test_exists_raises_on_exception(self) -> None:
         strategy = _make_strategy()
         strategy.connection_manager.get_session = MagicMock(side_effect=RuntimeError("boom"))
-        result = strategy.exists("any")
-        assert result is False
+        with pytest.raises(StorageError):
+            strategy.exists("any")
 
 
 # ---------------------------------------------------------------------------
@@ -366,10 +368,11 @@ class TestSQLStrategyCount:
         strategy.save("c2", {"id": "c2"})
         assert strategy.count() == 2
 
-    def test_count_returns_zero_on_exception(self) -> None:
+    def test_count_raises_on_exception(self) -> None:
         strategy = _make_strategy()
         strategy.connection_manager.get_session = MagicMock(side_effect=RuntimeError("boom"))
-        assert strategy.count() == 0
+        with pytest.raises(StorageError):
+            strategy.count()
 
 
 # ---------------------------------------------------------------------------

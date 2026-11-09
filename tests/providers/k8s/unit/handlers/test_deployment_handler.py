@@ -383,6 +383,45 @@ async def test_release_hosts_full_release_scales_to_zero_then_deletes() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("replicas", [1, 3])
+async def test_release_of_the_controller_name_changes_nothing(replicas: int) -> None:
+    """A pod never carries its controller's name, so that id is not a machine."""
+    core_v1 = MagicMock()
+    apps_v1 = MagicMock()
+    apps_v1.read_namespaced_deployment.return_value = _make_deployment_status(
+        spec_replicas=replicas
+    )
+    handler = _make_handler(client=_make_client(core_v1=core_v1, apps_v1=apps_v1))
+    request = _make_request(
+        requested_count=replicas, deployment_name="orb-deadbeef", namespace="orb-test"
+    )
+
+    await handler.release_hosts(["orb-deadbeef"], request.provider_data)
+
+    core_v1.patch_namespaced_pod.assert_not_called()
+    apps_v1.patch_namespaced_deployment_scale.assert_not_called()
+    apps_v1.delete_namespaced_deployment.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_release_with_controller_name_and_pod_releases_only_the_pod() -> None:
+    core_v1 = MagicMock()
+    core_v1.patch_namespaced_pod.return_value = SimpleNamespace()
+    apps_v1 = MagicMock()
+    apps_v1.read_namespaced_deployment.return_value = _make_deployment_status(spec_replicas=3)
+    apps_v1.patch_namespaced_deployment_scale.return_value = SimpleNamespace()
+    handler = _make_handler(client=_make_client(core_v1=core_v1, apps_v1=apps_v1))
+    request = _make_request(requested_count=3, deployment_name="orb-deadbeef", namespace="orb-test")
+
+    await handler.release_hosts(["orb-deadbeef", "pod-m2"], request.provider_data)
+
+    assert [c.kwargs["name"] for c in core_v1.patch_namespaced_pod.call_args_list] == ["pod-m2"]
+    scale = apps_v1.patch_namespaced_deployment_scale.call_args.kwargs
+    assert scale["body"]["spec"]["replicas"] == 2
+    apps_v1.delete_namespaced_deployment.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_release_hosts_empty_machine_ids_is_noop() -> None:
     core_v1 = MagicMock()
     apps_v1 = MagicMock()

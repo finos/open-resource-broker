@@ -160,20 +160,20 @@ class TestFindById:
         result = strat.find_by_id("missing")
         assert result is None
 
-    def test_returns_none_on_client_error(self):
+    def test_raises_on_client_error(self):
         strat = _make_strategy()
         strat.converter.get_key.return_value = {"id": "e-1"}
         strat.client_manager.get_item.side_effect = _client_error("ResourceNotFoundException")
         strat.client_manager.handle_client_error.return_value = None
-        result = strat.find_by_id("e-1")
-        assert result is None
+        with pytest.raises(StorageError):
+            strat.find_by_id("e-1")
 
-    def test_returns_none_on_generic_exception(self):
+    def test_raises_on_generic_exception(self):
         strat = _make_strategy()
         strat.converter.get_key.return_value = {"id": "e-1"}
         strat.client_manager.get_item.side_effect = RuntimeError("db err")
-        result = strat.find_by_id("e-1")
-        assert result is None
+        with pytest.raises(StorageError):
+            strat.find_by_id("e-1")
 
 
 # ---------------------------------------------------------------------------
@@ -193,18 +193,18 @@ class TestFindAll:
         assert len(result) == 2
         assert "e-1" in result
 
-    def test_returns_empty_on_client_error(self):
+    def test_raises_on_client_error(self):
         strat = _make_strategy()
         strat.client_manager.scan_table.side_effect = _client_error("ServiceUnavailable")
         strat.client_manager.handle_client_error.return_value = None
-        result = strat.find_all()
-        assert result == {}
+        with pytest.raises(StorageError):
+            strat.find_all()
 
-    def test_returns_empty_on_generic_exception(self):
+    def test_raises_on_generic_exception(self):
         strat = _make_strategy()
         strat.client_manager.scan_table.side_effect = RuntimeError("scan err")
-        result = strat.find_all()
-        assert result == {}
+        with pytest.raises(StorageError):
+            strat.find_all()
 
     def test_skips_items_without_entity_id(self):
         strat = _make_strategy()
@@ -272,11 +272,12 @@ class TestExists:
         strat.client_manager.get_item.return_value = None
         assert strat.exists("missing") is False
 
-    def test_returns_false_on_exception(self):
+    def test_raises_on_exception(self):
         strat = _make_strategy()
         strat.converter.get_key.return_value = {"id": "e-1"}
         strat.client_manager.get_item.side_effect = RuntimeError("boom")
-        assert strat.exists("e-1") is False
+        with pytest.raises(StorageError):
+            strat.exists("e-1")
 
 
 # ---------------------------------------------------------------------------
@@ -431,10 +432,11 @@ class TestMiscMethods:
         strat.client_manager.scan_table.return_value = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
         assert strat.count() == 3
 
-    def test_count_returns_zero_on_exception(self):
+    def test_count_raises_on_exception(self):
         strat = _make_strategy()
         strat.client_manager.scan_table.side_effect = RuntimeError("err")
-        assert strat.count() == 0
+        with pytest.raises(StorageError):
+            strat.count()
 
     def test_cleanup_does_not_raise(self):
         strat = _make_strategy()

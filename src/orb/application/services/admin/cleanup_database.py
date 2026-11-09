@@ -14,6 +14,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from orb.domain.base import UnitOfWorkFactory
+from orb.domain.base.ports import LoggingPort
+from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +77,74 @@ class CleanupDatabaseService:
         Delete all requests matching the status filter (and optional age filter).
     """
 
-    def __init__(self, uow_factory: UnitOfWorkFactory) -> None:
+    def __init__(
+        self,
+        uow_factory: UnitOfWorkFactory,
+        configuration_port: Optional[ConfigurationPort] = None,
+        provider_registry: Optional[ProviderRegistryPort] = None,
+        logger: Optional[LoggingPort] = None,
+    ) -> None:
         self._uow_factory = uow_factory
+        self._configuration_port = configuration_port
+        self._provider_registry = provider_registry
+        self._logger = logger
+
+    # ------------------------------------------------------------------
+    # Provider warnings
+    # ------------------------------------------------------------------
+
+    def _warn_if_orphan_gc_deletes(self) -> None:
+        """Warn once per configured provider instance whose orphan GC deletes pods.
+
+        Removing request history makes the pods of those requests look like orphans
+        to a collector that deletes pods without a request record. The lookup only
+        reads configuration and already-cached strategies. When an instance has no
+        cached strategy (a one-shot process), one throwaway strategy is built from
+        the registered factory; it is not initialised, cached or started, so
+        provider constructors must stay free of side effects. A failure here is
+        logged at debug level and never blocks the cleanup.
+        """
+        if self._configuration_port is None or self._provider_registry is None:
+            return
+        try:
+            instances = list(self._configuration_port.get_active_providers())
+        except Exception as exc:
+            self._debug("Orphan GC check skipped: cannot list providers: %s", exc)
+            return
+        for instance in instances:
+            try:
+                strategy = self._provider_registry.get_strategy(instance.name)
+                if strategy is None and self._provider_registry.is_provider_registered(
+                    instance.type
+                ):
+                    strategy = self._provider_registry.create_strategy_by_type(
+                        instance.type, instance
+                    )
+                if strategy is None:
+                    continue
+                features = strategy.get_capabilities().features
+                if features.get("deletes_pods_without_request_record"):
+                    self._warn(
+                        "Request history is being removed while the Kubernetes provider "
+                        "instance '%s' deletes pods that have no request record "
+                        "(orphan_gc_enabled, auto_cleanup_orphans and orb_instance_id "
+                        "are all set). Pods of the removed requests may be deleted. "
+                        "Run the cleanup with the orphan GC disabled, or keep "
+                        "auto_cleanup_orphans off while pruning.",
+                        _safe_log_value(str(instance.name)),
+                    )
+            except Exception as exc:
+                self._debug(
+                    "Orphan GC check skipped for provider %s: %s",
+                    _safe_log_value(str(getattr(instance, "name", "?"))),
+                    exc,
+                )
+
+    def _warn(self, message: str, *args: object) -> None:
+        (self._logger.warning if self._logger else logger.warning)(message, *args)
+
+    def _debug(self, message: str, *args: object) -> None:
+        (self._logger.debug if self._logger else logger.debug)(message, *args)
 
     # ------------------------------------------------------------------
     # Per-row helpers
@@ -108,6 +177,7 @@ class CleanupDatabaseService:
                     "Cancel or fail the request before purging."
                 )
 
+            self._warn_if_orphan_gc_deletes()
             machines_deleted = 0
             if cascade_machines:
                 machines = uow.machines.find_by_request_id(request_id)
@@ -214,6 +284,7 @@ class CleanupDatabaseService:
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=older_than_days)
 
         result = CleanupResult()
+        self._warn_if_orphan_gc_deletes()
 
         with self._uow_factory.create_unit_of_work() as uow:
             all_requests = uow.requests.find_all()

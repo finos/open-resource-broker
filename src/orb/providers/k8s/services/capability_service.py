@@ -25,7 +25,7 @@ from orb.providers.base.strategy import ProviderCapabilities, ProviderOperationT
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 
 if TYPE_CHECKING:  # pragma: no cover
-    pass
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
 
 # Sentinel value used when the user selects the in-cluster ServiceAccount
 # credential source.
@@ -42,12 +42,23 @@ def _normalise_sentinel(value: str) -> str:
 class K8sCapabilityService:
     """Service for k8s provider capabilities, naming, and CLI/credential helpers."""
 
-    def __init__(self, logger: LoggingPort) -> None:
+    def __init__(self, logger: LoggingPort, config: Optional[K8sProviderConfig] = None) -> None:
         self._logger = logger
+        self._config = config
 
     # ------------------------------------------------------------------
     # Capabilities
     # ------------------------------------------------------------------
+
+    def _deletes_pods_without_request_record(self) -> bool:
+        """Whether the orphan GC runs with deletion enabled (the same gate it starts on)."""
+        config = self._config
+        return bool(
+            config is not None
+            and config.orphan_gc_enabled
+            and config.auto_cleanup_orphans
+            and config.orb_instance_id
+        )
 
     def get_capabilities(self) -> ProviderCapabilities:
         """Return the provider's declared operation and API surface."""
@@ -94,6 +105,9 @@ class K8sCapabilityService:
                 },
                 "watch_supported": True,
                 "namespaces_supported": True,
+                # True when the orphan GC deletes pods that have no request record, so
+                # removing request history makes live pods look like orphans.
+                "deletes_pods_without_request_record": self._deletes_pods_without_request_record(),
             },
         )
 

@@ -33,7 +33,6 @@ from orb.application.services.orchestration.dtos import (
     ReturnMachinesInput,
     SyncMachineInput,
 )
-from orb.domain.base import UnitOfWorkFactory
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 from orb.infrastructure.logging.logger import get_logger
 from orb.interface.catalog import OPERATION_CATALOG, Interface
@@ -333,7 +332,7 @@ async def purge_machine(
     _check_destructive_admin_allowed(request)
 
     container = get_di_container()
-    service = CleanupDatabaseService(uow_factory=container.get(UnitOfWorkFactory))
+    service = container.get(CleanupDatabaseService)
 
     try:
         cleanup_result = service.delete_machine(machine_id)

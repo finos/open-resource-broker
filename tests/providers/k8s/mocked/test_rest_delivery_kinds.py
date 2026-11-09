@@ -106,7 +106,12 @@ async def test_acquire_status_and_list_for_kind(client, kmock_k8s, kind) -> None
     entry = status.json()["requests"][0]
     assert (entry.get("requestId") or entry.get("request_id")) == request_id
     assert entry["status"] in _WIRE_REQUEST_STATUSES
-    assert entry["machines"], entry
+    if kind == "Pod":
+        assert entry["machines"], entry
+    else:
+        # The emulated apiserver runs no controller, so a workload has no pods yet and
+        # the request lists no machine; the workload itself is not one.
+        assert entry["machines"] == [], entry
     for machine in entry["machines"]:
         assert machine["machineId"] and machine["name"]
         assert machine["result"] in _WIRE_MACHINE_RESULTS

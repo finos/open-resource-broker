@@ -259,6 +259,9 @@ class K8sJobHandler(K8sHandlerBase):
 
         namespace = self._resolve_namespace_from_provider_data(provider_data)
         job_name = self._resolve_job_name_from_provider_data(provider_data)
+        machine_ids = self._without_controller_name(machine_ids, job_name, request_id)
+        if not machine_ids:
+            return
         self._record_release(namespace=namespace, spec_kind=self.PROVIDER_API)
 
         parallelism = int(provider_data.get("parallelism") or 0)

@@ -95,6 +95,7 @@ def _make_container(
     template_repo,
 ):
     """Return a MagicMock DI container that resolves the given objects."""
+    from orb.application.services.admin.cleanup_database import CleanupDatabaseService
     from orb.domain.base import UnitOfWorkFactory
     from orb.domain.base.ports.configuration_port import ConfigurationPort
     from orb.domain.machine.repository import MachineRepository
@@ -117,6 +118,7 @@ def _make_container(
         RequestRepository: request_repo,
         TemplateRepository: template_repo,
         UnitOfWorkFactory: uow_factory,
+        CleanupDatabaseService: CleanupDatabaseService(uow_factory=uow_factory),
     }
     container = MagicMock()
     container.get.side_effect = lambda t: type_map[t]

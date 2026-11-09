@@ -93,10 +93,24 @@ class TestAcceptedOutcome:
         assert result.data["resource_ids"] == ["deploy-orb-xyz"]
         # Pods haven't been scheduled yet — no machine rows materialised.
         assert result.data["instances"] == []
-        # ``instance_ids`` falls back to ``resource_ids`` when no
-        # machine_ids are known.  This is what the deprovisioning path
-        # uses to scope a follow-up status read.
-        assert result.data["instance_ids"] == ["deploy-orb-xyz"]
+        # The controller is not a machine: the handler's empty answer stands.
+        assert result.data["instance_ids"] == []
+
+    def test_controller_workloads_record_no_machine_at_acquire(self) -> None:
+        for api in ("Deployment", "StatefulSet", "Job"):
+            outcome = Accepted(
+                request_id="req-ctl",
+                pending_resource_ids=["ctl-name"],
+                metadata={"machine_ids": [], "provider_api": api},
+            )
+            result = _outcome_to_provider_result(outcome, fallback_operation="create_instances")
+            assert result.data["instance_ids"] == [], api
+
+    def test_outcome_without_machine_ids_falls_back_to_resource_ids(self) -> None:
+        """Status and follow-up outcomes carry pod names as their resource ids."""
+        outcome = Completed(resource_ids=["pod-a", "pod-b"], metadata={})
+        result = _outcome_to_provider_result(outcome, fallback_operation="get_instance_status")
+        assert result.data["instance_ids"] == ["pod-a", "pod-b"]
 
     def test_accepted_passes_through_rich_instances_from_handler_metadata(self) -> None:
         """Status-resolver-supplied instance dicts are propagated verbatim."""

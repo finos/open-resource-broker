@@ -3,12 +3,28 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from boto3.dynamodb.conditions import Attr
 
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.storage.components.resource_manager import DataConverter
+
+# Criteria operator -> filter condition, in match order. ``build_filter_expression``
+# dispatches through this table and the strategy's ``find_by_criteria`` rejects any
+# operator that is not a key.
+_FILTER_OPERATORS: dict[str, Callable[[Attr, Any], Any]] = {
+    "$eq": lambda attr, value: attr.eq(value),
+    "$ne": lambda attr, value: attr.ne(value),
+    "$in": lambda attr, value: attr.is_in(value),
+    "$gt": lambda attr, value: attr.gt(value),
+    "$gte": lambda attr, value: attr.gte(value),
+    "$lt": lambda attr, value: attr.lt(value),
+    "$lte": lambda attr, value: attr.lte(value),
+    "$contains": lambda attr, value: attr.contains(value),
+    "$begins_with": lambda attr, value: attr.begins_with(value),
+}
+SUPPORTED_OPERATORS: tuple[str, ...] = tuple(_FILTER_OPERATORS)
 
 
 class DynamoDBConverter(DataConverter):
@@ -247,24 +263,11 @@ class DynamoDBConverter(DataConverter):
         for key, value in criteria.items():
             if isinstance(value, dict):
                 # Handle special operators
-                if "$eq" in value:
-                    filter_expressions.append(Attr(key).eq(value["$eq"]))
-                elif "$ne" in value:
-                    filter_expressions.append(Attr(key).ne(value["$ne"]))
-                elif "$in" in value:
-                    filter_expressions.append(Attr(key).is_in(value["$in"]))
-                elif "$gt" in value:
-                    filter_expressions.append(Attr(key).gt(value["$gt"]))
-                elif "$gte" in value:
-                    filter_expressions.append(Attr(key).gte(value["$gte"]))
-                elif "$lt" in value:
-                    filter_expressions.append(Attr(key).lt(value["$lt"]))
-                elif "$lte" in value:
-                    filter_expressions.append(Attr(key).lte(value["$lte"]))
-                elif "$contains" in value:
-                    filter_expressions.append(Attr(key).contains(value["$contains"]))
-                elif "$begins_with" in value:
-                    filter_expressions.append(Attr(key).begins_with(value["$begins_with"]))
+                operator = next((op for op in SUPPORTED_OPERATORS if op in value), None)
+                if operator is not None:
+                    filter_expressions.append(
+                        _FILTER_OPERATORS[operator](Attr(key), value[operator])
+                    )
                 else:
                     # Default equality
                     filter_expressions.append(Attr(key).eq(value))

@@ -55,7 +55,8 @@ def _build_provider_result_data(
       is the *resource* (1 entry: ``[deployment_name]``); the Pods it
       spawns are the *machines* (N entries, populated by the status
       resolver).  Acquire emits ``machine_ids=[]`` because the
-      controller has not yet scheduled any pods.
+      controller has not yet scheduled any pods, so the request has no
+      machines until a status read discovers them.
 
     The bridge therefore propagates whatever the handler put under
     ``metadata['instances']`` verbatim (it carries the authoritative
@@ -68,17 +69,20 @@ def _build_provider_result_data(
     # ``resource_ids`` are the per-controller (or per-pod for the Pod
     # handler) identifiers.  Both are propagated through ``provider_data``
     # so the application layer can reason about them independently.
-    machine_ids = list(meta_dict.get("machine_ids") or [])
     instances = [_to_domain_status(inst) for inst in meta_dict.get("instances") or []]
 
     data: dict[str, Any] = {
         "resource_ids": resource_ids,
         "instances": instances,
         # ``instance_ids`` consumed by deprovisioning / sync paths that
-        # want the per-pod identifiers.  Falls back to ``resource_ids``
-        # for the Pod handler (where resource = machine) when the
-        # handler did not put machine_ids in metadata.
-        "instance_ids": machine_ids or resource_ids,
+        # want the per-pod identifiers.  A handler that reports
+        # ``machine_ids`` is authoritative, including an empty list (a
+        # controller that has scheduled no pods yet).  Outcomes without the
+        # key (status, return, follow-ups) fall back to ``resource_ids``,
+        # which are pod names there.
+        "instance_ids": (
+            list(meta_dict["machine_ids"]) if "machine_ids" in meta_dict else resource_ids
+        ),
         "provider_data": meta_dict,
     }
     if tracking_request_id is not None:

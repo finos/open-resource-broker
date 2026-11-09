@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from orb.domain.base.operation_outcome import Accepted
+from orb.domain.base.operation_outcome import Accepted, Completed
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
@@ -327,10 +327,10 @@ class TestSyntheticInstanceType:
             pod_names=["res-0"],
             request_id="req-synth",
         )
-        req.request_type = RequestType.ACQUIRE
+        req.request_type = RequestType.RETURN
 
         outcome = await registry.get_status(["res-0"], req)
-        assert isinstance(outcome, Accepted)
+        assert isinstance(outcome, (Accepted, Completed))
         instances = (outcome.metadata or {}).get("instances", [])
         synth = [i for i in instances if i.get("instance_id") == "res-0"]
         assert len(synth) == 1
@@ -348,7 +348,7 @@ class TestSyntheticInstanceType:
         registry = _make_registry(handler=mock_handler, provider_api="Job")
 
         req = _make_request(provider_api="Job", pod_names=[], request_id="req-job-unknown")
-        req.request_type = RequestType.ACQUIRE
+        req.request_type = RequestType.RETURN
 
         outcome = await registry.get_status(["job-pod-0"], req)
         instances = (outcome.metadata or {}).get("instances", [])

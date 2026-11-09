@@ -252,17 +252,17 @@ class DynamoDBClientManager(ResourceManager):
             key: Primary key of the item
 
         Returns:
-            Item if found, None otherwise
+            Item if found, None if the item does not exist
+
+        Raises:
+            Exception: Read failures propagate so callers can tell "not found"
+                from "could not read".
         """
-        try:
-            table = self.get_table(table_name)
-            # Strongly consistent: the version read here is the baseline of a later
-            # conditional write, and a reload after a conflict must see the winner
-            response = table.get_item(Key=key, ConsistentRead=True)
-            return response.get("Item")
-        except Exception as e:
-            self.logger.error("Failed to get item from %s: %s", table_name, e)
-            return None
+        table = self.get_table(table_name)
+        # Strongly consistent: the version read here is the baseline of a later
+        # conditional write, and a reload after a conflict must see the winner
+        response = table.get_item(Key=key, ConsistentRead=True)
+        return response.get("Item")
 
     def delete_item(self, table_name: str, key: dict[str, Any]) -> bool:
         """

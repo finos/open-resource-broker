@@ -1128,6 +1128,10 @@ class ORBClient:
         Delegates to :class:`CleanupDatabaseService.bulk_cleanup`, targeting the
         supplied terminal ``statuses`` (defaulting to all terminal statuses) and
         optionally restricting to rows older than ``older_than_days``.
+
+        Logs a warning for each Kubernetes provider instance whose orphan GC deletes
+        pods without a request record (``orphan_gc_enabled``, ``auto_cleanup_orphans``
+        and ``orb_instance_id`` all set).
         """
         return await self._run_bulk_cleanup(
             statuses=statuses,
@@ -1146,6 +1150,10 @@ class ORBClient:
 
         Delegates to :class:`CleanupDatabaseService.bulk_cleanup` with
         ``include_machines=True``.
+
+        Logs a warning for each Kubernetes provider instance whose orphan GC deletes
+        pods without a request record (``orphan_gc_enabled``, ``auto_cleanup_orphans``
+        and ``orb_instance_id`` all set).
         """
         return await self._run_bulk_cleanup(
             statuses=statuses,
@@ -1164,10 +1172,9 @@ class ORBClient:
         import functools
 
         from orb.application.services.admin.cleanup_database import CleanupDatabaseService
-        from orb.domain.base import UnitOfWorkFactory
 
         assert self._container is not None  # noqa: S101  # type-narrowing; callers always check self._initialized before invoking this helper
-        service = CleanupDatabaseService(uow_factory=self._container.get(UnitOfWorkFactory))
+        service = self._container.get(CleanupDatabaseService)
 
         target_statuses = statuses if statuses else list(_TERMINAL_REQUEST_STATUSES)
 

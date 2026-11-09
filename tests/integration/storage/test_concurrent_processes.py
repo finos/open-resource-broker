@@ -11,6 +11,7 @@ import json
 import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -39,11 +40,25 @@ def backend(request, tmp_path, monkeypatch):
     env: dict[str, str] = {}
     if name == "dynamodb":
         pytest.importorskip("flask", reason="the moto server needs moto[server]")
-        from moto.server import ThreadedMotoServer
+        from moto.moto_server.werkzeug_app import DomainDispatcherApplication, create_backend_app
+        from werkzeug.serving import make_server
 
+        # One request at a time, as real DynamoDB applies each request atomically.
+        # moto's TransactWriteItems snapshots the touched tables and, when a
+        # condition fails, restores the whole snapshot without a lock, so on a
+        # threaded server a rolled-back transaction erases a write another
+        # connection committed meanwhile. test_concurrent_read_modify_write asserts
+        # that conflicts still happen, so serialising the server cannot hide
+        # contention between the worker processes.
         port = _free_port()
-        server = ThreadedMotoServer(ip_address="127.0.0.1", port=port, verbose=False)
-        server.start()
+        server = make_server(
+            "127.0.0.1",
+            port,
+            DomainDispatcherApplication(create_backend_app),
+            threaded=False,
+        )
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
         env = {
             "AWS_ENDPOINT_URL": f"http://127.0.0.1:{port}",
             "AWS_ACCESS_KEY_ID": "testing",
@@ -56,7 +71,9 @@ def backend(request, tmp_path, monkeypatch):
         try:
             yield name, _make_uow(name, tmp_path), env
         finally:
-            server.stop()
+            server.shutdown()
+            server_thread.join()
+            server.server_close()
         return
     yield name, _make_uow(name, tmp_path), env
 
@@ -143,7 +160,7 @@ def test_concurrent_read_modify_write_loses_no_update(backend, tmp_path):
         parent_uow.requests.save(request)
     request_id = str(request.request_id)
 
-    _run_workers(name, tmp_path, env, "counter", request_id)
+    retries = _run_workers(name, tmp_path, env, "counter", request_id)
 
     final = parent_uow.requests.find_by_id(request_id)
     assert final is not None
@@ -151,3 +168,6 @@ def test_concurrent_read_modify_write_loses_no_update(backend, tmp_path):
     assert set(final.resource_ids) == expected_ids
     # Every successful write moved the stored version by exactly one
     assert final.version == PROCESSES * PER_PROCESS
+    if name == "dynamodb":
+        # The serialised endpoint must still let the workers collide
+        assert retries > 0

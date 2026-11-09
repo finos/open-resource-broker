@@ -153,9 +153,6 @@ def _k8s_life(request, orb_config_dir_k8s, kmock_k8s, lifecycle_clock, monkeypat
     for handler in _handlers(strategy):
         handler._clock = lifecycle_clock
     life = Lifecycle(cell, cloud, lifecycle_clock, container)
-    # The Deployment cell's one known deviation is pinned by a single strict test;
-    # every other scenario skips that one row so it can exercise its own invariant.
-    life.scenario.tolerate_resource_rows = cell.api == "Deployment"
     yield life
     clear_classifiers()
     clear_shared_kube_state()
