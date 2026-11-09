@@ -48,6 +48,10 @@ from orb.domain.request.exceptions import (
     RequestTimeoutError,
     RequestValidationError,
 )
+from orb.domain.request.termination_confirmation import (
+    InstanceStillVisibleError,
+    TerminationNotVerifiedError,
+)
 from orb.domain.template.exceptions import (
     InvalidTemplateConfigurationError,
     TemplateAlreadyExistsError,
@@ -80,6 +84,8 @@ EXPECTED: dict[type[DomainException], HTTPStatus] = {
     BusinessRuleViolationError: UNPROCESSABLE,
     ConcurrencyError: CONFLICT,
     DuplicateError: CONFLICT,
+    InstanceStillVisibleError: CONFLICT,
+    TerminationNotVerifiedError: CONFLICT,
     # Backend and server-side failures
     InfrastructureError: UNAVAILABLE,
     ConfigurationError: SERVER_ERROR,

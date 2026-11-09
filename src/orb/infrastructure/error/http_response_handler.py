@@ -25,6 +25,10 @@ from orb.domain.request.exceptions import (
     RequestNotFoundError,
     RequestValidationError,
 )
+from orb.domain.request.termination_confirmation import (
+    InstanceStillVisibleError,
+    TerminationNotVerifiedError,
+)
 from orb.domain.template.exceptions import (
     TemplateNotFoundError,
     TemplateValidationError,
@@ -81,6 +85,8 @@ class HTTPErrorResponseHandler:
             BusinessRuleViolationError: self._handle_business_rule_error_http,
             ConcurrencyError: self._handle_concurrency_error_http,
             DuplicateError: self._handle_duplicate_error_http,
+            InstanceStillVisibleError: self._handle_termination_conflict_http,
+            TerminationNotVerifiedError: self._handle_termination_conflict_http,
             # Request errors
             RequestNotFoundError: self._handle_request_not_found_http,
             RequestValidationError: self._handle_request_validation_http,
@@ -145,6 +151,24 @@ class HTTPErrorResponseHandler:
         return ErrorResponse(
             error_code="DUPLICATE_ERROR",
             message="A duplicate resource already exists",
+            category=ErrorCategory.BUSINESS_RULE,
+            details=_safe_details(getattr(exception, "details", {})),
+            http_status=HTTPStatus.CONFLICT,
+        )
+
+    def _handle_termination_conflict_http(
+        self, exception: BusinessRuleViolationError
+    ) -> ErrorResponse:
+        """Report an unconfirmed termination as a conflict with the instance's current state."""
+        self._logger.warning(
+            "Termination not confirmed: %s",
+            str(exception),
+            extra={"details": getattr(exception, "details", {})},
+        )
+        still_visible = isinstance(exception, InstanceStillVisibleError)
+        return ErrorResponse(
+            error_code="INSTANCE_STILL_VISIBLE" if still_visible else "TERMINATION_NOT_VERIFIED",
+            message="The instance termination could not be confirmed",
             category=ErrorCategory.BUSINESS_RULE,
             details=_safe_details(getattr(exception, "details", {})),
             http_status=HTTPStatus.CONFLICT,
