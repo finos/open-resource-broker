@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -441,6 +441,44 @@ class TestCompositeStrategyNoCapableStrategies:
         result = asyncio.run(composite.execute_operation(op))
         assert not result.success
         assert result.error_code == "NO_CAPABLE_STRATEGIES"
+
+    @pytest.mark.parametrize(
+        "mode",
+        [CompositionMode.PARALLEL, CompositionMode.SEQUENTIAL, CompositionMode.LOAD_BALANCED],
+    )
+    def test_operation_supported_by_one_member_routes_only_to_it(self, mock_logger, mode):
+        """The capability union admits the operation; execution reaches only capable members."""
+        limited = ConcreteProviderStrategy(
+            "limited", supported_ops=[ProviderOperationType.HEALTH_CHECK]
+        )
+        full = ConcreteProviderStrategy("full")
+        composite = CompositeProviderStrategy(
+            mock_logger, [limited, full], config=CompositionConfig(mode=mode)
+        )
+        assert set(composite.composed_strategies) == {"limited", "full"}
+        # Force load balancing towards the member that cannot run the operation,
+        # so only the capability filter keeps it from being selected.
+        composite.set_strategy_weight("limited", 1.0)
+        composite.set_strategy_weight("full", 0.0)
+        assert composite.initialize()
+
+        assert composite.get_capabilities().supports_operation(
+            ProviderOperationType.CREATE_INSTANCES
+        )
+
+        with (
+            patch.object(
+                limited, "execute_operation", wraps=limited.execute_operation
+            ) as limited_spy,
+            patch.object(full, "execute_operation", wraps=full.execute_operation) as full_spy,
+        ):
+            result = asyncio.run(
+                composite.execute_operation(make_op(ProviderOperationType.CREATE_INSTANCES))
+            )
+
+        assert result.success
+        full_spy.assert_awaited_once()
+        limited_spy.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

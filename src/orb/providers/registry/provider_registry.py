@@ -444,23 +444,27 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
 
         Raises:
             UnsupportedProviderError: If provider type is not registered
+            ConfigurationError: If the registered config factory rejects the data
         """
         try:
             registration = self._get_type_registration(provider_type)
-            config = registration.config_factory(data)
-            if self._logger:
-                self._logger.debug("Created config for provider: %s", provider_type)
-            return config
         except ValueError:
             available_providers = ", ".join(self.get_registered_types())
             raise UnsupportedProviderError(
                 f"Provider type '{provider_type}' is not registered. "
                 f"Available providers: {available_providers}"
-            )
+            ) from None
+
+        try:
+            config = registration.config_factory(data)
         except Exception as e:
             raise ConfigurationError(
                 f"Failed to create config for provider '{provider_type}': {e!s}"
-            )
+            ) from e
+
+        if self._logger:
+            self._logger.debug("Created config for provider: %s", provider_type)
+        return config
 
     def create_resolver(self, provider_type: str) -> Optional[Any]:
         """

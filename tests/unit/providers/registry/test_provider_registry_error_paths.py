@@ -12,12 +12,19 @@ import types
 from typing import cast
 from unittest.mock import MagicMock, patch
 
+import pydantic
 import pytest
 
 from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.registry.base_registry import RegistryMode
 from orb.providers.registry.provider_registry import ProviderRegistry, get_provider_registry
 from orb.providers.registry.types import ProviderRegistration, UnsupportedProviderError
+
+
+class _RegionConfig(pydantic.BaseModel):
+    """Minimal provider config model whose validation errors escape the factory."""
+
+    region: str
 
 
 def _make_bare_registry() -> ProviderRegistry:
@@ -233,6 +240,36 @@ class TestCreateConfigExceptionTranslation:
 
         with pytest.raises(UnsupportedProviderError):
             registry.create_config("does-not-exist", {})
+
+    def test_validation_error_from_registered_factory_is_configuration_error(self) -> None:
+        """A factory raising pydantic ValidationError is not reported as an unknown provider."""
+        registry = _make_bare_registry()
+        registry.register_type(
+            "custom",
+            strategy_factory=lambda cfg: None,
+            config_factory=lambda data: _RegionConfig(**data),
+        )
+
+        with pytest.raises(ConfigurationError, match="Failed to create config") as exc_info:
+            registry.create_config("custom", {"region": 123})
+
+        assert "region" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, pydantic.ValidationError)
+
+    def test_invalid_gcp_config_is_configuration_error(self) -> None:
+        """An invalid GCP project_id surfaces as a configuration error, not 'not registered'."""
+        from orb.providers.gcp.factories import create_gcp_config
+
+        registry = _make_bare_registry()
+        registry.register_type(
+            "gcp", strategy_factory=lambda cfg: None, config_factory=create_gcp_config
+        )
+
+        with pytest.raises(ConfigurationError, match="Failed to create config") as exc_info:
+            registry.create_config("gcp", {"project_id": "BAD"})
+
+        assert "project_id" in str(exc_info.value)
+        assert isinstance(exc_info.value.__cause__, pydantic.ValidationError)
 
 
 class TestGetDefaultApiAndInstanceRegistration:
