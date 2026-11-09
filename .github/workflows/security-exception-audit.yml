@@ -3,7 +3,8 @@ name: Security Exception Audit
 # Checks every security exception recorded in .trivyignore.yaml and the
 # dependency-review allow-ghsas list against OSV (https://osv.dev) and opens
 # a tracking issue for any exception whose affected package now has a
-# published fix, so the exception can be re-evaluated and removed.
+# published fix, so the exception can be re-evaluated and removed. Fixed
+# Debian entries can be removed with `make security-exception-fixes`.
 
 on:
   schedule:

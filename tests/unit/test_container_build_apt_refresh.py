@@ -118,6 +118,7 @@ def test_published_image_is_scanned_weekly() -> None:
     job = jobs[0]
 
     assert "github.event_name == 'schedule'" in job["if"]
+    assert "github.event_name == 'workflow_dispatch'" in job["if"]
     assert job["permissions"] == {
         "contents": "read",
         "packages": "read",
@@ -125,10 +126,33 @@ def test_published_image_is_scanned_weekly() -> None:
     }
 
     steps = job["steps"]
-    scan = next(s for s in steps if "trivy-action" in s.get("uses", ""))
-    assert scan["with"]["trivyignores"] == ".trivyignore.yaml"
+    scans = [s for s in steps if "trivy-action" in s.get("uses", "")]
+    assert len(scans) == 2
+    # The gate scan uses the union of main's and the release's ignore entries
+    # and fails the job; the advisory scan uses main's file alone and never does.
+    scan, advisory = scans
+    assert scan["with"]["trivyignores"] == ".trivyignore.published.yaml"
     assert str(scan["with"]["exit-code"]) == "1"
     assert scan["env"]["TRIVY_PLATFORM"] == "linux/amd64"
+    assert advisory["with"]["trivyignores"] == ".trivyignore.yaml"
+    assert str(advisory["with"]["exit-code"]) == "0"
+    assert advisory["env"]["TRIVY_PLATFORM"] == "linux/amd64"
+    # Only the separate reporting job may write issues; no scan or install step holds it.
+    reporting = workflow["jobs"]["published-image-release-needed"]
+    assert reporting["permissions"] == {"contents": "read", "issues": "write"}
+    assert reporting["needs"] == ["published-image-scan"]
+    assert not any("trivy-action" in s.get("uses", "") for s in reporting["steps"])
+    assert "workflow_dispatch" in (workflow.get(True) or workflow["on"])
+    report = next(s for s in reporting["steps"] if "summarize" in s.get("run", ""))
+    condition = report["env"]["MANAGE_ISSUE"]
+    assert "github.event_name == 'schedule'" in condition
+    assert "github.ref == 'refs/heads/main'" in condition
+    assert '"$MANAGE_ISSUE" = "true"' in report["run"]
+    # A manual run reports nothing as relevant, so no other job starts for it.
+    relevant = workflow["jobs"]["changes"]["outputs"]["relevant"]
+    assert relevant.startswith("${{ github.event_name == 'workflow_dispatch' && 'false'")
+    build_step = next(s for s in steps if "published_image_ignore.py build" in s.get("run", ""))
+    assert ".trivyignore.published.yaml" in build_step["run"]
 
     upload = next(s for s in steps if "upload-sarif" in s.get("uses", ""))
     assert upload["if"] == "always()"
