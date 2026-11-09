@@ -91,8 +91,12 @@ class EC2FleetReleaseManager(BaseFleetReleaseManager):
         (AWS does not auto-delete request fleets) and cleans up the
         associated launch template.
 
-        For instant fleets, the fleet is already deleted by AWS; only
-        instance termination and launch template cleanup are performed.
+        For instant fleets, only the requested instances are terminated. The
+        fleet record is deleted, without terminating anything further, only
+        when the return covers the whole fleet; deleting an instant fleet
+        terminates every instance it still holds. The launch template cleanup
+        runs on every return and keeps the template while other instances of
+        the request are live.
 
         Args:
             fleet_id: The EC2 Fleet ID to operate on.

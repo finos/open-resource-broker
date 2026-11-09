@@ -221,8 +221,8 @@ class TestBaseFleetReleaseManagerSharedFlow:
         mgr._cancel_or_delete_fleet_mock.assert_not_called()
         mgr._cleanup_launch_template_mock.assert_not_called()
 
-    def test_instant_fleet_unconditional_teardown(self):
-        """Instant fleet (has_fleet_record=False): always attempt delete + cleanup."""
+    def test_instant_fleet_full_return_teardown(self):
+        """Instant fleet fully returned: delete without terminating, then clean up."""
         mgr = _ConcreteFleetReleaseManager()
 
         def _mock_extract(fleet_id, details, iids):
@@ -235,7 +235,21 @@ class TestBaseFleetReleaseManagerSharedFlow:
         # Instant fleets: no _fleet_has_no_remaining_instances check.
         mgr._fleet_has_no_remaining_instances_mock.assert_not_called()
         # But delete IS attempted.
-        mgr._cancel_or_delete_fleet_mock.assert_called_once()
+        mgr._cancel_or_delete_fleet_mock.assert_called_once_with("fleet-i", False, False)
+        mgr._cleanup_launch_template_mock.assert_called_once()
+
+    def test_instant_fleet_partial_return_keeps_fleet(self):
+        """Instant fleet partially returned: keep the fleet, still run template cleanup."""
+        mgr = _ConcreteFleetReleaseManager()
+
+        def _mock_extract(fleet_id, details, iids):
+            return _capacity_input("instant", target=3, count=1, weighted=1), {}
+
+        mgr._extract_capacity_input_mock = MagicMock(side_effect=_mock_extract)
+
+        mgr.release("fleet-i", ["i-1"], {"Type": "instant"})
+
+        mgr._cancel_or_delete_fleet_mock.assert_not_called()
         mgr._cleanup_launch_template_mock.assert_called_once()
 
     def test_empty_instance_ids_full_fleet_cancel(self):

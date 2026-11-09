@@ -607,7 +607,7 @@ class TestEC2FleetReleaseManagerFleetTypes:
             mgr.release("fleet-3", ["i-1"], self._fleet_details("instant", 1))
         mock_delete.assert_not_called()
         aws_client.ec2_client.delete_fleets.assert_called_once_with(
-            FleetIds=["fleet-3"], TerminateInstances=True
+            FleetIds=["fleet-3"], TerminateInstances=False
         )
         cleanup_fn.assert_called_once_with("ec2_fleet", "req-ec2-abc", ["i-1"])
 
