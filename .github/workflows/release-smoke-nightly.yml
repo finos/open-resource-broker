@@ -1,0 +1,58 @@
+name: Release Smoke (browser)
+
+# Nightly: build the release wheel and load every UI page in a real browser
+# against the installed package. Playwright is installed here at a pinned
+# version and is not a dependency of the project.
+
+on:
+  schedule:
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    name: Browser page load
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Read the package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^  version:[[:space:]]*\([^[:space:]#]*\).*/\1/p' .project.yml | head -n 1)"
+          echo "package-version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build the wheel
+        id: wheel
+        uses: ./.github/actions/build-release-wheel
+        with:
+          version: ${{ steps.version.outputs.package-version }}
+
+      - name: Setup Python and UV
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          group: test
+          cache-key: smoke-test-${{ hashFiles('uv.lock') }}
+          fail-on-cache-miss: false
+
+      - name: Install the browser driver
+        shell: bash
+        run: |
+          uv pip install --python .venv/bin/python --require-hashes --no-deps -r .github/requirements/playwright.txt
+          .venv/bin/python -m playwright install --with-deps chromium
+
+      - name: Load every page
+        shell: bash
+        env:
+          ORB_SMOKE_REQUIRED: "1"
+          ORB_SMOKE_BROWSER: "1"
+          ORB_SMOKE_WHEEL: ${{ github.workspace }}/dist/${{ steps.wheel.outputs.wheel-name }}
+          ORB_SMOKE_MOTO_SERVER: ${{ github.workspace }}/.venv/bin/moto_server
+        run: .venv/bin/python -m pytest tests/package_smoke/test_browser_pages.py -p no:xdist -q
