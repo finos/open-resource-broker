@@ -4525,6 +4525,28 @@
             ],
             "title": "Allocation Strategy"
           },
+          "allocation_strategy_on_demand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocation Strategy On Demand"
+          },
+          "fallback_to_ondemand": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback To Ondemand"
+          },
           "max_price": {
             "anyOf": [
               {
