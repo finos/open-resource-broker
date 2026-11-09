@@ -801,38 +801,8 @@ jobs:
     - name: Install openapi-generator-cli
       uses: ./.github/actions/install-openapi-generator-cli
 
-    # The Gradle wrapper launcher JAR is not committed to the repository (it
-    # is a prebuilt binary). Provision Gradle directly and use it to
-    # regenerate gradle-wrapper.jar for both Java and Kotlin before the build
-    # step below invokes ./gradlew, then verify the checksums.
-    - name: Set up Gradle
-      uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
-      with:
-        gradle-version: current
-        # Only used once to regenerate the wrapper launcher; no build to cache.
-        cache-disabled: true
-
-    # Each SDK's target version is read from its own committed wrapper
-    # properties, so a Dependabot Gradle bump is honoured here instead of being
-    # reverted by a hardcoded version. Mirrors the same step in sdk.yml.
-    - name: Regenerate Gradle wrapper launchers
-      run: |
-        set -euo pipefail
-        for sdk in sdk/java sdk/kotlin; do
-          archive=$(sed -n 's/^distributionUrl=.*\/\(gradle-[^/]*\.zip\)$/\1/p' \
-                      "${sdk}/gradle/wrapper/gradle-wrapper.properties")
-          if [ -z "$archive" ]; then
-            echo "::error::Could not parse distributionUrl in ${sdk}/gradle/wrapper/gradle-wrapper.properties"
-            exit 1
-          fi
-          stem=${archive%.zip}            # gradle-9.8.1-bin
-          version=${stem#gradle-}         # 9.8.1-bin
-          version=${version%-*}           # 9.8.1
-          dist_type=${stem##*-}           # bin | all
-          echo "${sdk}: regenerating wrapper for Gradle ${version} (${dist_type})"
-          (cd "$sdk" && gradle wrapper --gradle-version "$version" --distribution-type "$dist_type")
-        done
-
+    # The committed Gradle wrapper launchers are the ones CI tested; verify them
+    # against Gradle's published checksums before any ./gradlew call.
     - name: Validate Gradle wrapper checksums
       uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c  # v6.4.1
       with:

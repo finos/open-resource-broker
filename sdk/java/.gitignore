@@ -16,3 +16,7 @@ generated/
 # Misc
 *.class
 *.jar
+
+# Gradle wrapper launcher — committed so Dependabot can run ./gradlew
+# (validated against Gradle's published checksums in CI).
+!gradle/wrapper/gradle-wrapper.jar

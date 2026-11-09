@@ -253,6 +253,8 @@ Thumbs.db
 
 # Package files
 *.jar
+# Gradle wrapper launcher is committed (checksum-validated in CI)
+!**/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear
