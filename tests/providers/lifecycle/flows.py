@@ -45,7 +45,6 @@ async def acquire_complete(life: Lifecycle, count: int = 3) -> Any:
 
 async def complete_lists_only_machines(life: Lifecycle) -> None:
     """A completed request lists only machines of the cloud, each with an address and an image."""
-    life.scenario.tolerate_resource_rows = False
     await acquire_complete(life, 2)
 
 
@@ -70,8 +69,7 @@ async def delayed_pending(life: Lifecycle, count: int = 2) -> None:
         "pending_converges",
         f"request is {life.status(handle).value} after the machines started",
     )
-    skip = life.scenario.resource_ids if life.scenario.tolerate_resource_rows else set()
-    rows = {k: r for k, r in life.view(handle).rows.items() if k not in skip}
+    rows = life.view(handle).rows
     require(
         {r.status.value for r in rows.values()} == {"running"},
         "pending_converges",
@@ -471,7 +469,7 @@ async def quota_blocked_release(life: Lifecycle, requested: int = 2) -> None:
     life.advance_clock(PAST_DEADLINE_SECONDS)
     await life.sync(handle, check=False)
     precondition(life.status(handle) == RequestStatus.TIMEOUT, "deadline did not give TIMEOUT")
-    precondition(not life.view(handle).rows.keys() - life.scenario.resource_ids, "has machine ids")
+    precondition(not life.view(handle).rows, "has machine ids")
     life.cloud.advance()
     precondition(life.cloud.count(handle.request_id, PENDING, RUNNING) > 0, "no pods appeared")
     await life.sync(handle, check=False)

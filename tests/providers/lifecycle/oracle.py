@@ -165,9 +165,6 @@ class Scenario:
     released_requests: set[str] = field(default_factory=set)
     # Status each request had when its terminal transition was first checked.
     settled: dict[str, RequestStatus] = field(default_factory=dict)
-    # Resource ids (not machines) a request may list among its rows; see the Deployment cell.
-    tolerate_resource_rows: bool = False
-    resource_ids: set[str] = field(default_factory=set)
     # Machines each acquire request owned, remembered for return requests.
     owned: dict[str, set[str]] = field(default_factory=dict)
 
@@ -246,8 +243,7 @@ def _complete_matches_cloud(scn: Scenario, view: RequestView, owned: list) -> No
         "complete_matches_cloud",
         f"COMPLETED with {len(running)} running of {scn.requested} requested",
     )
-    ignored = scn.resource_ids if scn.tolerate_resource_rows else set()
-    reported = [i for i in view.machine_ids if i not in ignored]
+    reported = list(view.machine_ids)
     require(
         len(reported) == len(set(reported)),
         "complete_matches_cloud",
@@ -256,24 +252,17 @@ def _complete_matches_cloud(scn: Scenario, view: RequestView, owned: list) -> No
     cloud_ids = {m.machine_id for m in running}
     foreign = [i for i in reported if i not in cloud_ids]
     require(not foreign, "complete_matches_cloud", f"ids {foreign} do not belong to this request")
-    if not ignored:
-        _same_machines("request", reported, cloud_ids)
-    _same_machines("stored rows", [i for i in view.rows if i not in ignored], cloud_ids)
+    _same_machines("request", reported, cloud_ids)
+    _same_machines("stored rows", list(view.rows), cloud_ids)
     if view.dto is not None:
-        refs = [r.machine_id for r in view.dto.machine_references if r.machine_id not in ignored]
+        refs = [r.machine_id for r in view.dto.machine_references]
         _same_machines("status response", refs, cloud_ids)
     if view.hf_entry is not None:
-        listed = [
-            m.get("machineId")
-            for m in view.hf_entry.get("machines", [])
-            if m.get("machineId") not in ignored
-        ]
+        listed = [m.get("machineId") for m in view.hf_entry.get("machines", [])]
         _same_machines("HostFactory response", listed, cloud_ids)
     for machine in running:
         require(bool(machine.machine_id), "complete_matches_cloud", "empty machine id")
     for machine_id, row in view.rows.items():
-        if machine_id in ignored:
-            continue
         require(
             bool(getattr(row, "private_ip", None)),
             "complete_matches_cloud",
@@ -287,8 +276,6 @@ def _complete_matches_cloud(scn: Scenario, view: RequestView, owned: list) -> No
         )
     if view.dto is not None:
         for ref in view.dto.machine_references:
-            if ref.machine_id in ignored:
-                continue
             require(
                 ref.result == "succeed",
                 "complete_matches_cloud",
@@ -301,8 +288,6 @@ def _complete_matches_cloud(scn: Scenario, view: RequestView, owned: list) -> No
             f"HostFactory status {view.hf_entry.get('status')!r} for a complete request",
         )
         for machine in view.hf_entry.get("machines", []):
-            if machine.get("machineId") in ignored:
-                continue
             require(
                 machine.get("result") == "succeed",
                 "complete_matches_cloud",

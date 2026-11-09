@@ -120,9 +120,7 @@ async def test_every_surface_renders_the_canonical_row(life, state):
         "interface_consistency",
         f"{state}: status {row['status']!r}, want {wire_status!r}",
     )
-    results = {
-        m["result"] for m in row["machines"] if m["machineId"] not in life.scenario.resource_ids
-    }
+    results = {m["result"] for m in row["machines"]}
     require(
         results == {wire_result},
         "interface_consistency",

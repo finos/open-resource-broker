@@ -17,8 +17,9 @@ objects as they were when the call arrived.
 from __future__ import annotations
 
 import itertools
+import json
 from typing import Any, Optional
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from tests.providers.lifecycle.cloud import (
     PENDING,
@@ -61,6 +62,7 @@ class K8sCloud(Cloud):
         self._stopping: set[str] = set()
         self._gone: set[str] = set()
         self._owners: dict[str, Optional[str]] = {}
+        self._return_requests: set[str] = set()
         self._pending: set[str] = set()
         self._counter = itertools.count(1)
 
@@ -77,7 +79,7 @@ class K8sCloud(Cloud):
                     from kubernetes.client.rest import ApiException
 
                     raise ApiException(status=500, reason="Internal Server Error")
-                return original(method, url, *args, **kwargs)
+                return cloud._apply_label_selector(original(method, url, *args, **kwargs), url)
             body = kwargs.get("body")
             if body is None and len(args) > 1:
                 body = args[1]
@@ -86,6 +88,39 @@ class K8sCloud(Cloud):
             )
 
         api_client.call_api = call_api
+
+    def note_return_requests(self, request_ids: list[str]) -> None:
+        """Remember return requests: their status read selects by their own id."""
+        self._return_requests |= set(request_ids)
+
+    def _apply_label_selector(self, response: Any, url: str) -> Any:
+        """Serve a pod list as an apiserver does: only the pods carrying the selector's labels.
+
+        kmock returns every pod, so one request's status read would otherwise also list
+        the pods of every other request. A return request reads the pods it returns by
+        its own id, which no pod carries, so that read is served unfiltered; every other
+        selector that matches nothing gets an empty list.
+        """
+        selector = parse_qs(urlparse(url).query).get("labelSelector")
+        if not selector or "/pods" not in url:
+            return response
+        wanted = dict(term.split("=", 1) for term in selector[0].split(",") if "=" in term)
+        if wanted.get(REQUEST_LABEL) in self._return_requests:
+            return response
+        payload = json.loads(response.read())
+        items = payload.get("items")
+        if not isinstance(items, list):
+            return response
+        payload["items"] = [
+            item
+            for item in items
+            if all(
+                ((item.get("metadata") or {}).get("labels") or {}).get(key) == value
+                for key, value in wanted.items()
+            )
+        ]
+        response.data = json.dumps(payload).encode()
+        return response
 
     # ---- mutation hooks -----------------------------------------------------------
 

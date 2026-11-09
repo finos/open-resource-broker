@@ -258,3 +258,35 @@ def test_build_template_namespace_from_provider_config_is_promoted() -> None:
         f"Expected namespace='custom-namespace-xyz', got {template.namespace!r}. "
         "providerConfig.namespace was silently ignored."
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_api", ["Deployment", "StatefulSet", "Job"])
+async def test_controller_acquire_status_lists_only_its_pods(provider_api: str) -> None:
+    """The controller named in resource_ids is not a machine, so a status read
+    reports the pods it runs and nothing for the controller itself."""
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
+
+    handler = MagicMock()
+    handler.check_hosts_status.return_value = _make_check_result(
+        instances=[_instance("ctl-0"), _instance("ctl-1")],
+        state="fulfilled",
+    )
+    registry = K8sHandlerRegistry(
+        config=K8sProviderConfig(),
+        logger=MagicMock(),
+        client_provider=MagicMock,
+        watch_manager_provider=lambda: None,
+        plugin_factories=lambda: {},
+        native_spec_service_provider=lambda: None,
+        handler_overrides={provider_api: handler},
+    )
+    request = _make_request(request_type=RequestType.ACQUIRE)
+    request.provider_api = provider_api
+    request.provider_data = {}
+
+    outcome = await registry.get_status(["ctl"], request)
+
+    assert isinstance(outcome, Completed)
+    assert [i["instance_id"] for i in outcome.metadata["instances"]] == ["ctl-0", "ctl-1"]
+    assert sorted(outcome.resource_ids) == ["ctl-0", "ctl-1"]

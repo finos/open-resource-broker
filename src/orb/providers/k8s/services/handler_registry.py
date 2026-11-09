@@ -426,7 +426,17 @@ class K8sHandlerRegistry:
             synthetic_instance_type = api_to_instance_type.get(provider_api, f"k8s/{provider_api}")
 
             live_ids = {i.get("instance_id", "") for i in instances}
-            missing_ids = [mid for mid in (resource_ids or []) if mid and mid not in live_ids]
+            # The resource ids of a Deployment, StatefulSet or Job acquire name the
+            # controller, not machines: the pods it runs are the machines and the
+            # handler reports them. A controller is never a pod to reconcile, so
+            # only a pod request or a return (whose ids are pod names) is checked
+            # for absent ids.
+            names_machines = is_return or provider_api == "Pod"
+            missing_ids = (
+                [mid for mid in (resource_ids or []) if mid and mid not in live_ids]
+                if names_machines
+                else []
+            )
             for mid in missing_ids:
                 if confirmed_pod_names and mid in confirmed_pod_names:
                     instances.append(
