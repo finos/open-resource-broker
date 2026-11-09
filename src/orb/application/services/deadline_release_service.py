@@ -11,10 +11,15 @@ The release is finished only when a fresh provider read shows nothing left to
 release. A return that was created but never ran, a failed return, an unreachable
 provider or a lost write all leave the mark in place, so the next run tries again.
 
+A request that reached the deadline with resource ids but no machine ids is marked
+too. Its resources are read directly: the instances found are recorded as
+machines of the request and released by the same rules, and a resource that
+shows no instance at all is aborted through the provider's CANCEL_PROVISIONING
+operation, which also terminates anything it launched meanwhile. When the
+provider cannot abort, the mark records that and one alert is logged.
+
 Releases run as background tasks: they await provider termination, which must not
-add to the latency of a poll or be cancelled with the caller. Known limit: a
-request that reached the deadline with only a resource id and no machine ids is
-not marked, so what its resource launches afterwards is not released here.
+add to the latency of a poll or be cancelled with the caller.
 """
 
 from __future__ import annotations
@@ -32,16 +37,21 @@ from orb.application.services.machine_sync_service import (
     FailedProviderFetch,
     MachineSyncService,
 )
+from orb.application.services.provisioning_abort import abort_provisioning
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import ConcurrencyError
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
+from orb.domain.machine.aggregate import Machine
 from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.aggregate import Request
 from orb.domain.request.deadline_release import (
+    DEADLINE_RELEASE_ABORT_KEY,
     DEADLINE_RELEASE_KEY,
     RELEASE_DONE,
     RELEASE_NOTHING,
     RELEASE_PENDING,
+    RELEASE_UNSUPPORTED,
 )
 from orb.domain.request.exceptions import RequestValidationError
 from orb.domain.request.request_types import RequestStatus, RequestType
@@ -83,9 +93,11 @@ class DeadlineReleaseService:
         scan_interval_seconds: float = 300.0,
         clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
         monotonic: Callable[[], float] = time.monotonic,
+        provider_selection_port: Optional[ProviderSelectionPort] = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._machine_sync_service = machine_sync_service
+        self._provider_selection_port = provider_selection_port
         self._command_bus = command_bus
         self._logger = logger
         self._semaphore = asyncio.Semaphore(max(1, max_concurrency))
@@ -251,6 +263,9 @@ class DeadlineReleaseService:
             )
             return RELEASE_PENDING
 
+        if not request.machine_ids:
+            return await self._release_resources(request, stored_machines, provider_machines)
+
         ours = set(request.machine_ids)
         mine = [m for m in provider_machines if m.machine_id.value in ours]
         if not mine and not (
@@ -282,6 +297,111 @@ class DeadlineReleaseService:
 
         await self._issue_return(request, leftover)
         return RELEASE_PENDING
+
+    async def _release_resources(
+        self,
+        request: Request,
+        stored_machines: list[Machine],
+        provider_machines: list[Machine],
+    ) -> str:
+        """Release a request that recorded resource ids but no machine ids.
+
+        The provider read is scoped to the request's own resources, so every
+        instance in it belongs to the request. Instances found are recorded as
+        machines of the request (the return path looks machines up by id) and
+        released as on the machine path. Only a read that shows no instance at
+        all aborts the resources, so pending or launching instances are never
+        removed together with their group.
+        """
+        request_id = str(request.request_id)
+        if any(m.status == MachineStatus.UNKNOWN for m in provider_machines):
+            self._logger.debug(
+                "Provider read of request %s has instances without a known status; "
+                "keeping the release pending",
+                request_id,
+            )
+            return RELEASE_PENDING
+        if not provider_machines:
+            return await self._abort_resources(request)
+
+        await self._machine_sync_service.sync_machines_with_provider(
+            request, stored_machines, provider_machines
+        )
+        leftover = [m.machine_id.value for m in provider_machines if m.status in _UNSTARTED]
+        if leftover:
+            await self._issue_return(request, leftover)
+            return RELEASE_PENDING
+        _, recorded = await asyncio.to_thread(self._load, request_id)
+        mark = RELEASE_DONE if any(m.return_request_id for m in recorded) else RELEASE_NOTHING
+        await asyncio.to_thread(self._write_mark, request_id, mark)
+        return mark
+
+    async def _abort_resources(self, request: Request) -> str:
+        """Abort resources that launched nothing; record the outcome on the mark."""
+        request_id = str(request.request_id)
+        provider_name = request.provider_name
+        if self._provider_selection_port is None or not provider_name:
+            self._logger.warning(
+                "No provider to abort the resources of request %s; keeping the release pending",
+                request_id,
+            )
+            return RELEASE_PENDING
+        resource_ids = list(request.resource_ids)
+        try:
+            abort = await abort_provisioning(
+                self._provider_selection_port,
+                provider_name,
+                request_id,
+                request.provider_api,
+                resource_ids,
+            )
+        except Exception as exc:
+            self._logger.warning(
+                "Aborting the resources of request %s failed, will retry: %s", request_id, exc
+            )
+            return RELEASE_PENDING
+
+        if not abort.supported:
+            if await asyncio.to_thread(self._write_mark, request_id, RELEASE_UNSUPPORTED):
+                self._logger.error(
+                    "Request %s reached its deadline with resources %s that launched nothing, "
+                    "and provider %s cannot abort them (%s); remove them manually",
+                    request_id,
+                    resource_ids,
+                    provider_name,
+                    abort.reason,
+                    extra={
+                        "event": "request.deadline_abort_unsupported",
+                        "request_id": request_id,
+                        "provider_name": provider_name,
+                        "resource_ids": resource_ids,
+                        "reason": abort.reason,
+                    },
+                )
+            return RELEASE_UNSUPPORTED
+        if not abort.success:
+            self._logger.warning(
+                "Aborting the resources of request %s failed, will retry: %s",
+                request_id,
+                abort.reason,
+            )
+            return RELEASE_PENDING
+
+        # The abort terminates what the resources launched, including any
+        # instance listed after the read; they are recorded, not returned again.
+        await asyncio.to_thread(
+            self._write_mark,
+            request_id,
+            RELEASE_DONE,
+            {
+                DEADLINE_RELEASE_ABORT_KEY: {
+                    "resource_ids": resource_ids,
+                    "members": list(abort.members),
+                    "outcomes": list(abort.outcomes),
+                }
+            },
+        )
+        return RELEASE_DONE
 
     async def _issue_return(self, request: Request, leftover: list[str]) -> None:
         request_id = str(request.request_id)
@@ -315,7 +435,9 @@ class DeadlineReleaseService:
             )
         return request, machines
 
-    def _write_mark(self, request_id: str, mark: str) -> bool:
+    def _write_mark(
+        self, request_id: str, mark: str, details: Optional[dict[str, object]] = None
+    ) -> bool:
         """Record the outcome on a fresh read; False when the mark is not pending any more."""
         for attempt in range(_STAMP_WRITE_ATTEMPTS):
             try:
@@ -323,7 +445,9 @@ class DeadlineReleaseService:
                     current = uow.requests.get_by_id(RequestId(value=request_id))
                     if current is None or not self.is_owed(current):
                         return False
-                    uow.requests.save(current.update_metadata({DEADLINE_RELEASE_KEY: mark}))
+                    uow.requests.save(
+                        current.update_metadata({**(details or {}), DEADLINE_RELEASE_KEY: mark})
+                    )
                 return True
             except ConcurrencyError:
                 if attempt + 1 >= _STAMP_WRITE_ATTEMPTS:

@@ -286,6 +286,7 @@ def _register_deadline_release_service(container: DIContainer) -> None:
     from orb.application.services.machine_sync_service import MachineSyncService
     from orb.domain.base import UnitOfWorkFactory
     from orb.domain.base.clock import Clock, SystemClock
+    from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 
     def create_deadline_release_service(c: DIContainer) -> DeadlineReleaseService:
         clock = c.get_optional(Clock) or SystemClock()
@@ -296,6 +297,7 @@ def _register_deadline_release_service(container: DIContainer) -> None:
             logger=c.get(LoggingPort),
             clock=clock.now,
             monotonic=clock.monotonic,
+            provider_selection_port=c.get(ProviderSelectionPort),
         )
 
     container.register_singleton(DeadlineReleaseService, create_deadline_release_service)

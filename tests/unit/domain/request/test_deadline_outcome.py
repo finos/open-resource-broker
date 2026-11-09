@@ -80,8 +80,17 @@ def test_all_running_at_deadline_completes_without_release():
     assert STAMP not in result.metadata
 
 
-def test_timeout_without_machine_ids_owes_nothing():
+def test_timeout_with_only_a_resource_id_owes_a_release():
     request = _expired(machine_ids=[])
+
+    result = _machine().evaluate_deadline(request, now=NOW, running_count=0, fresh_read=True)
+
+    assert result.status == RequestStatus.TIMEOUT
+    assert result.metadata[STAMP] == "pending"
+
+
+def test_timeout_without_machine_ids_or_resource_ids_owes_nothing():
+    request = _expired(machine_ids=[]).model_copy(update={"resource_ids": []})
 
     result = _machine().evaluate_deadline(request, now=NOW, running_count=0, fresh_read=True)
 

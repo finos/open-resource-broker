@@ -112,7 +112,8 @@ def test_row_with_a_deadline_and_no_machine_ids_is_decided_by_the_state_machine(
 
     assert swept == 1
     assert repo.saves[0].status == RequestStatus.TIMEOUT
-    assert STAMP not in repo.saves[0].metadata
+    # Its resource may have launched machines it never recorded.
+    assert repo.saves[0].metadata[STAMP] == "pending"
 
 
 def test_legacy_row_without_a_deadline_is_force_failed():
