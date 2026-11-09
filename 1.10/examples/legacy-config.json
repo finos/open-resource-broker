@@ -1,0 +1,19 @@
+{
+  "provider": {
+    "type": "aws",
+    "aws": {
+      "region": "us-east-1",
+      "profile": "default",
+      "max_retries": 3,
+      "timeout": 30
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "file_path": "logs/legacy.log",
+    "console_enabled": false
+  },
+  "storage": {
+    "strategy": "json"
+  }
+}

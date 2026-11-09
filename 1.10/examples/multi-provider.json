@@ -1,0 +1,68 @@
+{
+  "provider": {
+    "selection_policy": "WEIGHTED_ROUND_ROBIN",
+    "health_check_interval": 30,
+    "circuit_breaker": {
+      "enabled": true,
+      "failure_threshold": 5,
+      "recovery_timeout": 60,
+      "half_open_max_calls": 3
+    },
+    "providers": [
+      {
+        "name": "aws_primary_us-east-1",
+        "type": "aws",
+        "enabled": true,
+        "priority": 1,
+        "weight": 70,
+        "capabilities": ["compute", "storage", "networking"],
+        "config": {
+          "region": "us-east-1",
+          "profile": "primary",
+          "max_retries": 3,
+          "timeout": 30
+        }
+      },
+      {
+        "name": "aws_backup_us-west-2",
+        "type": "aws",
+        "enabled": true,
+        "priority": 2,
+        "weight": 30,
+        "capabilities": ["compute", "storage"],
+        "config": {
+          "region": "us-west-2",
+          "profile": "backup",
+          "max_retries": 5,
+          "timeout": 45
+        }
+      }
+    ]
+  },
+  "logging": {
+    "level": "INFO",
+    "file_path": "logs/multi-provider.log",
+    "console_enabled": true
+  },
+  "storage": {
+    "strategy": "json",
+    "json_strategy": {
+      "storage_type": "single_file",
+      "base_path": "data",
+      "filenames": {
+        "single_file": "multi_provider_database.json"
+      }
+    }
+  },
+  "template": {
+    "default_image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+    "default_instance_type": "t3.small",
+    "subnet_ids": ["subnet-12345678", "subnet-87654321"],
+    "security_group_ids": ["sg-12345678"],
+    "ami_resolution": {
+      "enabled": true,
+      "fallback_on_failure": true,
+      "cache_enabled": true
+    }
+  }
+}

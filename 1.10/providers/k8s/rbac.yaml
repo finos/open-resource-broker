@@ -1,0 +1,265 @@
+# Minimum RBAC for the ORB Kubernetes provider running in-cluster.
+#
+# Apply with:
+#     kubectl apply -f docs/root/providers/k8s/rbac.yaml
+#
+# Scope:
+#   - Single-namespace mode.  For multi-namespace mode duplicate the Role +
+#     RoleBinding per namespace, or upgrade to ClusterRole + ClusterRoleBinding
+#     for cluster-scoped watches (`namespaces: ["*"]`).
+#
+# Adjust:
+#   - `metadata.namespace` to match where ORB runs.
+#   - The verbs list to drop any handler you do not use (e.g. drop
+#     `apps` / `deployments` if you only use the Pod handler).
+#
+# Opt-in sections:
+#   - events_watch_enabled     — events rule in the Role below
+#   - node_watch_enabled       — nodes rule in the ClusterRole section below
+#                                (always requires ClusterRole, even in single-namespace mode)
+#   - inbound_auth_enabled     — TokenReview ClusterRoleBinding at the end
+#
+# References:
+#   - docs/root/providers/k8s/auth.md
+#   - docs/root/providers/k8s/configuration.md
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orb
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orb
+  namespace: orb
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: orb
+  namespace: orb
+rules:
+  # Core — required for the Pod handler and for the watch task.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get"]
+  # Pod logs — optional; useful for diagnosing handler creation failures.
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # Events — required when `events_watch_enabled: true` (default: false).
+  # The events watcher streams CoreV1Api.list_event_for_all_namespaces
+  # filtered to involvedObject.kind=Node and caches Karpenter
+  # node-disruption events.  A namespace-scoped Role suffices for
+  # single-namespace mode; upgrade to ClusterRole when namespaces=["*"].
+  # Omit this rule when events_watch_enabled is False.
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+
+  # apps/v1 — required for the Deployment and StatefulSet handlers.
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/status", "statefulsets/status"]
+    verbs: ["get"]
+  # Scale subresource — required for Deployment/StatefulSet handlers and
+  # for START_INSTANCES / STOP_INSTANCES (scale to 0 / restore replicas).
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale", "statefulsets/scale"]
+    verbs: ["get", "patch"]
+
+  # batch/v1 — required for the Job handler.
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs/status"]
+    verbs: ["get"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: orb
+  namespace: orb
+subjects:
+  - kind: ServiceAccount
+    name: orb
+    namespace: orb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: orb
+
+# ---------------------------------------------------------------------------
+# Cluster-scoped variant
+# ---------------------------------------------------------------------------
+# Use this section INSTEAD of the Role + RoleBinding above when you set
+# `namespaces: ["*"]` in K8sProviderConfig (cluster-scoped watch mode).
+# The watcher must be able to list/watch the target resource types across all
+# namespaces; a namespaced Role cannot grant that.
+#
+# Apply with:
+#     kubectl apply -f docs/root/providers/k8s/rbac-cluster-scoped.yaml
+# or inline by replacing the Role + RoleBinding section above.
+#
+# NOTE: ClusterRole + ClusterRoleBinding grant permissions cluster-wide.
+# Review with your security team before applying in shared clusters.
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: orb
+  labels:
+    app.kubernetes.io/name: orb
+    app.kubernetes.io/component: cluster-scoped-watch
+rules:
+  # Core — required for the Pod handler and for the cluster-scoped watch task.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get"]
+  # Pod logs — optional; useful for diagnosing handler creation failures.
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # Events — required when `events_watch_enabled: true` (default: false).
+  # See events_watch_enabled note in the Role section above.
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  # Nodes — required when `node_watch_enabled: true` (default: false).
+  # The node watcher streams CoreV1Api.list_node to cache per-node metadata
+  # (instance type, availability zone, capacity type, CPU/memory capacity)
+  # and enriches per-instance provider_data in get_status responses.
+  # Nodes are cluster-scoped; a namespaced Role cannot grant this permission.
+  # This rule is always placed here (not in the namespaced Role) because
+  # node access is inherently cluster-scoped regardless of provider mode.
+  # Omit this rule when node_watch_enabled is False (the default).
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+
+  # apps/v1 — required for the Deployment and StatefulSet handlers.
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/status", "statefulsets/status"]
+    verbs: ["get"]
+  # Scale subresource — required for Deployment/StatefulSet handlers and
+  # for START_INSTANCES / STOP_INSTANCES.
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale", "statefulsets/scale"]
+    verbs: ["get", "patch"]
+
+  # batch/v1 — required for the Job handler.
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs/status"]
+    verbs: ["get"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: orb
+  labels:
+    app.kubernetes.io/name: orb
+    app.kubernetes.io/component: cluster-scoped-watch
+subjects:
+  - kind: ServiceAccount
+    name: orb
+    namespace: orb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: orb
+
+# ---------------------------------------------------------------------------
+# Inbound TokenReview auth  (opt-in via inbound_auth_enabled: true)
+# ---------------------------------------------------------------------------
+# Required when `inbound_auth_enabled: true` in K8sProviderConfig.
+#
+# The KubeAuthStrategy validates caller Bearer tokens by submitting them
+# to the `authentication.k8s.io/v1 TokenReview` API.  The ORB pod's
+# ServiceAccount must be able to create TokenReview objects.
+#
+# Option A (recommended): bind the standard system:auth-delegator ClusterRole,
+# which grants exactly `tokenreviews: create` on authentication.k8s.io.
+#
+# Option B: create a targeted ClusterRole granting only tokenreviews: create
+# (shown below, commented out).
+#
+# Uncomment ONE of the two options below when inbound_auth_enabled=true.
+# Leave both commented out (the default) when inbound_auth_enabled=false.
+#
+# See docs/root/providers/k8s/auth.md for role-mapping configuration.
+
+# --- Option A: bind system:auth-delegator (recommended) ---
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: orb-auth-delegator
+#   labels:
+#     app.kubernetes.io/name: orb
+#     app.kubernetes.io/component: inbound-auth
+# subjects:
+#   - kind: ServiceAccount
+#     name: orb
+#     namespace: orb
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: system:auth-delegator
+
+# --- Option B: targeted ClusterRole + ClusterRoleBinding ---
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: orb-tokenreview
+#   labels:
+#     app.kubernetes.io/name: orb
+#     app.kubernetes.io/component: inbound-auth
+# rules:
+#   - apiGroups: ["authentication.k8s.io"]
+#     resources: ["tokenreviews"]
+#     verbs: ["create"]
+#
+# ---
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: orb-tokenreview
+#   labels:
+#     app.kubernetes.io/name: orb
+#     app.kubernetes.io/component: inbound-auth
+# subjects:
+#   - kind: ServiceAccount
+#     name: orb
+#     namespace: orb
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: orb-tokenreview
