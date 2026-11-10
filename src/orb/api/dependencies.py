@@ -26,6 +26,7 @@ from orb.application.services.orchestration.get_machine import GetMachineOrchest
 from orb.application.services.orchestration.get_request_status import GetRequestStatusOrchestrator
 from orb.application.services.orchestration.get_template import GetTemplateOrchestrator
 from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
+from orb.application.services.orchestration.list_providers import ListProvidersOrchestrator
 from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
 from orb.application.services.orchestration.list_return_requests import (
     ListReturnRequestsOrchestrator,
@@ -139,6 +140,11 @@ def get_sync_machine_orchestrator():
 def get_list_templates_orchestrator() -> ListTemplatesOrchestrator:
     """Get ListTemplatesOrchestrator from DI container."""
     return get_di_container().get(ListTemplatesOrchestrator)
+
+
+def get_list_providers_orchestrator() -> ListProvidersOrchestrator:
+    """Get ListProvidersOrchestrator from DI container."""
+    return get_di_container().get(ListProvidersOrchestrator)
 
 
 def get_list_return_requests_orchestrator() -> ListReturnRequestsOrchestrator:

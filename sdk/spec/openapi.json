@@ -2272,14 +2272,16 @@
           "Providers"
         ],
         "summary": "List Providers",
-        "description": "Returns all configured provider instances with name, type, enabled flag, and a provider-specific config object.  Does not perform live connectivity probes; use GET /providers/health for live status.",
+        "description": "Returns all configured provider instances with name, type, enabled flag, capabilities, selection weight and priority, and a provider-specific config object.  Does not perform live connectivity probes; use GET /providers/health for live status.",
         "operationId": "listProviders",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderListResponse"
+                }
               }
             }
           }
@@ -3656,6 +3658,124 @@
         ],
         "title": "MachineReferenceDTO",
         "description": "Data Transfer Object for machine reference."
+      },
+      "ProviderItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities",
+            "default": []
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "ProviderItem",
+        "description": "A configured provider instance."
+      },
+      "ProviderListResponse": {
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderItem"
+            },
+            "type": "array",
+            "title": "Providers",
+            "default": []
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "default": 0
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "default": 0
+          },
+          "selection_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Policy"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "title": "ProviderListResponse",
+        "description": "Response for the provider list endpoint (default scheduler format)."
       },
       "RequestItem": {
         "properties": {

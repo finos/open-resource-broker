@@ -544,11 +544,13 @@ OPERATION_CATALOG: dict[str, CatalogEntry[Any, Any]] = {
             {
                 "providers": out.providers,
                 "count": out.count,
+                # Legacy REST key for the same value as ``count``.
+                "total_count": out.count,
                 "selection_policy": out.selection_policy,
                 "message": out.message,
             }
         ),
-        exposed_on=frozenset({_CLI, _MCP}),
+        exposed_on=frozenset({_CLI, _REST, _MCP, _SDK}),
     ),
     "get_provider_config": CatalogEntry(
         key="get_provider_config",

@@ -14,7 +14,16 @@ try:
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
-from orb.api.dependencies import get_config_manager, get_di_container, require_role
+from orb.api.dependencies import (
+    get_config_manager,
+    get_di_container,
+    get_list_providers_orchestrator,
+    get_request_formatter,
+    require_role,
+)
+from orb.api.models.responses import ProviderListResponse
+from orb.api.rest_render import render_rest
+from orb.application.services.orchestration.dtos import ListProvidersInput
 from orb.domain.base.exceptions import (
     ConfigurationError,
     EntityNotFoundError,
@@ -286,50 +295,26 @@ async def get_provider_schema(
     summary="List Providers",
     description=(
         "Returns all configured provider instances with name, type, enabled flag, "
-        "and a provider-specific config object.  Does not perform live connectivity "
-        "probes; use GET /providers/health for live status."
+        "capabilities, selection weight and priority, and a provider-specific config "
+        "object.  Does not perform live connectivity probes; use GET /providers/health "
+        "for live status."
     ),
+    response_model=ProviderListResponse,
 )
 @handle_rest_exceptions(endpoint="/api/v1/providers", method="GET")
 async def list_providers(
-    config_manager=CONFIG_MANAGER,
     _user=Depends(require_role("viewer")),
+    orchestrator=Depends(get_list_providers_orchestrator),
+    formatter=Depends(get_request_formatter),
 ) -> JSONResponse:
     """Return all configured provider instances.
 
-    Each entry includes:
-
-    * ``name``    – the unique provider instance identifier
-    * ``type``    – the provider type (e.g. ``"aws"``, ``"k8s"``)
-    * ``enabled`` – whether the instance is active
-    * ``config``  – provider-specific configuration keys (nested object)
-
-    AWS-specific top-level keys such as ``"profile"`` are intentionally
-    absent; they are nested inside ``config`` when present.
+    Each entry includes ``name``, ``type``, ``enabled``, ``status``, ``capabilities``,
+    ``weight``, ``priority`` and ``config`` (the provider-specific configuration
+    keys, nested). ``total_count`` repeats ``count``.
     """
-    providers_list: list[dict[str, Any]] = []
-
-    provider_config, active_providers = _read_provider_config(config_manager)
-    if provider_config:
-        for provider_instance in active_providers:
-            name: str = getattr(provider_instance, "name", "")
-            ptype: str = getattr(provider_instance, "type", "unknown")
-            enabled: bool = bool(getattr(provider_instance, "enabled", True))
-            instance_config: dict[str, Any] = getattr(provider_instance, "config", {}) or {}
-
-            providers_list.append(
-                {
-                    "name": name,
-                    "type": ptype,
-                    "enabled": enabled,
-                    "config": instance_config,
-                }
-            )
-
-    return JSONResponse(
-        content={"providers": providers_list, "total_count": len(providers_list)},
-        status_code=200,
-    )
+    result = await orchestrator.execute(ListProvidersInput())
+    return render_rest("list_providers", formatter, result)
 
 
 @router.get(

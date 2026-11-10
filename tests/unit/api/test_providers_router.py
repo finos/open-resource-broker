@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from orb.api.dependencies import get_config_manager, get_current_user
 from orb.api.routers.providers import router as providers_router
+from tests.unit.api.providers_support import serve_providers_from
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -74,6 +75,9 @@ def _make_provider_instance(*, name: str, ptype: str = "aws", enabled: bool = Tr
     p.type = ptype
     p.enabled = enabled
     p.config = {}
+    p.weight = 1
+    p.priority = 0
+    p.get_effective_handlers.return_value = {}
     return p
 
 
@@ -81,6 +85,8 @@ def _make_config_manager_with_providers(*providers) -> MagicMock:
     provider_config = MagicMock()
     provider_config.get_active_providers.return_value = list(providers)
     provider_config.default_provider = providers[0].name if providers else None
+    provider_config.provider_defaults = {}
+    provider_config.selection_policy = "first_available"
 
     config_mgr = MagicMock()
     config_mgr.get_provider_config.return_value = provider_config
@@ -339,7 +345,7 @@ class TestListProvidersConfigFailures:
         config_mgr.get_provider_config.side_effect = RuntimeError("config blow up")
 
         app = _make_app()
-        app.dependency_overrides[get_config_manager] = lambda: config_mgr
+        serve_providers_from(app, config_mgr)
         client = TestClient(app, raise_server_exceptions=False)
         _assert_config_error(client.get("/providers/"))
 
@@ -351,7 +357,7 @@ class TestListProvidersConfigFailures:
         config_mgr.get_provider_config.return_value = provider_config
 
         app = _make_app()
-        app.dependency_overrides[get_config_manager] = lambda: config_mgr
+        serve_providers_from(app, config_mgr)
         client = TestClient(app, raise_server_exceptions=False)
         _assert_config_error(client.get("/providers/"))
 

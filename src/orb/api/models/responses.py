@@ -105,6 +105,33 @@ class RequestStatusResponse(BaseModel):
     next_cursor: Optional[str] = None
 
 
+class ProviderItem(BaseModel):
+    """A configured provider instance."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+    type: str
+    enabled: bool = True
+    status: Optional[str] = None
+    capabilities: list[str] = []
+    weight: Optional[int] = None
+    priority: Optional[int] = None
+    config: dict[str, Any] = {}
+
+
+class ProviderListResponse(BaseModel):
+    """Response for the provider list endpoint (default scheduler format)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    providers: list[ProviderItem] = []
+    count: int = 0
+    total_count: int = 0
+    selection_policy: Optional[str] = None
+    message: Optional[str] = None
+
+
 class RequestOperationResponse(BaseModel):
     """Response for request create / cancel operations."""
 
