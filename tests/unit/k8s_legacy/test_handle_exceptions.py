@@ -1,7 +1,6 @@
 """Regression tests for the k8s_legacy exception-handling decorator.
 
-See https://github.com/finos/open-resource-broker/issues/670: the specific
-handlers must apply on every call, not only the first one.
+The specific handlers must apply on every call, not only the first one.
 """
 
 from __future__ import annotations
