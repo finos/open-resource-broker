@@ -1,8 +1,10 @@
 """Init command handler for ORB configuration initialization."""
 
+import argparse
 import json
 import platform
 import shutil
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -750,13 +752,36 @@ def _get_default_config(
     args, container: Any, used_provider_types: Optional[set[str]] = None
 ) -> Dict[str, Any]:
     """Get default configuration from args."""
+    return build_default_config(
+        container,
+        provider_type=args.provider_type,
+        scheduler_type=args.scheduler or "default",
+        options=vars(args),
+        used_provider_types=used_provider_types,
+    )
+
+
+def build_default_config(
+    container: Any,
+    *,
+    provider_type: Optional[str],
+    scheduler_type: str,
+    options: Mapping[str, Any],
+    used_provider_types: Optional[set[str]] = None,
+) -> Dict[str, Any]:
+    """Build the non-interactive init configuration from plain values.
+
+    ``options`` carries the provider options by their CLI argument names (for
+    example ``aws_region``), so the command line and the REST API build the same
+    configuration from the same values.
+    """
+    args = argparse.Namespace(**{**options, "provider_type": provider_type})
     # Get first available provider as default
     providers = _get_available_providers(container)
-    if not providers and not args.provider_type:
+    resolved_type = provider_type or (providers[0]["type"] if providers else None)
+    if not resolved_type:
         raise ValueError("No providers registered. Install a provider plugin to continue.")
-    default_provider = providers[0]["type"] if providers else args.provider_type
-
-    provider_type = args.provider_type or default_provider
+    provider_type = resolved_type
     if used_provider_types is not None:
         used_provider_types.add(provider_type)
     strategy_class = _get_provider_strategy(provider_type, container=container)
@@ -788,7 +813,7 @@ def _get_default_config(
     }
 
     return {
-        "scheduler_type": args.scheduler or "default",
+        "scheduler_type": scheduler_type,
         "providers": [first_provider],
     }
 
