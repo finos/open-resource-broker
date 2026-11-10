@@ -24,6 +24,9 @@ from orb.providers.k8s.infrastructure.handlers.base_handler import K8sHandlerBas
 from orb.providers.k8s.infrastructure.handlers.deployment_handler import K8sDeploymentHandler
 from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler
 from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
+from orb.providers.k8s.infrastructure.handlers.shared.namespace_resolver import (
+    resolve_namespace_from_provider_data,
+)
 from orb.providers.k8s.infrastructure.handlers.statefulset_handler import K8sStatefulSetHandler
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.value_objects import KubernetesProviderApi
@@ -293,8 +296,13 @@ class K8sHandlerRegistry:
         machine_ids: list[str],
         request: Request,
         provider_data_overrides: Optional[dict[str, Any]] = None,
+        machine_coordinates: Optional[dict[str, dict[str, Any]]] = None,
     ) -> OperationOutcome:
         """Delete the named resources via the per-API handler.
+
+        ``machine_coordinates`` (per machine id, as persisted at acquire time)
+        places each pod: pods are deleted in the namespace they were created in,
+        not in the return request's (empty) default.
 
         ``provider_data_overrides`` lets the caller supply the acquire-time
         controller name and origin request id, which the controller-backed
@@ -313,19 +321,33 @@ class K8sHandlerRegistry:
             for key, value in (provider_data_overrides or {}).items():
                 if value:
                     provider_data[key] = value
-            release_result = await handler.release_hosts(list(machine_ids), provider_data)
             # release_hosts returns a dict with ``deleted`` and
             # ``failed_deletes`` when partial failure occurred.  The caller
             # only needs the successfully deleted IDs as pending_resource_ids
-            # so the status-poll path can observe them draining.
-            release_info: dict[str, Any] = (
-                release_result if isinstance(release_result, dict) else {}
-            )
-            deleted = release_info.get("deleted", list(machine_ids))
-            failed_names = [
-                str(entry[0] if isinstance(entry, (tuple, list)) else entry)
-                for entry in (release_info.get("failed_deletes") or [])
-            ]
+            # so the status-poll path can observe them draining.  One call per
+            # namespace the machines were placed in.
+            deleted: list[str] = []
+            failed_names: list[str] = []
+            # Release per namespace only: controller-backed handlers compare the
+            # number of ids released against the controller's replicas, so ids of
+            # one controller must not be split across calls.
+            by_namespace: dict[str, list[str]] = {}
+            for (namespace, _origin), grouped in self._group_by_placement(
+                list(machine_ids), machine_coordinates, request
+            ).items():
+                by_namespace.setdefault(namespace, []).extend(grouped)
+            for namespace, names in by_namespace.items():
+                release_result = await handler.release_hosts(
+                    names, {**provider_data, "namespace": namespace}
+                )
+                release_info: dict[str, Any] = (
+                    release_result if isinstance(release_result, dict) else {}
+                )
+                deleted.extend(release_info.get("deleted", names))
+                failed_names.extend(
+                    str(entry[0] if isinstance(entry, (tuple, list)) else entry)
+                    for entry in (release_info.get("failed_deletes") or [])
+                )
             if failed_names:
                 # Some deletes failed. Report the per-ID split under
                 # ``provider_data`` so the deprovisioning orchestrator can mark
@@ -363,7 +385,6 @@ class K8sHandlerRegistry:
 
     def _group_by_placement(
         self,
-        handler: K8sHandlerBase,
         machine_ids: list[str],
         machine_coordinates: Optional[dict[str, dict[str, Any]]],
         request: Request,
@@ -381,8 +402,8 @@ class K8sHandlerRegistry:
             coords = (machine_coordinates or {}).get(mid) or {}
             placed = coords.get("provider_data") or {}
             source = placed if placed.get("namespace") else request_data
-            namespace = handler._resolve_namespace_from_provider_data(
-                source if isinstance(source, dict) else {}
+            namespace = resolve_namespace_from_provider_data(
+                source if isinstance(source, dict) else {}, self._config
             )
             origin = str(coords["request_id"]) if coords.get("request_id") else None
             groups.setdefault((namespace, origin), []).append(mid)
@@ -398,7 +419,7 @@ class K8sHandlerRegistry:
         """List the returned pods per (namespace, origin request) group."""
         instances: list[dict[str, Any]] = []
         unreadable: set[str] = set()
-        groups = self._group_by_placement(handler, list(resource_ids), machine_coordinates, request)
+        groups = self._group_by_placement(list(resource_ids), machine_coordinates, request)
         for (namespace, origin), names in groups.items():
             result = await asyncio.to_thread(handler.read_pods_for_return, namespace, origin, names)
             instances.extend(result.instances)

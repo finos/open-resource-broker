@@ -782,6 +782,7 @@ class K8sProviderStrategy(ProviderStrategy):
             machine_ids,
             request,
             provider_data_overrides=overrides or None,
+            machine_coordinates=operation.parameters.get("machine_coordinates"),
         )
         return _outcome_to_provider_result(outcome, fallback_operation="terminate_instances")
 
@@ -1167,10 +1168,14 @@ class K8sProviderStrategy(ProviderStrategy):
         machine_ids: list[str],
         request: Request,
         provider_data_overrides: Optional[dict[str, Any]] = None,
+        machine_coordinates: Optional[dict[str, dict[str, Any]]] = None,
     ) -> OperationOutcome:
         """Delete the named resources via the per-API handler."""
         return await self._handler_registry.return_machines(
-            machine_ids, request, provider_data_overrides=provider_data_overrides
+            machine_ids,
+            request,
+            provider_data_overrides=provider_data_overrides,
+            machine_coordinates=machine_coordinates,
         )
 
     async def get_status(

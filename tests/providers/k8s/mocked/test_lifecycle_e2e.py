@@ -77,6 +77,18 @@ def _make_acquire_request(
     )
 
 
+def _coordinates(provider_api: str, machine_ids: list[str]) -> dict[str, Any]:
+    """Placement as recorded at acquire time; a return request carries none of it."""
+    return {
+        mid: {
+            "provider_api": provider_api,
+            "provider_data": {"namespace": "orb-test"},
+            "request_id": None,
+        }
+        for mid in machine_ids
+    }
+
+
 def _make_return_request(
     provider_api: str,
     resource_ids: list[str],
@@ -201,10 +213,12 @@ async def test_pod_lifecycle_release_returns_accepted(
     return_req = _make_return_request(
         "Pod",
         resource_ids=resource_ids,
-        provider_data={"namespace": "orb-test"},
+        provider_data={},
     )
 
-    return_outcome = await registry.return_machines(resource_ids, return_req)
+    return_outcome = await registry.return_machines(
+        resource_ids, return_req, machine_coordinates=_coordinates("Pod", resource_ids)
+    )
     assert isinstance(return_outcome, Accepted)
 
 
@@ -255,14 +269,12 @@ async def test_deployment_lifecycle_release_returns_accepted(
     return_req = _make_return_request(
         "Deployment",
         resource_ids=[dep_name],
-        provider_data={
-            "namespace": "orb-test",
-            "deployment_name": dep_name,
-            "replicas": 2,
-        },
+        provider_data={"deployment_name": dep_name, "replicas": 2},
     )
 
-    return_outcome = await registry.return_machines([dep_name], return_req)
+    return_outcome = await registry.return_machines(
+        [dep_name], return_req, machine_coordinates=_coordinates("Deployment", [dep_name])
+    )
     assert isinstance(return_outcome, Accepted)
 
 
@@ -330,8 +342,10 @@ async def test_job_lifecycle_release_returns_accepted(
     return_req = _make_return_request(
         "Job",
         resource_ids=[job_name],
-        provider_data={"namespace": "orb-test", "job_name": job_name},
+        provider_data={"job_name": job_name},
     )
 
-    return_outcome = await registry.return_machines([job_name], return_req)
+    return_outcome = await registry.return_machines(
+        [job_name], return_req, machine_coordinates=_coordinates("Job", [job_name])
+    )
     assert isinstance(return_outcome, Accepted)

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from typing import Any, Optional
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from kubernetes.client.exceptions import ApiException
@@ -243,3 +243,47 @@ async def test_synthesised_machines_carry_the_kind_instance_type(env: Env) -> No
     assert [(i["status"], i["instance_type"]) for i in phantom.metadata["instances"]] == [
         ("unknown", f"k8s/{env.kind}")
     ]
+
+
+@pytest.mark.asyncio
+async def test_release_runs_in_the_pods_namespace(env: Env) -> None:
+    handler = env.registry.get_handler(env.kind)
+    release = AsyncMock(return_value={"deleted": [env.name], "failed_deletes": []})
+    handler.release_hosts = release  # type: ignore[method-assign]
+    outcome = await env.registry.return_machines(
+        [env.name], env.return_request(), machine_coordinates=env.coords([env.name])
+    )
+    assert isinstance(outcome, Accepted)
+    assert release.await_args_list[0].args[1]["namespace"] == NS
+
+
+@pytest.mark.asyncio
+async def test_pod_release_deletes_in_own_namespace_and_is_idempotent() -> None:
+    env = Env("Pod")
+    name = env.add()
+    other = env.add("orb-pod-1", namespace="orb-team-b")
+    coords = {**env.coords([name]), **env.coords([other], namespace="orb-team-b")}
+    for _ in range(2):
+        outcome = await env.registry.return_machines(
+            [name, other], env.return_request(), machine_coordinates=coords
+        )
+        assert isinstance(outcome, Accepted)
+    assert env.core.pods == {}
+    assert {c[1] for c in env.core.calls_for("delete")} == {NS, "orb-team-b"}
+
+
+@pytest.mark.asyncio
+async def test_release_is_one_call_per_namespace_across_origins() -> None:
+    env = Env("Deployment")
+    handler = env.registry.get_handler("Deployment")
+    release = AsyncMock(return_value={"deleted": ["a-0", "b-0"], "failed_deletes": []})
+    handler.release_hosts = release  # type: ignore[method-assign]
+    other_origin = "req-33333333-3333-4333-8333-333333333333"
+    coords = {**env.coords(["a-0"]), **env.coords(["b-0"], origin=other_origin)}
+
+    await env.registry.return_machines(
+        ["a-0", "b-0"], env.return_request(), machine_coordinates=coords
+    )
+
+    release.assert_awaited_once()
+    assert release.await_args_list[0].args[0] == ["a-0", "b-0"]

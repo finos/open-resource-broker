@@ -113,3 +113,28 @@ async def test_status_forwards_machine_coordinates() -> None:
         strategy._handler_registry.get_status.await_args_list[0].kwargs["machine_coordinates"]
         == coordinates
     )
+
+
+@pytest.mark.asyncio
+async def test_terminate_forwards_machine_coordinates() -> None:
+    strategy, _ = _strategy_with_mock_handler()
+    coordinates = {"m-0": {"provider_data": {"namespace": "orb-team-a"}, "request_id": "req-1"}}
+    strategy._handler_registry.return_machines = AsyncMock(  # type: ignore[method-assign]
+        return_value=Accepted(request_id="req-RET", pending_resource_ids=["m-0"])
+    )
+
+    await strategy._handle_terminate_instances(
+        ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "machine_ids": ["m-0"],
+                "request": SimpleNamespace(request_id="req-RET", provider_data={}),
+                "machine_coordinates": coordinates,
+            },
+        )
+    )
+
+    assert (
+        strategy._handler_registry.return_machines.await_args_list[0].kwargs["machine_coordinates"]
+        == coordinates
+    )
