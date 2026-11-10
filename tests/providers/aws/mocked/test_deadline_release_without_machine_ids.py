@@ -101,6 +101,19 @@ async def _reach_deadline(query_bus: Any, request_id: str) -> Any:
     return stored
 
 
+@pytest.fixture(autouse=True)
+def _no_background_release(monkeypatch):
+    """Keep the status read from starting its own release.
+
+    The tests call ``release`` themselves; a background release on the same
+    request would interleave with it and decide which of the two sees the
+    pending instance first.
+    """
+    from orb.application.services.deadline_release_service import DeadlineReleaseService
+
+    monkeypatch.setattr(DeadlineReleaseService, "enqueue", lambda self, request_id: False)
+
+
 def _release_service() -> Any:
     from orb.application.services.deadline_release_service import DeadlineReleaseService
 
