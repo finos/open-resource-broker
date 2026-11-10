@@ -2429,7 +2429,7 @@
           "Admin"
         ],
         "summary": "Initialize ORB",
-        "description": "Create default config file, data directories, and optionally refresh templates. Requires `allow_destructive_admin=true` in config AND environment != production. Body must contain `confirm: 'INIT'` to prevent accidents.",
+        "description": "Create the config file for a provider (verifying its credentials first), the data directories, and optionally refresh templates. Requires `allow_destructive_admin=true` in config AND environment != production. Body must contain `confirm: 'INIT'` to prevent accidents.",
         "operationId": "initOrb",
         "requestBody": {
           "content": {
@@ -2450,7 +2450,7 @@
             }
           },
           "400": {
-            "description": "Confirmation token missing or incorrect."
+            "description": "Confirmation token missing or incorrect, provider input rejected, or provider credentials could not be verified."
           },
           "403": {
             "description": "Feature disabled or production environment."
@@ -3043,10 +3043,33 @@
             "type": "string",
             "title": "Confirm",
             "default": ""
+          },
+          "provider_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Type"
+          },
+          "scheduler_type": {
+            "type": "string",
+            "title": "Scheduler Type",
+            "default": "default"
+          },
+          "options": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Options",
+            "default": {}
           }
         },
         "type": "object",
-        "title": "InitBody"
+        "title": "InitBody",
+        "description": "Body for POST /admin/init.\n\n``provider_type`` defaults to the first registered provider. ``options`` carries\nthe provider options by their ``orb init`` argument names, for example\n``{\"aws_region\": \"eu-west-2\", \"aws_profile\": \"ops\"}``; credential sources are\nnamed, never given as secrets."
       },
       "MachineItem": {
         "properties": {

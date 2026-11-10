@@ -26,6 +26,15 @@ from orb.interface.provider_resource_release import (
 logger = get_logger(__name__)
 
 
+class _InitOptions(argparse.Namespace):
+    """Provider options by CLI argument name; an option that was not given reads as ``None``."""
+
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith("__"):
+            raise AttributeError(name)
+        return None
+
+
 class InvalidInitInputError(ValueError):
     """A value given on the command line was rejected by the provider's validation."""
 
@@ -775,7 +784,7 @@ def build_default_config(
     example ``aws_region``), so the command line and the REST API build the same
     configuration from the same values.
     """
-    args = argparse.Namespace(**{**options, "provider_type": provider_type})
+    args = _InitOptions(**{**options, "provider_type": provider_type})
     # Get first available provider as default
     providers = _get_available_providers(container)
     resolved_type = provider_type or (providers[0]["type"] if providers else None)
