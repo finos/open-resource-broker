@@ -441,6 +441,8 @@ All REST responses use camelCase keys. Common envelope fields:
 
 Request status responses are formatted by the active `SchedulerPort` strategy and their shape varies by scheduler type.
 
+The in-process Python SDK follows the configured scheduler (or the `scheduler=` constructor argument). A call can name another registered format with the `format` keyword, for example `await sdk.list_machines(format="hostfactory")`; an unknown name raises `RequestValidationError`. The MCP tools accept the same `format` argument.
+
 ---
 
 ## Error Types

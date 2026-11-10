@@ -224,20 +224,26 @@ Use the standard AWS Signature Version 4 signing procedure with:
 Prefer the language-native AWS SDK for signing rather than a hand-rolled
 implementation. See `sdk/ARCHITECTURE.md` Layer 4 for per-language guidance.
 
-## The X-ORB-Scheduler header (HostFactory mode)
+## Response format and the X-ORB-Scheduler header
 
-When connecting to a remote ORB server that is running with
-`--scheduler hostfactory`, every request must carry:
+A response uses the format of the scheduler the server is configured with
+(`default`, `hostfactory` or `slurm`). Any caller, whatever its role, can ask
+for another registered format for one call:
 
 ```
 X-ORB-Scheduler: hostfactory
 ```
 
-The server reads this header to select the HostFactory scheduler backend.
-Without it the default scheduler is used. The header is ignored if the server
-was not started with `--scheduler hostfactory`.
+The `scheduler` query parameter does the same (`?scheduler=hostfactory`); if both
+are sent they must name the same format. An unknown name is a `400`. Every
+response carries `X-ORB-Scheduler` with the format that produced the body, and
+`Vary: X-ORB-Scheduler`; browsers can read the header because the server lists it
+in `Access-Control-Expose-Headers`.
 
-When using the default scheduler, omit the header entirely.
+The spec describes both shapes. Each operation whose HostFactory body differs has
+an `x-orb-formats` entry naming the response schema of every built-in format, and
+the HostFactory schemas are the `Hf*` components. Generated clients are typed for
+the default format; use the `Hf*` models when you request `hostfactory`.
 
 ## Regenerating after a spec update
 
