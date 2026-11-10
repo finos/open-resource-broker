@@ -12,6 +12,7 @@ import org.finos.openresourcebroker.sdk.client.OrbConflictError
 import org.finos.openresourcebroker.sdk.client.OrbNotFoundError
 import org.finos.openresourcebroker.sdk.client.OrbUnavailableError
 import org.finos.openresourcebroker.sdk.client.Scheduler
+import org.finos.openresourcebroker.sdk.client.SchedulerMismatchError
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -184,7 +185,7 @@ class OrbClientMockTest {
     }
 
     @Test
-    fun `scheduler header is NOT set for default scheduler`() = runTest {
+    fun `scheduler header names the default format on every call`() = runTest {
         val server = MockWebServer()
         server.start()
         try {
@@ -192,7 +193,41 @@ class OrbClientMockTest {
             val client = makeClient(server)
             client.listTemplates()
             val req = server.takeRequest()
-            assertNull(req.getHeader("X-ORB-Scheduler"))
+            assertEquals("default", req.getHeader("X-ORB-Scheduler"))
+            client.close()
+        } finally { server.shutdown() }
+    }
+
+    @Test
+    fun `a response naming another format raises SchedulerMismatchError`() = runTest {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(
+                MockResponse().setResponseCode(200).setHeader("X-ORB-Scheduler", "hostfactory")
+                    .setBody("""{"templates":[]}""")
+            )
+            val client = makeClient(server)
+            val error = assertThrows<SchedulerMismatchError> { client.listTemplates() }
+            assertEquals("default", error.expected)
+            assertEquals("hostfactory", error.actual)
+            client.close()
+        } finally { server.shutdown() }
+    }
+
+    @Test
+    fun `a response without the header or naming the requested format is accepted`() = runTest {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"templates":[]}"""))
+            server.enqueue(
+                MockResponse().setResponseCode(200).setHeader("X-ORB-Scheduler", "default")
+                    .setBody("""{"templates":[]}""")
+            )
+            val client = makeClient(server)
+            client.listTemplates()
+            client.listTemplates()
             client.close()
         } finally { server.shutdown() }
     }

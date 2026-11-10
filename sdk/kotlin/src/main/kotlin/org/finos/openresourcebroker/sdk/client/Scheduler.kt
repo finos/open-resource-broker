@@ -10,7 +10,7 @@ package org.finos.openresourcebroker.sdk.client
  */
 enum class Scheduler(val wireValue: String) {
 
-    /** The default ORB scheduler (no `X-ORB-Scheduler` header is sent). */
+    /** The default ORB format (`X-ORB-Scheduler: default`). */
     DEFAULT("default"),
 
     /** The HostFactory scheduler (`X-ORB-Scheduler: hostfactory`). */

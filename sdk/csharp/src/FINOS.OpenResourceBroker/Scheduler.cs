@@ -6,12 +6,14 @@
 // send a wrong X-ORB-Scheduler header (which changes wire parsing between
 // snake_case and camelCase).
 
+using System.Net.Http;
+
 namespace FINOS.OpenResourceBroker;
 
 /// <summary>Which ORB scheduler backend the client targets.</summary>
 public enum Scheduler
 {
-    /// <summary>The default ORB scheduler (no X-ORB-Scheduler header is sent).</summary>
+    /// <summary>The default ORB format (<c>X-ORB-Scheduler: default</c>).</summary>
     Default,
 
     /// <summary>The HostFactory scheduler (sends <c>X-ORB-Scheduler: hostfactory</c>).</summary>
@@ -43,5 +45,26 @@ public static class SchedulerExtensions
             "hostfactory" => Scheduler.HostFactory,
             _ => throw new ArgumentException($"Unknown scheduler: {value}", nameof(value)),
         };
+    }
+}
+
+/// <summary>Checks that a response uses the response format the call asked for.</summary>
+public static class SchedulerFormat
+{
+    /// <summary>
+    /// Throws <see cref="SchedulerMismatchException"/> when the response names a format in
+    /// <c>X-ORB-Scheduler</c> that differs from <paramref name="requested"/>.  A response
+    /// without the header is accepted.
+    /// </summary>
+    public static void ThrowIfMismatch(Scheduler requested, HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues("X-ORB-Scheduler", out var values)) return;
+        var answered = values.FirstOrDefault();
+        if (string.IsNullOrEmpty(answered)) return;
+        if (!string.Equals(answered, requested.WireValue(), StringComparison.OrdinalIgnoreCase))
+        {
+            response.Dispose();
+            throw new SchedulerMismatchException(requested.WireValue(), answered);
+        }
     }
 }

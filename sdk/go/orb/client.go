@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/finos/open-resource-broker/sdk/go/internal/process"
@@ -209,11 +210,17 @@ func (c *Client) doText(req *http.Request, out *string) error {
 }
 
 func (c *Client) do(req *http.Request, out any) error {
+	// Every call names its response format, so the answer does not depend on server config.
+	req.Header.Set(schedulerHeader, string(c.scheduler))
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return mapError(err)
 	}
 	defer resp.Body.Close()
+
+	if err := checkResponseFormat(c.scheduler, resp); err != nil {
+		return err
+	}
 
 	if resp.StatusCode >= 400 {
 		return parseAPIError(resp)
@@ -223,6 +230,19 @@ func (c *Client) do(req *http.Request, out any) error {
 		return json.NewDecoder(resp.Body).Decode(out)
 	}
 	return nil
+}
+
+// schedulerHeader names the response format on a request and on the response.
+const schedulerHeader = "X-ORB-Scheduler"
+
+// checkResponseFormat returns a SchedulerMismatchError when the response names a format
+// other than the one requested. A response without the header is accepted.
+func checkResponseFormat(requested SchedulerType, resp *http.Response) error {
+	answered := resp.Header.Get(schedulerHeader)
+	if answered == "" || strings.EqualFold(answered, string(requested)) {
+		return nil
+	}
+	return newSchedulerMismatchError(string(requested), answered)
 }
 
 // requestIDFromResponse extracts the server-assigned request ID from the
@@ -791,6 +811,7 @@ func (c *Client) runSSEProducer(ctx context.Context, id string, scfg streamConfi
 			return
 		}
 		req.Header.Set("Accept", "text/event-stream")
+		req.Header.Set(schedulerHeader, string(c.scheduler))
 
 		resp, err := c.sseClient().Do(req)
 		if err != nil {
@@ -1044,6 +1065,7 @@ func (c *Client) runEventProducer(ctx context.Context, path string, ch chan<- Ev
 			return
 		}
 		req.Header.Set("Accept", "text/event-stream")
+		req.Header.Set(schedulerHeader, string(c.scheduler))
 
 		resp, err := c.sseClient().Do(req)
 		if err != nil {

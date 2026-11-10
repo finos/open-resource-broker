@@ -802,12 +802,9 @@ public class OrbClient implements Closeable {
     }
 
     private Map<String, String> schedulerHeaders() {
-        if (scheduler != Scheduler.DEFAULT) {
-            Map<String, String> h = new LinkedHashMap<>();
-            h.put("X-ORB-Scheduler", scheduler.wireValue());
-            return h;
-        }
-        return Collections.emptyMap();
+        Map<String, String> h = new LinkedHashMap<>();
+        h.put("X-ORB-Scheduler", scheduler.wireValue());
+        return h;
     }
 
     /** Return the first element of a list, or {@code null} if null/empty. */
@@ -845,6 +842,7 @@ public class OrbClient implements Closeable {
     private <T> T parseResult(RawHttpClient.HttpResult result, TypeReference<T> type)
             throws IOException {
         int status = result.statusCode();
+        checkSchedulerFormat(result.headers());
         if (status >= 400) {
             throwApiException(status, result.body(), result.headers());
         }
@@ -852,6 +850,19 @@ public class OrbClient implements Closeable {
             return null;
         }
         return mapper.readValue(result.body(), type);
+    }
+
+    /**
+     * Fail when the response names a response format other than the one asked for. A
+     * response without the header (an older server) is accepted.
+     */
+    private void checkSchedulerFormat(Map<String, String> headers) {
+        if (headers == null) return;
+        String answered = headers.get("x-orb-scheduler");
+        if (answered != null && !answered.isEmpty()
+                && !answered.equalsIgnoreCase(scheduler.wireValue())) {
+            throw new SchedulerMismatchError(scheduler.wireValue(), answered);
+        }
     }
 
     /** Extract the server-assigned request ID from response headers (lower-cased). */
@@ -1074,10 +1085,8 @@ public class OrbClient implements Closeable {
                 });
             }
 
-            // Scheduler header
-            if (scheduler != Scheduler.DEFAULT) {
-                httpClient.addDefaultHeader("X-ORB-Scheduler", scheduler.wireValue());
-            }
+            // Every call names its response format, so the answer does not depend on server config.
+            httpClient.addDefaultHeader("X-ORB-Scheduler", scheduler.wireValue());
 
             ObjectMapper mapper = buildObjectMapper();
 

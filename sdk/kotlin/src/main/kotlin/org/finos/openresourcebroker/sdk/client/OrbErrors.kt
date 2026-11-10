@@ -26,6 +26,15 @@ package org.finos.openresourcebroker.sdk.client
 open class OrbError(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 /**
+ * The server answered in a different response format than the one the client asked for.
+ *
+ * Raised only when the response names a format in `X-ORB-Scheduler` that differs from the
+ * request; a response without that header is never an error.
+ */
+class SchedulerMismatchError(val expected: String, val actual: String) :
+    OrbError("requested response format \"$expected\" but the server answered in \"$actual\"")
+
+/**
  * An HTTP error response from the ORB API.
  *
  * Carries the canonical cross-SDK field set: HTTP [statusCode], machine-readable

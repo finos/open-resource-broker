@@ -25,7 +25,12 @@ import {
   type SseFrame,
   type OrbSseRequest,
 } from "./sse/reader.js";
-import { parseApiError, OrbApiError, OrbUnavailableError } from "./errors.js";
+import {
+  parseApiError,
+  OrbApiError,
+  OrbUnavailableError,
+  SchedulerMismatchError,
+} from "./errors.js";
 import type { AxiosResponseHeaders, RawAxiosResponseHeaders } from "axios";
 
 // Re-export generated models
@@ -157,6 +162,17 @@ export class OrbClient {
     // Layer 3: retry
     attachRetry(instance, config.retry);
 
+    // A response that names a different format than the call asked for is an error;
+    // a response without the header (an older server) is not.
+    instance.interceptors.response.use((resp) => {
+      const asked = resp.config?.headers?.["X-ORB-Scheduler"];
+      const answered = resp.headers?.["x-orb-scheduler"];
+      if (asked && answered && String(asked) !== String(answered)) {
+        throw new SchedulerMismatchError(String(asked), String(answered));
+      }
+      return resp;
+    });
+
     return new OrbClient(instance, baseUrl, scheduler, proc);
   }
 
@@ -187,11 +203,9 @@ export class OrbClient {
     }
   }
 
-  private schedulerHeaders(): Record<string, string> {
-    if (this.scheduler !== "default") {
-      return { "X-ORB-Scheduler": this.scheduler };
-    }
-    return {};
+  /** Every call names its response format, so the answer does not depend on server config. */
+  private schedulerHeaders(scheduler: string = this.scheduler): Record<string, string> {
+    return { "X-ORB-Scheduler": scheduler };
   }
 
   private async get<T>(path: string, params?: Record<string, unknown>): Promise<T> {
@@ -536,6 +550,25 @@ export class OrbClient {
       `/api/v1/requests/${encodeURIComponent(requestId)}/status`,
       verbose ? { verbose: "true" } : undefined
     );
+  }
+
+  /**
+   * getRequestStatus in the HostFactory format — GET /api/v1/requests/{request_id}/status
+   * with `X-ORB-Scheduler: hostfactory`, typed with the generated `Hf*` models.
+   */
+  async getRequestStatusHostFactory(
+    requestId: string,
+    verbose?: boolean
+  ): Promise<import("../generated/models/index.js").HfRequestStatusResponse> {
+    this.checkHealth();
+    const resp = await this.http.get<
+      import("../generated/models/index.js").HfRequestStatusResponse
+    >(`/api/v1/requests/${encodeURIComponent(requestId)}/status`, {
+      headers: { Accept: "application/json", ...this.schedulerHeaders("hostfactory") },
+      params: verbose ? { verbose: "true" } : undefined,
+    });
+    if (resp.status >= 400) throw parseApiError(this.makeAxiosError(resp));
+    return resp.data;
   }
 
   /** getRequest — GET /api/v1/requests/{request_id} */

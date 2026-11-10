@@ -50,8 +50,8 @@ public sealed class ClientConfig
     public string? SocketPath { get; init; }
 
     /// <summary>
-    /// Scheduler backend.  Sends the <c>X-ORB-Scheduler</c> header when not
-    /// <see cref="Scheduler.Default"/>.  A typed enum (rather than a raw string)
+    /// Scheduler backend.  Its name is sent in the <c>X-ORB-Scheduler</c> header on every
+    /// call.  A typed enum (rather than a raw string)
     /// prevents a typo from silently sending a wrong header value.
     /// </summary>
     public Scheduler Scheduler { get; init; } = Scheduler.Default;
@@ -198,10 +198,10 @@ public sealed class OrbClient : IAsyncDisposable
             throw new OrbUnavailableException("managed ORB process is unhealthy");
     }
 
+    // Every call names its response format, so the answer does not depend on server config.
     private void AddSchedulerHeader(HttpRequestMessage req)
     {
-        if (_scheduler != Scheduler.Default)
-            req.Headers.TryAddWithoutValidation("X-ORB-Scheduler", _scheduler.WireValue());
+        req.Headers.TryAddWithoutValidation("X-ORB-Scheduler", _scheduler.WireValue());
     }
 
     private async Task<T> GetAsync<T>(string path, Dictionary<string, string>? query = null, CancellationToken ct = default)
@@ -250,6 +250,7 @@ public sealed class OrbClient : IAsyncDisposable
     {
         var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseContentRead, ct)
                               .ConfigureAwait(false);
+        SchedulerFormat.ThrowIfMismatch(_scheduler, resp);
 
         if (!resp.IsSuccessStatusCode)
         {
@@ -355,6 +356,7 @@ public sealed class OrbClient : IAsyncDisposable
         // retry is intentionally left intact.
         req.Options.Set(RetryDelegatingHandler.SkipStatusRetryOption, true);
         var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseContentRead, ct).ConfigureAwait(false);
+        SchedulerFormat.ThrowIfMismatch(_scheduler, resp);
         if (resp.StatusCode != System.Net.HttpStatusCode.OK &&
             resp.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable)
         {
@@ -382,6 +384,7 @@ public sealed class OrbClient : IAsyncDisposable
         req.Options.Set(RetryDelegatingHandler.SkipStatusRetryOption, true);
         // Accept 200 (healthy) and 503 (degraded — ORB returns 503 for degraded health)
         var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseContentRead, ct).ConfigureAwait(false);
+        SchedulerFormat.ThrowIfMismatch(_scheduler, resp);
         if (resp.StatusCode != System.Net.HttpStatusCode.OK &&
             resp.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable)
         {
@@ -406,6 +409,7 @@ public sealed class OrbClient : IAsyncDisposable
         req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/plain"));
         AddSchedulerHeader(req);
         var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+        SchedulerFormat.ThrowIfMismatch(_scheduler, resp);
         if (!resp.IsSuccessStatusCode)
             throw OrbApiException.ForStatus((int)resp.StatusCode,
                 resp.ReasonPhrase ?? "metrics failed", requestId: ExtractRequestId(resp));
@@ -641,6 +645,7 @@ public sealed class OrbClient : IAsyncDisposable
 
             var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, innerCt)
                                   .ConfigureAwait(false);
+            SchedulerFormat.ThrowIfMismatch(_scheduler, resp);
             if (!resp.IsSuccessStatusCode)
             {
                 var body = await resp.Content.ReadAsStringAsync(innerCt).ConfigureAwait(false);
@@ -719,6 +724,7 @@ public sealed class OrbClient : IAsyncDisposable
 
             var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, innerCt)
                                   .ConfigureAwait(false);
+            SchedulerFormat.ThrowIfMismatch(_scheduler, resp);
             if (!resp.IsSuccessStatusCode)
             {
                 var body = await resp.Content.ReadAsStringAsync(innerCt).ConfigureAwait(false);

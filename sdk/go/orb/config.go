@@ -33,14 +33,13 @@ type ProcessConfig struct {
 type SchedulerType string
 
 const (
-	// SchedulerDefault is the standard ORB scheduler (snake_case JSON).
+	// SchedulerDefault is the standard ORB format (snake_case JSON).
 	SchedulerDefault SchedulerType = "default"
 	// SchedulerHostFactory is the HostFactory scheduler (camelCase JSON).
 	SchedulerHostFactory SchedulerType = "hostfactory"
 )
 
-// WithScheduler sets the scheduler type. Use SchedulerHostFactory when the ORB
-// server is running with --scheduler hostfactory.
+// WithScheduler sets the response format the client asks for on every call.
 func WithScheduler(s SchedulerType) Option {
 	return func(c *config) { c.scheduler = s }
 }
