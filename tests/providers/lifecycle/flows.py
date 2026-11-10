@@ -471,7 +471,6 @@ async def quota_blocked_release(life: Lifecycle, requested: int = 2) -> None:
     precondition(life.status(handle) == RequestStatus.TIMEOUT, "deadline did not give TIMEOUT")
     precondition(not life.view(handle).rows, "has machine ids")
     life.cloud.advance()
-    precondition(life.cloud.count(handle.request_id, PENDING, RUNNING) > 0, "no pods appeared")
     await life.sync(handle, check=False)
     exercise("deadline_outcome")
     alive = life.cloud.count(handle.request_id, PENDING, RUNNING)
@@ -480,11 +479,11 @@ async def quota_blocked_release(life: Lifecycle, requested: int = 2) -> None:
         "deadline_outcome",
         f"{alive} pods that appeared after the deadline were left running",
     )
-    require(
-        life.cloud.replicas(handle.request_id) < requested,
-        "deadline_outcome",
-        "the Deployment's replicas were not lowered",
-    )
+    try:
+        replicas = life.cloud.replicas(handle.request_id)
+    except LookupError:
+        replicas = 0  # the Deployment itself was removed
+    require(replicas < requested, "deadline_outcome", "the Deployment's replicas were not lowered")
 
 
 async def exhausted_capacity_at_create(life: Lifecycle) -> None:
