@@ -119,6 +119,51 @@ preemptible launch triggers an on-demand attempt. This is a retry after a launch
 error, not a replacement service for workers that are preempted later.
 Fallback never changes the shape, image, or architecture.
 
+## Optional launch preflight
+
+Set `launch_preflight` to `true` in an OCI provider instance's `config` to check
+live compatibility before each acquisition batch:
+
+```json
+{
+  "region": "us-phoenix-1",
+  "credential_source": "instance_principal",
+  "launch_preflight": true
+}
+```
+
+The default is `false`. Enabling it adds OCI reads using the same configured
+region and credentials as the launch. Preflight checks that the image and
+subnet are `AVAILABLE`, that an AD-specific subnet matches the selected AD, and
+that OCI lists the shape for the compartment, image and AD. It checks OCPU,
+total memory and memory-per-OCPU limits, including any stricter image limits.
+Regional subnets are supported; without an explicit AD, the existing first-AD
+selection is used. Checks run once per batch, with fresh reads on the next
+request. Dry runs and template registration/validation remain offline.
+
+For Flex templates, specify both OCPUs and memory, for example
+`"shape_config": {"ocpus": 4, "memoryInGBs": 32}`. If both are omitted for a
+`Flex` shape, preflight checks the launcher's existing 1 OCPU / 16 GB defaults.
+Partial sizing requires both values to be made explicit so preflight can check
+the actual requested size without guessing OCI's server-side defaults.
+
+Known incompatible settings return `OCI_PREFLIGHT_REJECTED` without submitting
+a launch. Missing read access, a 404, transient failures, incomplete responses
+or unresolved partial sizing return `OCI_PREFLIGHT_UNAVAILABLE`, also without
+launching. Correct the settings or restore access and retry. Raw CLI error
+responses and private bootstrap data are excluded from these errors.
+
+The principal needs access to `GetImage`, `GetSubnet`, `ListShapes` and
+`GetImageShapeCompatibilityEntry`, plus `ListAvailabilityDomains` when an AD
+must be selected. Existing operation-conditioned launch policies may need
+additional read permissions. See Oracle's
+[API permission reference](https://docs.oracle.com/en-us/iaas/Content/Identity/policyreference/corepolicyreference_topic-Permissions_Required_for_Each_API_Operation.htm).
+
+These checks do not reserve resources or establish live host capacity, quota
+availability, pricing, all launch permissions, or scheduler readiness. OCI still
+validates each launch, and the existing retry, reconciliation, capacity fallback
+and rollback behavior applies after preflight succeeds.
+
 ## Machine data
 
 The handler reports flat instance records. A running worker includes:
@@ -280,7 +325,8 @@ permissions. Cluster placement additionally needs `use compute-clusters`.
 - Pricing estimates are static and may be unknown for a shape.
 - HostFactory field mapping and CLI workflows are tested offline; actual Symphony
   registration remains unvalidated.
-- Availability and image compatibility must be validated for each selected shape.
+- Each selected shape needs deployment validation; optional launch preflight
+  checks current image/network compatibility and sizing without reserving capacity.
 - Launch and status calls are sequential; large batches incur per-instance CLI overhead.
 
 ## Related

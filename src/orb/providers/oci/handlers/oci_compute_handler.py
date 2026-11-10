@@ -21,6 +21,7 @@ from orb.providers.oci.cli_client import OCICommandError, run_oci, service_error
 from orb.providers.oci.configuration.realms import is_allowed_realm_domain
 from orb.providers.oci.mapping import OCITemplateMapper
 from orb.providers.oci.services import OCIPricingService
+from orb.providers.oci.services.launch_preflight import OCILaunchPreflight, OCIPreflightError
 
 # The confirm-time probe batches IDs into one search per chunk and stops after
 # a fixed budget; an unfinished probe is reported unavailable.
@@ -413,6 +414,21 @@ class OCIComputeHandler:
                     "OCI_REGION_VALIDATION_FAILED",
                     {"provider_region": self._region},
                 )
+            if self._auth_config.get("launch_preflight") is True:
+                try:
+                    resolved_ad = OCILaunchPreflight(self._run_oci).validate(launch_requests[0])
+                except OCIPreflightError as exc:
+                    return ProviderResult.error_result(
+                        str(exc),
+                        exc.error_code,
+                        {
+                            "operation": "create_instances",
+                            "provider": "oci",
+                            "region": self._region,
+                        },
+                    )
+                for launch_request in launch_requests:
+                    launch_request["availability_domain"] = resolved_ad
             try:
                 self._validate_compute_cluster(launch_requests[0])
             except Exception as exc:
