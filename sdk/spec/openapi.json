@@ -1702,6 +1702,17 @@
               }
             }
           }
+        },
+        "x-orb-formats": {
+          "default": {
+            "$ref": "#/components/schemas/RequestStatusResponse"
+          },
+          "hostfactory": {
+            "$ref": "#/components/schemas/HfRequestStatusResponse"
+          },
+          "slurm": {
+            "$ref": "#/components/schemas/RequestStatusResponse"
+          }
         }
       }
     },
@@ -5087,6 +5098,132 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "HfMachine": {
+        "additionalProperties": true,
+        "description": "A machine entry of a HostFactory request status.",
+        "properties": {
+          "machineId": {
+            "title": "Machineid",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "executing",
+              "fail",
+              "succeed"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "privateIpAddress": {
+            "title": "Privateipaddress",
+            "type": "string"
+          },
+          "publicIpAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Publicipaddress"
+          },
+          "launchtime": {
+            "format": "int64",
+            "title": "Launchtime",
+            "type": "integer"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "machineId",
+          "name",
+          "result",
+          "privateIpAddress",
+          "launchtime"
+        ],
+        "title": "HfMachine",
+        "type": "object"
+      },
+      "HfRequestStatusItem": {
+        "additionalProperties": true,
+        "description": "One request in a HostFactory request status response.",
+        "properties": {
+          "requestId": {
+            "title": "Requestid",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "complete",
+              "complete_with_error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "machines": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HfMachine"
+            },
+            "title": "Machines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requestId",
+          "status"
+        ],
+        "title": "HfRequestStatusItem",
+        "type": "object"
+      },
+      "HfRequestStatusResponse": {
+        "additionalProperties": true,
+        "description": "HostFactory getRequestStatus response.",
+        "properties": {
+          "requests": {
+            "items": {
+              "$ref": "#/components/schemas/HfRequestStatusItem"
+            },
+            "title": "Requests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requests"
+        ],
+        "title": "HfRequestStatusResponse",
+        "type": "object"
       }
     },
     "securitySchemes": {
