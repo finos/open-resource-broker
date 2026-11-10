@@ -23,6 +23,7 @@ OVERRIDABLE_FIELDS: frozenset[str] = frozenset(
         "machine_types_ondemand",
         "machine_types_priority",
         "price_type",
+        "fallback_to_ondemand",
         "max_price",
         "network_zones",
         "public_ip_assignment",

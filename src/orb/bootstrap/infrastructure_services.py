@@ -66,6 +66,7 @@ def _register_template_services(container: DIContainer):
         from orb.application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
+        from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
         from orb.domain.template.factory import TemplateFactoryPort
         from orb.infrastructure.registry.template_extension_registry import (
             TemplateExtensionRegistryAdapter,
@@ -86,6 +87,7 @@ def _register_template_services(container: DIContainer):
             logger=c.get(LoggingPort),
             template_factory=template_factory,  # type: ignore[arg-type]
             extension_registry=TemplateExtensionRegistryAdapter(),
+            provider_registry=c.get_optional(ProviderRegistryPort),
         )
 
     from orb.application.services.template_defaults_service import TemplateDefaultsService
@@ -284,6 +286,7 @@ def _register_deadline_release_service(container: DIContainer) -> None:
     from orb.application.services.machine_sync_service import MachineSyncService
     from orb.domain.base import UnitOfWorkFactory
     from orb.domain.base.clock import Clock, SystemClock
+    from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 
     def create_deadline_release_service(c: DIContainer) -> DeadlineReleaseService:
         clock = c.get_optional(Clock) or SystemClock()
@@ -294,6 +297,7 @@ def _register_deadline_release_service(container: DIContainer) -> None:
             logger=c.get(LoggingPort),
             clock=clock.now,
             monotonic=clock.monotonic,
+            provider_selection_port=c.get(ProviderSelectionPort),
         )
 
     container.register_singleton(DeadlineReleaseService, create_deadline_release_service)

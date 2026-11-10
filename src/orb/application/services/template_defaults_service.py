@@ -1,5 +1,6 @@
 """Template Defaults Service - Hierarchical template default resolution with domain extensions."""
 
+import warnings
 from typing import Any, Optional
 
 from pydantic import BaseModel
@@ -331,6 +332,9 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                     lt_fields,
                 )
         result = self._coalesce_merge(resolved_defaults, template_dict)
+        result = self._apply_template_row_migration(
+            provider_type, template_dict, resolved_defaults, result
+        )
 
         self.logger.debug("Final template has %s fields after default resolution", len(result))
 
@@ -343,6 +347,34 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             )
 
         return result
+
+    def _apply_template_row_migration(
+        self,
+        provider_type: Optional[str],
+        row: dict[str, Any],
+        defaults: dict[str, Any],
+        merged: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Let the template's provider rewrite a legacy row after the merge.
+
+        Providers contribute the rule through their registration; the rule sees
+        the row as written, the merged lower layers and the merged result.
+        """
+        if not provider_type or self.provider_registry is None:
+            return merged
+        migration = self.provider_registry.get_template_row_migration(provider_type)
+        if migration is None:
+            return merged
+        migrated, message = migration(row=row, defaults=defaults, merged=merged)
+        if message:
+            template_id = row.get("template_id", "unknown")
+            self.logger.warning(
+                "%s",
+                message,
+                extra={"event": "template.legacy_on_demand_strategy", "template_id": template_id},
+            )
+            warnings.warn(message, DeprecationWarning, stacklevel=3)
+        return migrated
 
     def _provider_context(
         self, template_dict: dict[str, Any], selected_instance: Optional[str]
@@ -509,6 +541,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             default_fields = [
                 "max_number",
                 "default_price_type",
+                "default_fallback_to_ondemand",
                 "default_provider_api",
             ]
 

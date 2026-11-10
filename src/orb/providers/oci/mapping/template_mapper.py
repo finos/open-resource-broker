@@ -126,7 +126,7 @@ class OCITemplateMapper:
 
         capacity_type = str(_get("capacity_type", "capacityType") or "ondemand").lower()
         fallback_to_ondemand = cls._to_bool(
-            _get("fallback_to_ondemand", "fallbackToOndemand", "fallback_to_on_demand") or False
+            _get("fallback_to_ondemand", "fallbackToOndemand", "fallback_to_on_demand")
         )
         preemptible_preserve_boot_volume = cls._to_bool(
             _get(
@@ -252,7 +252,7 @@ class OCITemplateMapper:
             "capacity_type": normalized.get("capacity_type"),
             "boot_volume_gbs": normalized.get("boot_volume_gbs"),
             "pricing_estimate": OCIPricingService.estimate_hourly_cost(template),
-            "fallback_to_ondemand": normalized.get("fallback_to_ondemand", False),
+            "fallback_to_ondemand": normalized["fallback_to_ondemand"],
         }
         if normalized.get("capacity_type") == "preemptible":
             payload["preemptible_instance_config"] = {

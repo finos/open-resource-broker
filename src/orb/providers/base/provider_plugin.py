@@ -226,6 +226,17 @@ class ProviderPlugin(ABC):
         """
         return None
 
+    def template_row_migration(self) -> Optional[Any]:
+        """Return a callable that rewrites legacy template rows, or ``None``.
+
+        Defaults to ``None``. When provided, template default resolution calls
+        it as ``migration(row=..., defaults=..., merged=...)`` after merging a
+        template row over its defaults. Passed to
+        :meth:`~orb.providers.registry.provider_registry.ProviderRegistry.register_provider`
+        as ``template_row_migration``.
+        """
+        return None
+
     def display_name(self) -> Optional[str]:
         """Return the human-readable name for this provider, or ``None``.
 
@@ -354,6 +365,7 @@ class ProviderPlugin(ABC):
                     strategy_class_loader=self.strategy_class,
                     default_api=self.default_api(),
                     display_name=self.display_name(),
+                    template_row_migration=self.template_row_migration(),
                 )
 
             if logger:

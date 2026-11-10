@@ -99,18 +99,24 @@ Each host template represents a class of instances that share some attributes, s
 
 - **allocationStrategy**
 
-  - Optional. Allocation strategy for Spot instances. The valid values are:
+  - Optional. Allocation strategy for Spot pools. The valid values are:
     - `capacityOptimized`
     - `capacityOptimizedPrioritized`
     - `diversified`
     - `lowestPrice`
     - `priceCapacityOptimized`
 
-    Default is `priceCapacityOptimized` when priceType is `spot` or `heterogeneous`, and `lowestPrice` when priceType is `ondemand`.
+    Default is `priceCapacityOptimized` for every priceType, from the AWS provider defaults (`provider_defaults.aws.template_defaults.allocation_strategy`); a provider instance's `template_defaults` can override it.
+
+    Templates written for earlier releases that set an On-Demand strategy here (`prioritized`, or `lowestPrice` with priceType `ondemand`) keep working: the value is applied as allocationStrategyOnDemand and a deprecation warning is logged. Move it to allocationStrategyOnDemand. Any other invalid value makes the template invalid, which `templates show` and `templates validate` report.
 
 - **allocationStrategyOnDemand**
 
-  - Optional. When priceType is set to `spot` or `heterogeneous`, specify the allocation strategy that determines how to fulfill the request for On-Demand capacity. Valid values are `lowestPrice` or `prioritized`. Default is `lowestPrice`.
+  - Optional. Allocation strategy for On-Demand pools, for every priceType. Valid values are `lowestPrice` or `prioritized`. Default is `lowestPrice`, from the AWS provider defaults (`provider_defaults.aws.template_defaults.allocation_strategy_on_demand`); a provider instance's `template_defaults` can override it.
+
+- **fallbackToOndemand**
+
+  - Optional. For RunInstances templates with priceType `spot`: when spot capacity is unavailable, launch the request on-demand instead. Default is `false`, from `template.default_fallback_to_ondemand`; provider type and provider instance `template_defaults`, the template and a request override can change it. See [RunInstances on-demand fallback](../providers/aws/run-instances.md#on-demand-fallback).
 
 - **percentOnDemand**
 

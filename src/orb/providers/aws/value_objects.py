@@ -8,12 +8,20 @@ callers outside the internal sub-packages can use a stable, shallow import path:
 
 from orb.providers.aws.domain.template.value_objects import (
     CANONICAL_ALLOCATION_STRATEGIES,
+    ON_DEMAND_ALLOCATION_STRATEGIES,
+    SPOT_ALLOCATION_STRATEGIES,
     AWSAllocationStrategy,
     normalise_allocation_strategy,
+    normalise_on_demand_allocation_strategy,
+    normalise_spot_allocation_strategy,
 )
 
 __all__: list[str] = [
     "AWSAllocationStrategy",
     "CANONICAL_ALLOCATION_STRATEGIES",
+    "ON_DEMAND_ALLOCATION_STRATEGIES",
+    "SPOT_ALLOCATION_STRATEGIES",
     "normalise_allocation_strategy",
+    "normalise_on_demand_allocation_strategy",
+    "normalise_spot_allocation_strategy",
 ]

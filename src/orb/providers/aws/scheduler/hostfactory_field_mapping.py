@@ -24,6 +24,7 @@ class AWSFieldMapping:
         # AWS pricing configurations
         "percentOnDemand": "percent_on_demand",
         "allocationStrategyOnDemand": "allocation_strategy_on_demand",
+        "fallbackToOndemand": "fallback_to_ondemand",
         # AWS fleet configurations
         "fleetRole": "fleet_role",
         "spotFleetRequestExpiry": "spot_fleet_request_expiry",
@@ -54,7 +55,6 @@ class AWSFieldMapping:
         should not be defaulted to empty lists.
         """
         mapped.setdefault("max_machines", 1)
-        mapped.setdefault("price_type", "ondemand")
         if not mapped.get("launch_template_id"):
             mapped.setdefault("subnet_ids", [])
             mapped.setdefault("security_group_ids", [])

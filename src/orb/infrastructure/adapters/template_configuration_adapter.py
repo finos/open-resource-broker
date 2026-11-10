@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.template_configuration_port import TemplateConfigurationPort
+from orb.domain.template.rejection import TemplateRejection
 from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 from orb.infrastructure.template.dtos import TemplateDTO
 
@@ -83,9 +84,27 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
             self._logger.warning("Template validation failed: %s", e)
             errors.append(f"Template validation error: {e!s}")
 
+        # Build the provider template, as loading does, so a value the provider
+        # template rejects is reported here rather than only at load.
+        if config.get("template_id"):
+            conversion_error = self._template_conversion_error(provider_type, config)
+            if conversion_error:
+                errors.append(conversion_error)
+
         # De-duplicate while preserving order (generic + provider checks may
         # both flag e.g. a missing image).
         return list(dict.fromkeys(errors))
+
+    def _template_conversion_error(self, provider_type: Any, config: dict[str, Any]) -> str:
+        """Return why the provider template cannot be built from *config*, or ''."""
+        factory = getattr(self._template_manager, "template_factory", None)
+        if factory is None or not hasattr(factory, "create_template"):
+            return ""
+        try:
+            factory.create_template(config, str(provider_type) if provider_type else None)
+        except Exception as e:
+            return f"Invalid template configuration: {e}"
+        return ""
 
     # Map a template's provider_api to the registered provider-type key so the
     # correct provider validator factory is selected.
@@ -152,6 +171,10 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
             TemplateDTO or None
         """
         return await self._template_manager.get_template_by_id(template_id)
+
+    async def get_template_rejection(self, template_id: str) -> Optional[TemplateRejection]:
+        """Return why *template_id* was skipped at load, or None."""
+        return await self._template_manager.get_template_rejection(template_id)
 
     async def get_templates_by_provider(self, provider_api: str) -> list[TemplateDTO]:
         """

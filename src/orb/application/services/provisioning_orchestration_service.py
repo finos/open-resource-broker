@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 from orb.application.ports.resilience_port import CircuitBreakerOpenError, CircuitBreakerPort
 from orb.application.ports.scheduler_port import SchedulerPort
+from orb.application.services.provisioning_abort import abort_provisioning
 from orb.application.services.provisioning_writes import save_provisioning_state
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.exceptions import (
@@ -26,10 +27,6 @@ from orb.domain.base.operation_outcome import (
     Failed,
     OperationOutcome,
     RequiresFollowUp,
-)
-from orb.domain.base.operations import (
-    Operation as ProviderOperation,
-    OperationType as ProviderOperationType,
 )
 from orb.domain.base.ports import ConfigurationPort, LoggingPort, ProviderConfigPort
 from orb.domain.base.results import ProviderSelectionResult
@@ -462,33 +459,16 @@ class ProvisioningOrchestrationService:
         provider_name = selection_result.provider_name
         reason = ""
         try:
-            capabilities = self._provider_selection_port.get_strategy_capabilities(provider_name)
-            supports = getattr(
-                capabilities, "supports_operation", None
-            )  # getattr: port returns Any
-            if supports is None or not supports(ProviderOperationType.CANCEL_PROVISIONING):
-                reason = "the provider cannot abort in-flight provisioning"
-            elif not provider_api:
-                reason = "the request has no provider API"
-            else:
-                result = await self._provider_selection_port.execute_operation(
-                    provider_name,
-                    ProviderOperation(
-                        operation_type=ProviderOperationType.CANCEL_PROVISIONING,
-                        parameters={
-                            "request_id": str(request.request_id),
-                            "provider_api": provider_api,
-                            "resource_ids": resource_ids,
-                            "instance_ids": list(instance_ids or []),
-                        },
-                        context={
-                            "correlation_id": str(request.request_id),
-                            "request_id": str(request.request_id),
-                        },
-                    ),
-                )
-                if not getattr(result, "success", False):  # getattr: provider result shape
-                    reason = str(getattr(result, "error_message", "") or "abort failed")
+            abort = await abort_provisioning(
+                self._provider_selection_port,
+                provider_name,
+                str(request.request_id),
+                provider_api,
+                resource_ids,
+                instance_ids=list(instance_ids or []),
+            )
+            if not abort.success:
+                reason = abort.reason
         except Exception as e:
             reason = str(e)
 

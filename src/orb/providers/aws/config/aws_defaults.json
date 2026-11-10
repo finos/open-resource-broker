@@ -64,7 +64,8 @@
           "machine_type": "t2.micro",
           "machine_ssh_key": "",
           "provider_api": "EC2Fleet",
-          "price_type": "ondemand",
+          "allocation_strategy": "priceCapacityOptimized",
+          "allocation_strategy_on_demand": "lowestPrice",
           "tags": {
             "Environment": "development",
             "Project": "hostfactory"
@@ -87,8 +88,6 @@
           "native_spec": {
             "spec_file_base_path": "config/specs/aws"
           },
-          "allocation_strategy": "capacityOptimized",
-          "allocation_strategy_on_demand": "lowestPrice",
           "volume_type": "gp3",
           "spot_fleet_request_expiry": 30,
           "percent_on_demand": 0,

@@ -345,7 +345,6 @@ def register_k8s_extensions(logger: Optional[LoggingPort] = None) -> None:
 def get_k8s_extension_defaults() -> dict[str, Any]:
     """Return default kubernetes extension configuration values.
 
-    Mirrors :func:`orb.providers.aws.registration.get_aws_extension_defaults`.
     Returns the kubernetes-specific defaults from
     :class:`K8sTemplateExtensionConfig` so callers (template merge,
     docs generation, CLI introspection) can introspect the baseline without

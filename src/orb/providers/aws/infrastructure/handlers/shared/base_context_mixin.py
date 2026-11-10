@@ -45,7 +45,7 @@ class BaseContextMixin:
     ) -> dict[str, Any]:
         """Standard capacity calculation for all fleet types."""
         total_capacity = requested_count
-        price_type = getattr(template, "price_type", None)
+        price_type = template.price_type
         percent_on_demand = template.percent_on_demand or 0
 
         if price_type == "ondemand":

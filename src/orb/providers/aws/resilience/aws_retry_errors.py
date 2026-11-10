@@ -61,6 +61,16 @@ AWS_NEVER_RETRY_ERROR_CODES: frozenset[str] = frozenset(
     }
 )
 
+# Spot launch failures that an on-demand launch of the same request may avoid.
+AWS_SPOT_CAPACITY_ERROR_CODES: frozenset[str] = frozenset(
+    {
+        "InsufficientInstanceCapacity",
+        "SpotMaxPriceTooLow",
+        "MaxSpotInstanceCountExceeded",
+        "UnfulfillableCapacity",
+    }
+)
+
 # Codes botocore only self-corrects on its own retry (it records the clock
 # offset from the response on the first failure).  With botocore retries off
 # the application retries them and the next attempt is signed correctly.

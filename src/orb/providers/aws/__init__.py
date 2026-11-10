@@ -8,7 +8,6 @@ from orb.providers.aws.configuration.template_extension import (
     AWSTemplateExtensionConfig,
 )
 from orb.providers.aws.registration import (
-    get_aws_extension_defaults,
     initialize_aws_provider,
     is_aws_provider_registered,
     register_aws_extensions,
@@ -34,7 +33,6 @@ __all__: list[str] = [
     "AWSProviderConfig",
     "AWSProviderStrategy",
     "AWSTemplateExtensionConfig",
-    "get_aws_extension_defaults",
     "initialize_aws_provider",
     "is_aws_provider_registered",
     "register_aws_extensions",

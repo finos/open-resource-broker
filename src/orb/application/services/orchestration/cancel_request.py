@@ -33,12 +33,12 @@ from orb.application.services.orchestration.dtos import (
     ReturnMachinesInput,
 )
 from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
+from orb.application.services.provisioning_abort import abort_provisioning
 from orb.domain.base.exceptions import (
     ApplicationError,
     EntityNotFoundError,
     ProviderContractError,
 )
-from orb.domain.base.operations import Operation, OperationType
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 from orb.domain.request.request_types import RequestStatus
@@ -285,46 +285,34 @@ class CancelRequestOrchestrator(OrchestratorBase[CancelRequestInput, CancelReque
             )
             return recorded("unsupported", reason), []
 
-        capabilities = self._provider_selection_port.get_strategy_capabilities(provider_name)
-        supports = getattr(capabilities, "supports_operation", None)
-        if supports is None or not supports(OperationType.CANCEL_PROVISIONING):
-            reason = f"provider '{provider_name}' cannot abort in-flight provisioning"
-            self._logger.warning(
-                "CancelRequestOrchestrator: cannot abort provisioning of %s: %s", request_id, reason
-            )
-            return recorded("unsupported", reason), []
-
-        operation = Operation(
-            operation_type=OperationType.CANCEL_PROVISIONING,
-            parameters={
-                "request_id": request_id,
-                "provider_api": provider_api,
-                "resource_ids": resource_ids,
-            },
-            context={"correlation_id": request_id, "request_id": request_id},
-        )
         try:
-            result = await self._provider_selection_port.execute_operation(provider_name, operation)
+            abort = await abort_provisioning(
+                self._provider_selection_port,
+                provider_name,
+                request_id,
+                provider_api,
+                resource_ids,
+            )
         except Exception as exc:
             raise self._cancel_failed(
                 request_id,
                 f"aborting provisioning failed ({exc}); resources may still be launching",
                 context,
             ) from exc
+        if not abort.supported:
+            self._logger.warning(
+                "CancelRequestOrchestrator: cannot abort provisioning of %s: %s",
+                request_id,
+                abort.reason,
+            )
+            return recorded("unsupported", abort.reason), []
 
-        data = getattr(result, "data", None)
-        resources = data.get("resources") if isinstance(data, dict) else None
-        outcomes: list[dict[str, Any]] = []
-        listed: list[str] = []
-        for entry in resources or []:
-            members = entry.get("members") or []
-            listed.extend(str(m) for m in members)
-            outcomes.append({k: v for k, v in entry.items() if k != "members"})
-        if not getattr(result, "success", False):
-            message = getattr(result, "error_message", None) or "provider reported a failure"
+        outcomes = list(abort.outcomes)
+        listed = list(abort.members)
+        if not abort.success:
             raise self._cancel_failed(
                 request_id,
-                f"aborting provisioning failed ({message}); resources may still be launching",
+                f"aborting provisioning failed ({abort.reason}); resources may still be launching",
                 {**context, "provider_abort": outcomes},
             )
         if not outcomes:

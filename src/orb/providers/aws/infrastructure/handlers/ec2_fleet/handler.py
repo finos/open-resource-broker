@@ -277,6 +277,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._logger.error("Circuit breaker OPEN for EC2 Fleet creation: %s", str(e))
             # Re-raise to allow upper layers to handle graceful degradation
             raise
+        except Exception as e:
+            self._discard_override_version_if_rejected(e, launch_template_result, request)
+            raise
 
         fleet_id = response["FleetId"]
         self._logger.info("Successfully created EC2 Fleet: %s", fleet_id)
@@ -308,6 +311,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     len(errors),
                     error_summary,
                 )
+                # An instant fleet launches once, during the call, so one that
+                # returned only errors will never launch with the version.
+                if fleet_type == AWSFleetType.INSTANT:
+                    self._discard_override_version(launch_template_result, request)
                 raise AWSInfrastructureError(
                     f"Fleet {fleet_id} creation failed with {len(errors)} error(s): {error_summary}"
                 )

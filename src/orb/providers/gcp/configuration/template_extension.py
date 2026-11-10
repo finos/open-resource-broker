@@ -38,9 +38,9 @@ class GCPTemplateExtensionConfig(BaseModel):
     )
     network_tags: list[str] = Field(default_factory=list, description="Default network tags")
     labels: dict[str, str] = Field(default_factory=dict, description="Default instance labels")
-    price_type: Literal["ondemand", "spot"] = Field(
-        default="ondemand",
-        description="Default provider-neutral price type",
+    price_type: Optional[Literal["ondemand", "spot"]] = Field(
+        default=None,
+        description="Price type for GCP templates; unset uses template.default_price_type",
     )
     source_image_family: Optional[str] = Field(
         default="debian-12", description="Default source image family"
@@ -65,8 +65,9 @@ class GCPTemplateExtensionConfig(BaseModel):
             "boot_disk_type": self.boot_disk_type,
             "tags": self.labels,
             "labels": self.labels,
-            "price_type": self.price_type,
         }
+        if self.price_type:
+            defaults["price_type"] = self.price_type
         if self.service_account_email:
             defaults["machine_role"] = self.service_account_email
             defaults["service_account_email"] = self.service_account_email

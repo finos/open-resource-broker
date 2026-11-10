@@ -67,9 +67,12 @@ from orb.providers.aws.infrastructure.launch_template.manager import (
     LTNetworkingState,
 )
 from orb.providers.aws.infrastructure.tags import build_system_tags, merge_tags
-from orb.providers.aws.resilience.retry_classifier import is_retryable_client_error
+from orb.providers.aws.resilience.aws_retry_errors import AWS_SPOT_CAPACITY_ERROR_CODES
 from orb.providers.aws.utilities.aws_operations import AWSOperations
 from orb.providers.aws.utilities.terminate_instances import wait_until_visible
+
+# Response key carrying a spot to on-demand fallback to the acquire result.
+_CAPACITY_FALLBACK_KEY = "OrbCapacityFallback"
 
 
 @injectable
@@ -151,21 +154,24 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                         # Machines will be populated later via status query
                         self._logger.debug("Skipping machine creation with partial data: %s", e)
 
+            provider_data: dict[str, Any] = {
+                "resource_type": "run_instances",
+                "reservation_id": resource_id,
+                "instance_ids": instance_ids,
+                # The CREATE call returns instance IDs while the instances
+                # are still pending. Keep the request in progress so the
+                # next status read syncs the machines and settles it once
+                # they are running.
+                "requires_async_polling": True,
+            }
+            if response.get(_CAPACITY_FALLBACK_KEY):
+                provider_data["capacity_fallback"] = response[_CAPACITY_FALLBACK_KEY]
             return {
                 "success": True,
                 "resource_ids": [resource_id],
                 "instance_ids": instance_ids,  # Store instance IDs for tracking
                 "instances": instances,
-                "provider_data": {
-                    "resource_type": "run_instances",
-                    "reservation_id": resource_id,
-                    "instance_ids": instance_ids,
-                    # The CREATE call returns instance IDs while the instances
-                    # are still pending. Keep the request in progress so the
-                    # next status read syncs the machines and settles it once
-                    # they are running.
-                    "requires_async_polling": True,
-                },
+                "provider_data": provider_data,
             }
         except Exception as e:
             self._logger.error("RunInstances failed: %s", e)
@@ -188,30 +194,43 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             launch_template_version=launch_template_result.version,
         )
 
-        # One idempotency token per logical call, reused by every retry attempt, so
-        # a retry after a lost response cannot launch a second set of instances.
-        run_params.setdefault("ClientToken", uuid.uuid4().hex)
-
         # Execute RunInstances API call with circuit breaker for critical operation
+        fallback: Optional[dict[str, str]] = None
         try:
-            response = self._retry_with_backoff(
-                self.aws_client.ec2_client.run_instances,
-                operation_type="critical",
-                operation_name="run_instances",
-                preserve_client_error=True,
-                **run_params,
-            )
+            response = self._run_instances(run_params)
         except ClientError as e:
-            # Only a rejection that AWS will not retry proves nothing launched.
-            # A transient error that outlasted the retries may follow a lost
-            # response, so the version is left alone then.
-            if not is_retryable_client_error(e):
-                self._lt_cleanup.delete_override_version(
-                    launch_template_result.template_id,
-                    launch_template_result.override_version or "",
-                    str(request.request_id),
+            try:
+                ondemand_params = self._on_demand_fallback_params(
+                    e, aws_template, request, launch_template_result
                 )
-            raise self._convert_client_error(e, "run_instances") from e
+            except Exception as fallback_error:
+                self._logger.warning(
+                    "Not falling back to on-demand for request %s: could not prepare it: %s",
+                    request.request_id,
+                    fallback_error,
+                )
+                ondemand_params = None
+            if ondemand_params is None:
+                self._discard_override_version_if_rejected(e, launch_template_result, request)
+                raise self._convert_client_error(e, "run_instances") from e
+            fallback = {"from": "spot", "to": "ondemand", "reason": error_code_of(e) or ""}
+            self._logger.warning(
+                "Spot capacity unavailable for request %s (%s); launching on-demand instead",
+                request.request_id,
+                fallback["reason"],
+                extra={
+                    "event": "aws.spot_fallback",
+                    "request_id": str(request.request_id),
+                    **fallback,
+                },
+            )
+            try:
+                response = self._run_instances(ondemand_params)
+            except ClientError as retry_error:
+                self._discard_override_version_if_rejected(
+                    retry_error, launch_template_result, request
+                )
+                raise self._convert_client_error(retry_error, "run_instances") from retry_error
 
         # Validate response
         reservation_id = response.get("ReservationId")
@@ -230,7 +249,77 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             instance_ids,
         )
 
+        if fallback is not None:
+            response = {**response, _CAPACITY_FALLBACK_KEY: fallback}
         return response
+
+    def _run_instances(self, run_params: dict[str, Any]) -> dict[str, Any]:
+        """Call RunInstances once per logical launch, raising the original ClientError."""
+        # One idempotency token per logical call, reused by every retry attempt, so
+        # a retry after a lost response cannot launch a second set of instances.
+        run_params.setdefault("ClientToken", uuid.uuid4().hex)
+        return self._retry_with_backoff(
+            self.aws_client.ec2_client.run_instances,
+            operation_type="critical",
+            operation_name="run_instances",
+            preserve_client_error=True,
+            **run_params,
+        )
+
+    def _on_demand_fallback_params(
+        self,
+        error: ClientError,
+        aws_template: AWSTemplate,
+        request: Request,
+        launch_template_result: Any,
+    ) -> Optional[dict[str, Any]]:
+        """RunInstances parameters for an on-demand retry of a spot launch, or None.
+
+        Applies only to a spot template with ``fallback_to_ondemand`` whose
+        launch failed for lack of spot capacity. The parameters are rebuilt
+        from the template with ``price_type`` set to ondemand. RunInstances
+        cannot override a market type set elsewhere, so the fallback is
+        skipped when a native spec or the launched launch template version sets
+        InstanceMarketOptions (or the version cannot be read).
+        """
+        if not (
+            aws_template.price_type == "spot"
+            and aws_template.fallback_to_ondemand
+            and error_code_of(error) in AWS_SPOT_CAPACITY_ERROR_CODES
+        ):
+            return None
+
+        ondemand_template = aws_template.model_copy(update={"price_type": "ondemand"})
+        params = self._create_run_instances_params(
+            aws_template=ondemand_template,
+            request=request,
+            launch_template_id=launch_template_result.template_id,
+            launch_template_version=launch_template_result.version,
+        )
+        if params.get("InstanceMarketOptions"):
+            self._logger.warning(
+                "Not falling back to on-demand for request %s: the provider API spec of "
+                "template %s sets InstanceMarketOptions",
+                request.request_id,
+                aws_template.template_id,
+            )
+            return None
+        if aws_template.launch_template_id:
+            inspection = self.launch_template_manager.inspect_launch_template(
+                launch_template_result.template_id, launch_template_result.version
+            )
+            if inspection.sets_market_options is not False:
+                self._logger.warning(
+                    "Not falling back to on-demand for request %s: launch template %s version %s "
+                    "%s InstanceMarketOptions",
+                    request.request_id,
+                    launch_template_result.template_id,
+                    launch_template_result.version,
+                    "sets" if inspection.sets_market_options else "could not be read for",
+                )
+                return None
+        params.pop("ClientToken", None)
+        return params
 
     def _default_provider_api(self) -> str:
         return "RunInstances"
@@ -277,29 +366,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 if template.price_type == "spot"
                 else ["instance"]
             ),
-            "has_spot_options": bool(template.allocation_strategy or template.max_price),
+            "has_spot_options": template.price_type == "spot",
             "max_spot_price": (str(template.max_price) if template.max_price is not None else None),
-            "spot_instance_type": (
-                self._get_spot_instance_type(template.allocation_strategy)
-                if template.allocation_strategy
-                else None
-            ),
         }
-
-    def _get_spot_instance_type(self, allocation_strategy: str) -> str:
-        """Convert allocation strategy to spot instance type for RunInstances."""
-        # RunInstances doesn't support all EC2Fleet allocation strategies
-        # Map to supported spot instance types
-        strategy_map = {
-            "lowest_price": "one-time",
-            "diversified": "one-time",  # RunInstances doesn't support diversified directly
-            "capacity_optimized": "one-time",  # RunInstances doesn't support capacity-optimized directly
-            "lowestPrice": "one-time",
-            "capacityOptimized": "one-time",
-            "capacityOptimizedPrioritized": "one-time",
-            "priceCapacityOptimized": "one-time",
-        }
-        return strategy_map.get(allocation_strategy, "one-time")
 
     def _create_run_instances_params(
         self,
@@ -382,10 +451,10 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             user_subnets = aws_template.subnet_ids or []
             user_sgs = aws_template.security_group_ids or []
             if user_subnets or user_sgs:
-                lt_state = self.launch_template_manager.inspect_launch_template_networking(
+                lt_state = self.launch_template_manager.inspect_launch_template(
                     aws_template.launch_template_id,
                     launch_template_version,
-                )
+                ).networking
                 if lt_state == LTNetworkingState.HAS_NETWORKING:
                     raise AWSValidationError(
                         f"Launch template {aws_template.launch_template_id} already "

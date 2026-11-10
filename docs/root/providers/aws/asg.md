@@ -115,7 +115,7 @@ The shape of the generated config depends on pricing:
 | `price_type: "spot"` | `InstancesDistribution` with `OnDemandPercentageAboveBaseCapacity: 0` — all capacity above the base is spot. |
 | `price_type: "heterogeneous"` or any `percent_on_demand` | `InstancesDistribution` with `OnDemandPercentageAboveBaseCapacity: <percent_on_demand>`. |
 
-`OnDemandBaseCapacity` is always `0`, so the percentage governs the whole group. When `allocation_strategy` is set it becomes `SpotAllocationStrategy`.
+`OnDemandBaseCapacity` is always `0`, so the percentage governs the whole group. The `InstancesDistribution` carries `allocation_strategy` as `SpotAllocationStrategy` and `allocation_strategy_on_demand` as `OnDemandAllocationStrategy`.
 
 Example 30% on-demand, 70% spot:
 
@@ -141,8 +141,11 @@ ASG uses the hyphenated wire format. ORB accepts camelCase, hyphenated, or snake
 | `capacityOptimizedPrioritized` | `capacity-optimized-prioritized` |
 | `priceCapacityOptimized` | `price-capacity-optimized` |
 | `diversified` | `diversified` |
+| `prioritized` (on-demand pools only) | `prioritized` |
 
-When no strategy is set, spot and heterogeneous templates default to `price-capacity-optimized` and on-demand templates default to `lowest-price`. Note that `prioritized` has no ASG spot equivalent and falls back to `lowest-price`.
+`allocation_strategy` is the strategy for spot pools and `allocation_strategy_on_demand` the strategy for on-demand pools. Their defaults come from the AWS provider defaults (`provider_defaults.aws.template_defaults`): `priceCapacityOptimized` for spot pools and `lowestPrice` for on-demand pools, whatever the template's `price_type`. A provider instance's `template_defaults` and the template itself override them; there is no per-request override.
+
+`prioritized` applies only to on-demand pools. A template that sets an invalid or unknown strategy is rejected and reported by `templates show` and `templates validate`. A template that sets `prioritized`, or `lowestPrice` with `price_type: ondemand`, in `allocation_strategy` is read as its on-demand strategy, with a deprecation warning; move the value to `allocation_strategy_on_demand`.
 
 ### Attribute-based instance selection
 

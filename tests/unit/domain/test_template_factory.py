@@ -101,8 +101,8 @@ class TestTemplateFactoryRegister:
         # Template fallback.
         assert type(tpl) is AwsTemplate
 
-    def test_falls_back_to_core_template_when_registered_class_fails(self):
-        """If the registered class raises on construction, fall back gracefully."""
+    def test_raises_when_registered_class_rejects_the_template(self):
+        """A template its provider class rejects is not downgraded to a core template."""
 
         class BadTemplate(Template):
             def __init__(self, **data):
@@ -111,9 +111,8 @@ class TestTemplateFactoryRegister:
 
         factory = TemplateFactory()
         factory.register_provider_template_class("aws", BadTemplate)
-        # Should fall back to core Template without raising
-        tpl = factory.create_template(_tpl_data(), provider_type="aws")
-        assert isinstance(tpl, Template)
+        with pytest.raises(RuntimeError, match="always fails"):
+            factory.create_template(_tpl_data(), provider_type="aws")
 
 
 # ---------------------------------------------------------------------------

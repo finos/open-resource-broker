@@ -23,7 +23,12 @@ from orb.providers.aws.domain.template.value_objects import (
     AWSTags,
     ProviderApi,
 )
-from orb.providers.aws.value_objects import AWSAllocationStrategy, normalise_allocation_strategy
+from orb.providers.aws.value_objects import (
+    AWSAllocationStrategy,
+    normalise_allocation_strategy,
+    normalise_on_demand_allocation_strategy,
+    normalise_spot_allocation_strategy,
+)
 
 _logger = get_logger(__name__)
 
@@ -231,7 +236,7 @@ class AWSTemplate(Template):
 
     # AWS spot configuration
     spot_fleet_request_expiry: Optional[int] = None
-    allocation_strategy_on_demand: Optional[AWSAllocationStrategy] = None
+    allocation_strategy_on_demand: Optional[AWSAllocationStrategy] = None  # type: ignore[assignment]
     percent_on_demand: Optional[int] = None
     pools_count: Optional[int] = None
 
@@ -372,45 +377,50 @@ class AWSTemplate(Template):
                         "launch_template_version must be a positive integer, '$Latest', or '$Default'"
                     )
 
+        if (
+            self.fallback_to_ondemand
+            and self.provider_api is not None
+            and self.provider_api != ProviderApi.RUN_INSTANCES
+        ):
+            _logger.warning(
+                "Template %s sets fallback_to_ondemand, which applies to RunInstances only; "
+                "%s mixes spot and on-demand capacity with price_type 'heterogeneous'",
+                self.template_id,
+                self.provider_api.value,
+            )
+
         return self
 
     @field_validator("allocation_strategy", mode="before")
     @classmethod
     def normalise_allocation_strategy_input(cls, value: Any) -> Any:
-        """Accept a value object or any known spelling and store the canonical string.
+        """Store the canonical spot-pool strategy.
 
-        Unknown strings are kept unchanged so the template still loads; the
-        request path rejects them with the unknown-strategy error.
+        Accepts a value object or any known spelling. Unknown values and
+        on-demand-only values (``prioritized``) are rejected.
         """
         if isinstance(value, AWSAllocationStrategy):
-            return value.value
-        if isinstance(value, str) and value:
-            try:
-                return normalise_allocation_strategy(value)
-            except ValueError:
-                return value
+            value = value.value
+        if value is None or value == "":
+            return None
+        if isinstance(value, str):
+            return normalise_spot_allocation_strategy(value)
         return value
-
-    @model_validator(mode="after")
-    def apply_allocation_strategy_default(self) -> "AWSTemplate":
-        """Default the allocation strategy from the price type when none is set."""
-        if not self.allocation_strategy:
-            default = (
-                "priceCapacityOptimized"
-                if self.price_type in ("spot", "heterogeneous")
-                else "lowestPrice"
-            )
-            object.__setattr__(self, "allocation_strategy", default)
-        return self
 
     @field_validator("allocation_strategy_on_demand", mode="before")
     @classmethod
     def coerce_allocation_strategy_on_demand(cls, value: Any) -> Optional["AWSAllocationStrategy"]:
-        """Coerce raw strings to AWSAllocationStrategy."""
-        if value is None or isinstance(value, AWSAllocationStrategy):
+        """Coerce the on-demand-pool strategy to AWSAllocationStrategy.
+
+        Unknown values and spot-only values are rejected.
+        """
+        if isinstance(value, AWSAllocationStrategy):
+            normalise_on_demand_allocation_strategy(value.value)
             return value
+        if value is None or value == "":
+            return None
         if isinstance(value, str):
-            return AWSAllocationStrategy.from_string(value)
+            return AWSAllocationStrategy(normalise_on_demand_allocation_strategy(value))
         return value
 
     @field_serializer("allocation_strategy_on_demand")
@@ -422,31 +432,42 @@ class AWSTemplate(Template):
             return None
         return value.value
 
-    def _get_allocation_strategy_for_api(self, api: str, default: str) -> str:
-        """Resolve allocation_strategy to the wire format for the given AWS API."""
-        if isinstance(self.allocation_strategy, AWSAllocationStrategy):
-            return self.allocation_strategy.to_api_format(api)
-        if isinstance(self.allocation_strategy, str) and self.allocation_strategy:
-            return AWSAllocationStrategy.from_string(self.allocation_strategy).to_api_format(api)
-        return default
+    def _get_allocation_strategy_for_api(self, api: str) -> Optional[str]:
+        """Spot-pool strategy in the wire format for *api*, or None when unset."""
+        strategy = getattr(self.allocation_strategy, "value", self.allocation_strategy)
+        if not strategy:
+            return None
+        return AWSAllocationStrategy.from_string(str(strategy)).to_api_format(api)
 
-    def get_ec2_fleet_allocation_strategy(self) -> str:
-        """Get allocation strategy in EC2 Fleet API format."""
-        return self._get_allocation_strategy_for_api("ec2_fleet", "lowest-price")
+    def get_ec2_fleet_allocation_strategy(self) -> Optional[str]:
+        """Get the spot-pool allocation strategy in EC2 Fleet API format."""
+        return self._get_allocation_strategy_for_api("ec2_fleet")
 
-    def get_spot_fleet_allocation_strategy(self) -> str:
-        """Get allocation strategy in Spot Fleet API format."""
-        return self._get_allocation_strategy_for_api("spot_fleet", "lowestPrice")
+    def get_spot_fleet_allocation_strategy(self) -> Optional[str]:
+        """Get the spot-pool allocation strategy in Spot Fleet API format."""
+        return self._get_allocation_strategy_for_api("spot_fleet")
 
-    def get_asg_allocation_strategy(self) -> str:
-        """Get allocation strategy in Auto Scaling Group API format."""
-        return self._get_allocation_strategy_for_api("asg", "lowest-price")
+    def get_asg_allocation_strategy(self) -> Optional[str]:
+        """Get the spot-pool allocation strategy in Auto Scaling Group API format."""
+        return self._get_allocation_strategy_for_api("asg")
 
-    def get_ec2_fleet_on_demand_allocation_strategy(self) -> str:
-        """Get on-demand allocation strategy in EC2 Fleet API format."""
-        if self.allocation_strategy_on_demand:
-            return self.allocation_strategy_on_demand.to_ec2_fleet_format()
-        return self.get_ec2_fleet_allocation_strategy()
+    def _get_on_demand_allocation_strategy_for_api(self, api: str) -> Optional[str]:
+        """On-demand-pool strategy in the wire format for *api*, or None when unset."""
+        if self.allocation_strategy_on_demand is None:
+            return None
+        return self.allocation_strategy_on_demand.to_api_format(api)
+
+    def get_ec2_fleet_on_demand_allocation_strategy(self) -> Optional[str]:
+        """Get the on-demand-pool allocation strategy in EC2 Fleet API format."""
+        return self._get_on_demand_allocation_strategy_for_api("ec2_fleet")
+
+    def get_spot_fleet_on_demand_allocation_strategy(self) -> Optional[str]:
+        """Get the on-demand-pool allocation strategy in Spot Fleet API format."""
+        return self._get_on_demand_allocation_strategy_for_api("spot_fleet")
+
+    def get_asg_on_demand_allocation_strategy(self) -> Optional[str]:
+        """Get the on-demand-pool allocation strategy in Auto Scaling Group API format."""
+        return self._get_on_demand_allocation_strategy_for_api("asg")
 
     def to_aws_api_format(self) -> dict[str, Any]:
         """Convert template to AWS API format."""

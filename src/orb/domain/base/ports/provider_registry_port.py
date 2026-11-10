@@ -1,7 +1,7 @@
 """Port interface for provider registry operations used by the application layer."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from orb.domain.base.results import ProviderSelectionResult
 from orb.domain.template.template_aggregate import Template
@@ -101,6 +101,15 @@ class ProviderRegistryPort(ABC):
         Returns None if the provider type is not registered or has no default API.
         """
         pass  # type: ignore[return]
+
+    def get_template_row_migration(self, provider_type: str) -> Optional[Callable[..., Any]]:
+        """Return the template row migration contributed by *provider_type*, or None.
+
+        The callable is invoked by template default resolution as
+        ``migration(row=..., defaults=..., merged=...)`` and returns the merged
+        dict plus an optional deprecation message.
+        """
+        return None
 
     @abstractmethod
     def list_all_provider_apis(self) -> list[str]:

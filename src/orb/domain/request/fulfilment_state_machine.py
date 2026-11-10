@@ -309,7 +309,11 @@ class FulfilmentStateMachine:
         # just never got its 'fulfilled' verdict) has no diagnostic — clear any
         # stale shortfall diagnostic so the completed request stays clean.
         clear_diagnostic = target == RequestStatus.COMPLETED and diagnostic is None
-        owes_release = target in (RequestStatus.PARTIAL, RequestStatus.TIMEOUT) and has_machine_ids
+        # A request with only a resource id may have launched machines the
+        # request never recorded, so it owes a release as well.
+        owes_release = target in (RequestStatus.PARTIAL, RequestStatus.TIMEOUT) and (
+            has_machine_ids or bool(request.resource_ids)
+        )
         return request._transition(
             target,
             now=now,

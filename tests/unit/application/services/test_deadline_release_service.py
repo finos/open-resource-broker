@@ -599,3 +599,190 @@ async def test_an_unknown_status_machine_among_running_ones_keeps_the_mark_pendi
 
     assert await h.service.release(h.request_id) == "pending"
     assert h.stored.metadata[STAMP] == "pending"
+
+
+# ---------------------------------------------------------------------------
+# Requests that reached the deadline with resource ids and no machine ids
+# ---------------------------------------------------------------------------
+
+
+class _AbortPort:
+    """Provider selection stand-in for CANCEL_PROVISIONING."""
+
+    def __init__(self, *, supported: bool = True, success: bool = True, raises: bool = False):
+        self.supported = supported
+        self.success = success
+        self.raises = raises
+        self.operations: list[Any] = []
+
+    def get_strategy_capabilities(self, provider_name: str) -> Any:
+        return SimpleNamespace(supports_operation=lambda op: self.supported)
+
+    async def execute_operation(self, provider_name: str, operation: Any) -> Any:
+        self.operations.append(operation)
+        if self.raises:
+            raise RuntimeError("provider down")
+        return SimpleNamespace(
+            success=self.success,
+            error_message=None if self.success else "abort failed",
+            data={
+                "resources": [
+                    {"resource_id": "fleet-1", "outcome": "aborted", "members": ["i-late"]}
+                ]
+            },
+        )
+
+
+def _resource_only(h_kwargs: Optional[dict[str, Any]] = None, **port_kwargs: Any) -> Any:
+    from unittest.mock import AsyncMock
+
+    request = _request(status=RequestStatus.TIMEOUT, machine_ids=[]).model_copy(
+        update={"provider_api": "ASG"}
+    )
+    h = _Harness(request, **(h_kwargs or {}))
+    h.port = _AbortPort(**port_kwargs)
+    h.service._provider_selection_port = h.port
+    h.synced = []
+
+    async def sync(request: Any, db_machines: Any, provider_machines: Any) -> Any:
+        h.synced.append([m.machine_id.value for m in provider_machines])
+        return provider_machines, {}
+
+    h.service._machine_sync_service.sync_machines_with_provider = AsyncMock(side_effect=sync)
+    return h
+
+
+@pytest.mark.asyncio
+async def test_resource_only_request_returns_unstarted_instances_and_keeps_started_ones():
+    h = _resource_only()
+    h.provider_machines = [
+        _machine("i-pending", MachineStatus.PENDING),
+        _machine("i-running", MachineStatus.RUNNING),
+    ]
+
+    assert await h.service.release(h.request_id) == "pending"
+    # Both are recorded as machines of the request; only the unstarted one is returned.
+    assert h.synced == [["i-pending", "i-running"]]
+    assert [c.machine_ids for c in h.commands] == [["i-pending"]]
+    assert h.port.operations == []
+    assert h.stored.metadata[STAMP] == "pending"
+
+    # Next run: the return has taken the pending instance away.
+    uow = h.service._uow_factory.create_unit_of_work.return_value
+    uow.machines.find_by_request_id.return_value = [
+        _machine("i-pending", MachineStatus.TERMINATED, return_request_id="ret-1"),
+        _machine("i-running", MachineStatus.RUNNING),
+    ]
+    h.provider_machines = [
+        _machine("i-pending", MachineStatus.TERMINATED),
+        _machine("i-running", MachineStatus.RUNNING),
+    ]
+    assert await h.service.release(h.request_id) == "done"
+    assert len(h.commands) == 1
+    assert h.port.operations == []
+
+
+@pytest.mark.asyncio
+async def test_resource_only_request_with_started_instances_only_has_nothing_to_release():
+    h = _resource_only()
+    h.provider_machines = [_machine("i-running", MachineStatus.RUNNING)]
+
+    assert await h.service.release(h.request_id) == "nothing_to_release"
+    assert h.commands == []
+    assert h.port.operations == []
+
+
+@pytest.mark.asyncio
+async def test_empty_resource_is_aborted_and_the_release_is_done():
+    h = _resource_only()
+    h.provider_machines = []
+
+    assert await h.service.release(h.request_id) == "done"
+    (operation,) = h.port.operations
+    assert operation.operation_type.value == "cancel_provisioning"
+    assert operation.parameters["resource_ids"] == ["fleet-1"]
+    assert h.stored.metadata[STAMP] == "done"
+    record = h.stored.metadata["deadline_release_abort"]
+    assert record["resource_ids"] == ["fleet-1"]
+    assert record["members"] == ["i-late"]
+    assert h.commands == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [{"success": False}, {"raises": True}])
+async def test_a_failed_abort_keeps_the_release_pending_and_is_retried(failure):
+    h = _resource_only(**failure)
+    h.provider_machines = []
+
+    assert await h.service.release(h.request_id) == "pending"
+    assert await h.service.release(h.request_id) == "pending"
+    assert len(h.port.operations) == 2
+    assert h.stored.metadata[STAMP] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_provider_that_cannot_abort_is_marked_and_alerted_once():
+    h = _resource_only(supported=False)
+    h.provider_machines = []
+
+    assert await h.service.release(h.request_id) == "abort_unsupported"
+    assert h.stored.metadata[STAMP] == "abort_unsupported"
+    alerts = [
+        c
+        for c in h.logger.error.call_args_list
+        if c.kwargs.get("extra", {}).get("event") == "request.deadline_abort_unsupported"
+    ]
+    assert len(alerts) == 1
+    assert alerts[0].kwargs["extra"]["resource_ids"] == ["fleet-1"]
+    assert alerts[0].kwargs["extra"]["provider_name"] == "aws-default"
+
+    assert await h.service.release(h.request_id) == "skipped"
+    alerts = [
+        c
+        for c in h.logger.error.call_args_list
+        if c.kwargs.get("extra", {}).get("event") == "request.deadline_abort_unsupported"
+    ]
+    assert len(alerts) == 1
+    assert h.port.operations == []
+
+
+@pytest.mark.asyncio
+async def test_abort_unsupported_is_not_owed_and_the_scan_skips_it():
+    h = _resource_only(supported=False)
+    h.provider_machines = []
+    await h.service.release(h.request_id)
+
+    assert DeadlineReleaseService.is_owed(h.stored) is False
+    assert h.service._owed_request_ids() == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("read", ["failed", "flagged", "unknown"])
+async def test_resource_only_request_with_a_doubtful_read_does_nothing(read):
+    h = _resource_only()
+    if read == "failed":
+        h.provider_machines = FailedProviderFetch([])
+    elif read == "flagged":
+        h.provider_machines = []
+        h.provider_metadata = {PROVIDER_FETCH_FAILED: True}
+    else:
+        h.provider_machines = [
+            _machine("i-1", MachineStatus.UNKNOWN),
+            _machine("i-2", MachineStatus.PENDING),
+        ]
+
+    assert await h.service.release(h.request_id) == "pending"
+    assert h.port.operations == []
+    assert h.commands == []
+    assert h.synced == []
+
+
+@pytest.mark.asyncio
+async def test_requests_with_machine_ids_keep_the_machine_path():
+    h = _resource_only()
+    h.requests.rows[h.request_id] = h.stored.model_copy(update={"machine_ids": ["i-1"]})
+    h.provider_machines = []
+
+    assert await h.service.release(h.request_id) == "pending"
+    assert h.port.operations == []
+    assert h.synced == []

@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 from orb.domain.template.factory import TemplateFactory
 from orb.infrastructure.logging.logger import get_logger
 from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
-from orb.providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
 from orb.providers.aws.domain.template.aws_template_dto_config import AWSTemplateDTOConfig
+from orb.providers.aws.domain.template.value_objects import migrate_legacy_on_demand_strategy
 from orb.providers.base.config_input import (
     provider_config_mapping,
     provider_instance_name,
@@ -308,6 +308,7 @@ def register_aws_provider(
                 validator_factory=create_aws_validator,
                 strategy_class_loader=_load_aws_strategy_class,
                 default_api=_load_aws_default_api(),
+                template_row_migration=migrate_legacy_on_demand_strategy,
             )
 
         # Register AWS template store
@@ -393,6 +394,7 @@ def register_aws_provider_instance(provider_instance, logger=None) -> bool:
                 resolver_factory=create_aws_resolver,
                 validator_factory=create_aws_validator,
                 strategy_class_loader=_load_aws_strategy_class,
+                template_row_migration=migrate_legacy_on_demand_strategy,
             )
 
         # Register the specific provider instance
@@ -486,16 +488,6 @@ def register_aws_template_factory(
         if logger:
             logger.error(error_msg, exc_info=True)
         # Don't raise here - factory registration is optional
-
-
-def get_aws_extension_defaults() -> dict:
-    """Get default AWS extension configuration.
-
-    Returns:
-        Dictionary of default AWS extension values
-    """
-    default_config = AWSTemplateExtensionConfig()  # type: ignore[call-arg]
-    return default_config.to_template_defaults()
 
 
 def register_aws_auth_strategies(logger: "Optional[LoggingPort]" = None) -> None:

@@ -64,6 +64,13 @@ class AWSPlugin(ProviderPlugin):
 
         return _load_aws_default_api()
 
+    def template_row_migration(self) -> Optional[Any]:
+        from orb.providers.aws.domain.template.value_objects import (
+            migrate_legacy_on_demand_strategy,
+        )
+
+        return migrate_legacy_on_demand_strategy
+
     def display_name(self) -> Optional[str]:
         return "Amazon Web Services (AWS)"
 

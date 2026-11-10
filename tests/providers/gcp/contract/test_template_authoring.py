@@ -14,6 +14,7 @@ async def test_generic_create_and_update_preserve_standard_gcp_fields() -> None:
     manager = MagicMock()
     manager._registry = None
     manager.get_template_by_id = AsyncMock(return_value=None)
+    manager.get_template_rejection = AsyncMock(return_value=None)
     manager.save_template = AsyncMock()
     port = TemplateConfigurationAdapter(manager, MagicMock())
     create_handler = CreateTemplateHandler(port, MagicMock(), MagicMock(), MagicMock())

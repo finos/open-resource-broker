@@ -1,11 +1,11 @@
 """Golden outcomes for a template's allocation strategy per entry path.
 
-When a template carries no explicit ``allocation_strategy`` only the AWS
-template decides a default: spot and heterogeneous templates get
-``priceCapacityOptimized`` and on-demand templates ``lowestPrice``. Every other
-entry path leaves the value unset. These tests pin the outcome for each path,
-plus what the EC2 Fleet request builder emits from it, so any change to where
-the default is decided is a visible, deliberate edit here.
+The allocation-strategy defaults live only in the provider template defaults
+and are applied by template default resolution. No aggregate and no entry path
+decides one itself: a template built without default resolution keeps the
+strategy unset, and the EC2 Fleet request builder then omits the option. These
+tests pin the outcome for each path, so any change to where a default is
+decided is a visible, deliberate edit here.
 """
 
 from __future__ import annotations
@@ -68,21 +68,15 @@ def test_base_template_leaves_strategy_unset(price_type: str) -> None:
     assert Template(template_id="t", price_type=price_type).allocation_strategy is None
 
 
-# (ii) AWS aggregate built directly
+# (ii) AWS aggregate built directly: no default either
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    ("price_type", "expected"),
-    [
-        ("spot", "priceCapacityOptimized"),
-        ("ondemand", "lowestPrice"),
-        ("heterogeneous", "priceCapacityOptimized"),
-    ],
-)
-def test_aws_template_default_follows_price_type(price_type: str, expected: str) -> None:
+@pytest.mark.parametrize("price_type", ["spot", "ondemand", "heterogeneous"])
+def test_aws_template_leaves_strategy_unset(price_type: str) -> None:
     template = AWSTemplate(template_id="t", price_type=price_type, **_FLEET_FIELDS)
-    assert template.allocation_strategy == expected
+    assert template.allocation_strategy is None
+    assert template.allocation_strategy_on_demand is None
 
 
 # (iii) stored template loaded without the key: left unset
@@ -142,9 +136,8 @@ def test_azure_template_allocation_strategy_is_unset(price_type: str) -> None:
     assert template.allocation_strategy is None
 
 
-# (vi) the fleet request carries AllocationStrategy for each entry path; the
-# builder only emits it when the template value is truthy, so the AWS template
-# default must reach it whichever way the template was built.
+# (vi) a template built without default resolution has no strategy, so the
+# fleet request omits AllocationStrategy instead of inventing one.
 
 
 def _template_via(path: str, price_type: str) -> Template:
@@ -160,23 +153,23 @@ def _template_via(path: str, price_type: str) -> Template:
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    ("path", "price_type", "expected"),
-    [
-        ("base", "spot", "price-capacity-optimized"),
-        ("aws", "spot", "price-capacity-optimized"),
-        ("stored", "spot", "price-capacity-optimized"),
-        ("base", "heterogeneous", "price-capacity-optimized"),
-        ("aws", "heterogeneous", "price-capacity-optimized"),
-        ("stored", "heterogeneous", "price-capacity-optimized"),
-    ],
-)
-def test_fleet_request_carries_allocation_strategy(
-    path: str, price_type: str, expected: str
-) -> None:
+@pytest.mark.parametrize("path", ["base", "aws", "stored"])
+@pytest.mark.parametrize("price_type", ["spot", "heterogeneous"])
+def test_fleet_request_omits_an_unset_allocation_strategy(path: str, price_type: str) -> None:
     template = _template_via(path, price_type)
-    options = _fleet_request_options(template)
-    assert options.get("AllocationStrategy") == expected
+    assert "AllocationStrategy" not in _fleet_request_options(template)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("price_type", ["spot", "heterogeneous"])
+def test_fleet_request_carries_the_resolved_default(price_type: str) -> None:
+    from tests.providers.aws.template_defaults_support import make_defaults_service
+
+    resolved = make_defaults_service().resolve_template_defaults(
+        {"template_id": "t", "provider_type": "aws", "price_type": price_type, **_FLEET_FIELDS}
+    )
+    options = _fleet_request_options(AWSTemplate.model_validate(resolved))
+    assert options.get("AllocationStrategy") == "price-capacity-optimized"
 
 
 @pytest.mark.unit

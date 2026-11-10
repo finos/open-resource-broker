@@ -275,11 +275,11 @@ class TestAWSFleetType:
 
 @pytest.mark.unit
 class TestAWSConfiguration:
-    def test_defaults_applied_when_fields_omitted(self) -> None:
+    def test_no_strategy_or_price_default_when_fields_omitted(self) -> None:
         config = AWSConfiguration(handler_type=ProviderApi.EC2_FLEET)
         assert config.fleet_type == AWSFleetType.REQUEST
-        assert config.allocation_strategy == "lowestPrice"
-        assert config.price_type == PriceType.ONDEMAND
+        assert config.allocation_strategy is None
+        assert config.price_type is None
 
     def test_explicit_values_are_preserved(self) -> None:
         config = AWSConfiguration(
@@ -301,8 +301,8 @@ class TestAWSConfiguration:
         api_format = config.to_aws_api_format()
         assert api_format["handler_type"] == "EC2Fleet"
         assert api_format["fleet_type"] == "request"
-        assert api_format["allocation_strategy"] == "lowestPrice"
-        assert api_format["price_type"] == "ondemand"
+        assert api_format["allocation_strategy"] is None
+        assert api_format["price_type"] is None
         assert api_format["subnet_ids"] == ["subnet-0123456789abcdef0"]
         assert api_format["security_group_ids"] == ["sg-0123456789abcdef0"]
 

@@ -24,7 +24,7 @@ from orb.domain.base.ports import ErrorHandlingPort, LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.request.aggregate import Request
 from orb.domain.template.template_aggregate import Template
-from orb.infrastructure.resilience import MaxRetriesExceededError
+from orb.infrastructure.resilience import CircuitBreakerOpenError, MaxRetriesExceededError
 from orb.providers.aws.configuration.cleanup_config import CleanupConfig
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import (
@@ -47,6 +47,7 @@ from orb.providers.aws.resilience.call_executor import (
     EVENTUAL_CONSISTENCY_ERRORS,
     AWSCallExecutor,
 )
+from orb.providers.aws.resilience.retry_classifier import is_retryable_client_error
 from orb.providers.base.handler import ProviderHandlerBase
 
 T = TypeVar("T")
@@ -456,6 +457,32 @@ class AWSHandler(ProviderHandlerBase, ABC):
     def _redact_aws_message(cls, message: str) -> str:
         """Remove access-key-like tokens from an AWS error message."""
         return cls._ACCESS_KEY_RE.sub("[REDACTED]", message)
+
+    def _discard_override_version_if_rejected(
+        self, error: BaseException, launch_template_result: Any, request: Request
+    ) -> None:
+        """Delete the request's override launch template version after a rejected create.
+
+        Only a rejection AWS will not retry proves nothing launched with the
+        version. The error must be a ``ClientError`` or carry one as its
+        cause; an open circuit breaker, a timeout, a connection error or a
+        retryable error that outlasted the retries keeps the version, since a
+        lost response may have launched capacity that uses it.
+        """
+        if isinstance(error, CircuitBreakerOpenError):
+            return
+        client_error = error if isinstance(error, ClientError) else error.__cause__
+        if not isinstance(client_error, ClientError) or is_retryable_client_error(client_error):
+            return
+        self._discard_override_version(launch_template_result, request)
+
+    def _discard_override_version(self, launch_template_result: Any, request: Request) -> None:
+        """Delete the override version this request added to a user launch template."""
+        self._lt_cleanup.delete_override_version(
+            launch_template_result.template_id,
+            launch_template_result.override_version or "",
+            str(request.request_id),
+        )
 
     def _convert_client_error(
         self, error: ClientError, operation_name: str = "unknown"

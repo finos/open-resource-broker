@@ -359,15 +359,40 @@ class TestRegisterAwsTemplateFactory:
 
 
 # ---------------------------------------------------------------------------
-# get_aws_extension_defaults
+# template row migration registration
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-class TestGetAwsExtensionDefaults:
-    def test_returns_template_defaults_dict(self) -> None:
-        defaults = reg.get_aws_extension_defaults()
-        assert isinstance(defaults, dict)
+class TestTemplateRowMigrationRegistration:
+    def test_register_aws_provider_passes_the_migration(self) -> None:
+        from orb.providers.aws.domain.template.value_objects import (
+            migrate_legacy_on_demand_strategy,
+        )
+
+        mock_registry = MagicMock()
+        reg.register_aws_provider(registry=mock_registry)
+        kwargs = mock_registry.register_provider.call_args.kwargs
+        assert kwargs["template_row_migration"] is migrate_legacy_on_demand_strategy
+
+    def test_registry_returns_the_registered_migration(self) -> None:
+        from orb.providers.registry.provider_registry import ProviderRegistry
+
+        def migration(**_: object) -> tuple[dict, None]:
+            return {}, None
+
+        registry = ProviderRegistry()
+        registry.register_provider(
+            provider_type="fake-migrating",
+            strategy_factory=MagicMock(),
+            config_factory=MagicMock(),
+            template_row_migration=migration,
+        )
+        try:
+            assert registry.get_template_row_migration("fake-migrating") is migration
+            assert registry.get_template_row_migration("not-registered") is None
+        finally:
+            registry.unregister_provider("fake-migrating")
 
 
 # ---------------------------------------------------------------------------

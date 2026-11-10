@@ -14,9 +14,11 @@ from orb.application.dto.template import TemplateDTO
 
 _TEMPLATE_DTO_FIELDS = [
     "allocation_strategy",
+    "allocation_strategy_on_demand",
     "created_at",
     "description",
     "encryption_key",
+    "fallback_to_ondemand",
     "image_id",
     "instance_profile",
     "iops",

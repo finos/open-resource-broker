@@ -236,7 +236,6 @@ class TemplateSerializer(BaseEntitySerializer):
                 "machine_role": processed_data.get("machine_role")
                 or processed_data.get("instance_profile"),
                 "monitoring_enabled": processed_data.get("monitoring_enabled"),
-                "price_type": data.get("price_type", "ondemand"),
                 "allocation_strategy": data.get("allocation_strategy"),
                 "max_price": data.get("max_price"),
                 "tags": data.get("tags", {}),
@@ -248,6 +247,9 @@ class TemplateSerializer(BaseEntitySerializer):
                 "created_at": created_at,
                 "updated_at": updated_at,
             }
+
+            if data.get("price_type") is not None:
+                template_data["price_type"] = data["price_type"]
 
             self.logger.debug("Converted template_data keys: %s", list(template_data.keys()))
 

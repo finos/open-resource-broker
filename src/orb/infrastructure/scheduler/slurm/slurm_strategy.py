@@ -236,7 +236,6 @@ class SlurmSchedulerStrategy(BaseSchedulerStrategy):
 
         # Apply defaults for missing fields
         mapped.setdefault("max_instances", 1)
-        mapped.setdefault("price_type", "ondemand")
         mapped.setdefault("is_active", True)
         mapped.setdefault("machine_types", {})
         mapped.setdefault("subnet_ids", [])

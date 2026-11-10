@@ -110,12 +110,8 @@ class AWSInstanceOperationService:
                 aws_template = AWSTemplate.model_validate(enhanced_config)
             except Exception as e:
                 self._logger.error("Failed to create AWSTemplate: %s", e)
-                aws_template = AWSTemplate(
-                    template_id=template_config.get("template_id", "unknown"),
-                    image_id=template_config.get("image_id", ""),
-                    instance_type=template_config.get("instance_type", "t2.micro"),
-                    subnet_ids=template_config.get("subnet_ids", []),
-                    security_group_ids=template_config.get("security_group_ids", []),
+                return ProviderResult.error_result(
+                    f"Invalid template configuration: {e}", "INVALID_TEMPLATE"
                 )
 
             # Ensure machine_types is populated — use machine_type as fallback

@@ -7,6 +7,7 @@ from .exceptions import (
     TemplateNotFoundError,
     TemplateValidationError,
 )
+from .rejection import TemplateRejection
 from .template_aggregate import Template
 
 __all__: list[str] = [
@@ -15,5 +16,6 @@ __all__: list[str] = [
     "TemplateAlreadyExistsError",
     "TemplateException",
     "TemplateNotFoundError",
+    "TemplateRejection",
     "TemplateValidationError",
 ]

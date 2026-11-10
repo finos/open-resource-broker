@@ -288,6 +288,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         default_api: Optional[str] = None,
         display_name: Optional[str] = None,
         strategy_class_loader: Optional[Callable[[], type]] = None,
+        template_row_migration: Optional[Callable[..., Any]] = None,
         **kwargs: Any,
     ) -> None:
         """Register provider type - implements abstract method."""
@@ -302,6 +303,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
                 default_api=default_api,
                 display_name=display_name,
                 strategy_class_loader=strategy_class_loader,
+                template_row_migration=template_row_migration,
             )
         except ValueError as e:
             raise ConfigurationError(str(e))
@@ -350,6 +352,16 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             pass  # Unregistered provider type; fall through to the None default
         return None
 
+    def get_template_row_migration(self, provider_type: str) -> Optional[Callable[..., Any]]:
+        """Return the template row migration registered for *provider_type*, if any."""
+        try:
+            registration = self._get_type_registration(provider_type)
+        except (ValueError, KeyError):
+            return None
+        if isinstance(registration, ProviderRegistration):
+            return registration.template_row_migration
+        return None
+
     def register_provider(
         self,
         provider_type: str,
@@ -361,6 +373,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         default_api: Optional[str] = None,
         display_name: Optional[str] = None,
         strategy_class_loader: Optional[Callable[[], type]] = None,
+        template_row_migration: Optional[Callable[..., Any]] = None,
     ) -> None:
         """
         Register a provider with its factory functions - backward compatibility method.
@@ -376,6 +389,8 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             display_name: Optional human-readable name for this provider
             strategy_class_loader: Optional callable returning the strategy class,
                 used to defer importing the provider SDK until it is needed
+            template_row_migration: Optional callable that rewrites legacy
+                template rows during template default resolution
 
         Raises:
             ValueError: If provider_type is already registered
@@ -390,6 +405,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             default_api=default_api,
             display_name=display_name,
             strategy_class_loader=strategy_class_loader,
+            template_row_migration=template_row_migration,
         )
 
     def register_provider_instance(
@@ -708,6 +724,7 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
             default_api=additional_factories.get("default_api"),
             display_name=additional_factories.get("display_name"),
             strategy_class_loader=additional_factories.get("strategy_class_loader"),
+            template_row_migration=additional_factories.get("template_row_migration"),
         )
 
     @staticmethod

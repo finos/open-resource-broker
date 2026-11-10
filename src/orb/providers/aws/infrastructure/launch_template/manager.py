@@ -68,6 +68,17 @@ class LTNetworkingState(Enum):
     UNKNOWN_UNAUTHORIZED = "unknown_unauthorized"
 
 
+@dataclass(frozen=True)
+class LTInspection:
+    """What one launch template version sets that a launch call cannot override.
+
+    ``sets_market_options`` is None when the version could not be read.
+    """
+
+    networking: LTNetworkingState
+    sets_market_options: Optional[bool]
+
+
 @injectable
 class AWSLaunchTemplateManager:
     """Manages AWS launch template creation and updates."""
@@ -315,15 +326,14 @@ class AWSLaunchTemplateManager:
         """Return True if any override field is non-None on the template."""
         return any(getattr(aws_template, field, None) is not None for field in _OVERRIDE_FIELDS)
 
-    def inspect_launch_template_networking(
-        self, launch_template_id: str, version: str
-    ) -> LTNetworkingState:
-        """Check whether the given LT version defines networking fields.
+    def inspect_launch_template(self, launch_template_id: str, version: str) -> LTInspection:
+        """Read the given LT version's networking and market options.
 
-        Returns HAS_NETWORKING when NetworkInterfaces, SubnetId, or
-        SecurityGroupIds are set inside LaunchTemplateData; NO_NETWORKING
-        otherwise; UNKNOWN_UNAUTHORIZED when the describe call is denied by
-        IAM (caller must decide fallback).
+        ``networking`` is HAS_NETWORKING when NetworkInterfaces, SubnetId, or
+        SecurityGroupIds are set inside LaunchTemplateData, NO_NETWORKING
+        otherwise, and UNKNOWN_UNAUTHORIZED when the describe call is denied by
+        IAM (caller must decide fallback). ``sets_market_options`` tells whether
+        the version sets InstanceMarketOptions, None when it could not be read.
         """
         try:
             response = self._call(
@@ -334,25 +344,33 @@ class AWSLaunchTemplateManager:
                 Versions=[version],
             )
             lt_data = response["LaunchTemplateVersions"][0]["LaunchTemplateData"]
-            if (
-                lt_data.get("NetworkInterfaces")
-                or lt_data.get("SubnetId")
-                or lt_data.get("SecurityGroupIds")
-            ):
-                return LTNetworkingState.HAS_NETWORKING
-            return LTNetworkingState.NO_NETWORKING
+            networking = (
+                LTNetworkingState.HAS_NETWORKING
+                if (
+                    lt_data.get("NetworkInterfaces")
+                    or lt_data.get("SubnetId")
+                    or lt_data.get("SecurityGroupIds")
+                )
+                else LTNetworkingState.NO_NETWORKING
+            )
+            return LTInspection(
+                networking=networking,
+                sets_market_options=bool(lt_data.get("InstanceMarketOptions")),
+            )
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "")
             if code in ("UnauthorizedOperation", "AccessDenied", "AccessDeniedException"):
                 self._logger.warning(
-                    "Cannot describe LT %s v%s for networking inspection (%s); "
-                    "assuming LT owns networking: %s",
+                    "Cannot describe LT %s v%s for inspection (%s); "
+                    "assuming LT owns networking and market options: %s",
                     launch_template_id,
                     version,
                     code,
                     e,
                 )
-                return LTNetworkingState.UNKNOWN_UNAUTHORIZED
+                return LTInspection(
+                    networking=LTNetworkingState.UNKNOWN_UNAUTHORIZED, sets_market_options=None
+                )
             raise
 
     def _create_new_lt_version(

@@ -214,9 +214,15 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             # A retry after a lost response finds the group its first attempt created.
             # That is a success only when the group is this request's own; any other
             # group of the same name is a real conflict.
-            if error_code_of(exc) != "AlreadyExists" or not self._asg_belongs_to_request(
-                asg_name, str(request.request_id), launch_template_result.template_id
-            ):
+            if error_code_of(exc) == "AlreadyExists":
+                # The group may be this request's own and use the version; it is
+                # never removed here.
+                if not self._asg_belongs_to_request(
+                    asg_name, str(request.request_id), launch_template_result.template_id
+                ):
+                    raise
+            else:
+                self._discard_override_version_if_rejected(exc, launch_template_result, request)
                 raise
             self._logger.info(
                 "Auto Scaling Group %s already exists for request %s; using it",

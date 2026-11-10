@@ -125,8 +125,11 @@ Spot Fleet uses camelCase on the wire, so template values pass through nearly un
 | `capacityOptimizedPrioritized` | `capacityOptimizedPrioritized` |
 | `priceCapacityOptimized` | `priceCapacityOptimized` |
 | `diversified` | `diversified` |
+| `prioritized` (on-demand pools only) | `prioritized` |
 
-When no strategy is set, spot and heterogeneous templates default to `priceCapacityOptimized` and on-demand templates default to `lowestPrice`. `prioritized` is not a Spot Fleet spot strategy and falls back to `lowestPrice`.
+`allocation_strategy` is sent as `AllocationStrategy` (spot pools) and `allocation_strategy_on_demand` as `OnDemandAllocationStrategy` when the request includes on-demand capacity. Their defaults come from the AWS provider defaults (`provider_defaults.aws.template_defaults`): `priceCapacityOptimized` for spot pools and `lowestPrice` for on-demand pools, whatever the template's `price_type`. A provider instance's `template_defaults` and the template itself override them; there is no per-request override.
+
+`prioritized` applies only to on-demand pools. A template that sets an invalid or unknown strategy is rejected and reported by `templates show` and `templates validate`. A template that sets `prioritized`, or `lowestPrice` with `price_type: ondemand`, in `allocation_strategy` is read as its on-demand strategy, with a deprecation warning; move the value to `allocation_strategy_on_demand`.
 
 ### Overrides, priority, and per-override price
 

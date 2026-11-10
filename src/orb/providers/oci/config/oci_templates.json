@@ -19,8 +19,7 @@
         "memoryInGBs": 8
       },
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-flex-preemptible-small",
@@ -40,8 +39,7 @@
         "memoryInGBs": 8
       },
       "boot_volume_gbs": 50,
-      "capacity_type": "preemptible",
-      "fallback_to_ondemand": false
+      "capacity_type": "preemptible"
     },
     {
       "template_id": "oci-vm-flex-preemptible-fallback-medium",
@@ -95,8 +93,7 @@
       "availability_domain": "<replace-availability-domain>",
       "image_id": "ocid1.image.oc1..<replace-hpc-image-ocid>",
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-bm-standard-ondemand",
@@ -112,8 +109,7 @@
         "BM.Standard.E5.192": 1
       },
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-standard-e5-ondemand",
@@ -133,8 +129,7 @@
         "memoryInGBs": 8
       },
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-standard-e6-ax-ondemand",
@@ -154,8 +149,7 @@
         "memoryInGBs": 8
       },
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-standard3-ondemand",
@@ -175,8 +169,7 @@
         "memoryInGBs": 8
       },
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-standard4-ax-ondemand",
@@ -196,8 +189,7 @@
         "memoryInGBs": 8
       },
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-optimized3-ondemand",
@@ -217,8 +209,7 @@
         "memoryInGBs": 8
       },
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-standard-a1-ondemand",
@@ -239,8 +230,7 @@
       },
       "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-standard-a2-ondemand",
@@ -261,8 +251,7 @@
       },
       "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-standard-a4-ondemand",
@@ -283,8 +272,7 @@
       },
       "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-standard-a4-ax-ondemand",
@@ -305,8 +293,7 @@
       },
       "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-denseio-e5-ondemand",
@@ -326,8 +313,7 @@
         "memoryInGBs": 96
       },
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-vm-denseio-e6-ax-ondemand",
@@ -347,8 +333,7 @@
         "memoryInGBs": 96
       },
       "boot_volume_gbs": 50,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-bm-standard-e6-256-ondemand",
@@ -364,8 +349,7 @@
         "BM.Standard.E6.256": 1
       },
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-bm-standard-e6-ax-192-ondemand",
@@ -381,8 +365,7 @@
         "BM.Standard.E6.Ax.192": 1
       },
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-bm-standard3-64-ondemand",
@@ -398,8 +381,7 @@
         "BM.Standard3.64": 1
       },
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-bm-standard4-ax-120-ondemand",
@@ -415,8 +397,7 @@
         "BM.Standard4.Ax.120": 1
       },
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-bm-standard-a1-160-ondemand",
@@ -433,8 +414,7 @@
       },
       "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-bm-standard-a4-48-ondemand",
@@ -451,8 +431,7 @@
       },
       "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-bm-standard-a4-ax-48-ondemand",
@@ -469,8 +448,7 @@
       },
       "image_id": "ocid1.image.oc1..<replace-arm64-image-ocid>",
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-bm-denseio-e5-128-ondemand",
@@ -486,8 +464,7 @@
         "BM.DenseIO.E5.128": 1
       },
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     },
     {
       "template_id": "oci-bm-denseio-e6-ax-192-ondemand",
@@ -503,8 +480,7 @@
         "BM.DenseIO.E6.Ax.192": 1
       },
       "boot_volume_gbs": 200,
-      "capacity_type": "ondemand",
-      "fallback_to_ondemand": false
+      "capacity_type": "ondemand"
     }
   ]
 }

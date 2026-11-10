@@ -105,10 +105,12 @@ class TestCleanArchitectureIntegration:
 
             # Test extension defaults - must provide non-empty config_data or it returns {}
             extension_defaults = TemplateExtensionRegistry.get_extension_defaults(
-                "aws", {"allocation_strategy": "capacity_optimized"}
+                "aws", {"volume_type": "io2"}
             )
             assert isinstance(extension_defaults, dict)
-            assert "allocation_strategy" in extension_defaults
+            assert extension_defaults["volume_type"] == "io2"
+            # Allocation strategies are template defaults, not extension defaults.
+            assert "allocation_strategy" not in extension_defaults
         finally:
             # Restore the registry to the pre-test state unconditionally.
             TemplateExtensionRegistry._extensions.clear()
@@ -150,14 +152,13 @@ class TestCleanArchitectureIntegration:
         """Test AWS extension configuration works correctly."""
         # Test AWS extension config
         aws_extension_config = AWSTemplateExtensionConfig(  # type: ignore[call-arg]
-            allocation_strategy="capacity_optimized",
             volume_type="gp3",
             spot_fleet_request_expiry=30,
         )
 
         # Test conversion to template defaults
         defaults = aws_extension_config.to_template_defaults()
-        assert defaults["allocation_strategy"] == "capacity_optimized"
+        assert "allocation_strategy" not in defaults
         assert defaults["volume_type"] == "gp3"
         assert defaults["spot_fleet_request_expiry"] == 30
 

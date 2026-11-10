@@ -115,11 +115,13 @@ class TemplateFactory(BaseTemplateFactory):
 
                 return template
             except Exception as e:
+                # A template its provider rejects is invalid; it is not
+                # downgraded to a core template that skips those checks.
                 if self._logger:
                     self._logger.error("Failed to create %s template: %s", provider_type, e)
-                # Fall back to core template
+                raise
 
-        # Fall back to core template
+        # No provider-specific class: build a core template
         try:
             template = Template(**template_data)
 
