@@ -690,11 +690,14 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             )
 
     def _update_machines_to_pending(self, machine_ids: list[str]) -> None:
-        """Update machine statuses to shutting-down (termination in progress)."""
+        """Update machine statuses to shutting-down (termination in progress).
+
+        Machines already in a terminal state keep it.
+        """
         with self.uow_factory.create_unit_of_work() as uow:
             for machine_id in machine_ids:
                 machine = uow.machines.get_by_id(machine_id)
-                if machine:
+                if machine and not machine.status.is_terminal:
                     from orb.domain.machine.machine_status import MachineStatus
 
                     updated_machine = machine.update_status(
