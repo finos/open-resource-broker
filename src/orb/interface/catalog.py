@@ -66,6 +66,8 @@ from orb.application.services.orchestration.dtos import (
     ListMachinesOutput,
     ListProvidersInput,
     ListProvidersOutput,
+    ListReclaimedMachinesInput,
+    ListReclaimedMachinesOutput,
     ListRequestsInput,
     ListRequestsOutput,
     ListReturnRequestsInput,
@@ -101,6 +103,9 @@ from orb.application.services.orchestration.get_request_status import GetRequest
 from orb.application.services.orchestration.get_template import GetTemplateOrchestrator
 from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
 from orb.application.services.orchestration.list_providers import ListProvidersOrchestrator
+from orb.application.services.orchestration.list_reclaimed_machines import (
+    ListReclaimedMachinesOrchestrator,
+)
 from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
 from orb.application.services.orchestration.list_return_requests import (
     ListReturnRequestsOrchestrator,
@@ -343,6 +348,16 @@ OPERATION_CATALOG: dict[str, CatalogEntry[Any, Any]] = {
         render_overrides={
             _CLI: lambda rfs, out: rfs.format_return_requests(out.requests),
         },
+    ),
+    # HostFactory polls getReturnRequests for machines the provider reclaimed. The
+    # operation is CLI-only: it exists to answer that poll, not as a general listing.
+    "list_reclaimed_machines": CatalogEntry(
+        key="list_reclaimed_machines",
+        orchestrator=ListReclaimedMachinesOrchestrator,
+        input_dto=ListReclaimedMachinesInput,
+        output_dto=ListReclaimedMachinesOutput,
+        render=lambda rfs, out: rfs.format_reclaimed_machines(out.machines),
+        exposed_on=frozenset({_CLI}),
     ),
     "cancel_request": CatalogEntry(
         key="cancel_request",

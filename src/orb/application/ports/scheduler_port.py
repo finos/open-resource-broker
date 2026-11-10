@@ -46,6 +46,14 @@ class SchedulerFormattingPort(ABC):
         rather than request-status envelopes.
         """
 
+    def format_reclaimed_machines_response(self, machines: list[dict[str, Any]]) -> dict[str, Any]:
+        """Format the machines the provider has reclaimed.
+
+        Each item carries ``name``, ``machine_id`` and ``grace_period``. The
+        default shape is ORB-native; schedulers with a wire format override it.
+        """
+        return {"reclaimed_machines": list(machines)}
+
     @abstractmethod
     def format_machine_status_response(self, machines: list[Any]) -> dict[str, Any]:
         """Format machine DTOs to scheduler response."""
@@ -171,6 +179,14 @@ class SchedulerRequestParsingPort(ABC):
     @abstractmethod
     def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
         """Format request creation response to scheduler format."""
+
+    def is_provider_reclaim_poll(self, input_data: Any) -> bool:
+        """Whether a ``list-returns`` call asks which machines the provider reclaimed.
+
+        Schedulers whose scripts poll for provider-initiated returns override this;
+        the default is a plain listing of user return requests.
+        """
+        return False
 
     def expand_node_range(self, node_spec: str) -> list[str]:
         """Expand a scheduler-specific node-range/hostlist expression to individual node names.

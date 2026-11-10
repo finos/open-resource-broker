@@ -40,6 +40,7 @@ from orb.application.queries.machine_query_handlers import ListMachinesHandler
 from orb.application.queries.request_query_handlers import (
     SyncAndGetRequestHandler,
     SyncAndListActiveRequestsHandler,
+    SyncAndListReclaimedMachinesHandler,
     SyncAndListReturnRequestsHandler,
 )
 from orb.application.queries.storage_handlers import ListStorageStrategiesHandler
@@ -85,6 +86,7 @@ _RESOLVED_FROM_CONTAINER = [
     ListMachinesHandler,
     SyncAndGetRequestHandler,
     SyncAndListActiveRequestsHandler,
+    SyncAndListReclaimedMachinesHandler,
     SyncAndListReturnRequestsHandler,
     ListStorageStrategiesHandler,
     GetConfigurationSectionHandler,

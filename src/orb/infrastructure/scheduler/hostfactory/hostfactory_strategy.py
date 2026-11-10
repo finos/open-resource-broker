@@ -670,6 +670,36 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "requests": items,
         }
 
+    def format_reclaimed_machines_response(self, machines: list[dict[str, Any]]) -> dict[str, Any]:
+        """HF-spec getReturnRequests response for machines the provider reclaimed."""
+        items = [
+            {
+                "machine": m.get("name") or m.get("machine_id"),
+                "gracePeriod": int(m.get("grace_period") or 0),
+            }
+            for m in machines
+        ]
+        return {
+            "status": "complete",
+            "message": "Return requests retrieved successfully."
+            if items
+            else "No machines to return.",
+            "requests": items,
+        }
+
+    def is_provider_reclaim_poll(self, input_data: Any) -> bool:
+        """Whether this ``list-returns`` call is HostFactory's getReturnRequests poll.
+
+        HostFactory sends the machines it tracks under ``machines`` (the key is
+        optional in the spec, so ``{}`` is also valid). The shipped
+        getReturnRequests script exports ``HF_CALLER_SCRIPT``, which identifies
+        the poll when the input carries no ``machines`` key. Anything else,
+        including a bare ``-d`` payload, lists user return requests.
+        """
+        if isinstance(input_data, dict) and "machines" in input_data:
+            return True
+        return os.environ.get("HF_CALLER_SCRIPT", "").startswith("getReturnRequests")
+
     def _build_hf_attributes(self, instance_type: str) -> dict[str, list[str]]:
         """Build IBM HF attributes dict from an instance type string.
 

@@ -278,3 +278,69 @@ def test_format_machine_details_required_fields_present(hf):
     assert "status" in result
     assert "machineId" in result
     assert "provider" in result
+
+
+# ---------------------------------------------------------------------------
+# Provider-reclaimed machines
+# ---------------------------------------------------------------------------
+
+
+def test_reclaimed_machines_use_the_getreturnrequests_envelope(hf):
+    result = hf.format_reclaimed_machines_response(
+        [
+            {"name": "host-1", "machine_id": "i-1", "grace_period": 120},
+            {"name": None, "machine_id": "i-2", "grace_period": 300},
+        ]
+    )
+
+    assert result == {
+        "status": "complete",
+        "message": "Return requests retrieved successfully.",
+        "requests": [
+            {"machine": "host-1", "gracePeriod": 120},
+            {"machine": "i-2", "gracePeriod": 300},
+        ],
+    }
+
+
+def test_no_reclaimed_machines_is_an_empty_complete_response(hf):
+    assert hf.format_reclaimed_machines_response([]) == {
+        "status": "complete",
+        "message": "No machines to return.",
+        "requests": [],
+    }
+
+
+@pytest.mark.parametrize(
+    ("input_data", "caller", "expected"),
+    [
+        ({"machines": [{"name": "h"}]}, None, True),
+        ({"machines": []}, None, True),
+        ({}, "getReturnRequests.sh", True),
+        ({}, "getReturnRequests.bat", True),
+        (None, "getReturnRequests.sh", True),
+        ({"x": 1}, None, False),
+        ({}, None, False),
+        (None, None, False),
+        ({"x": 1}, "getRequestStatus.sh", False),
+    ],
+)
+def test_reclaim_poll_detection(hf, monkeypatch, input_data, caller, expected):
+    if caller is None:
+        monkeypatch.delenv("HF_CALLER_SCRIPT", raising=False)
+    else:
+        monkeypatch.setenv("HF_CALLER_SCRIPT", caller)
+
+    assert hf.is_provider_reclaim_poll(input_data) is expected
+
+
+def test_default_scheduler_never_polls_for_reclaimed_machines(monkeypatch):
+    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
+    monkeypatch.setenv("HF_CALLER_SCRIPT", "getReturnRequests.sh")
+    strategy = DefaultSchedulerStrategy.__new__(DefaultSchedulerStrategy)
+
+    assert strategy.is_provider_reclaim_poll({"machines": []}) is False
+    assert strategy.format_reclaimed_machines_response([{"name": "a"}]) == {
+        "reclaimed_machines": [{"name": "a"}]
+    }

@@ -298,6 +298,18 @@ class ListReturnRequestsOutput:
 
 
 @dataclasses.dataclass(frozen=True)
+class ListReclaimedMachinesInput:
+    """Machines (by id or name) to check for provider-side reclamation."""
+
+    identifiers: list[str] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass(frozen=True)
+class ListReclaimedMachinesOutput:
+    machines: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass(frozen=True)
 class GetTemplateInput:
     template_id: str
     provider_name: Optional[str] = None

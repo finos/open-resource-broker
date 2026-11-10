@@ -43,6 +43,7 @@ def _mock_container_with_formatter():
 
     container = MagicMock()
     scheduler = MagicMock(spec=SchedulerPort)
+    scheduler.is_provider_reclaim_poll.return_value = False
     formatter = MagicMock(spec=ResponseFormattingService)
     formatter.status_poll_exit_code.return_value = 0
     formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})

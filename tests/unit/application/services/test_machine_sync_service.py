@@ -367,3 +367,39 @@ def test_image_id_is_adopted_only_when_the_stored_machine_has_none(stored, repor
         )
         is expected
     )
+
+
+@pytest.mark.unit
+class TestRefreshInstanceStatus:
+    """refresh_instance_status reads only the named instances, never the whole resource."""
+
+    @pytest.mark.asyncio
+    async def test_acquire_request_with_resources_is_read_by_instance_id(self):
+        from orb.providers.base.strategy.provider_strategy import ProviderResult
+
+        svc = _make_service()
+        seen: list = []
+
+        async def _capture(provider_name, operation):
+            seen.append((operation.operation_type.value, operation.parameters["instance_ids"]))
+            return ProviderResult.success_result(data={"instances": []})
+
+        registry_svc = MagicMock()
+        registry_svc.execute_operation = _capture
+        svc._provider_registry_service = registry_svc
+
+        req = _make_request(request_type="acquire")  # has resource_ids
+
+        await svc.refresh_instance_status(req, [_make_machine("i-1"), _make_machine("i-2")])  # type: ignore[arg-type]
+
+        assert seen == [("get_instance_status", ["i-1", "i-2"])]
+
+    @pytest.mark.asyncio
+    async def test_provider_failure_is_flagged(self):
+        svc = _make_service()
+        machines = [_make_machine("i-1")]
+
+        result, meta = await svc.refresh_instance_status(_make_request(), machines)  # type: ignore[arg-type]
+
+        assert meta == {"provider_fetch_failed": True}
+        assert result == machines

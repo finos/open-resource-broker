@@ -93,6 +93,11 @@ class ResponseFormattingService:
         data = self._scheduler.format_return_requests_response(requests)
         return InterfaceResponse(data=data)
 
+    def format_reclaimed_machines(self, machines: list[dict[str, Any]]) -> InterfaceResponse:
+        """Format the machines the provider has reclaimed."""
+        data = self._scheduler.format_reclaimed_machines_response(machines)
+        return InterfaceResponse(data=data)
+
     def format_machine_list(
         self,
         machines: list[Any],

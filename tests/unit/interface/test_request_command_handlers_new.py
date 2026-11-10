@@ -11,10 +11,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orb.application.dto.interface_response import InterfaceResponse
+from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.orchestration.dtos import (
     AcquireMachinesOutput,
     CancelRequestOutput,
     GetRequestStatusOutput,
+    ListReclaimedMachinesOutput,
     ListRequestsOutput,
     ListReturnRequestsOutput,
     ReturnMachinesOutput,
@@ -506,10 +508,13 @@ class TestHandleGetReturnRequests:
         orch = AsyncMock(spec=ListReturnRequestsOrchestrator)
         orch.execute.return_value = ListReturnRequestsOutput(requests=[], total_count=0)
 
+        scheduler = MagicMock(spec=SchedulerPort)
+        scheduler.is_provider_reclaim_poll.return_value = False
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ListReturnRequestsOrchestrator: orch,
             ResponseFormattingService: fmt,
+            SchedulerPort: scheduler,
         }.get(t, MagicMock())
 
         args = Namespace(
@@ -537,10 +542,13 @@ class TestHandleGetReturnRequests:
         orch = AsyncMock(spec=ListReturnRequestsOrchestrator)
         orch.execute.return_value = ListReturnRequestsOutput(requests=[])
 
+        scheduler = MagicMock(spec=SchedulerPort)
+        scheduler.is_provider_reclaim_poll.return_value = False
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ListReturnRequestsOrchestrator: orch,
             ResponseFormattingService: fmt,
+            SchedulerPort: scheduler,
         }.get(t, MagicMock())
 
         args = Namespace(
@@ -751,3 +759,55 @@ class TestHandleGetMultipleRequests:
 
         query_arg = mock_bus.execute.call_args[0][0]
         assert "r-via-flag" in query_arg.request_ids
+
+
+@pytest.mark.unit
+class TestHandleGetReturnRequestsReclaimPoll:
+    """The scheduler decides whether list-returns is the provider-reclaim poll."""
+
+    @staticmethod
+    def _container(reclaim_poll: bool):
+        from orb.application.services.orchestration.list_reclaimed_machines import (
+            ListReclaimedMachinesOrchestrator,
+        )
+        from orb.application.services.orchestration.list_return_requests import (
+            ListReturnRequestsOrchestrator,
+        )
+
+        scheduler = MagicMock(spec=SchedulerPort)
+        scheduler.is_provider_reclaim_poll.return_value = reclaim_poll
+        reclaimed = AsyncMock(spec=ListReclaimedMachinesOrchestrator)
+        reclaimed.execute.return_value = ListReclaimedMachinesOutput(machines=[])
+        listing = AsyncMock(spec=ListReturnRequestsOrchestrator)
+        listing.execute.return_value = ListReturnRequestsOutput(requests=[])
+        container = MagicMock()
+        container.get.side_effect = lambda t: {
+            ListReclaimedMachinesOrchestrator: reclaimed,
+            ListReturnRequestsOrchestrator: listing,
+            ResponseFormattingService: _make_formatter(),
+            SchedulerPort: scheduler,
+        }.get(t, MagicMock())
+        return container, scheduler, reclaimed, listing
+
+    @pytest.mark.asyncio
+    async def test_reclaim_poll_sends_the_input_machines_to_the_reclaimed_orchestrator(self):
+        container, scheduler, reclaimed, listing = self._container(True)
+        data = {"machines": [{"name": "h1", "machineId": "i-1"}, {"machineId": "i-2"}, {}]}
+
+        await handle_get_return_requests(Namespace(_container=container, input_data=data))
+
+        scheduler.is_provider_reclaim_poll.assert_called_once_with(data)
+        assert reclaimed.execute.call_args[0][0].identifiers == ["h1", "i-1", "i-2"]
+        listing.execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_other_calls_list_user_return_requests(self):
+        container, _, reclaimed, listing = self._container(False)
+
+        await handle_get_return_requests(
+            Namespace(_container=container, input_data={"x": 1}, status="complete")
+        )
+
+        listing.execute.assert_awaited_once()
+        assert listing.execute.call_args[0][0].status == "complete"
+        reclaimed.execute.assert_not_awaited()
