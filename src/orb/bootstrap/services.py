@@ -59,13 +59,10 @@ def setup_cqrs_infrastructure(container: "DIContainer") -> None:
         discovery_service = create_handler_discovery_service(container)
         discovery_service.discover_and_register_handlers()
 
-        try:
-            from orb.application.decorators import get_handler_registry_stats
+        from orb.application.decorators import get_handler_registry_stats
 
-            stats = get_handler_registry_stats()
-            logger.info("Handler discovery results: %s", stats)
-        except ImportError:
-            logger.debug("Handler registry stats not available")
+        stats = get_handler_registry_stats()
+        logger.info("Handler discovery results: %s", stats)
 
         logging_port = container.get(LoggingPort)
         query_bus, command_bus = BusFactory.create_buses(container, logging_port)
@@ -79,8 +76,9 @@ def setup_cqrs_infrastructure(container: "DIContainer") -> None:
 
         logger.info("CQRS infrastructure setup complete")
 
-    except ImportError as e:
-        logger.debug("CQRS infrastructure not available: %s", e)
+    except ImportError:
+        # A missing in-tree module is a broken install, not an optional feature.
+        raise
     except Exception as e:
         logger.warning("Failed to setup CQRS infrastructure: %s", e, exc_info=True)
 

@@ -36,24 +36,16 @@ def _make_container(*, lazy: bool = True):
 
 @pytest.mark.unit
 class TestSetupCqrsInfrastructureImportError:
-    def test_import_error_does_not_propagate(self, caplog):
-        """ImportError inside setup_cqrs_infrastructure is caught and swallowed."""
-        import logging
-
+    def test_import_error_propagates(self):
+        """A missing in-tree module fails CQRS setup instead of leaving no buses."""
         from orb.bootstrap.services import setup_cqrs_infrastructure
 
         container = _make_container()
 
-        # Force the LoggingPort import to fail, exercising the ImportError branch
-        # (services.py:82-83) which logs a debug message and returns without
-        # registering any buses.
-        with caplog.at_level(logging.DEBUG, logger="orb.bootstrap.services"):
-            with patch.dict("sys.modules", {"orb.domain.base.ports.logging_port": None}):
+        with patch.dict("sys.modules", {"orb.domain.base.ports.logging_port": None}):
+            with pytest.raises(ImportError):
                 setup_cqrs_infrastructure(container)
 
-        # The ImportError branch was taken: its debug message fired and no
-        # buses were registered.
-        assert "CQRS infrastructure not available" in caplog.text
         container.register_instance.assert_not_called()
 
     def test_exception_does_not_propagate(self, caplog):
