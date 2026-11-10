@@ -6896,9 +6896,14 @@
 <td><code>diversified</code></td>
 <td><code>diversified</code></td>
 </tr>
+<tr>
+<td><code>prioritized</code> (on-demand pools only)</td>
+<td><code>prioritized</code></td>
+</tr>
 </tbody>
 </table>
-<p>When no strategy is set, spot and heterogeneous templates default to <code>priceCapacityOptimized</code> and on-demand templates default to <code>lowestPrice</code>. <code>prioritized</code> is not a Spot Fleet spot strategy and falls back to <code>lowestPrice</code>.</p>
+<p><code>allocation_strategy</code> is sent as <code>AllocationStrategy</code> (spot pools) and <code>allocation_strategy_on_demand</code> as <code>OnDemandAllocationStrategy</code> when the request includes on-demand capacity. Their defaults come from the AWS provider defaults (<code>provider_defaults.aws.template_defaults</code>): <code>priceCapacityOptimized</code> for spot pools and <code>lowestPrice</code> for on-demand pools, whatever the template's <code>price_type</code>. A provider instance's <code>template_defaults</code> and the template itself override them; there is no per-request override.</p>
+<p><code>prioritized</code> applies only to on-demand pools. A template that sets an invalid or unknown strategy is rejected and reported by <code>templates show</code> and <code>templates validate</code>. A template that sets <code>prioritized</code>, or <code>lowestPrice</code> with <code>price_type: ondemand</code>, in <code>allocation_strategy</code> is read as its on-demand strategy, with a deprecation warning; move the value to <code>allocation_strategy_on_demand</code>.</p>
 <h3 id="overrides-priority-and-per-override-price">Overrides, priority, and per-override price<a class="headerlink" href="#overrides-priority-and-per-override-price" title="Permanent link">&para;</a></h3>
 <p><code>machine_types</code> and <code>subnet_ids</code> are expanded into the cartesian product of instance type and subnet. Spot Fleet overrides additionally carry:</p>
 <ul>

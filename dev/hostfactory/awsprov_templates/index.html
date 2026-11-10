@@ -6252,7 +6252,7 @@
 <p><strong>allocationStrategy</strong></p>
 </li>
 <li>
-<p>Optional. Allocation strategy for Spot instances. The valid values are:</p>
+<p>Optional. Allocation strategy for Spot pools. The valid values are:</p>
 <ul>
 <li><code>capacityOptimized</code></li>
 <li><code>capacityOptimizedPrioritized</code></li>
@@ -6260,13 +6260,20 @@
 <li><code>lowestPrice</code></li>
 <li><code>priceCapacityOptimized</code></li>
 </ul>
-<p>Default is <code>priceCapacityOptimized</code> when priceType is <code>spot</code> or <code>heterogeneous</code>, and <code>lowestPrice</code> when priceType is <code>ondemand</code>.</p>
+<p>Default is <code>priceCapacityOptimized</code> for every priceType, from the AWS provider defaults (<code>provider_defaults.aws.template_defaults.allocation_strategy</code>); a provider instance's <code>template_defaults</code> can override it.</p>
+<p>Templates written for earlier releases that set an On-Demand strategy here (<code>prioritized</code>, or <code>lowestPrice</code> with priceType <code>ondemand</code>) keep working: the value is applied as allocationStrategyOnDemand and a deprecation warning is logged. Move it to allocationStrategyOnDemand. Any other invalid value makes the template invalid, which <code>templates show</code> and <code>templates validate</code> report.</p>
 </li>
 <li>
 <p><strong>allocationStrategyOnDemand</strong></p>
 </li>
 <li>
-<p>Optional. When priceType is set to <code>spot</code> or <code>heterogeneous</code>, specify the allocation strategy that determines how to fulfill the request for On-Demand capacity. Valid values are <code>lowestPrice</code> or <code>prioritized</code>. Default is <code>lowestPrice</code>.</p>
+<p>Optional. Allocation strategy for On-Demand pools, for every priceType. Valid values are <code>lowestPrice</code> or <code>prioritized</code>. Default is <code>lowestPrice</code>, from the AWS provider defaults (<code>provider_defaults.aws.template_defaults.allocation_strategy_on_demand</code>); a provider instance's <code>template_defaults</code> can override it.</p>
+</li>
+<li>
+<p><strong>fallbackToOndemand</strong></p>
+</li>
+<li>
+<p>Optional. For RunInstances templates with priceType <code>spot</code>: when spot capacity is unavailable, launch the request on-demand instead. Default is <code>false</code>, from <code>template.default_fallback_to_ondemand</code>; provider type and provider instance <code>template_defaults</code>, the template and a request override can change it. See <a href="../../providers/aws/run-instances/#on-demand-fallback">RunInstances on-demand fallback</a>.</p>
 </li>
 <li>
 <p><strong>percentOnDemand</strong></p>

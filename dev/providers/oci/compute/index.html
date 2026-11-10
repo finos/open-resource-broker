@@ -6587,7 +6587,7 @@ with several providers, set <code>provider_name</code> to the intended configure
 <td><code>fallback_to_ondemand</code></td>
 <td>No</td>
 <td>boolean</td>
-<td>Retry a failed preemptible launch as on-demand using the same shape and image. Default <code>false</code>.</td>
+<td>Retry a failed preemptible launch as on-demand using the same shape and image. Default from <code>template.default_fallback_to_ondemand</code> (<code>false</code>), overridable per provider type, provider instance, template and request.</td>
 </tr>
 <tr>
 <td><code>preemptible_preserve_boot_volume</code></td>

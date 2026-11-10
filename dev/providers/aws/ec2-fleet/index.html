@@ -6770,13 +6770,13 @@
 <td><code>allocation_strategy</code></td>
 <td>No</td>
 <td><code>string</code></td>
-<td>Spot allocation strategy. Converted to the hyphenated EC2 Fleet form.</td>
+<td>Allocation strategy for spot pools. Converted to the hyphenated EC2 Fleet form.</td>
 </tr>
 <tr>
 <td><code>allocation_strategy_on_demand</code></td>
 <td>No</td>
 <td><code>string</code></td>
-<td>On-demand allocation strategy, used for heterogeneous fleets.</td>
+<td>Allocation strategy for on-demand pools (<code>lowestPrice</code> or <code>prioritized</code>).</td>
 </tr>
 <tr>
 <td><code>max_price</code></td>
@@ -6864,15 +6864,15 @@
 <tbody>
 <tr>
 <td><code>ondemand</code></td>
-<td><code>DefaultTargetCapacityType: on-demand</code>.</td>
+<td><code>DefaultTargetCapacityType: on-demand</code>, plus <code>OnDemandOptions.AllocationStrategy</code>. No <code>SpotOptions</code>.</td>
 </tr>
 <tr>
 <td><code>spot</code></td>
-<td><code>DefaultTargetCapacityType: spot</code>, plus <code>SpotOptions.AllocationStrategy</code> when a strategy is set and <code>SpotOptions.MaxTotalPrice</code> when <code>max_price</code> is set.</td>
+<td><code>DefaultTargetCapacityType: spot</code>, plus <code>SpotOptions.AllocationStrategy</code> and <code>SpotOptions.MaxTotalPrice</code> when <code>max_price</code> is set. No <code>OnDemandOptions</code>.</td>
 </tr>
 <tr>
 <td><code>heterogeneous</code></td>
-<td><code>OnDemandTargetCapacity: requested * percent_on_demand / 100</code> (floored), <code>SpotTargetCapacity</code> for the remainder, and <code>DefaultTargetCapacityType: on-demand</code>. Both <code>SpotOptions</code> and <code>OnDemandOptions</code> allocation strategies apply.</td>
+<td><code>OnDemandTargetCapacity: requested * percent_on_demand / 100</code> (floored), <code>SpotTargetCapacity</code> for the remainder, and <code>DefaultTargetCapacityType: on-demand</code>. Both <code>SpotOptions</code> and <code>OnDemandOptions</code> apply.</td>
 </tr>
 </tbody>
 </table>
@@ -6914,7 +6914,8 @@
 </tr>
 </tbody>
 </table>
-<p>When no strategy is set, spot and heterogeneous templates default to <code>price-capacity-optimized</code> and on-demand templates default to <code>lowest-price</code>. <code>allocation_strategy_on_demand</code> follows the same conversion and falls back to the spot strategy when unset.</p>
+<p><code>allocation_strategy</code> is the strategy for spot pools and <code>allocation_strategy_on_demand</code> the strategy for on-demand pools. Their defaults come from the AWS provider defaults (<code>provider_defaults.aws.template_defaults</code>): <code>priceCapacityOptimized</code> for spot pools and <code>lowestPrice</code> for on-demand pools, whatever the template's <code>price_type</code>. A provider instance's <code>template_defaults</code> and the template itself override them; there is no per-request override.</p>
+<p><code>prioritized</code> applies only to on-demand pools. A template that sets an invalid or unknown strategy is rejected and reported by <code>templates show</code> and <code>templates validate</code>. A template that sets <code>prioritized</code>, or <code>lowestPrice</code> with <code>price_type: ondemand</code>, in <code>allocation_strategy</code> is read as its on-demand strategy, with a deprecation warning; move the value to <code>allocation_strategy_on_demand</code>.</p>
 <h3 id="overrides">Overrides<a class="headerlink" href="#overrides" title="Permanent link">&para;</a></h3>
 <p><code>machine_types</code> and <code>subnet_ids</code> expand into the cartesian product of instance type and subnet, each override carrying <code>InstanceType</code> and <code>WeightedCapacity</code>. Unlike Spot Fleet, EC2 Fleet overrides carry no <code>Priority</code> or per-override price.</p>
 <p>Weighted capacity means target capacity is measured in units, not instances: a fleet offering <code>{"c5.xlarge": 2, "r5.xlarge": 3}</code> can fill a 6-unit request with three <code>c5.xlarge</code>, two <code>r5.xlarge</code>, or a mix.</p>

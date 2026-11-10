@@ -6271,9 +6271,8 @@ create a single template object with <code>templates create --file rdma-template
 <a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">  </span><span class="p">},</span>
 <a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">  </span><span class="nt">&quot;ssh_authorized_keys&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;ssh-public-key&gt;&quot;</span><span class="p">,</span>
 <a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">  </span><span class="nt">&quot;boot_volume_gbs&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">  </span><span class="nt">&quot;capacity_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ondemand&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">  </span><span class="nt">&quot;fallback_to_ondemand&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="p">}</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">  </span><span class="nt">&quot;capacity_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ondemand&quot;</span>
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="p">}</span>
 </code></pre></div>
 <p>The fixed-size shape provides 36 OCPUs and 512 GB RAM per node. Do not set <code>ocpus</code>,
 <code>memory_gbs</code>, or <code>shape_config</code>: ORB rejects Flex overrides for bare metal.

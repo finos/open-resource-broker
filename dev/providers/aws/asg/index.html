@@ -6775,7 +6775,7 @@
 </tr>
 </tbody>
 </table>
-<p><code>OnDemandBaseCapacity</code> is always <code>0</code>, so the percentage governs the whole group. When <code>allocation_strategy</code> is set it becomes <code>SpotAllocationStrategy</code>.</p>
+<p><code>OnDemandBaseCapacity</code> is always <code>0</code>, so the percentage governs the whole group. The <code>InstancesDistribution</code> carries <code>allocation_strategy</code> as <code>SpotAllocationStrategy</code> and <code>allocation_strategy_on_demand</code> as <code>OnDemandAllocationStrategy</code>.</p>
 <p>Example 30% on-demand, 70% spot:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">&quot;template_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;mixed-tier&quot;</span><span class="p">,</span>
@@ -6816,9 +6816,14 @@
 <td><code>diversified</code></td>
 <td><code>diversified</code></td>
 </tr>
+<tr>
+<td><code>prioritized</code> (on-demand pools only)</td>
+<td><code>prioritized</code></td>
+</tr>
 </tbody>
 </table>
-<p>When no strategy is set, spot and heterogeneous templates default to <code>price-capacity-optimized</code> and on-demand templates default to <code>lowest-price</code>. Note that <code>prioritized</code> has no ASG spot equivalent and falls back to <code>lowest-price</code>.</p>
+<p><code>allocation_strategy</code> is the strategy for spot pools and <code>allocation_strategy_on_demand</code> the strategy for on-demand pools. Their defaults come from the AWS provider defaults (<code>provider_defaults.aws.template_defaults</code>): <code>priceCapacityOptimized</code> for spot pools and <code>lowestPrice</code> for on-demand pools, whatever the template's <code>price_type</code>. A provider instance's <code>template_defaults</code> and the template itself override them; there is no per-request override.</p>
+<p><code>prioritized</code> applies only to on-demand pools. A template that sets an invalid or unknown strategy is rejected and reported by <code>templates show</code> and <code>templates validate</code>. A template that sets <code>prioritized</code>, or <code>lowestPrice</code> with <code>price_type: ondemand</code>, in <code>allocation_strategy</code> is read as its on-demand strategy, with a deprecation warning; move the value to <code>allocation_strategy_on_demand</code>.</p>
 <h3 id="attribute-based-instance-selection">Attribute-based instance selection<a class="headerlink" href="#attribute-based-instance-selection" title="Permanent link">&para;</a></h3>
 <p>Setting <code>abis_instance_requirements</code> replaces the instance-type overrides with a single <code>InstanceRequirements</code> override, letting AWS choose any matching type:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
