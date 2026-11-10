@@ -658,7 +658,7 @@ editing them.
 
 | Suite | What it checks |
 |-------|----------------|
-| `tests/providers/contract/test_provider_conformance.py` | Registration exports of every provider, and the shared contract subclasses or a reasoned exemption |
+| `tests/providers/contract/test_provider_conformance.py` | Registration exports of every provider, whether the registry creates its template validator (known gaps are strict expected failures), and the shared contract subclasses or a reasoned exemption |
 | `tests/providers/contract/test_capability_router_parity.py` | Capability and router parity across providers |
 | `tests/providers/contract/test_config_init_parity.py` | Config model and `orb init` parity |
 | `tests/providers/lifecycle/test_meta.py` | Every provider and API has a lifecycle cell or a documented exemption |
