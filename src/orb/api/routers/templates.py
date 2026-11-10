@@ -29,6 +29,7 @@ from orb.api.models.responses import (
     TemplateListResponse,
     TemplateMutationResponse,
 )
+from orb.api.rest_render import render_rest
 from orb.application.dto.template_generation_dto import TemplateGenerationRequest
 from orb.application.services.orchestration.dtos import (
     CreateTemplateInput,
@@ -42,7 +43,6 @@ from orb.application.services.orchestration.dtos import (
 from orb.application.services.template_generation_service import TemplateGenerationService
 from orb.domain.base.exceptions import EntityNotFoundError
 from orb.infrastructure.error.decorators import handle_rest_exceptions
-from orb.interface.catalog import OPERATION_CATALOG, Interface
 
 router = APIRouter(prefix="/templates", tags=["Templates"])
 
@@ -158,9 +158,7 @@ async def list_templates(
     )
     # The catalog renderer stamps the orchestrator's total_count and next_cursor
     # onto the formatted body, matching the CLI/SDK paginated template list.
-    entry = OPERATION_CATALOG["list_templates"]
-    payload = entry.renderer_for(Interface.REST)(formatter, result).data
-    return JSONResponse(status_code=200, content=payload)
+    return render_rest("list_templates", formatter, result)
 
 
 @router.post(
@@ -188,11 +186,7 @@ async def validate_template(
             config=template_data,
         )
     )
-    entry = OPERATION_CATALOG["validate_template"]
-    return JSONResponse(
-        status_code=200,
-        content=entry.renderer_for(Interface.REST)(formatter, result).data,
-    )
+    return render_rest("validate_template", formatter, result)
 
 
 @router.post(
@@ -212,11 +206,7 @@ async def refresh_templates(
     Refresh template cache and reload from files.
     """
     result = await orchestrator.execute(RefreshTemplatesInput())
-    entry = OPERATION_CATALOG["refresh_templates"]
-    return JSONResponse(
-        status_code=200,
-        content=entry.renderer_for(Interface.REST)(formatter, result).data,
-    )
+    return render_rest("refresh_templates", formatter, result)
 
 
 @router.post(
@@ -289,11 +279,7 @@ async def get_template(
     result = await orchestrator.execute(GetTemplateInput(template_id=template_id))
     if not result.template:
         raise EntityNotFoundError("Template", template_id)
-    entry = OPERATION_CATALOG["get_template"]
-    return JSONResponse(
-        status_code=200,
-        content=entry.renderer_for(Interface.REST)(formatter, result).data,
-    )
+    return render_rest("get_template", formatter, result)
 
 
 @router.post(
@@ -335,11 +321,7 @@ async def create_template(
             configuration=template_dict,
         )
     )
-    entry = OPERATION_CATALOG["create_template"]
-    return JSONResponse(
-        status_code=201,
-        content=entry.renderer_for(Interface.REST)(formatter, result).data,
-    )
+    return render_rest("create_template", formatter, result, status=201)
 
 
 @router.put(
@@ -381,11 +363,7 @@ async def update_template(
             configuration=template_dict,
         )
     )
-    entry = OPERATION_CATALOG["update_template"]
-    return JSONResponse(
-        status_code=200,
-        content=entry.renderer_for(Interface.REST)(formatter, result).data,
-    )
+    return render_rest("update_template", formatter, result)
 
 
 @router.delete(
@@ -408,8 +386,4 @@ async def delete_template(
     - **template_id**: Template identifier
     """
     result = await orchestrator.execute(DeleteTemplateInput(template_id=template_id))
-    entry = OPERATION_CATALOG["delete_template"]
-    return JSONResponse(
-        status_code=200,
-        content=entry.renderer_for(Interface.REST)(formatter, result).data,
-    )
+    return render_rest("delete_template", formatter, result)

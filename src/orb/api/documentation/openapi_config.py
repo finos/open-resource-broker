@@ -190,6 +190,15 @@ This API provides dynamic cloud resource provisioning capabilities for IBM Spect
 - **Authentication**: Multiple authentication strategies including JWT, AWS IAM, and AWS Cognito
 - **Real-time Status**: Get real-time status of provisioning operations
 
+### Response format
+
+Responses use the format of the configured scheduler (`default`, `hostfactory` or
+`slurm`). A caller may name another registered format for one call with the
+`X-ORB-Scheduler` header or the `scheduler` query parameter; an unknown name is a
+400. Every response names the format it used in the `X-ORB-Scheduler` header. The
+`x-orb-formats` extension on an operation lists the response schema of each
+built-in format.
+
 ### Authentication
 
 This API supports multiple authentication methods:

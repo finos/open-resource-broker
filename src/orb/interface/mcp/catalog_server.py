@@ -36,7 +36,7 @@ from orb.interface.catalog import (
     Interface,
     bind_from_mapping,
 )
-from orb.interface.response_formatting_service import ResponseFormattingService
+from orb.interface.format_selection import select_formatter
 
 # JSON-schema type name for each Python scalar/collection the input DTOs use.
 # Anything not in this map falls back to a permissive (unconstrained) property.
@@ -175,11 +175,15 @@ def _tool_for(entry: CatalogEntry[Any, Any]) -> mcp_types.Tool:
         f"{entry.key} — dispatched through {orchestrator_name}. "
         f"Returns the operation result rendered as the broker's canonical body."
     )
-    return mcp_types.Tool(
-        name=entry.key,
-        description=description,
-        input_schema=schema_from_input_dto(entry.input_dto),
-    )
+    input_schema = schema_from_input_dto(entry.input_dto)
+    input_schema["properties"]["format"] = {
+        "type": ["string", "null"],
+        "description": (
+            "Response format for this call (for example default or hostfactory). "
+            "Unset uses the configured scheduler's format."
+        ),
+    }
+    return mcp_types.Tool(name=entry.key, description=description, input_schema=input_schema)
 
 
 def _error_result(message: str) -> mcp_types.CallToolResult:
@@ -292,7 +296,7 @@ def build_server(container: Any) -> Server:
         try:
             dto = bind_from_mapping(entry, arguments)
             orchestrator = container.get(entry.orchestrator)
-            formatter = container.get(ResponseFormattingService)
+            formatter = select_formatter(container, arguments.get("format"))
             result = await orchestrator.execute(dto)
             body = entry.renderer_for(Interface.MCP)(formatter, result).data
         except Exception as exc:  # noqa: BLE001 — surfaced to the client as isError

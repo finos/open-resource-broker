@@ -657,6 +657,7 @@ def create_fastapi_app(server_config: Any) -> Any:
             allow_credentials=server_config.cors.credentials,
             allow_methods=server_config.cors.methods,
             allow_headers=server_config.cors.headers,
+            expose_headers=["X-ORB-Scheduler"],
         )
         logger.info("CORS middleware enabled")
         if server_config.cors.origins == ["*"] and server_config.auth.enabled:

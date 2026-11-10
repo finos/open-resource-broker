@@ -52,7 +52,7 @@ def _make_scheduler():
 
 
 def _make_formatter():
-    formatter = MagicMock()
+    formatter = MagicMock(scheduler_type="default")
     formatter.format_request_status.return_value = MagicMock(data={"requests": []})
     return formatter
 
@@ -64,7 +64,7 @@ def _make_echo_formatter():
     without any camelCase transform, letting tests confirm a failed request's
     error block reaches the response body rather than being 404'd away.
     """
-    formatter = MagicMock()
+    formatter = MagicMock(scheduler_type="default")
     formatter.format_request_status.side_effect = lambda requests: MagicMock(
         data={"requests": requests}
     )

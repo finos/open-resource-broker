@@ -22,6 +22,14 @@ class SchedulerFormattingPort(ABC):
     """Response and display formatting for a scheduler's wire protocol."""
 
     @abstractmethod
+    def get_scheduler_type(self) -> str:
+        """Name of the response format this scheduler produces (its registry name)."""
+
+    @abstractmethod
+    def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
+        """Format request creation response to scheduler format."""
+
+    @abstractmethod
     def format_templates_response(self, templates: list[Any]) -> dict[str, Any]:
         """Format template DTOs to scheduler response."""
 
@@ -175,10 +183,6 @@ class SchedulerRequestParsingPort(ABC):
     @abstractmethod
     def parse_request_data(self, raw_data: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
         """Parse scheduler request data to domain-compatible format."""
-
-    @abstractmethod
-    def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
-        """Format request creation response to scheduler format."""
 
     def is_provider_reclaim_poll(self, input_data: Any) -> bool:
         """Whether a ``list-returns`` call asks which machines the provider reclaimed.

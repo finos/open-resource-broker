@@ -30,6 +30,7 @@ from orb.api.models.responses import (
     RequestOperationResponse,
     RequestStatusResponse,
 )
+from orb.api.rest_render import FORMAT_HEADER, render_rest
 from orb.application.services.admin.cleanup_database import (
     CleanupDatabaseService,
     NonTerminalStatusError,
@@ -173,9 +174,7 @@ async def list_requests(
             filter_expressions=filter_expressions,
         )
     )
-    entry = OPERATION_CATALOG["list_requests"]
-    payload = entry.renderer_for(Interface.REST)(formatter, result).data
-    return JSONResponse(content=payload)
+    return render_rest("list_requests", formatter, result)
 
 
 @router.get(
@@ -220,9 +219,7 @@ async def list_return_requests(
             filter_expressions=filter_expressions,
         )
     )
-    entry = OPERATION_CATALOG["list_return_requests"]
-    payload = entry.renderer_for(Interface.REST)(formatter, result).data
-    return JSONResponse(content=payload)
+    return render_rest("list_return_requests", formatter, result)
 
 
 @router.get(
@@ -266,8 +263,7 @@ async def get_request(
         len(result.requests) == 1 and _is_not_found_marker(result.requests[0])
     ):
         raise EntityNotFoundError("Request", request_id)
-    entry = OPERATION_CATALOG["get_request_status"]
-    return JSONResponse(content=entry.renderer_for(Interface.REST)(formatter, result).data)
+    return render_rest("get_request_status", formatter, result)
 
 
 @router.get(
@@ -315,8 +311,7 @@ async def get_request_status(
         len(result.requests) == 1 and _is_not_found_marker(result.requests[0])
     ):
         raise EntityNotFoundError("Request", request_id)
-    entry = OPERATION_CATALOG["get_request_status"]
-    return JSONResponse(content=entry.renderer_for(Interface.REST)(formatter, result).data)
+    return render_rest("get_request_status", formatter, result)
 
 
 class BatchRequestStatusBody(APIRequest):
@@ -356,8 +351,7 @@ async def batch_get_request_status(
     result = await orchestrator.execute(
         GetRequestStatusInput(request_ids=body.request_ids, verbose=body.verbose)
     )
-    entry = OPERATION_CATALOG["get_request_status"]
-    return JSONResponse(content=entry.renderer_for(Interface.REST)(formatter, result).data)
+    return render_rest("get_request_status", formatter, result)
 
 
 @router.get(
@@ -444,7 +438,12 @@ async def stream_request_status(
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            FORMAT_HEADER: formatter.scheduler_type,
+            "Vary": FORMAT_HEADER,
+        },
     )
 
 
@@ -458,20 +457,18 @@ async def stream_request_status(
 @handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}", method="DELETE")
 async def cancel_request(
     request_id: str,
-    request: Request,
     reason: Optional[str] = Query(None, description="Cancellation reason"),
     _operator=Depends(require_role("operator")),
     orchestrator=CANCEL_ORCHESTRATOR,
+    formatter=FORMATTER,
 ) -> JSONResponse:
-    formatter = get_request_formatter(request, get_di_container())
     result = await orchestrator.execute(
         CancelRequestInput(
             request_id=request_id,
             reason=reason or "Cancelled via REST API",
         )
     )
-    entry = OPERATION_CATALOG["cancel_request"]
-    return JSONResponse(content=entry.renderer_for(Interface.REST)(formatter, result).data)
+    return render_rest("cancel_request", formatter, result)
 
 
 class ConfirmTerminatedBody(APIRequest):
@@ -556,8 +553,7 @@ async def confirm_terminated(
                 },
             },
         )
-    entry = OPERATION_CATALOG["confirm_terminated"]
-    return JSONResponse(content=entry.renderer_for(Interface.REST)(formatter, result).data)
+    return render_rest("confirm_terminated", formatter, result)
 
 
 @router.post(

@@ -181,10 +181,12 @@ async def main() -> None:
         if hasattr(args, "scheduler") and args.scheduler:
             try:
                 from orb.domain.base.ports.configuration_port import ConfigurationPort
+                from orb.interface.format_selection import invalidate_formats
 
                 container = get_container()
                 config = container.get(ConfigurationPort)
                 config.override_scheduler_strategy(args.scheduler)
+                invalidate_formats(container)
                 scheduler_override_active = True
             except Exception as e:
                 logger.warning("Failed to override scheduler strategy: %s", e, exc_info=True)

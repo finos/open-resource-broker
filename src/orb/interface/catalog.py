@@ -337,8 +337,7 @@ OPERATION_CATALOG: dict[str, CatalogEntry[Any, Any]] = {
         # paginated like the other list operations. The CLI feeds IBM Symphony
         # HostFactory, which expects the dedicated getReturnRequests shape
         # (machine/grace-period items), so it renders through the return-requests
-        # formatter. The MCP tool reuses the CLI handler, so it inherits that
-        # shape through the CLI renderer.
+        # formatter. MCP renders through the default renderer, like REST and the SDK.
         render=lambda rfs, out: rfs.format_request_status(
             out.requests,
             total_count=out.total_count,

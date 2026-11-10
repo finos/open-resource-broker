@@ -494,10 +494,12 @@ async def reload_config(request: Request, _user=Depends(require_role("admin"))) 
     caller_ip = request.client.host if request.client else "unknown"
     try:
         from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.interface.format_selection import invalidate_formats
 
         container = get_di_container()
         cm = container.get(ConfigurationManager)
         cm.reload()
+        invalidate_formats(container)
         logger.warning("ADMIN_RELOAD_CONFIG by ip=%s", caller_ip)
         return JSONResponse(
             status_code=200,

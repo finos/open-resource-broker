@@ -3,7 +3,7 @@
 from typing import Any, Final, Optional
 
 from orb.application.dto.interface_response import InterfaceResponse
-from orb.application.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerFormattingPort
 
 
 class _Unset:
@@ -22,8 +22,13 @@ _UNSET: Final = _Unset()
 
 
 class ResponseFormattingService:
-    def __init__(self, scheduler: SchedulerPort) -> None:
+    def __init__(self, scheduler: SchedulerFormattingPort) -> None:
         self._scheduler = scheduler
+
+    @property
+    def scheduler_type(self) -> str:
+        """Registry name of the format this service renders."""
+        return str(self._scheduler.get_scheduler_type())
 
     @staticmethod
     def _stamp_pagination(

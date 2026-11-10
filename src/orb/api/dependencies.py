@@ -38,8 +38,10 @@ from orb.application.services.orchestration.validate_template import ValidateTem
 from orb.application.services.template_generation_service import TemplateGenerationService
 from orb.config.schemas.server_schema import ServerConfig
 from orb.domain.base.ports.configuration_port import ConfigurationPort
+from orb.domain.request.exceptions import RequestValidationError
 from orb.infrastructure.di.buses import CommandBus, QueryBus
 from orb.infrastructure.di.container import get_container
+from orb.interface.format_selection import select_formatter
 from orb.interface.response_formatting_service import ResponseFormattingService
 
 T = TypeVar("T")
@@ -184,46 +186,24 @@ def get_response_formatting_service() -> ResponseFormattingService:
     return get_di_container().get(ResponseFormattingService)
 
 
-def _caller_has_operator_or_higher(request: Request) -> bool:
-    """Return True when the authenticated caller holds at least the operator role.
-
-    Reads the identity that AuthMiddleware already resolved onto request.state so
-    this check is a pure dict lookup with no I/O.
-    """
-    raw_roles: list[str] = getattr(request.state, "user_roles", []) or []
-    # Filter out the anonymous sentinel (mirrors the logic in get_current_user).
-    meaningful = [r for r in raw_roles if r.lower() != "anonymous"]
-    role = _resolve_role(meaningful) if meaningful else "viewer"
-    return _ROLE_RANK.get(role, 0) >= _ROLE_RANK["operator"]
-
-
 def get_request_formatter(
     request: Request,
     container=Depends(get_di_container),
 ) -> ResponseFormattingService:
-    """Get ResponseFormattingService, optionally overridden by X-ORB-Scheduler header.
+    """Pick the response formatter for this call.
 
-    The header is only honoured when the caller holds operator-or-higher privileges.
-    Below-operator callers receive the default scheduler silently.
+    The configured scheduler decides the format unless the caller names another
+    registered one with the ``X-ORB-Scheduler`` header or the ``scheduler`` query
+    parameter. Any role may choose: every format renders the same data. An
+    unregistered name, or a header and query parameter that disagree, is a 400.
     """
-    scheduler_override = request.headers.get("X-ORB-Scheduler")
-    if scheduler_override:
-        if not _caller_has_operator_or_higher(request):
-            _deps_logger.debug(
-                "X-ORB-Scheduler header ignored for sub-operator caller on %s",
-                request.url.path,
-            )
-        else:
-            from orb.infrastructure.scheduler.registry import get_scheduler_registry
-
-            registry = get_scheduler_registry()
-            if registry.is_registered(scheduler_override):
-                try:
-                    scheduler = registry.create_strategy(scheduler_override, container)
-                    return ResponseFormattingService(scheduler)
-                except Exception:  # noqa: S110  # Fall through to default scheduler
-                    pass
-    return container.get(ResponseFormattingService)
+    header = request.headers.get("X-ORB-Scheduler")
+    query = request.query_params.get("scheduler")
+    if header and query and header != query:
+        raise RequestValidationError(
+            "The X-ORB-Scheduler header and the scheduler query parameter name different formats"
+        )
+    return select_formatter(container, query or header)
 
 
 def get_template_generation_service() -> TemplateGenerationService:

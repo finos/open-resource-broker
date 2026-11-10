@@ -81,7 +81,7 @@ class TestMachinesRouter:
     def _make_formatter(self):
         from orb.application.dto.interface_response import InterfaceResponse
 
-        formatter = MagicMock()
+        formatter = MagicMock(scheduler_type="default")
         formatter.format_request_operation.return_value = InterfaceResponse(
             data={"request_id": "req-abc", "message": "ok"}
         )
@@ -337,7 +337,7 @@ class TestRequestsRouter:
     def _make_formatter(self):
         from orb.application.dto.interface_response import InterfaceResponse
 
-        formatter = MagicMock()
+        formatter = MagicMock(scheduler_type="default")
         formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
         formatter.format_request_operation.return_value = InterfaceResponse(
             data={"request_id": "req-789", "status": "cancelled"}
