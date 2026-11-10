@@ -198,6 +198,7 @@ async def list_return_requests(
     ),
     q: Optional[str] = Query(None, description="Substring search"),
     sort: Optional[str] = Query(None, description='Sort: "field" / "-field"'),
+    status: Optional[str] = Query(None, description="Filter by return request status"),
     provider_name: Optional[str] = Query(None, description="Filter by provider instance name"),
     provider_type: Optional[str] = Query(None, description="Filter by provider type"),
     filter_expressions: list[str] = Query(default=[]),
@@ -208,6 +209,7 @@ async def list_return_requests(
     """List requests that are pending return."""
     result = await orchestrator.execute(
         ListReturnRequestsInput(
+            status=status,
             limit=limit or 50,
             offset=offset,
             cursor=cursor,

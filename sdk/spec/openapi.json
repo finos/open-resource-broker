@@ -1419,6 +1419,24 @@
             "description": "Sort: \"field\" / \"-field\""
           },
           {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by return request status",
+              "title": "Status"
+            },
+            "description": "Filter by return request status"
+          },
+          {
             "name": "provider_name",
             "in": "query",
             "required": false,

@@ -465,7 +465,10 @@ def add_request_actions(subparsers, pp: "ParentParsers | None" = None):
         parents=[pp.common, pp.list, pp.provider_scope, pp.hf_compat],
     )
     add_cursor_argument(requests_list_returns)
-    requests_list_returns.add_argument("--status", help="Filter by return request status")
+    requests_list_returns.add_argument(
+        "--status",
+        help="Filter by return request status (pending, in_progress, complete, failed, cancelled, partial, timeout)",
+    )
 
 
 def add_infrastructure_actions(subparsers, pp: "ParentParsers | None" = None):

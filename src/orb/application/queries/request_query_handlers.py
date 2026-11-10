@@ -497,6 +497,19 @@ class SyncAndListReturnRequestsHandler(
         """Execute sync-and-list return requests query."""
         self.logger.info("Listing return requests")
 
+        status_filter = None
+        if query.status:
+            from orb.domain.request.exceptions import RequestValidationError
+            from orb.domain.request.value_objects import RequestStatus
+
+            try:
+                status_filter = RequestStatus(query.status).value
+            except ValueError:
+                valid = ", ".join(s.value for s in RequestStatus)
+                raise RequestValidationError(
+                    f"Invalid status '{query.status}'; expected one of: {valid}"
+                ) from None
+
         try:
             with self.uow_factory.create_unit_of_work() as uow:
                 from orb.domain.request.value_objects import RequestType
@@ -575,6 +588,9 @@ class SyncAndListReturnRequestsHandler(
                     request_dtos = [
                         r for r in request_dtos if r.provider_type == query.provider_type
                     ]
+
+                if query.status:
+                    request_dtos = [r for r in request_dtos if r.status == status_filter]
 
                 if query.machine_names:
                     machine_name_set = set(query.machine_names)

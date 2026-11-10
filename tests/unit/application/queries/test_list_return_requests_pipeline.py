@@ -11,7 +11,10 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from orb.application.dto.queries import SyncAndListReturnRequestsQuery
+from orb.domain.request.exceptions import RequestValidationError
 
 
 def _make_return_request(request_id="ret-1", terminal=False, machine_ids=None):
@@ -26,13 +29,16 @@ def _make_return_request(request_id="ret-1", terminal=False, machine_ids=None):
     )
 
 
-def _make_dto(request_id, provider_name="aws", provider_type="aws", template_id="tmpl"):
+def _make_dto(
+    request_id, provider_name="aws", provider_type="aws", template_id="tmpl", status="in_progress"
+):
     class _DTO:
         def __init__(self):
             self.request_id = request_id
             self.provider_name = provider_name
             self.provider_type = provider_type
             self.template_id = template_id
+            self.status = status
 
         def model_dump(self):
             return {
@@ -40,6 +46,7 @@ def _make_dto(request_id, provider_name="aws", provider_type="aws", template_id=
                 "provider_name": self.provider_name,
                 "provider_type": self.provider_type,
                 "template_id": self.template_id,
+                "status": self.status,
             }
 
     return _DTO()
@@ -121,6 +128,27 @@ class TestSyncAndListReturnRequests:
         # Must not raise; stored state returned.
         result = asyncio.run(handler.execute_query(SyncAndListReturnRequestsQuery()))
         assert result.total_count == 1
+
+    def test_filter_by_status(self):
+        reqs = [
+            _make_return_request("ret-1", terminal=True),
+            _make_return_request("ret-2", terminal=True),
+        ]
+        dtos = [
+            _make_dto("ret-1", status="complete"),
+            _make_dto("ret-2", status="in_progress"),
+        ]
+        handler, _ = _build_handler(reqs, dtos)
+        result = asyncio.run(
+            handler.execute_query(SyncAndListReturnRequestsQuery(status="complete"))
+        )
+        assert [r.request_id for r in result.items] == ["ret-1"]
+        assert result.total_count == 1
+
+    def test_unknown_status_is_a_validation_error(self):
+        handler, _ = _build_handler([], [])
+        with pytest.raises(RequestValidationError, match="Invalid status 'bogus'"):
+            asyncio.run(handler.execute_query(SyncAndListReturnRequestsQuery(status="bogus")))
 
     def test_filter_by_provider_name(self):
         reqs = [
