@@ -6,7 +6,7 @@ Covers:
 - CurrentUser.permissions property
 - require_role() factory — valid/invalid role, pass/fail on rank
 - check_destructive_admin_allowed() — all guard paths
-- get_request_scheduler() / get_request_formatter() — role-gated header override
+- get_request_formatter() — role-gated header override
 
 No real FastAPI app or HTTP request — Request is mocked.
 """

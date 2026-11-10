@@ -58,7 +58,7 @@ TIMEOUT = httpx.Timeout(30.0, connect=5.0)
 # Always request the canonical (snake_case) shape from ORB regardless of
 # the server's active scheduler strategy. ORB exposes a per-request
 # override via the X-ORB-Scheduler header (see
-# orb.api.dependencies.get_request_formatter / get_request_scheduler).
+# orb.api.dependencies.get_request_formatter).
 _DEFAULT_HEADERS = {"X-ORB-Scheduler": "default"}
 
 

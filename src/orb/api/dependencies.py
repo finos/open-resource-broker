@@ -226,34 +226,6 @@ def get_request_formatter(
     return container.get(ResponseFormattingService)
 
 
-def get_request_scheduler(
-    request: Request,
-    container=Depends(get_di_container),
-) -> SchedulerPort:
-    """Get SchedulerPort, optionally overridden by X-ORB-Scheduler header.
-
-    The header is only honoured when the caller holds operator-or-higher privileges.
-    Below-operator callers receive the default scheduler silently.
-    """
-    scheduler_override = request.headers.get("X-ORB-Scheduler")
-    if scheduler_override:
-        if not _caller_has_operator_or_higher(request):
-            _deps_logger.debug(
-                "X-ORB-Scheduler header ignored for sub-operator caller on %s",
-                request.url.path,
-            )
-        else:
-            from orb.infrastructure.scheduler.registry import get_scheduler_registry
-
-            registry = get_scheduler_registry()
-            if registry.is_registered(scheduler_override):
-                try:
-                    return registry.create_strategy(scheduler_override, container)
-                except Exception:  # noqa: S110  # Fall through to default scheduler
-                    pass
-    return container.get(SchedulerPort)
-
-
 def get_template_generation_service() -> TemplateGenerationService:
     """Get TemplateGenerationService from DI container."""
     return get_di_container().get(TemplateGenerationService)

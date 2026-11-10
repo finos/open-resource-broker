@@ -258,8 +258,8 @@ The ORB client must support two operating modes:
 
 For remote mode with HostFactory scheduler, the scheduler type is sent via the
 `X-ORB-Scheduler` HTTP header on every request.  The server-side
-`dependencies.py:get_request_scheduler` reads this header to select the
-scheduler backend.
+`dependencies.py:get_request_formatter` reads this header to select the
+response format.
 
 ```
 X-ORB-Scheduler: hostfactory

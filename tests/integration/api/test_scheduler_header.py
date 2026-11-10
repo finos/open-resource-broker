@@ -1,6 +1,6 @@
 """Integration tests for X-ORB-Scheduler per-request header feature.
 
-Documents the current wiring state of get_request_formatter / get_request_scheduler
+Documents the current wiring state of get_request_formatter
 in dependencies.py and verifies the feature behaviour end-to-end.
 
 Key findings (read before editing):
@@ -110,34 +110,6 @@ class TestGetRequestFormatterDependency:
         result = get_request_formatter(request=request, container=container)
 
         assert isinstance(result, ResponseFormattingService)
-
-    def test_get_request_scheduler_no_header_returns_default(self):
-        """get_request_scheduler without header returns container's SchedulerPort."""
-        from orb.api.dependencies import get_request_scheduler
-        from orb.application.ports.scheduler_port import SchedulerPort
-
-        mock_scheduler = _make_mock_scheduler("default")
-        container = MagicMock()
-        container.get.return_value = mock_scheduler
-
-        request = self._make_request({})
-        result = get_request_scheduler(request=request, container=container)
-
-        assert result is mock_scheduler
-        container.get.assert_called_once_with(SchedulerPort)
-
-    def test_get_request_scheduler_unknown_header_falls_back(self):
-        """get_request_scheduler with unknown header falls back to container default."""
-        from orb.api.dependencies import get_request_scheduler
-
-        mock_scheduler = _make_mock_scheduler("default")
-        container = MagicMock()
-        container.get.return_value = mock_scheduler
-
-        request = self._make_request({"X-ORB-Scheduler": "does-not-exist"})
-        result = get_request_scheduler(request=request, container=container)
-
-        assert result is mock_scheduler
 
 
 # ---------------------------------------------------------------------------
