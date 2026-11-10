@@ -50,8 +50,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from tests.providers.k8s.mocked.kmock_delivery_conftest import (  # noqa: E402
+    KINDS,
     _inject_kmock_factory,
     _make_k8s_logger,
+    _register_all_kinds,
     _register_pod_resource,
 )
 from tests.shared.constants import REQUEST_ID_RE  # noqa: E402
@@ -470,3 +472,27 @@ class TestCLIK8sRequestsList:
         assert len(requests) > 0, (
             f"Created request {request_id} not found in filtered list. Got: {list_result}"
         )
+
+
+class TestCLIK8sEveryKind:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("kind", list(KINDS))
+    async def test_cli_acquire_and_status_for_kind(self, orb_config_dir_k8s, kmock_k8s, kind):
+        """Each workload kind is acquired and read back through the CLI."""
+        from orb.bootstrap import Application
+
+        _register_all_kinds(kmock_k8s)
+        _patched_initialize = _make_patched_initialize(kmock_k8s, _make_k8s_logger())
+
+        with patch.object(Application, "initialize", _patched_initialize):
+            created = await _run_orb_cli_async(
+                ["machines", "request", "--template", KINDS[kind], "--count", "1"]
+            )
+            request_id = _extract_request_id(created)
+            assert request_id and REQUEST_ID_RE.match(request_id), created
+
+            status = await _run_orb_cli_async(["requests", "status", request_id])
+
+        entry = status["requests"][0]
+        assert (entry.get("request_id") or entry.get("requestId")) == request_id
+        assert _extract_status(status) in {"running", "complete", "complete_with_error", "pending"}

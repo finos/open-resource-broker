@@ -23,12 +23,11 @@ from tests.providers.aws.live.plugin_io_schemas import (
     expected_request_status_schema_hostfactory,
 )
 from tests.providers.k8s.mocked.kmock_delivery_conftest import (
+    KINDS,
+    PLURALS,
     _inject_kmock_factory,
     _make_k8s_logger,
-    _register_deployment_resource,
-    _register_job_resource,
-    _register_pod_resource,
-    _register_statefulset_resource,
+    _register_all_kinds,
 )
 from tests.shared.constants import REQUEST_ID_RE
 
@@ -48,15 +47,6 @@ _STATUS_SCHEMA["properties"]["requests"]["items"]["properties"]["machines"]["ite
 
 pytestmark = [pytest.mark.kmock, pytest.mark.rest_api]
 
-PLURALS = {"Pod": "pods", "Deployment": "deployments", "StatefulSet": "statefulsets", "Job": "jobs"}
-
-KINDS = {
-    "Pod": "k8s-pod-example",
-    "Deployment": "k8s-deployment-example",
-    "StatefulSet": "k8s-statefulset-example",
-    "Job": "k8s-job-example",
-}
-
 
 @pytest_asyncio.fixture
 async def client(orb_config_dir_k8s, kmock_k8s):
@@ -66,13 +56,7 @@ async def client(orb_config_dir_k8s, kmock_k8s):
     from orb.config.schemas.server_schema import ServerConfig
     from orb.infrastructure.di.container import get_container
 
-    for register in (
-        _register_pod_resource,
-        _register_deployment_resource,
-        _register_statefulset_resource,
-        _register_job_resource,
-    ):
-        register(kmock_k8s)
+    _register_all_kinds(kmock_k8s)
 
     _register_orchestrators(get_container())
     _inject_kmock_factory(kmock_k8s, _make_k8s_logger())
