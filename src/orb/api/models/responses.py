@@ -52,6 +52,9 @@ class RequestItem(BaseModel):
     completed_at: Optional[str] = None
     first_status_check: Optional[str] = None
     last_status_check: Optional[str] = None
+    # Present only when the request has a deadline / was ever partially fulfilled.
+    deadline_at: Optional[str] = None
+    partial_since: Optional[str] = None
 
     # --- Outcome detail ---
     message: Optional[str] = None

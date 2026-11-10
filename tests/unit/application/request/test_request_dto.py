@@ -52,6 +52,68 @@ class TestRequestDTOStatusCheckFields:
 
 
 @pytest.mark.unit
+class TestRequestDTOTimingFields:
+    """deadline_at and partial_since reach the DTO, the default body and the REST model."""
+
+    _DEADLINE = datetime(2026, 5, 1, 13, 0, 0, tzinfo=timezone.utc)
+    _PARTIAL = datetime(2026, 5, 1, 11, 30, 0, tzinfo=timezone.utc)
+
+    def test_passed_through_from_the_aggregate(self):
+        dto = RequestDTO.from_domain(
+            _make_request(deadline_at=self._DEADLINE, partial_since=self._PARTIAL)
+        )
+
+        assert dto.deadline_at == self._DEADLINE
+        assert dto.partial_since == self._PARTIAL
+
+    def test_default_body_carries_them_only_when_set(self):
+        from unittest.mock import MagicMock
+
+        from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
+        strategy = DefaultSchedulerStrategy(logger=MagicMock())
+        set_item = strategy.format_request_status_response(
+            [
+                RequestDTO.from_domain(
+                    _make_request(deadline_at=self._DEADLINE, partial_since=self._PARTIAL)
+                )
+            ]
+        )["requests"][0]
+        unset_item = strategy.format_request_status_response(
+            [RequestDTO.from_domain(_make_request())]
+        )["requests"][0]
+
+        assert set_item["deadline_at"] == "2026-05-01T13:00:00Z"
+        assert set_item["partial_since"] == "2026-05-01T11:30:00Z"
+        assert "deadline_at" not in unset_item
+        assert "partial_since" not in unset_item
+
+    def test_rest_item_model_declares_them(self):
+        from orb.api.models.responses import RequestItem
+
+        item = RequestItem.model_validate(
+            {"deadline_at": "2026-05-01T13:00:00Z", "partial_since": "2026-05-01T11:30:00Z"}
+        )
+
+        assert item.deadline_at == "2026-05-01T13:00:00Z"
+        assert item.partial_since == "2026-05-01T11:30:00Z"
+
+    def test_hostfactory_item_is_unchanged(self):
+        from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+            HostFactorySchedulerStrategy,
+        )
+
+        dto = RequestDTO.from_domain(
+            _make_request(deadline_at=self._DEADLINE, partial_since=self._PARTIAL)
+        )
+
+        item = HostFactorySchedulerStrategy().format_request_status_response([dto])["requests"][0]
+
+        assert "deadline_at" not in item and "deadlineAt" not in item
+        assert "partial_since" not in item and "partialSince" not in item
+
+
+@pytest.mark.unit
 class TestRequestDTOVerboseField:
     """verbose must not be a model field on RequestDTO."""
 

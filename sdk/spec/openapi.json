@@ -3933,6 +3933,28 @@
             ],
             "title": "Last Status Check"
           },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline At"
+          },
+          "partial_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partial Since"
+          },
           "message": {
             "anyOf": [
               {
