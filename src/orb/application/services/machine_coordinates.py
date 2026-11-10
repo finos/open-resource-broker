@@ -17,7 +17,8 @@ def load_machine_coordinates(
 ) -> dict[str, dict[str, Any]]:
     """Return per-machine provider coordinates keyed by machine id.
 
-    Each entry carries ``provider_api``, ``resource_id``, ``provider_data`` and
+    Each entry carries ``provider_api``, ``resource_id``, ``provider_data``,
+    ``request_id`` (the request that provisioned the machine) and
     ``launched_at`` (ISO timestamp of the launch, or of the record's creation).
     Placement fields missing from a machine's own ``provider_data`` are filled
     from the request that originally provisioned it, so flows driven by a
@@ -42,6 +43,7 @@ def load_machine_coordinates(
                 "provider_api": machine.provider_api,
                 "resource_id": machine.resource_id,
                 "provider_data": provider_data,
+                "request_id": machine.request_id,
                 "launched_at": _iso(machine.launch_time or machine.created_at),
             }
     return coordinates

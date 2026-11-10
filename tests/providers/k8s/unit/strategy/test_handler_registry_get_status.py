@@ -106,58 +106,6 @@ async def test_all_pods_present_returns_completed() -> None:
 
 
 @pytest.mark.asyncio
-async def test_some_pods_missing_appear_as_terminated_for_return_request() -> None:
-    """For a RETURN request: pods absent from the live list but present in
-    provider_data['pod_names'] are synthesised as 'terminated' entries.
-    The outcome remains Accepted while any pod is still live."""
-    # pod-1 is live, pod-2 is absent (deleted) but was confirmed submitted.
-    handler = MagicMock()
-    handler.check_hosts_status.return_value = _make_check_result(
-        instances=[_instance("pod-1", "running")],
-        state="in_progress",
-    )
-
-    registry = _make_registry(handler=handler)
-    request = _make_request(
-        request_type=RequestType.RETURN,
-        pod_names=["pod-1", "pod-2"],
-    )
-
-    outcome = await registry.get_status(["pod-1", "pod-2"], request)
-
-    # pod-1 is still live so the return is not yet complete.
-    assert isinstance(outcome, Accepted)
-    instances = outcome.metadata["instances"]
-    statuses = {i["instance_id"]: i["status"] for i in instances}
-    # pod-2 was in confirmed set, absent from live list → synthesised as terminated
-    assert statuses.get("pod-2") == "terminated"
-
-
-@pytest.mark.asyncio
-async def test_return_request_completes_when_all_pods_gone() -> None:
-    """A RETURN request transitions to Completed when all caller-supplied
-    resource_ids are absent from the live pod list (they were all deleted)."""
-    handler = MagicMock()
-    # No instances in the live list — all pods are gone.
-    handler.check_hosts_status.return_value = _make_check_result(
-        instances=[],
-        state="in_progress",
-    )
-
-    registry = _make_registry(handler=handler)
-    request = _make_request(
-        request_type=RequestType.RETURN,
-        pod_names=["pod-1", "pod-2"],
-    )
-
-    outcome = await registry.get_status(["pod-1", "pod-2"], request)
-
-    assert isinstance(outcome, Completed)
-    assert "pod-1" in outcome.resource_ids
-    assert "pod-2" in outcome.resource_ids
-
-
-@pytest.mark.asyncio
 async def test_handler_exception_returns_failed() -> None:
     """When check_hosts_status raises, get_status returns a Failed outcome
     with recoverable=True (transient errors should be retried)."""

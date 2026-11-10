@@ -779,7 +779,9 @@ class K8sProviderStrategy(ProviderStrategy):
         if origin_request_id:
             overrides["request_id"] = str(origin_request_id)
         outcome = await self.return_machines(
-            machine_ids, request, provider_data_overrides=overrides or None
+            machine_ids,
+            request,
+            provider_data_overrides=overrides or None,
         )
         return _outcome_to_provider_result(outcome, fallback_operation="terminate_instances")
 
@@ -797,7 +799,11 @@ class K8sProviderStrategy(ProviderStrategy):
             or operation.parameters.get("instance_ids")
             or []
         )
-        outcome = await self.get_status(resource_ids, request)
+        outcome = await self.get_status(
+            resource_ids,
+            request,
+            machine_coordinates=operation.parameters.get("machine_coordinates"),
+        )
         return _outcome_to_provider_result(outcome, fallback_operation="get_instance_status")
 
     async def _handle_describe_resource_instances(
@@ -1167,9 +1173,16 @@ class K8sProviderStrategy(ProviderStrategy):
             machine_ids, request, provider_data_overrides=provider_data_overrides
         )
 
-    async def get_status(self, resource_ids: list[str], request: Request) -> OperationOutcome:
+    async def get_status(
+        self,
+        resource_ids: list[str],
+        request: Request,
+        machine_coordinates: Optional[dict[str, dict[str, Any]]] = None,
+    ) -> OperationOutcome:
         """Poll the per-API handler's ``check_hosts_status`` for a verdict."""
-        return await self._handler_registry.get_status(resource_ids, request)
+        return await self._handler_registry.get_status(
+            resource_ids, request, machine_coordinates=machine_coordinates
+        )
 
     def _build_template_for_request(self, request: Request) -> Template:
         """Resolve the :class:`Template` carried by ``request``."""

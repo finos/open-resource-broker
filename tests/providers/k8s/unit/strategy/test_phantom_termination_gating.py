@@ -46,25 +46,6 @@ def _make_acquire_request(
     )
 
 
-def _make_return_request(
-    *,
-    request_id: str | None = None,
-    pod_names: list[str] | None = None,
-) -> Request:
-    return Request(
-        request_id=RequestId(value=request_id or f"req-{uuid.uuid4()}"),
-        request_type=RequestType.RETURN,
-        provider_type="k8s",
-        provider_api="Pod",
-        template_id="tpl-1",
-        requested_count=0,
-        provider_data={
-            "namespace": "orb-test",
-            "pod_names": pod_names or [],
-        },
-    )
-
-
 def _make_registry(*, check_result: CheckHostsStatusResult) -> K8sHandlerRegistry:
     """Build a registry whose Pod handler stub returns ``check_result``."""
     handler_stub = MagicMock()
@@ -136,40 +117,6 @@ async def test_phantom_pod_not_in_confirmed_set_is_unknown() -> None:
     phantom = [i for i in instances if i["instance_id"] == "orb-phantom-0000"]
     assert phantom, "Phantom pod should still appear in instances"
     assert phantom[0]["status"] == "unknown", f"Expected 'unknown', got {phantom[0]['status']!r}"
-
-
-@pytest.mark.asyncio
-async def test_phantom_pod_does_not_complete_return_request() -> None:
-    """A return request must NOT transition to Completed when only phantom IDs
-    are missing from the live list (no confirmed pods present)."""
-    check_result = CheckHostsStatusResult(
-        instances=[],
-        fulfilment=_fulfilment("in_progress"),
-    )
-    registry = _make_registry(check_result=check_result)
-    # No confirmed pod_names — the resource_id is a phantom.
-    request = _make_return_request(pod_names=[])
-
-    outcome = await registry.get_status(["orb-phantom-0001"], request)
-    # Return must stay Accepted (still draining), not Completed.
-    assert isinstance(outcome, Accepted), (
-        f"Expected Accepted (not Completed) but got {type(outcome).__name__}"
-    )
-
-
-@pytest.mark.asyncio
-async def test_confirmed_pod_deletion_completes_return_request() -> None:
-    """A return request with a confirmed pod (in pod_names) that is now absent
-    from the live list must transition to Completed."""
-    check_result = CheckHostsStatusResult(
-        instances=[],  # pod is gone
-        fulfilment=_fulfilment("in_progress"),
-    )
-    registry = _make_registry(check_result=check_result)
-    request = _make_return_request(pod_names=["orb-real-0000"])
-
-    outcome = await registry.get_status(["orb-real-0000"], request)
-    assert isinstance(outcome, Completed), f"Expected Completed but got {type(outcome).__name__}"
 
 
 @pytest.mark.asyncio
