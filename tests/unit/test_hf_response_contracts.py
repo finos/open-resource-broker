@@ -116,42 +116,40 @@ class TestRequestResponseShape:
 
 
 # ---------------------------------------------------------------------------
-# convert_domain_to_hostfactory_output — requestMachines
+# format_request_response (requestMachines)
 # ---------------------------------------------------------------------------
 
 
 class TestRequestMachinesOutputShape:
-    """convert_domain_to_hostfactory_output('requestMachines') contract."""
+    """format_request_response contract for requestMachines."""
 
     def setup_method(self):
         self.strategy = _make_strategy()
 
     def test_string_input_returns_requestId(self):
-        result = self.strategy.convert_domain_to_hostfactory_output("requestMachines", "req-abc")
+        result = self.strategy.format_request_response({"request_id": "req-abc"})
         assert "requestId" in result
         assert "message" in result
 
     def test_dict_input_returns_requestId(self):
-        result = self.strategy.convert_domain_to_hostfactory_output(
-            "requestMachines", {"request_id": "req-abc", "resource_ids": ["fleet-1"]}
+        result = self.strategy.format_request_response(
+            {"request_id": "req-abc", "resource_ids": ["fleet-1"]}
         )
         assert "requestId" in result
         assert "message" in result
 
     def test_no_snake_case_request_id_in_output(self):
-        result = self.strategy.convert_domain_to_hostfactory_output(
-            "requestMachines", {"request_id": "req-abc"}
-        )
+        result = self.strategy.format_request_response({"request_id": "req-abc"})
         assert "request_id" not in result
 
 
 # ---------------------------------------------------------------------------
-# convert_domain_to_hostfactory_output — getRequestStatus
+# format_request_status_response (getRequestStatus)
 # ---------------------------------------------------------------------------
 
 
 class TestGetRequestStatusOutputShape:
-    """convert_domain_to_hostfactory_output('getRequestStatus') contract."""
+    """format_request_status_response contract for getRequestStatus."""
 
     def setup_method(self):
         self.strategy = _make_strategy()
@@ -170,40 +168,40 @@ class TestGetRequestStatusOutputShape:
 
     def test_status_response_has_requests_list(self):
         dto = self._make_request_dto("req-abc", "completed")
-        result = self.strategy.convert_domain_to_hostfactory_output("getRequestStatus", dto)
+        result = self.strategy.format_request_status_response([dto])
         assert "requests" in result
         assert isinstance(result["requests"], list)
 
     def test_each_request_entry_has_requestId(self):
         dto = self._make_request_dto("req-abc", "completed")
-        result = self.strategy.convert_domain_to_hostfactory_output("getRequestStatus", dto)
+        result = self.strategy.format_request_status_response([dto])
         entry = result["requests"][0]
         assert "requestId" in entry
         assert "request_id" not in entry
 
     def test_each_request_entry_has_status(self):
         dto = self._make_request_dto("req-abc", "completed")
-        result = self.strategy.convert_domain_to_hostfactory_output("getRequestStatus", dto)
+        result = self.strategy.format_request_status_response([dto])
         entry = result["requests"][0]
         assert "status" in entry
 
     def test_each_request_entry_has_machines_list(self):
         dto = self._make_request_dto("req-abc", "completed")
-        result = self.strategy.convert_domain_to_hostfactory_output("getRequestStatus", dto)
+        result = self.strategy.format_request_status_response([dto])
         entry = result["requests"][0]
         assert "machines" in entry
         assert isinstance(entry["machines"], list)
 
     def test_each_request_entry_has_message(self):
         dto = self._make_request_dto("req-abc", "completed")
-        result = self.strategy.convert_domain_to_hostfactory_output("getRequestStatus", dto)
+        result = self.strategy.format_request_status_response([dto])
         entry = result["requests"][0]
         assert "message" in entry
 
     def test_status_is_mapped_to_hf_values(self):
         """Domain 'completed' must map to HF 'complete', not pass through raw."""
         dto = self._make_request_dto("req-abc", "completed")
-        result = self.strategy.convert_domain_to_hostfactory_output("getRequestStatus", dto)
+        result = self.strategy.format_request_status_response([dto])
         entry = result["requests"][0]
         assert entry["status"] in {"running", "complete", "complete_with_error"}
 
@@ -214,7 +212,7 @@ class TestGetRequestStatusOutputShape:
             "machines": [],
             "request_type": "provision",
         }
-        result = self.strategy.convert_domain_to_hostfactory_output("getRequestStatus", data)
+        result = self.strategy.format_request_status_response([data])
         entry = result["requests"][0]
         assert "requestId" in entry
         assert "request_id" not in entry

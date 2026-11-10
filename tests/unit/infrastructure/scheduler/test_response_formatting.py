@@ -3,7 +3,6 @@
 No file I/O, no DI container, no AWS.
 """
 
-import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -323,11 +322,11 @@ def test_hf_format_request_status_response_hf_extended_fields_present():
     m = result["requests"][0]["machines"][0]
     assert m["instanceType"] == "m5.large"
     assert m["priceType"] == "ondemand"
-    assert json.loads(m["instanceTags"]) == {"Environment": "prod"}
+    assert m["instanceTags"] == "Environment=prod"
 
 
 def test_hf_format_request_status_response_hf_extended_fields_absent_when_empty():
-    """Omit the three extended fields when upstream didn't populate them."""
+    """Omit instanceType and priceType when upstream didn't populate them; instanceTags is ''."""
     strategy = make_hf_strategy()
     machine = _make_machine_ref_dict(status="running", result="succeed")
     dto = _make_request_dto(status="pending", machines=[machine])
@@ -335,7 +334,7 @@ def test_hf_format_request_status_response_hf_extended_fields_absent_when_empty(
     m = result["requests"][0]["machines"][0]
     assert "instanceType" not in m
     assert "priceType" not in m
-    assert "instanceTags" not in m
+    assert m["instanceTags"] == ""
 
 
 def test_hf_format_request_status_response_result_values():
@@ -352,14 +351,14 @@ def test_hf_format_request_status_response_result_values():
         )
 
 
-def test_hf_format_request_status_response_private_ip_null_not_empty_string():
-    """privateIpAddress must be null (not '') when IP is absent."""
+def test_hf_format_request_status_response_private_ip_is_empty_string_when_unknown():
+    """privateIpAddress is mandatory in the HF spec, so an unknown address is '' and never null."""
     strategy = make_hf_strategy()
     machine = _make_machine_ref_dict(private_ip="")
     dto = _make_request_dto(status="pending", machines=[machine])
     result = strategy.format_request_status_response([dto])
     ip = result["requests"][0]["machines"][0]["privateIpAddress"]
-    assert ip is None, f"Expected null privateIpAddress, got '{ip}'"
+    assert ip == ""
 
 
 def test_hf_format_request_status_response_launchtime_is_integer():

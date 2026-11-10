@@ -657,6 +657,17 @@
               }
             }
           }
+        },
+        "x-orb-formats": {
+          "default": {
+            "$ref": "#/components/schemas/RequestOperationResponse"
+          },
+          "hostfactory": {
+            "$ref": "#/components/schemas/HfRequestIdResponse"
+          },
+          "slurm": {
+            "$ref": "#/components/schemas/RequestOperationResponse"
+          }
         }
       }
     },
@@ -726,6 +737,17 @@
                 }
               }
             }
+          }
+        },
+        "x-orb-formats": {
+          "default": {
+            "$ref": "#/components/schemas/RequestOperationResponse"
+          },
+          "hostfactory": {
+            "$ref": "#/components/schemas/HfRequestIdResponse"
+          },
+          "slurm": {
+            "$ref": "#/components/schemas/RequestOperationResponse"
           }
         }
       }
@@ -1561,6 +1583,17 @@
                 }
               }
             }
+          }
+        },
+        "x-orb-formats": {
+          "default": {
+            "$ref": "#/components/schemas/RequestStatusResponse"
+          },
+          "hostfactory": {
+            "$ref": "#/components/schemas/HfRequestStatusResponse"
+          },
+          "slurm": {
+            "$ref": "#/components/schemas/RequestStatusResponse"
           }
         }
       },
@@ -5223,6 +5256,154 @@
           "requests"
         ],
         "title": "HfRequestStatusResponse",
+        "type": "object"
+      },
+      "HfRequestIdResponse": {
+        "additionalProperties": true,
+        "description": "HostFactory requestMachines and requestReturnMachines response.",
+        "properties": {
+          "requestId": {
+            "title": "Requestid",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          }
+        },
+        "required": [
+          "requestId"
+        ],
+        "title": "HfRequestIdResponse",
+        "type": "object"
+      },
+      "HfReturnRequest": {
+        "additionalProperties": true,
+        "description": "A machine HostFactory must return, with the time left before it is reclaimed.",
+        "properties": {
+          "machine": {
+            "title": "Machine",
+            "type": "string"
+          },
+          "gracePeriod": {
+            "title": "Graceperiod",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "machine",
+          "gracePeriod"
+        ],
+        "title": "HfReturnRequest",
+        "type": "object"
+      },
+      "HfReturnRequestsResponse": {
+        "additionalProperties": true,
+        "description": "HostFactory getReturnRequests response.",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          },
+          "requests": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HfReturnRequest"
+            },
+            "title": "Requests",
+            "type": "array"
+          }
+        },
+        "title": "HfReturnRequestsResponse",
+        "type": "object"
+      },
+      "HfTemplate": {
+        "additionalProperties": true,
+        "description": "A template of a HostFactory getAvailableTemplates response.",
+        "properties": {
+          "templateId": {
+            "title": "Templateid",
+            "type": "string"
+          },
+          "maxNumber": {
+            "title": "Maxnumber",
+            "type": "integer"
+          },
+          "attributes": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Attributes",
+            "type": "object"
+          }
+        },
+        "required": [
+          "templateId",
+          "maxNumber",
+          "attributes"
+        ],
+        "title": "HfTemplate",
+        "type": "object"
+      },
+      "HfTemplatesResponse": {
+        "additionalProperties": true,
+        "description": "HostFactory getAvailableTemplates response.",
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/HfTemplate"
+            },
+            "title": "Templates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "templates"
+        ],
+        "title": "HfTemplatesResponse",
         "type": "object"
       }
     },

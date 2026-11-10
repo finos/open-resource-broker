@@ -323,51 +323,34 @@ def test_hf_request_status_multiple_requests(hf_strategy):
 
 
 # ---------------------------------------------------------------------------
-# 4. convert_domain_to_hostfactory_output — higher-level formatter
+# 4. request creation and request status — higher-level formatters
 # ---------------------------------------------------------------------------
 
 
-def test_hf_convert_domain_get_available_templates(hf_strategy):
-    """convert_domain_to_hostfactory_output for getAvailableTemplates returns templates list.
-
-    This path uses format_template_for_display (field mapper only) and does not
-    inject the attributes block — that is done by format_templates_response.
-    We validate the outer envelope shape only.
-    """
-    template_dto = _make_hf_template_dto(hf_strategy)
-    response = hf_strategy.convert_domain_to_hostfactory_output(
-        "getAvailableTemplates", [template_dto]
-    )
-    assert "templates" in response, f"Missing 'templates' key: {response}"
-    assert isinstance(response["templates"], list)
-    assert "message" in response, f"Missing 'message' key: {response}"
-
-
-def test_hf_convert_domain_request_machines(hf_strategy):
-    """convert_domain_to_hostfactory_output for requestMachines validates schema."""
-    response = hf_strategy.convert_domain_to_hostfactory_output(
-        "requestMachines",
-        {"request_id": "req-00000000-0000-0000-0000-000000000001"},
+def test_hf_request_machines_response_validates_schema(hf_strategy):
+    """format_request_response for requestMachines validates schema."""
+    response = hf_strategy.format_request_response(
+        {"request_id": "req-00000000-0000-0000-0000-000000000001"}
     )
     _validate(response, expected_request_machines_schema_hostfactory)
 
 
-def test_hf_convert_domain_get_request_status_dto(hf_strategy):
-    """convert_domain_to_hostfactory_output for getRequestStatus with DTO validates schema."""
+def test_hf_request_status_dto_validates_schema(hf_strategy):
+    """format_request_status_response with a DTO validates schema."""
     machine = make_machine_ref_dto()
     dto = make_request_dto(status="complete", machine_refs=[machine])
-    response = hf_strategy.convert_domain_to_hostfactory_output("getRequestStatus", dto)
+    response = hf_strategy.format_request_status_response([dto])
     _validate(response, expected_request_status_schema_hostfactory)
 
 
-def test_hf_convert_domain_get_request_status_dict(hf_strategy):
-    """convert_domain_to_hostfactory_output for getRequestStatus with dict validates schema."""
+def test_hf_request_status_dict_validates_schema(hf_strategy):
+    """format_request_status_response with a dict validates schema."""
     data = {
         "request_id": "req-00000000-0000-0000-0000-000000000001",
         "status": "pending",
         "machines": [],
     }
-    response = hf_strategy.convert_domain_to_hostfactory_output("getRequestStatus", data)
+    response = hf_strategy.format_request_status_response([data])
     _validate(response, expected_request_status_schema_hostfactory)
 
 

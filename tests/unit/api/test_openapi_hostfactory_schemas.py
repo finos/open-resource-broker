@@ -49,8 +49,10 @@ def test_each_mapped_operation_names_every_built_in_format(spec):
         formats = operations[operation_id]["x-orb-formats"]
         assert tuple(formats) == BUILT_IN_FORMATS
         assert formats["hostfactory"] == {"$ref": f"#/components/schemas/{model.__name__}"}
-        native = operations[operation_id]["responses"]["200"]["content"]["application/json"]
-        assert formats["default"] == native["schema"]
+        success = next(
+            r for code, r in operations[operation_id]["responses"].items() if code[0] == "2"
+        )
+        assert formats["default"] == success["content"]["application/json"]["schema"]
 
 
 def test_spec_does_not_depend_on_registered_schedulers(spec):

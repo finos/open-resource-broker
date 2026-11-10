@@ -50,9 +50,69 @@ class HfRequestStatusResponse(BaseModel):
     requests: list[HfRequestStatusItem]
 
 
-HF_MODELS: tuple[type[BaseModel], ...] = (HfMachine, HfRequestStatusItem, HfRequestStatusResponse)
+class HfRequestIdResponse(BaseModel):
+    """HostFactory requestMachines and requestReturnMachines response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    requestId: str
+    message: Optional[str] = None
+
+
+class HfReturnRequest(BaseModel):
+    """A machine HostFactory must return, with the time left before it is reclaimed."""
+
+    model_config = ConfigDict(extra="allow")
+
+    machine: str
+    gracePeriod: int
+
+
+class HfReturnRequestsResponse(BaseModel):
+    """HostFactory getReturnRequests response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    status: Optional[str] = None
+    message: Optional[str] = None
+    requests: list[HfReturnRequest] = []
+
+
+class HfTemplate(BaseModel):
+    """A template of a HostFactory getAvailableTemplates response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    templateId: str
+    maxNumber: int
+    # name -> [type, value], for example {"ncpus": ["Numeric", "1"]}
+    attributes: dict[str, list[str]]
+
+
+class HfTemplatesResponse(BaseModel):
+    """HostFactory getAvailableTemplates response."""
+
+    model_config = ConfigDict(extra="allow")
+
+    message: Optional[str] = None
+    templates: list[HfTemplate]
+
+
+HF_MODELS: tuple[type[BaseModel], ...] = (
+    HfMachine,
+    HfRequestStatusItem,
+    HfRequestStatusResponse,
+    HfRequestIdResponse,
+    HfReturnRequest,
+    HfReturnRequestsResponse,
+    HfTemplate,
+    HfTemplatesResponse,
+)
 
 # Operation id -> HostFactory response model, for the per-operation format map.
 HF_OPERATION_MODELS: dict[str, type[BaseModel]] = {
     "getRequestStatus": HfRequestStatusResponse,
+    "getRequest": HfRequestStatusResponse,
+    "requestMachines": HfRequestIdResponse,
+    "returnMachines": HfRequestIdResponse,
 }

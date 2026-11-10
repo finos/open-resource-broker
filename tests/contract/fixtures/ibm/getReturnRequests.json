@@ -1,0 +1,29 @@
+  {
+    "status" : "complete",
+    "message" : "Instances marked for termination retrieved successfully.",
+    "requests" : [ {
+      "gracePeriod" : 0,
+      "machine" : "ip-10-0-57-7.ec2.internal"
+    }, {
+      "gracePeriod" : 0,
+      "machine" : "ip-10-0-57-154.ec2.internal"
+    }, {
+      "gracePeriod" : 0,
+      "machine" : "ip-10-0-62-139.ec2.internal"
+    }, {
+      "gracePeriod" : 0,
+      "machine" : "ip-10-0-58-203.ec2.internal"
+    }, {
+      "gracePeriod" : 0,
+      "machine" : "ip-10-0-57-22.ec2.internal"
+    }, {
+      "gracePeriod" : 0,
+      "machine" : "ip-10-0-55-65.ec2.internal"
+    }, {
+      "gracePeriod" : 0,
+      "machine" : "ip-10-0-57-187.ec2.internal"
+    }, {
+      "gracePeriod" : 0,
+      "machine" : "ip-10-0-51-28.ec2.internal"
+    } ]
+  }

@@ -381,7 +381,7 @@ class TestRequestMachinesSchema:
         import re
 
         request_id = "req-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-        response = hf_strat.convert_domain_to_hostfactory_output("requestMachines", request_id)
+        response = hf_strat.format_request_response({"request_id": request_id, "status": "pending"})
         _validate(response, expected_request_machines_schema_hostfactory)
         pattern = r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         assert re.match(pattern, response["requestId"]), (
@@ -405,7 +405,7 @@ class TestRequestMachinesSchema:
     def test_hf_response_has_no_extra_required_fields(self, hf_strat):
         """HF requestMachines response has no keys beyond requestId and message (additionalProperties: False)."""
         request_id = "req-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-        response = hf_strat.convert_domain_to_hostfactory_output("requestMachines", request_id)
+        response = hf_strat.format_request_response({"request_id": request_id, "status": "pending"})
         allowed_keys = {"requestId", "message"}
         extra = set(response.keys()) - allowed_keys
         assert not extra, f"HF requestMachines response has unexpected keys: {extra}"

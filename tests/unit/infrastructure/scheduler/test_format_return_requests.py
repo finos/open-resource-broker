@@ -277,7 +277,7 @@ def test_format_machine_details_required_fields_present(hf):
     assert "name" in result
     assert "status" in result
     assert "machineId" in result
-    assert "provider" in result
+    assert result["providerType"] == "aws"
 
 
 # ---------------------------------------------------------------------------

@@ -161,13 +161,11 @@ def _add_format_schemas(openapi_schema: dict[str, Any]) -> None:
             model = HF_OPERATION_MODELS.get(operation.get("operationId", ""))
             if model is None:
                 continue
-            native = (
-                operation.get("responses", {})
-                .get("200", {})
-                .get("content", {})
-                .get("application/json", {})
-                .get("schema", {})
+            success = next(
+                (r for code, r in operation.get("responses", {}).items() if code.startswith("2")),
+                {},
             )
+            native = success.get("content", {}).get("application/json", {}).get("schema", {})
             hf = {"$ref": f"#/components/schemas/{model.__name__}"}
             operation["x-orb-formats"] = {
                 name: hf if name == "hostfactory" else native for name in BUILT_IN_FORMATS
