@@ -8,6 +8,7 @@ import json
 from typing import Any, Generic, Optional, TypeVar
 
 from orb.application.machine.dto import MachineDTO
+from orb.domain.request.exceptions import RequestValidationError
 
 T = TypeVar("T")
 
@@ -89,6 +90,10 @@ class GetRequestStatusInput:
     verbose: bool = False
     wait: bool = False
     timeout_seconds: int = 300
+
+    def __post_init__(self) -> None:
+        if not self.request_ids and not self.all_requests:
+            raise RequestValidationError("request_ids is required unless all_requests is set")
 
 
 @dataclasses.dataclass(frozen=True)
