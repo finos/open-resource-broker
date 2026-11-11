@@ -4,7 +4,6 @@ Guards against silent field-drop across:
   Machine aggregate → RequestDTOFactory → MachineReferenceDTO → HF formatter
 """
 
-import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
@@ -140,10 +139,8 @@ class TestMachineFieldContract:
         assert m.get("instanceType") == "m5.xlarge", "instanceType dropped"
         assert m.get("priceType") == "spot", "priceType dropped"
 
-        # Tags — stored as JSON string in wire format
-        assert "instanceTags" in m, "instanceTags dropped"
-        wire_tags = json.loads(m["instanceTags"])
-        assert wire_tags == {"Env": "test", "Owner": "contract"}, "instanceTags content wrong"
+        # Tags — a ``key=value`` list joined by ``;`` like the template instanceTags
+        assert m.get("instanceTags") == "Env=test;Owner=contract", "instanceTags content wrong"
 
     def test_missing_optional_fields_do_not_appear_in_wire(self):
         """A Machine with no optional fields produces a clean wire entry without spurious keys."""
@@ -176,12 +173,13 @@ class TestMachineFieldContract:
             "instanceType should reflect machine instance_type"
         )
 
-        # price_type and tags are truly optional — absent when not set on the Machine
+        # price_type is truly optional — absent when not set on the Machine.
+        # instanceTags is always present (the IBM example shows an empty string without tags).
         assert "priceType" not in m, "priceType should be absent when not set"
-        assert "instanceTags" not in m, "instanceTags should be absent when not set"
+        assert m["instanceTags"] == "", "instanceTags should be empty when no tags are set"
 
     def test_tags_serialised_as_sorted_json_string(self):
-        """Tags must be a JSON string (not a dict) in the wire format, sorted by key."""
+        """Tags must be a ``k=v;k=v`` string (not a dict) in the wire format, sorted by key."""
         request = _make_request()
         request_id = str(request.request_id)
         machine = _make_machine(request_id)
@@ -196,6 +194,4 @@ class TestMachineFieldContract:
 
         wire = self.formatter.format_request_status_response([request_dto])
         m = wire["requests"][0]["machines"][0]
-        assert isinstance(m["instanceTags"], str), "instanceTags must be a JSON string in wire"
-        parsed = json.loads(m["instanceTags"])
-        assert list(parsed.keys()) == sorted(parsed.keys()), "instanceTags keys must be sorted"
+        assert m["instanceTags"] == "Alpha=a;Middle=m;Zebra=z", "instanceTags must be sorted k=v"

@@ -278,6 +278,11 @@ with a `machines` key is treated as this poll.
 `launchtime` as a number on the machines list, `instanceTags` as `k=v;k=v` instead of a
 JSON string, and the machines list with the request-item machine keys (`privateIpAddress`,
 `instanceType`, `launchtime`, `result`) instead of `privateIp`, `vmType`, `launchTime`.
+The machines list and machine detail no longer carry `subnetId`, `securityGroupIds` or
+`terminationTime`. `statusReason` is now `message` (filled for failed machines), `tags` is
+`instanceTags`, `publicIp` is `publicIpAddress` and the detail `provider` is `providerType`
+(with `providerName`). `requestId` and `returnRequestId` appear only when set, where they were
+always present. `imageId` stays, as an optional key.
 `getReturnRequests` now reports provider-reclaimed machines instead of ORB's return requests.
 
 ## Deployment Scenarios

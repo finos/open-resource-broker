@@ -858,6 +858,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         )
         for field, key in (
             ("template_id", "templateId"),
+            ("image_id", "imageId"),
             ("provider_name", "providerName"),
             ("provider_type", "providerType"),
             ("instance_type", "instanceType"),
