@@ -18,11 +18,15 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
 from orb.domain.base.ports import LoggingPort
+from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.handlers.base_handler import K8sHandlerBase
 from orb.providers.k8s.infrastructure.handlers.deployment_handler import K8sDeploymentHandler
 from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler
 from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
+from orb.providers.k8s.infrastructure.handlers.shared.namespace_resolver import (
+    resolve_namespace_from_provider_data,
+)
 from orb.providers.k8s.infrastructure.handlers.statefulset_handler import K8sStatefulSetHandler
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.value_objects import KubernetesProviderApi
@@ -292,8 +296,13 @@ class K8sHandlerRegistry:
         machine_ids: list[str],
         request: Request,
         provider_data_overrides: Optional[dict[str, Any]] = None,
+        machine_coordinates: Optional[dict[str, dict[str, Any]]] = None,
     ) -> OperationOutcome:
         """Delete the named resources via the per-API handler.
+
+        ``machine_coordinates`` (per machine id, as persisted at acquire time)
+        places each pod: pods are deleted in the namespace they were created in,
+        not in the return request's (empty) default.
 
         ``provider_data_overrides`` lets the caller supply the acquire-time
         controller name and origin request id, which the controller-backed
@@ -312,19 +321,33 @@ class K8sHandlerRegistry:
             for key, value in (provider_data_overrides or {}).items():
                 if value:
                     provider_data[key] = value
-            release_result = await handler.release_hosts(list(machine_ids), provider_data)
             # release_hosts returns a dict with ``deleted`` and
             # ``failed_deletes`` when partial failure occurred.  The caller
             # only needs the successfully deleted IDs as pending_resource_ids
-            # so the status-poll path can observe them draining.
-            release_info: dict[str, Any] = (
-                release_result if isinstance(release_result, dict) else {}
-            )
-            deleted = release_info.get("deleted", list(machine_ids))
-            failed_names = [
-                str(entry[0] if isinstance(entry, (tuple, list)) else entry)
-                for entry in (release_info.get("failed_deletes") or [])
-            ]
+            # so the status-poll path can observe them draining.  One call per
+            # namespace the machines were placed in.
+            deleted: list[str] = []
+            failed_names: list[str] = []
+            # Release per namespace only: controller-backed handlers compare the
+            # number of ids released against the controller's replicas, so ids of
+            # one controller must not be split across calls.
+            by_namespace: dict[str, list[str]] = {}
+            for (namespace, _origin), grouped in self._group_by_placement(
+                list(machine_ids), machine_coordinates, request
+            ).items():
+                by_namespace.setdefault(namespace, []).extend(grouped)
+            for namespace, names in by_namespace.items():
+                release_result = await handler.release_hosts(
+                    names, {**provider_data, "namespace": namespace}
+                )
+                release_info: dict[str, Any] = (
+                    release_result if isinstance(release_result, dict) else {}
+                )
+                deleted.extend(release_info.get("deleted", names))
+                failed_names.extend(
+                    str(entry[0] if isinstance(entry, (tuple, list)) else entry)
+                    for entry in (release_info.get("failed_deletes") or [])
+                )
             if failed_names:
                 # Some deletes failed. Report the per-ID split under
                 # ``provider_data`` so the deprovisioning orchestrator can mark
@@ -360,7 +383,64 @@ class K8sHandlerRegistry:
             self._logger.error("Kubernetes return_machines failed: %s", exc, exc_info=True)
             return Failed(error=str(exc), recoverable=False)
 
-    async def get_status(self, resource_ids: list[str], request: Request) -> OperationOutcome:
+    def _group_by_placement(
+        self,
+        machine_ids: list[str],
+        machine_coordinates: Optional[dict[str, dict[str, Any]]],
+        request: Request,
+    ) -> dict[tuple[str, Optional[str]], list[str]]:
+        """Group machine ids by ``(namespace, origin request id)``.
+
+        Namespace precedence per machine: its persisted ``provider_data``, then
+        the request's own ``provider_data``, then the configured default.
+        Machines without coordinates land in the default namespace with no
+        origin request id.
+        """
+        request_data = request.provider_data or {}
+        groups: dict[tuple[str, Optional[str]], list[str]] = {}
+        for mid in machine_ids:
+            coords = (machine_coordinates or {}).get(mid) or {}
+            placed = coords.get("provider_data") or {}
+            source = placed if placed.get("namespace") else request_data
+            namespace = resolve_namespace_from_provider_data(
+                source if isinstance(source, dict) else {}, self._config
+            )
+            origin = str(coords["request_id"]) if coords.get("request_id") else None
+            groups.setdefault((namespace, origin), []).append(mid)
+        return groups
+
+    async def _read_return_pods(
+        self,
+        handler: K8sHandlerBase,
+        resource_ids: list[str],
+        request: Request,
+        machine_coordinates: Optional[dict[str, dict[str, Any]]],
+    ) -> tuple[list[dict[str, Any]], set[str], ProviderFulfilment]:
+        """List the returned pods per (namespace, origin request) group."""
+        instances: list[dict[str, Any]] = []
+        unreadable: set[str] = set()
+        groups = self._group_by_placement(list(resource_ids), machine_coordinates, request)
+        for (namespace, origin), names in groups.items():
+            result = await asyncio.to_thread(handler.read_pods_for_return, namespace, origin, names)
+            instances.extend(result.instances)
+            unreadable |= result.unreadable
+        pending = len(unreadable) + sum(
+            1 for i in instances if i.get("status") not in ("terminated", "unknown")
+        )
+        fulfilment = ProviderFulfilment(
+            state="in_progress" if pending else "fulfilled",
+            message=f"{pending} returned machine(s) not yet gone",
+            target_units=len(resource_ids),
+            pending_count=pending,
+        )
+        return instances, unreadable, fulfilment
+
+    async def get_status(
+        self,
+        resource_ids: list[str],
+        request: Request,
+        machine_coordinates: Optional[dict[str, dict[str, Any]]] = None,
+    ) -> OperationOutcome:
         """Poll the per-API handler's ``check_hosts_status`` for a verdict.
 
         Returns ``Completed`` when fulfilment is terminal (``fulfilled``,
@@ -381,9 +461,21 @@ class K8sHandlerRegistry:
 
             provider_api = self.resolve_provider_api(request)
             handler = self.get_handler(provider_api)
-            check_result = await asyncio.to_thread(handler.check_hosts_status, request)
-            instances = list(check_result.instances)
-            fulfilment = check_result.fulfilment
+            is_return = (
+                getattr(request, "request_type", None) == RequestType.RETURN
+                or getattr(getattr(request, "request_type", None), "value", None) == "return"
+            )
+            unreadable: set[str] = set()
+            if is_return:
+                # A return request's own id labels no pod: read the returned pods
+                # by the request that created them, in the namespace they live in.
+                instances, unreadable, fulfilment = await self._read_return_pods(
+                    handler, list(resource_ids or []), request, machine_coordinates
+                )
+            else:
+                check_result = await asyncio.to_thread(handler.check_hosts_status, request)
+                instances = list(check_result.instances)
+                fulfilment = check_result.fulfilment
 
             # Only synthesise ``terminated`` entries for IDs that were
             # confirmed submitted at acquire time (recorded in
@@ -402,11 +494,6 @@ class K8sHandlerRegistry:
             # advance the return request.
             provider_data: dict[str, Any] = getattr(request, "provider_data", None) or {}
             confirmed_pod_names: set[str] = set(provider_data.get("pod_names") or [])
-
-            is_return = (
-                getattr(request, "request_type", None) == RequestType.RETURN
-                or getattr(getattr(request, "request_type", None), "value", None) == "return"
-            )
 
             # For return requests where pod_names is not recorded at all (key absent),
             # treat the caller-supplied resource_ids as the confirmed set.  This
@@ -433,7 +520,11 @@ class K8sHandlerRegistry:
             # for absent ids.
             names_machines = is_return or provider_api == "Pod"
             missing_ids = (
-                [mid for mid in (resource_ids or []) if mid and mid not in live_ids]
+                [
+                    mid
+                    for mid in (resource_ids or [])
+                    if mid and mid not in live_ids and mid not in unreadable
+                ]
                 if names_machines
                 else []
             )
@@ -480,8 +571,13 @@ class K8sHandlerRegistry:
                     for i in instances
                     if i.get("status") not in ("terminated", "unknown")
                 ]
-                all_confirmed_gone = not non_terminal and any(
-                    i.get("status") == "terminated" for i in instances
+                if unreadable:
+                    # A failed list proves nothing: never close these out.
+                    metadata["unreadable_resource_ids"] = sorted(unreadable)
+                all_confirmed_gone = (
+                    not non_terminal
+                    and not unreadable
+                    and any(i.get("status") == "terminated" for i in instances)
                 )
                 if all_confirmed_gone:
                     completed_ids = [
@@ -491,7 +587,7 @@ class K8sHandlerRegistry:
                     ]
                     return Completed(resource_ids=completed_ids, metadata=metadata)
                 # Otherwise still draining.
-                pending_ids = non_terminal or list(resource_ids)
+                pending_ids = non_terminal + sorted(unreadable) or list(resource_ids)
                 return Accepted(
                     request_id=str(request.request_id),
                     pending_resource_ids=pending_ids,

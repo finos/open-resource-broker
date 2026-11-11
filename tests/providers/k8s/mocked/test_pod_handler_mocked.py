@@ -413,14 +413,21 @@ async def test_return_request_completes_when_pod_deleted(
     # Deliberately omit pod_names to reproduce the original bug scenario
     # (e.g. Job handler or requests created before pod_names was populated).
     return_request = Request(
-        request_id=RequestId(value=request_id),
+        request_id=RequestId(value=f"ret-{uuid.uuid4()}"),
         request_type=RequestType.RETURN,
         provider_type="k8s",
         provider_api="Pod",
         template_id="tpl-1",
         requested_count=1,
-        provider_data={"namespace": "orb-test"},  # no pod_names key
+        provider_data={},  # no pod_names key, no placement of its own
     )
+    coordinates = {
+        pod_name: {
+            "provider_api": "Pod",
+            "provider_data": {"namespace": "orb-test"},
+            "request_id": request_id,
+        }
+    }
 
     # --- Step 3: poll get_status via the registry ---
     registry = K8sHandlerRegistry(
@@ -433,7 +440,7 @@ async def test_return_request_completes_when_pod_deleted(
         handler_overrides={"Pod": handler},
     )
 
-    outcome = await registry.get_status([pod_name], return_request)
+    outcome = await registry.get_status([pod_name], return_request, machine_coordinates=coordinates)
 
     # The return request must be Completed once the pod is confirmed deleted.
     assert isinstance(outcome, Completed), (

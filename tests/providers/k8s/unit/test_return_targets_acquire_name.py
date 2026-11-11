@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from orb.domain.base.operation_outcome import Accepted
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.strategy.k8s_provider_strategy import K8sProviderStrategy
@@ -86,3 +87,54 @@ async def test_terminate_without_resource_id_leaves_provider_data_from_request()
     assert result.success
     _, provider_data = handler.release_hosts.await_args[0]
     assert provider_data["deployment_name"] == "orb-XYZ"
+
+
+@pytest.mark.asyncio
+async def test_status_forwards_machine_coordinates() -> None:
+    strategy, _ = _strategy_with_mock_handler()
+    coordinates = {"m-0": {"provider_data": {"namespace": "orb-team-a"}, "request_id": "req-1"}}
+    request = SimpleNamespace(request_id="req-RET", provider_data={})
+    strategy._handler_registry.get_status = AsyncMock(  # type: ignore[method-assign]
+        return_value=Accepted(request_id="req-RET", pending_resource_ids=["m-0"])
+    )
+
+    await strategy._handle_get_instance_status(
+        ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={
+                "instance_ids": ["m-0"],
+                "request": request,
+                "machine_coordinates": coordinates,
+            },
+        )
+    )
+
+    assert (
+        strategy._handler_registry.get_status.await_args_list[0].kwargs["machine_coordinates"]
+        == coordinates
+    )
+
+
+@pytest.mark.asyncio
+async def test_terminate_forwards_machine_coordinates() -> None:
+    strategy, _ = _strategy_with_mock_handler()
+    coordinates = {"m-0": {"provider_data": {"namespace": "orb-team-a"}, "request_id": "req-1"}}
+    strategy._handler_registry.return_machines = AsyncMock(  # type: ignore[method-assign]
+        return_value=Accepted(request_id="req-RET", pending_resource_ids=["m-0"])
+    )
+
+    await strategy._handle_terminate_instances(
+        ProviderOperation(
+            operation_type=ProviderOperationType.TERMINATE_INSTANCES,
+            parameters={
+                "machine_ids": ["m-0"],
+                "request": SimpleNamespace(request_id="req-RET", provider_data={}),
+                "machine_coordinates": coordinates,
+            },
+        )
+    )
+
+    assert (
+        strategy._handler_registry.return_machines.await_args_list[0].kwargs["machine_coordinates"]
+        == coordinates
+    )

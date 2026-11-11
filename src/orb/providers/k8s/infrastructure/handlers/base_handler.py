@@ -15,6 +15,7 @@ from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Generator, Optional, TypeVar
 
 from orb.domain.base.clock import Clock, SystemClock
@@ -54,6 +55,14 @@ if TYPE_CHECKING:  # pragma: no cover — type-checking only
     from orb.providers.k8s.watch.pod_state_cache import PodState, PodStateCache
 
 T = TypeVar("T")
+
+
+@dataclass
+class PodReadResult:
+    """Pods read for a return, plus the names whose namespace could not be listed."""
+
+    instances: list[dict[str, Any]] = field(default_factory=list)
+    unreadable: set[str] = field(default_factory=set)
 
 
 @injectable
@@ -366,6 +375,57 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
     def build_label_selector(self, request: Request) -> str:
         """Convenience: build the ``label_selector=orb.io/request-id=<id>`` string."""
         return request_id_label_selector(request, label_prefix=self._config.label_prefix)
+
+    def read_pods_for_return(
+        self,
+        namespace: str,
+        origin_request_id: Optional[str],
+        names: list[str],
+    ) -> PodReadResult:
+        """Read the named pods of one acquire request in one namespace.
+
+        Pods carry the id of the request that created them, not the id of the
+        return request, so the list selects by ``origin_request_id`` (or by the
+        managed label for machines recorded without one) and keeps only ``names``.
+        The read is strongly consistent: a release confirmation must not trust a
+        cached list.  A pod that is absent from a successful list is gone.  Any
+        failure to list leaves every name in ``unreadable`` so the caller retries
+        instead of treating the pods as gone.
+
+        Status is derived from the pod phase, not ``deletionTimestamp``: a
+        terminating pod stays Running until its containers exit.  Within one
+        StatefulSet, ordinal names are reused if the set is scaled up after a
+        selective release, so a replacement pod reads as the returned one still
+        alive (late, never falsely complete).
+        """
+        prefix = self._config.label_prefix
+        selector = (
+            f"{prefix}/request-id={origin_request_id}"
+            if origin_request_id
+            else f"{prefix}/managed=true"
+        )
+        wanted = set(names)
+        try:
+            with self._timed_api_call("list_namespaced_pod"):
+                response = self.with_retry(
+                    self.client.core_v1.list_namespaced_pod,
+                    namespace=namespace,
+                    label_selector=selector,
+                    operation_name="list_namespaced_pod",
+                )
+        except Exception as exc:
+            self._record_api_exception(exc, operation="list_namespaced_pod")
+            self._logger.error(
+                "list_namespaced_pod failed for return read in %s: %s", namespace, exc
+            )
+            return PodReadResult(instances=[], unreadable=set(wanted))
+        pods = [
+            pod
+            for pod in (response.items or [])
+            if pod.metadata is not None and pod.metadata.name in wanted
+        ]
+        instances = [self._instance_dict_for_pod(pod, namespace=namespace) for pod in pods]
+        return PodReadResult(instances=self.apply_pod_timeouts(instances), unreadable=set())
 
     def _stamp_native_workload_body(
         self,

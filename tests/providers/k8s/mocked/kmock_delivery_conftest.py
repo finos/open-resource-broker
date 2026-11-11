@@ -105,6 +105,27 @@ def _register_job_resource(kmock_k8s) -> None:
     }
 
 
+PLURALS = {"Pod": "pods", "Deployment": "deployments", "StatefulSet": "statefulsets", "Job": "jobs"}
+
+KINDS = {
+    "Pod": "k8s-pod-example",
+    "Deployment": "k8s-deployment-example",
+    "StatefulSet": "k8s-statefulset-example",
+    "Job": "k8s-job-example",
+}
+
+
+def _register_all_kinds(kmock_k8s) -> None:
+    """Declare every workload kind on the emulated apiserver."""
+    for register in (
+        _register_pod_resource,
+        _register_deployment_resource,
+        _register_statefulset_resource,
+        _register_job_resource,
+    ):
+        register(kmock_k8s)
+
+
 # ---------------------------------------------------------------------------
 # kmock injection helper
 # ---------------------------------------------------------------------------

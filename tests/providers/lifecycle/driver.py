@@ -138,9 +138,6 @@ class Lifecycle:
         command = CreateReturnRequestCommand(machine_ids=machine_ids)
         await self.command_bus.execute(command)
         created = list(command.created_request_ids or [])
-        note = getattr(self.cloud, "note_return_requests", None)
-        if note is not None:
-            note(created)
         for handle in self.handles.values():
             self._check(handle, phase="return")
         return created

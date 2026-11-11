@@ -1,6 +1,8 @@
-"""Critical path E2E tests for open-resource-broker.
+"""Critical-path router tests for open-resource-broker.
 
-Tests full stack flows: API -> application -> domain -> infrastructure (mocked at infra boundary).
+Drive the FastAPI app through its routers with the orchestrators and buses
+mocked, so the API contract of each critical flow is checked without any
+infrastructure behind it.
 
 Critical paths covered:
 1. Request Lifecycle: create -> provision -> return -> cleanup, status transitions, error handling
@@ -40,7 +42,7 @@ from orb.infrastructure.di.buses import CommandBus, QueryBus
 
 
 def _admin_user() -> CurrentUser:
-    """Return an admin CurrentUser for dependency override in e2e tests."""
+    """Return an admin CurrentUser for dependency override in router tests."""
     return CurrentUser(username="test-admin", role="admin", claims={})
 
 
@@ -118,7 +120,7 @@ def client(app) -> TestClient:
 
 
 class TestRequestLifecycle:
-    """E2E tests for the full request lifecycle."""
+    """Router tests for the request lifecycle."""
 
     def test_request_machines_returns_request_id(self, app, client: TestClient):
         """POST /api/v1/machines/request creates a request and returns a request_id."""
@@ -402,7 +404,7 @@ class TestRequestLifecycle:
 
 
 class TestTemplateManagement:
-    """E2E tests for template management flows."""
+    """Router tests for template management flows."""
 
     def test_list_templates_returns_empty_list(self, app, client: TestClient):
         """GET /api/v1/templates/ returns empty list when no templates exist."""
@@ -792,7 +794,7 @@ class TestTemplateManagement:
 
 
 class TestMachineLifecycle:
-    """E2E tests for machine lifecycle flows."""
+    """Router tests for machine lifecycle flows."""
 
     def test_list_machines_endpoint_exists(self, app, client: TestClient):
         """GET /api/v1/machines/ endpoint is reachable and returns results."""
@@ -951,7 +953,7 @@ class TestMachineLifecycle:
 
 
 class TestConfigurationManagement:
-    """E2E tests for configuration management flows."""
+    """Router tests for configuration management flows."""
 
     def test_health_endpoint_returns_healthy(self, app, client: TestClient):
         """GET /health returns healthy status."""

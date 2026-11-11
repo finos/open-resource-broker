@@ -46,7 +46,15 @@ def test_machine_provider_data_is_returned_with_resource() -> None:
         "provider_api": "MIG",
         "resource_id": "mig-a",
         "provider_data": {"scope": "zonal", "zone": "z1"},
+        "request_id": _ORIGIN_ID,
         "launched_at": None,
+    }
+    assert set(result["vm-a"]) == {
+        "provider_api",
+        "resource_id",
+        "provider_data",
+        "request_id",
+        "launched_at",
     }
 
 

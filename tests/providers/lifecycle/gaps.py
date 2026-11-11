@@ -19,7 +19,3 @@ STALE_READ_GUARD = (
 )
 
 skip_terminal_rows_stale = pytest.mark.skip(reason=TERMINAL_ROWS_STALE)
-DEPLOYMENT_LATE_PODS_NOT_RELEASED = (
-    "pods a Deployment's controller creates after the request's deadline are left running and "
-    "the Deployment's replicas are not lowered"
-)
