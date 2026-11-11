@@ -6340,6 +6340,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#conformance-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conformance requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6867,6 +6878,45 @@
 <li>Real-AWS tests: <code>tests/providers/aws/live/</code></li>
 <li>Contract tests: <code>tests/providers/aws/contract/</code></li>
 </ul>
+<hr />
+<h2 id="conformance-requirements">Conformance requirements<a class="headerlink" href="#conformance-requirements" title="Permanent link">&para;</a></h2>
+<p>A provider is conformant when these suites pass with it registered. They
+parametrize over the provider registry, so a new provider is picked up without
+editing them.</p>
+<table>
+<thead>
+<tr>
+<th>Suite</th>
+<th>What it checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tests/providers/contract/test_provider_conformance.py</code></td>
+<td>Registration exports of every provider, whether the registry creates its template validator (known gaps are strict expected failures), and the shared contract subclasses or a reasoned exemption</td>
+</tr>
+<tr>
+<td><code>tests/providers/contract/test_capability_router_parity.py</code></td>
+<td>Capability and router parity across providers</td>
+</tr>
+<tr>
+<td><code>tests/providers/contract/test_config_init_parity.py</code></td>
+<td>Config model and <code>orb init</code> parity</td>
+</tr>
+<tr>
+<td><code>tests/providers/lifecycle/test_meta.py</code></td>
+<td>Every provider and API has a lifecycle cell or a documented exemption</td>
+</tr>
+</tbody>
+</table>
+<p>Run them all with one command:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/providers/contract<span class="w"> </span>tests/providers/lifecycle<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>--dist<span class="o">=</span>loadscope
+</code></pre></div>
+<p>The lifecycle suite covers a provider through <code>CELLS</code> in
+<code>tests/providers/lifecycle/cells.py</code>. A provider or API that has no cell must be
+listed in <code>EXEMPT</code> in the same file with the reason. Azure, GCP and OCI are
+exempt as a whole today (no lifecycle fake yet); new entries need the same
+justification, and an exempt entry is removed as soon as its cell is covered.</p>
 <hr />
 <h2 id="cross-references">Cross-references<a class="headerlink" href="#cross-references" title="Permanent link">&para;</a></h2>
 <ul>
