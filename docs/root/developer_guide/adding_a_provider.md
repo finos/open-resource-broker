@@ -650,6 +650,33 @@ The AWS provider tests are the reference layout:
 
 ---
 
+## Conformance requirements
+
+A provider is conformant when these suites pass with it registered. They
+parametrize over the provider registry, so a new provider is picked up without
+editing them.
+
+| Suite | What it checks |
+|-------|----------------|
+| `tests/providers/contract/test_provider_conformance.py` | Registration exports of every provider, whether the registry creates its template validator (known gaps are strict expected failures), and the shared contract subclasses or a reasoned exemption |
+| `tests/providers/contract/test_capability_router_parity.py` | Capability and router parity across providers |
+| `tests/providers/contract/test_config_init_parity.py` | Config model and `orb init` parity |
+| `tests/providers/lifecycle/test_meta.py` | Every provider and API has a lifecycle cell or a documented exemption |
+
+Run them all with one command:
+
+```bash
+uv run pytest tests/providers/contract tests/providers/lifecycle -n 2 --dist=loadscope
+```
+
+The lifecycle suite covers a provider through `CELLS` in
+`tests/providers/lifecycle/cells.py`. A provider or API that has no cell must be
+listed in `EXEMPT` in the same file with the reason. Azure, GCP and OCI are
+exempt as a whole today (no lifecycle fake yet); new entries need the same
+justification, and an exempt entry is removed as soon as its cell is covered.
+
+---
+
 ## Cross-references
 
 - [Clean Architecture](../architecture/clean_architecture.md) — layer boundaries enforced by architecture tests

@@ -8,11 +8,9 @@ from orb.domain.request.value_objects import RequestStatus
 from tests.providers.lifecycle import flows
 from tests.providers.lifecycle.cells import K8S_CELLS, K8S_DEPLOYMENT
 from tests.providers.lifecycle.gaps import (
-    DEPLOYMENT_LATE_PODS_NOT_RELEASED,
     STALE_READ_GUARD,
     skip_terminal_rows_stale,
 )
-from tests.providers.lifecycle.oracle import KnownGap, expect_violation
 
 pytestmark = [
     pytest.mark.asyncio,
@@ -45,14 +43,10 @@ async def test_abandoned_pending_fails_after_window(life):
     await flows.abandoned_pending(life)
 
 
-async def test_deployment_pods_created_after_the_deadline_are_released(life, request):
+async def test_deployment_pods_created_after_the_deadline_are_released(life):
     if life.cell != K8S_DEPLOYMENT:
         pytest.skip("only a Deployment can hold a resource id with no machine ids")
-    request.applymarker(
-        pytest.mark.xfail(strict=True, raises=KnownGap, reason=DEPLOYMENT_LATE_PODS_NOT_RELEASED)
-    )
-    with expect_violation("deadline_outcome"):
-        await flows.quota_blocked_release(life)
+    await flows.quota_blocked_release(life)
 
 
 async def test_controller_request_records_its_pods_not_the_controller(life):
@@ -74,7 +68,7 @@ async def test_controller_request_records_its_pods_not_the_controller(life):
     assert {m["machineId"] for m in view.hf_entry["machines"]} == pods
 
 
-async def test_controller_timeout_without_pods_owes_no_release(life):
+async def test_controller_timeout_without_pods_removes_the_controller(life):
     if life.cell != K8S_DEPLOYMENT:
         pytest.skip("only a controller workload has a resource that is not a machine")
     life.cloud.block_pod_creation()
@@ -86,14 +80,10 @@ async def test_controller_timeout_without_pods_owes_no_release(life):
 
     view = life.view(handle)
     assert view.status == RequestStatus.TIMEOUT
-    assert "deadline_release" not in view.metadata
+    assert view.metadata["deadline_release"] == "done"
     assert view.machine_ids == []
-    released = [
-        c
-        for c in life.cloud.call_log[calls_before:]
-        if c.operation.split()[0] in ("DELETE", "PATCH")
-    ]
-    assert released == []
+    ops = [c.operation for c in life.cloud.call_log[calls_before:]]
+    assert "DeleteDeployment" in ops
 
 
 @pytest.mark.skip(reason=STALE_READ_GUARD)

@@ -23,8 +23,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from tests.providers.k8s.mocked.kmock_delivery_conftest import (  # noqa: E402
+    KINDS,
     _inject_kmock_factory,
     _make_k8s_logger,
+    _register_all_kinds,
     _register_pod_resource,
 )
 from tests.shared.constants import REQUEST_ID_RE  # noqa: E402
@@ -506,3 +508,29 @@ class TestSDKK8sRequestLifecycle:
                 )
             ) or result is None
             assert is_error, f"Expected error response for unknown template, got: {result}"
+
+
+class TestSDKK8sEveryKind:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("kind", list(KINDS))
+    async def test_acquire_and_status_for_kind(self, orb_config_dir_k8s, kmock_k8s, kind):
+        """Each workload kind is acquired and read back through the SDK."""
+        import json
+
+        from orb.sdk.client import ORBClient
+
+        _register_all_kinds(kmock_k8s)
+        config_data = json.loads((orb_config_dir_k8s / "config.json").read_text())
+
+        async with ORBClient(app_config=config_data) as sdk:
+            _inject_kmock_factory(kmock_k8s, _make_k8s_logger())
+
+            created = await sdk.create_request(template_id=KINDS[kind], count=1)
+            request_id = _extract_request_id(created)
+            assert request_id and REQUEST_ID_RE.match(request_id), created
+
+            status = await sdk.get_request_status(request_ids=[request_id])  # type: ignore[attr-defined]
+
+        entry = status["requests"][0] if isinstance(status, dict) else None
+        assert entry is not None, status
+        assert (entry.get("request_id") or entry.get("requestId")) == request_id

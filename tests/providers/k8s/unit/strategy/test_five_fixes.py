@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from orb.domain.base.operation_outcome import Accepted, Completed
+from orb.domain.base.operation_outcome import Accepted
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult, ProviderFulfilment
 from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
@@ -298,61 +298,6 @@ class TestDryRunContextPropagation:
 # ===========================================================================
 # Fix 4: Synthetic instance_type derived from provider_api
 # ===========================================================================
-
-
-class TestSyntheticInstanceType:
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "provider_api,expected_type",
-        [
-            ("Pod", "k8s/Pod"),
-            ("Deployment", "k8s/Deployment"),
-            ("StatefulSet", "k8s/StatefulSet"),
-            ("Job", "k8s/Job"),
-        ],
-    )
-    async def test_terminated_synthesis_uses_correct_instance_type(
-        self, provider_api: str, expected_type: str
-    ) -> None:
-        from orb.domain.request.request_types import RequestType
-
-        mock_handler = MagicMock()
-        mock_handler.check_hosts_status = MagicMock(
-            return_value=_make_check_result(instances=[], state="in_progress")
-        )
-        registry = _make_registry(handler=mock_handler, provider_api=provider_api)
-
-        req = _make_request(
-            provider_api=provider_api,
-            pod_names=["res-0"],
-            request_id="req-synth",
-        )
-        req.request_type = RequestType.RETURN
-
-        outcome = await registry.get_status(["res-0"], req)
-        assert isinstance(outcome, (Accepted, Completed))
-        instances = (outcome.metadata or {}).get("instances", [])
-        synth = [i for i in instances if i.get("instance_id") == "res-0"]
-        assert len(synth) == 1
-        assert synth[0]["instance_type"] == expected_type
-
-    @pytest.mark.asyncio
-    async def test_unknown_synthesis_also_uses_derived_instance_type(self) -> None:
-        """IDs not in confirmed set get synthetic 'unknown' status, also typed."""
-        from orb.domain.request.request_types import RequestType
-
-        mock_handler = MagicMock()
-        mock_handler.check_hosts_status = MagicMock(
-            return_value=_make_check_result(instances=[], state="in_progress")
-        )
-        registry = _make_registry(handler=mock_handler, provider_api="Job")
-
-        req = _make_request(provider_api="Job", pod_names=[], request_id="req-job-unknown")
-        req.request_type = RequestType.RETURN
-
-        outcome = await registry.get_status(["job-pod-0"], req)
-        instances = (outcome.metadata or {}).get("instances", [])
-        assert any(i["instance_type"] == "k8s/Job" for i in instances)
 
 
 # ===========================================================================

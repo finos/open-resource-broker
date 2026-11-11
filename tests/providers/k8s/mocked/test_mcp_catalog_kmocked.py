@@ -29,9 +29,10 @@ from mcp.server.context import ServerRequestContext
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from tests.providers.k8s.mocked.kmock_delivery_conftest import (  # noqa: E402
+    KINDS,
     _inject_kmock_factory,
     _make_k8s_logger,
-    _register_pod_resource,
+    _register_all_kinds,
 )
 from tests.shared.constants import REQUEST_ID_RE  # noqa: E402
 
@@ -51,7 +52,7 @@ async def mcp_server_k8s(orb_config_dir_k8s, kmock_k8s):
     from orb.bootstrap import Application
     from orb.interface.mcp.catalog_server import build_server
 
-    _register_pod_resource(kmock_k8s)
+    _register_all_kinds(kmock_k8s)
 
     app = Application(skip_validation=True)
     await app.initialize()
@@ -233,3 +234,24 @@ class TestMCPCatalogK8sRequestLifecycle:
         assert _request_id(return_body) or return_body.get("message"), (
             f"return_machines missing request_id/message: {return_body}"
         )
+
+
+class TestMCPCatalogK8sEveryKind:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("kind", list(KINDS))
+    async def test_request_and_status_for_kind(self, mcp_server_k8s, kind):
+        is_error, req_body = await _call(
+            mcp_server_k8s,
+            "request_machines",
+            {"template_id": KINDS[kind], "requested_count": 1},
+        )
+        assert not is_error, f"request_machines errored: {req_body}"
+        request_id = _request_id(req_body)
+        assert request_id and REQUEST_ID_RE.match(request_id), req_body
+
+        is_error, status_body = await _call(
+            mcp_server_k8s, "get_request_status", {"request_ids": [request_id]}
+        )
+        assert not is_error, f"get_request_status errored: {status_body}"
+        first = status_body["requests"][0]
+        assert (first.get("request_id") or first.get("requestId")) == request_id

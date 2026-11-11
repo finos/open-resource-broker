@@ -593,8 +593,9 @@ def create_fastapi_app(server_config: Any) -> Any:
             auth_port = _LoopbackAdminAuthWrapper(auth_strategy)
 
             # Build the excluded-paths list for auth middleware.
-            # /health, /livez, /readyz are always public probe endpoints
-            # (no sensitive detail) so orchestrators can poll them unauthenticated.
+            # /health, /livez, /readyz are always public probe endpoints so
+            # orchestrators can poll them unauthenticated; without credentials
+            # /health and /readyz return only the overall and per-check status.
             # /favicon.ico is static UI chrome, not sensitive.
             # /docs, /redoc, /openapi.json are excluded ONLY when
             # docs.require_auth=False — by default they are protected so that
@@ -720,12 +721,13 @@ def create_fastapi_app(server_config: Any) -> Any:
     _health_trusted_proxies: frozenset[str] = frozenset(server_config.trusted_proxies or [])
 
     async def _may_see_health_detail(request: Request) -> bool:
-        """True when the per-check detail of /health may be returned to this caller.
+        """True when the per-check detail of /health and /readyz may be returned to this caller.
 
-        /health is excluded from authentication so probes can reach it. With
+        Both are excluded from authentication so probes can reach them. With
         authentication enabled, only a caller presenting valid credentials gets
-        the detail (host CPU, memory and disk figures); everyone else gets the
-        overall status. Any failure counts as anonymous.
+        the detail (host CPU, memory and disk figures, check messages); everyone
+        else gets the overall status (and, on /readyz, each check's status).
+        Any failure counts as anonymous.
         """
         if auth_port is None:
             return True
@@ -787,7 +789,10 @@ def create_fastapi_app(server_config: Any) -> Any:
         return JSONResponse(content={"status": "alive"}, status_code=200)  # type: ignore[misc]
 
     @app.get("/readyz", tags=["System"], operation_id="readinessCheck")
-    async def readiness_check(health_port: Any = Depends(get_health_check_port)) -> Any:  # type: ignore[misc]
+    async def readiness_check(  # type: ignore[misc]
+        request: Request,
+        health_port: Any = Depends(get_health_check_port),  # type: ignore[misc]
+    ) -> Any:
         """Readiness probe.
 
         Returns 503 when a CORE dependency is not fully healthy, otherwise
@@ -802,12 +807,22 @@ def create_fastapi_app(server_config: Any) -> Any:
         connectivity failure surfaces as ``degraded``, and for a sole
         (core) provider that still means not-ready.
         """
+        status: dict[str, Any]
         try:
             status = await asyncio.to_thread(_run_checks_then, health_port, "get_readiness")
         except Exception:
             status = {"status": "unknown"}
 
         http_status = 503 if status.get("status") in ("unhealthy", "degraded") else 200
+        # The failure path has no "checks" to strip.
+        if "checks" in status and not await _may_see_health_detail(request):
+            status = {
+                **status,
+                "checks": {
+                    name: {"status": (check or {}).get("status")}
+                    for name, check in status["checks"].items()
+                },
+            }
         return JSONResponse(content=status, status_code=http_status)  # type: ignore[misc]
 
     # Add metrics endpoint
