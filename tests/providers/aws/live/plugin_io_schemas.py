@@ -119,9 +119,10 @@ expected_request_status_schema_hostfactory = {
                                     "type": "string",
                                     "enum": ["pending", "running", "terminated", "failed", "error"],
                                 },
+                                # Mandatory in the IBM spec: "" until the address is known.
                                 "privateIpAddress": {
                                     "type": ["string", "null"],
-                                    "pattern": "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$",
+                                    "pattern": "^(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})?$",
                                 },
                                 "instanceTags": {"type": "string"},
                                 "cloudHostId": {"type": ["string", "null"]},
