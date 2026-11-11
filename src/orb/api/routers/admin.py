@@ -313,10 +313,13 @@ async def init_orb(
                     options=body.options,
                 )
             except (InvalidInitInputError, ValueError) as exc:
-                return _init_rejected("INVALID_INIT_INPUT", str(exc))
+                logger.warning("ORB init input rejected (%s)", type(exc).__name__)
+                return _init_rejected(
+                    "INVALID_INIT_INPUT", "The provider type or options were rejected."
+                )
 
             provider = init_config["providers"][0]
-            verified, probe_error = await asyncio.to_thread(
+            verified, _ = await asyncio.to_thread(
                 _test_provider_credentials,
                 provider["type"],
                 provider["config"].get("profile"),
@@ -324,10 +327,8 @@ async def init_orb(
                 **provider["config"],
             )
             if not verified:
-                logger.warning("ORB init credential check failed: %s", probe_error)
-                return _init_rejected(
-                    "CREDENTIALS_REJECTED", "The provider credentials could not be verified."
-                )
+                logger.warning("ORB init provider verification failed for %s", provider["type"])
+                return _init_rejected("CREDENTIALS_REJECTED", "The provider could not be verified.")
 
         # ── Create directories ───────────────────────────────────────────────
         for d in [config_dir, work_dir, work_dir / ".cache", logs_dir]:
