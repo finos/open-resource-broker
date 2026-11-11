@@ -327,7 +327,7 @@ async def init_orb(
                 **provider["config"],
             )
             if not verified:
-                logger.warning("ORB init provider verification failed for %s", provider["type"])
+                logger.warning("ORB init provider verification failed")
                 return _init_rejected("CREDENTIALS_REJECTED", "The provider could not be verified.")
 
         # ── Create directories ───────────────────────────────────────────────
