@@ -269,28 +269,96 @@ class TestHealthDetailNeedsCredentials:
         assert anonymous.status_code == authenticated.status_code
         assert set(anonymous.json()) == _SUMMARY_KEYS
 
+    @pytest.mark.parametrize("path", ["/health", "/readyz"])
     def test_loopback_token_from_a_remote_peer_with_forwarded_loopback_gets_the_summary(
-        self, tmp_path: Path, _no_loopback_tokens: Any
+        self, tmp_path: Path, _no_loopback_tokens: Any, path: str
     ) -> None:
         _no_loopback_tokens._tokens = {"loopback-secret"}
         client = TestClient(_authenticated_app(tmp_path))
 
         response = client.get(
-            "/health",
+            path,
             headers={
                 "Authorization": "Bearer loopback-secret",
                 "X-Forwarded-For": "127.0.0.1",
             },
         )
 
-        assert set(response.json()) == _SUMMARY_KEYS
+        body = response.json()
+        if path == "/health":
+            assert set(body) == _SUMMARY_KEYS
+        else:
+            _assert_status_only_checks(body)
 
+    @pytest.mark.parametrize("path", ["/health", "/readyz"])
     def test_loopback_token_from_a_loopback_peer_gets_the_checks(
-        self, tmp_path: Path, _no_loopback_tokens: Any
+        self, tmp_path: Path, _no_loopback_tokens: Any, path: str
     ) -> None:
         _no_loopback_tokens._tokens = {"loopback-secret"}
         client = TestClient(_authenticated_app(tmp_path), client=("127.0.0.1", 50000))
 
-        response = client.get("/health", headers={"Authorization": "Bearer loopback-secret"})
+        response = client.get(path, headers={"Authorization": "Bearer loopback-secret"})
 
-        assert "checks" in response.json()
+        assert "database" in response.json()["checks"]
+        if path == "/readyz":
+            assert set(response.json()["checks"]["database"]) > {"status"}
+
+
+def _assert_status_only_checks(body: dict[str, Any]) -> None:
+    assert "database" in body["checks"]
+    for check in body["checks"].values():
+        assert set(check) == {"status"}
+
+
+@pytest.mark.unit
+@pytest.mark.api
+@pytest.mark.usefixtures("_no_loopback_tokens")
+class TestReadyzDetailNeedsCredentials:
+    """With auth enabled, /readyz shows per-check detail only to authenticated callers."""
+
+    def test_anonymous_caller_gets_only_the_status_of_each_check(self, tmp_path: Path) -> None:
+        client = TestClient(_authenticated_app(tmp_path))
+
+        anonymous = client.get("/readyz")
+        authenticated = client.get("/readyz", headers={"Authorization": f"Bearer {_valid_token()}"})
+
+        assert "status" in anonymous.json()
+        _assert_status_only_checks(anonymous.json())
+        assert set(authenticated.json()["checks"]["database"]) > {"status"}
+        assert anonymous.json()["status"] == authenticated.json()["status"]
+        assert anonymous.status_code == authenticated.status_code
+
+    def test_invalid_bearer_gets_the_stripped_checks(self, tmp_path: Path) -> None:
+        client = TestClient(_authenticated_app(tmp_path))
+
+        response = client.get("/readyz", headers={"Authorization": "Bearer not-a-real-token"})
+
+        assert response.status_code in (200, 503)
+        _assert_status_only_checks(response.json())
+
+    @pytest.mark.parametrize("authed", [False, True], ids=["anonymous", "authenticated"])
+    def test_failing_core_check_gives_503_for_both(self, tmp_path: Path, authed: bool) -> None:
+        client = TestClient(_authenticated_app(tmp_path, storage_raises=True))
+        headers = {"Authorization": f"Bearer {_valid_token()}"} if authed else {}
+
+        response = client.get("/readyz", headers=headers)
+
+        assert response.status_code == 503
+        assert response.json()["checks"]["database"]["status"] in ("unhealthy", "degraded")
+        if not authed:
+            _assert_status_only_checks(response.json())
+
+    @pytest.mark.parametrize("authed", [False, True], ids=["anonymous", "authenticated"])
+    def test_check_run_failure_returns_unknown_without_checks(
+        self, tmp_path: Path, authed: bool
+    ) -> None:
+        app = _authenticated_app(tmp_path)
+        broken = MagicMock()
+        broken.run_all_checks.side_effect = RuntimeError("boom")
+        app.dependency_overrides[get_health_check_port] = lambda: broken
+        headers = {"Authorization": f"Bearer {_valid_token()}"} if authed else {}
+
+        response = TestClient(app).get("/readyz", headers=headers)
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "unknown"}
