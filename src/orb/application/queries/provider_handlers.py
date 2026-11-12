@@ -18,6 +18,7 @@ from orb.application.provider.queries import (
 )
 from orb.application.services.provider_registry_service import ProviderRegistryService
 from orb.domain.base import UnitOfWorkFactory
+from orb.domain.base.exceptions import ConfigurationError
 from orb.domain.base.ports import ConfigurationPort, ErrorHandlingPort, LoggingPort
 from orb.domain.services.generic_filter_service import GenericFilterService
 from orb.domain.services.timestamp_service import TimestampService
@@ -176,6 +177,8 @@ class ListAvailableProvidersHandler(BaseQueryHandler[ListAvailableProvidersQuery
                         "capabilities": handler_names,  # Real handler names from inheritance
                         "weight": provider_instance.weight,
                         "priority": provider_instance.priority,
+                        "enabled": bool(provider_instance.enabled),
+                        "config": provider_instance.config or {},
                     }
                 )
 
@@ -194,11 +197,7 @@ class ListAvailableProvidersHandler(BaseQueryHandler[ListAvailableProvidersQuery
 
         except Exception as e:
             self.logger.error("Failed to list available providers: %s", e, exc_info=True)
-            return {
-                "providers": [],
-                "count": 0,
-                "message": f"Failed to retrieve providers: {e}",
-            }
+            raise ConfigurationError("Failed to read provider configuration") from e
 
 
 @query_handler(GetProviderCapabilitiesQuery)  # type: ignore[arg-type]

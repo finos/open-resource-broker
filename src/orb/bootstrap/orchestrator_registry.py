@@ -38,6 +38,9 @@ def register_orchestrators(container: DIContainer) -> None:
     from orb.application.services.orchestration.get_template import GetTemplateOrchestrator
     from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
     from orb.application.services.orchestration.list_providers import ListProvidersOrchestrator
+    from orb.application.services.orchestration.list_reclaimed_machines import (
+        ListReclaimedMachinesOrchestrator,
+    )
     from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
     from orb.application.services.orchestration.list_return_requests import (
         ListReturnRequestsOrchestrator,
@@ -172,6 +175,15 @@ def register_orchestrators(container: DIContainer) -> None:
         container.register_singleton(
             ListReturnRequestsOrchestrator,
             lambda c: ListReturnRequestsOrchestrator(
+                command_bus=c.get(CommandBus),
+                query_bus=c.get(QueryBus),
+                logger=c.get(LoggingPort),
+            ),
+        )
+    if not container.is_registered(ListReclaimedMachinesOrchestrator):
+        container.register_singleton(
+            ListReclaimedMachinesOrchestrator,
+            lambda c: ListReclaimedMachinesOrchestrator(
                 command_bus=c.get(CommandBus),
                 query_bus=c.get(QueryBus),
                 logger=c.get(LoggingPort),

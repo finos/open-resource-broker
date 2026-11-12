@@ -198,3 +198,18 @@ class ValidateMCPQuery(Query, BaseModel):
     """Query to validate MCP configuration."""
 
     model_config = ConfigDict(frozen=True)
+
+
+class ListReclaimedMachinesQuery(Query, BaseModel):
+    """Query for the machines, among the given ones, that the provider has reclaimed.
+
+    This is a sync-on-read query: the named machines are refreshed from the
+    provider (one read per parent request) and the refreshed state is persisted
+    before the answer is assembled. See ADR-0001 for the naming convention.
+
+    ``identifiers`` are machine ids or machine names as the caller knows them.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    identifiers: list[str] = []

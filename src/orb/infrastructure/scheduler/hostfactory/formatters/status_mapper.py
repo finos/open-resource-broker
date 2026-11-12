@@ -1,6 +1,6 @@
 """Stateless HostFactory status-mapping functions.
 
-These three pure functions translate between internal domain status strings
+These pure functions translate between internal domain status strings
 and the HostFactory API's ``status`` / ``result`` / ``message`` fields as
 specified in ``docs/root/hostfactory/input-output.md``.
 
@@ -9,6 +9,15 @@ imported and unit-tested independently of ``HostFactorySchedulerStrategy``.
 """
 
 from __future__ import annotations
+
+from orb.application.machine.result_mapping import map_machine_status_to_result
+
+__all__ = [
+    "generate_status_message",
+    "map_domain_status_to_hostfactory",
+    "map_machine_status_to_result",
+    "summarise_diagnostic",
+]
 
 
 def map_domain_status_to_hostfactory(domain_status: str) -> str:
@@ -41,41 +50,6 @@ def map_domain_status_to_hostfactory(domain_status: str) -> str:
         "error": "complete_with_error",
     }
     return status_mapping.get(domain_status.lower(), "running")
-
-
-def map_machine_status_to_result(status: str | None, request_type: str | None = None) -> str:
-    """Map a machine status to the HostFactory ``result`` field.
-
-    Per HostFactory docs the possible values are:
-    ``'executing'``, ``'fail'``, ``'succeed'``.
-
-    Args:
-        status: Machine lifecycle status (e.g. ``"running"``, ``"pending"``,
-            ``"terminated"``).
-        request_type: Optional request context — ``"return"`` flips the
-            success/fail semantics so that ``"terminated"`` maps to
-            ``"succeed"`` rather than ``"fail"``.
-
-    Returns:
-        One of ``'executing'``, ``'fail'``, or ``'succeed'``.
-    """
-    if request_type == "return":
-        # For return requests: terminated/stopped = success, in-flight = executing
-        if status in ["terminated", "stopped"]:
-            return "succeed"
-        elif status in ["shutting-down", "stopping", "pending", "terminating", "running"]:
-            return "executing"
-        else:
-            return "fail"
-    # For acquire requests, running is success
-    elif status == "running":
-        return "succeed"
-    elif status in ["pending", "launching"]:
-        return "executing"
-    elif status in ["terminated", "failed", "error"]:
-        return "fail"
-    else:
-        return "executing"  # Default for unknown states
 
 
 def summarise_diagnostic(

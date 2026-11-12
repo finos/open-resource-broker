@@ -247,12 +247,12 @@ class TestListAvailableProvidersHandler:
         assert result["providers"][0]["type"] == "k8s"
 
     @pytest.mark.asyncio
-    async def test_exception_returns_empty_list(self):
+    async def test_config_read_failure_is_a_configuration_error(self):
+        from orb.domain.base.exceptions import ConfigurationError
+
         h = self._handler(config_raises=True)
-        q = ListAvailableProvidersQuery()
-        result = await h.execute_query(q)
-        assert result["count"] == 0
-        assert "Failed" in result["message"]
+        with pytest.raises(ConfigurationError):
+            await h.execute_query(ListAvailableProvidersQuery())
 
     @pytest.mark.asyncio
     async def test_provider_status_disabled(self):

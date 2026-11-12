@@ -57,7 +57,7 @@ def test_request_completes_only_with_running_machines(orb_config_dir, moto_aws):
     machines = _machines(initialize)
     assert machines
     assert all(m["status"] == "running" for m in machines)
-    assert all(m["privateIp"] for m in machines)
+    assert all(m["privateIpAddress"] for m in machines)
     assert all(m["imageId"] not in ("", "unknown", None) for m in machines)
 
     shown = _cli(initialize, ["machines", "show", machines[0]["machineId"]])

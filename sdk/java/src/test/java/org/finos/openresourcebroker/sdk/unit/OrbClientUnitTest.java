@@ -11,6 +11,7 @@ import org.finos.openresourcebroker.sdk.client.OrbApiException;
 import org.finos.openresourcebroker.sdk.client.OrbClient;
 import org.finos.openresourcebroker.sdk.client.OrbNotFoundException;
 import org.finos.openresourcebroker.sdk.client.OrbUnavailableException;
+import org.finos.openresourcebroker.sdk.client.SchedulerMismatchError;
 import org.finos.openresourcebroker.sdk.model.MachineItem;
 import org.finos.openresourcebroker.sdk.model.TemplateItem;
 import org.finos.openresourcebroker.sdk.model.TemplateListResponse;
@@ -346,7 +347,7 @@ class OrbClientUnitTest {
     }
 
     @Test
-    void testSchedulerHeader_default_notSent() throws Exception {
+    void testSchedulerHeader_default_isSent() throws Exception {
         server.enqueue(new MockResponse()
                 .setResponseCode(200)
                 .setHeader("Content-Type", "application/json")
@@ -355,8 +356,44 @@ class OrbClientUnitTest {
         client.listTemplates(null, null, null);
 
         RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-        assertNull(req.getHeader("X-ORB-Scheduler"),
-                "should NOT send X-ORB-Scheduler for default scheduler");
+        assertEquals("default", req.getHeader("X-ORB-Scheduler"),
+                "should name the default format on every call");
+    }
+
+    @Test
+    void testSchedulerMismatch_responseNamesAnotherFormat_throws() {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setHeader("X-ORB-Scheduler", "hostfactory")
+                .setBody("{\"templates\": []}"));
+
+        SchedulerMismatchError error = assertThrows(SchedulerMismatchError.class,
+                () -> client.listTemplates(null, null, null));
+
+        assertEquals("default", error.expected());
+        assertEquals("hostfactory", error.actual());
+    }
+
+    @Test
+    void testSchedulerMismatch_responseWithoutHeader_isAccepted() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"templates\": []}"));
+
+        assertDoesNotThrow(() -> client.listTemplates(null, null, null));
+    }
+
+    @Test
+    void testSchedulerMismatch_responseNamesTheRequestedFormat_isAccepted() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setHeader("X-ORB-Scheduler", "default")
+                .setBody("{\"templates\": []}"));
+
+        assertDoesNotThrow(() -> client.listTemplates(null, null, null));
     }
 
     // ──────────────────────────────────────────────────────────────────────

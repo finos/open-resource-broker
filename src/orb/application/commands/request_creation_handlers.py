@@ -30,6 +30,7 @@ from orb.domain.base.ports import (
     ProviderSelectionPort,
 )
 from orb.domain.request.aggregate import Request
+from orb.domain.request.exceptions import RequestValidationError
 from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
 from orb.domain.request.request_identifiers import RequestId
 from orb.domain.request.request_types import RequestStatus
@@ -89,9 +90,9 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         """Validate create request command."""
         await super().validate_command(command)
         if not command.template_id:
-            raise ValueError("template_id is required")
+            raise RequestValidationError("template_id is required")
         if not command.requested_count or command.requested_count <= 0:
-            raise ValueError("requested_count must be positive")
+            raise RequestValidationError("requested_count must be positive")
 
     async def execute_command(self, command: CreateRequestCommand) -> None:
         """Handle machine request creation by orchestrating services.
@@ -324,7 +325,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         """Validate create return request command."""
         await super().validate_command(command)
         if not command.machine_ids:
-            raise ValueError("machine_ids is required and cannot be empty")
+            raise RequestValidationError("machine_ids is required and cannot be empty")
 
         # For single machine operations, maintain strict validation (existing behavior)
         is_single_machine = len(command.machine_ids) == 1
@@ -339,8 +340,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
 
                 if machine.return_request_id:
                     if not command.force_return:
-                        from orb.domain.request.exceptions import RequestValidationError
-
                         raise RequestValidationError(
                             f"Machine {machine_id} already has pending return request: {machine.return_request_id}"
                         )
@@ -691,11 +690,14 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             )
 
     def _update_machines_to_pending(self, machine_ids: list[str]) -> None:
-        """Update machine statuses to shutting-down (termination in progress)."""
+        """Update machine statuses to shutting-down (termination in progress).
+
+        Machines already in a terminal state keep it.
+        """
         with self.uow_factory.create_unit_of_work() as uow:
             for machine_id in machine_ids:
                 machine = uow.machines.get_by_id(machine_id)
-                if machine:
+                if machine and not machine.status.is_terminal:
                     from orb.domain.machine.machine_status import MachineStatus
 
                     updated_machine = machine.update_status(

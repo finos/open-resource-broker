@@ -2,6 +2,7 @@
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, cast
 
@@ -21,6 +22,28 @@ from orb.infrastructure.scheduler.hostfactory.formatters.status_mapper import (
 from orb.infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.infrastructure.utilities.common.string_utils import extract_provider_type
+
+
+def _epoch_seconds(value: Any) -> int:
+    """Seconds since the epoch for an int, numeric string, ISO string or datetime; 0 if unknown."""
+    if value is None or value == "":
+        return 0
+    if isinstance(value, datetime):
+        return int(value.timestamp())
+    if isinstance(value, (int, float)):
+        return int(value)
+    text = str(value)
+    try:
+        return int(float(text))
+    except ValueError:
+        pass
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return 0
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return int(parsed.timestamp())
 
 
 class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
@@ -297,167 +320,6 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 "message": request_dict.get("message", "Request status unknown"),
             }
 
-    def convert_domain_to_hostfactory_output(self, operation: str, data: Any) -> dict[str, Any]:
-        """Convert domain objects to HostFactory JSON output format.
-
-        This method handles the conversion from internal domain objects to the expected
-        HostFactory API output format as documented in docs/root/hostfactory/input-output.md.
-
-        Args:
-            operation: The HostFactory operation
-            data: Domain objects or DTOs to convert
-
-        Returns:
-            Dict in HostFactory JSON output format
-        """
-        if operation == "getAvailableTemplates":
-            if isinstance(data, list):
-                templates = []
-                for template in data:
-                    # Convert domain Template to HostFactory format
-                    hf_template = self._convert_template_to_hostfactory(template)
-                    templates.append(hf_template)
-
-                return {
-                    "templates": templates,
-                    "message": "Get available templates success.",
-                }
-            else:
-                return {"templates": [], "message": "No templates found."}
-
-        elif operation == "requestMachines":
-            # Handle both direct request_id and nested data structures
-            if isinstance(data, str):
-                request_id = data
-                resource_ids = []
-            elif isinstance(data, dict):
-                request_id = str(data.get("request_id", data.get("requestId", "")))
-                resource_ids = data.get("resource_ids", [])
-            else:
-                request_id = str(data) if data else ""
-                resource_ids = []
-
-            # Create message with resource ID information
-            base_message = "Request VM succeeded."
-            if resource_ids:
-                # Include the first resource ID in the message for user visibility
-                # Show first for brevity
-                resource_id_info = f" Resource ID: {resource_ids[0]}"
-                message = base_message + resource_id_info
-            else:
-                message = base_message
-
-            # Return success - the command handler will have already handled any errors
-            # If we reach here, the request was created successfully
-            return {"requestId": request_id, "message": message}
-
-        elif operation == "getRequestStatus":
-            # Convert RequestDTO to HostFactory format
-            if hasattr(data, "request_id"):
-                # Handle RequestDTO object - use to_dict() to get machines data
-                dto_dict = data.to_dict()
-                machines_data = dto_dict.get("machines", [])
-
-                machines = self._format_machines_for_hostfactory(
-                    machines_data, request_type=dto_dict.get("request_type")
-                )
-                status = self._map_domain_status_to_hostfactory(data.status)
-                message = self._generate_status_message(data.status, len(machines))
-                message = self._enrich_message_with_diagnostic(message, dto_dict, len(machines))
-
-                return {
-                    "requests": [
-                        {
-                            "requestId": data.request_id,
-                            "status": status,
-                            "message": message,
-                            "machines": machines,
-                        }
-                    ]
-                }
-            elif isinstance(data, dict):
-                # Handle dict format (fallback)
-                machines = self._format_machines_for_hostfactory(
-                    data.get("machines", []), request_type=data.get("request_type")
-                )
-                status = self._map_domain_status_to_hostfactory(data.get("status", "unknown"))
-                message = self._generate_status_message(
-                    data.get("status", "unknown"), len(machines)
-                )
-
-                return {
-                    "requests": [
-                        {
-                            "requestId": data.get("request_id", data.get("requestId", "")),
-                            "status": status,
-                            "message": message,
-                            "machines": machines,
-                        }
-                    ]
-                }
-            else:
-                return {"requests": [], "message": "Request not found."}
-
-        elif operation == "requestReturnMachines":
-            return self.format_request_response(data)
-
-        else:
-            raise ValueError(f"Unsupported HostFactory operation: {operation}")
-
-    def _convert_template_to_hostfactory(self, template: Any) -> dict[str, Any]:
-        """Convert internal template to HostFactory format."""
-        # Handle TemplateDTO objects
-        template_dict = self.format_template_for_display(template)
-
-        # Start with the formatted template
-        hf_template = template_dict.copy()
-
-        # Add optional HostFactory fields if present
-        optional_fields = [
-            "imageId",
-            "subnetId",
-            "vmType",
-            "vmTypes",
-            "keyName",
-            "securityGroupIds",
-            "priceType",
-            "instanceTags",
-            "instanceProfile",
-            "userDataScript",
-            "rootDeviceVolumeSize",
-            "volumeType",
-            "fleetRole",
-            "maxSpotPrice",
-            "allocationStrategy",
-            "spotFleetRequestExpiry",
-            "abisInstanceRequirements",
-        ]
-
-        for field in optional_fields:
-            # Map from internal field names to HostFactory field names
-            internal_field = self._map_hostfactory_to_internal_field(field)
-            if internal_field in template_dict:
-                hf_template[field] = template_dict[internal_field]
-            elif field in template_dict:
-                hf_template[field] = template_dict[field]
-
-        return hf_template
-
-    def _map_hostfactory_to_internal_field(self, hf_field: str) -> str:
-        """Map HostFactory field names to internal field names."""
-        mapping = {
-            "templateId": "template_id",
-            "maxNumber": "max_machines",
-            "imageId": "machine_image",
-            "subnetId": "subnet_ids",  # Note: HF uses single, we use array
-            "vmType": "instance_type",
-            "keyName": "machine_ssh_key",
-            "securityGroupIds": "security_group_ids",
-            "priceType": "price_type",
-            "abisInstanceRequirements": "abis_instance_requirements",
-        }
-        return mapping.get(hf_field, hf_field)
-
     def get_config_file_path(self) -> str:
         """Get config file path using configuration.
 
@@ -670,6 +532,36 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "requests": items,
         }
 
+    def format_reclaimed_machines_response(self, machines: list[dict[str, Any]]) -> dict[str, Any]:
+        """HF-spec getReturnRequests response for machines the provider reclaimed."""
+        items = [
+            {
+                "machine": m.get("name") or m.get("machine_id"),
+                "gracePeriod": int(m.get("grace_period") or 0),
+            }
+            for m in machines
+        ]
+        return {
+            "status": "complete",
+            "message": "Return requests retrieved successfully."
+            if items
+            else "No machines to return.",
+            "requests": items,
+        }
+
+    def is_provider_reclaim_poll(self, input_data: Any) -> bool:
+        """Whether this ``list-returns`` call is HostFactory's getReturnRequests poll.
+
+        HostFactory sends the machines it tracks under ``machines`` (the key is
+        optional in the spec, so ``{}`` is also valid). The shipped
+        getReturnRequests script exports ``HF_CALLER_SCRIPT``, which identifies
+        the poll when the input carries no ``machines`` key. Anything else,
+        including a bare ``-d`` payload, lists user return requests.
+        """
+        if isinstance(input_data, dict) and "machines" in input_data:
+            return True
+        return os.environ.get("HF_CALLER_SCRIPT", "").startswith("getReturnRequests")
+
     def _build_hf_attributes(self, instance_type: str) -> dict[str, list[str]]:
         """Build IBM HF attributes dict from an instance type string.
 
@@ -731,7 +623,8 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def format_request_status_response(self, requests: list[RequestDTO]) -> dict[str, Any]:
         """
         Format RequestDTOs to HostFactory response format.
-        Only includes fields specified in HostFactory documentation.
+
+        IBM fields come first; ORB extensions are camelCase like the rest of the item.
         """
         formatted_requests = []
         for request_dto in requests:
@@ -742,27 +635,24 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             if "machine_references" in req_dict:
                 req_dict["machines"] = req_dict.pop("machine_references")
 
-            # Convert machines to camelCase using existing method
-            machines = []
-            if "machines" in req_dict:
-                machines = self._format_machines_for_hostfactory(
-                    req_dict["machines"], request_type=req_dict.get("request_type")
-                )
+            machines = self._format_machines_for_hostfactory(
+                req_dict.get("machines") or [], request_type=req_dict.get("request_type")
+            )
 
-            # Create HostFactory-compliant request object (only HF spec fields)
             hf_request = {
                 "requestId": req_dict.get("request_id"),
                 "status": self._map_domain_status_to_hostfactory(
                     req_dict.get("status") or "pending"
                 ),
-                "message": req_dict.get("message", ""),
+                "message": self._enrich_message_with_diagnostic(
+                    req_dict.get("message", ""), req_dict, len(machines)
+                ),
                 "machines": machines,
-                # ORB extension: expose resource_ids so callers can discover the backing
+                # ORB extension: expose resource ids so callers can discover the backing
                 # fleet / ASG identifier without a separate EC2 tag lookup.
-                "resource_ids": req_dict.get("resource_ids") or [],
+                "resourceIds": req_dict.get("resource_ids") or [],
             }
 
-            # Add provider information if present
             if req_dict.get("provider_name"):
                 hf_request["providerName"] = req_dict["provider_name"]
             if req_dict.get("provider_type"):
@@ -774,70 +664,34 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             # weighted-fleet fulfilment (target capacity units vs delivered).
             # IBM Symphony spec is silent on these fields; expose as ORB
             # extension keys when the provider has populated them.
-            for cap_field in (
-                "target_units",
-                "fulfilled_units",
-                "running_count",
-                "pending_count",
+            for field, key in (
+                ("target_units", "targetUnits"),
+                ("fulfilled_units", "fulfilledUnits"),
+                ("running_count", "runningCount"),
+                ("pending_count", "pendingCount"),
             ):
-                value = req_dict.get(cap_field)
+                value = req_dict.get(field)
                 if value is not None:
-                    hf_request[cap_field] = value
+                    hf_request[key] = value
 
             formatted_requests.append(hf_request)
 
         return {"requests": formatted_requests}
 
     def format_machine_status_response(self, machines: list[MachineDTO]) -> dict[str, Any]:
-        """
-        Format MachineDTOs to HostFactory machine response.
+        """Format MachineDTOs to HostFactory machine response.
 
-        This method handles the conversion from MachineDTO objects to HostFactory response format.
+        Machines use the same shape as the machines of a request status.
         """
         return {
             "machines": [
-                {
-                    # Domain -> HostFactory field mapping using consistent serialization
-                    "machineId": str(machine.machine_id),
-                    "templateId": machine.template_id or "",
-                    "requestId": machine.request_id or "",
-                    "returnRequestId": machine.return_request_id,
-                    "cloudHostId": machine.cloud_host_id,
-                    "vmType": str(machine.instance_type),
-                    "imageId": machine.image_id or "",
-                    "privateIp": machine.private_ip,
-                    "publicIp": machine.public_ip,
-                    "subnetId": machine.subnet_id,
-                    "securityGroupIds": machine.security_group_ids,
-                    "status": str(machine.status),
-                    "statusReason": machine.status_reason,
-                    "launchTime": machine.launch_time,
-                    "terminationTime": machine.termination_time,
-                    "tags": machine.tags,
-                }
-                for machine in machines
+                self._hf_machine(m if isinstance(m, dict) else m.to_dict()) for m in machines
             ]
         }
 
     def format_machine_details_response(self, machine_data: dict) -> dict:
-        """Format machine details with hostfactory-specific fields."""
-        return {
-            "name": machine_data.get("name"),
-            "status": machine_data.get("status"),
-            "provider": machine_data.get("provider_type") or "aws",
-            "machineId": machine_data.get("machine_id"),
-            "returnRequestId": machine_data.get("return_request_id"),
-            "vmType": machine_data.get("instance_type"),
-            "imageId": machine_data.get("image_id"),
-            "privateIp": machine_data.get("private_ip"),
-            "publicIp": machine_data.get("public_ip"),
-            "subnetId": machine_data.get("subnet_id"),
-            "securityGroupIds": machine_data.get("security_group_ids"),
-            "statusReason": machine_data.get("status_reason"),
-            "launchTime": machine_data.get("launch_time"),
-            "terminationTime": machine_data.get("termination_time"),
-            "tags": machine_data.get("tags"),
-        }
+        """Format one machine in the HostFactory machine shape."""
+        return self._hf_machine(machine_data)
 
     def _get_scheduler_env_var(self, suffix: str) -> str | None:
         """HostFactory checks HF_PROVIDER_* and HF_* vars."""
@@ -949,76 +803,83 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         self, machines: list[dict[str, Any]], request_type: str | None = None
     ) -> list[dict[str, Any]]:
         """Format machine data to exact HostFactory format per docs/root/hostfactory/input-output.md."""
-        formatted_machines = []
+        return [self._hf_machine(machine, request_type) for machine in machines]
 
-        for machine in machines:
-            result = self._map_machine_status_to_result(
-                machine.get("status"), request_type=request_type
+    def _hf_machine(
+        self, machine: dict[str, Any], request_type: str | None = None
+    ) -> dict[str, Any]:
+        """One machine in the HostFactory shape, shared by every operation that lists machines.
+
+        ``status`` is the raw ORB lifecycle value (including ``pending`` and
+        ``launching``); ``result`` is the progress field.
+        """
+        result = self._map_machine_status_to_result(
+            machine.get("status"), request_type=request_type
+        )
+
+        # Per IBM HF spec, message is mandatory when result=="fail"
+        if result == "fail":
+            message = (
+                machine.get("status_reason")
+                or machine.get("error")
+                or machine.get("message")
+                or "Machine failed (no detail available)"
             )
+        else:
+            message = machine.get("message", "")
 
-            # Per IBM HF spec, message is mandatory when result=="fail"
-            if result == "fail":
-                message = (
-                    machine.get("status_reason")
-                    or machine.get("error")
-                    or machine.get("message")
-                    or "Machine failed (no detail available)"
-                )
-            else:
-                message = machine.get("message", "")
+        hf_machine = {
+            "machineId": machine.get("machine_id", machine.get("instance_id")),
+            "name": machine.get("name", machine.get("instance_id", machine.get("private_ip", ""))),
+            "result": result,
+            "status": machine.get("status", "unknown"),
+            # Mandatory in the IBM spec: an empty string until the address is known.
+            "privateIpAddress": machine.get("private_ip_address", machine.get("private_ip")) or "",
+            "launchtime": _epoch_seconds(machine.get("launch_time")),
+            "message": message,
+            # Per IBM HF spec, cloudHostId must always be present, defaulting to null
+            "cloudHostId": machine.get("cloud_host_id") or None,
+        }
 
-            # Per IBM HF spec, launchtime is mandatory - default to 0 if not available
-            launchtime = int(machine.get("launch_time") or 0)
+        if request_type == "return":
+            hf_machine["requestId"] = machine.get("request_id")
+        elif request_type in ("acquire", "provision"):
+            if machine.get("return_request_id"):
+                hf_machine["returnRequestId"] = machine.get("return_request_id")
+        else:
+            # neutral context (machine list/show) — show both when present
+            if machine.get("request_id"):
+                hf_machine["requestId"] = machine.get("request_id")
+            if machine.get("return_request_id"):
+                hf_machine["returnRequestId"] = machine.get("return_request_id")
 
-            # Per IBM HF spec, privateIpAddress must be a valid IP or null (not empty string)
-            raw_ip = machine.get("private_ip_address", machine.get("private_ip"))
-            private_ip = raw_ip if raw_ip else None
-
-            formatted_machine = {
-                "machineId": machine.get("machine_id", machine.get("instance_id")),
-                "name": machine.get(
-                    "name", machine.get("instance_id", machine.get("private_ip", ""))
-                ),
-                "result": result,
-                "status": machine.get("status", "unknown"),
-                "privateIpAddress": private_ip,
-                "launchtime": launchtime,
-                "message": message,
-                # Per IBM HF spec, cloudHostId must always be present, defaulting to null
-                "cloudHostId": machine.get("cloud_host_id") or None,
-            }
-
-            if request_type == "return":
-                formatted_machine["requestId"] = machine.get("request_id")
-            elif request_type in ("acquire", "provision"):
-                if machine.get("return_request_id"):
-                    formatted_machine["returnRequestId"] = machine.get("return_request_id")
-            else:
-                # neutral context (machine list/show) — show both when present
-                if machine.get("request_id"):
-                    formatted_machine["requestId"] = machine.get("request_id")
-                if machine.get("return_request_id"):
-                    formatted_machine["returnRequestId"] = machine.get("return_request_id")
-
-            formatted_machine["publicIpAddress"] = (
-                machine.get("public_ip_address") or machine.get("public_ip") or None
-            )
-            if machine.get("instance_type"):
-                formatted_machine["instanceType"] = machine["instance_type"]
-            if machine.get("price_type"):
-                formatted_machine["priceType"] = machine["price_type"]
-            if machine.get("tags"):
-                formatted_machine["instanceTags"] = json.dumps(machine["tags"], sort_keys=True)
-
-            formatted_machines.append(formatted_machine)
-
-        return formatted_machines
+        hf_machine["publicIpAddress"] = (
+            machine.get("public_ip_address") or machine.get("public_ip") or None
+        )
+        for field, key in (
+            ("template_id", "templateId"),
+            ("image_id", "imageId"),
+            ("provider_name", "providerName"),
+            ("provider_type", "providerType"),
+            ("instance_type", "instanceType"),
+            ("price_type", "priceType"),
+        ):
+            if machine.get(field):
+                hf_machine[key] = machine[field]
+        # ``k=v;k=v`` like the template ``instanceTags``, empty when there are no tags. A tag
+        # containing ``;`` or ``=`` is not escaped, so a splitting consumer can misread it
+        # as extra tags.
+        hf_machine["instanceTags"] = ";".join(
+            f"{key}={value}" for key, value in sorted((machine.get("tags") or {}).items())
+        )
+        return hf_machine
 
     def _map_machine_status_to_result(
         self, status: str | None, request_type: str | None = None
     ) -> str:
         """Map machine status to HostFactory result field per docs/root/hostfactory/input-output.md."""
-        return map_machine_status_to_result(status, request_type=request_type)
+        result = map_machine_status_to_result(status, request_type=request_type)
+        return str(getattr(result, "value", result))
 
     def _map_domain_status_to_hostfactory(self, domain_status: str) -> str:
         """Map domain status to HostFactory status per docs/root/hostfactory/input-output.md."""

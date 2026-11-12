@@ -52,7 +52,7 @@ def _make_scheduler():
 
 
 def _make_formatter():
-    formatter = MagicMock()
+    formatter = MagicMock(scheduler_type="default")
     formatter.format_request_status.return_value = MagicMock(data={"requests": []})
     return formatter
 
@@ -64,7 +64,7 @@ def _make_echo_formatter():
     without any camelCase transform, letting tests confirm a failed request's
     error block reaches the response body rather than being 404'd away.
     """
-    formatter = MagicMock()
+    formatter = MagicMock(scheduler_type="default")
     formatter.format_request_status.side_effect = lambda requests: MagicMock(
         data={"requests": requests}
     )
@@ -552,6 +552,18 @@ class TestListReturnRequestsLimitType:
 
         call_input = orchestrator.execute.call_args[0][0]
         assert call_input.limit == 10
+
+    def test_list_return_requests_forwards_status(self, requests_app):
+        """GET /requests/return?status=complete → orchestrator receives status."""
+        orchestrator = AsyncMock()
+        orchestrator.execute = AsyncMock(return_value=ListReturnRequestsOutput(requests=[]))
+        client = _make_client(
+            requests_app, {get_list_return_requests_orchestrator: lambda: orchestrator}
+        )
+
+        client.get("/requests/return?status=complete")
+
+        assert orchestrator.execute.call_args[0][0].status == "complete"
 
     def test_list_return_requests_default_limit(self, requests_app):
         """GET /requests/return (no limit) → orchestrator receives limit=50."""

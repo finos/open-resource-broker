@@ -40,6 +40,28 @@ func (e *OrbError) Is(target error) bool {
 	return e.sentinel != nil && errors.Is(e.sentinel, target)
 }
 
+// SchedulerMismatchError is returned when the server answers in a different response
+// format than the one the call asked for. It is returned only when the response names a
+// format in X-ORB-Scheduler that differs from the request; a response without that
+// header is never an error.
+type SchedulerMismatchError struct {
+	OrbError
+	// Expected is the format the call asked for.
+	Expected string
+	// Actual is the format the response named.
+	Actual string
+}
+
+func newSchedulerMismatchError(expected, actual string) *SchedulerMismatchError {
+	return &SchedulerMismatchError{
+		OrbError: OrbError{
+			Message: fmt.Sprintf("orb: requested response format %q but the server answered in %q", expected, actual),
+		},
+		Expected: expected,
+		Actual:   actual,
+	}
+}
+
 // OrbApiError is returned for all HTTP error responses from ORB. It carries the
 // canonical cross-SDK field set: HTTP status, machine-readable error code,
 // message, and the server request ID (for support/correlation).

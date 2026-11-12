@@ -46,7 +46,7 @@ from typing import Any
 from orb.infrastructure.logging.logger import get_logger
 
 
-def _reload_config_from_signal(logger: Any, cm: Any) -> None:
+def _reload_config_from_signal(logger: Any, cm: Any, scheduler_factory: Any = None) -> None:
     """Invoke ConfigurationManager.reload() using the pre-resolved instance.
 
     Best-effort: any failure is logged but does not abort the running
@@ -58,9 +58,13 @@ def _reload_config_from_signal(logger: Any, cm: Any) -> None:
         cm: Pre-resolved ConfigurationManager (obtained at server-start time
             so the SIGHUP handler does not call get_container() at signal
             delivery time).
+        scheduler_factory: Pre-resolved SchedulerStrategyFactory whose cached
+            strategies are dropped after the reload.
     """
     try:
         cm.reload()
+        if scheduler_factory is not None:
+            scheduler_factory.invalidate()
         logger.info("SIGHUP: configuration reloaded from disk")
     except Exception as exc:
         logger.error("SIGHUP: ConfigurationManager.reload() failed: %s", exc)
@@ -122,11 +126,14 @@ async def run_api_foreground(
     # need to call get_container() at signal-delivery time (service-locator
     # avoided; the reload() call itself is intentional on the live instance).
     _cm: Any = None
+    _scheduler_factory: Any = None
     try:
         from orb.config.managers.configuration_manager import ConfigurationManager
         from orb.infrastructure.di.container import get_container
+        from orb.infrastructure.scheduler.factory import SchedulerStrategyFactory
 
         _cm = get_container().get(ConfigurationManager)
+        _scheduler_factory = get_container().get(SchedulerStrategyFactory)
     except Exception as exc:
         logger.warning("Could not pre-resolve ConfigurationManager for SIGHUP: %s", exc)
 
@@ -139,7 +146,7 @@ async def run_api_foreground(
         if _cm is None:
             logger.error("SIGHUP: ConfigurationManager unavailable; reload skipped")
             return
-        _reload_config_from_signal(logger, _cm)
+        _reload_config_from_signal(logger, _cm, _scheduler_factory)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)

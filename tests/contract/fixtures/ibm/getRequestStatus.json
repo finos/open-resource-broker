@@ -1,0 +1,104 @@
+{
+    "requests" : [ {
+      "status" : "complete",
+      "machines" : [ {
+        "machineId" : "i-0721bb06651cad7f1",
+        "name" : "ip-10-0-57-22.ec2.internal",
+        "priceType" : "ondemand",
+        "instanceType" : "r5n.2xlarge",
+        "result" : "succeed",
+        "status" : "terminated",
+        "privateIpAddress" : "10.0.57.22",
+        "instanceTags" : "",
+        "cloudHostId" : null,
+        "launchtime" : 1734619942,
+        "message" : ""
+      }, {
+        "machineId" : "i-0af73d1e849ff1be7",
+        "name" : "ip-10-0-55-65.ec2.internal",
+        "priceType" : "ondemand",
+        "instanceType" : "r5n.2xlarge",
+        "result" : "succeed",
+        "status" : "terminated",
+        "privateIpAddress" : "10.0.55.65",
+        "instanceTags" : "",
+        "cloudHostId" : null,
+        "launchtime" : 1734619942,
+        "message" : ""
+      }, {
+        "machineId" : "i-0f7862c0e491a3699",
+        "name" : "ip-10-0-57-187.ec2.internal",
+        "priceType" : "ondemand",
+        "instanceType" : "r5n.2xlarge",
+        "result" : "succeed",
+        "status" : "terminated",
+        "privateIpAddress" : "10.0.57.187",
+        "instanceTags" : "",
+        "cloudHostId" : null,
+        "launchtime" : 1734619942,
+        "message" : ""
+      }, {
+        "machineId" : "i-0f1dfc111f6d14851",
+        "name" : "ip-10-0-51-28.ec2.internal",
+        "priceType" : "ondemand",
+        "instanceType" : "r5n.2xlarge",
+        "result" : "succeed",
+        "status" : "terminated",
+        "privateIpAddress" : "10.0.51.28",
+        "instanceTags" : "",
+        "cloudHostId" : null,
+        "launchtime" : 1734619942,
+        "message" : ""
+      }, {
+        "machineId" : "i-0e90ecb3228822f6f",
+        "name" : "ip-10-0-57-7.ec2.internal",
+        "priceType" : "ondemand",
+        "instanceType" : "r5n.2xlarge",
+        "result" : "succeed",
+        "status" : "terminated",
+        "privateIpAddress" : "10.0.57.7",
+        "instanceTags" : "",
+        "cloudHostId" : null,
+        "launchtime" : 1734619988,
+        "message" : ""
+      }, {
+        "machineId" : "i-0c8755260b9aa6ebe",
+        "name" : "ip-10-0-57-154.ec2.internal",
+        "priceType" : "ondemand",
+        "instanceType" : "r5n.2xlarge",
+        "result" : "succeed",
+        "status" : "terminated",
+        "privateIpAddress" : "10.0.57.154",
+        "instanceTags" : "",
+        "cloudHostId" : null,
+        "launchtime" : 1734619988,
+        "message" : ""
+      }, {
+        "machineId" : "i-0e219a7b5a927368a",
+        "name" : "ip-10-0-62-139.ec2.internal",
+        "priceType" : "ondemand",
+        "instanceType" : "r5n.2xlarge",
+        "result" : "succeed",
+        "status" : "terminated",
+        "privateIpAddress" : "10.0.62.139",
+        "instanceTags" : "",
+        "cloudHostId" : null,
+        "launchtime" : 1734619988,
+        "message" : ""
+      }, {
+        "machineId" : "i-0cd2be94721fe4c6f",
+        "name" : "ip-10-0-58-203.ec2.internal",
+        "priceType" : "ondemand",
+        "instanceType" : "r5n.2xlarge",
+        "result" : "succeed",
+        "status" : "terminated",
+        "privateIpAddress" : "10.0.58.203",
+        "instanceTags" : "",
+        "cloudHostId" : null,
+        "launchtime" : 1734619988,
+        "message" : ""
+      } ],
+      "requestId" : "ret-84ffbee9-8c84-4afe-8e8e-ac052a7ff8d3",
+      "message" : ""
+    } ]
+}

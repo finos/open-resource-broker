@@ -23,6 +23,23 @@ export class OrbError extends Error {
   }
 }
 
+/**
+ * The server answered in a different response format than the one the call asked for.
+ * Raised only when the response names a format (`X-ORB-Scheduler`) that differs from the
+ * request; a response without the header is never an error.
+ */
+export class SchedulerMismatchError extends OrbError {
+  readonly expected: string;
+  readonly actual: string;
+
+  constructor(expected: string, actual: string) {
+    super(`requested response format "${expected}" but the server answered in "${actual}"`);
+    this.name = "SchedulerMismatchError";
+    this.expected = expected;
+    this.actual = actual;
+  }
+}
+
 export interface ApiErrorInit {
   code?: string | null;
   message: string;

@@ -77,13 +77,13 @@ async def test_list_tools_matches_catalog_mcp_entries() -> None:
 
 @pytest.mark.asyncio
 async def test_each_tool_schema_carries_its_dto_fields() -> None:
-    """Every tool's inputSchema exposes exactly its input DTO's fields."""
+    """Every tool's inputSchema exposes its input DTO's fields plus the per-call format."""
     server = build_server(MagicMock(spec=DIContainer))
     tools = await _list_tools(server)
 
     for tool in tools:
         entry = OPERATION_CATALOG[tool.name]
-        expected_fields = {f.name for f in dataclasses.fields(entry.input_dto)}
+        expected_fields = {f.name for f in dataclasses.fields(entry.input_dto)} | {"format"}
         schema_fields = set(tool.input_schema["properties"].keys())
         assert schema_fields == expected_fields, (
             f"{tool.name}: schema properties {schema_fields} != DTO fields {expected_fields}"
@@ -390,3 +390,46 @@ async def test_call_tool_accepts_valid_arguments() -> None:
 
     assert tool_result.is_error is False
     orchestrator.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_call_tool_format_argument_selects_another_format_and_rejects_unknown_names() -> None:
+    """The per-call ``format`` argument renders with that format; a bad name is an error."""
+    from orb.domain.base.ports.configuration_port import ConfigurationPort
+    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+    from orb.infrastructure.scheduler.factory import SchedulerStrategyFactory
+    from tests.utilities.reset_singletons import reset_all_singletons
+
+    orchestrator = AsyncMock(spec=ListMachinesOrchestrator)
+    orchestrator.execute.return_value = ListMachinesOutput(machines=[], count=0, total_count=0)
+    configured = ResponseFormattingService(DefaultSchedulerStrategy(logger=MagicMock()))
+    other = MagicMock()
+    other.format_machine_status_response.return_value = {"marker": "other-format"}
+    other.get_scheduler_type.return_value = "mcp-probe"
+    config = MagicMock()
+    config.get_scheduler_strategy.return_value = "default"
+    factory = MagicMock()
+    factory.create_strategy.return_value = other
+
+    container = MagicMock(spec=DIContainer)
+    container.get.side_effect = lambda cls: {
+        ListMachinesOrchestrator: orchestrator,
+        ResponseFormattingService: configured,
+        ConfigurationPort: config,
+        SchedulerStrategyFactory: factory,
+    }.get(cls)
+
+    from orb.infrastructure.scheduler.registry import get_scheduler_registry
+
+    registry = get_scheduler_registry()
+    registry.register("mcp-probe", lambda cfg: other, lambda c: None, strategy_class=MagicMock)
+    try:
+        server = build_server(container)
+        chosen = await _call_tool(server, "list_machines", {"format": "mcp-probe"})
+        unknown = await _call_tool(server, "list_machines", {"format": "nope"})
+    finally:
+        reset_all_singletons()
+
+    assert chosen.is_error is False
+    assert json.loads(chosen.content[0].text)["marker"] == "other-format"
+    assert unknown.is_error is True

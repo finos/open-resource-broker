@@ -1,0 +1,30 @@
+{
+  "templates" : [ {
+    "templateId" : "OnDemand-Minimal-Template-VM",
+    "maxNumber" : 10,
+    "attributes" : {
+      "nram" : [ "Numeric", "1024" ],
+      "ncpus" : [ "Numeric", "1" ],
+      "ncores" : [ "Numeric", "1" ],
+      "type" : [ "String", "X86_64" ]
+    },
+    "pgrpName" : null,
+    "onDemandCapacity" : 0
+  }, {
+    "templateId" : "Spot-Template-VM",
+    "maxNumber" : 10,
+    "attributes" : {
+      "nram" : [ "Numeric", "1024" ],
+      "ncpus" : [ "Numeric", "1" ],
+      "ncores" : [ "Numeric", "1" ],
+      "type" : [ "String", "X86_64" ]
+    },
+    "vmTypes" : {
+      "m3.medium" : 1
+    },
+    "instanceTags" : "company=abc;project=awscloud;team=xyz",
+    "pgrpName" : null,
+    "onDemandCapacity" : 0
+  } ],
+  "message" : "Get available templates success."
+}

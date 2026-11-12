@@ -20,6 +20,15 @@ http://<host>:<port>/api/v1
 
 Authentication is not enforced by default in development mode. For production deployments, place ORB behind a reverse proxy or API gateway that handles authentication.
 
+## Response Format
+
+The configured scheduler decides the shape of every response. A call can ask for
+another registered format with the `X-ORB-Scheduler` header or the `scheduler`
+query parameter, with any role; an unknown name returns `400`. The response names
+the format it used in the `X-ORB-Scheduler` header and varies on it. The OpenAPI
+document describes the default shape of each operation and, under
+`x-orb-formats`, the schema of every built-in format.
+
 ## Templates
 
 ### List Templates
@@ -422,7 +431,9 @@ Returns the status of a specific request.
 |-----------|------|-------------|
 | `long` | boolean | Include detailed info and refresh provider state (default: `true`) |
 
-**Response (200):** Scheduler-dependent format.
+**Response (200):** Scheduler-dependent format. A request that has a deadline carries
+`deadline_at`, and one that was ever partially fulfilled carries `partial_since`
+(ISO 8601); both are absent otherwise and are not part of the HostFactory format.
 
 Default scheduler example:
 ```json
@@ -449,6 +460,22 @@ curl "http://localhost:8000/api/v1/requests/req-abc123/status?long=false"
 
 ---
 
+### List Return Requests
+
+Returns the return requests ORB created.
+
+**Endpoint:** `GET /api/v1/requests/return`
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `status` | string | Filter by return request status (`pending`, `in_progress`, `complete`, `failed`, `cancelled`, `partial`, `timeout`); an unknown value returns `400` |
+| `limit`, `offset`, `cursor`, `q`, `sort` | | Paging, search and ordering, as for List Requests |
+
+**Response (200):** Scheduler-dependent format.
+
+---
+
 ### Get Request Details
 
 Returns full details for a request.
@@ -466,6 +493,44 @@ Returns full details for a request.
 ```bash
 curl http://localhost:8000/api/v1/requests/req-abc123
 ```
+
+---
+
+## Providers
+
+### List Providers
+
+**Endpoint:** `GET /api/v1/providers/`
+
+**Response (200):** `providers` (each with `name`, `type`, `enabled`, `status`,
+`capabilities`, `weight`, `priority` and `config`), `count`, `total_count` (the
+same value as `count`), `selection_policy` and `message`. An unreadable provider
+configuration returns a configuration error, not an empty list.
+
+---
+
+## Administration
+
+### Initialise ORB
+
+**Endpoint:** `POST /api/v1/admin/init`
+
+Requires the `admin` role, `allow_destructive_admin`, a non-production
+environment and `"confirm": "INIT"`. It writes a configuration with one provider
+built the same way as `orb init --non-interactive`, after checking the provider
+credentials; nothing is written when the check fails.
+
+| Body field | Type | Description |
+|------------|------|-------------|
+| `confirm` | string | Must be `INIT` |
+| `provider_type` | string | Provider to configure; the first registered provider if omitted |
+| `scheduler_type` | string | Scheduler type, `default` if omitted |
+| `options` | object | Provider options by their `orb init` argument names, for example `{"aws_region": "eu-west-2", "aws_profile": "ops"}`. Credential sources are named, never sent as secrets |
+| `force` | boolean | Replace an existing configuration |
+| `generate_templates` | boolean | Refresh templates afterwards (default `true`) |
+
+Returns `400` for a missing confirmation, rejected provider input or credentials
+that could not be verified.
 
 ---
 

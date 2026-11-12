@@ -333,3 +333,27 @@ class TestRunEmbeddedForeground:
 
         assert result["exit_code"] == 0
         assert "Reflex exited" in result["message"]
+
+
+@pytest.mark.unit
+@pytest.mark.cli
+class TestReloadInvalidatesSchedulerFormats:
+    def test_successful_reload_drops_cached_strategies(self):
+        from orb.interface.server_runtime import _reload_config_from_signal
+
+        factory = MagicMock()
+
+        _reload_config_from_signal(MagicMock(), MagicMock(), factory)
+
+        factory.invalidate.assert_called_once()
+
+    def test_failed_reload_keeps_cached_strategies(self):
+        from orb.interface.server_runtime import _reload_config_from_signal
+
+        cm = MagicMock()
+        cm.reload.side_effect = ValueError("bad config")
+        factory = MagicMock()
+
+        _reload_config_from_signal(MagicMock(), cm, factory)
+
+        factory.invalidate.assert_not_called()

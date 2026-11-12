@@ -21,6 +21,7 @@ from orb.domain.base.ports import (
     LoggingPort,
     ProviderSelectionPort,
 )
+from orb.domain.request.exceptions import RequestValidationError
 from orb.domain.request.request_types import RequestStatus
 
 # ---------------------------------------------------------------------------
@@ -147,21 +148,21 @@ class TestCreateMachineRequestHandlerValidation:
     async def test_validate_raises_when_template_id_missing(self):
         handler, _ = _make_machine_handler()
         cmd = CreateRequestCommand(template_id="", requested_count=1)
-        with pytest.raises(ValueError, match="template_id is required"):
+        with pytest.raises(RequestValidationError, match="template_id is required"):
             await handler.validate_command(cmd)
 
     @pytest.mark.asyncio
     async def test_validate_raises_when_requested_count_zero(self):
         handler, _ = _make_machine_handler()
         cmd = CreateRequestCommand(template_id="t1", requested_count=0)
-        with pytest.raises(ValueError, match="requested_count must be positive"):
+        with pytest.raises(RequestValidationError, match="requested_count must be positive"):
             await handler.validate_command(cmd)
 
     @pytest.mark.asyncio
     async def test_validate_raises_when_requested_count_negative(self):
         handler, _ = _make_machine_handler()
         cmd = CreateRequestCommand(template_id="t1", requested_count=-5)
-        with pytest.raises(ValueError, match="requested_count must be positive"):
+        with pytest.raises(RequestValidationError, match="requested_count must be positive"):
             await handler.validate_command(cmd)
 
     @pytest.mark.asyncio
@@ -375,7 +376,7 @@ class TestCreateReturnRequestHandlerValidation:
     async def test_validate_raises_when_machine_ids_empty(self):
         handler = _make_return_handler()
         cmd = CreateReturnRequestCommand(machine_ids=[])
-        with pytest.raises(ValueError, match="machine_ids is required"):
+        with pytest.raises(RequestValidationError, match="machine_ids is required"):
             await handler.validate_command(cmd)
 
     @pytest.mark.asyncio

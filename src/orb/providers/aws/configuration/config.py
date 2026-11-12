@@ -91,18 +91,28 @@ class HandlersConfig(BaseModel):
 
     @model_validator(mode="after")
     def sync_legacy_fields(self) -> "HandlersConfig":
-        """Sync legacy fields with capabilities."""
-        # Update capabilities from legacy fields if they differ
-        if (
-            self.ec2_fleet != self.capabilities.ec2_fleet
-            or self.spot_fleet != self.capabilities.spot_fleet
-            or self.asg != self.capabilities.asg
-            or self.run_instances != self.capabilities.run_instances
-        ):
-            object.__setattr__(self.capabilities, "ec2_fleet", self.ec2_fleet)
-            object.__setattr__(self.capabilities, "spot_fleet", self.spot_fleet)
-            object.__setattr__(self.capabilities, "asg", self.asg)
-            object.__setattr__(self.capabilities, "run_instances", self.run_instances)
+        """Keep the legacy flags and ``capabilities`` consistent.
+
+        Only explicitly configured values are propagated, so a default never
+        overwrites a value the operator set on the other side. Setting both
+        sides to different values is ambiguous and rejected.
+        """
+        for name in HandlerCapabilityConfig.model_fields:
+            legacy_set = name in self.model_fields_set
+            capability_set = name in self.capabilities.model_fields_set
+            legacy = getattr(self, name)
+            capability = getattr(self.capabilities, name)
+            if legacy == capability:
+                continue
+            if legacy_set and capability_set:
+                raise ValueError(
+                    f"handlers.{name}={legacy} conflicts with handlers.capabilities.{name}="
+                    f"{capability}; set only one of them"
+                )
+            if legacy_set:
+                object.__setattr__(self.capabilities, name, legacy)
+            else:
+                object.__setattr__(self, name, capability)
 
         return self
 

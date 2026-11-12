@@ -52,6 +52,9 @@ class RequestItem(BaseModel):
     completed_at: Optional[str] = None
     first_status_check: Optional[str] = None
     last_status_check: Optional[str] = None
+    # Present only when the request has a deadline / was ever partially fulfilled.
+    deadline_at: Optional[str] = None
+    partial_since: Optional[str] = None
 
     # --- Outcome detail ---
     message: Optional[str] = None
@@ -103,6 +106,33 @@ class RequestStatusResponse(BaseModel):
     count: Optional[int] = None
     total_count: Optional[int] = None
     next_cursor: Optional[str] = None
+
+
+class ProviderItem(BaseModel):
+    """A configured provider instance."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+    type: str
+    enabled: bool = True
+    status: Optional[str] = None
+    capabilities: list[str] = []
+    weight: Optional[int] = None
+    priority: Optional[int] = None
+    config: dict[str, Any] = {}
+
+
+class ProviderListResponse(BaseModel):
+    """Response for the provider list endpoint (default scheduler format)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    providers: list[ProviderItem] = []
+    count: int = 0
+    total_count: int = 0
+    selection_policy: Optional[str] = None
+    message: Optional[str] = None
 
 
 class RequestOperationResponse(BaseModel):

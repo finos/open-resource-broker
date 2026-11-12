@@ -81,7 +81,7 @@ def test_wait_returns_once_the_machines_are_running(initialize):
     machines = _machines(initialize)
     assert machines
     assert all(m["status"] == "running" for m in machines)
-    assert all(m["privateIp"] for m in machines)
+    assert all(m["privateIpAddress"] for m in machines)
 
 
 def test_request_without_wait_returns_immediately_in_progress(initialize):

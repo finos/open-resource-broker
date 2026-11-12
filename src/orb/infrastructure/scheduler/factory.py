@@ -62,3 +62,12 @@ class SchedulerStrategyFactory:
                 raise
 
         return self._strategy_cache[cache_key]
+
+    def invalidate(self) -> None:
+        """Drop cached strategies.
+
+        A strategy keeps per-provider-type state (its field mapper), so the cache
+        must be cleared whenever configuration is reloaded or the scheduler or
+        provider is overridden.
+        """
+        self._strategy_cache.clear()

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 if TYPE_CHECKING:
     from orb.application.services.provider_registry_service import ProviderRegistryService
+    from orb.domain.base.operations import OperationType as ProviderOperationType
 
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.services.machine_coordinates import load_machine_coordinates
@@ -79,10 +80,7 @@ class MachineSyncService:
     ) -> Tuple[list[Machine], dict]:
         """Fetch machines from provider."""
         try:
-            from orb.domain.base.operations import (
-                Operation as ProviderOperation,
-                OperationType as ProviderOperationType,
-            )
+            from orb.domain.base.operations import OperationType as ProviderOperationType
 
             # For return requests, always use instance-level status for the specific
             # machines being returned — not resource-level discovery which returns all
@@ -107,15 +105,50 @@ class MachineSyncService:
                 }
             # Fallback to instance-level discovery for requests without resource tracking
             elif db_machines:
-                operation_type = ProviderOperationType.GET_INSTANCE_STATUS
-                instance_ids = [m.machine_id.value for m in db_machines]
-                parameters = {
-                    "instance_ids": instance_ids,
-                    "template_id": request.template_id,
-                    "machine_coordinates": load_machine_coordinates(self.uow_factory, instance_ids),
-                }
+                return await self.refresh_instance_status(request, db_machines)
             else:
                 return [], {}
+        except Exception as e:
+            self.logger.error(f"Failed to fetch provider machines: {e}")
+            return FailedProviderFetch(db_machines), {PROVIDER_FETCH_FAILED: True}
+
+        return await self._execute_provider_fetch(request, db_machines, operation_type, parameters)
+
+    async def refresh_instance_status(
+        self, request: Request, machines: list[Machine]
+    ) -> Tuple[list[Machine], dict]:
+        """Read the provider's current state of the given machines by instance id.
+
+        Unlike ``fetch_provider_machines`` this never does resource-level
+        discovery, so only the named machines are returned.
+        """
+        try:
+            from orb.domain.base.operations import OperationType as ProviderOperationType
+
+            instance_ids = [m.machine_id.value for m in machines]
+            parameters = {
+                "instance_ids": instance_ids,
+                "template_id": request.template_id,
+                "machine_coordinates": load_machine_coordinates(self.uow_factory, instance_ids),
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to fetch provider machines: {e}")
+            return FailedProviderFetch(machines), {PROVIDER_FETCH_FAILED: True}
+
+        return await self._execute_provider_fetch(
+            request, machines, ProviderOperationType.GET_INSTANCE_STATUS, parameters
+        )
+
+    async def _execute_provider_fetch(
+        self,
+        request: Request,
+        db_machines: list[Machine],
+        operation_type: "ProviderOperationType",
+        parameters: dict,
+    ) -> Tuple[list[Machine], dict]:
+        """Run one provider read and convert the instances it returns to machines."""
+        try:
+            from orb.domain.base.operations import Operation as ProviderOperation
 
             parameters = {**parameters, "request": request}
             operation = ProviderOperation(

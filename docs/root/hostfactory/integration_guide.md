@@ -200,22 +200,90 @@ For production environments with multiple providers:
 **Expected Output Format:**
 ```json
 {
-  "requestId": "req-12345",
-  "status": "completed",
-  "machines": [
+  "requests": [
     {
-      "machineId": "i-0123456789abcdef0",
-      "status": "running",
-      "ipAddress": "10.0.1.100",
-      "attributes": {
-        "type": ["String", "X86_64"],
-        "ncpus": ["Numeric", "2"],
-        "nram": ["Numeric", "4096"]
-      }
+      "requestId": "req-12345",
+      "status": "complete",
+      "message": "",
+      "machines": [
+        {
+          "machineId": "i-0123456789abcdef0",
+          "name": "ip-10-0-1-100.ec2.internal",
+          "result": "succeed",
+          "status": "running",
+          "privateIpAddress": "10.0.1.100",
+          "publicIpAddress": null,
+          "launchtime": 1734619942,
+          "message": "",
+          "cloudHostId": null,
+          "instanceType": "m5.large",
+          "instanceTags": "env=prod;team=hpc"
+        }
+      ],
+      "resourceIds": ["fleet-0123456789abcdef0"]
     }
   ]
 }
 ```
+
+### getReturnRequests
+
+**HostFactory Call:**
+```bash
+/path/to/getReturnRequests.sh -f /tmp/input_file
+```
+
+HostFactory sends the machines it tracks (`{"machines": [{"name": "...", "machineId": "..."}]}`).
+ORB reads the current state of those machines from the provider and answers with the ones
+the provider has reclaimed (for example a spot interruption) and that ORB did not return
+itself:
+
+```json
+{
+  "status": "complete",
+  "message": "Return requests retrieved successfully.",
+  "requests": [{"machine": "ip-10-0-1-100.ec2.internal", "gracePeriod": 120}]
+}
+```
+
+A machine is matched by `name` or `machineId`. No `machines`, or none reclaimed, gives
+`"requests": []`. Limits: a spot instance that is stopped or hibernated on interruption is
+not reported; the provider purges terminated instances after about an hour, after which they
+can no longer be read; the machine is reported once the provider shows it shutting down, with
+no advance warning.
+
+The shipped `getReturnRequests` scripts set `HF_CALLER_SCRIPT`, which is how ORB recognises
+the poll when HostFactory sends `{}`. Outside those scripts, `orb requests list-returns` with
+`{}` or `-d` data that has no `machines` key lists ORB's own return requests; a `-f` file
+with a `machines` key is treated as this poll.
+
+## Output Format Notes
+
+- Every key in a request item, including ORB extensions (`resourceIds`, `targetUnits`,
+  `fulfilledUnits`, `runningCount`, `pendingCount`, `providerName`, `providerType`,
+  `providerApi`), is camelCase.
+- The machines of a request status, the machines list and a machine detail share one shape.
+  `launchtime` is an integer of epoch seconds (`0` when unknown); `privateIpAddress` is `""`
+  until the address is known; `instanceTags` is `key=value` pairs joined by `;`, empty
+  without tags. A tag containing `;` or `=` is not escaped, so a consumer that splits on
+  those characters can read it as extra tags.
+- The `message` of a failed or partial request carries a short reason when ORB knows one.
+- Known divergence from the IBM page: a machine `status` carries ORB lifecycle values such
+  as `pending` and `launching` in addition to the values IBM lists. `result` is the progress
+  field. The output conforms to the documented specification except for these `status`
+  values.
+
+**Migrating from earlier releases:** scripts that parsed the old output must read
+`resourceIds` instead of `resource_ids` (and the other camelCase names above),
+`launchtime` as a number on the machines list, `instanceTags` as `k=v;k=v` instead of a
+JSON string, and the machines list with the request-item machine keys (`privateIpAddress`,
+`instanceType`, `launchtime`, `result`) instead of `privateIp`, `vmType`, `launchTime`.
+The machines list and machine detail no longer carry `subnetId`, `securityGroupIds` or
+`terminationTime`. `statusReason` is now `message` (filled for failed machines), `tags` is
+`instanceTags`, `publicIp` is `publicIpAddress` and the detail `provider` is `providerType`
+(with `providerName`). `requestId` and `returnRequestId` appear only when set, where they were
+always present. `imageId` stays, as an optional key.
+`getReturnRequests` now reports provider-reclaimed machines instead of ORB's return requests.
 
 ## Deployment Scenarios
 

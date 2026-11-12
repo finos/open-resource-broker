@@ -64,7 +64,7 @@ data class ClientConfig(
     val process: ProcessConfig? = null,
     /** UNIX socket path for UDS mode without managed subprocess */
     val socketPath: String = "",
-    /** Scheduler backend; sends the X-ORB-Scheduler header when not [Scheduler.DEFAULT] */
+    /** Scheduler backend; its name is sent in the X-ORB-Scheduler header on every call */
     val scheduler: Scheduler = Scheduler.DEFAULT,
 )
 
@@ -235,10 +235,21 @@ class OrbClient private constructor(
         }
     }
 
+    /** Every call names its response format, so the answer does not depend on server config. */
     private fun schedulerHeaders(): Map<String, String> =
-        if (scheduler != Scheduler.DEFAULT)
-            mapOf("X-ORB-Scheduler" to scheduler.wireValue)
-        else emptyMap()
+        mapOf("X-ORB-Scheduler" to scheduler.wireValue)
+
+    /**
+     * Fail when the response names a response format other than the one asked for. A
+     * response without the header (an older server) is accepted.
+     */
+    private fun checkSchedulerFormat(resp: Response) {
+        val answered = resp.header("X-ORB-Scheduler")
+        if (!answered.isNullOrEmpty() && !answered.equals(scheduler.wireValue, ignoreCase = true)) {
+            resp.close()
+            throw SchedulerMismatchError(scheduler.wireValue, answered)
+        }
+    }
 
     private fun get(path: String, params: Map<String, String> = emptyMap()): Response {
         checkHealth()
@@ -291,6 +302,7 @@ class OrbClient private constructor(
     }
 
     private fun handleResponse(resp: Response): String {
+        checkSchedulerFormat(resp)
         val body = resp.body?.string() ?: ""
         if (resp.code >= 400) {
             val requestId = requestIdFromHeaders(resp)

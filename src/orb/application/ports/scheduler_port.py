@@ -22,6 +22,14 @@ class SchedulerFormattingPort(ABC):
     """Response and display formatting for a scheduler's wire protocol."""
 
     @abstractmethod
+    def get_scheduler_type(self) -> str:
+        """Name of the response format this scheduler produces (its registry name)."""
+
+    @abstractmethod
+    def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
+        """Format request creation response to scheduler format."""
+
+    @abstractmethod
     def format_templates_response(self, templates: list[Any]) -> dict[str, Any]:
         """Format template DTOs to scheduler response."""
 
@@ -45,6 +53,14 @@ class SchedulerFormattingPort(ABC):
         Symphony HF 7.3.2 spec, items are flat {machine, gracePeriod} pairs
         rather than request-status envelopes.
         """
+
+    def format_reclaimed_machines_response(self, machines: list[dict[str, Any]]) -> dict[str, Any]:
+        """Format the machines the provider has reclaimed.
+
+        Each item carries ``name``, ``machine_id`` and ``grace_period``. The
+        default shape is ORB-native; schedulers with a wire format override it.
+        """
+        return {"reclaimed_machines": list(machines)}
 
     @abstractmethod
     def format_machine_status_response(self, machines: list[Any]) -> dict[str, Any]:
@@ -168,9 +184,13 @@ class SchedulerRequestParsingPort(ABC):
     def parse_request_data(self, raw_data: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
         """Parse scheduler request data to domain-compatible format."""
 
-    @abstractmethod
-    def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
-        """Format request creation response to scheduler format."""
+    def is_provider_reclaim_poll(self, input_data: Any) -> bool:
+        """Whether a ``list-returns`` call asks which machines the provider reclaimed.
+
+        Schedulers whose scripts poll for provider-initiated returns override this;
+        the default is a plain listing of user return requests.
+        """
+        return False
 
     def expand_node_range(self, node_spec: str) -> list[str]:
         """Expand a scheduler-specific node-range/hostlist expression to individual node names.

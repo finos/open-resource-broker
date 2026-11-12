@@ -10,7 +10,7 @@ package org.finos.openresourcebroker.sdk.client;
  */
 public enum Scheduler {
 
-    /** The default ORB scheduler (no {@code X-ORB-Scheduler} header is sent). */
+    /** The default ORB format ({@code X-ORB-Scheduler: default}). */
     DEFAULT("default"),
 
     /** The HostFactory scheduler ({@code X-ORB-Scheduler: hostfactory}). */

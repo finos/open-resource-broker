@@ -58,6 +58,10 @@ orb init --non-interactive \
   --fleet-role arn:aws:iam::123456789012:role/MySpotFleetRole
 ```
 
+A running server can be initialised over REST with `POST /api/v1/admin/init`; it builds
+the same provider configuration and verifies the credentials first (see the
+[API reference](../user_guide/api_reference.md#initialise-orb)).
+
 This guide uses AWS, but the same `orb init --provider-type <type>` flow sets up Azure, Google Cloud, and Kubernetes — see the [Azure Provider Guide](../providers/azure/index.md), the [Google Cloud Provider Guide](../providers/gcp/index.md), and the [Kubernetes Provider Guide](../providers/k8s/index.md).
 
 ## Step 2: Generate templates

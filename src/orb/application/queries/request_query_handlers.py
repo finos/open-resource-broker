@@ -8,12 +8,14 @@ from typing import Any, Optional
 from orb.application.base.handlers import BaseQueryHandler
 from orb.application.decorators import query_handler
 from orb.application.dto.queries import (
+    ListReclaimedMachinesQuery,
     SyncAndGetRequestQuery,
     SyncAndListActiveRequestsQuery,
     SyncAndListReturnRequestsQuery,
 )
 from orb.application.dto.responses import RequestDTO
 from orb.application.factories.request_dto_factory import RequestDTOFactory
+from orb.application.machine.dto import MachineDTO
 from orb.application.ports.cache_service_port import CacheServicePort
 from orb.application.request.queries import ListRequestsQuery
 from orb.application.services.deadline_release_service import DeadlineReleaseService
@@ -497,6 +499,19 @@ class SyncAndListReturnRequestsHandler(
         """Execute sync-and-list return requests query."""
         self.logger.info("Listing return requests")
 
+        status_filter = None
+        if query.status:
+            from orb.domain.request.exceptions import RequestValidationError
+            from orb.domain.request.value_objects import RequestStatus
+
+            try:
+                status_filter = RequestStatus(query.status).value
+            except ValueError:
+                valid = ", ".join(s.value for s in RequestStatus)
+                raise RequestValidationError(
+                    f"Invalid status '{query.status}'; expected one of: {valid}"
+                ) from None
+
         try:
             with self.uow_factory.create_unit_of_work() as uow:
                 from orb.domain.request.value_objects import RequestType
@@ -575,6 +590,9 @@ class SyncAndListReturnRequestsHandler(
                     request_dtos = [
                         r for r in request_dtos if r.provider_type == query.provider_type
                     ]
+
+                if query.status:
+                    request_dtos = [r for r in request_dtos if r.status == status_filter]
 
                 if query.machine_names:
                     machine_name_set = set(query.machine_names)
@@ -905,3 +923,87 @@ class SyncAndListActiveRequestsHandler(
         except Exception as e:
             self.logger.error("Failed to list active requests: %s", e)
             raise
+
+
+@query_handler(ListReclaimedMachinesQuery)
+class SyncAndListReclaimedMachinesHandler(
+    BaseQueryHandler[ListReclaimedMachinesQuery, list[MachineDTO]]
+):
+    """Handler for listing machines the provider has reclaimed.
+
+    A machine counts as reclaimed when the provider reports it as shutting down
+    or terminated and no return request of ours owns it, so returns that ORB
+    started itself are excluded. The machines are refreshed from the provider
+    first: a request that already completed is no longer synced by the status
+    polls, so stored state alone would not show a later interruption. See
+    ADR-0001.
+
+    Known gaps: a spot instance that is stopped or hibernated on interruption
+    reports ``stopped`` and is not listed (a stop is not a reclaim); the
+    provider purges terminated instances after about an hour, after which they
+    can no longer be read; detection starts when the provider reports the
+    shutdown, with no advance warning.
+    """
+
+    def __init__(
+        self,
+        uow_factory: UnitOfWorkFactory,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        machine_sync_service: MachineSyncService,
+    ) -> None:
+        super().__init__(logger, error_handler)
+        self.uow_factory = uow_factory
+        self._machine_sync_service = machine_sync_service
+
+    async def execute_query(self, query: ListReclaimedMachinesQuery) -> list[MachineDTO]:
+        """Refresh the named machines from the provider and list the reclaimed ones."""
+        from orb.application.services.machine_sync_service import FailedProviderFetch
+        from orb.domain.machine.machine_status import MachineStatus
+        from orb.domain.request.request_identifiers import RequestId
+
+        by_request: dict[str, list[Any]] = {}
+        for machine in self._find_machines(query.identifiers):
+            if machine.request_id:
+                by_request.setdefault(machine.request_id, []).append(machine)
+
+        reclaimed: list[MachineDTO] = []
+        for request_id, machines in by_request.items():
+            with self.uow_factory.create_unit_of_work() as uow:
+                request = uow.requests.get_by_id(RequestId(value=request_id))
+            if request is None:
+                continue
+            provider_machines, _ = await self._machine_sync_service.refresh_instance_status(
+                request, machines
+            )
+            if isinstance(provider_machines, FailedProviderFetch):
+                self.logger.warning(
+                    "Provider read failed for request %s; not reporting its machines this poll",
+                    request_id,
+                )
+                continue
+            synced, _ = await self._machine_sync_service.sync_machines_with_provider(
+                request, machines, provider_machines
+            )
+            reclaimed.extend(
+                MachineDTO.from_domain(m)
+                for m in synced
+                if m.status in (MachineStatus.SHUTTING_DOWN, MachineStatus.TERMINATED)
+                and not m.return_request_id
+            )
+        return reclaimed
+
+    def _find_machines(self, identifiers: list[str]) -> list[Any]:
+        """Stored machines whose id or name is one of ``identifiers``."""
+        wanted = [i for i in dict.fromkeys(identifiers) if i]
+        if not wanted:
+            return []
+        with self.uow_factory.create_unit_of_work() as uow:
+            found = {str(m.machine_id.value): m for m in uow.machines.find_by_ids(wanted)}
+            matched = set(found) | {m.name for m in found.values() if m.name}
+            if any(i not in matched for i in wanted):
+                names = set(wanted)
+                for machine in uow.machines.get_all():
+                    if machine.name in names:
+                        found.setdefault(str(machine.machine_id.value), machine)
+        return list(found.values())

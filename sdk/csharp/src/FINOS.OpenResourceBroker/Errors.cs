@@ -21,6 +21,24 @@ public class OrbException : Exception
 }
 
 /// <summary>
+/// The server answered in a different response format than the one the client asked for.
+/// Raised only when the response names a format in <c>X-ORB-Scheduler</c> that differs
+/// from the request; a response without that header is never an error.
+/// </summary>
+public sealed class SchedulerMismatchException : OrbException
+{
+    public string Expected { get; }
+    public string Actual { get; }
+
+    public SchedulerMismatchException(string expected, string actual)
+        : base($"requested response format \"{expected}\" but the server answered in \"{actual}\"")
+    {
+        Expected = expected;
+        Actual = actual;
+    }
+}
+
+/// <summary>
 /// The server ended a request status stream because its maximum stream duration
 /// elapsed before the request reached a terminal status. The last event
 /// received is not a final status.

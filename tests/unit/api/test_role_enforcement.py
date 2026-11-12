@@ -575,7 +575,7 @@ def _stub_request_formatter_terminal():
     MagicMock whose .data is a dict with a cancelled request ensures
     _is_terminal_status() fires on the first iteration.
     """
-    fmt = MagicMock()
+    fmt = MagicMock(scheduler_type="default")
     result = MagicMock()
     result.data = {"requests": [{"request_id": "req-1", "status": "cancelled"}]}
     fmt.format_request_status.return_value = result

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
 from orb._package import AUTHOR, EMAIL, REPO_NAME, REPO_ORG, __version__
+from orb.api.models.hostfactory import HF_MODELS, HF_OPERATION_MODELS
 from orb.config.schemas.server_schema import ServerConfig
 
 from .examples import get_api_examples
@@ -129,10 +130,46 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig):
         # Add examples
         _add_examples_to_schema(openapi_schema)
 
+        _add_format_schemas(openapi_schema)
+
         app.openapi_schema = openapi_schema
         return app.openapi_schema
 
     app.openapi = custom_openapi
+
+
+# Response formats the server can render. Static on purpose: the exported spec
+# must not depend on which schedulers are registered or configured at export time.
+BUILT_IN_FORMATS = ("default", "hostfactory", "slurm")
+
+
+def _add_format_schemas(openapi_schema: dict[str, Any]) -> None:
+    """Register the HostFactory response schemas and map them per operation.
+
+    ``x-orb-formats`` on an operation names the schema of its response in each
+    built-in format. The default and slurm formats use the operation's own
+    response schema; HostFactory uses the ``Hf*`` component.
+    """
+    schemas = openapi_schema.setdefault("components", {}).setdefault("schemas", {})
+    for model in HF_MODELS:
+        schema = model.model_json_schema(ref_template="#/components/schemas/{model}")
+        schemas.update(schema.pop("$defs", {}))
+        schemas[model.__name__] = schema
+
+    for path_item in openapi_schema.get("paths", {}).values():
+        for operation in path_item.values():
+            model = HF_OPERATION_MODELS.get(operation.get("operationId", ""))
+            if model is None:
+                continue
+            success = next(
+                (r for code, r in operation.get("responses", {}).items() if code.startswith("2")),
+                {},
+            )
+            native = success.get("content", {}).get("application/json", {}).get("schema", {})
+            hf = {"$ref": f"#/components/schemas/{model.__name__}"}
+            operation["x-orb-formats"] = {
+                name: hf if name == "hostfactory" else native for name in BUILT_IN_FORMATS
+            }
 
 
 def _get_api_description() -> str:
@@ -150,6 +187,15 @@ This API provides dynamic cloud resource provisioning capabilities for IBM Spect
 - **Request Tracking**: Monitor provisioning requests with detailed status information
 - **Authentication**: Multiple authentication strategies including JWT, AWS IAM, and AWS Cognito
 - **Real-time Status**: Get real-time status of provisioning operations
+
+### Response format
+
+Responses use the format of the configured scheduler (`default`, `hostfactory` or
+`slurm`). A caller may name another registered format for one call with the
+`X-ORB-Scheduler` header or the `scheduler` query parameter; an unknown name is a
+400. Every response names the format it used in the `X-ORB-Scheduler` header. The
+`x-orb-formats` extension on an operation lists the response schema of each
+built-in format.
 
 ### Authentication
 

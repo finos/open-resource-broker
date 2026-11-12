@@ -87,9 +87,7 @@ class TestGetRequestStatusFunctionality:
         )
 
         # Convert to HostFactory format
-        result = scheduler_strategy.convert_domain_to_hostfactory_output(
-            "getRequestStatus", mock_dto
-        )
+        result = scheduler_strategy.format_request_status_response([mock_dto])
 
         # Verify structure matches docs/root/hostfactory/input-output.md
         assert "requests" in result
@@ -133,9 +131,7 @@ class TestGetRequestStatusFunctionality:
             ],
         )
 
-        result = scheduler_strategy.convert_domain_to_hostfactory_output(
-            "getRequestStatus", mock_dto
-        )
+        result = scheduler_strategy.format_request_status_response([mock_dto])
 
         assert len(result["requests"][0]["machines"]) == 2
 
@@ -160,9 +156,7 @@ class TestGetRequestStatusFunctionality:
 
         for domain_status, expected_hf_status in test_cases:
             mock_dto = FakeRequestDTO(status=domain_status)
-            result = scheduler_strategy.convert_domain_to_hostfactory_output(
-                "getRequestStatus", mock_dto
-            )
+            result = scheduler_strategy.format_request_status_response([mock_dto])
             assert result["requests"][0]["status"] == expected_hf_status
 
     def test_machine_result_mapping(self, scheduler_strategy):
@@ -189,18 +183,14 @@ class TestGetRequestStatusFunctionality:
                 ]
             )
 
-            result = scheduler_strategy.convert_domain_to_hostfactory_output(
-                "getRequestStatus", mock_dto
-            )
+            result = scheduler_strategy.format_request_status_response([mock_dto])
             machine = result["requests"][0]["machines"][0]
             assert machine["result"] == expected_result
 
     def test_empty_machines_list(self, scheduler_strategy):
         """Test handling of empty machines list."""
         mock_dto = FakeRequestDTO(machines=[])
-        result = scheduler_strategy.convert_domain_to_hostfactory_output(
-            "getRequestStatus", mock_dto
-        )
+        result = scheduler_strategy.format_request_status_response([mock_dto])
 
         assert result["requests"][0]["machines"] == []
         assert result["requests"][0]["status"] == "complete"
@@ -220,9 +210,7 @@ class TestGetRequestStatusFunctionality:
             ],
         }
 
-        result = scheduler_strategy.convert_domain_to_hostfactory_output(
-            "getRequestStatus", dict_data
-        )
+        result = scheduler_strategy.format_request_status_response([dict_data])
 
         assert result["requests"][0]["requestId"] == "dict-test-789"
         assert result["requests"][0]["status"] == "complete_with_error"

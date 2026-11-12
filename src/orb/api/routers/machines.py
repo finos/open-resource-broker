@@ -22,6 +22,7 @@ from orb.api.dependencies import (
 )
 from orb.api.models.base import APIRequest
 from orb.api.models.responses import MachineListResponse, RequestOperationResponse
+from orb.api.rest_render import render_rest
 from orb.application.services.admin.cleanup_database import (
     CleanupDatabaseService,
     NonTerminalStatusError,
@@ -35,7 +36,6 @@ from orb.application.services.orchestration.dtos import (
 )
 from orb.infrastructure.error.decorators import handle_rest_exceptions
 from orb.infrastructure.logging.logger import get_logger
-from orb.interface.catalog import OPERATION_CATALOG, Interface
 
 router = APIRouter(prefix="/machines", tags=["Machines"])
 
@@ -136,9 +136,7 @@ async def request_machines(
             timeout_seconds=min(timeout, _MAX_WAIT_TIMEOUT_SECONDS),
         )
     )
-    entry = OPERATION_CATALOG["request_machines"]
-    body = entry.renderer_for(Interface.REST)(formatter, result).data
-    return JSONResponse(content=body, status_code=202)
+    return render_rest("request_machines", formatter, result, status=202)
 
 
 @router.post(
@@ -176,9 +174,7 @@ async def return_machines(
             provider_type=request_data.provider_type,
         )
     )
-    entry = OPERATION_CATALOG["return_machines"]
-    body = entry.renderer_for(Interface.REST)(formatter, result).data
-    return JSONResponse(content=body)
+    return render_rest("return_machines", formatter, result)
 
 
 @router.get(
@@ -235,9 +231,7 @@ async def list_machines(
             filter_expressions=filter_expressions,
         )
     )
-    entry = OPERATION_CATALOG["list_machines"]
-    payload = entry.renderer_for(Interface.REST)(formatter, result).data
-    return JSONResponse(content=payload)
+    return render_rest("list_machines", formatter, result)
 
 
 @router.get(
@@ -265,9 +259,7 @@ async def sync_machine_status(
         return JSONResponse(content={"detail": f"Machine {machine_id} not found"}, status_code=404)
     # The 404 envelope above is REST-specific; the success body (machine detail
     # with the sync outcome overlaid) is the shared shape declared in the catalog.
-    entry = OPERATION_CATALOG["sync_machine"]
-    payload = entry.renderer_for(Interface.REST)(formatter, result).data
-    return JSONResponse(content=payload)
+    return render_rest("sync_machine", formatter, result)
 
 
 @router.get(
@@ -289,8 +281,7 @@ async def get_machine(
         return JSONResponse(content={"detail": f"Machine {machine_id} not found"}, status_code=404)
     # The 404 envelope above is REST-specific; the success body is the shared
     # canonical machine detail declared in the catalog.
-    entry = OPERATION_CATALOG["get_machine"]
-    return JSONResponse(content=entry.renderer_for(Interface.REST)(formatter, result).data)
+    return render_rest("get_machine", formatter, result)
 
 
 @router.delete(

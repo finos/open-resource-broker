@@ -23,6 +23,7 @@ export {
   OrbUnavailableError,
   OrbStreamTimeoutError,
   OrbStreamError,
+  SchedulerMismatchError,
   apiErrorForStatus,
 } from "./errors.js";
 export type { ApiErrorInit } from "./errors.js";

@@ -66,6 +66,8 @@ from orb.application.services.orchestration.dtos import (
     ListMachinesOutput,
     ListProvidersInput,
     ListProvidersOutput,
+    ListReclaimedMachinesInput,
+    ListReclaimedMachinesOutput,
     ListRequestsInput,
     ListRequestsOutput,
     ListReturnRequestsInput,
@@ -101,6 +103,9 @@ from orb.application.services.orchestration.get_request_status import GetRequest
 from orb.application.services.orchestration.get_template import GetTemplateOrchestrator
 from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
 from orb.application.services.orchestration.list_providers import ListProvidersOrchestrator
+from orb.application.services.orchestration.list_reclaimed_machines import (
+    ListReclaimedMachinesOrchestrator,
+)
 from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
 from orb.application.services.orchestration.list_return_requests import (
     ListReturnRequestsOrchestrator,
@@ -332,8 +337,7 @@ OPERATION_CATALOG: dict[str, CatalogEntry[Any, Any]] = {
         # paginated like the other list operations. The CLI feeds IBM Symphony
         # HostFactory, which expects the dedicated getReturnRequests shape
         # (machine/grace-period items), so it renders through the return-requests
-        # formatter. The MCP tool reuses the CLI handler, so it inherits that
-        # shape through the CLI renderer.
+        # formatter. MCP renders through the default renderer, like REST and the SDK.
         render=lambda rfs, out: rfs.format_request_status(
             out.requests,
             total_count=out.total_count,
@@ -343,6 +347,16 @@ OPERATION_CATALOG: dict[str, CatalogEntry[Any, Any]] = {
         render_overrides={
             _CLI: lambda rfs, out: rfs.format_return_requests(out.requests),
         },
+    ),
+    # HostFactory polls getReturnRequests for machines the provider reclaimed. The
+    # operation is CLI-only: it exists to answer that poll, not as a general listing.
+    "list_reclaimed_machines": CatalogEntry(
+        key="list_reclaimed_machines",
+        orchestrator=ListReclaimedMachinesOrchestrator,
+        input_dto=ListReclaimedMachinesInput,
+        output_dto=ListReclaimedMachinesOutput,
+        render=lambda rfs, out: rfs.format_reclaimed_machines(out.machines),
+        exposed_on=frozenset({_CLI}),
     ),
     "cancel_request": CatalogEntry(
         key="cancel_request",
@@ -530,11 +544,13 @@ OPERATION_CATALOG: dict[str, CatalogEntry[Any, Any]] = {
             {
                 "providers": out.providers,
                 "count": out.count,
+                # Legacy REST key for the same value as ``count``.
+                "total_count": out.count,
                 "selection_policy": out.selection_policy,
                 "message": out.message,
             }
         ),
-        exposed_on=frozenset({_CLI, _MCP}),
+        exposed_on=frozenset({_CLI, _REST, _MCP, _SDK}),
     ),
     "get_provider_config": CatalogEntry(
         key="get_provider_config",

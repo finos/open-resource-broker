@@ -564,7 +564,7 @@ class TestRunInstancesCompletion:
         machines = listed.json()["machines"]
         assert machines
         assert all(m["status"] == "running" for m in machines), json.dumps(machines)
-        assert all(m["privateIp"] for m in machines)
+        assert all(m["privateIpAddress"] for m in machines)
 
 
 @pytest.fixture

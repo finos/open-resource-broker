@@ -133,6 +133,10 @@ class RequestDTO(BaseDTO):
     # Structured *why* for a partial/failed/timeout outcome. Serialised dict of
     # the FulfilmentDiagnostic value object; surfaced only when present.
     fulfilment_diagnostic: Optional[dict[str, Any]] = None
+    # When a still-active request is given up on, and when it first became partially
+    # fulfilled (set only for requests with a deadline / a partial-pending phase).
+    deadline_at: Optional[datetime] = None
+    partial_since: Optional[datetime] = None
 
     @classmethod
     def from_domain(
@@ -258,6 +262,8 @@ class RequestDTO(BaseDTO):
             version=request.version,
             resource_ids=request.resource_ids,
             error=error_block,
+            deadline_at=request.deadline_at,
+            partial_since=request.partial_since,
             # Capacity fields — populated from resolved ProviderFulfilment when available.
             # Falls back to metadata["last_fulfilment"] when no explicit arg is supplied.
             target_units=resolved_fulfilment.target_units if resolved_fulfilment else None,

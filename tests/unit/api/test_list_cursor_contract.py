@@ -87,7 +87,7 @@ def client_and_rows():
         generic_filter_service=GenericFilterService(),
     )
     orchestrator = ListRequestsOrchestrator(MagicMock(), _Bus(handler), MagicMock())  # type: ignore[arg-type]
-    formatter = MagicMock()
+    formatter = MagicMock(scheduler_type="default")
     formatter.format_request_status.side_effect = lambda requests, total_count, next_cursor: (
         MagicMock(
             data={

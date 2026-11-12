@@ -15,7 +15,6 @@ from orb.api.dependencies import (
     get_list_templates_orchestrator,
     get_refresh_templates_orchestrator,
     get_request_formatter,
-    get_request_scheduler,
     get_scheduler_strategy,
     get_update_template_orchestrator,
     get_validate_template_orchestrator,
@@ -85,7 +84,6 @@ class TestTemplatesRouter:
 
     def _make_client(self, app, overrides=None):
         scheduler = self._make_scheduler_mock()
-        app.dependency_overrides[get_request_scheduler] = lambda: scheduler
         app.dependency_overrides[get_scheduler_strategy] = lambda: scheduler
         # The template routes render through the ResponseFormattingService, which
         # delegates to the same scheduler seam the mock stubs above.
@@ -590,12 +588,10 @@ class TestTemplatesRouteOrder:
     def _make_client(self, app, overrides=None):
         from orb.api.dependencies import (
             get_request_formatter,
-            get_request_scheduler,
             get_scheduler_strategy,
         )
 
         scheduler = self._make_scheduler_mock()
-        app.dependency_overrides[get_request_scheduler] = lambda: scheduler
         app.dependency_overrides[get_scheduler_strategy] = lambda: scheduler
         app.dependency_overrides[get_request_formatter] = lambda: ResponseFormattingService(
             scheduler

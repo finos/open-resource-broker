@@ -155,12 +155,20 @@ async def handle_request_machines(
 async def handle_get_return_requests(
     args: "argparse.Namespace",
 ) -> Union[dict[str, Any], "InterfaceResponse"]:
-    """List machine return requests, optionally filtered by status, provider, or filter expressions."""
+    """List machine return requests, optionally filtered by status, provider, or filter expressions.
+
+    When the active scheduler recognises the call as its poll for provider-reclaimed
+    machines, answer that instead (see ``list_reclaimed_machines``).
+    """
     from orb.application.services.orchestration.dtos import ListReturnRequestsInput
     from orb.interface.catalog import OPERATION_CATALOG, Interface
 
-    entry = OPERATION_CATALOG["list_return_requests"]
     container = args._container
+    input_data = getattr(args, "input_data", None)
+    if container.get(SchedulerPort).is_provider_reclaim_poll(input_data):
+        return await _list_reclaimed_machines(args, input_data)
+
+    entry = OPERATION_CATALOG["list_return_requests"]
     orchestrator = container.get(entry.orchestrator)
     formatter = container.get(ResponseFormattingService)
 
@@ -177,6 +185,30 @@ async def handle_get_return_requests(
     )
     print_cursor_hint(args, result)
     return entry.renderer_for(Interface.CLI)(formatter, result)
+
+
+async def _list_reclaimed_machines(
+    args: "argparse.Namespace", input_data: Any
+) -> Union[dict[str, Any], "InterfaceResponse"]:
+    """Answer which of the caller's machines the provider has reclaimed."""
+    from orb.application.services.orchestration.dtos import ListReclaimedMachinesInput
+    from orb.interface.catalog import OPERATION_CATALOG, Interface
+
+    entry = OPERATION_CATALOG["list_reclaimed_machines"]
+    container = args._container
+    machines = input_data.get("machines") if isinstance(input_data, dict) else None
+    identifiers: list[str] = []
+    for machine in machines or []:
+        if isinstance(machine, dict):
+            identifiers.extend(
+                str(v)
+                for v in (machine.get("name"), machine.get("machineId"), machine.get("machine_id"))
+                if v
+            )
+    result = await container.get(entry.orchestrator).execute(
+        ListReclaimedMachinesInput(identifiers=identifiers)
+    )
+    return entry.renderer_for(Interface.CLI)(container.get(ResponseFormattingService), result)
 
 
 @handle_interface_exceptions(context="request_return_machines", interface_type="cli")

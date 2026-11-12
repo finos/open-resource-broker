@@ -189,4 +189,7 @@ def build_probe(key: str, spec: dict[str, Any]) -> Probe:
         media = content.get("application/json")
         if media is not None:
             body = sample(media.get("schema", {}), spec)
+    # A status lookup must name a request; an empty list is rejected before any fault runs.
+    if key.endswith("/requests/status") and isinstance(body, dict):
+        body["requestIds"] = body.get("requestIds") or ["unknown-request-id"]
     return Probe(method=method, url=url, json=body, params=params)

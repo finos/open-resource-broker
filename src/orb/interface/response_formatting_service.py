@@ -3,7 +3,7 @@
 from typing import Any, Final, Optional
 
 from orb.application.dto.interface_response import InterfaceResponse
-from orb.application.ports.scheduler_port import SchedulerPort
+from orb.application.ports.scheduler_port import SchedulerFormattingPort
 
 
 class _Unset:
@@ -22,8 +22,13 @@ _UNSET: Final = _Unset()
 
 
 class ResponseFormattingService:
-    def __init__(self, scheduler: SchedulerPort) -> None:
+    def __init__(self, scheduler: SchedulerFormattingPort) -> None:
         self._scheduler = scheduler
+
+    @property
+    def scheduler_type(self) -> str:
+        """Registry name of the format this service renders."""
+        return str(self._scheduler.get_scheduler_type())
 
     @staticmethod
     def _stamp_pagination(
@@ -91,6 +96,11 @@ class ResponseFormattingService:
         """Format a list of return-request items using the scheduler's dedicated
         return-requests formatter — NOT format_request_status (different spec shape)."""
         data = self._scheduler.format_return_requests_response(requests)
+        return InterfaceResponse(data=data)
+
+    def format_reclaimed_machines(self, machines: list[dict[str, Any]]) -> InterfaceResponse:
+        """Format the machines the provider has reclaimed."""
+        data = self._scheduler.format_reclaimed_machines_response(machines)
         return InterfaceResponse(data=data)
 
     def format_machine_list(

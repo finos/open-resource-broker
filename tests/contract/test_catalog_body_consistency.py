@@ -35,6 +35,7 @@ from orb.application.services.orchestration.dtos import (
     GetRequestStatusOutput,
     GetTemplateOutput,
     ListMachinesOutput,
+    ListProvidersOutput,
     ListRequestsOutput,
     ListReturnRequestsOutput,
     ListTemplatesOutput,
@@ -126,6 +127,12 @@ _OUTPUT_BUILDERS: dict[str, Callable[[], Any]] = {
         valid=True, errors=[], message="", template_id="tmpl-001"
     ),
     "refresh_templates": lambda: RefreshTemplatesOutput(templates=[]),
+    "list_providers": lambda: ListProvidersOutput(
+        providers=[{"name": "aws-1", "type": "aws", "enabled": True, "config": {}}],
+        count=1,
+        selection_policy="first_available",
+        message="ok",
+    ),
 }
 
 

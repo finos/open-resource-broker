@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import shutil
 import uuid
 from typing import Annotated, Any, Optional
 
@@ -158,9 +157,20 @@ async def wipe_database(
 
 
 class InitBody(BaseModel):
+    """Body for POST /admin/init.
+
+    ``provider_type`` defaults to the first registered provider. ``options`` carries
+    the provider options by their ``orb init`` argument names, for example
+    ``{"aws_region": "eu-west-2", "aws_profile": "ops"}``; credential sources are
+    named, never given as secrets.
+    """
+
     force: bool = False
     generate_templates: bool = True
     confirm: str = ""
+    provider_type: Optional[str] = None
+    scheduler_type: str = "default"
+    options: dict[str, Any] = {}
 
 
 class CleanupDatabaseBody(BaseModel):
@@ -177,18 +187,44 @@ class CleanupDatabaseBody(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _init_rejected(code: str, message: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=400,
+        content={"success": False, "error": {"code": code, "message": message}},
+    )
+
+
+def _reload_configuration() -> None:
+    """Make the running process see the config file init just wrote (best effort)."""
+    try:
+        from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.interface.format_selection import invalidate_formats
+
+        container = get_di_container()
+        container.get(ConfigurationManager).reload()
+        invalidate_formats(container)
+    except Exception as exc:
+        logger.warning("Configuration reload after init skipped: %s", exc)
+
+
 @router.post(
     "/init",
     operation_id="initOrb",
     summary="Initialize ORB",
     description=(
-        "Create default config file, data directories, and optionally refresh templates. "
+        "Create the config file for a provider (verifying its credentials first), the data "
+        "directories, and optionally refresh templates. "
         "Requires `allow_destructive_admin=true` in config AND environment != production. "
         "Body must contain `confirm: 'INIT'` to prevent accidents."
     ),
     responses={
         200: {"description": "ORB initialized successfully."},
-        400: {"description": "Confirmation token missing or incorrect."},
+        400: {
+            "description": (
+                "Confirmation token missing or incorrect, provider input rejected, "
+                "or provider credentials could not be verified."
+            )
+        },
         403: {"description": "Feature disabled or production environment."},
     },
 )
@@ -256,33 +292,57 @@ async def init_orb(
         logs_dir = get_logs_location()
         scripts_dir = get_scripts_location()
 
+        # ── Build and verify the provider configuration ─────────────────────
+        # Nothing is created until the credentials work, so a rejected request
+        # leaves no config or directories behind.
+        config_file = config_dir / "config.json"
+        init_config: Optional[dict[str, Any]] = None
+        if not config_file.exists() or body.force:
+            from orb.interface.init_command_handler import (
+                InvalidInitInputError,
+                _test_provider_credentials,
+                build_default_config,
+            )
+
+            container = get_di_container()
+            try:
+                init_config = build_default_config(
+                    container,
+                    provider_type=body.provider_type,
+                    scheduler_type=body.scheduler_type,
+                    options=body.options,
+                )
+            except (InvalidInitInputError, ValueError) as exc:
+                logger.warning("ORB init input rejected (%s)", type(exc).__name__)
+                return _init_rejected(
+                    "INVALID_INIT_INPUT", "The provider type or options were rejected."
+                )
+
+            provider = init_config["providers"][0]
+            verified, _ = await asyncio.to_thread(
+                _test_provider_credentials,
+                provider["type"],
+                provider["config"].get("profile"),
+                container,
+                **provider["config"],
+            )
+            if not verified:
+                logger.warning("ORB init provider verification failed")
+                return _init_rejected("CREDENTIALS_REJECTED", "The provider could not be verified.")
+
         # ── Create directories ───────────────────────────────────────────────
         for d in [config_dir, work_dir, work_dir / ".cache", logs_dir]:
             if not d.exists():
                 d.mkdir(parents=True, exist_ok=True)
                 created_dirs.append(str(d))
 
-        # ── Ensure config file ───────────────────────────────────────────────
-        config_file = config_dir / "config.json"
-        if not config_file.exists() or body.force:
-            # Copy default_config.json shipped with the package
-            from pathlib import Path
+        # ── Write the config file ────────────────────────────────────────────
+        if init_config is not None:
+            from orb.interface.init_command_handler import _write_config_file
 
-            default_src = Path(__file__).resolve().parents[3] / "config" / "default_config.json"
-            if default_src.exists():
-                shutil.copy2(default_src, config_file)
-            else:
-                # Fallback: write a minimal valid config
-                import json
-
-                minimal: dict[str, Any] = {
-                    "scheduler": {"type": "default"},
-                    "provider": {"providers": []},
-                    "environment": "development",
-                    "allow_destructive_admin": False,
-                }
-                config_file.write_text(json.dumps(minimal, indent=2))
+            _write_config_file(config_file, init_config, None, get_di_container())
             created_files.append(str(config_file))
+            _reload_configuration()
 
         # ── Copy platform scripts (best-effort) ──────────────────────────────
         try:
@@ -494,10 +554,12 @@ async def reload_config(request: Request, _user=Depends(require_role("admin"))) 
     caller_ip = request.client.host if request.client else "unknown"
     try:
         from orb.config.managers.configuration_manager import ConfigurationManager
+        from orb.interface.format_selection import invalidate_formats
 
         container = get_di_container()
         cm = container.get(ConfigurationManager)
         cm.reload()
+        invalidate_formats(container)
         logger.warning("ADMIN_RELOAD_CONFIG by ip=%s", caller_ip)
         return JSONResponse(
             status_code=200,

@@ -46,6 +46,7 @@ def _mock_container(extra: dict | None = None):
 
     container = MagicMock()
     scheduler = MagicMock(spec=SchedulerPort)
+    scheduler.is_provider_reclaim_poll.return_value = False
     formatter = MagicMock(spec=ResponseFormattingService)
     formatter.status_poll_exit_code.return_value = 0
 

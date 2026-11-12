@@ -256,10 +256,11 @@ The ORB client must support two operating modes:
 | **Spawn** | UDS socket | optional | Client starts ORB as a child process |
 | **Remote** | TCP/HTTPS | Bearer / SigV4 | Client connects to an existing ORB instance |
 
-For remote mode with HostFactory scheduler, the scheduler type is sent via the
-`X-ORB-Scheduler` HTTP header on every request.  The server-side
-`dependencies.py:get_request_scheduler` reads this header to select the
-scheduler backend.
+Every SDK sends the response format it wants in the `X-ORB-Scheduler` HTTP header on
+every request (`default` unless the client is configured for `hostfactory`). The
+server-side `dependencies.py:get_request_formatter` reads this header to select the
+response format. When a response names a different format than the request, the
+client raises `SchedulerMismatchError`; a response without the header is accepted.
 
 ```
 X-ORB-Scheduler: hostfactory

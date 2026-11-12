@@ -19,10 +19,13 @@ def _make_args(**kwargs) -> argparse.Namespace:
 
 
 def _make_container(**orchestrators):
+    from orb.application.ports.scheduler_port import SchedulerPort
     from orb.infrastructure.di.buses import CommandBus, QueryBus
     from orb.interface.response_formatting_service import ResponseFormattingService
 
     container = MagicMock()
+    scheduler = MagicMock(spec=SchedulerPort)
+    scheduler.is_provider_reclaim_poll.return_value = False
     formatter = MagicMock(spec=ResponseFormattingService)
     formatter.format_machine_list.return_value = {"machines": []}
     formatter.format_template_list.return_value = {"templates": []}
@@ -35,6 +38,8 @@ def _make_container(**orchestrators):
             return orchestrators[name]
         if cls is ResponseFormattingService:
             return formatter
+        if cls is SchedulerPort:
+            return scheduler
         if cls is CommandBus:
             return MagicMock()
         if cls is QueryBus:

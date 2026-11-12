@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, Optional
 from orb.bootstrap import Application
 from orb.config.managers.configuration_manager import ConfigurationManager
 from orb.infrastructure.di.container import create_container
+from orb.interface.format_selection import select_formatter
 
 from .config import SDKConfig
 from .discovery import MethodInfo, SDKMethodDiscovery
@@ -547,7 +548,7 @@ class ORBClient:
     # with the other interfaces. The SDK returns the bare response body — the
     # rendered InterfaceResponse data — and drops the interface exit code.
 
-    async def _dispatch_catalog(self, key: str, dto: Any) -> dict:
+    async def _dispatch_catalog(self, key: str, dto: Any, format: Optional[str] = None) -> dict:
         """Run a catalog operation and return the SDK response body.
 
         Resolves the operation's orchestrator and the ResponseFormattingService
@@ -556,12 +557,11 @@ class ORBClient:
         rendered body (``InterfaceResponse.data``) without the interface exit code.
         """
         from orb.interface.catalog import OPERATION_CATALOG, Interface
-        from orb.interface.response_formatting_service import ResponseFormattingService
 
         assert self._container is not None  # noqa: S101  # type-narrowing; callers always check self._initialized before invoking this helper
         entry = OPERATION_CATALOG[key]
         orchestrator = self._container.get(entry.orchestrator)
-        formatter = self._container.get(ResponseFormattingService)
+        formatter = select_formatter(self._container, format)
         result = await orchestrator.execute(dto)
         return entry.renderer_for(Interface.SDK)(formatter, result).data
 
@@ -612,6 +612,7 @@ class ORBClient:
                 additional_data=kwargs.get("additional_data", {}),
                 template_overrides=dict(overrides or {}),
             ),
+            format=kwargs.get("format"),
         )
 
     async def get_request_status(
@@ -647,6 +648,7 @@ class ORBClient:
                 wait=kwargs.get("wait", False),
                 timeout_seconds=kwargs.get("timeout_seconds", 300),
             ),
+            format=kwargs.get("format"),
         )
 
     async def list_requests(self, **kwargs) -> dict:
@@ -669,6 +671,7 @@ class ORBClient:
                 provider_type=kwargs.get("provider_type") or self._config.provider_type,
                 filter_expressions=kwargs.get("filter_expressions") or [],
             ),
+            format=kwargs.get("format"),
         )
 
     async def return_machines(self, machine_ids: list, **kwargs) -> dict:
@@ -690,6 +693,7 @@ class ORBClient:
                 provider_name=kwargs.get("provider_name") or self._config.provider_name,
                 provider_type=kwargs.get("provider_type") or self._config.provider_type,
             ),
+            format=kwargs.get("format"),
         )
 
     async def cancel_request(self, request_id: str, **kwargs) -> dict:
@@ -706,6 +710,7 @@ class ORBClient:
                 request_id=request_id,
                 reason=kwargs.get("reason", "Cancelled via API"),
             ),
+            format=kwargs.get("format"),
         )
 
     async def list_machines(self, **kwargs) -> dict:
@@ -729,6 +734,7 @@ class ORBClient:
                 timestamp_format=kwargs.get("timestamp_format"),
                 filter_expressions=kwargs.get("filter_expressions") or [],
             ),
+            format=kwargs.get("format"),
         )
 
     async def get_machine(self, machine_id: str, **kwargs) -> dict:
@@ -746,9 +752,8 @@ class ORBClient:
             raise NotFoundError("Machine", machine_id)
 
         from orb.interface.catalog import OPERATION_CATALOG, Interface
-        from orb.interface.response_formatting_service import ResponseFormattingService
 
-        formatter = self._container.get(ResponseFormattingService)
+        formatter = select_formatter(self._container, kwargs.get("format"))
         entry = OPERATION_CATALOG["get_machine"]
         return entry.renderer_for(Interface.SDK)(formatter, result).data
 
@@ -771,6 +776,7 @@ class ORBClient:
                 offset=kwargs.get("offset", 0),
                 filter_expressions=kwargs.get("filter_expressions") or [],
             ),
+            format=kwargs.get("format"),
         )
 
     async def get_template(self, template_id: str, **kwargs) -> dict:
@@ -788,9 +794,8 @@ class ORBClient:
             raise NotFoundError("Template", template_id)
 
         from orb.interface.catalog import OPERATION_CATALOG, Interface
-        from orb.interface.response_formatting_service import ResponseFormattingService
 
-        formatter = self._container.get(ResponseFormattingService)
+        formatter = select_formatter(self._container, kwargs.get("format"))
         entry = OPERATION_CATALOG["get_template"]
         return entry.renderer_for(Interface.SDK)(formatter, result).data
 
@@ -806,6 +811,7 @@ class ORBClient:
 
         # Named kwargs extracted explicitly; everything else goes into configuration
         _explicit = {
+            "format",
             "name",
             "description",
             "machine_type",
@@ -829,6 +835,7 @@ class ORBClient:
                 tags=kwargs.get("tags", {}),
                 configuration=configuration,
             ),
+            format=kwargs.get("format"),
         )
 
     async def update_template(self, template_id: str, **kwargs) -> dict:
@@ -841,6 +848,7 @@ class ORBClient:
 
         # Named kwargs extracted explicitly; everything else goes into configuration
         _explicit = {
+            "format",
             "name",
             "description",
             "machine_type",
@@ -862,6 +870,7 @@ class ORBClient:
                 image_id=kwargs.get("image_id"),
                 configuration=configuration,
             ),
+            format=kwargs.get("format"),
         )
 
     async def delete_template(self, template_id: str, **kwargs) -> dict:
@@ -877,6 +886,7 @@ class ORBClient:
             return await self._dispatch_catalog(
                 "delete_template",
                 DeleteTemplateInput(template_id=template_id),
+                format=kwargs.get("format"),
             )
         except EntityNotFoundError:
             raise NotFoundError("Template", template_id)
@@ -895,6 +905,7 @@ class ORBClient:
                 template_id=kwargs.get("template_id"),
                 config=kwargs.get("config"),
             ),
+            format=kwargs.get("format"),
         )
 
     async def refresh_templates(self, **kwargs) -> dict:
@@ -908,6 +919,7 @@ class ORBClient:
         return await self._dispatch_catalog(
             "refresh_templates",
             RefreshTemplatesInput(provider_name=kwargs.get("provider_name")),
+            format=kwargs.get("format"),
         )
 
     async def show_template(self, template_id: str) -> Any:
@@ -974,6 +986,7 @@ class ORBClient:
                 provider_type=kwargs.get("provider_type") or self._config.provider_type,
                 filter_expressions=kwargs.get("filter_expressions") or [],
             ),
+            format=kwargs.get("format"),
         )
 
     async def list_active_requests(self, **kwargs: Any) -> Any:

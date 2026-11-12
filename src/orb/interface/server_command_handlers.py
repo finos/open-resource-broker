@@ -87,6 +87,9 @@ def _resolve_configs(args) -> tuple[Any, Any | None]:
         # application resolves when it asks for ConfigurationPort.
         port_manager = container.get(ConfigurationPort)
         port_manager.override_scheduler_strategy(scheduler)
+        from orb.interface.format_selection import invalidate_formats
+
+        invalidate_formats(container)
 
     ui_config = None
     try:

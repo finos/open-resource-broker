@@ -238,9 +238,10 @@ def test_format_machine_status_response_core_fields_present(hf_strategy):
         "machineId",
         "templateId",
         "requestId",
-        "vmType",
-        "imageId",
-        "privateIp",
+        "instanceType",
+        "privateIpAddress",
+        "launchtime",
+        "result",
         "status",
         "cloudHostId",
     ):

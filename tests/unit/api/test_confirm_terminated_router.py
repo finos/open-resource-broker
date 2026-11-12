@@ -61,7 +61,7 @@ def _orchestrator(result=None, raises=None):
 
 
 def _formatter():
-    return MagicMock()
+    return MagicMock(scheduler_type="default")
 
 
 def _app(orchestrator, user: CurrentUser | None = None) -> FastAPI:

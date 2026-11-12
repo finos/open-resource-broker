@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Open Resource Broker API",
-    "description": "## Open Resource Broker REST API\n\nThis API provides dynamic cloud resource provisioning capabilities for IBM Spectrum Symphony Host Factory.\n\n### Features\n\n- **Multi-Cloud Support**: Currently supports AWS with extensible architecture for other providers\n- **Template Management**: Define and manage VM templates with provider-specific configurations\n- **Machine Provisioning**: Request and manage cloud instances with various deployment strategies\n- **Request Tracking**: Monitor provisioning requests with detailed status information\n- **Authentication**: Multiple authentication strategies including JWT, AWS IAM, and AWS Cognito\n- **Real-time Status**: Get real-time status of provisioning operations\n\n### Authentication\n\nThis API supports multiple authentication methods:\n\n- **None**: No authentication (development/testing only)\n- **Bearer Token**: JWT-based authentication with configurable secrets\n- **AWS IAM**: AWS credential-based authentication using IAM roles/users\n- **AWS Cognito**: Integration with AWS Cognito User Pools\n\n### Rate Limiting\n\nAPI requests are subject to rate limiting to ensure fair usage and system stability.\n\n### Error Handling\n\nAll endpoints return consistent error responses with appropriate HTTP status codes and detailed error messages.\n\n### Versioning\n\nThis API uses URL path versioning (e.g., `/api/v1/`). Breaking changes will result in a new version.",
+    "description": "## Open Resource Broker REST API\n\nThis API provides dynamic cloud resource provisioning capabilities for IBM Spectrum Symphony Host Factory.\n\n### Features\n\n- **Multi-Cloud Support**: Currently supports AWS with extensible architecture for other providers\n- **Template Management**: Define and manage VM templates with provider-specific configurations\n- **Machine Provisioning**: Request and manage cloud instances with various deployment strategies\n- **Request Tracking**: Monitor provisioning requests with detailed status information\n- **Authentication**: Multiple authentication strategies including JWT, AWS IAM, and AWS Cognito\n- **Real-time Status**: Get real-time status of provisioning operations\n\n### Response format\n\nResponses use the format of the configured scheduler (`default`, `hostfactory` or\n`slurm`). A caller may name another registered format for one call with the\n`X-ORB-Scheduler` header or the `scheduler` query parameter; an unknown name is a\n400. Every response names the format it used in the `X-ORB-Scheduler` header. The\n`x-orb-formats` extension on an operation lists the response schema of each\nbuilt-in format.\n\n### Authentication\n\nThis API supports multiple authentication methods:\n\n- **None**: No authentication (development/testing only)\n- **Bearer Token**: JWT-based authentication with configurable secrets\n- **AWS IAM**: AWS credential-based authentication using IAM roles/users\n- **AWS Cognito**: Integration with AWS Cognito User Pools\n\n### Rate Limiting\n\nAPI requests are subject to rate limiting to ensure fair usage and system stability.\n\n### Error Handling\n\nAll endpoints return consistent error responses with appropriate HTTP status codes and detailed error messages.\n\n### Versioning\n\nThis API uses URL path versioning (e.g., `/api/v1/`). Breaking changes will result in a new version.",
     "version": "1.10.0",
     "contact": {
       "name": "",
@@ -657,6 +657,17 @@
               }
             }
           }
+        },
+        "x-orb-formats": {
+          "default": {
+            "$ref": "#/components/schemas/RequestOperationResponse"
+          },
+          "hostfactory": {
+            "$ref": "#/components/schemas/HfRequestIdResponse"
+          },
+          "slurm": {
+            "$ref": "#/components/schemas/RequestOperationResponse"
+          }
         }
       }
     },
@@ -726,6 +737,17 @@
                 }
               }
             }
+          }
+        },
+        "x-orb-formats": {
+          "default": {
+            "$ref": "#/components/schemas/RequestOperationResponse"
+          },
+          "hostfactory": {
+            "$ref": "#/components/schemas/HfRequestIdResponse"
+          },
+          "slurm": {
+            "$ref": "#/components/schemas/RequestOperationResponse"
           }
         }
       }
@@ -1419,6 +1441,24 @@
             "description": "Sort: \"field\" / \"-field\""
           },
           {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by return request status",
+              "title": "Status"
+            },
+            "description": "Filter by return request status"
+          },
+          {
             "name": "provider_name",
             "in": "query",
             "required": false,
@@ -1543,6 +1583,17 @@
                 }
               }
             }
+          }
+        },
+        "x-orb-formats": {
+          "default": {
+            "$ref": "#/components/schemas/RequestStatusResponse"
+          },
+          "hostfactory": {
+            "$ref": "#/components/schemas/HfRequestStatusResponse"
+          },
+          "slurm": {
+            "$ref": "#/components/schemas/RequestStatusResponse"
           }
         }
       },
@@ -1683,6 +1734,17 @@
                 }
               }
             }
+          }
+        },
+        "x-orb-formats": {
+          "default": {
+            "$ref": "#/components/schemas/RequestStatusResponse"
+          },
+          "hostfactory": {
+            "$ref": "#/components/schemas/HfRequestStatusResponse"
+          },
+          "slurm": {
+            "$ref": "#/components/schemas/RequestStatusResponse"
           }
         }
       }
@@ -2210,14 +2272,16 @@
           "Providers"
         ],
         "summary": "List Providers",
-        "description": "Returns all configured provider instances with name, type, enabled flag, and a provider-specific config object.  Does not perform live connectivity probes; use GET /providers/health for live status.",
+        "description": "Returns all configured provider instances with name, type, enabled flag, capabilities, selection weight and priority, and a provider-specific config object.  Does not perform live connectivity probes; use GET /providers/health for live status.",
         "operationId": "listProviders",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderListResponse"
+                }
               }
             }
           }
@@ -2365,7 +2429,7 @@
           "Admin"
         ],
         "summary": "Initialize ORB",
-        "description": "Create default config file, data directories, and optionally refresh templates. Requires `allow_destructive_admin=true` in config AND environment != production. Body must contain `confirm: 'INIT'` to prevent accidents.",
+        "description": "Create the config file for a provider (verifying its credentials first), the data directories, and optionally refresh templates. Requires `allow_destructive_admin=true` in config AND environment != production. Body must contain `confirm: 'INIT'` to prevent accidents.",
         "operationId": "initOrb",
         "requestBody": {
           "content": {
@@ -2386,7 +2450,7 @@
             }
           },
           "400": {
-            "description": "Confirmation token missing or incorrect."
+            "description": "Confirmation token missing or incorrect, provider input rejected, or provider credentials could not be verified."
           },
           "403": {
             "description": "Feature disabled or production environment."
@@ -2979,10 +3043,33 @@
             "type": "string",
             "title": "Confirm",
             "default": ""
+          },
+          "provider_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Type"
+          },
+          "scheduler_type": {
+            "type": "string",
+            "title": "Scheduler Type",
+            "default": "default"
+          },
+          "options": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Options",
+            "default": {}
           }
         },
         "type": "object",
-        "title": "InitBody"
+        "title": "InitBody",
+        "description": "Body for POST /admin/init.\n\n``provider_type`` defaults to the first registered provider. ``options`` carries\nthe provider options by their ``orb init`` argument names, for example\n``{\"aws_region\": \"eu-west-2\", \"aws_profile\": \"ops\"}``; credential sources are\nnamed, never given as secrets."
       },
       "MachineItem": {
         "properties": {
@@ -3595,6 +3682,124 @@
         "title": "MachineReferenceDTO",
         "description": "Data Transfer Object for machine reference."
       },
+      "ProviderItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities",
+            "default": []
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "ProviderItem",
+        "description": "A configured provider instance."
+      },
+      "ProviderListResponse": {
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderItem"
+            },
+            "type": "array",
+            "title": "Providers",
+            "default": []
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "default": 0
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "default": 0
+          },
+          "selection_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Policy"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "title": "ProviderListResponse",
+        "description": "Response for the provider list endpoint (default scheduler format)."
+      },
       "RequestItem": {
         "properties": {
           "request_id": {
@@ -3750,6 +3955,28 @@
               }
             ],
             "title": "Last Status Check"
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline At"
+          },
+          "partial_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partial Since"
           },
           "message": {
             "anyOf": [
@@ -5069,6 +5296,280 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "HfMachine": {
+        "additionalProperties": true,
+        "description": "A machine entry of a HostFactory request status.",
+        "properties": {
+          "machineId": {
+            "title": "Machineid",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "executing",
+              "fail",
+              "succeed"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "privateIpAddress": {
+            "title": "Privateipaddress",
+            "type": "string"
+          },
+          "publicIpAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Publicipaddress"
+          },
+          "launchtime": {
+            "format": "int64",
+            "title": "Launchtime",
+            "type": "integer"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "machineId",
+          "name",
+          "result",
+          "privateIpAddress",
+          "launchtime"
+        ],
+        "title": "HfMachine",
+        "type": "object"
+      },
+      "HfRequestStatusItem": {
+        "additionalProperties": true,
+        "description": "One request in a HostFactory request status response.",
+        "properties": {
+          "requestId": {
+            "title": "Requestid",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "complete",
+              "complete_with_error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "machines": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HfMachine"
+            },
+            "title": "Machines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requestId",
+          "status"
+        ],
+        "title": "HfRequestStatusItem",
+        "type": "object"
+      },
+      "HfRequestStatusResponse": {
+        "additionalProperties": true,
+        "description": "HostFactory getRequestStatus response.",
+        "properties": {
+          "requests": {
+            "items": {
+              "$ref": "#/components/schemas/HfRequestStatusItem"
+            },
+            "title": "Requests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requests"
+        ],
+        "title": "HfRequestStatusResponse",
+        "type": "object"
+      },
+      "HfRequestIdResponse": {
+        "additionalProperties": true,
+        "description": "HostFactory requestMachines and requestReturnMachines response.",
+        "properties": {
+          "requestId": {
+            "title": "Requestid",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          }
+        },
+        "required": [
+          "requestId"
+        ],
+        "title": "HfRequestIdResponse",
+        "type": "object"
+      },
+      "HfReturnRequest": {
+        "additionalProperties": true,
+        "description": "A machine HostFactory must return, with the time left before it is reclaimed.",
+        "properties": {
+          "machine": {
+            "title": "Machine",
+            "type": "string"
+          },
+          "gracePeriod": {
+            "title": "Graceperiod",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "machine",
+          "gracePeriod"
+        ],
+        "title": "HfReturnRequest",
+        "type": "object"
+      },
+      "HfReturnRequestsResponse": {
+        "additionalProperties": true,
+        "description": "HostFactory getReturnRequests response.",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          },
+          "requests": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HfReturnRequest"
+            },
+            "title": "Requests",
+            "type": "array"
+          }
+        },
+        "title": "HfReturnRequestsResponse",
+        "type": "object"
+      },
+      "HfTemplate": {
+        "additionalProperties": true,
+        "description": "A template of a HostFactory getAvailableTemplates response.",
+        "properties": {
+          "templateId": {
+            "title": "Templateid",
+            "type": "string"
+          },
+          "maxNumber": {
+            "title": "Maxnumber",
+            "type": "integer"
+          },
+          "attributes": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Attributes",
+            "type": "object"
+          }
+        },
+        "required": [
+          "templateId",
+          "maxNumber",
+          "attributes"
+        ],
+        "title": "HfTemplate",
+        "type": "object"
+      },
+      "HfTemplatesResponse": {
+        "additionalProperties": true,
+        "description": "HostFactory getAvailableTemplates response.",
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/HfTemplate"
+            },
+            "title": "Templates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "templates"
+        ],
+        "title": "HfTemplatesResponse",
+        "type": "object"
       }
     },
     "securitySchemes": {

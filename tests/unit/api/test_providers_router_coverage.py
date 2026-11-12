@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 
 from orb.api.dependencies import get_config_manager, get_current_user
 from orb.api.routers.providers import router as providers_router
+from tests.unit.api.providers_support import serve_providers_from
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -63,6 +64,9 @@ def _provider_instance(*, name: str, ptype: str = "aws", enabled: bool = True):
     p.type = ptype
     p.enabled = enabled
     p.config = {"region": "us-east-1"}
+    p.weight = 1
+    p.priority = 0
+    p.get_effective_handlers.return_value = {}
     return p
 
 
@@ -79,6 +83,8 @@ def _config_mgr_with(*providers):
     provider_config = MagicMock()
     provider_config.get_active_providers.return_value = list(providers)
     provider_config.default_provider = providers[0].name if providers else None
+    provider_config.provider_defaults = {}
+    provider_config.selection_policy = "first_available"
     m = MagicMock()
     m.get_provider_config.return_value = provider_config
     return m
@@ -393,7 +399,7 @@ class TestListProviders:
         config_mgr.get_provider_config.return_value = None
 
         app = _make_app()
-        app.dependency_overrides[get_config_manager] = lambda: config_mgr
+        serve_providers_from(app, config_mgr)
 
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/providers/")
@@ -410,7 +416,7 @@ class TestListProviders:
         config_mgr.get_provider_config.return_value = provider_config
 
         app = _make_app()
-        app.dependency_overrides[get_config_manager] = lambda: config_mgr
+        serve_providers_from(app, config_mgr)
 
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/providers/")
@@ -423,7 +429,7 @@ class TestListProviders:
         config_mgr = _config_mgr_with(p1)
 
         app = _make_app()
-        app.dependency_overrides[get_config_manager] = lambda: config_mgr
+        serve_providers_from(app, config_mgr)
 
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/providers/")
@@ -439,7 +445,7 @@ class TestListProviders:
         config_mgr.get_provider_config.side_effect = RuntimeError("config error")
 
         app = _make_app()
-        app.dependency_overrides[get_config_manager] = lambda: config_mgr
+        serve_providers_from(app, config_mgr)
 
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/providers/")
