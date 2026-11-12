@@ -1030,6 +1030,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#response-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Response Format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#templates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1219,10 +1230,77 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#list-return-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        List Return Requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-request-details" class="md-nav__link">
     <span class="md-ellipsis">
       
         Get Request Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Providers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Providers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#list-providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        List Providers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initialise-orb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialise ORB
       
     </span>
   </a>
@@ -6346,6 +6424,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#response-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Response Format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#templates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6535,10 +6624,77 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#list-return-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        List Return Requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-request-details" class="md-nav__link">
     <span class="md-ellipsis">
       
         Get Request Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Providers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Providers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#list-providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        List Providers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Administration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initialise-orb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialise ORB
       
     </span>
   </a>
@@ -6614,6 +6770,13 @@
 </code></pre></div>
 <h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
 <p>Authentication is not enforced by default in development mode. For production deployments, place ORB behind a reverse proxy or API gateway that handles authentication.</p>
+<h2 id="response-format">Response Format<a class="headerlink" href="#response-format" title="Permanent link">&para;</a></h2>
+<p>The configured scheduler decides the shape of every response. A call can ask for
+another registered format with the <code>X-ORB-Scheduler</code> header or the <code>scheduler</code>
+query parameter, with any role; an unknown name returns <code>400</code>. The response names
+the format it used in the <code>X-ORB-Scheduler</code> header and varies on it. The OpenAPI
+document describes the default shape of each operation and, under
+<code>x-orb-formats</code>, the schema of every built-in format.</p>
 <h2 id="templates">Templates<a class="headerlink" href="#templates" title="Permanent link">&para;</a></h2>
 <h3 id="list-templates">List Templates<a class="headerlink" href="#list-templates" title="Permanent link">&para;</a></h3>
 <p>Returns all available templates.</p>
@@ -6898,7 +7061,9 @@
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | <code>long</code> | boolean | Include detailed info and refresh provider state (default: <code>true</code>) |</p>
-<p><strong>Response (200):</strong> Scheduler-dependent format.</p>
+<p><strong>Response (200):</strong> Scheduler-dependent format. A request that has a deadline carries
+<code>deadline_at</code>, and one that was ever partially fulfilled carries <code>partial_since</code>
+(ISO 8601); both are absent otherwise and are not part of the HostFactory format.</p>
 <p>Default scheduler example:
 <div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="p">{</span>
 <a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span><span class="nt">&quot;request_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;req-abc123&quot;</span><span class="p">,</span>
@@ -6919,6 +7084,16 @@
 <a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>curl<span class="w"> </span><span class="s2">&quot;http://localhost:8000/api/v1/requests/req-abc123/status?long=false&quot;</span>
 </code></pre></div></p>
 <hr />
+<h3 id="list-return-requests">List Return Requests<a class="headerlink" href="#list-return-requests" title="Permanent link">&para;</a></h3>
+<p>Returns the return requests ORB created.</p>
+<p><strong>Endpoint:</strong> <code>GET /api/v1/requests/return</code></p>
+<p><strong>Query Parameters:</strong>
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| <code>status</code> | string | Filter by return request status (<code>pending</code>, <code>in_progress</code>, <code>complete</code>, <code>failed</code>, <code>cancelled</code>, <code>partial</code>, <code>timeout</code>); an unknown value returns <code>400</code> |
+| <code>limit</code>, <code>offset</code>, <code>cursor</code>, <code>q</code>, <code>sort</code> | | Paging, search and ordering, as for List Requests |</p>
+<p><strong>Response (200):</strong> Scheduler-dependent format.</p>
+<hr />
 <h3 id="get-request-details">Get Request Details<a class="headerlink" href="#get-request-details" title="Permanent link">&para;</a></h3>
 <p>Returns full details for a request.</p>
 <p><strong>Endpoint:</strong> <code>GET /api/v1/requests/{request_id}</code></p>
@@ -6930,6 +7105,65 @@
 <p><strong>Example:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>curl<span class="w"> </span>http://localhost:8000/api/v1/requests/req-abc123
 </code></pre></div></p>
+<hr />
+<h2 id="providers">Providers<a class="headerlink" href="#providers" title="Permanent link">&para;</a></h2>
+<h3 id="list-providers">List Providers<a class="headerlink" href="#list-providers" title="Permanent link">&para;</a></h3>
+<p><strong>Endpoint:</strong> <code>GET /api/v1/providers/</code></p>
+<p><strong>Response (200):</strong> <code>providers</code> (each with <code>name</code>, <code>type</code>, <code>enabled</code>, <code>status</code>,
+<code>capabilities</code>, <code>weight</code>, <code>priority</code> and <code>config</code>), <code>count</code>, <code>total_count</code> (the
+same value as <code>count</code>), <code>selection_policy</code> and <code>message</code>. An unreadable provider
+configuration returns a configuration error, not an empty list.</p>
+<hr />
+<h2 id="administration">Administration<a class="headerlink" href="#administration" title="Permanent link">&para;</a></h2>
+<h3 id="initialise-orb">Initialise ORB<a class="headerlink" href="#initialise-orb" title="Permanent link">&para;</a></h3>
+<p><strong>Endpoint:</strong> <code>POST /api/v1/admin/init</code></p>
+<p>Requires the <code>admin</code> role, <code>allow_destructive_admin</code>, a non-production
+environment and <code>"confirm": "INIT"</code>. It writes a configuration with one provider
+built the same way as <code>orb init --non-interactive</code>, after checking the provider
+credentials; nothing is written when the check fails.</p>
+<table>
+<thead>
+<tr>
+<th>Body field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>confirm</code></td>
+<td>string</td>
+<td>Must be <code>INIT</code></td>
+</tr>
+<tr>
+<td><code>provider_type</code></td>
+<td>string</td>
+<td>Provider to configure; the first registered provider if omitted</td>
+</tr>
+<tr>
+<td><code>scheduler_type</code></td>
+<td>string</td>
+<td>Scheduler type, <code>default</code> if omitted</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td>object</td>
+<td>Provider options by their <code>orb init</code> argument names, for example <code>{"aws_region": "eu-west-2", "aws_profile": "ops"}</code>. Credential sources are named, never sent as secrets</td>
+</tr>
+<tr>
+<td><code>force</code></td>
+<td>boolean</td>
+<td>Replace an existing configuration</td>
+</tr>
+<tr>
+<td><code>generate_templates</code></td>
+<td>boolean</td>
+<td>Refresh templates afterwards (default <code>true</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Returns <code>400</code> for a missing confirmation, rejected provider input or credentials
+that could not be verified.</p>
 <hr />
 <h2 id="error-responses">Error Responses<a class="headerlink" href="#error-responses" title="Permanent link">&para;</a></h2>
 <p>All endpoints return a consistent error format on failure:</p>

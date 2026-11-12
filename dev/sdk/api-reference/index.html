@@ -7888,6 +7888,7 @@
 </tbody>
 </table>
 <p>Request status responses are formatted by the active <code>SchedulerPort</code> strategy and their shape varies by scheduler type.</p>
+<p>The in-process Python SDK follows the configured scheduler (or the <code>scheduler=</code> constructor argument). A call can name another registered format with the <code>format</code> keyword, for example <code>await sdk.list_machines(format="hostfactory")</code>; an unknown name raises <code>RequestValidationError</code>. The MCP tools accept the same <code>format</code> argument.</p>
 <hr />
 <h2 id="error-types">Error Types<a class="headerlink" href="#error-types" title="Permanent link">&para;</a></h2>
 <table>

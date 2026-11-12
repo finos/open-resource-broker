@@ -5327,10 +5327,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-x-orb-scheduler-header-hostfactory-mode" class="md-nav__link">
+  <a href="#response-format-and-the-x-orb-scheduler-header" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The X-ORB-Scheduler header (HostFactory mode)
+        Response format and the X-ORB-Scheduler header
       
     </span>
   </a>
@@ -6579,10 +6579,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-x-orb-scheduler-header-hostfactory-mode" class="md-nav__link">
+  <a href="#response-format-and-the-x-orb-scheduler-header" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The X-ORB-Scheduler header (HostFactory mode)
+        Response format and the X-ORB-Scheduler header
       
     </span>
   </a>
@@ -6917,15 +6917,21 @@ implementations.</p>
 </ul>
 <p>Prefer the language-native AWS SDK for signing rather than a hand-rolled
 implementation. See <code>sdk/ARCHITECTURE.md</code> Layer 4 for per-language guidance.</p>
-<h2 id="the-x-orb-scheduler-header-hostfactory-mode">The X-ORB-Scheduler header (HostFactory mode)<a class="headerlink" href="#the-x-orb-scheduler-header-hostfactory-mode" title="Permanent link">&para;</a></h2>
-<p>When connecting to a remote ORB server that is running with
-<code>--scheduler hostfactory</code>, every request must carry:</p>
+<h2 id="response-format-and-the-x-orb-scheduler-header">Response format and the X-ORB-Scheduler header<a class="headerlink" href="#response-format-and-the-x-orb-scheduler-header" title="Permanent link">&para;</a></h2>
+<p>A response uses the format of the scheduler the server is configured with
+(<code>default</code>, <code>hostfactory</code> or <code>slurm</code>). Any caller, whatever its role, can ask
+for another registered format for one call:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>X-ORB-Scheduler: hostfactory
 </code></pre></div>
-<p>The server reads this header to select the HostFactory scheduler backend.
-Without it the default scheduler is used. The header is ignored if the server
-was not started with <code>--scheduler hostfactory</code>.</p>
-<p>When using the default scheduler, omit the header entirely.</p>
+<p>The <code>scheduler</code> query parameter does the same (<code>?scheduler=hostfactory</code>); if both
+are sent they must name the same format. An unknown name is a <code>400</code>. Every
+response carries <code>X-ORB-Scheduler</code> with the format that produced the body, and
+<code>Vary: X-ORB-Scheduler</code>; browsers can read the header because the server lists it
+in <code>Access-Control-Expose-Headers</code>.</p>
+<p>The spec describes both shapes. Each operation whose HostFactory body differs has
+an <code>x-orb-formats</code> entry naming the response schema of every built-in format, and
+the HostFactory schemas are the <code>Hf*</code> components. Generated clients are typed for
+the default format; use the <code>Hf*</code> models when you request <code>hostfactory</code>.</p>
 <h2 id="regenerating-after-a-spec-update">Regenerating after a spec update<a class="headerlink" href="#regenerating-after-a-spec-update" title="Permanent link">&para;</a></h2>
 <p>The spec can change between ORB releases. To regenerate models after an
 upgrade:</p>

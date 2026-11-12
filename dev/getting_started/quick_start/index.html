@@ -6443,6 +6443,9 @@ unavailable or the desired resource is not shown. If GCP project listing returns
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>--security-group-ids<span class="w"> </span>sg-0abc1234<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span>--fleet-role<span class="w"> </span>arn:aws:iam::123456789012:role/MySpotFleetRole
 </code></pre></div>
+<p>A running server can be initialised over REST with <code>POST /api/v1/admin/init</code>; it builds
+the same provider configuration and verifies the credentials first (see the
+<a href="../../user_guide/api_reference/#initialise-orb">API reference</a>).</p>
 <p>This guide uses AWS, but the same <code>orb init --provider-type &lt;type&gt;</code> flow sets up Azure, Google Cloud, and Kubernetes — see the <a href="../../providers/azure/">Azure Provider Guide</a>, the <a href="../../providers/gcp/">Google Cloud Provider Guide</a>, and the <a href="../../providers/k8s/">Kubernetes Provider Guide</a>.</p>
 <h2 id="step-2-generate-templates">Step 2: Generate templates<a class="headerlink" href="#step-2-generate-templates" title="Permanent link">&para;</a></h2>
 <p>Generate example templates for your configured provider:</p>
