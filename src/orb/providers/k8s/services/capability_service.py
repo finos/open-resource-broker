@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.base.strategy import ProviderCapabilities, ProviderOperationType
-from orb.providers.k8s.value_objects import KubernetesProviderApi
+from orb.providers.k8s.handler_plugins import supported_provider_apis
 
 if TYPE_CHECKING:  # pragma: no cover
     from orb.providers.k8s.configuration.config import K8sProviderConfig
@@ -30,8 +30,6 @@ if TYPE_CHECKING:  # pragma: no cover
 # Sentinel value used when the user selects the in-cluster ServiceAccount
 # credential source.
 _IN_CLUSTER_SENTINEL = "in_cluster"
-
-_SUPPORTED_APIS: tuple[str, ...] = tuple(api.value for api in KubernetesProviderApi)
 
 
 def _normalise_sentinel(value: str) -> str:
@@ -80,7 +78,7 @@ class K8sCapabilityService:
                 ProviderOperationType.START_INSTANCES,
                 ProviderOperationType.STOP_INSTANCES,
             ],
-            supported_apis=list(_SUPPORTED_APIS),
+            supported_apis=supported_provider_apis(),
             features={
                 "selective_termination": False,
                 "selective_termination_by_api": {
@@ -146,8 +144,8 @@ class K8sCapabilityService:
 
     @staticmethod
     def get_supported_apis() -> list[str]:
-        """Return the list of supported provider API values."""
-        return list(_SUPPORTED_APIS)
+        """Return the built-in provider API values plus any registered plugin APIs."""
+        return supported_provider_apis()
 
     # ------------------------------------------------------------------
     # Region helpers (Kubernetes has no regions)

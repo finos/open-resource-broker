@@ -104,9 +104,10 @@ plugin needs:
 
 * `orb.providers.registry.get_provider_registry()` - to register a
   fully fresh `ProviderStrategy`.
-* `K8sProviderStrategy._HANDLERS` (via the
-  `register_k8s_handler` helper introduced below) - to attach a
-  new handler to the existing Kubernetes provider.
+* `orb.providers.k8s.handler_plugins.register_k8s_handler()` - to attach
+  a new handler to the existing Kubernetes provider.  The registered
+  `provider_api` is then accepted by the template validators and listed in
+  the provider's supported APIs and handler defaults.
 * Anything else needed (CLI specs, defaults loaders, etc.) - same
   registries the built-in providers use.
 
@@ -312,10 +313,7 @@ from __future__ import annotations
 
 import logging
 
-from orb.providers.k8s.strategy.k8s_provider_strategy import (
-    K8sProviderStrategy,
-)
-from orb.providers.k8s.value_objects import KubernetesProviderApi
+from orb.providers.k8s.handler_plugins import register_k8s_handler
 
 from orb_mpi_job.handler import KubernetesMPIJobHandler
 
@@ -330,10 +328,11 @@ def register() -> None:
     the entry-point name is a configured provider type.
     """
     try:
-        # The Kubernetes provider strategy exposes a class-level registry
-        # of handlers keyed by `provider_api`.  Adding to it is the entire
+        # A process-wide registry of handlers keyed by `provider_api`.
+        # Every Kubernetes provider strategy, the template validators and
+        # the provider defaults read it; adding to it is the entire
         # integration surface.
-        K8sProviderStrategy.register_handler(
+        register_k8s_handler(
             provider_api="KubernetesMPIJob",
             handler_class=KubernetesMPIJobHandler,
         )
@@ -447,7 +446,7 @@ dependencies = [
 ```
 
 The plugin contract - `register()`, `K8sHandlerBase`,
-`K8sProviderStrategy.register_handler`, the
+`register_k8s_handler`, the
 `orb.providers` entry-point group - is part of ORB's public surface
 and follows semantic versioning.  Breaking changes will be called out
 in `CHANGELOG.md` and held to major-version bumps.
