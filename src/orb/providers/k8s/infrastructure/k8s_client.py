@@ -67,7 +67,7 @@ from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.exceptions.k8s_exceptions import K8sAuthError
 
 if TYPE_CHECKING:
-    from kubernetes.client import AppsV1Api, BatchV1Api, CoreV1Api
+    from kubernetes.client import AppsV1Api, BatchV1Api, CoreV1Api, CustomObjectsApi
     from kubernetes.client.api_client import ApiClient
 
 # When a mass-401 fans out across many concurrent retry workers, only the
@@ -104,6 +104,7 @@ class K8sClient:
         self._core_v1: Optional[CoreV1Api] = None
         self._apps_v1: Optional[AppsV1Api] = None
         self._batch_v1: Optional[BatchV1Api] = None
+        self._custom_objects_api: Optional[CustomObjectsApi] = None
 
         # Coalesce concurrent 401-driven refreshes: the lock serialises the
         # re-mint and ``_last_refresh_at`` records when it last completed so
@@ -380,6 +381,15 @@ class K8sClient:
             self._batch_v1 = _BatchV1Api(self.api_client)
         return self._batch_v1
 
+    @property
+    def custom_objects_api(self) -> CustomObjectsApi:
+        """Lazy ``CustomObjectsApi`` accessor (custom resources, for plugin handlers)."""
+        if self._custom_objects_api is None:
+            from kubernetes.client import CustomObjectsApi as _CustomObjectsApi
+
+            self._custom_objects_api = _CustomObjectsApi(self.api_client)
+        return self._custom_objects_api
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
@@ -404,3 +414,4 @@ class K8sClient:
         self._core_v1 = None
         self._apps_v1 = None
         self._batch_v1 = None
+        self._custom_objects_api = None
