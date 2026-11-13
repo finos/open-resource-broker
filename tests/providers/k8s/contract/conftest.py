@@ -30,9 +30,7 @@ from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     K8sResourceQuantities,
     K8sTemplate,
 )
-from orb.providers.k8s.infrastructure.adapters.template_adapter import (
-    _SUPPORTED_PROVIDER_APIS,
-)
+from orb.providers.k8s.handler_plugins import supported_provider_apis
 from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
 
@@ -256,7 +254,7 @@ class _K8sProviderAdapter:
 
 # ---------------------------------------------------------------------------
 # Inline validation adapter — thin implementation of BaseProviderValidationAdapter
-# using the static _SUPPORTED_PROVIDER_APIS list from the k8s template adapter.
+# using supported_provider_apis() from the k8s handler plugin registry.
 # There is no K8sValidationAdapter class in the production codebase; this
 # inline version satisfies the validation contract without adding prod code.
 # ---------------------------------------------------------------------------
@@ -265,7 +263,7 @@ class _K8sProviderAdapter:
 class _K8sValidationAdapter(BaseProviderValidationAdapter):
     """Minimal validation adapter for the k8s provider contract tests."""
 
-    _SUPPORTED: list[str] = list(_SUPPORTED_PROVIDER_APIS)
+    _SUPPORTED: list[str] = supported_provider_apis()
 
     def get_provider_type(self) -> str:
         return "k8s"
@@ -315,7 +313,7 @@ class _K8sTemplateProvider:
             provider_api is not None
             and isinstance(provider_api, str)
             and len(provider_api) > 0
-            and provider_api in _SUPPORTED_PROVIDER_APIS
+            and provider_api in supported_provider_apis()
         )
 
 
