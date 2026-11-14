@@ -107,7 +107,10 @@ plugin needs:
 * `orb.providers.k8s.handler_plugins.register_k8s_handler()` - to attach
   a new handler to the existing Kubernetes provider.  The registered
   `provider_api` is then accepted by the template validators and listed in
-  the provider's supported APIs and handler defaults.
+  the provider's supported APIs and handler defaults.  A handler that
+  creates custom resources declares their kinds with `custom_resources=`
+  so the orphan garbage collector covers them (see
+  [Orphan cleanup](#orphan-cleanup)).
 * Anything else needed (CLI specs, defaults loaders, etc.) - same
   registries the built-in providers use.
 
@@ -249,13 +252,16 @@ class KubernetesMPIJobHandler(K8sHandlerBase):
         return []
 
     def _build_mpijob_body(self, request: Request, template: Template) -> dict[str, Any]:
-        # Stamp the canonical ORB labels so the orphan reconciler picks the
-        # MPIJob up.  Use the base class's label_prefix.
+        # Stamp the canonical ORB labels so the orphan garbage collector can
+        # tell which installation and request own the MPIJob.  Use the base
+        # class's label_prefix.
         labels = {
             f"{self._config.label_prefix}/managed": "true",
             f"{self._config.label_prefix}/request-id": str(request.request_id),
             f"{self._config.label_prefix}/provider-api": self.PROVIDER_API,
         }
+        if self._config.orb_instance_id:
+            labels[f"{self._config.label_prefix}/orb-instance"] = self._config.orb_instance_id
         return {
             "apiVersion": f"{self.GROUP}/{self.VERSION}",
             "kind": "MPIJob",
@@ -313,7 +319,7 @@ from __future__ import annotations
 
 import logging
 
-from orb.providers.k8s.handler_plugins import register_k8s_handler
+from orb.providers.k8s.handler_plugins import K8sCustomResource, register_k8s_handler
 
 from orb_mpi_job.handler import KubernetesMPIJobHandler
 
@@ -335,6 +341,8 @@ def register() -> None:
         register_k8s_handler(
             provider_api="KubernetesMPIJob",
             handler_class=KubernetesMPIJobHandler,
+            # Swept by the orphan garbage collector alongside pods.
+            custom_resources=[K8sCustomResource("kubeflow.org", "v2beta1", "mpijobs")],
         )
     except Exception:  # pragma: no cover - defensive
         log.exception("Failed to register orb-mpi-job plugin")
@@ -362,6 +370,28 @@ baseline [`rbac.yaml`](rbac.yaml):
 
 Apply by either adding the rules to your existing Role or by shipping a
 companion `Role` in the plugin's own manifests.
+
+### Orphan cleanup
+
+When `orphan_gc_enabled` is on, the orphan garbage collector lists the
+kinds a plugin declared with `custom_resources=` in every watched
+namespace, next to pods, and applies the same rules to both:
+
+* only objects labelled `<label_prefix>/managed=true` and
+  `<label_prefix>/orb-instance=<orb_instance_id>` are listed, so the
+  handler must stamp both, plus `<label_prefix>/request-id`;
+* nothing is classified when `orb_instance_id` is unset or the request
+  store cannot be read or is empty;
+* an object whose request is unknown is logged, and deleted only when
+  `auto_cleanup_orphans` is on, it is older than
+  `orphan_min_age_seconds`, and a re-check confirms the request is still
+  missing;
+* objects without a request-id label, and objects already being deleted,
+  are never deleted.
+
+Deletion goes through `delete_namespaced_custom_object`, so the GC needs
+`list` and `delete` on the kind, which the RBAC rules above grant.  A kind
+whose CRD is not installed is skipped with one warning.
 
 ### Testing
 

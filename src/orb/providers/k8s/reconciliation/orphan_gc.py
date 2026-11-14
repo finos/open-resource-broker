@@ -11,6 +11,11 @@ Long-running asyncio task that walks the cluster every
 
 Such pods are "orphans": the controller plane has lost track of them.
 
+The same sweep covers the custom resource kinds that plugin handlers
+declare through ``register_k8s_handler(custom_resources=...)``: an object
+of such a kind is an orphan under exactly the rules above, and is deleted
+under the same guards.  Objects already being deleted are skipped.
+
 The collector fails safe.  It does nothing when the instance id is not
 configured, when the known-request-id lookup is missing, fails or returns
 an empty set, and it re-checks storage for the pod's request immediately
@@ -41,6 +46,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.di.injectable import injectable
 from orb.providers.k8s.configuration.config import K8sProviderConfig
+from orb.providers.k8s.handler_plugins import K8sCustomResource, registered_custom_resources
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.reconciliation.startup_reconciler import OrphanPod
 from orb.providers.k8s.utilities.labels import (
@@ -61,6 +67,20 @@ _LIST_TIMEOUT_SECONDS = 60
 _DELETE_CONCURRENCY = 50
 
 
+@dataclass(frozen=True)
+class OrphanCustomResource:
+    """A custom resource object that carries the managed labels of an unknown request."""
+
+    resource: K8sCustomResource
+    name: str
+    namespace: str
+    request_id: Optional[str]
+    creation_timestamp: Optional[str]
+
+
+Orphan = OrphanPod | OrphanCustomResource
+
+
 @dataclass
 class OrphanGCStats:
     """Cumulative orphan-GC statistics surfaced for metrics / debug."""
@@ -75,6 +95,7 @@ class OrphanGCStats:
     skipped_recheck: int = 0
     last_error: Optional[str] = None
     namespaces_checked: list[str] = field(default_factory=list)
+    custom_resources_checked: list[str] = field(default_factory=list)
 
 
 @injectable
@@ -96,6 +117,9 @@ class OrphanGarbageCollector:
         interval_seconds: Override for
             :attr:`K8sProviderConfig.orphan_gc_interval_seconds`
             (tests inject a much shorter interval).
+        custom_resources: Callable returning the custom resource kinds to
+            sweep alongside pods, evaluated on every run.  Defaults to the
+            kinds plugin handlers declared with ``register_k8s_handler``.
     """
 
     def __init__(
@@ -107,8 +131,10 @@ class OrphanGarbageCollector:
         known_request_ids: Optional[Callable[[], Iterable[str]]],
         existing_request_ids: Optional[Callable[[Iterable[str]], Iterable[str]]] = None,
         interval_seconds: Optional[float] = None,
+        custom_resources: Optional[Callable[[], Iterable[K8sCustomResource]]] = None,
     ) -> None:
         self._client = kubernetes_client
+        self._custom_resources_fn = custom_resources or registered_custom_resources
         self._config = config
         self._logger = logger
         self._known_request_ids_fn = known_request_ids
@@ -163,13 +189,14 @@ class OrphanGarbageCollector:
     # Single sweep — used by the loop and exposed for tests / cron
     # ------------------------------------------------------------------
 
-    async def run_once(self) -> list[OrphanPod]:
+    async def run_once(self) -> list[Orphan]:
         """Perform exactly one sweep across all namespaces in parallel.
 
         Namespace fan-out runs concurrently via :func:`asyncio.gather` so
         a slow apiserver response for one namespace does not block the
         others.  Exceptions from individual namespaces are logged and
-        skipped; the overall sweep continues.
+        skipped; the overall sweep continues.  Each declared custom
+        resource kind is listed in every namespace the same way.
         """
         self.stats.runs += 1
         self.stats.last_run_at = time.monotonic()
@@ -206,22 +233,35 @@ class OrphanGarbageCollector:
         label_selector = _build_owned_pods_selector(self._config.label_prefix, instance_id)
         request_id_label = f"{self._config.label_prefix}/request-id"
 
+        resources = self._read_custom_resources()
+        self.stats.custom_resources_checked = [str(resource) for resource in resources]
+
+        targets: list[tuple[Optional[K8sCustomResource], Optional[str]]] = [
+            (None, ns) for ns in namespaces
+        ]
+        targets.extend((resource, ns) for resource in resources for ns in namespaces)
         results = await asyncio.gather(
             *[
                 self._gc_namespace(ns, label_selector, request_id_label, known_ids)
-                for ns in namespaces
+                if resource is None
+                else self._gc_custom_namespace(
+                    resource, ns, label_selector, request_id_label, known_ids
+                )
+                for resource, ns in targets
             ],
             return_exceptions=True,
         )
 
-        orphans: list[OrphanPod] = []
-        for ns, result in zip(namespaces, results, strict=True):
+        orphans: list[Orphan] = []
+        for (resource, ns), result in zip(targets, results, strict=True):
             if isinstance(result, BaseException):
                 ns_label = ns if ns is not None else "*"
-                self.stats.last_error = f"gc_namespace failed for {ns_label}: {result}"
+                kind = "pods" if resource is None else str(resource)
+                self.stats.last_error = f"gc_namespace failed for {ns_label} ({kind}): {result}"
                 self._logger.warning(
-                    "Orphan GC: namespace=%s raised an exception (continuing): %s",
+                    "Orphan GC: namespace=%s kind=%s raised an exception (continuing): %s",
                     ns_label,
+                    kind,
                     result,
                     exc_info=result,
                 )
@@ -235,6 +275,17 @@ class OrphanGarbageCollector:
             await self._delete_orphans_concurrently(orphans)
         else:
             for orphan in orphans:
+                if isinstance(orphan, OrphanCustomResource):
+                    self._logger.warning(
+                        "Orphan custom resource detected (auto_cleanup_orphans=False): "
+                        "kind=%s name=%s namespace=%s request_id=%s created=%s",
+                        orphan.resource,
+                        orphan.name,
+                        orphan.namespace,
+                        orphan.request_id,
+                        orphan.creation_timestamp,
+                    )
+                    continue
                 self._logger.warning(
                     "Orphan pod detected (auto_cleanup_orphans=False): "
                     "pod=%s namespace=%s request_id=%s created=%s",
@@ -245,6 +296,16 @@ class OrphanGarbageCollector:
                 )
 
         return orphans
+
+    def _read_custom_resources(self) -> list[K8sCustomResource]:
+        """Return the declared custom resource kinds; a failing lookup sweeps pods only."""
+        try:
+            return list(dict.fromkeys(self._custom_resources_fn()))
+        except Exception as exc:
+            self._logger.warning(
+                "Orphan GC: custom resource lookup failed; sweeping pods only: %s", exc
+            )
+            return []
 
     def _read_known_ids(self) -> set[str]:
         assert self._known_request_ids_fn is not None  # noqa: S101  # narrowed by caller
@@ -301,6 +362,43 @@ class OrphanGarbageCollector:
                 self._logger.warning(
                     "Managed pod has no request-id label; not deleting: pod=%s namespace=%s",
                     orphan.pod_name,
+                    orphan.namespace,
+                )
+                continue
+            if orphan is not None:
+                orphans.append(orphan)
+        return orphans
+
+    async def _gc_custom_namespace(
+        self,
+        resource: K8sCustomResource,
+        namespace: Optional[str],
+        label_selector: str,
+        request_id_label: str,
+        known_ids: set[str],
+    ) -> list[OrphanCustomResource]:
+        """Collect orphaned objects of one custom resource kind in one namespace."""
+        objects = await asyncio.to_thread(
+            self._list_custom_objects, resource, namespace, label_selector
+        )
+        orphans: list[OrphanCustomResource] = []
+        for obj in objects:
+            orphan = self._classify_custom_orphan(
+                obj,
+                resource=resource,
+                namespace=namespace,
+                known_ids=known_ids,
+                request_id_label=request_id_label,
+                instance_label=_instance_label_key(self._config.label_prefix),
+                instance_id=self._config.orb_instance_id or "",
+            )
+            if orphan is not None and not orphan.request_id:
+                self.stats.skipped_unlabeled += 1
+                self._logger.warning(
+                    "Managed custom resource has no request-id label; not deleting: "
+                    "kind=%s name=%s namespace=%s",
+                    resource,
+                    orphan.name,
                     orphan.namespace,
                 )
                 continue
@@ -365,6 +463,93 @@ class OrphanGarbageCollector:
             return []
         return list(getattr(response, "items", []) or [])
 
+    def _list_custom_objects(
+        self,
+        resource: K8sCustomResource,
+        namespace: Optional[str],
+        label_selector: str,
+    ) -> list[dict[str, Any]]:
+        api = self._client.custom_objects_api
+        try:
+            if namespace is None:
+                response = api.list_cluster_custom_object(
+                    group=resource.group,
+                    version=resource.version,
+                    plural=resource.plural,
+                    label_selector=label_selector,
+                    timeout_seconds=_LIST_TIMEOUT_SECONDS,
+                )
+            else:
+                response = api.list_namespaced_custom_object(
+                    group=resource.group,
+                    version=resource.version,
+                    namespace=namespace,
+                    plural=resource.plural,
+                    label_selector=label_selector,
+                    timeout_seconds=_LIST_TIMEOUT_SECONDS,
+                )
+        except Exception as exc:
+            ns_label = namespace if namespace is not None else "*"
+            if _is_not_found(exc):
+                # The CRD is not installed (yet).  Say so once per kind.
+                key = f"crd_missing:{resource}"
+                log = self._logger.debug if key in self._warned else self._logger.warning
+                self._warned.add(key)
+                log(
+                    "Orphan GC: custom resource %s is not served by the cluster; "
+                    "skipping it (namespace=%s)",
+                    resource,
+                    ns_label,
+                )
+                return []
+            self.stats.last_error = f"list {resource} failed: {exc}"
+            self._logger.warning(
+                "Orphan GC: list %s failed for namespace=%s: %s",
+                resource,
+                ns_label,
+                exc,
+                exc_info=True,
+            )
+            return []
+        items = response.get("items") if isinstance(response, dict) else None
+        return [item for item in items or [] if isinstance(item, dict)]
+
+    @staticmethod
+    def _classify_custom_orphan(
+        obj: dict[str, Any],
+        *,
+        resource: K8sCustomResource,
+        namespace: Optional[str],
+        known_ids: set[str],
+        request_id_label: str,
+        instance_label: str,
+        instance_id: str,
+    ) -> Optional[OrphanCustomResource]:
+        metadata = obj.get("metadata")
+        if not isinstance(metadata, dict):
+            return None
+        name = metadata.get("name")
+        if not name:
+            return None
+        if metadata.get("deletionTimestamp"):
+            return None
+        labels = dict(metadata.get("labels") or {})
+        if not instance_id or labels.get(instance_label) != instance_id:
+            return None
+        request_id = labels.get(request_id_label)
+        if request_id is not None and request_id in known_ids:
+            return None
+        creation_timestamp = metadata.get("creationTimestamp")
+        return OrphanCustomResource(
+            resource=resource,
+            name=str(name),
+            namespace=str(metadata.get("namespace") or namespace or ""),
+            request_id=request_id,
+            creation_timestamp=(
+                str(creation_timestamp) if creation_timestamp is not None else None
+            ),
+        )
+
     @staticmethod
     def _classify_orphan(
         pod: V1Pod,
@@ -398,7 +583,7 @@ class OrphanGarbageCollector:
             ),
         )
 
-    async def _delete_orphans_concurrently(self, orphans: list[OrphanPod]) -> None:
+    async def _delete_orphans_concurrently(self, orphans: list[Orphan]) -> None:
         """Delete *orphans* concurrently using :func:`asyncio.gather`.
 
         Each delete runs inside :func:`asyncio.to_thread` (the k8s client is
@@ -413,42 +598,87 @@ class OrphanGarbageCollector:
         """
         sem = asyncio.Semaphore(_DELETE_CONCURRENCY)
 
-        async def _bounded_delete(orphan: OrphanPod) -> None:
+        async def _bounded_delete(orphan: Orphan) -> None:
             async with sem:
-                await asyncio.to_thread(self._delete_orphan, orphan)
+                if isinstance(orphan, OrphanCustomResource):
+                    await asyncio.to_thread(self._delete_custom_orphan, orphan)
+                else:
+                    await asyncio.to_thread(self._delete_orphan, orphan)
 
         await asyncio.gather(
             *(_bounded_delete(orphan) for orphan in orphans),
             return_exceptions=True,
         )
 
-    def _delete_orphan(self, orphan: OrphanPod) -> None:
-        """Best-effort delete; swallow 404 (already gone).
+    def _may_delete(
+        self, name: str, request_id: Optional[str], creation_timestamp: Optional[str]
+    ) -> bool:
+        """Apply the guards every orphan delete must pass.
 
-        The min-age guard prevents deletion of pods whose request record may
-        not yet have been committed to storage (in-flight request commit race).
+        The min-age guard prevents deletion of objects whose request record
+        may not yet have been committed to storage (in-flight request commit
+        race); the re-check confirms the request is still missing right now.
         """
         min_age = self._config.orphan_min_age_seconds
-        if min_age > 0 and orphan.creation_timestamp is not None:
-            pod_age_seconds = _pod_age_seconds(orphan.creation_timestamp)
-            if pod_age_seconds is not None and pod_age_seconds < min_age:
+        if min_age > 0 and creation_timestamp is not None:
+            age_seconds = _pod_age_seconds(creation_timestamp)
+            if age_seconds is not None and age_seconds < min_age:
                 self._logger.debug(
                     "Skipping orphan %s; created %.1fs ago, under min-age threshold (%ds)",
-                    orphan.pod_name,
-                    pod_age_seconds,
+                    name,
+                    age_seconds,
                     min_age,
                 )
-                return
-        if not orphan.request_id:
-            return
-        if not self._request_still_unknown(orphan.request_id):
+                return False
+        if not request_id:
+            return False
+        if not self._request_still_unknown(request_id):
             with self._stats_lock:
                 self.stats.skipped_recheck += 1
             self._logger.info(
-                "Keeping pod %s: request %s exists in storage or could not be confirmed missing",
-                orphan.pod_name,
+                "Keeping %s: request %s exists in storage or could not be confirmed missing",
+                name,
+                request_id,
+            )
+            return False
+        return True
+
+    def _delete_custom_orphan(self, orphan: OrphanCustomResource) -> None:
+        """Best-effort delete of an orphaned custom resource; swallow 404."""
+        label = f"{orphan.resource} {orphan.namespace}/{orphan.name}"
+        if not self._may_delete(label, orphan.request_id, orphan.creation_timestamp):
+            return
+        try:
+            self._client.custom_objects_api.delete_namespaced_custom_object(
+                group=orphan.resource.group,
+                version=orphan.resource.version,
+                namespace=orphan.namespace,
+                plural=orphan.resource.plural,
+                name=orphan.name,
+            )
+            with self._stats_lock:
+                self.stats.total_orphans_deleted += 1
+            self._logger.info(
+                "Orphan custom resource deleted: kind=%s name=%s namespace=%s request_id=%s",
+                orphan.resource,
+                orphan.name,
+                orphan.namespace,
                 orphan.request_id,
             )
+        except Exception as exc:
+            if _is_not_found(exc):
+                with self._stats_lock:
+                    self.stats.total_orphans_deleted += 1
+                self._logger.debug("Orphan %s already gone (404)", label)
+                return
+            with self._stats_lock:
+                self.stats.delete_failures += 1
+            self.stats.last_error = f"delete {label}: {exc}"
+            self._logger.warning("Orphan custom resource delete failed: %s error=%s", label, exc)
+
+    def _delete_orphan(self, orphan: OrphanPod) -> None:
+        """Best-effort delete; swallow 404 (already gone)."""
+        if not self._may_delete(orphan.pod_name, orphan.request_id, orphan.creation_timestamp):
             return
         try:
             self._client.core_v1.delete_namespaced_pod(
@@ -509,4 +739,4 @@ def _is_not_found(exc: BaseException) -> bool:
     return getattr(exc, "status", None) == 404
 
 
-__all__ = ["OrphanGCStats", "OrphanGarbageCollector"]
+__all__ = ["Orphan", "OrphanCustomResource", "OrphanGCStats", "OrphanGarbageCollector"]

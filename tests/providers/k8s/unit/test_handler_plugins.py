@@ -17,8 +17,10 @@ import pytest
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.defaults_loader import KubernetesDefaultsLoader
 from orb.providers.k8s.handler_plugins import (
+    K8sCustomResource,
     plugin_handler_defaults,
     register_k8s_handler,
+    registered_custom_resources,
     registered_k8s_handlers,
     supported_provider_apis,
     unregister_k8s_handler,
@@ -29,6 +31,8 @@ from orb.providers.k8s.strategy.k8s_provider_strategy import K8sProviderStrategy
 from orb.providers.k8s.validation.template_validator import K8sTemplateValidator
 
 _API = "KubernetesPluginTest"
+_API2 = "KubernetesPluginTestTwo"
+_CR = K8sCustomResource("example.io", "v1", "widgets")
 
 
 class _StubHandler:
@@ -42,8 +46,10 @@ class _OtherStubHandler:
 @pytest.fixture(autouse=True)
 def _clean_registry() -> Iterator[None]:
     unregister_k8s_handler(_API)
+    unregister_k8s_handler(_API2)
     yield
     unregister_k8s_handler(_API)
+    unregister_k8s_handler(_API2)
 
 
 def _make_strategy() -> K8sProviderStrategy:
@@ -97,6 +103,45 @@ def test_unregister_removes_the_api() -> None:
     unregister_k8s_handler(_API)
     assert _API not in supported_provider_apis()
     unregister_k8s_handler(_API)  # unknown name is a no-op
+
+
+def test_custom_resources_default_to_none() -> None:
+    register_k8s_handler(_API, _StubHandler)
+    assert registered_custom_resources() == []
+
+
+def test_custom_resources_are_listed_once_in_order() -> None:
+    other = K8sCustomResource("example.io", "v1", "gadgets")
+    register_k8s_handler(_API, _StubHandler, custom_resources=[_CR, other])
+    register_k8s_handler(_API2, _OtherStubHandler, custom_resources=[_CR])
+    assert registered_custom_resources() == [_CR, other]
+    unregister_k8s_handler(_API)
+    assert registered_custom_resources() == [_CR]
+
+
+def test_re_registering_replaces_the_custom_resources() -> None:
+    register_k8s_handler(_API, _StubHandler, custom_resources=[_CR])
+    register_k8s_handler(_API, _StubHandler)
+    assert registered_custom_resources() == []
+
+
+def test_custom_resources_must_be_declared_with_the_dataclass() -> None:
+    with pytest.raises(TypeError, match="K8sCustomResource"):
+        register_k8s_handler(_API, _StubHandler, custom_resources=["widgets.example.io"])  # type: ignore[list-item]
+    assert _API not in supported_provider_apis()
+
+
+@pytest.mark.parametrize(
+    ("group", "version", "plural"),
+    [("", "v1", "widgets"), ("example.io", "", "widgets"), ("example.io", "v1", "")],
+)
+def test_custom_resource_fields_are_required(group: str, version: str, plural: str) -> None:
+    with pytest.raises(ValueError, match="non-empty"):
+        K8sCustomResource(group, version, plural)
+
+
+def test_custom_resource_str_is_readable() -> None:
+    assert str(_CR) == "widgets.example.io/v1"
 
 
 # ---------------------------------------------------------------------------
