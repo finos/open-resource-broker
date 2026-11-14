@@ -66,6 +66,7 @@ from orb.providers.k8s.strategy.outcome_bridge import (
 )
 from orb.providers.k8s.strategy.reconciliation_lifecycle import K8sReconciliationLifecycle
 from orb.providers.k8s.strategy.watch_lifecycle import K8sWatchManagerLifecycle
+from orb.providers.k8s.handler_plugins import registered_k8s_handlers
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.events_watcher import K8sEventsWatcher, K8sNodeEventsCache
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
@@ -267,13 +268,15 @@ class K8sProviderStrategy(ProviderStrategy):
         # lazily by :meth:`_get_start_stop_service` on first use so the
         # kubernetes client is resolved only when a start/stop is requested.
         self._start_stop_service: Optional[K8sStartStopService] = None
-        # Per-instance plugin factory registry — seeded from the class-level
-        # defaults so every instance starts with the same empty set but is
-        # fully isolated from other instances.  Two strategy objects for
-        # different clusters in the same process do not share plugin state.
-        self._handler_factories: dict[str, Callable[..., K8sHandlerBase]] = dict(
-            type(self)._DEFAULT_HANDLER_FACTORIES
-        )
+        # Per-instance plugin factory registry — seeded from the handlers
+        # plugins registered process-wide with ``register_k8s_handler`` and
+        # from the class-level defaults.  Later ``register_handler`` calls
+        # stay on this instance: two strategy objects for different clusters
+        # in the same process do not share them.
+        self._handler_factories: dict[str, Callable[..., K8sHandlerBase]] = {
+            **registered_k8s_handlers(),
+            **type(self)._DEFAULT_HANDLER_FACTORIES,
+        }
         # Guard that ensures :meth:`start_daemon_services` is idempotent.
         # Set to True only after all four sub-systems start successfully;
         # a second invocation (e.g. uvicorn worker recycle) short-circuits
@@ -994,7 +997,13 @@ class K8sProviderStrategy(ProviderStrategy):
         return K8sCapabilityService.get_provider_name_pattern()
 
     def get_supported_apis(self) -> list[str]:
-        return K8sCapabilityService.get_supported_apis()
+        apis = K8sCapabilityService.get_supported_apis()
+        # Handlers registered on this instance only.
+        # getattr: the provider registry may call this unbound, with the class as ``self``.
+        for api in getattr(self, "_handler_factories", {}):
+            if api not in apis:
+                apis.append(api)
+        return apis
 
     def resolve_api_alias(self, raw_api: str) -> str:
         """Normalise alternate-case provider_api spellings to canonical form.

@@ -28,16 +28,8 @@ from orb.domain.base.ports.template_adapter_port import TemplateAdapterPort
 from orb.domain.template.template_aggregate import Template
 from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 from orb.infrastructure.template.dtos import TemplateDTO
+from orb.providers.k8s.handler_plugins import supported_provider_apis
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
-
-# Kubernetes resource-API names recognised by the v1 provider.  Templates
-# carrying an unknown ``provider_api`` value are rejected during validation.
-_SUPPORTED_PROVIDER_APIS: list[str] = [
-    "Pod",
-    "Deployment",
-    "StatefulSet",
-    "Job",
-]
 
 # DNS-1123 label / subdomain pattern used for namespace / runtime-class
 # validation.  Matches the kube-API restrictions in core/v1.
@@ -238,8 +230,8 @@ class K8sTemplateAdapter(TemplateAdapterPort):
         await self._template_config_manager.delete_template(template_id)
 
     def get_supported_provider_apis(self) -> list[str]:
-        """Return the static list of kubernetes resource APIs supported by v1."""
-        return list(_SUPPORTED_PROVIDER_APIS)
+        """Return the built-in kubernetes APIs plus any registered plugin APIs."""
+        return supported_provider_apis()
 
     def get_adapter_info(self) -> dict[str, Any]:
         """Return metadata describing this adapter for diagnostic purposes."""
@@ -271,10 +263,11 @@ class K8sTemplateAdapter(TemplateAdapterPort):
         provider_api = template.provider_api
         if provider_api is None:
             return []
-        if provider_api not in _SUPPORTED_PROVIDER_APIS:
+        supported_apis = supported_provider_apis()
+        if provider_api not in supported_apis:
             return [
                 f"Unsupported kubernetes provider_api: {provider_api!r}. "
-                f"Must be one of {_SUPPORTED_PROVIDER_APIS}."
+                f"Must be one of {supported_apis}."
             ]
         return []
 
