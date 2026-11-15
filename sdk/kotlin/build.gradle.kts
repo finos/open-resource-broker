@@ -72,12 +72,12 @@ dependencies {
     // AWS SDK v2 auth — provides the native SigV4 signer (AwsV4HttpSigner / Aws4Signer)
     // and the standard credential provider chain. No AWS service stubs are pulled in;
     // only the auth/signer module and its minimal transitive dependencies are included.
-    implementation("software.amazon.awssdk:auth:2.57.10")
-    implementation("software.amazon.awssdk:regions:2.57.10")
+    implementation("software.amazon.awssdk:auth:2.57.13")
+    implementation("software.amazon.awssdk:regions:2.57.13")
 
     // Test
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
-    testImplementation("io.mockk:mockk:1.14.11")
+    testImplementation("io.mockk:mockk:1.14.12")
 
     // JUnit versions come from the BOM, and junit-platform-launcher is declared
     // explicitly rather than left to Gradle's bundled copy: from JUnit 6 onwards
