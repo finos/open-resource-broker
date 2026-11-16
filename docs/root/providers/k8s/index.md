@@ -173,6 +173,8 @@ for all available fields.
   examples for in-cluster and out-of-cluster modes.
 * [Configuration reference](configuration.md) - every `K8sProviderConfig` field.
 * [Handlers](handlers.md) - Pod, Deployment, StatefulSet, Job; when to pick each.
+* [KubeSwift sandboxes](kubeswift.md) - `KubeSwiftSandbox`: each machine a
+  microVM from a warm pool or a cold boot.
 * [Native spec escape hatch](native-spec.md) - submit a full kubernetes
   API body and bypass the typed builders for fields ORB does not model.
 * [Authentication](auth.md) - in-cluster vs kubeconfig, inbound TokenReview auth, troubleshooting.
