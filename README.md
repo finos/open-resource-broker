@@ -33,7 +33,7 @@
 
 **Open Resource Broker (ORB)** is a unified API for orchestrating and provisioning compute capacity programmatically. Define what you need in a template, request it, track it, return it — through a CLI, REST API, MCP server, or native SDKs for Python, Go, TypeScript, Java, Kotlin, and .NET.
 
-ORB includes provider backends for AWS, Azure, Google Cloud, and Kubernetes, plus an extensible provider system for adding new backends.
+ORB includes provider backends for AWS, Azure, Google Cloud, Oracle Cloud Infrastructure (OCI), and Kubernetes, plus an extensible provider system for adding new backends.
 
 **Provider support:**
 - **AWS** — EC2 RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups, Lambda MicroVMs (built in; see [AWS Provider Setup](#setup) below)
