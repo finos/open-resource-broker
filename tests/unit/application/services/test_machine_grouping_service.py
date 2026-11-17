@@ -96,12 +96,17 @@ def _make_resource_machine(
     return m
 
 
-def _make_provider_selection_port(*, supports_tag_instances: bool) -> MagicMock:
-    """A ProviderSelectionPort stub whose capabilities report TAG_INSTANCES support."""
+def _make_provider_selection_port(
+    *, direct_termination: bool, supports_tag_instances: bool = True
+) -> MagicMock:
+    """A ProviderSelectionPort stub with the given direct-termination feature."""
     port = MagicMock()
     capabilities = MagicMock()
     capabilities.supports_operation.side_effect = lambda op: (
         supports_tag_instances and op == OperationType.TAG_INSTANCES
+    )
+    capabilities.get_feature.side_effect = lambda name, default=None: (
+        direct_termination if name == "direct_instance_termination" else default
     )
     port.get_strategy_capabilities.return_value = capabilities
     return port
@@ -122,12 +127,12 @@ class TestGroupByResource:
         assert len(groups[key]) == 2
         assert skipped == []
 
-    def test_direct_termination_fallback_when_provider_supports_tag_instances(self):
+    def test_direct_termination_fallback_when_provider_declares_it(self):
         m1 = _make_resource_machine(
             resource_id=None, provider_api=None, machine_id_value="i-abc123"
         )
         factory = _make_uow_factory({"i-abc123": m1})
-        provider_selection_port = _make_provider_selection_port(supports_tag_instances=True)
+        provider_selection_port = _make_provider_selection_port(direct_termination=True)
         service = MachineGroupingService(
             uow_factory=factory,
             logger=MagicMock(),
@@ -143,10 +148,12 @@ class TestGroupByResource:
         assert provider_api == "RunInstances"
         assert resource_id == "direct-i-abc123"
 
-    def test_missing_resource_id_is_skipped_when_provider_lacks_tag_instances(self):
+    def test_missing_resource_id_is_skipped_when_provider_lacks_direct_termination(self):
         m1 = _make_resource_machine(resource_id=None, machine_id_value="i-abc123")
         factory = _make_uow_factory({"i-abc123": m1})
-        provider_selection_port = _make_provider_selection_port(supports_tag_instances=False)
+        provider_selection_port = _make_provider_selection_port(
+            direct_termination=False, supports_tag_instances=False
+        )
         service = MachineGroupingService(
             uow_factory=factory,
             logger=MagicMock(),
@@ -157,6 +164,25 @@ class TestGroupByResource:
 
         assert groups == {}
         assert skipped == ["i-abc123"]
+
+    def test_tagging_alone_does_not_enable_direct_termination(self):
+        """A provider that can tag (e.g. Kubernetes pods as labels) but has no
+        instance-id termination path must not be routed to RunInstances."""
+        m1 = _make_resource_machine(resource_id=None, machine_id_value="orb-pod-0000")
+        factory = _make_uow_factory({"orb-pod-0000": m1})
+        provider_selection_port = _make_provider_selection_port(
+            direct_termination=False, supports_tag_instances=True
+        )
+        service = MachineGroupingService(
+            uow_factory=factory,
+            logger=MagicMock(),
+            provider_selection_port=provider_selection_port,
+        )
+
+        groups, skipped = service.group_by_resource(["orb-pod-0000"])
+
+        assert groups == {}
+        assert skipped == ["orb-pod-0000"]
 
     def test_missing_resource_id_is_skipped_when_no_provider_selection_port(self):
         m1 = _make_resource_machine(resource_id=None, machine_id_value="node-xyz")

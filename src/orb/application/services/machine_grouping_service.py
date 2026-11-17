@@ -14,6 +14,10 @@ from orb.domain.base.exceptions import EntityNotFoundError
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.provider_selection_port import ProviderSelectionPort
 
+# Capability feature declaring that a provider can terminate a machine by its
+# instance id alone, without a fleet or group (AWS EC2 instances).
+DIRECT_INSTANCE_TERMINATION_FEATURE = "direct_instance_termination"
+
 
 class MachineGroupingService:
     """Service for grouping machines by provider and resource context."""
@@ -170,24 +174,25 @@ class MachineGroupingService:
     def _supports_direct_instance_termination(self, provider_name: str) -> bool:
         """Whether this provider manages raw tagged instances directly.
 
-        Checks the provider's declared TAG_INSTANCES capability rather than
-        sniffing the machine_id format (e.g. an "i-" prefix is an AWS
-        instance-ID detail that has no business leaking into this layer).
+        Reads the provider's ``direct_instance_termination`` capability feature
+        rather than sniffing the machine_id format (e.g. an "i-" prefix is an
+        AWS instance-ID detail that has no business leaking into this layer).
+        Being able to tag instances (``TAG_INSTANCES``) is not enough: the
+        Kubernetes provider tags pods as labels but cannot terminate a pod
+        through the instance-id path.
         Returns False (safe default — the caller skips the machine instead
         of guessing) when no provider_selection_port was injected.
         """
         if self._provider_selection_port is None:
             return False
         try:
-            from orb.domain.base.operations import OperationType
-
             capabilities = self._provider_selection_port.get_strategy_capabilities(provider_name)
-            return bool(capabilities) and capabilities.supports_operation(
-                OperationType.TAG_INSTANCES
+            return bool(capabilities) and bool(
+                capabilities.get_feature(DIRECT_INSTANCE_TERMINATION_FEATURE, False)
             )
         except Exception as e:
             self.logger.debug(
-                "Could not determine TAG_INSTANCES capability for provider %s: %s",
+                "Could not determine direct-termination capability for provider %s: %s",
                 provider_name,
                 e,
             )
