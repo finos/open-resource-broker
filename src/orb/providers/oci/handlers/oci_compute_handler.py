@@ -246,6 +246,7 @@ class OCIComputeHandler:
             "display_name": "displayName",
             "metadata": "metadata",
             "agent_config": "agentConfig",
+            "instance_options": "instanceOptions",
             "freeform_tags": "freeformTags",
         }.items():
             if launch_payload.get(field):

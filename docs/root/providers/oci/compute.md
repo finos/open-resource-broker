@@ -103,6 +103,7 @@ orb requests status <return-request-id>
 | `tags` | No | object | OCI freeform instance tags. |
 | `compute_cluster_id` | No | string | Existing cluster OCID; requires bare metal, explicit AD, and on-demand capacity. |
 | `agent_config` | No | object | OCI agent configuration, including HPC plugin settings. |
+| `instance_options` | No | object | OCI instance metadata options; set `areLegacyImdsEndpointsDisabled` to `true` to require IMDSv2. |
 | `pricing` | No | object | Static estimate overrides; does not constrain OCI billing. |
 
 Required deployment fields may come from provider template defaults. OCI-specific
@@ -110,6 +111,37 @@ fields persist through `provider_config`; explicit saved fields take precedence
 over defaults. Shape aliases include `shape`, `machine_type`, and `instance_type`.
 The complete shipped shape matrix and architecture requirements are in the
 [template guide](templates.md).
+
+### Instance metadata service
+
+To disable legacy IMDSv1 endpoints for new workers, add this entry to the
+template's `provider_config`:
+
+```json
+{
+  "provider_config": {
+    "instance_options": {
+      "areLegacyImdsEndpointsDisabled": true
+    }
+  }
+}
+```
+
+The option is omitted by default, preserving the existing OCI launch behavior.
+An explicit `false` is passed through unchanged, but tenancy policy can reject
+launches that permit IMDSv1. Before setting `true`, verify that the selected image,
+cloud-init, agents, and workload bootstrap support IMDSv2. Applications must use
+the `/opc/v2` metadata endpoints with the required authorization header; legacy
+metadata requests stop working. See Oracle's
+[instance metadata guide](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/gettingmetadata.htm).
+
+An IAM-denied launch can surface as `404 NotAuthorizedOrNotFound`; this error also
+has other causes. Check the stored OCI error and applicable policies. A tenancy
+may deny instance creation unless legacy metadata endpoints are disabled, and
+Deny takes precedence over Allow. Members of the default administrator group in
+the default domain are exempt from Deny policies, so an operator's successful
+launch does not establish that the broker's instance principal has the same
+access. See Oracle's [Deny policy documentation](https://docs.oracle.com/en-us/iaas/Content/Identity/policysyntax/denypolicies.htm).
 
 ### Preemptible capacity
 

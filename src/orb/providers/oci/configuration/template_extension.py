@@ -5,6 +5,7 @@ from typing import Any, Literal
 from pydantic import Field
 
 from orb.providers.base.template_extension import ProviderTemplateExtensionBase
+from orb.providers.oci.configuration.instance_options import OCIInstanceOptions
 
 
 class OCITemplateExtensionConfig(ProviderTemplateExtensionBase):
@@ -13,6 +14,7 @@ class OCITemplateExtensionConfig(ProviderTemplateExtensionBase):
     availability_domain: str | None = None
     compute_cluster_id: str | None = None
     agent_config: dict[str, Any] | None = None
+    instance_options: OCIInstanceOptions | None = None
     shape: str | None = None
     pricing: dict[str, Any] | None = None
     shape_config: dict[str, Any] | None = None
