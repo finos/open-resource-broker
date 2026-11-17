@@ -497,6 +497,80 @@ class K8sPodHandler(K8sHandlerBase):
                 raise typed from exc
 
     # ------------------------------------------------------------------
+    # Pod labels (TAG_INSTANCES)
+    # ------------------------------------------------------------------
+
+    async def patch_pod_labels(
+        self, *, namespace: str, pod_name: str, labels: dict[str, str]
+    ) -> bool:
+        """Merge ``labels`` into one pod's ``metadata.labels``.
+
+        Returns ``False`` when the pod does not exist in ``namespace`` (404)
+        and ``True`` once the patch is applied.  Other errors are recorded in
+        ``orb_k8s_api_errors_total`` and raised.  The 404 is turned into a
+        return value before the retry layer sees it, as the delete path does,
+        so a missing pod costs no retry budget and does not count towards the
+        circuit breaker.
+        """
+        body = {"metadata": {"labels": dict(labels)}}
+
+        def _patch_or_report_missing() -> bool:
+            try:
+                self.client.core_v1.patch_namespaced_pod(
+                    name=pod_name, namespace=namespace, body=body
+                )
+            except Exception as exc:
+                if self.is_not_found(exc):
+                    return False
+                raise
+            return True
+
+        try:
+            with self._timed_api_call("patch_namespaced_pod"):
+                return await asyncio.to_thread(
+                    self.with_retry,
+                    _patch_or_report_missing,
+                    operation_name="patch_namespaced_pod",
+                )
+        except Exception as exc:
+            if self.is_not_found(exc):
+                return False
+            self._record_api_exception(exc, operation="patch_namespaced_pod")
+            raise
+
+    async def find_managed_pod_namespace(self, pod_name: str) -> Optional[str]:
+        """Return the namespace of the ORB-managed pod named ``pod_name``, if any.
+
+        Used when the provider watches every namespace (``namespaces: ["*"]``)
+        and the pod is not in the default namespace.  Lists across all
+        namespaces with a field selector on the name and the
+        ``<label_prefix>/managed=true`` label, so a pod ORB did not create is
+        never matched.  ``pod_name`` must already be a valid pod name.
+        """
+        from orb.providers.k8s.utilities.labels import build_label_selector
+
+        selector = build_label_selector(self.config.label_prefix, "managed", "true")
+        try:
+            with self._timed_api_call("list_pod_for_all_namespaces"):
+                response = await asyncio.to_thread(
+                    self.with_retry,
+                    self.client.core_v1.list_pod_for_all_namespaces,
+                    field_selector=f"metadata.name={pod_name}",
+                    label_selector=selector,
+                    operation_name="list_pod_for_all_namespaces",
+                )
+        except Exception as exc:
+            self._record_api_exception(exc, operation="list_pod_for_all_namespaces")
+            raise
+        # getattr: the SDK returns V1PodList / V1Pod objects, but tests and
+        # degraded apiserver responses can omit items or metadata.
+        for pod in getattr(response, "items", None) or []:
+            namespace = getattr(getattr(pod, "metadata", None), "namespace", None)
+            if namespace:
+                return str(namespace)
+        return None
+
+    # ------------------------------------------------------------------
     # Examples
     # ------------------------------------------------------------------
 

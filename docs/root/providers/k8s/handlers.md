@@ -132,6 +132,43 @@ that id when machines are returned, so returning it scales and deletes nothing. 
 request keeps listing the controller name until it is cancelled or its real pods are
 returned.
 
+## Machine tags as pod labels
+
+The provider supports `TAG_INSTANCES`: when ORB tags a machine (for example with the
+Slurm node name `orb:node-name` after `orb machines request ... --nodes`), it patches the
+tag onto the pod's `metadata.labels`. A container can then read it through the
+downward API; see [Reading the Node Name on Kubernetes](../../slurm/integration_guide.md#reading-the-node-name-on-kubernetes).
+
+A machine id is the pod name for every handler, so this works for the pods of `Pod`,
+`Deployment`, `StatefulSet` and `Job` requests alike. The pod is looked up in the
+provider's `namespace`, or in each entry of `namespaces`; with `namespaces: ["*"]` ORB
+also searches the cluster for an ORB-managed pod with that name.
+
+Tags map to labels as follows (defined in
+`orb.providers.k8s.utilities.instance_tag_labels`):
+
+| Tag key | Label key |
+|---|---|
+| `orb:<name>` | `<label_prefix>/<name>`, e.g. `orb:node-name` -> `orb.io/node-name` |
+| any other valid label key (`team`, `example.com/team`) | unchanged |
+| anything else (`Cost Centre`, `aws:cloudformation:stack`) | skipped |
+
+A tag is also skipped when it would overwrite one of ORB's identity labels
+(`<label_prefix>/managed`, `request-id`, `machine-id`, `provider-api`, `template-id`,
+`orb-instance`) or when its value is not a valid label value (at most 63 characters,
+alphanumeric at both ends, `-`, `_` and `.` inside). Values are never truncated or
+rewritten. Skipped tags are logged and reported per machine in the operation result and
+do not fail it. A pod that cannot be found or patched is reported per machine and fails
+the operation with `TAG_OPERATION_FAILED`, as on AWS.
+
+Labels written this way belong to the pod object. A pod that a controller recreates
+starts without them, and ORB labels again only when it names a new machine. A
+`StatefulSet` pod recreated under the same name therefore loses its `node-name` label.
+
+RBAC: `patch` on `pods`, already granted by [`rbac.yaml`](rbac.yaml) for the Pod
+handler. `namespaces: ["*"]` also uses the cluster-wide `list` on `pods` that the
+ClusterRole there grants.
+
 ## Cross-handler defaults
 
 All handlers honour the provider-level defaults from

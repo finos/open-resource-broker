@@ -104,6 +104,7 @@ API_OPERATIONS: frozenset[str] = frozenset(
         "create_namespaced_pod",
         "delete_namespaced_pod",
         "list_namespaced_pod",
+        "list_pod_for_all_namespaces",
         # Deployment
         "create_namespaced_deployment",
         "delete_namespaced_deployment",
