@@ -50,6 +50,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from orb.providers.k8s.handler_plugins import supported_provider_apis
 from orb.providers.k8s.utilities.dns_names import (
     DNS_1123_LABEL_REGEX as _DNS_1123_LABEL,
     DNS_1123_SUBDOMAIN_MAX_LEN as _DNS_1123_SUBDOMAIN_MAX_LEN,
@@ -61,8 +62,6 @@ from orb.providers.k8s.utilities.dns_names import (
 # local so this module has no hard import dependency on the adapter.
 # ---------------------------------------------------------------------------
 
-#: kubernetes resource-API types recognised by the v1 provider.
-_SUPPORTED_PROVIDER_APIS: frozenset[str] = frozenset({"Pod", "Deployment", "StatefulSet", "Job"})
 
 #: Kubernetes resource-quantity pattern (CPU / memory / storage).
 #: Mirrors the regex in :mod:`template_adapter`.
@@ -305,12 +304,13 @@ class K8sTemplateValidator:
         return []
 
     def _check_provider_api(self, template: Any) -> list[str]:
-        """Rule 3: provider_api must be one of the four supported APIs when set."""
+        """Rule 3: provider_api must be a built-in or registered plugin API when set."""
         provider_api = getattr(template, "provider_api", None)
         if provider_api is None:
             return []
-        if provider_api not in _SUPPORTED_PROVIDER_APIS:
-            supported = sorted(_SUPPORTED_PROVIDER_APIS)
+        supported_apis = supported_provider_apis()
+        if provider_api not in supported_apis:
+            supported = sorted(supported_apis)
             return [f"provider_api {provider_api!r} is not supported; must be one of {supported}"]
         return []
 
