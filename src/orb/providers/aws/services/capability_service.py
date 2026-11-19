@@ -61,6 +61,8 @@ class AWSCapabilityService:
                 "security_groups": True,
                 "key_pairs": True,
                 "tags_support": True,
+                # Machines missing fleet context can be terminated by instance id.
+                "direct_instance_termination": True,
                 "monitoring": True,
                 "regions": ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"],
                 "instance_types": ["t3.micro", "t3.small", "t3.medium", "m5.large", "c5.large"],

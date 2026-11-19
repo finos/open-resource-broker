@@ -79,6 +79,9 @@ class K8sCapabilityService:
                 # rejected) and the caller needs to know it is wired.
                 ProviderOperationType.START_INSTANCES,
                 ProviderOperationType.STOP_INSTANCES,
+                # Writes machine tags onto pods as labels (``orb:node-name`` ->
+                # ``<label_prefix>/node-name``); see instance_tagging_service.
+                ProviderOperationType.TAG_INSTANCES,
             ],
             supported_apis=list(_SUPPORTED_APIS),
             features={

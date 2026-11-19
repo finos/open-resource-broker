@@ -244,6 +244,55 @@ fi
 
 The instance's IAM role needs `ec2:DescribeTags` permission for this to work.
 
+### Reading the Node Name on Kubernetes
+
+On the Kubernetes provider the tag becomes the pod label `orb.io/node-name` (the prefix
+is the provider's `label_prefix`). The Pod handler creates pods before ORB knows which
+pod gets which name: ORB names the machines on the next status sync and then labels the
+pods, so the label appears after the container has started. The container has to wait
+for it.
+
+Read the label through a downward API **volume**. Kubelet updates the files of a
+downward API volume when the pod's labels change, but environment variables are
+resolved once when the container starts, so an `env` entry would never see the label.
+
+The fragment below is part of the compute pod body; one way to supply it is the
+template's [`native_spec`](../providers/k8s/native-spec.md).
+
+```yaml
+spec:
+  containers:
+    - name: slurmd
+      image: registry.example.com/slurm-compute:24.05
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          labels=/etc/podinfo/labels
+          until grep -q '^orb.io/node-name=' "$labels"; do sleep 2; done
+          NODE_NAME=$(sed -n 's|^orb.io/node-name="\(.*\)"$|\1|p' "$labels")
+          exec slurmd -D -N "$NODE_NAME"
+      volumeMounts:
+        - name: podinfo
+          mountPath: /etc/podinfo
+          readOnly: true
+  volumes:
+    - name: podinfo
+      downwardAPI:
+        items:
+          - path: labels
+            fieldRef:
+              fieldPath: metadata.labels
+```
+
+The `labels` file holds one `key="value"` line per label. Volume updates reach the
+container after kubelet's sync period, so allow up to about a minute after the ORB sync
+that named the machine. ORB's ServiceAccount needs `patch` on `pods`, which the
+[reference RBAC](../providers/k8s/rbac.yaml) already grants. Slurm node names must be
+valid label values (at most 63 characters, letters, digits, `-`, `_` and `.`), which
+names such as `k8s-001` are; a name that is not is logged and the pod is left unlabelled.
+See [Kubernetes handlers](../providers/k8s/handlers.md#machine-tags-as-pod-labels) for
+the full tag-to-label mapping.
+
 **Recommended:**
 
 - cloud-init or user_data support for dynamic hostname configuration

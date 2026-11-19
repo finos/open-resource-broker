@@ -22,7 +22,7 @@ factory can be a near drop-in.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional, cast
 
 from orb.domain.base.operation_outcome import OperationOutcome
 from orb.domain.base.ports import LoggingPort
@@ -54,6 +54,7 @@ from orb.providers.k8s.services.instance_operation_service import (
     CancelResourceResult,
     K8sInstanceOperationService,
 )
+from orb.providers.k8s.services.instance_tagging_service import K8sInstanceTaggingService
 from orb.providers.k8s.services.start_stop_service import K8sStartStopService
 from orb.providers.k8s.services.template_validation_service import K8sTemplateValidationService
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
@@ -267,6 +268,9 @@ class K8sProviderStrategy(ProviderStrategy):
         # lazily by :meth:`_get_start_stop_service` on first use so the
         # kubernetes client is resolved only when a start/stop is requested.
         self._start_stop_service: Optional[K8sStartStopService] = None
+        # TAG_INSTANCES (pod labels) service — constructed lazily by
+        # :meth:`_get_instance_tagging_service`.
+        self._instance_tagging_service: Optional[K8sInstanceTaggingService] = None
         # Per-instance plugin factory registry — seeded from the class-level
         # defaults so every instance starts with the same empty set but is
         # fully isolated from other instances.  Two strategy objects for
@@ -681,6 +685,8 @@ class K8sProviderStrategy(ProviderStrategy):
                 result = await self._get_start_stop_service().start_instances(operation)
             elif operation.operation_type == ProviderOperationType.STOP_INSTANCES:
                 result = await self._get_start_stop_service().stop_instances(operation)
+            elif operation.operation_type == ProviderOperationType.TAG_INSTANCES:
+                result = await self._get_instance_tagging_service().tag_instances(operation)
             else:
                 result = ProviderResult.error_result(
                     f"Operation {operation.operation_type} is not supported by the "
@@ -1228,6 +1234,25 @@ class K8sProviderStrategy(ProviderStrategy):
                 logger=self._logger,
             )
         return self._start_stop_service
+
+    def _get_instance_tagging_service(self) -> K8sInstanceTaggingService:
+        """Return the ``TAG_INSTANCES`` service, constructing it lazily.
+
+        The service patches pods through the Pod handler so the calls share its
+        retry, circuit breaker and metrics.  A machine id is a pod name for
+        every handler, so the Pod handler serves pods owned by any controller.
+        """
+        if self._instance_tagging_service is None:
+            from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
+
+            self._instance_tagging_service = K8sInstanceTaggingService(
+                config=self._k8s_config,
+                logger=self._logger,
+                pod_handler_provider=lambda: cast(
+                    K8sPodHandler, self._get_handler(KubernetesProviderApi.POD.value)
+                ),
+            )
+        return self._instance_tagging_service
 
     def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Discover Kubernetes infrastructure for the configured cluster.

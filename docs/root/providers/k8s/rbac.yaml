@@ -45,6 +45,7 @@ metadata:
   namespace: orb
 rules:
   # Core — required for the Pod handler and for the watch task.
+  # `patch` also writes machine tags as pod labels (TAG_INSTANCES, e.g. orb.io/node-name).
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch", "create", "patch", "delete"]
@@ -128,6 +129,7 @@ metadata:
     app.kubernetes.io/component: cluster-scoped-watch
 rules:
   # Core — required for the Pod handler and for the cluster-scoped watch task.
+  # `patch` also writes machine tags as pod labels (TAG_INSTANCES, e.g. orb.io/node-name).
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch", "create", "patch", "delete"]
