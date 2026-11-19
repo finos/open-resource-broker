@@ -55,6 +55,7 @@ Welcome to the Open Resource Broker documentation. ORB lets you define what comp
 - **[AWS](providers/aws/run-instances.md)** — EC2 Instances, Auto Scaling Groups, Spot Fleet, EC2 Fleet, Lambda MicroVMs
 - **[Azure](providers/azure/index.md)** — Virtual Machine Scale Sets, single VMs, and CycleCloud cluster nodes
 - **[Google Cloud](providers/gcp/index.md)** — Managed Instance Groups and single Compute Engine VMs
+- **[OCI](providers/oci/compute.md)** — Compute instances with Flex and bare metal shapes
 - **[Kubernetes](providers/k8s/index.md)** — Pods, Deployments, StatefulSets, and Jobs
 
 ### Schedulers
