@@ -62,6 +62,10 @@ updates:
     open-pull-requests-limit: 2
     cooldown:
       default-days: 7
+    ignore:
+      # v1.27.x references its setup action by tag, which the SHA-pinning policy rejects.
+      - dependency-name: "reviewdog/action-suggester"
+        versions: ["1.27.x"]
     groups:
       github-actions-security:
         applies-to: security-updates
