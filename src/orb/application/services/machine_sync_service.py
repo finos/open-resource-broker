@@ -9,11 +9,17 @@ if TYPE_CHECKING:
 
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.services.machine_coordinates import load_machine_coordinates
+from orb.application.services.node_name_assignment import (
+    ORB_TAG_PREFIX,
+    NodeNameReconciler,
+    requested_node_names,
+)
 from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.exceptions import ConcurrencyError
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.base.value_objects import Tags
 from orb.domain.machine.aggregate import Machine
 from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.aggregate import Request
@@ -58,6 +64,11 @@ class MachineSyncService:
     def provider_registry_service(self) -> Optional["ProviderRegistryService"]:
         """Return the injected provider registry service."""
         return self._provider_registry_service
+
+    @property
+    def _node_names(self) -> NodeNameReconciler:
+        """Reconciler for scheduler node names, built on the current collaborators."""
+        return NodeNameReconciler(self.uow_factory, self.logger, self._provider_registry_service)
 
     async def populate_missing_machine_ids(self, request: Request) -> None:
         """Populate missing machine IDs via command."""
@@ -266,6 +277,23 @@ class MachineSyncService:
                     raise
 
     @staticmethod
+    def _merged_tags(existing: Machine, provider_machine: Machine) -> Tags:
+        """The provider's tags, plus the ``orb:`` tags ORB set that the provider lacks.
+
+        ORB sets tags such as ``orb:node-name`` itself. A provider that cannot
+        tag its resources, or has not been asked to yet, does not report them,
+        and a sync must not erase them.
+        """
+        orb_owned = {
+            key: value
+            for key, value in existing.tags.tags.items()
+            if key.startswith(ORB_TAG_PREFIX) and key not in provider_machine.tags.tags
+        }
+        if not orb_owned:
+            return provider_machine.tags
+        return Tags(tags={**provider_machine.tags.tags, **orb_owned})
+
+    @staticmethod
     def _apply_provider_state(existing: Machine, provider_machine: Machine) -> Machine:
         """Overlay what the provider owns onto ``existing``.
 
@@ -308,7 +336,7 @@ class MachineSyncService:
         machine_data["security_group_ids"] = provider_machine.security_group_ids
         machine_data["vpc_id"] = provider_machine.vpc_id
         machine_data["version"] = existing.version + 1
-        machine_data["tags"] = provider_machine.tags
+        machine_data["tags"] = MachineSyncService._merged_tags(existing, provider_machine)
         if provider_machine.resource_id and not existing.resource_id:
             machine_data["resource_id"] = provider_machine.resource_id
         # A machine recorded from a launch response may not carry its image
@@ -469,7 +497,7 @@ class MachineSyncService:
                         or existing.public_dns_name != provider_machine.public_dns_name
                         or existing.price_type != provider_machine.price_type
                         or str(existing.instance_type) != str(provider_machine.instance_type)
-                        or existing.tags != provider_machine.tags
+                        or existing.tags != self._merged_tags(existing, provider_machine)
                         or existing.subnet_id != provider_machine.subnet_id
                         or existing.security_group_ids != provider_machine.security_group_ids
                         or existing.vpc_id != provider_machine.vpc_id
@@ -505,6 +533,18 @@ class MachineSyncService:
                     updated_machines[index] = self._write_machine(provider_machine, existing)
 
                 self.logger.info(f"Updated {len(to_upsert)} machines from provider sync")
+
+            # Keep the request's scheduler node names (e.g. Slurm) applied to its
+            # machines, including machines this sync recorded for the first time.
+            if not isinstance(provider_machines, FailedProviderFetch) and requested_node_names(
+                request.metadata
+            ):
+                renamed = await self._node_names.reconcile(request.request_id, provider_machines)
+                by_id = {str(m.machine_id.value): m for m in renamed}
+                for index, machine in enumerate(updated_machines):
+                    renamed_machine = by_id.get(str(machine.machine_id.value))
+                    if renamed_machine is not None:
+                        updated_machines[index] = renamed_machine
 
             # Stamp first_status_check (once, immutable) and last_status_check
             # on every sync cycle. Mutation lives here (not in the query
