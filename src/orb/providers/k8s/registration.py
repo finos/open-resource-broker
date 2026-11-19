@@ -471,6 +471,14 @@ def register_k8s_provider(
 
         registry = get_provider_registry()
 
+    # Workload kinds that ship with ORB but are backed by custom resources
+    # register through the same plugin registry a third-party handler uses.
+    from orb.providers.k8s.infrastructure.handlers.kubeswift_sandbox_handler import (
+        register_kubeswift_sandbox_handler,
+    )
+
+    register_kubeswift_sandbox_handler()
+
     try:
         if instance_name:
             registry.register_provider_instance(

@@ -184,6 +184,7 @@ nav:
       - Infrastructure Discovery: providers/k8s/discovery.md
       - Configuration: providers/k8s/configuration.md
       - Handlers: providers/k8s/handlers.md
+      - KubeSwift Sandboxes: providers/k8s/kubeswift.md
       - Authentication: providers/k8s/auth.md
       - Migrating from k8s-legacy: providers/k8s/migrating-from-k8s-legacy.md
       - Plugin Authoring: providers/k8s/plugin-authoring.md

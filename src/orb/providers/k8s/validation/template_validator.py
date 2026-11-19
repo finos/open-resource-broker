@@ -50,6 +50,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from orb.providers.k8s.handler_plugins import supported_provider_apis
 from orb.providers.k8s.utilities.dns_names import (
     DNS_1123_LABEL_REGEX as _DNS_1123_LABEL,
     DNS_1123_SUBDOMAIN_MAX_LEN as _DNS_1123_SUBDOMAIN_MAX_LEN,
@@ -61,8 +62,6 @@ from orb.providers.k8s.utilities.dns_names import (
 # local so this module has no hard import dependency on the adapter.
 # ---------------------------------------------------------------------------
 
-#: kubernetes resource-API types recognised by the v1 provider.
-_SUPPORTED_PROVIDER_APIS: frozenset[str] = frozenset({"Pod", "Deployment", "StatefulSet", "Job"})
 
 #: Kubernetes resource-quantity pattern (CPU / memory / storage).
 #: Mirrors the regex in :mod:`template_adapter`.
@@ -205,6 +204,7 @@ class K8sTemplateValidator:
         # would fail K8sTemplate construction and be lost in the coercion
         # fallback.  Check those directly on the dict first so they still surface.
         errors: list[str] = []
+        raw = template
         if isinstance(template, dict):
             errors.extend(self._check_dict_only_rules(template))
 
@@ -219,6 +219,7 @@ class K8sTemplateValidator:
         errors.extend(self._check_resource_quantities(template))
         errors.extend(self._check_tolerations(template))
         errors.extend(self._check_restart_policy_per_kind(template))
+        errors.extend(self._check_kubeswift_sandbox(template, raw))
 
         return K8sTemplateValidationResult(valid=len(errors) == 0, errors=errors)
 
@@ -305,14 +306,41 @@ class K8sTemplateValidator:
         return []
 
     def _check_provider_api(self, template: Any) -> list[str]:
-        """Rule 3: provider_api must be one of the four supported APIs when set."""
+        """Rule 3: provider_api must be a built-in or registered plugin API when set."""
         provider_api = getattr(template, "provider_api", None)
         if provider_api is None:
             return []
-        if provider_api not in _SUPPORTED_PROVIDER_APIS:
-            supported = sorted(_SUPPORTED_PROVIDER_APIS)
+        supported_apis = supported_provider_apis()
+        if provider_api not in supported_apis:
+            supported = sorted(supported_apis)
             return [f"provider_api {provider_api!r} is not supported; must be one of {supported}"]
         return []
+
+    def _check_kubeswift_sandbox(self, template: Any, raw: Any) -> list[str]:
+        """Rule: a ``KubeSwiftSandbox`` template must be one acquire can honour.
+
+        Reads ``raw`` when it is a config dict: the typed coercion keeps only
+        K8sTemplate fields and drops ``metadata`` and ``machine_bootstrap``.
+        """
+        # getattr: the template may be a raw object the coercion above could not type.
+        if getattr(template, "provider_api", None) != "KubeSwiftSandbox":
+            return []
+        from orb.providers.k8s.infrastructure.handlers.kubeswift.sandbox_spec import (
+            POD_ONLY_FIELDS,
+            static_errors,
+            template_static_errors,
+        )
+
+        if not isinstance(raw, dict):
+            return template_static_errors(template)
+        fields = {_CONFIG_KEY_ALIASES.get(key, key): value for key, value in raw.items()}
+        metadata = raw.get("metadata")
+        return static_errors(
+            image=fields.get("machine_image") or raw.get("image_id"),
+            machine_bootstrap=raw.get("machine_bootstrap") or raw.get("user_data"),
+            kubeswift=metadata.get("kubeswift") if isinstance(metadata, dict) else None,
+            pod_fields={name: fields.get(name) for name in POD_ONLY_FIELDS},
+        )
 
     def _check_image_id(self, template: Any) -> list[str]:
         """Rule 4: machine_image must be set and non-empty."""
