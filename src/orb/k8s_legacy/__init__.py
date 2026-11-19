@@ -76,23 +76,23 @@ def handle_exceptions(
     def wrap(f: _DecoratedFuncT) -> _DecoratedFuncT:
         """Returns decorator that wraps/handles exceptions."""
 
-        def wrapped_f(*args, **kwargs) -> None:
+        def wrapped_f(*args: Any, **kwargs: Any) -> Any:
             """Wrapped function."""
             # A fresh copy per call: the recursion below pops from it, so a
             # decoration-time copy would be consumed on the first call and
             # leave every later call without its specific handlers.
             exclist_copy = list(exclist)
 
-            def apply_handlers() -> None:
+            def apply_handlers() -> Any:
                 """Run the wrapped function under the remaining handlers."""
                 if not exclist_copy:
-                    f(*args, **kwargs)
+                    return f(*args, **kwargs)
                 else:
                     exc_handler: _ExceptionHandler = exclist_copy.pop(0)
                     exc, handler = exc_handler
 
                     try:
-                        apply_handlers()
+                        return apply_handlers()
                     except exc as err:
                         if isinstance(handler, str):
                             traceback.print_exc()
@@ -105,14 +105,13 @@ def handle_exceptions(
 
                         sys.exit(EXIT_CODE_DEFAULT)
 
-            apply_handlers()
+            return apply_handlers()
 
         @functools.wraps(f)
-        def _handle_any(*args, **kwargs) -> None:
+        def _handle_any(*args: Any, **kwargs: Any) -> Any:
             """Default exception handler."""
             try:
-                wrapped_f(*args, **kwargs)
-                return
+                return wrapped_f(*args, **kwargs)
 
             except click.UsageError as usage_err:
                 click.echo(f"Usage error: {usage_err!s}", err=True)
