@@ -81,6 +81,92 @@ async def test_signed_launch_sends_stable_header_and_private_api_body():
     assert all(not p.exists() for p in paths)
 
 
+@pytest.mark.parametrize("disabled", [None, True, False])
+@pytest.mark.parametrize("capacity_type", ["ondemand", "preemptible"])
+@pytest.mark.asyncio
+async def test_instance_metadata_options_reach_signed_launch_body(disabled, capacity_type):
+    bodies = []
+
+    def run(cmd, **kwargs):
+        assert cmd[1] == "raw-request"
+        path = Path(cmd[cmd.index("--request-body") + 1].removeprefix("file://"))
+        bodies.append(json.loads(path.read_text()))
+        return subprocess.CompletedProcess(
+            cmd, 0, '{"status":"200 OK","data":{"id":"instance","lifecycleState":"PROVISIONING"}}'
+        )
+
+    handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=run)
+    operation = make_operation()
+    operation.parameters["capacity_type"] = capacity_type
+    if disabled is not None:
+        operation.parameters["instance_options"] = {"areLegacyImdsEndpointsDisabled": disabled}
+
+    result = await handler.create_instances(operation)
+
+    assert result.success, result.error_message
+    assert len(bodies) == 1
+    body = bodies[0]
+    if disabled is None:
+        assert "instanceOptions" not in body
+    else:
+        assert body["instanceOptions"] == {"areLegacyImdsEndpointsDisabled": disabled}
+        assert body["instanceOptions"]["areLegacyImdsEndpointsDisabled"] is disabled
+    assert ("preemptibleInstanceConfig" in body) is (capacity_type == "preemptible")
+
+
+@pytest.mark.parametrize("disabled", [True, False])
+@pytest.mark.asyncio
+async def test_ondemand_fallback_keeps_instance_metadata_options(disabled):
+    bodies = []
+
+    def run(cmd, **kwargs):
+        assert cmd[1] == "raw-request"
+        path = Path(cmd[cmd.index("--request-body") + 1].removeprefix("file://"))
+        bodies.append(json.loads(path.read_text()))
+        if len(bodies) == 1:
+            return subprocess.CompletedProcess(
+                cmd, 0, '{"status":"400 Error","data":{"code":"OutOfHostCapacity"}}'
+            )
+        return subprocess.CompletedProcess(
+            cmd, 0, '{"status":"200 OK","data":{"id":"instance","lifecycleState":"PROVISIONING"}}'
+        )
+
+    handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=run)
+    operation = make_operation()
+    operation.parameters.update(
+        capacity_type="preemptible",
+        fallback_to_ondemand=True,
+        instance_options={"areLegacyImdsEndpointsDisabled": disabled},
+    )
+
+    result = await handler.create_instances(operation)
+
+    assert result.success, result.error_message
+    assert len(bodies) == 2
+    assert "preemptibleInstanceConfig" in bodies[0]
+    assert "preemptibleInstanceConfig" not in bodies[1]
+    assert all(
+        body["instanceOptions"] == {"areLegacyImdsEndpointsDisabled": disabled} for body in bodies
+    )
+
+
+@pytest.mark.parametrize(
+    "options", [{"areLegacyImdsEndpointsDisabled": "false"}, {"areLegacyEndpointsDisabled": True}]
+)
+@pytest.mark.asyncio
+async def test_invalid_instance_metadata_options_cannot_reach_launch(options):
+    runner = MagicMock(side_effect=AssertionError("Invalid instance options reached OCI"))
+    handler = OCIComputeHandler(MagicMock(), "us-phoenix-1", run_command=runner)
+    operation = make_operation()
+    operation.parameters["instance_options"] = options
+
+    result = await handler.create_instances(operation)
+
+    assert not result.success
+    assert result.error_code == "INVALID_TEMPLATE"
+    runner.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_cross_region_launch_is_rejected_before_mutation():
     runner = MagicMock(side_effect=AssertionError("cross-region request reached OCI"))

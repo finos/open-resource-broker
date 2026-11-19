@@ -5,6 +5,7 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any
 
+from orb.providers.oci.configuration.instance_options import OCIInstanceOptions
 from orb.providers.oci.services import OCIPricingService
 
 
@@ -140,6 +141,14 @@ class OCITemplateMapper:
         shape_family = cls._shape_family(shape)
         cpu_vendor = _get("cpu_vendor", "cpuVendor")
         generation = _get("generation")
+        raw_instance_options = _get("instance_options", "instanceOptions")
+        instance_options = (
+            OCIInstanceOptions.model_validate(raw_instance_options).model_dump(
+                by_alias=True, exclude_none=True
+            )
+            if raw_instance_options is not None
+            else None
+        )
 
         return {
             "template_id": _get("template_id", "templateId"),
@@ -152,6 +161,7 @@ class OCITemplateMapper:
             "availability_domain": _get("availability_domain", "availabilityDomain"),
             "compute_cluster_id": _get("compute_cluster_id", "computeClusterId"),
             "agent_config": _get("agent_config", "agentConfig"),
+            "instance_options": instance_options,
             "nsg_ids": security_group_ids,
             "user_data": _get("machine_bootstrap", "user_data", "userData"),
             "ssh_authorized_keys": _get("ssh_authorized_keys", "sshAuthorizedKeys")
@@ -263,6 +273,8 @@ class OCITemplateMapper:
             }
         if normalized.get("agent_config"):
             payload["agent_config"] = normalized["agent_config"]
+        if normalized.get("instance_options"):
+            payload["instance_options"] = normalized["instance_options"]
 
         if normalized.get("compute_cluster_id"):
             payload["compute_cluster_id"] = normalized["compute_cluster_id"]
