@@ -18,7 +18,6 @@ import json
 import logging
 import secrets
 import string
-import sys
 import tempfile
 import traceback
 from collections.abc import Callable
@@ -103,7 +102,7 @@ def handle_exceptions(
                         else:
                             click.echo(handler(err), err=True)
 
-                        sys.exit(EXIT_CODE_DEFAULT)
+                        raise SystemExit(EXIT_CODE_DEFAULT)
 
             return apply_handlers()
 
@@ -115,7 +114,7 @@ def handle_exceptions(
 
             except click.UsageError as usage_err:
                 click.echo(f"Usage error: {usage_err!s}", err=True)
-                sys.exit(EXIT_CODE_DEFAULT)
+                raise SystemExit(EXIT_CODE_DEFAULT)
 
             except Exception as unhandled:  # pylint: disable=W0703
                 with tempfile.NamedTemporaryFile(
@@ -127,7 +126,7 @@ def handle_exceptions(
                         err=True,
                     )
 
-                sys.exit(EXIT_CODE_DEFAULT)
+                raise SystemExit(EXIT_CODE_DEFAULT)
 
         return _handle_any
 

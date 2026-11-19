@@ -5,6 +5,7 @@ The specific handlers must apply on every call, not only the first one.
 
 from __future__ import annotations
 
+import click
 import pytest
 
 from orb.k8s_legacy import EXIT_CODE_DEFAULT, handle_exceptions
@@ -100,3 +101,16 @@ def test_unhandled_exception_escapes_to_fallback(capsys) -> None:
     assert seen == []
     # The generic fallback names the error and writes a traceback temp file.
     assert "Error: unhandled" in capsys.readouterr().err
+
+
+def test_usage_error_exits_with_default_code(capsys) -> None:
+    """A click usage error is reported and exits with the default code."""
+
+    @handle_exceptions([])
+    def bad_usage() -> None:
+        raise click.UsageError("bad flag")
+
+    with pytest.raises(SystemExit) as exc_info:
+        bad_usage()
+    assert exc_info.value.code == EXIT_CODE_DEFAULT
+    assert "Usage error: bad flag" in capsys.readouterr().err
