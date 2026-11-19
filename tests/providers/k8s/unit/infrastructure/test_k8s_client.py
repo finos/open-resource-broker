@@ -4,7 +4,7 @@ Backfill coverage added in Group T1:
 * load_config() with in_cluster=False + a valid kubeconfig path
 * load_config() with in_cluster=False + an invalid kubeconfig path (raises K8sAuthError)
 * api_client lazy-wiring (property builds an ApiClient on first access)
-* core_v1, apps_v1, batch_v1 lazy accessors
+* core_v1, apps_v1, batch_v1, custom_objects_api lazy accessors
 """
 
 from __future__ import annotations
@@ -197,21 +197,44 @@ def test_batch_v1_lazy_accessor_builds_once() -> None:
     assert r1 is r2
 
 
-def test_cleanup_resets_cached_api_sub_clients() -> None:
-    """cleanup() must null out core_v1, apps_v1, and batch_v1 cached instances."""
+def test_custom_objects_api_lazy_accessor_builds_once() -> None:
+    """custom_objects_api property wraps the pre-supplied ApiClient in a CustomObjectsApi."""
     mock_api_client = MagicMock()
     client = _make_client(api_client=mock_api_client)
 
-    # Pre-warm all three lazy accessors.
+    import kubernetes.client as _kc
+
+    mock_custom = MagicMock()
+    orig = _kc.CustomObjectsApi
+    factory = MagicMock(return_value=mock_custom)
+    _kc.CustomObjectsApi = factory  # type: ignore[assignment]
+    try:
+        r1 = client.custom_objects_api
+        r2 = client.custom_objects_api
+    finally:
+        _kc.CustomObjectsApi = orig
+
+    assert r1 is r2
+    factory.assert_called_once_with(mock_api_client)
+
+
+def test_cleanup_resets_cached_api_sub_clients() -> None:
+    """cleanup() must null out every cached typed API client."""
+    mock_api_client = MagicMock()
+    client = _make_client(api_client=mock_api_client)
+
+    # Pre-warm every lazy accessor.
     client._core_v1 = MagicMock()
     client._apps_v1 = MagicMock()
     client._batch_v1 = MagicMock()
+    client._custom_objects_api = MagicMock()
 
     client.cleanup()
 
     assert client._core_v1 is None
     assert client._apps_v1 is None
     assert client._batch_v1 is None
+    assert client._custom_objects_api is None
     assert client._api_client is None
 
 
