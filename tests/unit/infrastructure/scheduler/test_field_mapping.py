@@ -523,13 +523,13 @@ def test_get_mappings_aws_static_matches_aws_field_mapping_class():
     )
 
 
-def test_scheduler_mapper_copy_unmapped_defaults_match_base():
-    """Concrete mapper methods declare the same copy_unmapped defaults as the base."""
+def test_scheduler_mapper_copy_unmapped_defaults_preserve_scheduler_contracts():
+    """HostFactory drops unmapped fields by default; other mappers follow the base."""
     import inspect
 
     from orb.infrastructure.scheduler.slurm.field_mapper import SlurmFieldMapper
 
-    mapper_classes = [DefaultFieldMapper, HostFactoryFieldMapper, SlurmFieldMapper]
+    mapper_classes = [DefaultFieldMapper, SlurmFieldMapper]
     for mapper_class in mapper_classes:
         actual = inspect.signature(mapper_class.map_output_fields).parameters[
             "copy_unmapped"
@@ -541,6 +541,11 @@ def test_scheduler_mapper_copy_unmapped_defaults_match_base():
             f"{mapper_class.__name__}.map_output_fields declares copy_unmapped={actual!r}; "
             f"expected the base default {expected!r}"
         )
+
+    hostfactory_default = inspect.signature(HostFactoryFieldMapper.map_output_fields).parameters[
+        "copy_unmapped"
+    ].default
+    assert hostfactory_default is False
 
     actual = inspect.signature(DefaultFieldMapper.format_for_generation).parameters[
         "copy_unmapped"
