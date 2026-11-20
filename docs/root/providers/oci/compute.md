@@ -114,6 +114,13 @@ over defaults. Shape aliases include `shape`, `machine_type`, and `instance_type
 The complete shipped shape matrix and architecture requirements are in the
 [template guide](templates.md).
 
+Explicit saved IMDS booleans and `capacity_type` choices retain precedence over
+provider template defaults after reloading. An absent or null `instance_options`,
+`{}`, or a null nested IMDS option remains unset and inherits the configured
+default; these values do not clear it. Review saved `capacity_type` values before
+upgrading: a persisted `preemptible` choice previously masked by a lower
+`ondemand` default will now request preemptible capacity.
+
 ### Instance metadata service
 
 To disable legacy IMDSv1 endpoints for new workers, add this entry to the
