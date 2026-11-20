@@ -234,6 +234,8 @@ class OCIComputeHandler:
         nsg_ids = vnic.get("nsg_ids")
         if nsg_ids:
             body["createVnicDetails"]["nsgIds"] = nsg_ids
+        if vnic.get("assign_public_ip") is not None:
+            body["createVnicDetails"]["assignPublicIp"] = vnic["assign_public_ip"]
         shape_config = launch_payload.get("shape_config")
         if not isinstance(shape_config, dict) and "Flex" in str(shape):
             shape_config = {"ocpus": 1, "memoryInGBs": 16}

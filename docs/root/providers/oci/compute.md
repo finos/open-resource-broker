@@ -91,6 +91,7 @@ orb requests status <return-request-id>
 | `compartment_id` | Yes | string | Target compartment OCID. |
 | `availability_domain` | For compute clusters; recommended otherwise | string | Target AD. Otherwise the handler attempts resolution from subnet/compartment information. |
 | `security_group_ids` | No | list[string] | OCI NSG OCIDs attached to the worker VNIC. |
+| `public_ip_assignment` | No | boolean or null | Whether to assign a public IPv4 address to the primary VNIC. Omitted or null leaves OCI's subnet-based default in effect when no provider default is configured. |
 | `shape_config` | Explicit in shipped VM examples | object | `ocpus` and `memoryInGBs`; DenseIO requires a supported pair. Omit for bare metal. |
 | `ocpus`, `memory_gbs` | No | number | Alternate top-level sizing inputs; override the corresponding `shape_config` values. |
 | `capacity_type` | No | string | `ondemand` (default) or `preemptible`. |
@@ -142,6 +143,25 @@ Deny takes precedence over Allow. Members of the default administrator group in
 the default domain are exempt from Deny policies, so an operator's successful
 launch does not establish that the broker's instance principal has the same
 access. See Oracle's [Deny policy documentation](https://docs.oracle.com/en-us/iaas/Content/Identity/policysyntax/denypolicies.htm).
+
+### Public-IP assignment
+
+Set `"public_ip_assignment": false` on a template to request a worker without a public
+IPv4 address, including in a public subnet. Set it to `true` only when the chosen
+subnet permits public addresses. The value must be a JSON boolean; strings such
+as `"false"` and numbers are rejected before launch. The choice is preserved
+during an on-demand capacity fallback and does not change the subnet or NSGs.
+
+If no value is supplied through the template or provider defaults, ORB omits
+`createVnicDetails.assignPublicIp`. OCI then assigns a public address in a public
+subnet and none in a private subnet. OCI rejects `true` when the subnet's
+`prohibitPublicIpOnVnic` setting is enabled. This handler relies on that launch
+validation; it does not read the subnet to validate this setting beforehand.
+See Oracle's [CreateVnicDetails reference](https://docs.oracle.com/en-us/iaas/tools/python/latest/api/core/models/oci.core.models.CreateVnicDetails.html#oci.core.models.CreateVnicDetails.assign_public_ip).
+
+This uses ORB's existing top-level `public_ip_assignment` field. It can also be
+set in provider `template_defaults`; an explicit template value, including
+`false`, overrides that default and survives saving and reloading the template.
 
 ### Preemptible capacity
 

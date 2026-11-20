@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import model_validator
+from pydantic import StrictBool, model_validator
 
 from orb.domain.template.template_aggregate import Template
 from orb.providers.oci.configuration.template_extension import OCITemplateExtensionConfig
@@ -13,6 +13,7 @@ class OCITemplate(Template, OCITemplateExtensionConfig):
 
     provider_type: str = "oci"
     provider_api: str = "OCICompute"
+    public_ip_assignment: StrictBool | None = None
 
     @model_validator(mode="before")
     @classmethod

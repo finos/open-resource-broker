@@ -92,6 +92,9 @@ class OCITemplateMapper:
 
         subnet_ids = _get("subnet_ids", "subnetIds") or []
         security_group_ids = _get("security_group_ids", "securityGroupIds", "nsg_ids") or []
+        public_ip_assignment = _get("public_ip_assignment")
+        if public_ip_assignment is not None and not isinstance(public_ip_assignment, bool):
+            raise ValueError("public_ip_assignment must be true or false")
         machine_types = _get("machine_types") or {}
         inferred_shape = None
         if isinstance(machine_types, dict) and machine_types:
@@ -163,6 +166,7 @@ class OCITemplateMapper:
             "agent_config": _get("agent_config", "agentConfig"),
             "instance_options": instance_options,
             "nsg_ids": security_group_ids,
+            "public_ip_assignment": public_ip_assignment,
             "user_data": _get("machine_bootstrap", "user_data", "userData"),
             "ssh_authorized_keys": _get("ssh_authorized_keys", "sshAuthorizedKeys")
             or metadata.get("ssh_authorized_keys"),
@@ -264,6 +268,8 @@ class OCITemplateMapper:
             "pricing_estimate": OCIPricingService.estimate_hourly_cost(template),
             "fallback_to_ondemand": normalized["fallback_to_ondemand"],
         }
+        if normalized["public_ip_assignment"] is not None:
+            payload["create_vnic_details"]["assign_public_ip"] = normalized["public_ip_assignment"]
         if normalized.get("capacity_type") == "preemptible":
             payload["preemptible_instance_config"] = {
                 "preemptionAction": {
