@@ -244,6 +244,9 @@ class OCIComputeHandler:
         boot_volume_gbs = launch_payload.get("boot_volume_gbs")
         if boot_volume_gbs is not None:
             body["sourceDetails"]["bootVolumeSizeInGBs"] = int(float(boot_volume_gbs))
+        boot_volume_vpus_per_gb = launch_payload.get("boot_volume_vpus_per_gb")
+        if boot_volume_vpus_per_gb is not None:
+            body["sourceDetails"]["bootVolumeVpusPerGB"] = boot_volume_vpus_per_gb
         for field, target in {
             "compute_cluster_id": "computeClusterId",
             "display_name": "displayName",

@@ -98,6 +98,7 @@ orb requests status <return-request-id>
 | `fallback_to_ondemand` | No | boolean | Retry a failed preemptible launch as on-demand using the same shape and image. Default from `template.default_fallback_to_ondemand` (`false`), overridable per provider type, provider instance, template and request. |
 | `preemptible_preserve_boot_volume` | No | boolean | Preserve the boot disk on preemption. Default `false`; does not configure ordinary worker return. |
 | `boot_volume_gbs` | No | number | Boot disk size in GB, independent of DenseIO local NVMe. |
+| `boot_volume_vpus_per_gb` | No | integer | Optional boot disk performance: `10`, `20`, or `30`–`120` VPUs/GB. Independent of boot disk size; also accepts `bootVolumeVpusPerGB`. |
 | `max_machines` | No | integer | Maximum machines for the template; accepts `max_instances`. |
 | `ssh_authorized_keys` | No | string | SSH public key text. |
 | `machine_bootstrap` | No | string | Base64 cloud-init/user data; also accepts `user_data`. |
@@ -162,6 +163,42 @@ See Oracle's [CreateVnicDetails reference](https://docs.oracle.com/en-us/iaas/to
 This uses ORB's existing top-level `public_ip_assignment` field. It can also be
 set in provider `template_defaults`; an explicit template value, including
 `false`, overrides that default and survives saving and reloading the template.
+
+### Boot-volume performance
+
+To select boot disk performance independently of its capacity, add an optional
+integer to the template or its provider template defaults:
+
+```json
+{
+  "provider_config": {
+    "boot_volume_gbs": 200,
+    "boot_volume_vpus_per_gb": 20
+  }
+}
+```
+
+`10` selects Balanced, `20` Higher Performance, and integers from `30` through
+`120` Ultra High Performance, following Oracle's
+[image-source API contract](https://docs.oracle.com/en-us/iaas/tools/python/latest/api/core/models/oci.core.models.InstanceSourceViaImageDetails.html).
+Use a JSON integer: booleans, quoted numbers and floating-point values are
+rejected before launch. `0` (Lower Cost) is not supported for boot volumes.
+The option maps to `sourceDetails.bootVolumeVpusPerGB`; omitting it leaves the
+existing launch request unchanged and uses OCI's Balanced default. It does not
+set or resize the boot disk, change the image, configure performance autotuning,
+or affect the shape's DenseIO local NVMe disks. An on-demand fallback retains
+the same boot disk settings.
+
+Check the selected shape, image and attachment support before choosing Ultra
+High Performance. Oracle documents this boot-volume level for VM instances
+with paravirtualized attachments; achieved performance also depends on boot
+disk capacity and instance resources. See
+[Boot Volumes and Ultra High Performance](https://docs.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeultrahighperformance.htm#Boot_Volumes_and_Ultra_High_Performance).
+ORB's static price estimate includes its configured capacity rate and does not
+add a VPU performance premium. Verify current storage and performance charges
+with OCI pricing for your deployment. Live acceptance must independently read
+the boot volume's `vpus-per-gb` and verify boot-volume cleanup after worker
+return; instance status alone does not establish either result.
 
 ### Preemptible capacity
 

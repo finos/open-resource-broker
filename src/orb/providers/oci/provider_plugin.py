@@ -36,6 +36,13 @@ class OCIPlugin(ProviderPlugin):
     def default_api(self) -> str:
         return "OCICompute"
 
+    def template_row_migration(self) -> Any:
+        from orb.providers.oci.configuration.boot_volume import (
+            preserve_boot_volume_performance_override,
+        )
+
+        return preserve_boot_volume_performance_override
+
     def provider_settings_class(self) -> type:
         from orb.providers.oci.configuration.config import OCIProviderConfig
 

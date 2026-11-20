@@ -5,6 +5,10 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any
 
+from orb.providers.oci.configuration.boot_volume import (
+    select_boot_volume_performance,
+    validate_boot_volume_vpus_per_gb,
+)
 from orb.providers.oci.configuration.instance_options import OCIInstanceOptions
 from orb.providers.oci.services import OCIPricingService
 
@@ -117,6 +121,9 @@ class OCITemplateMapper:
         boot_volume_gbs = cls._to_float(
             _get("boot_volume_gbs", "machine_disk_size_gb", "storage_gbs", "bootVolumeSizeInGBs")
         )
+        boot_volume_vpus_per_gb = validate_boot_volume_vpus_per_gb(
+            select_boot_volume_performance(template)
+        )
 
         effective_shape_config = dict(shape_config)
         effective_shape_config.pop("OCPUs", None)
@@ -178,6 +185,7 @@ class OCITemplateMapper:
             "ocpus": ocpus,
             "memory_gbs": memory_gbs,
             "boot_volume_gbs": boot_volume_gbs,
+            "boot_volume_vpus_per_gb": boot_volume_vpus_per_gb,
             "capacity_type": capacity_type,
             "fallback_to_ondemand": fallback_to_ondemand,
             "preemptible_preserve_boot_volume": preemptible_preserve_boot_volume,
@@ -270,6 +278,8 @@ class OCITemplateMapper:
         }
         if normalized["public_ip_assignment"] is not None:
             payload["create_vnic_details"]["assign_public_ip"] = normalized["public_ip_assignment"]
+        if normalized.get("boot_volume_vpus_per_gb") is not None:
+            payload["boot_volume_vpus_per_gb"] = normalized["boot_volume_vpus_per_gb"]
         if normalized.get("capacity_type") == "preemptible":
             payload["preemptible_instance_config"] = {
                 "preemptionAction": {
