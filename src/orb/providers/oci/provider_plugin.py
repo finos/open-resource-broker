@@ -36,6 +36,13 @@ class OCIPlugin(ProviderPlugin):
     def default_api(self) -> str:
         return "OCICompute"
 
+    def template_row_migration(self) -> Any:
+        from orb.providers.oci.configuration.instance_options import (
+            preserve_launch_controls_overrides,
+        )
+
+        return preserve_launch_controls_overrides
+
     def provider_settings_class(self) -> type:
         from orb.providers.oci.configuration.config import OCIProviderConfig
 

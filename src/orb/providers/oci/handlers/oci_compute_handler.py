@@ -21,6 +21,7 @@ from orb.providers.oci.cli_client import OCICommandError, run_oci, service_error
 from orb.providers.oci.configuration.realms import is_allowed_realm_domain
 from orb.providers.oci.mapping import OCITemplateMapper
 from orb.providers.oci.services import OCIPricingService
+from orb.providers.oci.services.launch_preflight import OCILaunchPreflight, OCIPreflightError
 
 # The confirm-time probe batches IDs into one search per chunk and stops after
 # a fixed budget; an unfinished probe is reported unavailable.
@@ -233,6 +234,8 @@ class OCIComputeHandler:
         nsg_ids = vnic.get("nsg_ids")
         if nsg_ids:
             body["createVnicDetails"]["nsgIds"] = nsg_ids
+        if vnic.get("assign_public_ip") is not None:
+            body["createVnicDetails"]["assignPublicIp"] = vnic["assign_public_ip"]
         shape_config = launch_payload.get("shape_config")
         if not isinstance(shape_config, dict) and "Flex" in str(shape):
             shape_config = {"ocpus": 1, "memoryInGBs": 16}
@@ -241,11 +244,15 @@ class OCIComputeHandler:
         boot_volume_gbs = launch_payload.get("boot_volume_gbs")
         if boot_volume_gbs is not None:
             body["sourceDetails"]["bootVolumeSizeInGBs"] = int(float(boot_volume_gbs))
+        boot_volume_vpus_per_gb = launch_payload.get("boot_volume_vpus_per_gb")
+        if boot_volume_vpus_per_gb is not None:
+            body["sourceDetails"]["bootVolumeVpusPerGB"] = boot_volume_vpus_per_gb
         for field, target in {
             "compute_cluster_id": "computeClusterId",
             "display_name": "displayName",
             "metadata": "metadata",
             "agent_config": "agentConfig",
+            "instance_options": "instanceOptions",
             "freeform_tags": "freeformTags",
         }.items():
             if launch_payload.get(field):
@@ -413,6 +420,21 @@ class OCIComputeHandler:
                     "OCI_REGION_VALIDATION_FAILED",
                     {"provider_region": self._region},
                 )
+            if self._auth_config.get("launch_preflight") is True:
+                try:
+                    resolved_ad = OCILaunchPreflight(self._run_oci).validate(launch_requests[0])
+                except OCIPreflightError as exc:
+                    return ProviderResult.error_result(
+                        str(exc),
+                        exc.error_code,
+                        {
+                            "operation": "create_instances",
+                            "provider": "oci",
+                            "region": self._region,
+                        },
+                    )
+                for launch_request in launch_requests:
+                    launch_request["availability_domain"] = resolved_ad
             try:
                 self._validate_compute_cluster(launch_requests[0])
             except Exception as exc:

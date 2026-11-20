@@ -53,6 +53,10 @@ class OCIProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     private_key_path: Optional[str] = Field(
         default=None, description="OCI API key private key path"
     )
+    launch_preflight: bool = Field(
+        default=False,
+        description="Check live image, subnet and shape compatibility before each launch batch",
+    )
 
     @field_validator("extra_realm_suffixes")
     @classmethod
