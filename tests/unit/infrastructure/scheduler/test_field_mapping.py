@@ -8,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
+from orb.infrastructure.scheduler.base.field_mapper import SchedulerFieldMapper
 from orb.infrastructure.scheduler.default.field_mapper import DefaultFieldMapper
 from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
 from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
@@ -520,3 +521,17 @@ def test_get_mappings_aws_static_matches_aws_field_mapping_class():
         "HostFactoryFieldMappings.MAPPINGS['aws'] is out of sync with "
         "AWSFieldMapping._PROVIDER_MAPPINGS. Update field_mappings.py to match."
     )
+
+
+def test_scheduler_mapper_copy_unmapped_defaults_preserve_scheduler_contracts():
+    """HostFactory drops internal-only output fields; generation can preserve them."""
+    hostfactory = HostFactoryFieldMapper("aws")
+    output = hostfactory.map_output_fields(
+        {"template_id": "hostfactory-template", "provider_config": {"secret": "value"}}
+    )
+    assert "provider_config" not in output
+
+    generated = DefaultFieldMapper().format_for_generation(
+        [{"provider_config": {"region": "us-east-1"}}], copy_unmapped=True
+    )
+    assert generated == [{"provider_config": {"region": "us-east-1"}}]
