@@ -2,14 +2,15 @@
 
 ``TemplateDefaultsService.resolve_template_defaults`` uses the row's
 ``provider_type``, or the configured type of the selected provider instance, to
-choose which provider-type defaults to merge.  It does not stamp that type on
-the row.  ``TemplateFactory.create_template(row)`` then builds the provider's
-template class only when the row itself carries ``provider_type``, so a type's
-rows are typed by the row, or by ``provider_type`` in the type's
-``template_defaults`` (which the merge copies onto the row).
+choose which provider-type defaults to merge, and writes that type onto a row
+that has none.  ``TemplateFactory.create_template(row)`` builds the provider's
+template class only when the row carries ``provider_type``, so a row resolved
+against an instance is typed by its instance, and a row built without an
+instance is typed only by its own ``provider_type`` or by ``provider_type`` in
+the type's ``template_defaults`` (which the merge copies onto the row).
 
-These cases pin what happens today for the Kubernetes provider, whose bundled
-``template_defaults`` carry no ``provider_type``.
+These cases cover the Kubernetes provider, whose bundled ``template_defaults``
+carry no ``provider_type``.
 """
 
 from __future__ import annotations
@@ -54,11 +55,11 @@ def _build(
 
 @pytest.mark.unit
 class TestKubernetesRowTyping:
-    def test_scheduler_path_with_an_instance_does_not_type_an_untyped_row(self) -> None:
+    def test_scheduler_path_with_an_instance_types_an_untyped_row(self) -> None:
         resolved, template = _build(ROW, "k8s_ctx", _bundled_template_defaults())
-        assert "provider_type" not in resolved
-        assert type(template) is Template
-        assert not hasattr(template, "namespace")
+        assert resolved["provider_type"] == "k8s"
+        assert isinstance(template, K8sTemplate)
+        assert template.namespace == "team-a"
 
     def test_explicit_provider_type_row_becomes_a_k8s_template(self) -> None:
         resolved, template = _build(
