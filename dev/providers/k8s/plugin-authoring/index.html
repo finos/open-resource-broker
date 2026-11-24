@@ -4036,6 +4036,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#building-a-provider-type-on-the-kubernetes-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building a provider type on the Kubernetes provider
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#failure-semantics" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6414,6 +6425,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#building-a-provider-type-on-the-kubernetes-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building a provider type on the Kubernetes provider
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#failure-semantics" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6860,6 +6882,82 @@ Verify with:</p>
 <p>The list will include the standard kubernetes provider; the MPIJob
 handler shows up as an extra <code>provider_api</code> value on the kubernetes
 provider when running <code>orb templates generate --help</code>.</p>
+<h2 id="building-a-provider-type-on-the-kubernetes-provider">Building a provider type on the Kubernetes provider<a class="headerlink" href="#building-a-provider-type-on-the-kubernetes-provider" title="Permanent link">&para;</a></h2>
+<p>A plugin handler adds a workload kind to the <code>k8s</code> provider type. A provider
+that needs its own type name, defaults, capabilities and handlers (for
+example one that creates custom resources) subclasses <code>K8sProviderStrategy</code>
+instead and overrides the class attributes that differ. Every attribute
+defaults to the Kubernetes provider's own value.</p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Controls</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_PROVIDER_TYPE</code>, <code>_CONFIG_CLASS</code></td>
+<td>type name, config class (own <code>label_prefix</code> and environment prefix)</td>
+</tr>
+<tr>
+<td><code>_DEFAULTS_RESOURCE</code></td>
+<td><code>(package, file)</code> of the bundled defaults JSON</td>
+</tr>
+<tr>
+<td><code>_DEFAULT_API</code>, <code>_API_ALIASES</code></td>
+<td>API used when a request names none, spelling aliases</td>
+</tr>
+<tr>
+<td><code>_HANDLER_CLASSES</code>, <code>_TEMPLATE_CLASS</code></td>
+<td>handler per <code>provider_api</code>, template class requests are upcast to</td>
+</tr>
+<tr>
+<td><code>_CAPABILITY_SERVICE_CLASS</code></td>
+<td>override <code>_build_capabilities</code> to declare operations and APIs</td>
+</tr>
+<tr>
+<td><code>_DAEMON_SERVICES</code></td>
+<td>which of <code>reconciler</code>, <code>watch</code>, <code>orphan_gc</code>, <code>node_watcher</code>, <code>events_watcher</code> run</td>
+</tr>
+<tr>
+<td><code>_CANCEL_KINDS</code></td>
+<td><code>CancelKind(kind, list_names, delete)</code> entries <code>cancel_resource</code> covers</td>
+</tr>
+<tr>
+<td><code>_RESOURCE_NAME_KEYS</code>, <code>_HEALTH_CHECK_NAME</code></td>
+<td><code>provider_data</code> keys for controller names, health check name</td>
+</tr>
+</tbody>
+</table>
+<p>Handlers add two class attributes: <code>resource_ids_name_machines</code> (the ids an
+acquire reports are machine names, so a status poll reconciles them) and
+<code>timeout_delete_enabled</code> (a timed-out pod may be deleted by name; set it to
+<code>False</code> for a handler whose machines are not pods). A handler whose machines
+are not pods also overrides <code>read_pods_for_return</code>, and records the machine
+names it created under <code>provider_data["pod_names"]</code>.</p>
+<p><code>get_supported_apis</code> is an instance method; a subclass overrides it to list
+its own APIs. The capability set is declared in <code>_build_capabilities</code>; the
+<code>deletes_pods_without_request_record</code> feature is added after it, so an
+override cannot leave it out. A type whose <code>get_capabilities</code> omits
+<code>START_INSTANCES</code> and <code>STOP_INSTANCES</code> is refused those operations.</p>
+<p>Register the type like an in-tree provider: a <code>ProviderPlugin</code> subclass whose
+<code>strategy_factory</code> is <code>functools.partial(create_k8s_strategy,
+strategy_class=..., config_class=...)</code>, plus a
+<code>orb.providers.&lt;type&gt;.registration</code> module exposing
+<code>register_&lt;type&gt;_provider</code>, <code>initialize_&lt;type&gt;_provider</code>,
+<code>register_&lt;type&gt;_services_with_di</code> and <code>register_&lt;type&gt;_template_factory</code>.
+A row is built as the type's template class when it carries <code>provider_type</code>,
+so include <code>"provider_type": "&lt;type&gt;"</code> in the type's <code>template_defaults</code>.</p>
+<p>The defaults assume pods. <code>_CANCEL_KINDS</code> (Pod, Deployment, StatefulSet, Job),
+<code>_DAEMON_SERVICES</code> (all five services) and <code>timeout_delete_enabled = True</code> need
+pod, apps and batch permissions, so a type that only creates custom resources
+must override all three: supply its own cancel kinds, leave the pod-based
+services (<code>reconciler</code>, <code>watch</code>, <code>node_watcher</code>, <code>events_watcher</code>) out of
+<code>_DAEMON_SERVICES</code>, and set <code>timeout_delete_enabled = False</code> on its handlers.
+The type's template class sets <code>DEFAULT_PROVIDER_TYPE</code> (inherited from
+<code>K8sTemplate</code>, default <code>"k8s"</code>) to its own type name. A worked example lives in
+<code>tests/providers/k8s/extension/</code>.</p>
 <h2 id="failure-semantics">Failure semantics<a class="headerlink" href="#failure-semantics" title="Permanent link">&para;</a></h2>
 <ul>
 <li>If a plugin's <code>register()</code> callable raises, ORB logs the exception at
