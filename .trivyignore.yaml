@@ -154,16 +154,6 @@ vulnerabilities:
       5.40.1-6+deb13u1: vulnerable; checked 2026-10-29).
     expired_at: 2027-01-27
 
-  - id: CVE-2026-18374
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: glibc: Heap buffer overflow via attacker-controlled fopen mode string. Debian security
-      tracker lists no fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4:
-      vulnerable; checked 2026-10-29).
-    expired_at: 2027-01-27
-
   - id: CVE-2026-18477
     purls:
       - pkg:deb/debian/tar
@@ -180,26 +170,6 @@ vulnerabilities:
       tar: tar: --one-top-level hardlink targets not confined to top-level directory enabling
       arbitrary file overwrite. Debian security tracker lists no fixed version for trixie (source
       package tar, trixie 1.35+dfsg-3.1: vulnerable; checked 2026-10-29).
-    expired_at: 2027-01-27
-
-  - id: CVE-2026-19499
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: Buffer Overflow in strfmon right-justification padding. Debian security tracker lists
-      no fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked
-      2026-10-29).
-    expired_at: 2027-01-27
-
-  - id: CVE-2026-19542
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: Fix out-of-bounds array write in tdelete. Debian security tracker lists no fixed
-      version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked
-      2026-10-29).
     expired_at: 2027-01-27
 
   - id: CVE-2026-3184
@@ -246,16 +216,6 @@ vulnerabilities:
       3.46.1-7+deb13u2: vulnerable; checked 2026-10-29).
     expired_at: 2027-01-27
 
-  - id: CVE-2026-5435
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: glibc: Out-of-bounds write via TSIG record processing. Debian security tracker lists no
-      fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked
-      2026-10-29).
-    expired_at: 2027-01-27
-
   - id: CVE-2026-54370
     purls:
       - pkg:deb/debian/libacl1
@@ -293,85 +253,6 @@ vulnerabilities:
       version for trixie (source package tar, trixie 1.35+dfsg-3.1: vulnerable; checked 2026-10-29).
     expired_at: 2027-01-27
 
-  - id: CVE-2026-6238
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: glibc: Application crash or uninitialized memory read via crafted DNS response. Debian
-      security tracker lists no fixed version for trixie (source package glibc, trixie
-      2.41-12+deb13u4: vulnerable; checked 2026-10-29).
-    expired_at: 2027-01-27
-
-  - id: CVE-2026-6368
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: glibc: Process abort due to invalid memory in wordexp. Debian security tracker lists no
-      fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked
-      2026-10-29).
-    expired_at: 2027-01-27
-
-  - id: CVE-2026-6791
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: Glibc: Denial of Service via stack exhaustion during tilde expansion. Debian security
-      tracker lists no fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4:
-      vulnerable; checked 2026-10-29).
-    expired_at: 2027-01-27
-
-  - id: CVE-2026-77117
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: Non-progress DoS in SHIFT_JISX0213 -&gt. Debian security tracker lists no fixed version
-      for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked 2026-10-29).
-    expired_at: 2027-01-27
-
-  - id: CVE-2026-80489
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: Non-progress DoS in EUC_JISX0213 -> UCS-4 conversion state. Debian security tracker
-      lists no fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable;
-      checked 2026-10-29).
-    expired_at: 2027-01-27
-
-  - id: CVE-2026-8674
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: glibc DNS stub resolver: Denial of Service via long search domain in configuration.
-      Debian security tracker lists no fixed version for trixie (source package glibc, trixie
-      2.41-12+deb13u4: vulnerable; checked 2026-10-29).
-    expired_at: 2027-01-27
-
-  - id: CVE-2026-86805
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: glibc: Privilege escalation and arbitrary code execution via TOCTOU race condition in
-      dynamic loader. Debian security tracker lists no fixed version for trixie (source package
-      glibc, trixie 2.41-12+deb13u4: vulnerable; checked 2026-10-29).
-    expired_at: 2027-01-27
-
-  - id: CVE-2026-89092
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: nscd stack overflow leads to degraded DNS resolution. Debian security tracker lists no
-      fixed version for trixie (source package glibc, trixie 2.41-12+deb13u4: vulnerable; checked
-      2026-10-29).
-    expired_at: 2027-01-27
-
   - id: CVE-2026-95619
     purls:
       - pkg:deb/debian/gcc-14-base
@@ -380,16 +261,6 @@ vulnerabilities:
     statement: >-
       gcc: libstdc++ integer overflow in `new` operator. Debian security tracker lists no fixed
       version for trixie (source package gcc-14, trixie 14.2.0-19: vulnerable; checked 2026-10-29).
-    expired_at: 2027-01-27
-
-  - id: CVE-2026-95818
-    purls:
-      - pkg:deb/debian/libc-bin
-      - pkg:deb/debian/libc6
-    statement: >-
-      glibc: glibc: Local attacker can cause denial of service and information disclosure via stack-
-      based buffer overflow. Debian security tracker lists no fixed version for trixie (source
-      package glibc, trixie 2.41-12+deb13u4: vulnerable; checked 2026-10-29).
     expired_at: 2027-01-27
 
   - id: CVE-2026-119373
@@ -523,6 +394,31 @@ vulnerabilities:
       no fixed version for trixie (source package perl, trixie 5.40.1-6+deb13u1: vulnerable, no-dsa;
       checked 2026-11-06).
     expired_at: 2027-02-06
+
+  - id: CVE-2026-124709
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: The QUIC server retains state for rejected streams reset before STOP_SENDING is
+      acknowledged, allowing memory exhaustion (denial of service). Debian security tracker lists
+      no fixed version for trixie (source package openssl, trixie 3.5.9-1~deb13u1 and
+      trixie-security 3.5.7-1~deb13u3: vulnerable; checked 2026-11-24). ORB does not use QUIC.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-107494
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: The QUIC stack queues a RETIRE_CONNECTION_ID frame for every retransmitted
+      NEW_CONNECTION_ID frame, allowing a remote QUIC peer to cause memory exhaustion (denial of
+      service). Debian security tracker lists no fixed version for trixie (source package openssl,
+      trixie 3.5.9-1~deb13u1 and trixie-security 3.5.7-1~deb13u3: vulnerable; checked 2026-11-24).
+      ORB does not use QUIC.
+    expired_at: 2027-01-27
 
   # ── filelock on Python 3.10 ────────────────────────────────────────────────
   #
