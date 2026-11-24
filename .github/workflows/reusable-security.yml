@@ -75,9 +75,28 @@ jobs:
         run: make ci-security-pip-audit
 
       # Semgrep Static Analysis
+      # Semgrep is a uv project (dev-tools/ci/semgrep) so Dependabot can update
+      # its lock with the overrides kept. uv comes from the hash-locked tool
+      # requirements and installs into the setup-python interpreter only
+      # (UV_PYTHON_DOWNLOADS=never), into a venv outside the workspace so the scan
+      # does not read it. --locked fails if pyproject.toml and uv.lock disagree.
+      - name: Setup Python for Semgrep
+        id: semgrep-python
+        if: inputs.scan-type == 'semgrep' && inputs.enabled
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: ${{ inputs.default-python-version }}
+
       - name: Install Semgrep
         if: inputs.scan-type == 'semgrep' && inputs.enabled
-        run: pip install --require-hashes --no-deps -r .github/requirements/semgrep.txt
+        env:
+          PYTHON: ${{ steps.semgrep-python.outputs.python-path }}
+          UV_PYTHON_DOWNLOADS: never
+          UV_PROJECT_ENVIRONMENT: ${{ runner.temp }}/semgrep-venv
+        run: |
+          pip install --require-hashes --no-deps -r .github/requirements/uv.txt
+          uv sync --locked --project dev-tools/ci/semgrep --python "$PYTHON"
+          echo "$UV_PROJECT_ENVIRONMENT/bin" >> "$GITHUB_PATH"
 
       # --error makes semgrep exit non-zero on any finding, which fails the job.
       # Findings are also written to semgrep.sarif and surfaced in the GitHub
@@ -93,6 +112,44 @@ jobs:
             --output semgrep.sarif \
             --error \
             .
+
+      # Canary for a Semgrep upgrade. When a pull request changes the Semgrep
+      # project, scan the same tree with the Semgrep locked on the base commit and
+      # fail if the new one reports fewer results (rules or ignore handling
+      # silently broken). Skipped when the base commit has no Semgrep project.
+      # The current scan's output is excluded so both scans see the same tree.
+      - name: Compare Semgrep results with the base commit
+        if: >-
+          inputs.scan-type == 'semgrep' && inputs.enabled
+          && github.event_name == 'pull_request' && always()
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PYTHON: ${{ steps.semgrep-python.outputs.python-path }}
+          UV_PYTHON_DOWNLOADS: never
+        run: |
+          project=dev-tools/ci/semgrep
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          if git diff --quiet "$BASE_SHA" HEAD -- "$project"; then
+            echo "Semgrep project unchanged; no baseline comparison needed."
+            exit 0
+          fi
+          if ! git cat-file -e "$BASE_SHA:$project/uv.lock" 2>/dev/null; then
+            echo "Base commit has no Semgrep project; no baseline to compare."
+            exit 0
+          fi
+          base="$(mktemp -d "$RUNNER_TEMP/semgrep-base.XXXXXX")"
+          git show "$BASE_SHA:$project/pyproject.toml" > "$base/pyproject.toml"
+          git show "$BASE_SHA:$project/uv.lock" > "$base/uv.lock"
+          UV_PROJECT_ENVIRONMENT="$base/venv" uv sync --locked --project "$base" --python "$PYTHON"
+          "$base/venv/bin/semgrep" scan \
+            --config p/security-audit \
+            --config p/secrets \
+            --config p/python \
+            --exclude semgrep.sarif \
+            --sarif \
+            --output "$RUNNER_TEMP/semgrep-baseline.sarif" \
+            .
+          python3 dev-tools/ci/semgrep_baseline_check.py "$RUNNER_TEMP/semgrep-baseline.sarif" semgrep.sarif
 
       # Semgrep still writes results silenced by `# nosemgrep` into the SARIF,
       # and code scanning would keep them open. Drop them before upload. When
