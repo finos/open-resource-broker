@@ -326,7 +326,7 @@ dev = [
     "mike>=1.1.0,<3.0.0",
     # --- inlined from dependency-groups.security ---
     "pip-audit>=2.6.1,<3.0.0",
-    "cyclonedx-bom>=4.0.0,<8.0.0",
+    "cyclonedx-bom>=4.0.0,<9.0.0",
     "lxml>=6.1.0",
     # semgrep is intentionally excluded from this shim (as in the security group):
     # workflows pin and install their own version to avoid version drift.
@@ -473,7 +473,7 @@ docs = [
 
 security = [
     "pip-audit>=2.6.1,<3.0.0",
-    "cyclonedx-bom>=4.0.0,<8.0.0",
+    "cyclonedx-bom>=4.0.0,<9.0.0",
     # Security override for lxml (CVE-2026-41066) — transitive via cyclonedx-bom + pip-audit
     "lxml>=6.1.0",
     # semgrep is intentionally excluded: the workflow pins and installs its own
