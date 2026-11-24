@@ -5545,6 +5545,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#template-provider-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Template Provider Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#multi-provider-template-generation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6784,6 +6795,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#template-provider-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Template Provider Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#multi-provider-template-generation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7422,6 +7444,8 @@
 - <code>aws_default_us-east-1_templates.json</code>
 - <code>aws_prod_us-west-2_templates.json</code>
 - <code>aws_dev_eu-west-1_templates.json</code></p>
+<h3 id="template-provider-type">Template Provider Type<a class="headerlink" href="#template-provider-type" title="Permanent link">&para;</a></h3>
+<p>A template row resolved against a provider instance takes that instance's type, so a row without <code>provider_type</code> loads as that provider's template type and keeps its provider-specific fields. A <code>provider_type</code> set on the row always wins. A row with no provider instance to resolve against stays a core template. Provider validation applies to every row of the type, including rows that omit <code>provider_type</code>; a row the provider rejects is logged and skipped.</p>
 <h3 id="multi-provider-template-generation">Multi-Provider Template Generation<a class="headerlink" href="#multi-provider-template-generation" title="Permanent link">&para;</a></h3>
 <p>Generate templates for multiple providers:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Generate for all active providers</span>
