@@ -14,12 +14,13 @@ between its strategy shell and its handler factory.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
 
 from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
 from orb.providers.k8s.configuration.config import K8sProviderConfig
+from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 from orb.providers.k8s.infrastructure.handlers.base_handler import K8sHandlerBase
 from orb.providers.k8s.infrastructure.handlers.deployment_handler import K8sDeploymentHandler
 from orb.providers.k8s.infrastructure.handlers.job_handler import K8sJobHandler
@@ -77,6 +78,10 @@ class K8sHandlerRegistry:
         node_state_cache_provider: Optional[Callable[[], Optional[K8sNodeStateCache]]] = None,
         api_aliases: Optional[dict[str, str]] = None,
         metrics_provider: Optional[Callable[[], Optional[Any]]] = None,
+        handler_classes: Optional[Mapping[str, type[K8sHandlerBase]]] = None,
+        default_api: str = KubernetesProviderApi.POD.value,
+        provider_type: str = "k8s",
+        template_class: Optional[type[K8sTemplate]] = None,
     ) -> None:
         self._config = config
         self._logger = logger
@@ -99,7 +104,15 @@ class K8sHandlerRegistry:
         # Per-instance mutable copy of the handler-class table.  Seeded from
         # the class-level defaults so every registry instance starts with the
         # four built-in kinds but is fully isolated from every other instance.
-        self._handler_classes: dict[str, type[K8sHandlerBase]] = dict(self._DEFAULT_HANDLER_CLASSES)
+        self._handler_classes: dict[str, type[K8sHandlerBase]] = dict(
+            handler_classes if handler_classes is not None else self._DEFAULT_HANDLER_CLASSES
+        )
+        # ``provider_api`` a request without one resolves to, the provider type
+        # used for synthetic ``<type>/<api>`` instance types and fallback
+        # templates, and the template class requests are upcast to.
+        self._default_api = default_api
+        self._provider_type = provider_type
+        self._template_class: type[K8sTemplate] = template_class or K8sTemplate
         # Handler cache keyed by provider_api value.  Tests can pre-seed
         # this via ``handler_overrides`` to inject mock handlers.
         self._handlers: dict[str, K8sHandlerBase] = dict(handler_overrides or {})
@@ -125,7 +138,7 @@ class K8sHandlerRegistry:
         if api:
             raw = str(api)
             return self._api_aliases.get(raw, raw)
-        return KubernetesProviderApi.POD.value
+        return self._default_api
 
     def _resilience_kwargs(self) -> dict[str, Any]:
         """Map the provider config's circuit-breaker / retry knobs to handler kwargs.
@@ -232,10 +245,12 @@ class K8sHandlerRegistry:
         cls,
         *,
         plugin_factories: Optional[dict[str, Callable[..., K8sHandlerBase]]] = None,
+        handler_classes: Optional[Mapping[str, type[K8sHandlerBase]]] = None,
     ) -> list[Any]:
         """Return example templates contributed by every registered handler.
 
-        Iterates the built-in :attr:`_HANDLER_CLASSES` dict plus any plugin-
+        Iterates the handler-class table (the built-in kinds unless
+        ``handler_classes`` supplies a provider type's own) plus any plugin-
         registered factories.  Each handler exposes a classmethod
         ``get_example_templates`` (or a callable on the plugin factory's
         target class).  Handlers without that method or that fail to produce
@@ -247,7 +262,8 @@ class K8sHandlerRegistry:
         :meth:`AWSHandlerFactory.generate_example_templates`.
         """
         examples: list[Any] = []
-        sources: dict[str, Any] = {**cls._DEFAULT_HANDLER_CLASSES, **(plugin_factories or {})}
+        table = handler_classes if handler_classes is not None else cls._DEFAULT_HANDLER_CLASSES
+        sources: dict[str, Any] = {**table, **(plugin_factories or {})}
         for handler_target in sources.values():
             getter = getattr(handler_target, "get_example_templates", None)
             if getter is None:
@@ -504,13 +520,7 @@ class K8sHandlerRegistry:
 
             # Derive instance_type from the workload kind so machine rows
             # group and filter correctly by provider_api.
-            api_to_instance_type: dict[str, str] = {
-                "Pod": "k8s/Pod",
-                "Deployment": "k8s/Deployment",
-                "StatefulSet": "k8s/StatefulSet",
-                "Job": "k8s/Job",
-            }
-            synthetic_instance_type = api_to_instance_type.get(provider_api, f"k8s/{provider_api}")
+            synthetic_instance_type = f"{self._provider_type}/{provider_api}"
 
             live_ids = {i.get("instance_id", "") for i in instances}
             # The resource ids of a Deployment, StatefulSet or Job acquire name the
@@ -518,7 +528,7 @@ class K8sHandlerRegistry:
             # handler reports them. A controller is never a pod to reconcile, so
             # only a pod request or a return (whose ids are pod names) is checked
             # for absent ids.
-            names_machines = is_return or provider_api == "Pod"
+            names_machines = is_return or self._names_machines(handler, provider_api)
             missing_ids = (
                 [
                     mid
@@ -612,6 +622,18 @@ class K8sHandlerRegistry:
             self._logger.error("Kubernetes get_status failed: %s", exc, exc_info=True)
             return Failed(error=str(exc), recoverable=True)
 
+    def _names_machines(self, handler: K8sHandlerBase, provider_api: str) -> bool:
+        """Whether *handler*'s resource ids name machines (see ``resource_ids_name_machines``).
+
+        A handler that does not declare the flag (a test double) is judged by
+        the built-in rule: only the Pod kind names machines.
+        """
+        # getattr: a test double does not declare the flag
+        declared = getattr(type(handler), "resource_ids_name_machines", None)
+        if isinstance(declared, bool):
+            return declared
+        return provider_api == KubernetesProviderApi.POD.value
+
     def build_template_for_request(self, request: Request) -> Template:
         """Resolve the :class:`Template` carried by ``request``.
 
@@ -627,19 +649,19 @@ class K8sHandlerRegistry:
             Template as _Template,
         )
         from orb.providers.k8s.domain.template.k8s_template_aggregate import (
-            K8sTemplate,
             upcast_to_k8s_template,
         )
 
+        template_class = self._template_class
         meta = getattr(request, "metadata", None) or {}
         if isinstance(meta, dict):
             template_payload = meta.get("template")
-            if isinstance(template_payload, K8sTemplate):
+            if isinstance(template_payload, template_class):
                 return template_payload
             if isinstance(template_payload, _Template):
-                return upcast_to_k8s_template(template_payload)
+                return upcast_to_k8s_template(template_payload, template_class)
             if isinstance(template_payload, dict):
-                return K8sTemplate.model_validate(template_payload)
+                return template_class.model_validate(template_payload)
             # ``TemplateDTO`` from the application layer carries the generic
             # fields on the top level and the typed K8s-specific fields under
             # ``provider_config``.  Flatten both into the K8sTemplate.  Done
@@ -661,13 +683,13 @@ class K8sHandlerRegistry:
                     for key, value in provider_config.items():
                         if value is not None and flat.get(key) is None:
                             flat[key] = value
-                return K8sTemplate.model_validate(flat)
+                return template_class.model_validate(flat)
 
-        # Fall back to a minimal K8sTemplate built from the request fields.
-        return K8sTemplate(
+        # Fall back to a minimal template built from the request fields.
+        return template_class(
             template_id=str(request.template_id),
-            provider_type="k8s",
-            provider_api=request.provider_api or KubernetesProviderApi.POD.value,
+            provider_type=self._provider_type,
+            provider_api=request.provider_api or self._default_api,
             max_instances=max(int(request.requested_count), 1),
         )
 

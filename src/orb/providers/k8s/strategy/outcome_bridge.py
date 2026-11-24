@@ -109,7 +109,7 @@ def _all_instances_terminal(instances: list[dict[str, Any]]) -> bool:
 
 
 def _outcome_to_provider_result(
-    outcome: OperationOutcome, *, fallback_operation: str
+    outcome: OperationOutcome, *, fallback_operation: str, provider_type: str = "k8s"
 ) -> ProviderResult:
     """Translate an :class:`OperationOutcome` into a :class:`ProviderResult`.
 
@@ -138,7 +138,7 @@ def _outcome_to_provider_result(
                 "metadata": {
                     **(outcome.metadata or {}),
                     "operation": fallback_operation,
-                    "provider": "k8s",
+                    "provider": provider_type,
                     "recoverable": outcome.recoverable,
                 }
             }
@@ -158,7 +158,7 @@ def _outcome_to_provider_result(
                 metadata=meta,
                 tracking_request_id=outcome.request_id,
             ),
-            {"operation": fallback_operation, "provider": "k8s"},
+            {"operation": fallback_operation, "provider": provider_type},
         )
 
     if isinstance(outcome, Completed):
@@ -171,7 +171,7 @@ def _outcome_to_provider_result(
                 resource_ids=list(outcome.resource_ids),
                 metadata=meta,
             ),
-            {"operation": fallback_operation, "provider": "k8s"},
+            {"operation": fallback_operation, "provider": provider_type},
         )
 
     if isinstance(outcome, RequiresFollowUp):
@@ -196,7 +196,7 @@ def _outcome_to_provider_result(
                 resource_ids=pending_ids,
                 metadata=meta,
             ),
-            {"operation": fallback_operation, "provider": "k8s"},
+            {"operation": fallback_operation, "provider": provider_type},
         )
 
     return ProviderResult.error_result(

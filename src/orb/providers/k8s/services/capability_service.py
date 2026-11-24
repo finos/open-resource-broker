@@ -42,28 +42,58 @@ def _normalise_sentinel(value: str) -> str:
 class K8sCapabilityService:
     """Service for k8s provider capabilities, naming, and CLI/credential helpers."""
 
-    def __init__(self, logger: LoggingPort, config: Optional[K8sProviderConfig] = None) -> None:
+    def __init__(
+        self,
+        logger: LoggingPort,
+        config: Optional[K8sProviderConfig] = None,
+        *,
+        provider_type: str = "k8s",
+        orphan_gc_available: bool = True,
+    ) -> None:
         self._logger = logger
         self._config = config
+        self._provider_type = provider_type
+        # False when the provider type does not run the orphan GC at all.
+        self._orphan_gc_available = orphan_gc_available
 
     # ------------------------------------------------------------------
     # Capabilities
     # ------------------------------------------------------------------
 
-    def _deletes_pods_without_request_record(self) -> bool:
-        """Whether the orphan GC runs with deletion enabled (the same gate it starts on)."""
+    def _deletes_unrecorded_objects(self) -> bool:
+        """Whether the orphan GC runs with deletion enabled (the same gate it starts on).
+
+        Independent of which kinds the GC sweeps: a type that sweeps only custom
+        resources deletes live objects too once their request history is gone.
+        """
         config = self._config
         return bool(
-            config is not None
+            self._orphan_gc_available
+            and config is not None
             and config.orphan_gc_enabled
             and config.auto_cleanup_orphans
             and config.orb_instance_id
         )
 
     def get_capabilities(self) -> ProviderCapabilities:
-        """Return the provider's declared operation and API surface."""
+        """Return the provider's declared operation and API surface.
+
+        The surface comes from :meth:`_build_capabilities`; the
+        ``deletes_pods_without_request_record`` feature is added here, after the
+        hook, so a type that overrides the hook cannot leave it out.  ``orb
+        cleanup`` reads it to warn before pruning request history.
+        """
+        capabilities = self._build_capabilities()
+        features = {
+            **capabilities.features,
+            "deletes_pods_without_request_record": self._deletes_unrecorded_objects(),
+        }
+        return capabilities.model_copy(update={"features": features})
+
+    def _build_capabilities(self) -> ProviderCapabilities:
+        """Build the declared operation and API surface (override per provider type)."""
         return ProviderCapabilities(
-            provider_type="k8s",
+            provider_type=self._provider_type,
             supported_operations=[
                 ProviderOperationType.CREATE_INSTANCES,
                 ProviderOperationType.TERMINATE_INSTANCES,
@@ -105,9 +135,6 @@ class K8sCapabilityService:
                 },
                 "watch_supported": True,
                 "namespaces_supported": True,
-                # True when the orphan GC deletes pods that have no request record, so
-                # removing request history makes live pods look like orphans.
-                "deletes_pods_without_request_record": self._deletes_pods_without_request_record(),
             },
         )
 
@@ -116,10 +143,10 @@ class K8sCapabilityService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def generate_provider_name(config: dict[str, Any]) -> str:
+    def generate_provider_name(config: dict[str, Any], prefix: str = "k8s") -> str:
         """Generate a Kubernetes provider instance name.
 
-        Pattern: ``k8s_{sanitized_context}``.
+        Pattern: ``{prefix}_{sanitized_context}``.
         """
         raw_context: str | None = config.get("context") or None
 
@@ -127,22 +154,22 @@ class K8sCapabilityService:
             sanitized = re.sub(r"[^a-zA-Z0-9\-_]", "-", raw_context)
             if sanitized == "in-cluster":
                 sanitized = f"ctx_{sanitized}"
-            return f"k8s_{sanitized}"
+            return f"{prefix}_{sanitized}"
 
-        return "k8s_in-cluster"
+        return f"{prefix}_in-cluster"
 
     @staticmethod
-    def parse_provider_name(provider_name: str) -> dict[str, str]:
+    def parse_provider_name(provider_name: str, prefix: str = "k8s") -> dict[str, str]:
         """Inverse of :meth:`generate_provider_name`."""
-        if not provider_name.startswith("k8s_"):
+        if not provider_name.startswith(f"{prefix}_"):
             return {}
-        suffix = provider_name[len("k8s_") :]
+        suffix = provider_name[len(prefix) + 1 :]
         return {"context_or_namespace": suffix}
 
     @staticmethod
-    def get_provider_name_pattern() -> str:
+    def get_provider_name_pattern(prefix: str = "k8s") -> str:
         """Return the naming pattern string."""
-        return "k8s_{sanitized_context}"
+        return f"{prefix}_{{sanitized_context}}"
 
     @staticmethod
     def get_supported_apis() -> list[str]:

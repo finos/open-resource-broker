@@ -25,7 +25,7 @@ on the parent type is preserved and every k8s-specific field is
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -442,14 +442,18 @@ class K8sTemplate(Template):
     # are set, inline ``native_spec`` takes precedence and a warning is logged.
     native_spec_path: Optional[str] = None
 
+    # ``provider_type`` a row receives when it does not declare one.  A provider
+    # type built on the Kubernetes provider overrides it on its template subclass.
+    DEFAULT_PROVIDER_TYPE: ClassVar[str] = "k8s"
+
     def __init__(self, **data: Any) -> None:
         """Initialise the K8sTemplate.
 
-        ``provider_type`` is forced to ``"k8s"`` so the template factory and
+        ``provider_type`` defaults to :attr:`DEFAULT_PROVIDER_TYPE` so the template factory and
         provider-resolver code paths route the template through the
         kubernetes provider without callers having to set it explicitly.
         """
-        data.setdefault("provider_type", "k8s")
+        data.setdefault("provider_type", self.DEFAULT_PROVIDER_TYPE)
         super().__init__(**data)
 
     # ------------------------------------------------------------------
@@ -718,17 +722,21 @@ class K8sTemplate(Template):
 # ---------------------------------------------------------------------------
 
 
-def upcast_to_k8s_template(template: Template | K8sTemplate) -> K8sTemplate:
-    """Return a :class:`K8sTemplate` view of ``template``.
+def upcast_to_k8s_template(
+    template: Template | K8sTemplate, template_class: type[K8sTemplate] = K8sTemplate
+) -> K8sTemplate:
+    """Return a ``template_class`` view of ``template``.
 
-    When ``template`` is already a :class:`K8sTemplate` it is returned
+    When ``template`` is already an instance of ``template_class`` it is returned
     unchanged.  Otherwise the generic template is round-tripped through
     ``model_dump`` / ``model_validate`` — every parent-field is preserved
-    and every k8s-specific field stays at its ``None`` default.
+    and every provider-specific field stays at its ``None`` default.
+    ``template_class`` is a :class:`K8sTemplate` subclass for a provider type
+    built on the Kubernetes provider.
     """
-    if isinstance(template, K8sTemplate):
+    if isinstance(template, template_class):
         return template
-    return K8sTemplate.model_validate(template.model_dump())
+    return template_class.model_validate(template.model_dump())
 
 
 __all__ = [
