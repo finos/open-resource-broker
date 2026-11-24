@@ -18,6 +18,8 @@ on:
       - 'src/orb/api/server.py'           # inline /health,/metrics,/info operations + router registration
       - 'src/orb/api/dependencies.py'     # response-model deps wired into routes
       - 'dev-tools/release/export_openapi_spec.sh'  # the exporter itself
+      - 'dev-tools/ci/check_csharp_lock*.sh'  # the C# lock guard
+      - 'makefiles/sdk.mk'
   # No paths filter on pull_request: SDK CI Passed is becoming a required
   # status check, so it must report (even if skipped) on every PR, including
   # docs-only ones. The `changes` job below detects whether the paths that
@@ -87,6 +89,8 @@ jobs:
               - 'src/orb/api/server.py'
               - 'src/orb/api/dependencies.py'
               - 'dev-tools/release/export_openapi_spec.sh'
+              - 'dev-tools/ci/check_csharp_lock*.sh'
+              - 'makefiles/sdk.mk'
 
   # ---------------------------------------------------------------------------
   # Static spec-conformance: asserts sdk/parity/scenario.json matches the
@@ -378,6 +382,14 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Generate + build SDK (make ${{ matrix.check-drift-target }})
         run: make ${{ matrix.check-drift-target }}
+
+      # The drift target above runs the lock guard on the real restore. This
+      # proves the guard itself: it must accept the committed lock, one without
+      # (or with) the generated project entry, and reject a changed contentHash,
+      # resolved version or missing package.
+      - name: Prove the C# lock guard rejects tampering
+        if: matrix.lang == 'dotnet'
+        run: dev-tools/ci/check_csharp_lock_selftest.sh
 
       # -----------------------------------------------------------------------
       # Unit tests
