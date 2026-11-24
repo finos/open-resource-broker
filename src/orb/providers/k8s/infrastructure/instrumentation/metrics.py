@@ -119,6 +119,13 @@ API_OPERATIONS: frozenset[str] = frozenset(
         "create_namespaced_job",
         "delete_namespaced_job",
         "read_namespaced_job",
+        # Custom resources (provider types built on the Kubernetes provider)
+        "create_namespaced_custom_object",
+        "get_namespaced_custom_object",
+        "list_namespaced_custom_object",
+        "list_cluster_custom_object",
+        "patch_namespaced_custom_object",
+        "delete_namespaced_custom_object",
         # Watcher / generic
         "list_watch",
         "unknown",

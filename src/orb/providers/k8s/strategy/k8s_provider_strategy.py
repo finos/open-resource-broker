@@ -22,7 +22,7 @@ factory can be a near drop-in.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Mapping, Optional, Sequence
 
 from orb.domain.base.operation_outcome import OperationOutcome
 from orb.domain.base.ports import LoggingPort
@@ -38,6 +38,7 @@ from orb.providers.base.strategy import (
     ProviderStrategy,
 )
 from orb.providers.k8s.configuration.config import K8sProviderConfig
+from orb.providers.k8s.domain.template.k8s_template_aggregate import K8sTemplate
 from orb.providers.k8s.infrastructure.handlers.base_handler import K8sHandlerBase
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.reconciliation.orphan_gc import OrphanGarbageCollector
@@ -51,6 +52,7 @@ from orb.providers.k8s.services.infrastructure_discovery_service import (
     K8sInfrastructureDiscoveryService,
 )
 from orb.providers.k8s.services.instance_operation_service import (
+    CancelKind,
     CancelResourceResult,
     K8sInstanceOperationService,
 )
@@ -101,14 +103,62 @@ class K8sProviderStrategy(ProviderStrategy):
     per-provider-API handlers via :class:`K8sHandlerRegistry`.
     """
 
+    # ------------------------------------------------------------------
+    # Extension hooks.  A provider type built on the Kubernetes provider
+    # subclasses this strategy and overrides what differs; every default is
+    # the Kubernetes provider's own value.  See
+    # ``docs/root/providers/k8s/plugin-authoring.md``.
+    # ------------------------------------------------------------------
+
+    # Provider type: reported by :attr:`provider_type`, stamped on result
+    # metadata and capabilities, used as the instance-name prefix and as the
+    # ``provider`` label of the handler registry's synthetic instance types.
+    _PROVIDER_TYPE: ClassVar[str] = "k8s"
+    # Configuration class the strategy validates its config against.  A
+    # subclass overrides ``provider_type`` and ``model_config`` (env prefix,
+    # ``label_prefix`` default) on its own subclass of ``K8sProviderConfig``.
+    _CONFIG_CLASS: ClassVar[type[K8sProviderConfig]] = K8sProviderConfig
+    # ``(package, file)`` of the bundled defaults JSON read by
+    # :meth:`get_defaults_config`.
+    _DEFAULTS_RESOURCE: ClassVar[tuple[str, str]] = (
+        "orb.providers.k8s.config",
+        "k8s_defaults.json",
+    )
     _SUPPORTED_APIS: tuple[str, ...] = tuple(api.value for api in KubernetesProviderApi)
+    # ``provider_api`` used by a request that carries none.
+    _DEFAULT_API: ClassVar[str] = KubernetesProviderApi.POD.value
+    # Handler classes by ``provider_api``.
+    _HANDLER_CLASSES: ClassVar[Mapping[str, type[K8sHandlerBase]]] = (
+        K8sHandlerRegistry._DEFAULT_HANDLER_CLASSES
+    )
+    # Template class requests are upcast to.
+    _TEMPLATE_CLASS: ClassVar[type[K8sTemplate]] = K8sTemplate
+    # Capability service class; a type overrides ``_build_capabilities`` on its subclass.
+    _CAPABILITY_SERVICE_CLASS: ClassVar[type[K8sCapabilityService]] = K8sCapabilityService
+    # Background services :meth:`start_daemon_services` runs: any of
+    # ``reconciler``, ``watch``, ``orphan_gc``, ``node_watcher``, ``events_watcher``.
+    _DAEMON_SERVICES: ClassVar[frozenset[str]] = frozenset(
+        {"reconciler", "watch", "orphan_gc", "node_watcher", "events_watcher"}
+    )
+    # Kinds ``cancel_resource`` deletes by request-id label; ``None`` is the
+    # four built-in workload kinds.
+    _CANCEL_KINDS: ClassVar[Optional[Sequence[CancelKind]]] = None
+    # ``provider_data`` keys :meth:`_handle_terminate_instances` fills with the
+    # acquire-time resource name for controller-backed handlers.
+    _RESOURCE_NAME_KEYS: ClassVar[tuple[str, ...]] = (
+        "deployment_name",
+        "statefulset_name",
+        "job_name",
+    )
+    # Name the connectivity health check is registered under.
+    _HEALTH_CHECK_NAME: ClassVar[str] = "kubernetes_api"
 
     # Canonical aliases for lowercase (or alternate-case) provider_api values.
     # REST or CLI submissions that spell ``provider_api="pod"`` (lowercase) are
     # normalised to ``"Pod"`` before reaching the handler registry, preventing
     # opaque ``NotImplementedError`` failures.  Extend this dict to cover any
     # additional aliases as new workload kinds are introduced.
-    _API_ALIASES: dict[str, str] = {
+    _API_ALIASES: ClassVar[dict[str, str]] = {
         "pod": "Pod",
         "deployment": "Deployment",
         "statefulset": "StatefulSet",
@@ -182,8 +232,8 @@ class K8sProviderStrategy(ProviderStrategy):
         node_events_cache: Optional[K8sNodeEventsCache] = None,
         native_spec_service: Optional[Any] = None,
     ) -> None:
-        if not isinstance(config, K8sProviderConfig):
-            raise ValueError("K8sProviderStrategy requires K8sProviderConfig")
+        if not isinstance(config, self._CONFIG_CLASS):
+            raise ValueError(f"{type(self).__name__} requires {self._CONFIG_CLASS.__name__}")
 
         super().__init__(config)
         self._logger = logger
@@ -251,8 +301,11 @@ class K8sProviderStrategy(ProviderStrategy):
         # :meth:`_get_discovery_service` on first use.
         self._discovery_service: Optional[K8sInfrastructureDiscoveryService] = None
         # Focused service objects — mirror the AWS provider's layout.
-        self._capability_service = K8sCapabilityService(
-            logger=self._logger, config=self._k8s_config
+        self._capability_service = self._CAPABILITY_SERVICE_CLASS(
+            logger=self._logger,
+            config=self._k8s_config,
+            provider_type=self._PROVIDER_TYPE,
+            orphan_gc_available="orphan_gc" in self._DAEMON_SERVICES,
         )
         self._template_service = K8sTemplateValidationService(logger=self._logger)
         self._health_check_service = K8sHealthCheckService(
@@ -262,6 +315,7 @@ class K8sProviderStrategy(ProviderStrategy):
         self._instance_operation_service = K8sInstanceOperationService(
             config=self._k8s_config,
             logger=self._logger,
+            kinds=self._CANCEL_KINDS,
         )
         # Start/stop service (scale Deployment/StatefulSet) — constructed
         # lazily by :meth:`_get_start_stop_service` on first use so the
@@ -295,6 +349,10 @@ class K8sProviderStrategy(ProviderStrategy):
             node_state_cache_provider=lambda: self._node_watch_lifecycle.node_state_cache,
             api_aliases=type(self)._API_ALIASES,
             metrics_provider=self._get_metrics,
+            handler_classes=self._HANDLER_CLASSES,
+            default_api=self._DEFAULT_API,
+            provider_type=self._PROVIDER_TYPE,
+            template_class=self._TEMPLATE_CLASS,
         )
 
     # ------------------------------------------------------------------
@@ -303,7 +361,7 @@ class K8sProviderStrategy(ProviderStrategy):
 
     @property
     def provider_type(self) -> str:
-        return "k8s"
+        return self._PROVIDER_TYPE
 
     @property
     def provider_name(self) -> Optional[str]:
@@ -431,11 +489,17 @@ class K8sProviderStrategy(ProviderStrategy):
                 "Kubernetes daemon services already started; skipping second invocation."
             )
             return
-        await self._run_startup_reconciler()
-        self._maybe_start_watch_manager()
-        self._maybe_start_orphan_gc()
-        self._maybe_start_node_watcher()
-        self._maybe_start_events_watcher()
+        services = self._DAEMON_SERVICES
+        if "reconciler" in services:
+            await self._run_startup_reconciler()
+        if "watch" in services:
+            self._maybe_start_watch_manager()
+        if "orphan_gc" in services:
+            self._maybe_start_orphan_gc()
+        if "node_watcher" in services:
+            self._maybe_start_node_watcher()
+        if "events_watcher" in services:
+            self._maybe_start_events_watcher()
         self._daemon_services_started = True
 
     def cleanup(self) -> None:
@@ -639,7 +703,7 @@ class K8sProviderStrategy(ProviderStrategy):
                 },
                 {
                     "operation": str(operation.operation_type),
-                    "provider": "k8s",
+                    "provider": self.provider_type,
                     "fulfillment_final": True,
                 },
             )
@@ -677,9 +741,15 @@ class K8sProviderStrategy(ProviderStrategy):
                 result = await self._handle_describe_resource_instances(operation)
             elif operation.operation_type == ProviderOperationType.VALIDATE_TEMPLATE:
                 result = self._template_service.validate_template(operation)
-            elif operation.operation_type == ProviderOperationType.START_INSTANCES:
+            elif (
+                operation.operation_type == ProviderOperationType.START_INSTANCES
+                and self._declares(ProviderOperationType.START_INSTANCES)
+            ):
                 result = await self._get_start_stop_service().start_instances(operation)
-            elif operation.operation_type == ProviderOperationType.STOP_INSTANCES:
+            elif (
+                operation.operation_type == ProviderOperationType.STOP_INSTANCES
+                and self._declares(ProviderOperationType.STOP_INSTANCES)
+            ):
                 result = await self._get_start_stop_service().stop_instances(operation)
             else:
                 result = ProviderResult.error_result(
@@ -693,12 +763,12 @@ class K8sProviderStrategy(ProviderStrategy):
                 update={
                     "routing_info": {
                         "execution_time_ms": execution_time_ms,
-                        "provider": "k8s",
+                        "provider": self.provider_type,
                     },
                     "metadata": {
                         **result.metadata,
                         "execution_time_ms": execution_time_ms,
-                        "provider": "k8s",
+                        "provider": self.provider_type,
                     },
                 }
             )
@@ -712,10 +782,14 @@ class K8sProviderStrategy(ProviderStrategy):
                 update={
                     "routing_info": {
                         "execution_time_ms": execution_time_ms,
-                        "provider": "k8s",
+                        "provider": self.provider_type,
                     }
                 }
             )
+
+    def _declares(self, operation_type: ProviderOperationType) -> bool:
+        """Whether :meth:`get_capabilities` lists *operation_type* as supported."""
+        return operation_type in self.get_capabilities().supported_operations
 
     # ------------------------------------------------------------------
     # Shared-envelope -> typed-interface bridges
@@ -745,7 +819,9 @@ class K8sProviderStrategy(ProviderStrategy):
                 existing_meta["template"] = template
                 request = request.update_metadata(existing_meta)
         outcome = await self.acquire(request)
-        return _outcome_to_provider_result(outcome, fallback_operation="create_instances")
+        return _outcome_to_provider_result(
+            outcome, fallback_operation="create_instances", provider_type=self.provider_type
+        )
 
     async def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
         """Dispatch a ``TERMINATE_INSTANCES`` operation to :meth:`return_machines`."""
@@ -772,9 +848,8 @@ class K8sProviderStrategy(ProviderStrategy):
         overrides: dict[str, Any] = {}
         resource_id = operation.parameters.get("resource_id")
         if resource_id:
-            overrides["deployment_name"] = resource_id
-            overrides["statefulset_name"] = resource_id
-            overrides["job_name"] = resource_id
+            for key in self._RESOURCE_NAME_KEYS:
+                overrides[key] = resource_id
         origin_request_id = operation.parameters.get("request_id")
         if origin_request_id:
             overrides["request_id"] = str(origin_request_id)
@@ -784,7 +859,9 @@ class K8sProviderStrategy(ProviderStrategy):
             provider_data_overrides=overrides or None,
             machine_coordinates=operation.parameters.get("machine_coordinates"),
         )
-        return _outcome_to_provider_result(outcome, fallback_operation="terminate_instances")
+        return _outcome_to_provider_result(
+            outcome, fallback_operation="terminate_instances", provider_type=self.provider_type
+        )
 
     async def _handle_get_instance_status(self, operation: ProviderOperation) -> ProviderResult:
         """Dispatch a ``GET_INSTANCE_STATUS`` operation to :meth:`get_status`."""
@@ -805,7 +882,9 @@ class K8sProviderStrategy(ProviderStrategy):
             request,
             machine_coordinates=operation.parameters.get("machine_coordinates"),
         )
-        return _outcome_to_provider_result(outcome, fallback_operation="get_instance_status")
+        return _outcome_to_provider_result(
+            outcome, fallback_operation="get_instance_status", provider_type=self.provider_type
+        )
 
     async def _handle_describe_resource_instances(
         self, operation: ProviderOperation
@@ -833,7 +912,9 @@ class K8sProviderStrategy(ProviderStrategy):
         )
         outcome = await self.get_status(resource_ids, request)
         result = _outcome_to_provider_result(
-            outcome, fallback_operation="describe_resource_instances"
+            outcome,
+            fallback_operation="describe_resource_instances",
+            provider_type=self.provider_type,
         )
         # Surface the fulfilment object in metadata so callers can inspect
         # ``.state`` / ``.message`` / ``.running_count`` etc. without
@@ -891,7 +972,7 @@ class K8sProviderStrategy(ProviderStrategy):
             )
         return ProviderResult.success_result(
             result.to_dict(),
-            {"operation": "cancel_resource", "provider": "k8s"},
+            {"operation": "cancel_resource", "provider": self.provider_type},
         )
 
     async def cancel_resource(self, request_id: str) -> CancelResourceResult:
@@ -950,7 +1031,7 @@ class K8sProviderStrategy(ProviderStrategy):
         Delegates to :class:`K8sCapabilityService`.  See that class for the
         full specification of the ``k8s_{sanitized_context}`` pattern.
         """
-        return K8sCapabilityService.generate_provider_name(config)
+        return cls._CAPABILITY_SERVICE_CLASS.generate_provider_name(config, cls._PROVIDER_TYPE)
 
     @classmethod
     def get_defaults_config(cls) -> dict:
@@ -966,18 +1047,15 @@ class K8sProviderStrategy(ProviderStrategy):
         import json
         from importlib.resources import files
 
-        from orb.providers.k8s.configuration.config import K8sProviderConfig
-
-        text = (
-            files("orb.providers.k8s.config")
-            .joinpath("k8s_defaults.json")
-            .read_text(encoding="utf-8")
-        )
+        package, filename = cls._DEFAULTS_RESOURCE
+        text = files(package).joinpath(filename).read_text(encoding="utf-8")
         raw = json.loads(text)
-        provider_config = raw.get("provider", {}).get("provider_defaults", {}).get("k8s", {})
+        provider_config = (
+            raw.get("provider", {}).get("provider_defaults", {}).get(cls._PROVIDER_TYPE, {})
+        )
         # Lightweight structural validation — raises ValidationError on schema drift.
         if provider_config:
-            K8sProviderConfig(
+            cls._CONFIG_CLASS(
                 **{
                     k: v
                     for k, v in provider_config.items()
@@ -988,10 +1066,12 @@ class K8sProviderStrategy(ProviderStrategy):
 
     def parse_provider_name(self, provider_name: str) -> dict[str, str]:
         """Inverse of :meth:`generate_provider_name`."""
-        return K8sCapabilityService.parse_provider_name(provider_name)
+        return self._CAPABILITY_SERVICE_CLASS.parse_provider_name(
+            provider_name, self._PROVIDER_TYPE
+        )
 
     def get_provider_name_pattern(self) -> str:
-        return K8sCapabilityService.get_provider_name_pattern()
+        return self._CAPABILITY_SERVICE_CLASS.get_provider_name_pattern(self._PROVIDER_TYPE)
 
     def get_supported_apis(self) -> list[str]:
         return K8sCapabilityService.get_supported_apis()
@@ -1125,7 +1205,10 @@ class K8sProviderStrategy(ProviderStrategy):
             return
 
         self._health_check_service.register_health_checks(
-            health_check, client, kind=connectivity_check_kind(provider_cfg)
+            health_check,
+            client,
+            kind=connectivity_check_kind(provider_cfg),
+            check_name=self._HEALTH_CHECK_NAME,
         )
 
     # ------------------------------------------------------------------

@@ -100,8 +100,17 @@ def _build_request_id_readers() -> tuple[
     return known_request_ids, existing_request_ids
 
 
-def create_k8s_strategy(provider_config: Any) -> Any:
+def create_k8s_strategy(
+    provider_config: Any,
+    *,
+    strategy_class: Optional[type] = None,
+    config_class: Optional[type] = None,
+) -> Any:
     """Create a :class:`K8sProviderStrategy` from configuration.
+
+    A provider type built on the Kubernetes provider registers this factory
+    with its own ``strategy_class`` and ``config_class`` (for example through
+    :func:`functools.partial`); both default to the Kubernetes provider's.
 
     Accepts a :class:`K8sProviderConfig`, a ``ProviderInstanceConfig``,
     or a raw config dict.  The DI container is consulted opportunistically
@@ -128,8 +137,11 @@ def create_k8s_strategy(provider_config: Any) -> Any:
         K8sProviderStrategy,
     )
 
+    strategy_cls = strategy_class or K8sProviderStrategy
+    config_cls = config_class or K8sProviderConfig
+
     try:
-        if isinstance(provider_config, K8sProviderConfig):
+        if isinstance(provider_config, config_cls):
             k8s_config = provider_config
             provider_instance_config = None
             provider_name = None
@@ -150,7 +162,7 @@ def create_k8s_strategy(provider_config: Any) -> Any:
                     "Ensure the provider instance is present in config.json, or pass "
                     "{'in_cluster': True} when running inside a Kubernetes pod."
                 )
-            k8s_config = K8sProviderConfig(**config_data)
+            k8s_config = config_cls(**config_data)
         else:
             config_data = provider_config_mapping(provider_config)
             # Reject empty / None configs before constructing a strategy that
@@ -167,7 +179,7 @@ def create_k8s_strategy(provider_config: Any) -> Any:
                 )
             provider_instance_config = None
             provider_name = None
-            k8s_config = K8sProviderConfig(**(config_data or {}))
+            k8s_config = config_cls(**(config_data or {}))
 
         logger = LoggingAdapter()
 
@@ -204,7 +216,7 @@ def create_k8s_strategy(provider_config: Any) -> Any:
 
         known_request_ids, existing_request_ids = _build_request_id_readers()
 
-        strategy = K8sProviderStrategy(
+        strategy = strategy_cls(
             config=k8s_config,
             logger=logger,
             known_request_ids=known_request_ids,
@@ -241,6 +253,7 @@ def create_k8s_strategy(provider_config: Any) -> Any:
                     health_check,
                     strategy.kubernetes_client,
                     kind=connectivity_check_kind(provider_cfg),
+                    check_name=strategy._HEALTH_CHECK_NAME,
                 )
 
         if provider_name:

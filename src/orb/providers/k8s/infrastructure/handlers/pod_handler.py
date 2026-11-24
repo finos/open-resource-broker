@@ -75,6 +75,7 @@ class K8sPodHandler(K8sHandlerBase):
     """
 
     PROVIDER_API: str = "Pod"
+    resource_ids_name_machines = True
 
     def __init__(
         self,

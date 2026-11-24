@@ -24,6 +24,7 @@ def register_k8s_health_checks(
     kubernetes_client: K8sClient,
     *,
     kind: str = "provider",
+    check_name: str = "kubernetes_api",
 ) -> None:
     """Register Kubernetes-specific health checks with the given HealthCheck instance.
 
@@ -37,6 +38,9 @@ def register_k8s_health_checks(
             (``"core"`` when Kubernetes is the sole enabled provider so a
             broken provider gates ``/readyz``; ``"provider"`` otherwise). See
             ``providers.health_scoping.connectivity_check_kind``.
+        check_name: Name the check is registered under.  A provider type built
+            on the Kubernetes provider passes its own so two types do not
+            collide.
     """
 
     def _check_kubernetes_api_health() -> HealthStatus:
@@ -46,14 +50,14 @@ def register_k8s_health_checks(
             )
             resource_count = len(getattr(resources, "resources", []) or [])
             return HealthStatus(
-                name="kubernetes_api",
+                name=check_name,
                 status="healthy",
                 details={
                     "group_version": getattr(resources, "group_version", "v1"),
                     "resource_count": resource_count,
                     "api_status": "available",
                 },
-                dependencies=["kubernetes_api"],
+                dependencies=[check_name],
             )
         except Exception as exc:
             # An unreachable API server is a degraded signal for this provider,
@@ -61,10 +65,10 @@ def register_k8s_health_checks(
             # so a single unreachable cluster no longer forces the endpoint to
             # 503.
             return HealthStatus(
-                name="kubernetes_api",
+                name=check_name,
                 status="degraded",
-                details=failure_details("kubernetes_api", exc),
-                dependencies=["kubernetes_api"],
+                details=failure_details(check_name, exc),
+                dependencies=[check_name],
             )
 
-    health_check.register_check("kubernetes_api", _check_kubernetes_api_health, kind=kind)
+    health_check.register_check(check_name, _check_kubernetes_api_health, kind=kind)

@@ -126,9 +126,9 @@ class CleanupDatabaseService:
                 if features.get("deletes_pods_without_request_record"):
                     self._warn(
                         "Request history is being removed while the Kubernetes provider "
-                        "instance '%s' deletes pods that have no request record "
+                        "instance '%s' deletes pods or custom resources that have no request record "
                         "(orphan_gc_enabled, auto_cleanup_orphans and orb_instance_id "
-                        "are all set). Pods of the removed requests may be deleted. "
+                        "are all set). Objects of the removed requests may be deleted. "
                         "Run the cleanup with the orphan GC disabled, or keep "
                         "auto_cleanup_orphans off while pruning.",
                         _safe_log_value(str(instance.name)),
