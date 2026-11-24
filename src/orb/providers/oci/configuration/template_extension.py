@@ -61,6 +61,7 @@ class OCITemplateExtensionConfig(ProviderTemplateExtensionBase):
     @model_validator(mode="after")
     def validate_secondary_volume_count(self) -> "OCITemplateExtensionConfig":
         if self.secondary_volumes and len(self.secondary_volumes) > 16:
+            # getattr: full templates supply machine_types; standalone OCI defaults omit it.
             shape = self.shape or next(iter(getattr(self, "machine_types", {}) or {}), None)
             if shape in _PV_LIMIT_16_SHAPES:
                 raise ValueError(

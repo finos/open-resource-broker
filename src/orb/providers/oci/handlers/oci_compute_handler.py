@@ -305,6 +305,7 @@ class OCIComputeHandler:
         req = params.get("request")
         for origin_id, metadata in (
             (coordinates.get("request_id"), coordinates.get("provider_data")),
+            # getattr: coordinate-only polls and returns can omit the request and its volume metadata.
             (getattr(req, "request_id", None), getattr(req, "provider_data", None)),
         ):
             if (

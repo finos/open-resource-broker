@@ -90,6 +90,7 @@ class OCIVolumeJournal:
         from orb.infrastructure.storage.repositories.versioned_save import supports_versioned_save
         from orb.infrastructure.storage.sql.unit_of_work import SQLUnitOfWork
 
+        # getattr: the request repository interface does not require a versioned storage strategy.
         if not supports_versioned_save(getattr(uow.requests, "storage_strategy", None)):
             raise ValueError("OCI secondary volumes require version-checked request storage")
         if os.name == "nt" and isinstance(uow, JSONUnitOfWork):
