@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from importlib.resources import files
@@ -23,6 +24,9 @@ from orb.providers.oci.configuration.config import OCIProviderConfig
 from orb.providers.oci.handlers import OCIComputeHandler
 from orb.providers.oci.mapping import OCITemplateMapper
 from orb.providers.oci.services import OCIPricingService
+from orb.providers.oci.volume_journal import OCIVolumeJournal
+
+_VOLUME_POLL_SECONDS = 30
 
 
 class OCIProviderStrategy(ProviderStrategy):
@@ -34,6 +38,8 @@ class OCIProviderStrategy(ProviderStrategy):
         logger: LoggingPort,
         provider_name: Optional[str] = None,
         provider_instance_config: Optional[Any] = None,
+        *,
+        volume_journal: OCIVolumeJournal | None = None,
     ) -> None:
         if not isinstance(config, OCIProviderConfig):
             raise ValueError("OCIProviderStrategy requires OCIProviderConfig")
@@ -42,12 +48,17 @@ class OCIProviderStrategy(ProviderStrategy):
         self._logger = logger
         self._provider_name = provider_name
         self._provider_instance_config = provider_instance_config
+        self._volume_journal = volume_journal
+        self._volume_work: set[tuple[str, str]] = set()
+        self._volume_task: asyncio.Task[None] | None = None
+        self._volume_loop: asyncio.AbstractEventLoop | None = None
         self._compute_handler = OCIComputeHandler(
             logger=logger,
             region=config.region,
             profile=config.profile,
             credential_source=config.credential_source,
             auth_config=config.model_dump(),
+            volume_journal=volume_journal,
         )
 
     @property
@@ -80,6 +91,61 @@ class OCIProviderStrategy(ProviderStrategy):
             return False
         self._initialized = True
         return True
+
+    async def start_daemon_services(self) -> None:
+        """Discover interrupted volume work and subscribe to new work on this daemon."""
+        journal = self._volume_journal
+        if journal is None or self._volume_loop is not None or is_dry_run_active():
+            return
+        loop = asyncio.get_running_loop()
+        self._volume_loop = loop
+
+        def notify(request: str, worker: str) -> None:
+            # Journal writes run on worker threads; only the event loop owns the queue.
+            if not loop.is_closed() and self._volume_loop is loop:
+                loop.call_soon_threadsafe(self._schedule_volume, (request, worker))
+
+        journal.on_change = notify
+        try:
+            self._volume_work.update(await asyncio.to_thread(journal.pending_workers))
+        except Exception as exc:
+            self._logger.warning("OCI secondary-volume recovery scan unavailable: %s", exc)
+        await self._volume_pass()
+        self._start_volume_poll()
+
+    def _schedule_volume(self, key: tuple[str, str]) -> None:
+        if self._volume_loop is not None:
+            self._volume_work.add(key)
+            self._start_volume_poll()
+
+    def _start_volume_poll(self) -> None:
+        if self._volume_work and (self._volume_task is None or self._volume_task.done()):
+            self._volume_task = asyncio.create_task(self._poll_volumes())
+
+    async def _poll_volumes(self) -> None:
+        while self._volume_work:
+            await asyncio.sleep(_VOLUME_POLL_SECONDS)
+            await self._volume_pass()
+
+    async def _volume_pass(self) -> None:
+        journal = self._volume_journal
+        if journal is None:
+            return
+        batch, self._volume_work = self._volume_work, set()
+        for request, worker in batch:
+            try:
+                state = await asyncio.to_thread(journal.recovery_state, request, worker)
+                if state == "done":
+                    continue
+                if state == "recover":
+                    await asyncio.to_thread(
+                        self._compute_handler.resume_volume_worker, request, worker
+                    )
+            except Exception as exc:
+                self._logger.warning(
+                    "OCI secondary-volume recovery for %s on %s: %s", request, worker, exc
+                )
+            self._volume_work.add((request, worker))
 
     async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         if not self._initialized:
@@ -382,4 +448,11 @@ class OCIProviderStrategy(ProviderStrategy):
         return defaults
 
     def cleanup(self) -> None:
+        if self._volume_journal is not None:
+            self._volume_journal.on_change = None
+        task = self._volume_task
+        loop, self._volume_loop = self._volume_loop, None
+        if task is not None and not task.done() and loop is not None and not loop.is_closed():
+            loop.call_soon_threadsafe(task.cancel)
+        self._volume_work.clear()
         self._initialized = False

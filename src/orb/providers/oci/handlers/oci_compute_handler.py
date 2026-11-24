@@ -21,6 +21,8 @@ from orb.providers.oci.cli_client import OCICommandError, run_oci, service_error
 from orb.providers.oci.configuration.realms import is_allowed_realm_domain
 from orb.providers.oci.mapping import OCITemplateMapper
 from orb.providers.oci.services import OCIPricingService
+from orb.providers.oci.services.secondary_volumes import OCISecondaryVolumes
+from orb.providers.oci.volume_journal import OCIVolumeJournal
 
 # The confirm-time probe batches IDs into one search per chunk and stops after
 # a fixed budget; an unfinished probe is reported unavailable.
@@ -40,8 +42,10 @@ class OCIComputeHandler:
         auth_config: dict[str, Any] | None = None,
         *,
         run_command: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+        volume_journal: OCIVolumeJournal | None = None,
     ) -> None:
         self._logger = logger
+        self._volume_journal = volume_journal
         self._region = region
         self._profile = profile
         self._credential_source = credential_source
@@ -215,14 +219,6 @@ class OCIComputeHandler:
         if not image_id:
             raise RuntimeError("Missing image_id for OCI launch")
 
-        # The high-level launch command does not expose opc-retry-token.
-        # raw-request retains CLI signing and lets us set the idempotency header.
-        region = self._region_aliases.get(self._region.lower(), self._region.lower())
-        domain = self._auth_config.get("realm_domain_component", "oraclecloud.com")
-        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)+", region) or not is_allowed_realm_domain(
-            domain, self._auth_config.get("extra_realm_suffixes")
-        ):
-            raise ValueError("OCI launch requires a full region name and valid realm domain")
         body: dict[str, Any] = {
             "availabilityDomain": str(resolved_ad),
             "compartmentId": str(compartment_id),
@@ -257,13 +253,34 @@ class OCIComputeHandler:
         retry_token = launch_payload.get("retry_token") or str(uuid4())
         if force_ondemand:
             retry_token = str(uuid5(NAMESPACE_URL, retry_token + ":ondemand"))
-        result = self._run_oci(
+        result = self._post_compute_resource("instances", body, retry_token)
+        # raw-request uses API field casing; existing CLI reads use kebab case.
+        data = result.get("data", {})
+        return {
+            "data": {
+                **data,
+                "lifecycle-state": data.get("lifecycleState") or data.get("lifecycle-state"),
+            }
+        }
+
+    def _post_compute_resource(
+        self, resource: str, body: dict[str, Any], retry_token: str
+    ) -> dict[str, Any]:
+        # The high-level launch command does not expose opc-retry-token.
+        # raw-request retains CLI signing and lets us set the idempotency header.
+        region = self._region_aliases.get(self._region.lower(), self._region.lower())
+        domain = self._auth_config.get("realm_domain_component", "oraclecloud.com")
+        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)+", region) or not is_allowed_realm_domain(
+            domain, self._auth_config.get("extra_realm_suffixes")
+        ):
+            raise ValueError("OCI launch requires a full region name and valid realm domain")
+        return self._run_oci(
             [
                 "raw-request",
                 "--http-method",
                 "POST",
                 "--target-uri",
-                f"https://iaas.{region}.{domain}/20160918/instances",
+                f"https://iaas.{region}.{domain}/20160918/{resource}",
                 "--request-headers",
                 json.dumps({"opc-retry-token": retry_token, "content-type": "application/json"}),
                 "--no-retry",
@@ -275,14 +292,129 @@ class OCIComputeHandler:
             payload=body,
             payload_argument="--request-body",
         )
-        # raw-request uses API field casing; existing CLI reads use kebab case.
-        data = result.get("data", {})
-        return {
-            "data": {
-                **data,
-                "lifecycle-state": data.get("lifecycleState") or data.get("lifecycle-state"),
-            }
-        }
+
+    def _volumes(self) -> OCISecondaryVolumes:
+        if self._volume_journal is None:
+            raise RuntimeError("OCI secondary volumes require a configured durable request store")
+        return OCISecondaryVolumes(self._volume_journal, self._run_oci, self._post_compute_resource)
+
+    def _volume_origin(self, params: dict[str, Any], worker: str) -> str | None:
+        # The origin can differ across machines in a single return request.
+        # Only the originating request may identify an owned volume plan.
+        coordinates = (params.get("machine_coordinates") or {}).get(worker, {})
+        req = params.get("request")
+        for origin_id, metadata in (
+            (coordinates.get("request_id"), coordinates.get("provider_data")),
+            # getattr: coordinate-only polls and returns can omit the request and its volume metadata.
+            (getattr(req, "request_id", None), getattr(req, "provider_data", None)),
+        ):
+            if (
+                metadata
+                and OCIVolumeJournal.has_plans(metadata)
+                and OCIVolumeJournal.plan_key(worker) in metadata
+            ):
+                if not origin_id:
+                    raise RuntimeError("Missing originating request for OCI secondary volumes")
+                return str(origin_id)
+        if self._volume_journal and not coordinates and req is None:
+            return self._volume_journal.origin_for_worker(worker)
+        return None
+
+    def _volume_status(
+        self, origin: str, worker: str, worker_state: str, *, is_return: bool = False
+    ) -> tuple[str, dict]:
+        service = self._volumes()
+        slots = service.journal.slots(origin, worker)
+        if not slots:
+            raise RuntimeError("Missing durable plan for OCI secondary-volume worker")
+        returning = slots[0].returning
+        if not returning and (
+            worker_state == "TERMINATED" or is_return or service.journal.abandoned(origin)
+        ):
+            service.journal.start_return(origin, worker)
+            returning = True
+        if returning and worker_state != "TERMINATED":
+            # Resume a return interrupted between the durable fence and the API.
+            # Standalone volumes automatically detach on actual instance termination.
+            if worker_state in {"RUNNING", "STARTING", "STOPPED", "STOPPING", "PROVISIONING"}:
+                self._run_oci(
+                    ["compute", "instance", "terminate", "--instance-id", worker, "--force"]
+                )
+            return "shutting-down", {}
+        outcomes = service.reconcile(origin, worker, release=returning)
+        done = {"retained", "deleted", "skipped"} if returning else {"attached"}
+        complete = all(row["status"] in done for row in outcomes)
+        if returning:
+            status = "terminated" if complete else "shutting-down"
+        else:
+            status = "running" if complete else "pending"
+        return status, {"secondary_volumes": outcomes}
+
+    def _volume_poll(
+        self,
+        params: dict,
+        worker: str,
+        worker_state: str,
+        status: str,
+        is_return: bool,
+        instance: dict | None = None,
+    ) -> tuple[str, dict]:
+        if not is_return and worker_state not in {"RUNNING", "TERMINATED"}:
+            return status, {}
+        try:
+            origin = self._volume_origin(params, worker)
+            if not origin:
+                return status, {}
+            if instance is not None and instance.get("id") != worker:
+                raise RuntimeError("OCI returned a different secondary-volume worker")
+            status, volume_data = self._volume_status(
+                origin, worker, worker_state, is_return=is_return
+            )
+            if instance is not None and (
+                not instance.get("shape")
+                or not (
+                    instance.get("image-id")
+                    or (instance.get("source-details") or {}).get("image-id")
+                )
+            ):
+                # A signed launch receipt can survive a process exit before ORB
+                # saves the Machine. Supply its pinned image/shape to the ordinary
+                # machine-sync upsert when GetInstance omits them.
+                volume_data["launch_details"] = self._volumes().journal.worker_details(
+                    origin, worker
+                )
+            return status, volume_data
+        except Exception as exc:
+            # A lost receipt or an unavailable journal for one worker must not
+            # prevent other workers in the same request from completing cleanup.
+            status = "shutting-down" if is_return or worker_state == "TERMINATED" else "pending"
+            self._logger.warning(
+                "OCI secondary-volume reconciliation for %s failed: %s", worker, exc
+            )
+            return status, {"secondary_volumes": [{"status": "unresolved", "error": str(exc)}]}
+
+    def resume_volume_worker(self, request_id: str, worker_id: str) -> None:
+        """Resume one journalled worker from the daemon using foreground status semantics."""
+        row = self._run_oci(["compute", "instance", "get", "--instance-id", worker_id])["data"]
+        if row.get("id") != worker_id:
+            raise RuntimeError("OCI worker read does not match the journal")
+        state = row.get("lifecycle-state")
+        service = self._volumes()
+        slots = service.journal.slots(request_id, worker_id)
+        if slots and (
+            state in {"RUNNING", "TERMINATED"}
+            or slots[0].returning
+            or service.journal.abandoned(request_id)
+        ):
+            _, data = self._volume_status(request_id, worker_id, state)
+            for outcome in data.get("secondary_volumes", []):
+                if outcome["status"] == "unresolved":
+                    self._logger.warning(
+                        "Secondary volume unresolved for worker %s, slot %s: %s",
+                        worker_id,
+                        outcome["slot"],
+                        outcome["error"],
+                    )
 
     def _reconcile_launch(self, launch_payload: dict[str, Any]) -> dict[str, Any] | None:
         """Find only this logical launch after an uncertain response, including eventual visibility."""
@@ -321,6 +453,10 @@ class OCIComputeHandler:
     def _launch_idempotently(
         self, launch_payload: dict[str, Any], force_ondemand: bool = False
     ) -> dict[str, Any]:
+        specs = launch_payload.get("secondary_volumes")
+        if specs:
+            origin = launch_payload["freeform_tags"]["orb_request_id"]
+            self._volumes().journal.require_acquisition(origin)
         try:
             response = self._launch_with_cli(launch_payload, force_ondemand=force_ondemand)
             if not response.get("data", {}).get("id"):
@@ -330,6 +466,18 @@ class OCIComputeHandler:
             return response
         except OCICommandError as exc:
             if exc.ambiguous:
+                if launch_payload.get("secondary_volumes"):
+                    # Only a signed successful LaunchInstance response can establish
+                    # ownership of a worker to which ORB will attach and return disks.
+                    self._volumes().journal.require_acquisition(
+                        launch_payload["freeform_tags"]["orb_request_id"]
+                    )
+                    replayed = self._launch_with_cli(launch_payload, force_ondemand=force_ondemand)
+                    if not replayed.get("data", {}).get("id"):
+                        raise OCICommandError(
+                            "Missing OCI worker receipt", reason="invalid_response"
+                        )
+                    return replayed
                 reconciled = self._reconcile_launch(launch_payload)
                 if reconciled is not None:
                     return reconciled
@@ -389,7 +537,13 @@ class OCIComputeHandler:
         pricing_estimate = OCIPricingService.estimate_hourly_cost(merged_template)
         effective_capacity_types: list[str] = []
         fallback_attempted_any = False
+        specs = launch_requests[0].get("secondary_volumes") or []
         if self._use_live_cli(operation):
+            if specs:
+                try:
+                    self._volumes().journal.require_acquisition(request_id)
+                except (ValueError, RuntimeError) as exc:
+                    return ProviderResult.error_result(str(exc), "OCI_VOLUME_STORE_UNAVAILABLE")
             try:
                 self._validate_resource_regions(
                     [
@@ -422,6 +576,7 @@ class OCIComputeHandler:
                     {"compute_cluster_id": normalized_template.get("compute_cluster_id")},
                 )
             unresolved_launch = None
+            newly_planned_workers: set[str] = set()
             try:
                 for launch_request in launch_requests:
                     unresolved_launch = {
@@ -464,6 +619,32 @@ class OCIComputeHandler:
                         raise RuntimeError("OCI launch response missing instance ID")
                     unresolved_launch = None
                     instance_ids.append(instance_id)
+                    if specs:
+                        ad = (
+                            data.get("availabilityDomain")
+                            or data.get("availability-domain")
+                            or launch_request.get("availability_domain")
+                        )
+                        if not ad:
+                            raise RuntimeError(
+                                "Missing availability domain on launched volume worker"
+                            )
+                        attachment_type = (
+                            "iscsi"
+                            if str(launch_request["shape"]).startswith("BM.")
+                            else "paravirtualized"
+                        )
+                        new_plan = self._volumes().journal.begin(
+                            request_id,
+                            instance_id,
+                            launch_request["compartment_id"],
+                            ad,
+                            [{**spec, "attachment_type": attachment_type} for spec in specs],
+                            instance_type=data.get("shape") or launch_request["shape"],
+                            image_id=normalized_template["image_id"],
+                        )
+                        if new_plan:
+                            newly_planned_workers.add(instance_id)
                     effective_capacity_types.append(effective_capacity_type)
                     instances.append(
                         {
@@ -471,7 +652,7 @@ class OCIComputeHandler:
                             "resource_id": instance_id,
                             "instance_type": data.get("shape") or normalized_template.get("shape"),
                             "image_id": normalized_template.get("image_id"),
-                            "status": data.get("lifecycle-state"),
+                            "status": "pending" if specs else data.get("lifecycle-state"),
                             "provider_data": {
                                 "provider": "oci",
                                 "provider_api": "OCICompute",
@@ -486,11 +667,33 @@ class OCIComputeHandler:
                             },
                         }
                     )
+                if specs:
+                    self._volumes().journal.accept_workers(request_id, instance_ids)
             except Exception as exc:
                 self._logger.error("OCI live launch failed for template %s: %s", template_id, exc)
                 rollback_ids: list[str] = []
                 rollback_errors: list[dict[str, str]] = []
                 for instance_id in instance_ids:
+                    if specs:
+                        if instance_id not in newly_planned_workers:
+                            # A replay or a failed durable write cannot prove that
+                            # this invocation may tear down a previously accepted worker.
+                            rollback_errors.append(
+                                {
+                                    "instance_id": instance_id,
+                                    "error": "Worker ownership for batch rollback unconfirmed; preserved",
+                                }
+                            )
+                            continue
+                        try:
+                            self._volumes().journal.start_return(
+                                request_id, instance_id, unaccepted_only=True
+                            )
+                        except Exception as journal_exc:
+                            rollback_errors.append(
+                                {"instance_id": instance_id, "error": str(journal_exc)}
+                            )
+                            continue
                     try:
                         self._run_oci(
                             [
@@ -604,6 +807,9 @@ class OCIComputeHandler:
             for machine_id in machine_ids:
                 try:
                     self._validate_resource_regions([machine_id])
+                    origin = self._volume_origin(params, machine_id)
+                    if origin:
+                        self._volumes().journal.start_return(origin, machine_id)
                     self._run_oci(
                         [
                             "compute",
@@ -755,16 +961,20 @@ class OCIComputeHandler:
                                 "that it is terminated",
                                 machine_id,
                             )
+                            status, volume_data = self._volume_poll(
+                                params, machine_id, "TERMINATED", "terminated", is_return
+                            )
                             instances.append(
                                 {
                                     "instance_id": machine_id,
                                     "resource_id": machine_id,
-                                    "status": "terminated",
+                                    "status": status,
                                     "provider_type": "oci",
                                     "provider_api": "OCICompute",
                                     "provider_data": {
                                         "lifecycle_state": "TERMINATED",
                                         "operator_confirmed": True,
+                                        **volume_data,
                                     },
                                 }
                             )
@@ -794,6 +1004,9 @@ class OCIComputeHandler:
                         "TERMINATING": "shutting-down",
                         "TERMINATED": "terminated",
                     }.get(state, "unknown")
+                    status, volume_data = self._volume_poll(
+                        params, machine_id, state, status, is_return, data
+                    )
                     network = self._get_instance_network(machine_id) if state == "RUNNING" else {}
                     cluster_id = data.get("compute-cluster-id")
                     requested_cluster = (data.get("freeform-tags") or {}).get(
@@ -824,9 +1037,11 @@ class OCIComputeHandler:
                             "instance_id": machine_id,
                             "resource_id": machine_id,
                             "status": status,
-                            "instance_type": data.get("shape"),
+                            "instance_type": data.get("shape")
+                            or (volume_data.get("launch_details") or {}).get("instance_type"),
                             "image_id": data.get("image-id")
-                            or (data.get("source-details") or {}).get("image-id"),
+                            or (data.get("source-details") or {}).get("image-id")
+                            or (volume_data.get("launch_details") or {}).get("image_id"),
                             "launch_time": data.get("time-created"),
                             "tags": data.get("freeform-tags") or {},
                             **network,
@@ -835,6 +1050,7 @@ class OCIComputeHandler:
                             "provider_data": {
                                 "lifecycle_state": state,
                                 "compute_cluster_id": cluster_id,
+                                **volume_data,
                             },
                         }
                     )
@@ -880,9 +1096,19 @@ class OCIComputeHandler:
             fulfilment_state = "fulfilled"
         elif failed and not pending:
             fulfilment_state = "partial" if running else "failed"
+        volume_outcomes = {
+            item["instance_id"]: item["provider_data"]["secondary_volumes"]
+            for item in instances
+            if item.get("provider_data", {}).get("secondary_volumes")
+        }
+        first_error = next(
+            (row["error"] for rows in volume_outcomes.values() for row in rows if row.get("error")),
+            None,
+        )
+        volume_message = f". Secondary volume unresolved: {first_error}" if first_error else ""
         fulfilment = ProviderFulfilment(
             state=fulfilment_state,
-            message=f"OCI: {running}/{target} instances running",
+            message=f"OCI: {running}/{target} instances running{volume_message}",
             target_units=target,
             fulfilled_units=running,
             running_count=running,
@@ -893,7 +1119,7 @@ class OCIComputeHandler:
             terminated = sum(instance["status"] == "terminated" for instance in instances)
             fulfilment = ProviderFulfilment(
                 state="fulfilled" if terminated >= target else "in_progress",
-                message=f"OCI: {terminated}/{target} instances terminated",
+                message=f"OCI: {terminated}/{target} instances terminated{volume_message}",
                 target_units=target,
                 fulfilled_units=terminated,
                 running_count=running,
@@ -906,6 +1132,7 @@ class OCIComputeHandler:
                 "operation": "get_instance_status",
                 "provider": "oci",
                 "provider_fulfilment": fulfilment,
+                **({"secondary_volumes": volume_outcomes} if volume_outcomes else {}),
             },
         )
 

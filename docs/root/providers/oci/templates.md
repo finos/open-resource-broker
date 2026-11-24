@@ -104,6 +104,35 @@ storage and configure mounts in your own bootstrap. See
 Bare metal examples are fixed shapes. Do not add `shape_config`, `ocpus`, or
 `memory_gbs`; ORB rejects Flex overrides on bare metal.
 
+## Secondary block volumes
+
+For each direct worker that needs additional storage, add `secondary_volumes` to its OCI template. Each list entry creates one blank disk in the worker's compartment and availability domain. To request one scratch disk and one disk to keep, add the following fragment to the generated template.
+
+```json
+{
+  "secondary_volumes": [
+    {"display_name": "scratch", "size_in_gbs": 50, "vpus_per_gb": 10, "delete_on_return": true},
+    {"display_name": "results", "size_in_gbs": 50, "delete_on_return": false}
+  ]
+}
+```
+
+Supply a whole number from 50 to 32,768 for `size_in_gbs` and an explicit JSON boolean for `delete_on_return`. The optional `vpus_per_gb` accepts 0, 10 or 20. Omit it to use the service default. The number of attachable disks depends on the shape. For example, VM.Standard.E5.Flex supports up to 16 paravirtualized data volumes. The template cost estimate excludes these data disks. Retained volumes continue to incur storage charges until their owner removes them. [Oracle Block Volume](https://docs.oracle.com/en-us/iaas/Content/Block/Concepts/overview.htm)
+
+The broker manages attachment at the OCI control plane. Configure the guest separately to connect iSCSI sessions where required, partition the disk, and mount a filesystem. Use the returned volume OCID to locate a retained disk. Display names can repeat across workers.
+
+The broker records the disk ID, attachment ID and final retention outcome on the original acquire request. After returning a worker, use that acquire request ID to list disks whose retention has been confirmed.
+
+```bash
+orb requests show "$ACQUIRE_REQUEST_ID" | jq -r '
+  .requests[0].provider_data as $data
+  | $data | to_entries[]
+  | select((.key | startswith("oci_secondary_volumes/")) and (.key | endswith("/outcome")) and .value == "retained")
+  | .key | sub("/outcome$"; "/volume") | $data[.]'
+```
+
+This feature requires persistent request storage with version-checked writes. Use a file-backed SQL store on Windows. Shared brokers need a request database accessible to every broker process. Give the broker principal access to create, read, attach and delete data volumes in the target compartment. If OCI cannot confirm the exact disk or attachment for a request, inspect the stored request and OCI inventory before taking action.
+
 ## Images and deployment settings
 
 Keep compartment, subnet, NSGs, SSH public keys, and bootstrap settings in
