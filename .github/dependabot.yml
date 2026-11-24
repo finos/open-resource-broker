@@ -78,10 +78,11 @@ updates:
           - "minor"
           - "patch"
 
-  # Hash-locked tool requirements (CI, packaging, container images).
-  # Regenerate manually with dev-tools/ci/update_tool_locks.sh if an update
-  # does not refresh the hashes.
-  - package-ecosystem: "pip"
+  # Hash-locked tool requirements (CI, packaging, container images). The uv
+  # ecosystem re-runs `uv pip compile` with the options in each lock header, so
+  # the locks stay hash-pinned and universal. Do not add --override or
+  # --constraint to a lock header: Dependabot cannot replay them (a test fails).
+  - package-ecosystem: "uv"
     directory: "/.github/requirements"
     schedule:
       interval: "weekly"
@@ -90,20 +91,24 @@ updates:
       timezone: "America/New_York"
     labels:
       - "dependencies"
-      - "github-actions"
+      - "python"
     commit-message:
       prefix: "ci"
       include: "scope"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 3
     cooldown:
       default-days: 7
     groups:
+      # Majors arrive as single PRs so each gets its own review.
       ci-tools:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Hash-locked MicroVM worker image requirements.
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/tests/e2e/microvm/worker"
     schedule:
       interval: "weekly"
@@ -116,6 +121,25 @@ updates:
       prefix: "chore"
       include: "scope"
     open-pull-requests-limit: 1
+    cooldown:
+      default-days: 7
+
+  # Semgrep CLI for the security workflow: a native uv project, so the
+  # overrides in its pyproject.toml are kept when uv.lock is updated.
+  - package-ecosystem: "uv"
+    directory: "/dev-tools/ci/semgrep"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "06:00"
+      timezone: "America/New_York"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    open-pull-requests-limit: 2
     cooldown:
       default-days: 7
 

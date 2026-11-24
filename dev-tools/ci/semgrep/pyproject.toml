@@ -1,0 +1,27 @@
+# Semgrep CLI used by the security workflow. It is a native uv project so that
+# Dependabot updates uv.lock with `uv lock --upgrade-package`, which keeps the
+# overrides below; a compiled requirements file would lose them.
+# Installed in CI with `uv sync --locked`.
+[project]
+name = "orb-ci-semgrep"
+version = "0"
+requires-python = ">=3.12"
+dependencies = [
+    "semgrep==1.183.0",
+]
+
+[tool.uv]
+package = false
+# Semgrep pins some transitive dependencies to releases with published
+# advisories. The environment is installed from the lock, so replacing those
+# constraints here is what takes the patched releases.
+override-dependencies = [
+    "mcp>=1.30.0,<2",
+    "opentelemetry-api>=1.45.1",
+    "opentelemetry-sdk>=1.45.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.45.1",
+    "opentelemetry-instrumentation-requests>=0.66b0",
+    "opentelemetry-instrumentation-threading>=0.66b0",
+    # GHSA-53pm-wgxf-c6qf, patched in 11.2.
+    "wcmatch>=11.2",
+]

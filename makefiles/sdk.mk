@@ -362,7 +362,11 @@ sdk-csharp-check-drift: sdk-csharp-generate  ## Verify C# SDK: generate from spe
 	@# against them: a spec change that produces uncompilable generated code, or
 	@# that breaks the client's use of a model, fails here instead of silently.
 	@dotnet build sdk/csharp/OrbSdk.sln --configuration Release
+	@$(MAKE) --no-print-directory sdk-csharp-check-lock
 	@echo "C# SDK: spec → generate → build (client + generated models) OK."
+
+sdk-csharp-check-lock:  ## Verify the C# packages.lock.json external packages match the committed lock (needs the generated project)
+	@./dev-tools/ci/check_csharp_lock.sh
 
 sdk-check-drift: sdk-go-check-drift sdk-java-check-drift sdk-kotlin-check-drift sdk-typescript-check-drift sdk-csharp-check-drift  ## Verify all SDKs: generate from spec + build (all five languages)
 	@echo "All SDK spec-consistency checks passed."
@@ -417,7 +421,7 @@ sdk-java-contract-test:  ## Run Java SDK contract tests (requires ORB binary in 
 
 .PHONY: sdk-generate sdk-go-generate sdk-java-generate sdk-kotlin-generate sdk-csharp-generate \
         sdk-typescript-generate sdk-check-drift sdk-go-check-drift sdk-java-check-drift \
-        sdk-kotlin-check-drift sdk-typescript-check-drift sdk-csharp-check-drift \
+        sdk-kotlin-check-drift sdk-typescript-check-drift sdk-csharp-check-drift sdk-csharp-check-lock \
         check-java _ensure-jar sdk-spec-conformance sdk-spec-drift-guard \
         sdk-go-build sdk-go-test \
         sdk-java-build sdk-java-test sdk-java-contract-test \
