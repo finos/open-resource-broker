@@ -34,11 +34,27 @@ def _extract_oci_provider_settings(provider_config: Any) -> dict[str, Any]:
     return {}
 
 
+def _configured_uow():
+    """Resolve the broker's configured store only when the volume feature uses it."""
+    from orb.domain.base import UnitOfWorkFactory
+    from orb.infrastructure.di.container import get_container
+
+    return get_container().get(UnitOfWorkFactory).create_unit_of_work()
+
+
+def _volume_state_machine():
+    from orb.domain.request.fulfilment_state_machine import FulfilmentStateMachine
+    from orb.infrastructure.di.container import get_container
+
+    return get_container().get(FulfilmentStateMachine)
+
+
 def create_oci_strategy(provider_config: Any) -> Any:
     """Create OCI provider strategy from configuration."""
     from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
     from orb.providers.oci.configuration.config import OCIProviderConfig
     from orb.providers.oci.strategy.oci_provider_strategy import OCIProviderStrategy
+    from orb.providers.oci.volume_journal import OCIVolumeJournal
 
     try:
         if isinstance(provider_config, OCIProviderConfig):
@@ -65,6 +81,12 @@ def create_oci_strategy(provider_config: Any) -> Any:
             logger=logger,
             provider_name=provider_name,
             provider_instance_config=provider_instance_config,
+            volume_journal=OCIVolumeJournal(
+                _configured_uow,
+                provider_name or "oci-default",
+                oci_config.region,
+                state_machine=_volume_state_machine,
+            ),
         )
 
         if not strategy.initialize():

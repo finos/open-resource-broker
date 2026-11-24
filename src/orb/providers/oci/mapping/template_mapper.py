@@ -5,6 +5,7 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any
 
+from orb.providers.oci.configuration.template_extension import OCITemplateExtensionConfig
 from orb.providers.oci.services import OCIPricingService
 
 
@@ -141,7 +142,7 @@ class OCITemplateMapper:
         cpu_vendor = _get("cpu_vendor", "cpuVendor")
         generation = _get("generation")
 
-        return {
+        normalized = {
             "template_id": _get("template_id", "templateId"),
             "image_id": _get("machine_image", "image_id", "imageId"),
             "shape": shape,
@@ -169,6 +170,19 @@ class OCITemplateMapper:
             "preemptible_preserve_boot_volume": preemptible_preserve_boot_volume,
             "pricing": pricing,
         }
+        # A data-volume plan allocates storage. Read it only from explicit
+        # template configuration, never from generic user-supplied metadata.
+        volumes = template.get("secondary_volumes")
+        if volumes is None:
+            volumes = configuration.get("secondary_volumes")
+        if volumes is not None:
+            config = OCITemplateExtensionConfig.model_validate(
+                {"shape": shape, "secondary_volumes": volumes}
+            )
+            normalized["secondary_volumes"] = [
+                volume.model_dump(exclude_none=True) for volume in config.secondary_volumes or []
+            ]
+        return normalized
 
     @classmethod
     def validate_required_fields(cls, template: dict[str, Any]) -> list[str]:
@@ -263,6 +277,9 @@ class OCITemplateMapper:
             }
         if normalized.get("agent_config"):
             payload["agent_config"] = normalized["agent_config"]
+
+        if normalized.get("secondary_volumes"):
+            payload["secondary_volumes"] = normalized["secondary_volumes"]
 
         if normalized.get("compute_cluster_id"):
             payload["compute_cluster_id"] = normalized["compute_cluster_id"]
