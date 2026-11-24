@@ -211,7 +211,7 @@ class TestLoadTemplatesFromScheduler:
             templates=[{"template_id": ""}, {"no_id": True}]  # both invalid
         )
         # patch _batch_resolve_images and _filter to passthrough
-        mgr._filter_templates_by_active_providers = lambda x: x  # type: ignore[misc,attr-defined,union-attr,assignment]
+        mgr._filter_templates_by_active_providers = lambda x, *_: x  # type: ignore[misc,attr-defined,union-attr,assignment]
 
         loop = asyncio.new_event_loop()
         try:
@@ -226,7 +226,7 @@ class TestLoadTemplatesFromScheduler:
     def test_logs_template_id_when_conversion_fails(self):
         bad = {"template_id": "bad-tpl", "price_type": 123}
         mgr = _make_manager(templates=[bad])
-        mgr._filter_templates_by_active_providers = lambda x: x  # type: ignore[misc,attr-defined,union-attr,assignment]
+        mgr._filter_templates_by_active_providers = lambda x, *_: x  # type: ignore[misc,attr-defined,union-attr,assignment]
 
         loop = asyncio.new_event_loop()
         try:

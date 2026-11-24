@@ -273,7 +273,7 @@ def test_naming_and_defaults_come_from_the_type() -> None:
     assert FakeCrStrategy.generate_provider_name({"context": "c"}) == "fakecr_c"
     defaults = FakeCrStrategy.get_defaults_config()
     template_defaults = defaults["provider"]["provider_defaults"]["fakecr"]["template_defaults"]
-    assert template_defaults["provider_type"] == "fakecr"
+    assert "provider_type" not in template_defaults  # rows take it from their instance
 
 
 def test_example_templates_come_from_the_types_handler_table() -> None:

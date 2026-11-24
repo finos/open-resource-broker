@@ -10,7 +10,6 @@
           }
         },
         "template_defaults": {
-          "provider_type": "fakecr",
           "provider_api": "Widget",
           "machine_image": "widget:1"
         }

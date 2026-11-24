@@ -332,6 +332,13 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                     lt_fields,
                 )
         result = self._coalesce_merge(resolved_defaults, template_dict)
+        # The factory picks the template class from the row's own provider_type,
+        # so a row resolved against a known instance must carry that type.
+        # The row's value always wins.
+        if not result.get("provider_type"):
+            stamp_type = self._trusted_stamp_type(template_dict, provider_instance_name)
+            if stamp_type:
+                result["provider_type"] = stamp_type
         result = self._apply_template_row_migration(
             provider_type, template_dict, resolved_defaults, result
         )
@@ -394,6 +401,75 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         provider_type = declared_type or instance_type
         matching_instance = instance if instance_type == provider_type else None
         return provider_type, matching_instance
+
+    def _trusted_stamp_type(
+        self, template_dict: dict[str, Any], selected_instance: Optional[str]
+    ) -> Optional[str]:
+        """Return the type to stamp, or None when stamping would lose the row.
+
+        The load filter drops rows whose type is not active. The selected
+        instance (the active one, or the override) counts as active; a row
+        pointing at another inactive instance is left as it is today.
+        """
+        candidate = self._candidate_stamp_type(template_dict, selected_instance)
+        if not candidate:
+            return None
+        try:
+            provider_config = self.config_manager.get_provider_config()
+            admitted = {p.type for p in provider_config.get_active_providers()}  # type: ignore[union-attr]
+        except Exception as e:
+            self.logger.debug("Could not read active provider types: %s", e)
+            return candidate
+        if not admitted:
+            return candidate  # the filter keeps every row when no active type is known
+        if selected_instance:
+            selected_type = self._configured_provider_type(selected_instance)
+            if selected_type:
+                admitted.add(selected_type)
+        return candidate if candidate in admitted else None
+
+    def _candidate_stamp_type(
+        self, template_dict: dict[str, Any], selected_instance: Optional[str]
+    ) -> Optional[str]:
+        """Return the provider type that may be written onto a row, or None.
+
+        Trusted: the row's own declared type, the type of an instance found in
+        ``config.providers``, or a name-prefix type the provider registry
+        accepts. A name-prefix guess for an unknown instance ("default",
+        "My_Cluster") is never stamped.
+        """
+        declared = template_dict.get("provider_type") or template_dict.get("providerType")
+        if declared:
+            return declared
+        instance = (
+            template_dict.get("provider_name") or template_dict.get("providerName")
+        ) or selected_instance
+        if not instance:
+            return None
+        configured = self._configured_provider_type(instance)
+        if configured:
+            return configured
+        guess = extract_provider_type(instance)
+        if guess and self.provider_registry is not None:
+            try:
+                if self.provider_registry.is_provider_registered(guess):
+                    return guess
+            except Exception as e:
+                self.logger.warning("Could not check provider type %s: %s", guess, e)
+        return None
+
+    def _configured_provider_type(self, provider_instance_name: str) -> Optional[str]:
+        """Type of an instance listed in config.providers, else None (no name guessing)."""
+        try:
+            provider_config = self.config_manager.get_provider_config()
+            for provider in getattr(provider_config, "providers", None) or []:
+                if provider.name == provider_instance_name:
+                    return provider.type
+        except Exception as e:
+            self.logger.warning(
+                "Could not determine provider type for %s: %s", provider_instance_name, e
+            )
+        return None
 
     def _coalesce_merge(
         self, defaults: dict[str, Any], overrides: dict[str, Any]

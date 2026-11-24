@@ -59,6 +59,10 @@ Template files are named based on provider names:
 - `aws_prod_us-west-2_templates.json`
 - `aws_dev_eu-west-1_templates.json`
 
+### Template Provider Type
+
+A template row resolved against a provider instance takes that instance's type, so a row without `provider_type` loads as that provider's template type and keeps its provider-specific fields. A `provider_type` set on the row always wins. A row with no provider instance to resolve against stays a core template. Provider validation applies to every row of the type, including rows that omit `provider_type`; a row the provider rejects is logged and skipped.
+
 ### Multi-Provider Template Generation
 
 Generate templates for multiple providers:
