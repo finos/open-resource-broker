@@ -403,8 +403,21 @@ vulnerabilities:
     statement: >-
       openssl: The QUIC server retains state for rejected streams reset before STOP_SENDING is
       acknowledged, allowing memory exhaustion (denial of service). Debian security tracker lists
-      no fixed version for trixie (source package openssl, trixie 3.5.7-1~deb13u3: vulnerable;
-      checked 2026-11-24). ORB does not use QUIC.
+      no fixed version for trixie (source package openssl, trixie 3.5.9-1~deb13u1 and
+      trixie-security 3.5.7-1~deb13u3: vulnerable; checked 2026-11-24). ORB does not use QUIC.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-107494
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: The QUIC stack queues a RETIRE_CONNECTION_ID frame for every retransmitted
+      NEW_CONNECTION_ID frame, allowing a remote QUIC peer to cause memory exhaustion (denial of
+      service). Debian security tracker lists no fixed version for trixie (source package openssl,
+      trixie 3.5.9-1~deb13u1 and trixie-security 3.5.7-1~deb13u3: vulnerable; checked 2026-11-24).
+      ORB does not use QUIC.
     expired_at: 2027-01-27
 
   # ── filelock on Python 3.10 ────────────────────────────────────────────────
