@@ -136,3 +136,78 @@ class TestFilterTemplatesByActiveProviders:
         assert "aws-tpl" in ids
         assert "k8s-tpl" in ids
         assert "other-tpl" not in ids
+
+
+# ---------------------------------------------------------------------------
+# Provider override
+# ---------------------------------------------------------------------------
+
+
+def _make_override_manager(
+    active: list[str], instances: dict[str, str]
+) -> TemplateConfigurationManager:
+    """Manager whose active providers are ``active`` types and config lists ``instances``."""
+    manager, _ = _make_manager(active)
+    provider_config = manager.config_manager.get_provider_config()
+    named = []
+    for name, ptype in instances.items():
+        instance = _make_provider_instance(ptype)
+        instance.name = name
+        named.append(instance)
+    assert provider_config is not None
+    provider_config.providers = named
+    return manager
+
+
+class TestFilterWithProviderOverride:
+    ROWS: list[dict[str, Any]] = [
+        {"template_id": "untyped"},
+        {"template_id": "k8s-typed", "provider_type": "k8s"},
+        {"template_id": "azure-typed", "provider_type": "azure"},
+        {"template_id": "aws-typed", "provider_type": "aws"},
+    ]
+
+    def _ids(self, manager: TemplateConfigurationManager, override: str | None) -> set[str]:
+        result = manager._filter_templates_by_active_providers(self.ROWS, override)
+        return {t["template_id"] for t in result}
+
+    def test_override_type_of_inactive_instance_is_admitted(self):
+        manager = _make_override_manager(["aws"], {"k8s-x": "k8s"})
+        assert self._ids(manager, "k8s-x") == {"untyped", "k8s-typed", "aws-typed"}
+
+    def test_third_type_is_still_dropped(self):
+        manager = _make_override_manager(["aws"], {"k8s-x": "k8s"})
+        assert "azure-typed" not in self._ids(manager, "k8s-x")
+
+    def test_without_override_nothing_changes(self):
+        manager = _make_override_manager(["aws"], {"k8s-x": "k8s"})
+        assert self._ids(manager, None) == {"untyped", "aws-typed"}
+
+    def test_override_missing_from_config_adds_no_type(self):
+        manager = _make_override_manager(["aws"], {"k8s-x": "k8s"})
+        # The name prefix "k8s" must not be guessed into the admitted set.
+        assert self._ids(manager, "k8s-unknown") == {"untyped", "aws-typed"}
+
+    def test_override_config_error_adds_no_type(self):
+        manager = _make_override_manager(["aws"], {})
+        manager._override_provider_type = MagicMock(return_value=None)  # type: ignore[method-assign]
+        assert self._ids(manager, "k8s-x") == {"untyped", "aws-typed"}
+
+    def test_override_load_passes_the_override_to_the_filter(self):
+        import asyncio
+
+        manager = _make_override_manager(["aws"], {"k8s-x": "k8s"})
+        manager.scheduler_strategy.get_template_paths.return_value = ["p"]  # type: ignore[attr-defined]
+        manager.scheduler_strategy.load_templates_from_path.return_value = [  # type: ignore[attr-defined]
+            {"template_id": "k8s-typed", "provider_type": "k8s"}
+        ]
+        seen: list[Any] = []
+
+        async def _passthrough(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            seen.extend(rows)
+            return rows
+
+        manager._batch_resolve_images = _passthrough  # type: ignore[method-assign]
+        manager._convert_template_dicts = MagicMock(return_value=[])  # type: ignore[method-assign]
+        asyncio.run(manager._load_templates_from_scheduler("k8s-x"))
+        assert [t["template_id"] for t in seen] == ["k8s-typed"]
