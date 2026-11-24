@@ -1,8 +1,9 @@
 """A recording stand-in for ``K8sClient`` that serves custom objects from memory.
 
 Only discovery is allowed on the core API (``get_api_resources``); any other
-attribute of ``core_v1``, and any use of ``apps_v1`` or ``batch_v1``, fails the
-test.  Every call is recorded so a test can assert what was touched.
+attribute of ``core_v1``, and any use of ``apps_v1`` or ``batch_v1``, raises
+``AttributeError`` and is recorded as ``forbidden:<api>.<attr>``.  A test asserts on
+``forbidden_calls()`` because production code may swallow the error.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ ALLOWED_CORE_V1 = frozenset({"get_api_resources"})
 
 
 class _Guard:
-    """Fails on any attribute access outside ``allowed``; records the ones it allows."""
+    """Raises AttributeError on any attribute access outside ``allowed``; records the ones it allows."""
 
     def __init__(self, name: str, allowed: frozenset[str], calls: list[str]) -> None:
         self._name = name
@@ -26,7 +27,7 @@ class _Guard:
             # Recorded first: production code swallows exceptions, so the
             # attempt must be visible to the test even when the raise is caught.
             self._calls.append(f"forbidden:{self._name}.{attr}")
-            raise AssertionError(f"{self._name}.{attr} must not be used by this provider type")
+            raise AttributeError(f"{self._name}.{attr} must not be used by this provider type")
 
         def _call(*args: Any, **kwargs: Any) -> Any:
             self._calls.append(f"{self._name}.{attr}")

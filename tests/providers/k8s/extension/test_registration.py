@@ -91,8 +91,13 @@ def test_registry_afterwards_yields_only_the_known_providers() -> None:
 
 
 def test_state_is_restored_when_the_body_raises() -> None:
-    with pytest.raises(RuntimeError), bootstrapped_with_fakecr():
-        raise RuntimeError("boom")
+    raised = False
+    try:
+        with bootstrapped_with_fakecr():
+            raise RuntimeError("boom")
+    except RuntimeError:
+        raised = True
+    assert raised
     assert PROVIDER_TYPE not in provider_registration._REGISTERED_PROVIDERS
     assert not TemplateExtensionRegistry.has_extension(PROVIDER_TYPE)
 

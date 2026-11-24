@@ -102,7 +102,7 @@ async def test_objects_carry_the_types_own_labels() -> None:
         f"{LABEL_PREFIX}/request-id",
         f"{LABEL_PREFIX}/orb-instance",
     }
-    assert not any(key.startswith("orb.io/") for key in obj["metadata"]["labels"])
+    assert {key.split("/")[0] for key in obj["metadata"]["labels"]} == {LABEL_PREFIX}
 
 
 @pytest.mark.asyncio
@@ -298,11 +298,11 @@ def test_the_fake_client_rejects_everything_but_discovery() -> None:
     client.core_v1.get_api_resources()
     assert client.forbidden_calls() == []
     for attribute in ("list_namespaced_pod", "delete_namespaced_pod", "read_namespaced_pod"):
-        with pytest.raises(AssertionError):
+        with pytest.raises(AttributeError):
             getattr(client.core_v1, attribute)
-    with pytest.raises(AssertionError):
+    with pytest.raises(AttributeError):
         getattr(client.apps_v1, "list_namespaced_deployment")  # noqa: B009
-    with pytest.raises(AssertionError):
+    with pytest.raises(AttributeError):
         getattr(client.batch_v1, "list_namespaced_job")  # noqa: B009
     assert client.forbidden_calls() == [
         "forbidden:core_v1.list_namespaced_pod",
