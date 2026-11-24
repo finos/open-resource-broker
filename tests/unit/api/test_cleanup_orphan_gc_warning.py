@@ -71,6 +71,7 @@ def test_one_warning_naming_the_instance_when_the_gc_deletes() -> None:
 
     assert logger.warning.call_count == 1
     assert "k8s-a" in logger.warning.call_args.args[1]
+    assert "custom resources" in logger.warning.call_args.args[0]
 
 
 def test_no_warning_when_the_gc_does_not_delete() -> None:

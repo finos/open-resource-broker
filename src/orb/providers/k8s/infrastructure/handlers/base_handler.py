@@ -16,7 +16,7 @@ import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Generator, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Generator, Optional, TypeVar
 
 from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.ports import LoggingPort
@@ -80,6 +80,17 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
     # Resource-API key for the handler (e.g. ``"Pod"``).  Used
     # for label injection and reconciler matching.  Subclasses override.
     PROVIDER_API: str = "Kubernetes"
+
+    # True when the resource ids an acquire reports are machine (pod) names, so
+    # a status poll can reconcile each id against the live machines.  A handler
+    # whose resource ids name a controller (Deployment, Job, a custom resource)
+    # keeps the default.
+    resource_ids_name_machines: ClassVar[bool] = False
+
+    # True when :meth:`apply_pod_timeouts` may delete a timed-out pod by name.
+    # A handler whose machines are not plain pods turns this off so no pod that
+    # happens to share a name is touched.
+    timeout_delete_enabled: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -484,7 +495,7 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
             now=self._clock.time(),
         )
 
-        if self._config.delete_timed_out_pods:
+        if self._config.delete_timed_out_pods and self.timeout_delete_enabled:
             self._schedule_timed_out_pod_deletions(instances, rewritten)
 
         return rewritten

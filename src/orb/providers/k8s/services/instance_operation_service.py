@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
 
 from orb.domain.base.ports import LoggingPort
 from orb.providers.k8s.configuration.config import K8sProviderConfig
@@ -72,21 +72,68 @@ class CancelResourceResult:
         }
 
 
+@dataclass(frozen=True)
+class CancelKind:
+    """One kind of object ``cancel_resource`` lists and deletes by request-id label.
+
+    Both callables are synchronous (they run via :func:`asyncio.to_thread`) and
+    raise on API errors; a 404 on delete counts as already gone.
+
+    Attributes:
+        kind: Kind name used in result entries (``"<kind>/<name>"``).
+        list_names: ``(client, namespace, label_selector) -> names``.
+        delete: ``(client, namespace, name) -> None``.
+    """
+
+    kind: str
+    list_names: Callable[[K8sClient, str, str], list[str]]
+    delete: Callable[[K8sClient, str, str], None]
+
+
 class K8sInstanceOperationService:
     """Service owning cancel_resource for the k8s provider.
 
     Args:
         config:   Validated :class:`K8sProviderConfig`.
         logger:   Injected :class:`LoggingPort`.
+        kinds:    The kinds to cancel, in order.  Defaults to Pod, Deployment,
+                  StatefulSet and Job.  A provider type built on the
+                  Kubernetes provider supplies its own table.
     """
 
     def __init__(
         self,
         config: K8sProviderConfig,
         logger: LoggingPort,
+        kinds: Optional[Sequence[CancelKind]] = None,
     ) -> None:
         self._config = config
         self._logger = logger
+        self._kinds: tuple[CancelKind, ...] = (
+            tuple(kinds) if kinds is not None else self._default_kinds()
+        )
+
+    @property
+    def kind_names(self) -> tuple[str, ...]:
+        """Names of the kinds ``cancel_resource`` covers, in order."""
+        return tuple(kind.kind for kind in self._kinds)
+
+    def _default_kinds(self) -> tuple[CancelKind, ...]:
+        def _builtin(
+            kind: str, list_names: Callable[[K8sClient, str, str], list[str]]
+        ) -> CancelKind:
+            return CancelKind(
+                kind=kind,
+                list_names=list_names,
+                delete=lambda client, ns, name: self._delete_workload(client, ns, kind, name),
+            )
+
+        return (
+            _builtin("Pod", self._list_pod_names),
+            _builtin("Deployment", self._list_deployment_names),
+            _builtin("StatefulSet", self._list_statefulset_names),
+            _builtin("Job", self._list_job_names),
+        )
 
     # ------------------------------------------------------------------
     # cancel_resource — tear down in-flight workloads by request-id label
@@ -129,25 +176,13 @@ class K8sInstanceOperationService:
             request_id,
         )
 
-        # Gather workload names for all four kinds concurrently, then delete.
+        # Gather workload names for every kind concurrently, then delete.
         try:
-            pods_task = asyncio.to_thread(
-                self._list_pod_names, kubernetes_client, ns, label_selector
-            )
-            deployments_task = asyncio.to_thread(
-                self._list_deployment_names, kubernetes_client, ns, label_selector
-            )
-            statefulsets_task = asyncio.to_thread(
-                self._list_statefulset_names, kubernetes_client, ns, label_selector
-            )
-            jobs_task = asyncio.to_thread(
-                self._list_job_names, kubernetes_client, ns, label_selector
-            )
-            pod_names, deploy_names, sts_names, job_names = await asyncio.gather(
-                pods_task,
-                deployments_task,
-                statefulsets_task,
-                jobs_task,
+            listed = await asyncio.gather(
+                *(
+                    asyncio.to_thread(kind.list_names, kubernetes_client, ns, label_selector)
+                    for kind in self._kinds
+                ),
                 return_exceptions=True,
             )
         except Exception as exc:
@@ -160,25 +195,20 @@ class K8sInstanceOperationService:
             result.failed.append((f"list:{request_id}", str(exc)))
             return result
 
-        # Flatten and de-duplicate with kind tags so we can route deletes correctly.
-        items: list[tuple[str, str]] = []  # (kind, name)
-        for kind, names_or_exc in (
-            ("Pod", pod_names),
-            ("Deployment", deploy_names),
-            ("StatefulSet", sts_names),
-            ("Job", job_names),
-        ):
+        # Flatten with kind tags so we can route deletes correctly.
+        items: list[tuple[CancelKind, str]] = []
+        for cancel_kind, names_or_exc in zip(self._kinds, listed, strict=True):
             if isinstance(names_or_exc, Exception):
                 self._logger.warning(
                     "K8s cancel_resource: list %s failed for request_id=%s: %s",
-                    kind,
+                    cancel_kind.kind,
                     request_id,
                     names_or_exc,
                 )
-                result.failed.append((f"list:{kind}", str(names_or_exc)))
+                result.failed.append((f"list:{cancel_kind.kind}", str(names_or_exc)))
             else:
                 for name in list(names_or_exc):  # type: ignore[arg-type]
-                    items.append((kind, name))
+                    items.append((cancel_kind, name))
 
         if not items:
             self._logger.info(
@@ -197,12 +227,11 @@ class K8sInstanceOperationService:
         # Delete concurrently, bounded by _CANCEL_CONCURRENCY.
         sem = asyncio.Semaphore(_CANCEL_CONCURRENCY)
 
-        async def _delete_one(kind: str, name: str) -> None:
+        async def _delete_one(cancel_kind: CancelKind, name: str) -> None:
+            kind = cancel_kind.kind
             async with sem:
                 try:
-                    await asyncio.to_thread(
-                        self._delete_workload, kubernetes_client, ns, kind, name
-                    )
+                    await asyncio.to_thread(cancel_kind.delete, kubernetes_client, ns, name)
                     result.deleted.append(f"{kind}/{name}")
                     self._logger.debug("K8s cancel_resource: deleted %s/%s", kind, name)
                 except Exception as exc:
@@ -220,7 +249,7 @@ class K8sInstanceOperationService:
                             exc,
                         )
 
-        await asyncio.gather(*(_delete_one(kind, name) for kind, name in items))
+        await asyncio.gather(*(_delete_one(cancel_kind, name) for cancel_kind, name in items))
 
         self._logger.info(
             "K8s cancel_resource: request_id=%s done — deleted=%d already_gone=%d failed=%d",
@@ -305,4 +334,4 @@ def _is_404(exc: BaseException) -> bool:
     return isinstance(exc, ApiException) and getattr(exc, "status", None) == 404
 
 
-__all__ = ["CancelResourceResult", "K8sInstanceOperationService"]
+__all__ = ["CancelKind", "CancelResourceResult", "K8sInstanceOperationService"]

@@ -424,6 +424,57 @@ The list will include the standard kubernetes provider; the MPIJob
 handler shows up as an extra `provider_api` value on the kubernetes
 provider when running `orb templates generate --help`.
 
+## Building a provider type on the Kubernetes provider
+
+A plugin handler adds a workload kind to the `k8s` provider type. A provider
+that needs its own type name, defaults, capabilities and handlers (for
+example one that creates custom resources) subclasses `K8sProviderStrategy`
+instead and overrides the class attributes that differ. Every attribute
+defaults to the Kubernetes provider's own value.
+
+| Attribute | Controls |
+|---|---|
+| `_PROVIDER_TYPE`, `_CONFIG_CLASS` | type name, config class (own `label_prefix` and environment prefix) |
+| `_DEFAULTS_RESOURCE` | `(package, file)` of the bundled defaults JSON |
+| `_DEFAULT_API`, `_API_ALIASES` | API used when a request names none, spelling aliases |
+| `_HANDLER_CLASSES`, `_TEMPLATE_CLASS` | handler per `provider_api`, template class requests are upcast to |
+| `_CAPABILITY_SERVICE_CLASS` | override `_build_capabilities` to declare operations and APIs |
+| `_DAEMON_SERVICES` | which of `reconciler`, `watch`, `orphan_gc`, `node_watcher`, `events_watcher` run |
+| `_CANCEL_KINDS` | `CancelKind(kind, list_names, delete)` entries `cancel_resource` covers |
+| `_RESOURCE_NAME_KEYS`, `_HEALTH_CHECK_NAME` | `provider_data` keys for controller names, health check name |
+
+Handlers add two class attributes: `resource_ids_name_machines` (the ids an
+acquire reports are machine names, so a status poll reconciles them) and
+`timeout_delete_enabled` (a timed-out pod may be deleted by name; set it to
+`False` for a handler whose machines are not pods). A handler whose machines
+are not pods also overrides `read_pods_for_return`, and records the machine
+names it created under `provider_data["pod_names"]`.
+
+`get_supported_apis` is an instance method; a subclass overrides it to list
+its own APIs. The capability set is declared in `_build_capabilities`; the
+`deletes_pods_without_request_record` feature is added after it, so an
+override cannot leave it out. A type whose `get_capabilities` omits
+`START_INSTANCES` and `STOP_INSTANCES` is refused those operations.
+
+Register the type like an in-tree provider: a `ProviderPlugin` subclass whose
+`strategy_factory` is `functools.partial(create_k8s_strategy,
+strategy_class=..., config_class=...)`, plus a
+`orb.providers.<type>.registration` module exposing
+`register_<type>_provider`, `initialize_<type>_provider`,
+`register_<type>_services_with_di` and `register_<type>_template_factory`.
+A row is built as the type's template class when it carries `provider_type`,
+so include `"provider_type": "<type>"` in the type's `template_defaults`.
+
+The defaults assume pods. `_CANCEL_KINDS` (Pod, Deployment, StatefulSet, Job),
+`_DAEMON_SERVICES` (all five services) and `timeout_delete_enabled = True` need
+pod, apps and batch permissions, so a type that only creates custom resources
+must override all three: supply its own cancel kinds, leave the pod-based
+services (`reconciler`, `watch`, `node_watcher`, `events_watcher`) out of
+`_DAEMON_SERVICES`, and set `timeout_delete_enabled = False` on its handlers.
+The type's template class sets `DEFAULT_PROVIDER_TYPE` (inherited from
+`K8sTemplate`, default `"k8s"`) to its own type name. A worked example lives in
+`tests/providers/k8s/extension/`.
+
 ## Failure semantics
 
 * If a plugin's `register()` callable raises, ORB logs the exception at

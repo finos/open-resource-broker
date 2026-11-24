@@ -144,6 +144,7 @@ class K8sHealthCheckService:
         kubernetes_client: K8sClient,
         *,
         kind: str = "provider",
+        check_name: str = "kubernetes_api",
     ) -> None:
         """Register Kubernetes-specific health checks.
 
@@ -154,7 +155,9 @@ class K8sHealthCheckService:
         """
         from orb.providers.k8s.health import register_k8s_health_checks
 
-        register_k8s_health_checks(health_check, kubernetes_client, kind=kind)
+        register_k8s_health_checks(
+            health_check, kubernetes_client, kind=kind, check_name=check_name
+        )
 
 
 __all__ = ["K8sHealthCheckService"]
