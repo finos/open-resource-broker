@@ -395,6 +395,18 @@ vulnerabilities:
       checked 2026-11-06).
     expired_at: 2027-02-06
 
+  - id: CVE-2026-124709
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: The QUIC server retains state for rejected streams reset before STOP_SENDING is
+      acknowledged, allowing memory exhaustion (denial of service). Debian security tracker lists
+      no fixed version for trixie (source package openssl, trixie 3.5.7-1~deb13u3: vulnerable;
+      checked 2026-11-24). ORB does not use QUIC.
+    expired_at: 2027-01-27
+
   # ── filelock on Python 3.10 ────────────────────────────────────────────────
   #
   # filelock is not a runtime dependency of orb-py. It is pulled in only by dev
