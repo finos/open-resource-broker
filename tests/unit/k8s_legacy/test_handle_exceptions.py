@@ -5,6 +5,7 @@ The specific handlers must apply on every call, not only the first one.
 
 from __future__ import annotations
 
+import click
 import pytest
 
 from orb.k8s_legacy import EXIT_CODE_DEFAULT, handle_exceptions
@@ -63,6 +64,29 @@ def test_handlers_are_not_consumed_across_calls(capsys) -> None:
     assert err.count("handled ValueError") == 1
 
 
+def test_return_value_is_propagated_on_every_call() -> None:
+    """The wrapped function's value is returned on the first and later calls."""
+
+    @handle_exceptions([(ValueError, "bad value")])
+    def compute(a: int, b: int = 1) -> int:
+        return a + b
+
+    assert compute(2, b=3) == 5
+    assert compute(2, b=3) == 5
+    assert compute(10) == 11
+
+
+def test_return_value_is_propagated_without_specific_handlers() -> None:
+    """The value also comes back when the handler list is empty."""
+
+    @handle_exceptions([])
+    def compute() -> dict[str, bool]:
+        return {"ok": True}
+
+    assert compute() == {"ok": True}
+    assert compute() == {"ok": True}
+
+
 def test_unhandled_exception_escapes_to_fallback(capsys) -> None:
     """Exceptions not in the list still reach the generic fallback."""
     seen: list[str] = []
@@ -77,3 +101,16 @@ def test_unhandled_exception_escapes_to_fallback(capsys) -> None:
     assert seen == []
     # The generic fallback names the error and writes a traceback temp file.
     assert "Error: unhandled" in capsys.readouterr().err
+
+
+def test_usage_error_exits_with_default_code(capsys) -> None:
+    """A click usage error is reported and exits with the default code."""
+
+    @handle_exceptions([])
+    def bad_usage() -> None:
+        raise click.UsageError("bad flag")
+
+    with pytest.raises(SystemExit) as exc_info:
+        bad_usage()
+    assert exc_info.value.code == EXIT_CODE_DEFAULT
+    assert "Usage error: bad flag" in capsys.readouterr().err
