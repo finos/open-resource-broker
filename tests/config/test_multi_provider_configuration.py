@@ -6,6 +6,7 @@ from orb.config.managers.type_converter import ConfigTypeConverter
 from orb.providers.aws.configuration.config import AWSProviderConfig
 
 
+@pytest.mark.usefixtures("aws_provider_settings_registered")
 class TestMultiProviderConfiguration:
     """Test multi-provider configuration resolution scenarios."""
 
