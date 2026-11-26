@@ -300,6 +300,9 @@ commit the updated JSON. Growing a listed file, or adding a new oversized one, n
 `make file-sizes-baseline-init` and a reason in the PR description; splitting the
 file is preferred.
 
+When two PRs change the same listed file, the second one must be rebased and the
+baseline regenerated before it merges; otherwise the merge queue ejects it.
+
 ### IDE Setup
 - **VS Code**: Install Ruff extension, settings already configured
 - **PyCharm**: Install Ruff plugin, enable format-on-save

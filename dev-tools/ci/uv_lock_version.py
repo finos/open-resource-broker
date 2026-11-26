@@ -22,6 +22,7 @@ def _normalize(name: str) -> str:
 
 
 def lock_versions(package: str, lock_path: str = "uv.lock") -> set[str]:
+    """Return the distinct versions of package recorded in the lockfile."""
     with open(lock_path, "rb") as f:
         lock = tomllib.load(f)
     wanted = _normalize(package)
@@ -33,18 +34,19 @@ def lock_versions(package: str, lock_path: str = "uv.lock") -> set[str]:
 
 
 def main(argv: list[str]) -> int:
+    """Print the single resolved version, or return a non-zero exit code."""
     if len(argv) not in (2, 3):
-        print(__doc__, file=sys.stderr)
+        sys.stderr.write(f"{__doc__}\n")
         return 2
     package = argv[1]
     versions = lock_versions(package, *argv[2:])
     if not versions or "" in versions:
-        print(f"{package}: no version found in the lockfile", file=sys.stderr)
+        sys.stderr.write(f"{package}: no version found in the lockfile\n")
         return 1
     if len(versions) > 1:
-        print(f"{package}: multiple versions in the lockfile: {sorted(versions)}", file=sys.stderr)
+        sys.stderr.write(f"{package}: multiple versions in the lockfile: {sorted(versions)}\n")
         return 1
-    print(next(iter(versions)))
+    sys.stdout.write(f"{next(iter(versions))}\n")
     return 0
 
 

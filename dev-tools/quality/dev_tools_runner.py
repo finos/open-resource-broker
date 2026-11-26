@@ -26,6 +26,7 @@ def clean_whitespace():
     """Clean whitespace from Python files."""
 
     def load_gitignore_spec(root_dir: Path):
+        """Load .gitignore patterns, or None when pathspec is unavailable."""
         if pathspec is None:
             return None
         gitignore_path = root_dir / ".gitignore"
@@ -35,6 +36,7 @@ def clean_whitespace():
         return pathspec.PathSpec.from_lines("gitwildmatch", [])
 
     def clean_file(file_path: Path) -> bool:
+        """Clean whitespace in one file; return True when it changed."""
         try:
             with open(file_path, encoding="utf-8") as f:
                 content = f.read()
@@ -76,6 +78,7 @@ def clean_whitespace():
 
 DEFAULT_BASELINE = Path(__file__).parent / "file_size_baseline.json"
 BASELINE_CMD = "make file-sizes-baseline"
+BASELINE_INIT_CMD = "make file-sizes-baseline-init"
 
 
 def _scan_large_files(threshold):
@@ -163,21 +166,29 @@ def check_file_sizes(
         return
 
     baseline = _load_baseline(baseline_path)
-    problems = []
+    problems = []  # (message, needs_increase)
     for path, count in sorted(large.items()):
         if path not in baseline:
-            problems.append(f"{path}: {count} lines, over {threshold} and not in the baseline")
+            problems.append(
+                (f"{path}: {count} lines, over {threshold} and not in the baseline", True)
+            )
         elif count > baseline[path]:
-            problems.append(f"{path}: grew from {baseline[path]} to {count} lines")
+            problems.append((f"{path}: grew from {baseline[path]} to {count} lines", True))
         elif count < baseline[path]:
             problems.append(
-                f"{path}: shrank from {baseline[path]} to {count} lines; lower the baseline"
+                (
+                    f"{path}: shrank from {baseline[path]} to {count} lines; lower the baseline",
+                    False,
+                )
             )
     for path, recorded in sorted(baseline.items()):
         if path not in large:
             problems.append(
-                f"{path}: recorded at {recorded} lines but now at or under {threshold} "
-                "or gone; remove the stale entry"
+                (
+                    f"{path}: recorded at {recorded} lines but now at or under {threshold} "
+                    "or gone; remove the stale entry",
+                    False,
+                )
             )
 
     if not problems:
@@ -185,14 +196,21 @@ def check_file_sizes(
         return
 
     logger.warning("File size baseline violations:")
-    for problem in problems:
-        logger.warning(f"  {problem}")
+    for message, _ in problems:
+        logger.warning(f"  {message}")
     logger.warning(
         "The recorded size is a ratchet: a file may only get smaller, and the recorded "
-        f"number must follow it down. Run `{BASELINE_CMD}` and commit "
-        f"{baseline_path.name}. Growth needs the explicit flag --allow-increase "
-        "(`make file-sizes-baseline-init`) and a reason in the PR."
+        "number must follow it down."
     )
+    if any(not needs_increase for _, needs_increase in problems):
+        logger.warning(
+            f"Shrunk or stale entries: run `{BASELINE_CMD}` and commit {baseline_path.name}."
+        )
+    if any(needs_increase for _, needs_increase in problems):
+        logger.warning(
+            f"New or grown files: split the file, or run `{BASELINE_INIT_CMD}`, commit "
+            f"{baseline_path.name} and give the reason in the PR."
+        )
     if not warn_only:
         logger.error("File size baseline check failed.")
         sys.exit(1)
@@ -291,6 +309,7 @@ def deps_add(package, dev=False):
 
 
 def main():
+    """Parse arguments and run the requested tool."""
     parser = argparse.ArgumentParser(description="Development tools runner")
     parser.add_argument(
         "command",

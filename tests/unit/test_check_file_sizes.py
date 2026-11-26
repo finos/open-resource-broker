@@ -63,7 +63,25 @@ def test_baselined_file_that_shrank_fails_with_lower_the_baseline(runner, tree, 
     _write(tree, "big.py", 649)
     assert _run(runner, tree) == 1
     assert "lower the baseline" in caplog.text
-    assert "make file-sizes-baseline" in caplog.text
+    assert "run `make file-sizes-baseline`" in caplog.text
+    assert "baseline-init" not in caplog.text
+
+
+def test_failure_message_names_the_command_for_each_violation_type(runner, tree, caplog):
+    _baseline(tree, {KEY: 650, "src/pkg/small.py": 700})
+    _write(tree, "big.py", 651)
+    _write(tree, "small.py", 650)
+    assert _run(runner, tree) == 1
+    assert "make file-sizes-baseline-init" in caplog.text
+    assert "Shrunk or stale entries: run `make file-sizes-baseline`" in caplog.text
+
+
+def test_growth_only_failure_does_not_suggest_the_lowering_command(runner, tree, caplog):
+    _baseline(tree, {KEY: 650})
+    _write(tree, "big.py", 651)
+    assert _run(runner, tree) == 1
+    assert "make file-sizes-baseline-init" in caplog.text
+    assert "Shrunk or stale" not in caplog.text
 
 
 def test_stale_entry_fails(runner, tree, caplog):

@@ -28,9 +28,9 @@ ci-quality-custom-changed:  ## Run custom quality checks on Python files changed
 	@# clone would diff nothing and pass; fail instead.
 	@test "$$GITHUB_EVENT_NAME" = "pull_request" || { echo "Only runs for pull requests (GITHUB_EVENT_NAME=pull_request)." >&2; exit 1; }
 	@git rev-parse --verify -q "origin/$$GITHUB_BASE_REF" >/dev/null || { echo "origin/$$GITHUB_BASE_REF not found: fetch full history." >&2; exit 1; }
-	@files=$$(git diff --name-only --diff-filter=d "origin/$$GITHUB_BASE_REF...HEAD" -- '*.py'); \
-	if [ -z "$$files" ]; then echo "No Python files changed."; exit 0; fi; \
-	python3 ./dev-tools/quality/quality_check.py --strict --files $$files
+	@# NUL-delimited so paths with spaces survive; xargs -r skips an empty diff.
+	@git diff -z --name-only --diff-filter=d "origin/$$GITHUB_BASE_REF...HEAD" -- '*.py' \
+		| xargs -0 -r python3 ./dev-tools/quality/quality_check.py --strict --files
 
 ci-quality-pyright:  ## Run pyright type checking
 	@echo "Running pyright type check..."
