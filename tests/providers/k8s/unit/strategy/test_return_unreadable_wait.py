@@ -130,3 +130,12 @@ async def test_a_readable_machine_still_leaving_defers_the_failure(
     done = await registry.get_status(["pod-a", "pod-b"], _return(old), coords)
     assert sorted(_statuses(done)) == ["failed", "terminated"]
     assert done.metadata["return_unreadable_timed_out"] is True
+
+
+@pytest.mark.asyncio
+async def test_a_machine_is_pending_once_whether_unknown_or_failed() -> None:
+    waiting = await _status(NOW - timedelta(seconds=LIMIT - 1))
+    ended = await _status(NOW - timedelta(seconds=LIMIT + 1))
+
+    assert waiting.pending_resource_ids == ["pod-a"]
+    assert ended.pending_resource_ids == ["pod-a"]

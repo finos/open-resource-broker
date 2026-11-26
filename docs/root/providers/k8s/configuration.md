@@ -106,7 +106,8 @@ If the pods stay unreadable for `return_unreadable_timeout_seconds`, counted
 from when the return request was created, the return request is marked
 `failed`. The unreadable machine ids are listed in the request status message
 and in the request metadata under `unreadable_resource_ids`
-(`orb requests status` shows the message, and the metadata with `--verbose`). Machines that could be read are handled as
+(`orb requests status` shows the message; add `--verbose` to see the
+metadata). Machines that could be read are handled as
 normal, and the return only fails once none of them is still waiting to
 terminate.
 
