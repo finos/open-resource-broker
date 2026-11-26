@@ -73,16 +73,6 @@ async def handle_provider_config(args) -> InterfaceResponse:
     return entry.renderer_for(Interface.CLI)(formatter, result)
 
 
-@handle_interface_exceptions(context="validate_provider_config", interface_type="cli")
-async def handle_validate_provider_config(args) -> dict[str, Any]:
-    """Handle validate provider config operations."""
-    return {
-        "error": "Not implemented",
-        "endpoint": "validate_provider_config",
-        "message": "Provider configuration validation is planned but not yet available.",
-    }
-
-
 @handle_interface_exceptions(context="select_provider_strategy", interface_type="cli")
 async def handle_select_provider_strategy(args) -> dict[str, Any]:
     """Handle select provider strategy — delegates to set-default config write."""

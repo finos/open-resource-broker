@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -70,39 +70,6 @@ class TestCLIIntegration:
 
         assert result.data["message"] == "Provider configuration retrieved successfully"
         assert result.data["config"] == expected_config
-
-    @pytest.mark.asyncio
-    @patch("orb.bootstrap.services.register_all_services")
-    async def test_validate_provider_config_cli_e2e(self, mock_register_services):
-        """Test validateProviderConfig CLI operation end-to-end."""
-        # Setup mocks
-        mock_container = Mock()
-        mock_query_bus = Mock()
-        mock_command_bus = Mock()
-
-        expected_result = {
-            "validation": {"status": "valid", "errors": []},
-            "message": "Provider configuration validated successfully",
-        }
-
-        mock_query_bus.execute.return_value = expected_result
-        mock_container.get.side_effect = lambda cls: {
-            "QueryBus": mock_query_bus,
-            "CommandBus": mock_command_bus,
-        }.get(cls.__name__ if hasattr(cls, "__name__") else str(cls), Mock())
-
-        mock_register_services.return_value = mock_container
-
-        # Test async function-based handler
-        from orb.interface.command_handlers import handle_validate_provider_config
-
-        mock_command = Mock()
-        mock_command.file = None
-        mock_command.data = None
-
-        result = await handle_validate_provider_config(mock_command)
-
-        assert "provider configuration" in result["message"].lower()
 
     @pytest.mark.asyncio
     async def test_reload_provider_config_cli_e2e(self):

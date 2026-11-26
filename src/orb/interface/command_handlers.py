@@ -10,6 +10,7 @@ This module provides a integrated interface to all command handlers organized by
 
 # Import base handler
 from orb.application.base.command_handler import CLICommandHandler
+from orb.interface.config_command_handlers import handle_validate_provider_config
 from orb.interface.machine_command_handlers import (
     handle_get_machine_status,
 )
@@ -40,7 +41,6 @@ from orb.interface.system_command_handlers import (
     handle_provider_metrics,
     handle_reload_provider_config,
     handle_select_provider_strategy,
-    handle_validate_provider_config,
 )
 
 # Import specialized handlers by category

@@ -248,21 +248,6 @@ class AWSLaunchTemplateManager:
             aws_template,
         )
 
-    def _create_or_reuse_base_template(self, aws_template: AWSTemplate) -> LaunchTemplateResult:
-        """
-        Create or reuse a base launch template (not per-request).
-        This strategy creates one template per template_id and reuses it.
-
-        Args:
-            aws_template: The AWS template configuration
-
-        Returns:
-            LaunchTemplateResult with template details
-        """
-        # This would be implemented for base template strategy
-        # For now, not implemented as we're using per-request strategy
-        raise NotImplementedError("Base template strategy not yet implemented")
-
     def _use_existing_template_strategy(self, aws_template: AWSTemplate) -> LaunchTemplateResult:
         """
         Use an existing launch template specified in the template configuration.

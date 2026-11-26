@@ -19,7 +19,6 @@ from orb.infrastructure.adapters.ports.resource_provisioning_port import (
 from orb.infrastructure.di.injectable import injectable
 from orb.infrastructure.template.configuration_manager import TemplateConfigurationManager
 from orb.providers.aws.exceptions.aws_exceptions import (
-    AWSEntityNotFoundError,
     AWSValidationError,
     QuotaExceededError,
 )
@@ -96,52 +95,6 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         return await asyncio.to_thread(
             self._provision_via_handlers, request, template, dry_run=is_dry_run
         )
-
-    async def _provision_via_strategy(
-        self, request: Request, template: Template, dry_run: bool = False
-    ) -> dict[str, Any]:  # type: ignore[return]
-        """
-        Provision resources using the provider strategy pattern.
-
-        Args:
-            request: The request to fulfill
-            template: The template to use for provisioning
-            dry_run: Whether to run in dry-run mode
-
-        Returns:
-            str: The resource ID
-        """
-        from orb.providers.base.strategy import ProviderOperation, ProviderOperationType
-
-        # Create provider operation with dry-run context
-        operation_context = {"skip_provisioning_port": True}
-        if dry_run:
-            operation_context["dry_run"] = True
-
-        operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES,
-            parameters={
-                "template_config": template.model_dump(),
-                "count": request.requested_count,
-                "request_id": str(request.request_id),
-            },
-            context=operation_context,
-        )
-
-        # Execute operation via provider strategy
-        result = await self._provider_strategy.execute_operation(operation)
-
-        if result.success:
-            # Extract resource ID from result
-            resource_id = result.data.get("instance_ids", ["dry-run-resource-id"])[0]
-            self._logger.info(
-                "Successfully provisioned resources via strategy with ID %s",
-                resource_id,
-            )
-            return resource_id
-        else:
-            self._logger.error("Provider strategy operation failed: %s", result.error_message)
-            raise InfrastructureError(f"Failed to provision resources: {result.error_message}")
 
     def _provision_via_handlers(
         self, request: Request, template: Template, dry_run: bool = False
@@ -348,113 +301,6 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             message = str(result.get("message", "")) if isinstance(result, dict) else ""
             outcomes.append({"resource_id": resource_id, "outcome": outcome, "message": message})
         return outcomes
-
-    # No current caller — available for a future health endpoint
-    def get_resource_health(self, resource_id: str) -> dict[str, Any]:
-        """
-        Get health information for a specific AWS resource.
-
-        Args:
-            resource_id: Resource identifier
-
-        Returns:
-            Dictionary containing health information
-
-        Raises:
-            AWSEntityNotFoundError: If the resource is not found
-            InfrastructureError: For other infrastructure errors
-        """
-        self._logger.info("Getting health information for resource %s", resource_id)
-
-        try:
-            # Determine the resource type from the ID format
-            if resource_id.startswith("i-"):
-                # EC2 instance
-                response = self.aws_client.ec2_client.describe_instance_status(
-                    InstanceIds=[resource_id]
-                )
-                if not response["InstanceStatuses"]:
-                    raise AWSEntityNotFoundError(f"Instance {resource_id} not found")
-
-                status = response["InstanceStatuses"][0]
-                return {
-                    "resource_id": resource_id,
-                    "resource_type": "ec2_instance",
-                    "state": status["InstanceState"]["Name"],
-                    "status": status["InstanceStatus"]["Status"],
-                    "system_status": status["SystemStatus"]["Status"],
-                    "details": status,
-                }
-            elif resource_id.startswith("fleet-"):
-                # EC2 Fleet
-                response = self.aws_client.ec2_client.describe_fleets(FleetIds=[resource_id])
-                if not response["Fleets"]:
-                    raise AWSEntityNotFoundError(f"Fleet {resource_id} not found")
-
-                fleet = response["Fleets"][0]
-                return {
-                    "resource_id": resource_id,
-                    "resource_type": "ec2_fleet",
-                    "state": fleet["FleetState"],
-                    "status": ("active" if fleet["FleetState"] == "active" else "inactive"),
-                    "target_capacity": fleet["TargetCapacitySpecification"]["TotalTargetCapacity"],
-                    "fulfilled_capacity": fleet.get("FulfilledCapacity", 0),
-                    "details": fleet,
-                }
-            elif resource_id.startswith("sfr-"):
-                # Spot Fleet
-                response = self.aws_client.ec2_client.describe_spot_fleet_requests(
-                    SpotFleetRequestIds=[resource_id]
-                )
-                if not response["SpotFleetRequestConfigs"]:
-                    raise AWSEntityNotFoundError(f"Spot Fleet {resource_id} not found")
-
-                fleet = response["SpotFleetRequestConfigs"][0]
-                return {
-                    "resource_id": resource_id,
-                    "resource_type": "spot_fleet",
-                    "state": fleet["SpotFleetRequestState"],
-                    "status": (
-                        "active" if fleet["SpotFleetRequestState"] == "active" else "inactive"
-                    ),
-                    "target_capacity": fleet["SpotFleetRequestConfig"]["TargetCapacity"],
-                    "fulfilled_capacity": fleet.get("FulfilledCapacity", 0),
-                    "details": fleet,
-                }
-            else:
-                # Try to determine the resource type from the AWS API
-                # This is a simplified approach and might need to be expanded
-                try:
-                    # Try as ASG
-                    response = self.aws_client.autoscaling_client.describe_auto_scaling_groups(
-                        AutoScalingGroupNames=[resource_id]
-                    )
-                    if response["AutoScalingGroups"]:
-                        asg = response["AutoScalingGroups"][0]
-                        return {
-                            "resource_id": resource_id,
-                            "resource_type": "ASG",
-                            "status": "active",
-                            "desired_capacity": asg["DesiredCapacity"],
-                            "current_capacity": len(asg["Instances"]),
-                            "details": asg,
-                        }
-                except Exception as e:
-                    self._logger.warning(
-                        "Failed to process auto scaling group details: %s",
-                        e,
-                        extra={"resource_id": resource_id},
-                    )
-
-                # If we get here, we couldn't determine the resource type
-                raise AWSEntityNotFoundError(
-                    f"Resource {resource_id} not found or type not supported"
-                )
-        except AWSEntityNotFoundError:
-            raise
-        except Exception as e:
-            self._logger.error("Error getting resource health: %s", str(e))
-            raise InfrastructureError(f"Failed to get resource health: {e!s}")
 
     def _get_handler_for_template(self, template: Template) -> AWSHandler:
         """

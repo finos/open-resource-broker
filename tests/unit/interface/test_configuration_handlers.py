@@ -45,13 +45,28 @@ class TestProviderConfigHandlers:
 
     @pytest.mark.asyncio
     async def test_handle_validate_provider_config(self):
-        """Test handle_validate_provider_config function - takes only args, no app param."""
-        args = Namespace(resource="provider", action="validate")
+        """Runs the validate query on the query bus and formats the result."""
+        from orb.infrastructure.di.buses import QueryBus
+        from orb.interface.response_formatting_service import ResponseFormattingService
 
-        # handle_validate_provider_config takes only args (no app parameter)
+        raw = {"validation": {"status": "valid", "errors": []}}
+        query_bus = AsyncMock()
+        query_bus.execute.return_value = raw
+        formatter = Mock()
+        formatter.format_config.return_value = {"formatted": True}
+        container = Mock()
+        container.get.side_effect = lambda t: {
+            QueryBus: query_bus,
+            ResponseFormattingService: formatter,
+        }[t]
+        args = Namespace(resource="config", action="validate", verbose=True, _container=container)
+
         result = await handle_validate_provider_config(args)
 
-        assert isinstance(result, dict)
+        query_bus.execute.assert_awaited_once()
+        assert query_bus.execute.await_args.args[0].verbose is True
+        formatter.format_config.assert_called_once_with(raw)
+        assert result == {"formatted": True}
 
     @pytest.mark.asyncio
     async def test_handle_reload_provider_config(self):
