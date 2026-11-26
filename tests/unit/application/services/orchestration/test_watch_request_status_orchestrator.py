@@ -212,3 +212,49 @@ class TestWatchRequestStatusOrchestrator:
         mock_query_bus.execute.return_value = _make_request_dto()
         result = await orchestrator.execute(WatchRequestStatusInput(request_id="req-123"))
         assert result.created_at == "2026-04-20T00:00:00Z"
+
+
+@pytest.mark.unit
+@pytest.mark.application
+@pytest.mark.asyncio
+async def test_placement_from_provider_instance_data_reaches_watch(mock_query_bus, mock_logger):
+    """Instance data saved as machines is what the watch view reads back."""
+    from datetime import datetime, timezone
+
+    from orb.application.factories.request_dto_factory import RequestDTOFactory
+    from orb.application.services.request_status_management_service import (
+        RequestStatusManagementService,
+    )
+    from orb.domain.request.aggregate import Request
+    from orb.domain.request.request_types import RequestType
+    from orb.domain.request.value_objects import RequestId
+
+    request = Request(
+        request_id=RequestId(value="req-00000000-0000-0000-0000-000000000001"),
+        request_type=RequestType.ACQUIRE,
+        provider_type="aws",
+        provider_name="aws_test",
+        provider_api="ec2fleet",
+        template_id="tmpl-1",
+        requested_count=1,
+        status="pending",
+        created_at=datetime.now(timezone.utc),
+    )
+    service = RequestStatusManagementService(uow_factory=MagicMock(), logger=mock_logger)
+    machine = service._create_machine_aggregate(
+        {
+            "instance_id": "i-abc123",
+            "instance_type": "t3.large",
+            "provider_data": {"availability_zone": "eu-west-1a", "vcpus": 2},
+        },
+        request,
+        "tmpl-1",
+    )
+    mock_query_bus.execute.return_value = RequestDTOFactory().create_from_domain(request, [machine])
+    orchestrator = WatchRequestStatusOrchestrator(query_bus=mock_query_bus, logger=mock_logger)
+
+    result = await orchestrator.execute(WatchRequestStatusInput(request_id="req-123"))
+
+    assert result.fulfilled_vcpus == 2
+    assert "eu-west-1a" in result.az_stats
+    assert "unknown" not in result.az_stats

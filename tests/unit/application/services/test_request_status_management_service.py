@@ -477,6 +477,22 @@ class TestCreateMachineAggregate:
         machine = self.svc._create_machine_aggregate(instance_data, req, "tmpl-001")
         assert str(machine.instance_type) == "t2.micro"
 
+    def test_provider_data_is_kept(self):
+        req = _make_request()
+        instance_data = {
+            "instance_id": "i-1234567890abcdef0",
+            "provider_data": {"availability_zone": "eu-west-1a", "vcpus": 2},
+        }
+        machine = self.svc._create_machine_aggregate(instance_data, req, "tmpl-001")
+        assert machine.provider_data == {"availability_zone": "eu-west-1a", "vcpus": 2}
+
+    def test_missing_provider_data_defaults_to_empty(self):
+        req = _make_request()
+        machine = self.svc._create_machine_aggregate(
+            {"instance_id": "i-1234567890abcdef0"}, req, "tmpl-001"
+        )
+        assert machine.provider_data == {}
+
 
 class TestProviderDiagnosticMergedOntoRequest:
     """The AWS handler classifies fleet errors into a FulfilmentDiagnostic and
