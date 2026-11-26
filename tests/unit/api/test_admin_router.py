@@ -822,3 +822,25 @@ class TestReloadConfigNoInfoLeak:
 
         assert r.status_code == 500
         assert r.json()["error"]["code"] == "RELOAD_FAILED"
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestAdminInitOptionsValidation:
+    """POST /admin/init accepts only the option names ``orb init`` defines."""
+
+    @pytest.mark.parametrize("options", [{"__class__": "x"}, {"bogus": 1}, {"provider_type": "x"}])
+    def test_unknown_option_is_rejected_with_400(self, admin_app, tmp_path, options):
+        config_port = _make_config_port(allow_destructive=True, environment="development")
+        machine_repo, request_repo, template_repo = _make_repositories()
+        container = _make_container(config_port, machine_repo, request_repo, template_repo)
+
+        with (
+            _patch_ctx(container),
+            patch("orb.config.platform_dirs.get_config_location", return_value=tmp_path),
+        ):
+            client = TestClient(admin_app, raise_server_exceptions=False)
+            r = _init_post(client, {"confirm": "INIT", "options": options})
+
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "INVALID_INIT_INPUT"

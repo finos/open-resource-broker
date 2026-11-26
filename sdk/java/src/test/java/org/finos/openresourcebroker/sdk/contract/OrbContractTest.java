@@ -857,17 +857,16 @@ class OrbContractTest {
             Thread.sleep(200);
             try {
                 UnixDomainSocketAddress addr = UnixDomainSocketAddress.of(socketPath);
-                try (SocketChannel ch = SocketChannel.open(addr)) {
+                try (SocketChannel ch = SocketChannel.open(addr);
+                     BufferedReader reader = new BufferedReader(new InputStreamReader(
+                             java.nio.channels.Channels.newInputStream(ch), StandardCharsets.UTF_8))) {
                     ch.configureBlocking(true);
                     var out = java.nio.channels.Channels.newOutputStream(ch);
-                    var in  = java.nio.channels.Channels.newInputStream(ch);
 
                     String req = "GET /health HTTP/1.1\r\nHost: localhost\r\nAccept: application/json\r\nConnection: close\r\n\r\n";
                     out.write(req.getBytes(StandardCharsets.US_ASCII));
                     out.flush();
 
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(in, StandardCharsets.UTF_8));
                     String statusLine = reader.readLine();
                     if (statusLine != null && statusLine.contains(" 200 ")) {
                         // Skip headers

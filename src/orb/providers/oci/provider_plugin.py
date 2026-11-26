@@ -14,12 +14,12 @@ class OCIPlugin(ProviderPlugin):
         return "Oracle Cloud Infrastructure (OCI)"
 
     def strategy_factory(self) -> Any:
-        from orb.providers.oci.registration import create_oci_strategy
+        from orb.providers.oci.factories import create_oci_strategy
 
         return create_oci_strategy
 
     def config_factory(self) -> Any:
-        from orb.providers.oci.registration import create_oci_config
+        from orb.providers.oci.factories import create_oci_config
 
         return create_oci_config
 

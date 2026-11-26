@@ -207,3 +207,10 @@ class AzureTemplateExtensionConfig(ProviderTemplateExtensionBase):
                 legacy_os_disk["disk_size_gb"] = self.os_disk_size_gb
             defaults["os_disk"] = legacy_os_disk
         return defaults
+
+
+def get_azure_extension_defaults() -> dict[str, Any]:
+    """Get default Azure extension configuration."""
+    return AzureTemplateExtensionConfig(
+        os_disk_type="Premium_LRS",
+    ).to_template_defaults()

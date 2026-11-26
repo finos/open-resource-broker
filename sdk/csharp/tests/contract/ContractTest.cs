@@ -89,8 +89,8 @@ public class ContractTest : IClassFixture<OrbFixture>
         // The HealthAsync method accepts both status codes.
         var result = await _fixture.Client.HealthAsync();
         Assert.NotNull(result);
-        Assert.True(result.ContainsKey("status"), "health response must have 'status' key");
-        var status = result["status"]?.ToString() ?? "";
+        Assert.True(result.TryGetValue("status", out var statusObj), "health response must have 'status' key");
+        var status = statusObj?.ToString() ?? "";
         var validStatuses = new[] { "healthy", "degraded", "unhealthy" };
         Assert.True(validStatuses.Contains(status), $"health status '{status}' is not in {string.Join(",", validStatuses)}");
         _out.WriteLine($"  health: {status}");

@@ -30,6 +30,7 @@ from orb.providers.k8s.infrastructure.handlers.shared.namespace_resolver import 
 )
 from orb.providers.k8s.infrastructure.handlers.statefulset_handler import K8sStatefulSetHandler
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+from orb.providers.k8s.utilities.labels import K8sValidationError
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
 from orb.providers.k8s.watch.node_state_cache import K8sNodeStateCache
@@ -348,9 +349,14 @@ class K8sHandlerRegistry:
             # number of ids released against the controller's replicas, so ids of
             # one controller must not be split across calls.
             by_namespace: dict[str, list[str]] = {}
-            for (namespace, _origin), grouped in self._group_by_placement(
+            groups, invalid_ids = self._group_by_placement(
                 list(machine_ids), machine_coordinates, request
-            ).items():
+            )
+            # Machines whose stored namespace is invalid are not released; the
+            # rest of the batch proceeds.
+            failed_names.extend(invalid_ids)
+            delete_failures = 0
+            for (namespace, _origin), grouped in groups.items():
                 by_namespace.setdefault(namespace, []).extend(grouped)
             for namespace, names in by_namespace.items():
                 release_result = await handler.release_hosts(
@@ -360,10 +366,12 @@ class K8sHandlerRegistry:
                     release_result if isinstance(release_result, dict) else {}
                 )
                 deleted.extend(release_info.get("deleted", names))
-                failed_names.extend(
+                failed_deletes = [
                     str(entry[0] if isinstance(entry, (tuple, list)) else entry)
                     for entry in (release_info.get("failed_deletes") or [])
-                )
+                ]
+                failed_names.extend(failed_deletes)
+                delete_failures += len(failed_deletes)
             if failed_names:
                 # Some deletes failed. Report the per-ID split under
                 # ``provider_data`` so the deprovisioning orchestrator can mark
@@ -376,7 +384,9 @@ class K8sHandlerRegistry:
                 )
                 return Failed(
                     error=f"{len(failed_names)} of {len(machine_ids)} pod deletions failed",
-                    recoverable=True,
+                    # An invalid stored namespace never succeeds on retry; only
+                    # failed deletes are worth retrying.
+                    recoverable=delete_failures > 0,
                     metadata={
                         "provider_api": provider_api,
                         "provider_data": {
@@ -404,26 +414,37 @@ class K8sHandlerRegistry:
         machine_ids: list[str],
         machine_coordinates: Optional[dict[str, dict[str, Any]]],
         request: Request,
-    ) -> dict[tuple[str, Optional[str]], list[str]]:
+    ) -> tuple[dict[tuple[str, Optional[str]], list[str]], list[str]]:
         """Group machine ids by ``(namespace, origin request id)``.
 
         Namespace precedence per machine: its persisted ``provider_data``, then
         the request's own ``provider_data``, then the configured default.
         Machines without coordinates land in the default namespace with no
         origin request id.
+
+        Returns the groups plus the ids whose stored namespace is invalid; those
+        machines are left out of the groups so one bad row cannot fail the batch.
         """
         request_data = request.provider_data or {}
         groups: dict[tuple[str, Optional[str]], list[str]] = {}
+        invalid: list[str] = []
         for mid in machine_ids:
             coords = (machine_coordinates or {}).get(mid) or {}
             placed = coords.get("provider_data") or {}
             source = placed if placed.get("namespace") else request_data
-            namespace = resolve_namespace_from_provider_data(
-                source if isinstance(source, dict) else {}, self._config
-            )
+            try:
+                namespace = resolve_namespace_from_provider_data(
+                    source if isinstance(source, dict) else {}, self._config
+                )
+            except K8sValidationError:
+                self._logger.warning(
+                    "Kubernetes machine has an invalid stored namespace: machine_id=%s", mid
+                )
+                invalid.append(mid)
+                continue
             origin = str(coords["request_id"]) if coords.get("request_id") else None
             groups.setdefault((namespace, origin), []).append(mid)
-        return groups
+        return groups, invalid
 
     async def _read_return_pods(
         self,
@@ -435,7 +456,10 @@ class K8sHandlerRegistry:
         """List the returned pods per (namespace, origin request) group."""
         instances: list[dict[str, Any]] = []
         unreadable: set[str] = set()
-        groups = self._group_by_placement(list(resource_ids), machine_coordinates, request)
+        groups, invalid_ids = self._group_by_placement(
+            list(resource_ids), machine_coordinates, request
+        )
+        unreadable.update(invalid_ids)
         for (namespace, origin), names in groups.items():
             result = await asyncio.to_thread(handler.read_pods_for_return, namespace, origin, names)
             instances.extend(result.instances)

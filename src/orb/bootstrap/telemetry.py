@@ -80,7 +80,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, TextIO
 
 if TYPE_CHECKING:
-    from orb.infrastructure.di.container import DIContainer
+    from orb.infrastructure.di.contracts import DIContainerPort
 
 
 class _TelemetryState:
@@ -171,7 +171,7 @@ def _resolve_telemetry_file_dir(configured: Optional[str]) -> Path:
     return Path(tempfile.mkdtemp(prefix="orb-telemetry-"))
 
 
-def configure_telemetry(container: DIContainer) -> None:
+def configure_telemetry(container: DIContainerPort) -> None:
     """Initialise the OTel SDK from the container's OtelConfig.
 
     This function is a complete no-op in any of the following situations:

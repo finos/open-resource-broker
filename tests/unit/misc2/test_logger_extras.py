@@ -27,19 +27,19 @@ from orb.infrastructure.logging.logger import (
 @pytest.fixture(autouse=True)
 def _reset_logging_state():
     """Reset logging initialized flag and handlers around each test."""
-    original_initialized = logger_module._logging_initialized
+    original_initialized = logger_module._LoggingState.initialized
     root = logging.getLogger()
     original_handlers = list(root.handlers)
     for h in list(root.handlers):
         root.removeHandler(h)
-    logger_module._logging_initialized = False
+    logger_module._LoggingState.initialized = False
     yield
-    logger_module._logging_initialized = False
+    logger_module._LoggingState.initialized = False
     for h in list(root.handlers):
         root.removeHandler(h)
     for h in original_handlers:
         root.addHandler(h)
-    logger_module._logging_initialized = original_initialized
+    logger_module._LoggingState.initialized = original_initialized
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ class TestSetupLogging:
         )
         logger_module.setup_logging(config)
         logger_module.setup_logging(config)  # second call must be a noop
-        assert logger_module._logging_initialized is True
+        assert logger_module._LoggingState.initialized is True
 
     def test_file_handler_added_when_file_path_set(self, tmp_path) -> None:
         from orb.config.schemas.logging_schema import LoggingConfig

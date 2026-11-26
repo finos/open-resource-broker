@@ -54,3 +54,36 @@ def test_unset_provider_type_falls_back_to_the_first_registered_provider():
 
     assert config["providers"][0]["type"] == "aws"
     assert config["providers"][0]["config"]["region"]
+
+
+def test_core_init_options_match_the_init_subparser():
+    import sys
+
+    from orb.cli.args import parse_args
+
+    argv = ["orb", "init", "--subnet-ids", "s", "--security-group-ids", "g", "--fleet-role", "r"]
+    with patch.object(sys, "argv", argv):
+        namespace, _ = parse_args()
+
+    parsed = {name for name in init_mod._CORE_INIT_OPTIONS if getattr(namespace, name, None)}
+    assert parsed == set(init_mod._CORE_INIT_OPTIONS)
+
+
+def test_documented_init_options_are_accepted():
+    init_mod.validate_init_options(
+        {
+            "aws_region": "eu-west-2",
+            "aws_profile": "ops",
+            "subnet_ids": "subnet-1",
+            "security_group_ids": "sg-1",
+            "fleet_role": "role",
+        }
+    )
+
+
+def test_unknown_init_options_are_rejected():
+    import pytest
+
+    for key in ("bogus", "__class__", "__dict__", "provider_type", "config_dir", "force"):
+        with pytest.raises(init_mod.InvalidInitInputError):
+            init_mod.validate_init_options({key: "x"})

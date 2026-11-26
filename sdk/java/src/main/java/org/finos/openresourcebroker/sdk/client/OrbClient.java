@@ -179,6 +179,11 @@ public class OrbClient implements Closeable {
     // Templates — 8 operations
     // ======================================================================
 
+    /** listTemplates — GET /api/v1/templates/ (no filters). */
+    public TemplateListResponse listTemplates() throws Exception {
+        return listTemplates(null, null, null);
+    }
+
     /**
      * listTemplates — GET /api/v1/templates/
      *
@@ -186,11 +191,6 @@ public class OrbClient implements Closeable {
      * @param limit       max results (default 50)
      * @param offset      skip this many results
      */
-    /** listTemplates — GET /api/v1/templates/ (no filters). */
-    public TemplateListResponse listTemplates() throws Exception {
-        return listTemplates(null, null, null);
-    }
-
     public TemplateListResponse listTemplates(String providerApi, Integer limit, Integer offset)
             throws Exception {
         Map<String, String> params = new LinkedHashMap<>();
@@ -276,6 +276,11 @@ public class OrbClient implements Closeable {
         return post("/api/v1/machines/return", request, new TypeReference<>() {});
     }
 
+    /** listMachines — GET /api/v1/machines/ (no filters). */
+    public MachineListResponse listMachines() throws Exception {
+        return listMachines(null, null, null, null, null);
+    }
+
     /**
      * listMachines — GET /api/v1/machines/
      *
@@ -285,11 +290,6 @@ public class OrbClient implements Closeable {
      * @param limit        max results
      * @param offset       skip results
      */
-    /** listMachines — GET /api/v1/machines/ (no filters). */
-    public MachineListResponse listMachines() throws Exception {
-        return listMachines(null, null, null, null, null);
-    }
-
     public MachineListResponse listMachines(String status, String providerName, String requestId,
                                              Integer limit, Integer offset) throws Exception {
         Map<String, String> params = new LinkedHashMap<>();

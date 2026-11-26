@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from orb.domain.base.ports.provider_defaults_loader_port import ProviderDefaultsLoaderPort
 from orb.providers.azure.capabilities import get_supported_api_capabilities
-from orb.providers.azure.registration import get_azure_extension_defaults
+from orb.providers.azure.configuration.template_extension import get_azure_extension_defaults
 
 _HANDLER_CLASSES = {
     "VMSS": "VMSSHandler",

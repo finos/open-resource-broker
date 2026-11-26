@@ -14,7 +14,7 @@
  */
 
 import { Agent, request as undiciRequest } from "undici";
-import { PassThrough, Readable } from "stream";
+import { PassThrough } from "stream";
 import type { AxiosAdapter, InternalAxiosRequestConfig, AxiosResponse } from "axios";
 import { settle } from "./axios-settle";
 

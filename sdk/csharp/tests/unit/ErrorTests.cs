@@ -1,6 +1,10 @@
 // Unit tests for the error types.
 
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using FINOS.OpenResourceBroker;
+using FINOS.OpenResourceBroker.Transport;
 using Xunit;
 
 namespace UnitTests;
@@ -93,5 +97,41 @@ public class ErrorTests
         Assert.True(ex.IsUnavailable);
         Assert.IsAssignableFrom<OrbApiException>(ex);
         Assert.IsAssignableFrom<OrbException>(ex);
+    }
+
+    // An error body whose code/message is not a string, or is not JSON at all,
+    // must still map to an OrbApiException rather than escaping as a parse error.
+    [Theory]
+    [InlineData("{\"code\": 5}")]
+    [InlineData("{\"message\": 5}")]
+    [InlineData("not json")]
+    public async Task UnparseableErrorBody_StillYieldsOrbApiException(string body)
+    {
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        var port = ((IPEndPoint)listener.LocalEndPoint!).Port;
+        var serve = Task.Run(async () =>
+        {
+            using var conn = await listener.AcceptAsync();
+            using var stream = new NetworkStream(conn);
+            var buf = new byte[4096];
+            _ = await stream.ReadAsync(buf);
+            var payload = Encoding.UTF8.GetBytes(body);
+            var head = Encoding.ASCII.GetBytes(
+                $"HTTP/1.1 400 Bad Request\r\nContent-Length: {payload.Length}\r\nConnection: close\r\n\r\n");
+            await stream.WriteAsync(head);
+            await stream.WriteAsync(payload);
+        });
+
+        await using var client = await OrbClient.CreateAsync(new ClientConfig
+        {
+            BaseUrl = $"http://127.0.0.1:{port}",
+            Retry = new RetryConfig { MaxRetries = 0 },
+        });
+        var ex = await Assert.ThrowsAsync<OrbApiException>(() => client.HealthAsync());
+        Assert.Equal(400, ex.StatusCode);
+        Assert.Null(ex.Code);
+        await serve;
     }
 }

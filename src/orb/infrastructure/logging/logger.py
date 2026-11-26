@@ -166,8 +166,10 @@ class ContextLogger(logging.Logger):
         super()._log(level, msg, args, exc_info, extra, stack_info, stacklevel + 1)
 
 
-# Flag to track if logging has been initialized
-_logging_initialized = False
+class _LoggingState:
+    """Holds the one-time initialisation flag (attribute access avoids ``global`` rebinding)."""
+
+    initialized = False
 
 
 def setup_logging(config: LoggingConfig) -> None:
@@ -177,10 +179,8 @@ def setup_logging(config: LoggingConfig) -> None:
     Args:
         config: Logging configuration
     """
-    global _logging_initialized
-
     # Only initialize logging once
-    if _logging_initialized:
+    if _LoggingState.initialized:
         return
 
     # Set logging class
@@ -261,9 +261,7 @@ def setup_logging(config: LoggingConfig) -> None:
     get_logger("botocore").setLevel(logging.WARNING)
     get_logger("urllib3").setLevel(logging.WARNING)
 
-    # Mark logging as initialized; read by the guard check at the top of
-    # this function on the next call.
-    _logging_initialized = True
+    _LoggingState.initialized = True
 
     # Log initialization
     logging.getLogger(__name__).debug("Logging system initialized")

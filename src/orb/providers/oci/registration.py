@@ -4,96 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from orb.providers.base.config_input import (
-    provider_config_mapping,
-    provider_instance_name,
-    warn_unknown_config_keys,
-)
+from orb.providers.oci.factories import create_oci_config, create_oci_strategy
 
-
-def _extract_oci_provider_settings(provider_config: Any) -> dict[str, Any]:
-    """Unwrap provider instance entries to the inner OCI settings dict."""
-    if provider_config is None:
-        return {}
-    if hasattr(provider_config, "config"):
-        provider_config = provider_config.config
-    if hasattr(provider_config, "model_dump"):
-        provider_config = provider_config.model_dump()
-    elif hasattr(provider_config, "dict"):
-        provider_config = provider_config.dict()
-    if isinstance(provider_config, dict):
-        provider_config = provider_config_mapping(provider_config)
-        nested = provider_config.get("config")
-        if isinstance(nested, dict):
-            return provider_config_mapping(nested)
-        if nested is not None and hasattr(nested, "model_dump"):
-            return provider_config_mapping(nested.model_dump())
-        if nested is not None and hasattr(nested, "dict"):
-            return provider_config_mapping(nested.dict())
-        return provider_config
-    return {}
-
-
-def create_oci_strategy(provider_config: Any) -> Any:
-    """Create OCI provider strategy from configuration."""
-    from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
-    from orb.providers.oci.configuration.config import OCIProviderConfig
-    from orb.providers.oci.strategy.oci_provider_strategy import OCIProviderStrategy
-
-    try:
-        if isinstance(provider_config, OCIProviderConfig):
-            oci_config = provider_config
-            provider_instance_config = None
-            provider_name = None
-        elif hasattr(provider_config, "config"):
-            provider_instance_config = provider_config
-            # getattr: config wrappers expose settings but may omit an instance name.
-            provider_name = getattr(provider_config, "name", None)
-            oci_config = OCIProviderConfig(**_extract_oci_provider_settings(provider_config))
-        else:
-            provider_instance_config = (
-                provider_config if isinstance(provider_config, dict) else None
-            )
-            provider_name = (
-                provider_config.get("name") if isinstance(provider_config, dict) else None
-            )
-            oci_config = OCIProviderConfig(**_extract_oci_provider_settings(provider_config))
-
-        logger = LoggingAdapter()
-        strategy = OCIProviderStrategy(
-            config=oci_config,
-            logger=logger,
-            provider_name=provider_name,
-            provider_instance_config=provider_instance_config,
-        )
-
-        if not strategy.initialize():
-            raise RuntimeError("Failed to initialize OCI provider strategy")
-
-        return strategy
-    except ImportError as exc:
-        raise ImportError(f"OCI provider strategy not available: {exc!s}")
-    except Exception as exc:
-        raise RuntimeError(f"Failed to create OCI strategy: {exc!s}")
-
-
-def create_oci_config(data: Any) -> Any:
-    """Create OCI configuration from data dictionary."""
-    from orb.infrastructure.logging.logger import get_logger
-    from orb.providers.oci.configuration.config import OCIProviderConfig
-
-    try:
-        if isinstance(data, OCIProviderConfig):
-            return data
-        if isinstance(data, dict) or hasattr(data, "config"):
-            settings = _extract_oci_provider_settings(data)
-            warn_unknown_config_keys(
-                OCIProviderConfig, settings, provider_instance_name(data), get_logger(__name__)
-            )
-            return OCIProviderConfig(**settings)
-        return OCIProviderConfig()
-    except Exception as exc:
-        raise RuntimeError(f"Failed to create OCI config: {exc!s}")
+__all__ = ["create_oci_config", "create_oci_strategy"]
 
 
 def register_oci_provider(registry=None, logger=None, instance_name=None) -> None:

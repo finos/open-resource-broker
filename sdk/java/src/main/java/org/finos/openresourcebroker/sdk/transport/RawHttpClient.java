@@ -146,7 +146,7 @@ public class RawHttpClient {
      */
     public HttpResult getNoRetry(String path, Map<String, String> params) throws IOException {
         String fullPath = buildPath(path, params);
-        return execute("GET", fullPath, null, "application/json", true);
+        return execute("GET", fullPath, null, "application/json");
     }
 
     /** Perform GET request for plain text (e.g. metrics). */
@@ -199,18 +199,21 @@ public class RawHttpClient {
             throws IOException, InterruptedException {
         IOException lastIoErr = null;
         HttpResult lastResult = null;
-        boolean firstAttempt = true;
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             if (attempt > 0) {
                 long delayMs = baseDelay.toMillis() * (1L << (attempt - 1));
                 Thread.sleep(delayMs);
             }
             try {
-                lastResult = execute(method, path, body, accept, firstAttempt);
+                lastResult = execute(method, path, body, accept);
                 if (!shouldRetryStatus(method, lastResult.statusCode())) {
                     return lastResult;
                 }
                 // retryable status — continue
+            } catch (MalformedResponseException e) {
+                // The server answered with an unparseable response; retrying
+                // cannot help and may repeat a request that was processed.
+                throw e;
             } catch (PreWriteConnectException e) {
                 // Connection refused before any bytes were written: the server
                 // never saw the request, so it is safe to retry even for POST.
@@ -224,7 +227,6 @@ public class RawHttpClient {
                 }
                 // idempotent — retry
             }
-            firstAttempt = false;
         }
         if (lastIoErr != null) throw lastIoErr;
         return lastResult;
@@ -246,13 +248,12 @@ public class RawHttpClient {
     // Core HTTP execution
     // ------------------------------------------------------------------
 
-    private HttpResult execute(String method, String path, String body, String accept,
-                               boolean firstAttempt)
+    private HttpResult execute(String method, String path, String body, String accept)
             throws IOException {
         if (socketPath != null) {
             return executeUds(method, path, body, accept);
         } else {
-            return executeTcp(method, path, body, accept, firstAttempt);
+            return executeTcp(method, path, body, accept);
         }
     }
 
@@ -266,15 +267,14 @@ public class RawHttpClient {
         }
     }
 
-    private HttpResult executeTcp(String method, String path, String body, String accept,
-                                  boolean firstAttempt)
+    private HttpResult executeTcp(String method, String path, String body, String accept)
             throws IOException {
         URI uri = URI.create(baseUrl + path);
         String host = uri.getHost();
         int port = resolvePort(uri);
         java.net.Socket sock = null;
         try {
-            sock = openTcpSocket(host, port, firstAttempt);
+            sock = openTcpSocket(host, port);
             return doHttp11Streams(sock.getInputStream(), sock.getOutputStream(),
                     method, host, path, body, accept);
         } finally {
@@ -294,11 +294,11 @@ public class RawHttpClient {
      * Open a connected TCP socket, wrapped in TLS with certificate + hostname
      * verification when the base URL uses {@code https://}.
      *
-     * <p>A connection-refused failure on the first write attempt is surfaced as a
+     * <p>A connection-refused failure is surfaced as a
      * {@link PreWriteConnectException} so the retry layer knows the request never
      * reached the server (the only network failure safe to retry for POST).
      */
-    private java.net.Socket openTcpSocket(String host, int port, boolean firstAttempt)
+    private java.net.Socket openTcpSocket(String host, int port)
             throws IOException {
         java.net.Socket plain = new java.net.Socket();
         try {
@@ -425,7 +425,12 @@ public class RawHttpClient {
         // e.g. "HTTP/1.1 200 OK"
         String[] parts = statusLine.split(" ", 3);
         if (parts.length < 2) throw new IOException("Bad status line: " + statusLine);
-        int statusCode = Integer.parseInt(parts[1].trim());
+        int statusCode;
+        try {
+            statusCode = Integer.parseInt(parts[1].trim());
+        } catch (NumberFormatException e) {
+            throw new MalformedResponseException("Bad status code: " + statusLine, e);
+        }
 
         // Headers
         Map<String, String> headers = new LinkedHashMap<>();
@@ -443,7 +448,12 @@ public class RawHttpClient {
         StringBuilder bodyBuilder = new StringBuilder();
         String contentLength = headers.get("content-length");
         if (contentLength != null) {
-            long len = Long.parseLong(contentLength.trim());
+            long len;
+            try {
+                len = Long.parseLong(contentLength.trim());
+            } catch (NumberFormatException e) {
+                throw new MalformedResponseException("Bad Content-Length: " + contentLength, e);
+            }
             if (len < 0 || len > MAX_RESPONSE_BYTES) {
                 throw new IOException("Response Content-Length " + len +
                         " exceeds maximum allowed " + MAX_RESPONSE_BYTES);
@@ -496,7 +506,12 @@ public class RawHttpClient {
             int semi = hex.indexOf(';');
             if (semi >= 0) hex = hex.substring(0, semi).trim();
             if (hex.isEmpty()) continue;
-            long chunkSize = Long.parseLong(hex, 16);
+            long chunkSize;
+            try {
+                chunkSize = Long.parseLong(hex, 16);
+            } catch (NumberFormatException e) {
+                throw new MalformedResponseException("Bad chunk size: " + hex, e);
+            }
             if (chunkSize == 0) break;
             if (chunkSize < 0 || chunkSize > MAX_RESPONSE_BYTES) {
                 throw new IOException("Chunk size " + chunkSize +
@@ -543,7 +558,7 @@ public class RawHttpClient {
         URI uri = URI.create(baseUrl + path);
         String host = uri.getHost();
         int port = resolvePort(uri);
-        java.net.Socket sock = openTcpSocket(host, port, false);
+        java.net.Socket sock = openTcpSocket(host, port);
         try {
             writeSseRequest(sock.getOutputStream(), host, path);
             BufferedInputStream buffered = new BufferedInputStream(sock.getInputStream(), 65536);
@@ -689,6 +704,13 @@ public class RawHttpClient {
 
     /** Result type carrying the HTTP status, body, and lower-cased headers. */
     public record HttpResult(int statusCode, String body, Map<String, String> headers) {}
+
+    /** Unparseable status line, Content-Length or chunk size; never retried. */
+    private static final class MalformedResponseException extends IOException {
+        MalformedResponseException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
 
     /**
      * Marker IOException raised when a TCP connection is refused before any bytes

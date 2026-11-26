@@ -420,6 +420,132 @@ vulnerabilities:
       ORB does not use QUIC.
     expired_at: 2027-01-27
 
+  - id: CVE-2026-84785
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: A QUIC peer that sends many small out-of-order STREAM fragments while withholding the first byte of the stream can make OpenSSL buffer a large number of reassembly nodes, allowing memory exhaustion (denial of service). Debian security tracker lists no fixed version for trixie (source package
+      openssl, trixie 3.5.9-1~deb13u1 and trixie-security 3.5.7-1~deb13u3: vulnerable; checked
+      2026-11-26). ORB does not use QUIC.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-95691
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: A retransmitted QUIC CRYPTO frame can release packet storage that the TLS record layer still points to, causing a use after free read in the OpenSSL QUIC client. Debian security tracker lists no fixed version for trixie (source package
+      openssl, trixie 3.5.9-1~deb13u1 and trixie-security 3.5.7-1~deb13u3: vulnerable; checked
+      2026-11-26). ORB does not use QUIC.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-107496
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: CMS_encrypt() can loop indefinitely when encrypting to an EC certificate whose
+      group order is 1 (denial of service). Debian security tracker lists no fixed version for
+      trixie (source package openssl, trixie 3.5.9-1~deb13u1 and trixie-security 3.5.7-1~deb13u3:
+      vulnerable; checked 2026-11-26). ORB source does not use CMS.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-121482
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: Verifying a crafted CMS or PKCS#7 SignedData message with CRL checking enabled can
+      consume excessive CPU (denial of service). Debian security tracker lists no fixed version
+      for trixie (source package openssl, trixie 3.5.9-1~deb13u1 and trixie-security
+      3.5.7-1~deb13u3: vulnerable; checked 2026-11-26). ORB source does not use CMS or PKCS#7.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-35190
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: A TLS 1.3 server with the Suite B certificate flag can read past the end of a fixed
+      group list while processing a ClientHello. Debian security tracker lists no fixed version
+      for trixie (source package openssl, trixie 3.5.9-1~deb13u1 and trixie-security
+      3.5.7-1~deb13u3: vulnerable; checked 2026-11-26). ORB source does not use Suite B.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-84786
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: A DANE-enabled TLS client can crash on a NULL pointer dereference for an unusual
+      mix of certificate and TLSA records. Debian security tracker lists no fixed version for
+      trixie (source package openssl, trixie 3.5.9-1~deb13u1 and trixie-security 3.5.7-1~deb13u3:
+      vulnerable; checked 2026-11-26). ORB source does not use DANE.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-95690
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: Crafted out-of-sequence DTLS handshake fragments can cause excessive memory
+      allocation (denial of service). Debian security tracker lists no fixed version for trixie
+      (source package openssl, trixie 3.5.9-1~deb13u1 and trixie-security 3.5.7-1~deb13u3:
+      vulnerable; checked 2026-11-26).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-95692
+    purls:
+      - pkg:deb/debian/libssl3t64
+      - pkg:deb/debian/openssl
+      - pkg:deb/debian/openssl-provider-legacy
+    statement: >-
+      openssl: Setting an AES-GCM-SIV IV shorter than the expected nonce length can cause a heap
+      out-of-bounds read. Debian security tracker lists no fixed version for trixie (source
+      package openssl, trixie 3.5.9-1~deb13u1 and trixie-security 3.5.7-1~deb13u3: vulnerable;
+      checked 2026-11-26). ORB source does not use AES-GCM-SIV.
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-115819
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: The wide scanf family writes one extra null byte past the end of the destination
+      array for %s or %[ conversions without the l modifier. Debian security tracker lists no
+      fixed version for trixie (source package glibc, trixie 2.41-12+deb13u5: vulnerable; checked
+      2026-11-26).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-121757
+    purls:
+      - pkg:deb/debian/libc-bin
+      - pkg:deb/debian/libc6
+    statement: >-
+      glibc: Converting crafted CP949 input to UTF-8 with //IGNORE can make iconv read past the
+      end of the input buffer. Debian security tracker lists no fixed version for trixie (source
+      package glibc, trixie 2.41-12+deb13u5: vulnerable; checked 2026-11-26).
+    expired_at: 2027-01-27
+
+  - id: CVE-2026-125709
+    purls:
+      - pkg:deb/debian/gcc-14-base
+      - pkg:deb/debian/libgcc-s1
+      - pkg:deb/debian/libstdc%2B%2B6
+    statement: >-
+      gcc: libstdc++ can append data to the internal buffer after a failed write during file
+      stream processing, causing a buffer overflow. Debian security tracker lists no fixed version
+      for trixie (source package gcc-14, trixie 14.2.0-19: vulnerable; checked 2026-11-26).
+    expired_at: 2027-01-27
+
   # ── filelock on Python 3.10 ────────────────────────────────────────────────
   #
   # filelock is not a runtime dependency of orb-py. It is pulled in only by dev

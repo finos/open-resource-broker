@@ -37,17 +37,17 @@ class _GCPOperationWithName(Protocol):
     """Methods supplied by the SDK operation, not implemented by this protocol."""
 
     @property
-    def name(self) -> str | None:
+    def name(self) -> str | None:  # type: ignore[return]
         """Return the provider operation name."""
-        ...
+        pass
 
-    def done(self) -> bool:
+    def done(self) -> bool:  # type: ignore[return]
         """Refresh the operation once and report whether it completed."""
-        ...
+        pass
 
-    def result(self, timeout: float | None = None) -> object:
+    def result(self, timeout: float | None = None) -> object:  # type: ignore[return]
         """Return the completed operation result or raise its failure."""
-        ...
+        pass
 
 
 @dataclass(frozen=True)
