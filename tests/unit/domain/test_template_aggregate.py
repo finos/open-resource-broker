@@ -711,3 +711,39 @@ class TestTemplateExceptions:
         """Test TemplateNotFoundError stores entity_id in details."""
         error = TemplateNotFoundError("template-001")
         assert error.details.get("entity_id") == "template-001"
+
+
+_DEPRECATED_NAMES = {
+    "instance_type": "machine_type",
+    "instance_profile": "machine_role",
+    "image_id": "machine_image",
+    "max_instances": "max_machines",
+    "root_device_volume_size": "machine_disk_size_gb",
+    "volume_type": "machine_disk_type",
+    "key_name": "machine_ssh_key",
+    "user_data": "machine_bootstrap",
+}
+
+_INT_FIELDS = {"max_instances": 1, "root_device_volume_size": 8}
+
+
+class TestDeprecatedAliasTable:
+    """The alias table drives both the operator log and the developer warning."""
+
+    def test_table_lists_every_deprecated_name(self):
+        assert Template.deprecated_aliases_in(dict.fromkeys(_DEPRECATED_NAMES)) == _DEPRECATED_NAMES
+
+    def test_canonical_key_present_suppresses_the_alias(self):
+        data = {"instance_type": "m5.large", "machine_type": "c5.large"}
+        assert Template.deprecated_aliases_in(data) == {}
+
+    @pytest.mark.parametrize(("old", "new"), list(_DEPRECATED_NAMES.items()))
+    def test_each_name_logs_once_and_warns_once(self, old, new, caplog):
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="orb.domain.template.template_aggregate"):
+            with pytest.warns(DeprecationWarning) as recorded:
+                Template(template_id="alias-1", **{old: _INT_FIELDS.get(old, "x")})
+        expected = f"Template field '{old}' is deprecated; use '{new}' instead."
+        assert [r.message for r in caplog.records].count(expected) == 1
+        assert [str(w.message) for w in recorded].count(expected) == 1
