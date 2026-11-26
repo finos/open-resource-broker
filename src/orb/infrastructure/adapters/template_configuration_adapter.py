@@ -56,15 +56,17 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
             errors.append("Template ID is required")
 
         provider_api = config.get("providerApi") or config.get("provider_api")
-        provider_type = (
+        declared_type = (
             config.get("providerType")
             or config.get("provider_type")
             or self._PROVIDER_API_TO_TYPE.get(str(provider_api or ""))
         )
         # provider_api is required for non-k8s providers.  For k8s the
         # runtime defaults provider_api to "Pod" when it is absent, so a
-        # missing provider_api is not an error on that path.
-        if not provider_api and provider_type != "k8s":
+        # missing provider_api is not an error on that path.  This check keeps
+        # the stamped-type-or-API-map expression: resolving the type from the
+        # provider configuration below must not loosen it.
+        if not provider_api and declared_type != "k8s":
             errors.append("Provider API is required")
 
         image_id = config.get("machine_image") or config.get("imageId") or config.get("image_id")
@@ -79,6 +81,12 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         # so this infrastructure adapter imports no provider package.  When no
         # provider validator is available the generic checks are the verdict.
         try:
+            provider_type = declared_type or self._type_from_provider_config(config)
+            if not provider_type:
+                self._logger.warning(
+                    "Provider type not resolved for template %s; provider rules not applied",
+                    template_id,
+                )
             errors.extend(self._provider_validation_errors(provider_type, config))
         except Exception as e:
             self._logger.warning("Template validation failed: %s", e)
@@ -120,6 +128,75 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         "OCICompute": "oci",
     }
 
+    # Types whose validators are applied only when the row names its type or API.
+    # Resolving a type from the provider configuration is for the other types.
+    _UNCHANGED_TYPES: frozenset[str] = frozenset({"k8s", "oci"})
+
+    # Types whose validator is not run on the validate path yet.  The AWS
+    # adapter reads legacy field names only and would reject current AWS
+    # templates, so AWS validation stays as it was until its rules are updated.
+    _VALIDATE_PATH_PENDING: frozenset[str] = frozenset({"aws"})
+
+    def _enabled_instances(self) -> list[Any]:
+        """Enabled provider instances from configuration; empty when unreadable."""
+        try:
+            provider_config = self._template_manager.config_manager.get_provider_config()
+            return [
+                p
+                for p in (getattr(provider_config, "providers", None) or [])
+                if getattr(p, "enabled", True)
+            ]
+        except Exception as exc:
+            self._logger.debug("Could not read provider instances: %s", type(exc).__name__)
+            return []
+
+    def _type_from_provider_config(self, config: dict[str, Any]) -> Optional[str]:
+        """Resolve a row's provider type from provider configuration.
+
+        The row's ``provider_name`` selects an enabled instance; failing that, a
+        deployment with exactly one enabled instance has one answer.  Types in
+        ``_UNCHANGED_TYPES`` are never resolved this way.
+        """
+        instances = self._enabled_instances()
+        name = config.get("providerName") or config.get("provider_name")
+        named = next((p for p in instances if name and getattr(p, "name", None) == name), None)
+        resolved = getattr(named, "type", None)
+        if not resolved and len(instances) == 1:
+            resolved = getattr(instances[0], "type", None)
+        if not resolved or str(resolved) in self._UNCHANGED_TYPES:
+            return None
+        return str(resolved)
+
+    def _create_validator(self, registry: Any, provider_type: str, row: dict[str, Any]) -> Any:
+        """Create the validator for ``provider_type``, or None.
+
+        k8s and OCI factories ignore configuration and keep the one-argument
+        call.  Other types get the config of the instance the row names, else
+        the first enabled instance of that type.
+        """
+        if provider_type in self._UNCHANGED_TYPES:
+            return registry.create_validator(provider_type)
+
+        instances = [
+            p for p in self._enabled_instances() if getattr(p, "type", None) == provider_type
+        ]
+        name = row.get("providerName") or row.get("provider_name")
+        instance = next((p for p in instances if getattr(p, "name", None) == name), None)
+        instance = instance or (instances[0] if instances else None)
+        if instance is None:
+            self._logger.warning(
+                "No enabled %s provider instance; provider rules not applied", provider_type
+            )
+            return None
+        validator = registry.create_validator(provider_type, getattr(instance, "config", None))
+        if validator is None:
+            self._logger.warning(
+                "No validator for provider instance %s (%s); provider rules not applied",
+                getattr(instance, "name", ""),
+                provider_type,
+            )
+        return validator
+
     def _provider_validation_errors(self, provider_type: Any, domain_template: Any) -> list[str]:
         """Run the active provider's registered validator, returning its errors.
 
@@ -136,9 +213,11 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         if not provider_type:
             return []
         provider_type = str(provider_type)
+        if provider_type in self._VALIDATE_PATH_PENDING:
+            return []
 
         try:
-            validator = registry.create_validator(provider_type)
+            validator = self._create_validator(registry, provider_type, domain_template)
         except Exception as e:  # pragma: no cover — defensive
             self._logger.debug("Could not create %s validator: %s", provider_type, e)
             return []
