@@ -269,7 +269,6 @@ hostfactory/
                 ├── getReturnRequests.sh
                 ├── requestMachines.sh
                 ├── requestReturnMachines.sh
-                ├── templateWizard.sh       # Interactive helper, not called by HF
                 └── invoke_provider.sh      # Wrapper sourced by every entry script
 ```
 
