@@ -11,20 +11,6 @@ namespace UnitTests;
 
 public class ListRequestsTimeRangeTests
 {
-    // Calls ListRequestsAsync by reflection with only the named arguments set. The
-    // unit-test project does not reference the generated model assembly, so the
-    // method's response type cannot be named here, only the Task it returns.
-    private static Task ListRequests(OrbClient client, params (string Name, object Value)[] named)
-    {
-        var method = typeof(OrbClient).GetMethod(nameof(OrbClient.ListRequestsAsync))!;
-        var args = method.GetParameters()
-            .Select(p => named.Any(n => n.Name == p.Name)
-                ? named.First(n => n.Name == p.Name).Value
-                : p.HasDefaultValue ? p.DefaultValue : null)
-            .ToArray();
-        return (Task)method.Invoke(client, args)!;
-    }
-
     [Fact]
     public async Task Range_Is_Sent_As_Utc_With_Six_Fraction_Digits_And_Omitted_When_Unset()
     {
@@ -64,13 +50,14 @@ public class ListRequestsTimeRangeTests
         // +02:00 offset: the wire value must be the equivalent UTC instant
         var start = new DateTimeOffset(2026, 11, 1, 12, 0, 0, 500, TimeSpan.FromHours(2));
         var end = new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero);
-        await ListRequests(client, ("startTime", start), ("endTime", end));
-        await ListRequests(client, ("status", "pending"));
+        await client.ListRequestsAsync(startTime: start, endTime: end);
+        await client.ListRequestsAsync(status: "pending");
 
         var seenLines = await serve;
         var rangedLine = Uri.UnescapeDataString(seenLines[0]);
         Assert.Contains("start_time=2026-11-01T10:00:00.500000Z", rangedLine);
         Assert.Contains("end_time=2026-11-02T00:00:00.000000Z", rangedLine);
+        Assert.Contains("status=pending", seenLines[1]);
         Assert.DoesNotContain("start_time", seenLines[1]);
         Assert.DoesNotContain("end_time", seenLines[1]);
     }
