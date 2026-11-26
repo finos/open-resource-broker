@@ -24,6 +24,9 @@ __all__ = [
 ]
 
 
+_RETURN_ENVELOPE_KEYS = ("unreadable_resource_ids", "return_unreadable_timed_out")
+
+
 def _to_domain_status(instance: Any) -> Any:
     """Return ``instance`` with the internal ``starting`` status as ``pending``.
 
@@ -152,13 +155,16 @@ def _outcome_to_provider_result(
             # promote to fulfillment_final so the provisioning service closes
             # the request without a redundant status poll.
             meta["fulfillment_final"] = True
+        # The unreadable-return facts must reach the status service, which reads
+        # the envelope metadata; the rest of ``meta`` rides in ``provider_data``.
+        carried = {k: meta[k] for k in _RETURN_ENVELOPE_KEYS if k in meta}
         return ProviderResult.success_result(
             _build_provider_result_data(
                 resource_ids=pending,
                 metadata=meta,
                 tracking_request_id=outcome.request_id,
             ),
-            {"operation": fallback_operation, "provider": provider_type},
+            {"operation": fallback_operation, "provider": provider_type, **carried},
         )
 
     if isinstance(outcome, Completed):

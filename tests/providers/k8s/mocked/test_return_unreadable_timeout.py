@@ -16,6 +16,7 @@ import pytest
 from kubernetes.client import V1Container
 from kubernetes.client.exceptions import ApiException
 
+from orb.application.commands.request_creation_handlers import CreateReturnRequestHandler
 from orb.application.commands.request_sync_handlers import PopulateMachineIdsHandler
 from orb.application.services.machine_sync_service import MachineSyncService
 from orb.application.services.request_reconciler import RequestReconciler
@@ -157,6 +158,7 @@ class World:
             "reconcile_request_timeout_seconds": 30,
             "list_cache_max_age_seconds": 30,
         }
+        self.status = status
         self.reconciler = RequestReconciler(
             uow_factory=factory,  # type: ignore[arg-type]
             machine_sync_service=sync,
@@ -367,6 +369,9 @@ async def test_unreadable_return_past_the_limit_fails(world: World) -> None:
 
     assert request.status == RequestStatus.FAILED
     assert {world.machine(n).status for n in ("pod-a", "pod-b")} == {MachineStatus.FAILED}
+    assert request.metadata["unreadable_resource_ids"] == ["pod-a", "pod-b"]
+    assert request.status_message is not None
+    assert "pod-a, pod-b" in request.status_message
 
 
 @pytest.mark.integration
@@ -392,6 +397,7 @@ async def test_only_the_unreadable_machine_fails(world: World) -> None:
     assert request.status == RequestStatus.FAILED
     assert world.machine("pod-a").status == MachineStatus.TERMINATED
     assert world.machine("pod-b").status == MachineStatus.FAILED
+    assert request.metadata["unreadable_resource_ids"] == ["pod-b"]
 
 
 @pytest.mark.integration
@@ -415,6 +421,7 @@ async def test_a_readable_pod_still_leaving_defers_the_failure(
     waiting = await world.poll()
 
     assert waiting.status == RequestStatus.IN_PROGRESS
+    assert "unreadable_resource_ids" not in waiting.metadata
     assert world.machine("pod-b").status == MachineStatus.SHUTTING_DOWN
 
     del world.core.pods[("orb-team-b", "pod-a")]  # the readable pod finishes
@@ -423,3 +430,77 @@ async def test_a_readable_pod_still_leaving_defers_the_failure(
     assert request.status == RequestStatus.FAILED
     assert world.machine("pod-a").status == MachineStatus.TERMINATED
     assert world.machine("pod-b").status == MachineStatus.FAILED
+    assert request.metadata["unreadable_resource_ids"] == ["pod-b"]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_failed_return_is_not_rewritten_by_a_later_status_write(world: World) -> None:
+    world.add_return(["pod-a"], age_seconds=PAST_LIMIT)
+    world.list_fails()
+    failed = await world.poll()
+    assert failed.status == RequestStatus.FAILED
+
+    again = await world.status.update_request_status(
+        failed, RequestStatus.FAILED.value, "later", {"unreadable_resource_ids": ["other"]}
+    )
+
+    stored = world.request()
+    assert (again.version, stored.version) == (failed.version, failed.version)
+    assert stored.metadata["unreadable_resource_ids"] == ["pod-a"]
+    assert stored.status_message == failed.status_message
+
+
+# ---------------------------------------------------------------------------
+# What the operator does next
+# ---------------------------------------------------------------------------
+
+
+def _return_handler(world: World) -> CreateReturnRequestHandler:
+    return CreateReturnRequestHandler(
+        uow_factory=_Factory(world.uow),  # type: ignore[arg-type]
+        logger=MagicMock(),
+        event_publisher=MagicMock(),
+        error_handler=MagicMock(),
+        query_bus=MagicMock(),
+        provider_selection_port=MagicMock(),
+        command_bus=MagicMock(),
+        domain_config=MagicMock(),
+        deprovisioning_orchestrator=MagicMock(),
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_forced_return_finishes_what_the_failed_one_could_not(world: World) -> None:
+    world.add_return(["pod-a", "pod-b"], age_seconds=PAST_LIMIT)
+    world.list_fails()
+    failed = await world.poll()
+    assert failed.status == RequestStatus.FAILED
+    handler = _return_handler(world)
+
+    # A plain return is refused while the failed one still owns the machines.
+    valid, skipped = handler._filter_machines(["pod-a", "pod-b"])
+    assert valid == []
+    assert {entry["machine_id"] for entry in skipped} == {"pod-a", "pod-b"}
+
+    valid, skipped = handler._filter_machines(["pod-a", "pod-b"], force_return=True)
+    assert (valid, skipped) == (["pod-a", "pod-b"], [])
+    forced = Request.create_return_request(
+        machine_ids=valid,
+        provider_type="k8s",
+        provider_name="k8s_default",
+        provider_api="Pod",
+        metadata={},
+        request_id="ret-33333333-3333-4333-8333-333333333333",
+    ).update_status(RequestStatus.IN_PROGRESS, "started", force=True)
+    handler._cancel_validate_and_persist(valid, forced, force_return=True)
+
+    world.list_works()  # the pods are gone
+    await world.reconciler.reconcile_request(forced)
+
+    done = world.uow.requests.get_by_id(forced.request_id)
+    assert done is not None
+    assert done.status == RequestStatus.COMPLETED
+    assert {world.machine(n).status for n in ("pod-a", "pod-b")} == {MachineStatus.TERMINATED}
+    assert world.request().status == RequestStatus.FAILED
