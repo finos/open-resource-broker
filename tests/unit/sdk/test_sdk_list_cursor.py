@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -55,3 +56,26 @@ async def test_cursor_defaults_to_none() -> None:
     await sdk.list_requests()
 
     assert orchestrator.execute.call_args[0][0].cursor is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ("2026-11-01", "2026-11-01"),
+        (datetime(2026, 11, 1, 9, 30, tzinfo=timezone.utc), "2026-11-01T09:30:00+00:00"),
+        (datetime(2026, 11, 1, 9, 30), "2026-11-01T09:30:00"),
+        (None, None),
+    ],
+)
+async def test_list_requests_forwards_time_range(given, expected) -> None:  # noqa: ANN001
+    orchestrator = MagicMock()
+    orchestrator.execute = AsyncMock(return_value=ListRequestsOutput(requests=[]))
+    sdk = _initialized_sdk()
+    _mock_container(sdk, ListRequestsOrchestrator, orchestrator)
+
+    await sdk.list_requests(start_time=given, end_time=given)
+
+    dto = orchestrator.execute.call_args[0][0]
+    assert (dto.start_time, dto.end_time) == (expected, expected)
