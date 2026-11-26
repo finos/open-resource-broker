@@ -161,23 +161,6 @@ class HostFactoryTransformations:
                     else 0,
                 )
 
-        # Transform volume-related camelCase fields to the internal names.
-        if "rootDeviceVolumeSize" in mapped_data:
-            mapped_data["machine_disk_size_gb"] = mapped_data["rootDeviceVolumeSize"]
-            logger.debug(
-                "HostFactory: Transformed rootDeviceVolumeSize: %s -> machine_disk_size_gb: %s",
-                mapped_data["rootDeviceVolumeSize"],
-                mapped_data["machine_disk_size_gb"],
-            )
-
-        if "volumeType" in mapped_data:
-            mapped_data["machine_disk_type"] = mapped_data["volumeType"]
-            logger.debug(
-                "HostFactory: Transformed volumeType: %s -> machine_disk_type: %s",
-                mapped_data["volumeType"],
-                mapped_data["machine_disk_type"],
-            )
-
         # Ensure instance type consistency
         mapped_data = HostFactoryTransformations.ensure_instance_type_consistency(mapped_data)
 
