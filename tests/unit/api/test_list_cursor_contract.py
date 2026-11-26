@@ -248,6 +248,14 @@ class TestListDateRange:
         client, _ = client_and_rows
         assert client.get("/requests/", params={param: "last tuesday"}).status_code == 400
 
+    @pytest.mark.parametrize("param", ["start_time", "end_time"])
+    @pytest.mark.parametrize("extreme", ["0001-01-01T00:00:00+05:00", "9999-12-31T23:59:59-05:00"])
+    def test_bound_outside_the_datetime_range_after_utc_conversion_is_400(
+        self, client_and_rows, param, extreme
+    ) -> None:
+        client, _ = client_and_rows
+        assert client.get("/requests/", params={param: extreme}).status_code == 400
+
     def test_inverted_range_is_400(self, client_and_rows) -> None:
         client, _ = client_and_rows
         response = client.get(

@@ -209,7 +209,17 @@ class TestListRequestsDateRange:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("field", ["start_time", "end_time"])
-    @pytest.mark.parametrize("bad", ["yesterday", "2026-13-45", "26/11/2026"])
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "yesterday",
+            "2026-13-45",
+            "26/11/2026",
+            # Valid timestamps whose UTC form falls outside the datetime range
+            "0001-01-01T00:00:00+05:00",
+            "9999-12-31T23:59:59-05:00",
+        ],
+    )
     async def test_malformed_bound_is_validation_error_without_echo(
         self, orchestrator, mock_query_bus, field, bad
     ):

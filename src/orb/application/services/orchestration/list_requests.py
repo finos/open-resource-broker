@@ -44,7 +44,8 @@ def _parse_bound(name: str, value: Optional[str]) -> Optional[datetime]:
         return None
     try:
         return parse_iso_datetime(value).astimezone(timezone.utc)
-    except ValueError:
+    except (ValueError, OverflowError):
+        # OverflowError: a non-UTC offset at the datetime limits has no UTC form
         # The offending value is not echoed back to the caller or the log.
         raise ValidationError(f"{name} is not a valid timestamp: {_TIME_FORMAT_HINT}") from None
 
