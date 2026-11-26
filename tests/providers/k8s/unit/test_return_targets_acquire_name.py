@@ -164,6 +164,7 @@ async def test_return_with_invalid_stored_namespace_releases_only_the_rest() -> 
     assert released == ["m-good"]
     assert provider_data["namespace"] == "orb-team-a"
     assert isinstance(outcome, Failed)
+    assert outcome.recoverable is False
     assert outcome.metadata["provider_data"]["successful_instance_ids"] == ["m-good"]
     assert outcome.metadata["provider_data"]["failed_instance_ids"] == ["m-bad"]
 

@@ -355,6 +355,7 @@ class K8sHandlerRegistry:
             # Machines whose stored namespace is invalid are not released; the
             # rest of the batch proceeds.
             failed_names.extend(invalid_ids)
+            delete_failures = 0
             for (namespace, _origin), grouped in groups.items():
                 by_namespace.setdefault(namespace, []).extend(grouped)
             for namespace, names in by_namespace.items():
@@ -365,10 +366,12 @@ class K8sHandlerRegistry:
                     release_result if isinstance(release_result, dict) else {}
                 )
                 deleted.extend(release_info.get("deleted", names))
-                failed_names.extend(
+                failed_deletes = [
                     str(entry[0] if isinstance(entry, (tuple, list)) else entry)
                     for entry in (release_info.get("failed_deletes") or [])
-                )
+                ]
+                failed_names.extend(failed_deletes)
+                delete_failures += len(failed_deletes)
             if failed_names:
                 # Some deletes failed. Report the per-ID split under
                 # ``provider_data`` so the deprovisioning orchestrator can mark
@@ -381,7 +384,9 @@ class K8sHandlerRegistry:
                 )
                 return Failed(
                     error=f"{len(failed_names)} of {len(machine_ids)} pod deletions failed",
-                    recoverable=True,
+                    # An invalid stored namespace never succeeds on retry; only
+                    # failed deletes are worth retrying.
+                    recoverable=delete_failures > 0,
                     metadata={
                         "provider_api": provider_api,
                         "provider_data": {
