@@ -23,34 +23,19 @@ source .venv/bin/activate
 echo "INFO: Using Python: $(python --version)"
 echo "INFO: Python executable: $(which python)"
 
-# Hybrid installation approach
-if command -v uv >/dev/null 2>&1; then
-    echo "INFO: Using uv for faster development installation..."
-
-    # Upgrade pip and build tools first with uv
-    echo "INFO: Upgrading pip and build tools with uv..."
-    uv pip install --require-hashes --no-deps -r .github/requirements/build-tools.txt
-
-    # Install in editable mode using uv
-    echo "INFO: Installing package in editable mode with uv..."
-    uv pip install -e ".[dev]"
-
-    echo "SUCCESS: Development installation completed with uv!"
-    echo "TIP: uv provided faster dependency resolution and installation"
-else
-    echo "INFO: Using pip (uv not available)..."
-
-    # Upgrade pip and build tools first
-    echo "INFO: Upgrading pip and build tools..."
-    python -m pip install --require-hashes --no-deps -r .github/requirements/build-tools.txt
-
-    # Install in editable mode using the venv's Python explicitly
-    echo "INFO: Installing package in editable mode..."
-    python -m pip install -e ".[dev]"
-
-    echo "SUCCESS: Development installation completed with pip!"
-    echo "TIP: Install uv for faster development setup: pip install uv"
+# uv is the only install path; bootstrap it from the hash-locked requirements
+if ! command -v uv >/dev/null 2>&1; then
+    echo "INFO: Installing uv from hash-locked requirements..."
+    python -m pip install --require-hashes --no-deps -r .github/requirements/uv.txt
 fi
+
+echo "INFO: Upgrading pip and build tools with uv..."
+uv pip install --require-hashes --no-deps -r .github/requirements/build-tools.txt
+
+echo "INFO: Installing package in editable mode with uv..."
+uv pip install -e ".[dev]"
+
+echo "SUCCESS: Development installation completed with uv!"
 
 # Verify installation
 echo ""
