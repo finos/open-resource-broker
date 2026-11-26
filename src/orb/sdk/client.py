@@ -259,6 +259,8 @@ class ORBClient:
                 self._query_bus, self._command_bus
             )
 
+            self._wrap_cache_invalidating_methods()
+
             # Dynamically add methods to SDK instance.
             # Skip names that have explicit orchestrator-backed implementations
             # defined directly on this class — those take precedence.
@@ -523,6 +525,35 @@ class ORBClient:
         # Re-wrap already-discovered methods if initialized
         if self._initialized:
             self._apply_middleware_to_methods()
+
+    # Discovered commands that change what list_templates returns: they alter
+    # configuration, provider registration, provider operations or provider health.
+    # Query handlers never mutate, and the template commands are explicit methods
+    # that clear the cache themselves.
+    _CACHE_INVALIDATING_METHODS: frozenset[str] = frozenset(
+        {
+            "set_configuration",
+            "reload_provider_config",
+            "register_provider_strategy",
+            "execute_provider_operation",
+            "update_provider_health",
+        }
+    )
+
+    def _wrap_cache_invalidating_methods(self) -> None:
+        """Make discovered configuration and provider commands clear the template cache."""
+
+        def invalidating(method: Callable) -> Callable:
+            async def call(**kwargs: Any) -> Any:
+                try:
+                    return await method(**kwargs)
+                finally:
+                    self.clear_cache()
+
+            return call
+
+        for name in self._CACHE_INVALIDATING_METHODS & self._methods.keys():
+            self._methods[name] = invalidating(self._methods[name])
 
     def _apply_middleware_to_methods(self) -> None:
         """Re-wrap all discovered methods with the current middleware chain."""

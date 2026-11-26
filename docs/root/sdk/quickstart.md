@@ -182,8 +182,8 @@ async with orb(template_cache_ttl_seconds=60) as sdk:
 Behaviour to be aware of:
 
 - The cache belongs to one client instance and is keyed on the call's arguments (`active_only`, provider selection, `limit`, `offset`, filters and `format`). Different arguments are cached separately.
-- Calling `create_template`, `update_template`, `delete_template` or `refresh_templates` on the same client clears it, as does `cleanup()`.
-- Changes made elsewhere (the CLI, another client, a config file edit, or provider-side changes) are not seen until the lifetime ends or you call `clear_cache()`. Choose a lifetime that matches how stale a listing may be.
+- These calls on the same client clear the cache: `create_template`, `update_template`, `delete_template`, `refresh_templates`, `set_configuration`, `reload_provider_config`, `register_provider_strategy`, `execute_provider_operation` and `update_provider_health`. So does `cleanup()`. They clear it even when the call fails.
+- Changes made by other clients or processes (the CLI, another SDK client, a config file edit, or provider-side changes) are not seen by this client. The staleness is bounded by the lifetime you set; call `clear_cache()` to refresh sooner.
 - Callers receive copies, so modifying a returned listing does not alter the cache.
 - Only `list_templates()` is cached. `get_template()` and request operations always load fresh data.
 

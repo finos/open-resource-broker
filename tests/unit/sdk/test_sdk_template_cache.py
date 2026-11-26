@@ -10,6 +10,7 @@ import pytest
 from orb.sdk.client import ORBClient
 from orb.sdk.config import SDKConfig
 from orb.sdk.exceptions import ConfigurationError, SDKError
+from orb.sdk.middleware import SDKMiddleware
 
 pytestmark = pytest.mark.unit
 
@@ -68,6 +69,30 @@ class TestListTemplatesCache:
         await sdk.list_templates(format="json")
         await sdk.list_templates(limit=5)
         assert _calls(sdk) == 4
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "argument,first,second",
+        [
+            ("provider_api", "EC2Fleet", "SpotFleet"),
+            ("provider_type", "aws", "k8s"),
+            ("provider_name", "a", "b"),
+            ("offset", 0, 10),
+            ("limit", 50, 5),
+            ("active_only", True, False),
+            ("format", None, "json"),
+            ("filter_expressions", ["cpu=2"], ["cpu=4"]),
+        ],
+    )
+    async def test_each_argument_is_part_of_the_key(self, clock, argument, first, second):
+        sdk = _client()
+        await sdk.list_templates(**{argument: first})
+        await sdk.list_templates(**{argument: first})
+        assert _calls(sdk) == 1
+        await sdk.list_templates(**{argument: second})
+        assert _calls(sdk) == 2
+        await sdk.list_templates(**{argument: second})
+        assert _calls(sdk) == 2
 
     @pytest.mark.asyncio
     async def test_expiry_reloads(self, clock):
@@ -201,8 +226,68 @@ class TestListTemplatesCache:
         sdk.clear_cache()
         assert sdk._template_cache_gen == 1
 
-    def test_list_templates_is_not_middleware_wrapped(self):
-        assert "list_templates" in ORBClient._EXPLICIT_METHODS
+    @pytest.mark.asyncio
+    async def test_cache_hit_runs_no_middleware_that_a_miss_would_run(self, clock):
+        class Recorder(SDKMiddleware):
+            def __init__(self):
+                self.seen: list[str] = []
+
+            async def process(self, method_name, args, kwargs, next_fn):
+                self.seen.append(method_name)
+                return await next_fn(args, kwargs)
+
+        sdk = _client()
+        recorder = Recorder()
+        sdk._methods = {"get_system_status": AsyncMock(return_value={})}
+        sdk._middlewares = [recorder]
+        sdk._apply_middleware_to_methods()
+        await sdk.list_templates()  # miss
+        await sdk.list_templates()  # hit
+        assert recorder.seen == []
+        await sdk.get_system_status()  # type: ignore[attr-defined]
+        assert recorder.seen == ["get_system_status"]
+
+
+class TestDiscoveredCommandInvalidation:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("name", sorted(ORBClient._CACHE_INVALIDATING_METHODS))
+    @pytest.mark.parametrize("fails", [False, True])
+    async def test_discovered_command_clears_cache(self, clock, name, fails):
+        sdk = _client()
+        sdk._methods = {
+            name: AsyncMock(side_effect=RuntimeError("boom")) if fails else AsyncMock(),
+            "get_system_status": AsyncMock(),
+        }
+        sdk._wrap_cache_invalidating_methods()
+        await sdk.list_templates()
+        if fails:
+            with pytest.raises(RuntimeError):
+                await sdk._methods[name]()
+        else:
+            await sdk._methods[name]()
+        await sdk.list_templates()
+        assert _calls(sdk) == 2
+
+    @pytest.mark.asyncio
+    async def test_other_discovered_methods_keep_the_cache(self, clock):
+        sdk = _client()
+        query = AsyncMock()
+        sdk._methods = {"get_system_status": query}
+        sdk._wrap_cache_invalidating_methods()
+        await sdk.list_templates()
+        await sdk._methods["get_system_status"]()
+        await sdk.list_templates()
+        assert _calls(sdk) == 1
+        assert sdk._methods["get_system_status"] is query
+
+    @pytest.mark.asyncio
+    async def test_wrapped_command_passes_arguments_and_result(self):
+        sdk = _client()
+        command = AsyncMock(return_value={"ok": True})
+        sdk._methods = {"set_configuration": command}
+        sdk._wrap_cache_invalidating_methods()
+        assert await sdk._methods["set_configuration"](key="a", value=1) == {"ok": True}
+        command.assert_awaited_once_with(key="a", value=1)
 
 
 class TestTemplateCacheConfig:
@@ -212,6 +297,10 @@ class TestTemplateCacheConfig:
     def test_from_env_parses_float(self, monkeypatch):
         monkeypatch.setenv("ORB_TEMPLATE_CACHE_TTL_SECONDS", "1.5")
         assert SDKConfig.from_env().template_cache_ttl_seconds == 1.5
+
+    def test_from_env_treats_empty_as_unset(self, monkeypatch):
+        monkeypatch.setenv("ORB_TEMPLATE_CACHE_TTL_SECONDS", "")
+        assert SDKConfig.from_env().template_cache_ttl_seconds == 0
 
     def test_from_env_rejects_bad_value(self, monkeypatch):
         monkeypatch.setenv("ORB_TEMPLATE_CACHE_TTL_SECONDS", "soon")

@@ -191,7 +191,7 @@ class SDKConfig:
             if legacy_profile is not None:
                 provider_config["profile"] = legacy_profile
 
-        raw_ttl = os.getenv("ORB_TEMPLATE_CACHE_TTL_SECONDS", "0")
+        raw_ttl = os.getenv("ORB_TEMPLATE_CACHE_TTL_SECONDS") or "0"
         try:
             template_cache_ttl = float(raw_ttl)
         except ValueError:
