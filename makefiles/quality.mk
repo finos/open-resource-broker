@@ -134,11 +134,17 @@ quality-gates: lint test architecture-check  ## Run all quality gates
 
 quality-full: quality-gates docs-build  ## Run all quality gates and generate docs
 
-file-sizes: dev-install  ## Check file sizes (developer-friendly alias)
-	./dev-tools/quality/dev_tools_runner.py check-file-sizes --warn-only
+file-sizes: dev-install  ## Check file sizes against the baseline (developer-friendly alias)
+	./dev-tools/quality/dev_tools_runner.py check-file-sizes
 
 file-sizes-report: dev-install  ## Generate detailed file size report
-	./dev-tools/quality/dev_tools_runner.py check-file-sizes
+	./dev-tools/quality/dev_tools_runner.py check-file-sizes --report
+
+file-sizes-baseline: dev-install  ## Lower or remove file size baseline entries after shrinking a file
+	./dev-tools/quality/dev_tools_runner.py check-file-sizes --write-baseline
+
+file-sizes-baseline-init: dev-install  ## Record new or grown oversized files in the baseline (needs a PR reason)
+	./dev-tools/quality/dev_tools_runner.py check-file-sizes --write-baseline --allow-increase
 
 validate-workflow-syntax: dev-install  ## Validate GitHub Actions workflow YAML syntax
 	@echo "Validating workflow files..."

@@ -49,7 +49,7 @@ ci-arch-imports:  ## Run import validation
 
 ci-arch-file-sizes:  ## Check file size compliance
 	@echo "Running file size checks..."
-	uv run --no-sync python ./dev-tools/quality/dev_tools_runner.py check-file-sizes --warn-only
+	uv run --no-sync python ./dev-tools/quality/dev_tools_runner.py check-file-sizes
 
 ci-arch-lint-imports:  ## Run import-linter layer-boundary contracts
 	@# In CI the venv is pre-populated by setup-uv-cached (group: arch).

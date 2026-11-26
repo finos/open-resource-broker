@@ -87,8 +87,8 @@ repos:
         language: system
         files: \.(py)$
         pass_filenames: false
-        description: "Check file sizes for architecture compliance"
-        stages: [manual]  # Optional check - run as warning only
+        description: "Fail when a file exceeds or drops below its recorded size in the file-size baseline"
+        stages: [manual]  # Manual stage; enforced against dev-tools/quality/file_size_baseline.json
 
       - id: security-scan
         name: Security Scan
@@ -159,5 +159,5 @@ repos:
         language: system
         files: \.(py)$
         pass_filenames: false
-        description: "Check for files that may violate Single Responsibility Principle"
-        stages: [manual]  # Optional check - run as warning only
+        description: "Fail when a file exceeds or drops below its recorded size in the file-size baseline"
+        stages: [manual]  # Manual stage; enforced against dev-tools/quality/file_size_baseline.json
