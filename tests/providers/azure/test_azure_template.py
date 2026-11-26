@@ -734,3 +734,23 @@ class TestValueObjects:
 
         mapped = AzurePriority.from_price_type(PriceType.SPOT)
         assert mapped == AzurePriority.SPOT
+
+
+def test_explicit_max_machines_wins_over_defaulted_max_number():
+    from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
+
+    template = AzureTemplate.model_validate(
+        {
+            "template_id": "t1",
+            "provider_api": "VMSS",
+            "vm_size": "Standard_D4s_v5",
+            "resource_group": "rg",
+            "location": "eastus2",
+            "ssh_public_keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"],
+            "image": {"publisher": "C", "offer": "o", "sku": "s"},
+            "max_machines": 5,
+            "max_number": 10,
+        }
+    )
+
+    assert template.max_machines == 5

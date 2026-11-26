@@ -364,3 +364,11 @@ def test_normalisation_failure_skips_provider_rules_with_a_warning(registry, mon
     logged = " ".join(str(a) for c in logger.warning.call_args_list for a in c.args)
     assert "ValueError" in logged
     assert "secret-detail" not in logged
+
+
+def test_camel_case_azure_row_with_defaulted_max_number_gets_no_errors(registry) -> None:
+    # Default resolution adds max_number beside the row's own maxNumber.
+    adapter = _adapter(registry, [_instance("azure-1", "azure")])
+    errors = adapter.validate_template_config(_hf_azure_row(maxNumber=5, max_number=10))
+    assert not _has(errors, "Extra inputs")
+    assert errors == []
