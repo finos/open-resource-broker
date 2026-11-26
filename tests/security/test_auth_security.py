@@ -72,20 +72,20 @@ class TestAuthenticationSecurity:
 
     def test_expired_token_rejection(self, auth_client):
         """Test that expired tokens are properly rejected."""
-        # Create token with very short expiry
-        strategy = BearerTokenStrategy(
-            secret_key="security-test-secret-key-very-long-and-secure",
+        now = int(time.time())
+        expired_token = jwt.encode(
+            {
+                "sub": "test-user",
+                "roles": ["user"],
+                "permissions": ["read"],
+                "type": "access",
+                "iat": now - 120,
+                "exp": now - 60,
+                "iss": "open-resource-broker",
+            },
+            "security-test-secret-key-very-long-and-secure",
             algorithm="HS256",
-            token_expiry=1,  # 1 second
-            enabled=True,
         )
-
-        expired_token = strategy._create_access_token(
-            user_id="test-user", roles=["user"], permissions=["read"]
-        )
-
-        # Wait for token to expire
-        time.sleep(2)
 
         headers = {"Authorization": f"Bearer {expired_token}"}
         response = auth_client.get("/info", headers=headers)

@@ -317,10 +317,21 @@ class TestEnhancedBearerTokenStrategyIntegration:
     @pytest.mark.asyncio
     async def test_expired_token_returns_expired_status(self):
         """An expired JWT returns AuthStatus.EXPIRED."""
-        strategy = _make_strategy(token_expiry=1)
-        token = strategy._create_access_token("carol", ["user"], ["read"])
-
-        time.sleep(2)
+        strategy = _make_strategy()
+        now = int(time.time())
+        token = jwt.encode(
+            {
+                "sub": "carol",
+                "roles": ["user"],
+                "permissions": ["read"],
+                "type": "access",
+                "iat": now - 120,
+                "exp": now - 60,
+                "iss": "open-resource-broker",
+            },
+            SECRET,
+            algorithm="HS256",
+        )
 
         result = await strategy.validate_token(token)
 
