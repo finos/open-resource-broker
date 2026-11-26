@@ -375,6 +375,46 @@ class TestRunInstancesHandlerMachineAdapterContext:
             provider_api="RunInstances",
         )
 
+    def test_find_instances_by_resource_ids_raises_on_unsupported_filter(self):
+        """An unsupported reservation-id filter is a real failure, not a retry."""
+        handler = _make_handler()
+        request = _make_request(resource_ids=["r-1"])
+        describe = MagicMock(
+            side_effect=ClientError(
+                {
+                    "Error": {
+                        "Code": "NotImplemented",
+                        "Message": "Filter dicts have not been implemented in Moto for 'reservation-id'",
+                    }
+                },
+                "DescribeInstances",
+            )
+        )
+        handler.aws_client.ec2_client.configure_mock(describe_instances=describe)
+
+        with pytest.raises(AWSInfrastructureError):
+            handler._find_instances_by_resource_ids(request, ["r-1"])
+
+        assert describe.call_count == 1
+        describe.assert_called_once_with(Filters=[{"Name": "reservation-id", "Values": ["r-1"]}])
+
+    def test_find_instances_by_resource_ids_skips_unknown_reservation(self):
+        """A reservation AWS no longer knows about is skipped, not fatal."""
+        handler = _make_handler()
+        request = _make_request(resource_ids=["r-gone"])
+        handler.aws_client.ec2_client.configure_mock(
+            describe_instances=MagicMock(
+                side_effect=ClientError(
+                    {"Error": {"Code": "InvalidReservationID.NotFound", "Message": "gone"}},
+                    "DescribeInstances",
+                )
+            )
+        )
+
+        result = handler._find_instances_by_resource_ids(request, ["r-gone"])
+
+        assert result.instances == []
+
 
 def _make_aws_template(*, subnet_ids=None, security_group_ids=None, launch_template_id="lt-abc"):
     """Build a minimal AWSTemplate-like mock for legacy params builder."""

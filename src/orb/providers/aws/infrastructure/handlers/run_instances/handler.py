@@ -716,18 +716,6 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     if e.response["Error"]["Code"] == "InvalidReservationID.NotFound":
                         self._logger.warning("Reservation ID %s not found", resource_id)
                         continue
-                    if "Filter dicts have not been implemented" in str(e):
-                        self._logger.info(
-                            "Reservation-id filter not supported (likely moto), falling back to describe all instances"
-                        )
-                        return self._find_instances_by_tags_fallback(request, resource_ids)
-                    raise
-                except Exception as e:
-                    if "Filter dicts have not been implemented" in str(e):
-                        self._logger.info(
-                            "Reservation-id filter not supported (likely moto), falling back to describe all instances"
-                        )
-                        return self._find_instances_by_tags_fallback(request, resource_ids)
                     raise
 
             self._logger.info(
@@ -747,58 +735,6 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             )
             raise AWSInfrastructureError(
                 f"Failed to find instances by resource IDs {resource_ids}: {e!s}"
-            )
-
-    def _find_instances_by_tags_fallback(
-        self, request: Request, resource_ids: list[str]
-    ) -> CheckHostsStatusResult:
-        """Fallback method to find instances by tags when reservation-id filter is not supported."""
-        try:
-            response = self.aws_client.ec2_client.describe_instances()
-            formatted_instances: list[dict[str, Any]] = []
-
-            for reservation in response.get("Reservations", []):
-                reservation_id = reservation.get("ReservationId")
-                if reservation_id not in resource_ids:
-                    continue
-
-                instance_ids = [
-                    instance.get("InstanceId") for instance in reservation.get("Instances", [])
-                ]
-                instance_ids = [instance_id for instance_id in instance_ids if instance_id]
-
-                if not instance_ids:
-                    continue
-
-                detailed_instances = self._get_instance_details(
-                    instance_ids,
-                    request_id=str(request.request_id),
-                    resource_id=reservation_id,
-                    provider_api="RunInstances",
-                )
-                formatted_instances.extend(
-                    self._format_instance_data(
-                        detailed_instances, reservation_id, self._resolve_provider_api(request)
-                    )
-                )
-
-            fulfilment = self._compute_run_instances_fulfilment(
-                formatted_instances, request.requested_count, str(request.request_id)
-            )
-            return CheckHostsStatusResult(instances=formatted_instances, fulfilment=fulfilment)
-
-        except Exception as e:
-            self._logger.error("FALLBACK: Fallback method failed to find instances: %s", e)
-            return CheckHostsStatusResult(
-                instances=[],
-                fulfilment=ProviderFulfilment(
-                    state="in_progress",
-                    message="Instance lookup failed — will retry",
-                    target_units=request.requested_count,
-                    running_count=0,
-                    pending_count=0,
-                    failed_count=0,
-                ),
             )
 
     def release_hosts(
