@@ -352,6 +352,18 @@ class DeprovisioningOrchestrator:
                         "error_message": result.error_message,
                     }
 
+                if not failed_ids:
+                    # The result says failure yet reports every machine as terminated.
+                    # Trust the failure: a machine is never marked terminated on a
+                    # result that says the operation failed.
+                    self.logger.warning(
+                        "Provider reported failure for resource %s but no failed instances; "
+                        "treating all %d as failed",
+                        resource_id,
+                        len(instance_ids),
+                    )
+                    failed_ids = list(dict.fromkeys(instance_ids))
+
                 self.logger.error(
                     "Termination failed for resource %s: %s", resource_id, result.error_message
                 )
