@@ -352,6 +352,12 @@ class ListRequestsQueryHandler:
             raise
 ```
 
+#### Handler naming
+
+A query handler that writes as a side effect of answering, for example by persisting machine or request state it just refreshed from the provider, carries the `SyncAnd` prefix (`SyncAndGetRequestHandler`, `SyncAndListMachinesHandler`). The name tells the reader the query is not read-only. A handler whose query can only read keeps the plain name.
+
+If a sync path needs its own failure or retry semantics, split it out of the query into a command instead of growing the handler. An architecture test fails when a registered query handler calls a `sync_*` or `populate_*` method on a sync service without the prefix.
+
 ### Query Bus
 
 The query bus routes queries to their appropriate handlers:

@@ -36,7 +36,7 @@ from orb.application.queries.bulk_handlers import (
     GetMultipleRequestsHandler,
     GetMultipleTemplatesHandler,
 )
-from orb.application.queries.machine_query_handlers import ListMachinesHandler
+from orb.application.queries.machine_query_handlers import SyncAndListMachinesHandler
 from orb.application.queries.request_query_handlers import (
     SyncAndGetRequestHandler,
     SyncAndListActiveRequestsHandler,
@@ -83,7 +83,7 @@ _RESOLVED_FROM_CONTAINER = [
     GetMultipleMachinesHandler,
     GetMultipleRequestsHandler,
     GetMultipleTemplatesHandler,
-    ListMachinesHandler,
+    SyncAndListMachinesHandler,
     SyncAndGetRequestHandler,
     SyncAndListActiveRequestsHandler,
     SyncAndListReclaimedMachinesHandler,

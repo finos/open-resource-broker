@@ -47,6 +47,8 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, List[MachineDTO]])
         return [MachineDTO.from_domain(m) for m in machines]
 ```
 
+Query handlers that persist provider state while answering are named with a `SyncAnd` prefix (for example `SyncAndGetRequestHandler`).
+
 ### Event Handlers
 Handle domain events for side effects:
 

@@ -18,7 +18,7 @@ import pytest
 moto = pytest.importorskip("moto")
 
 from orb.application.dto.responses import MachineDTO  # noqa: E402
-from orb.application.queries.machine_query_handlers import ListMachinesHandler  # noqa: E402
+from orb.application.queries.machine_query_handlers import SyncAndListMachinesHandler  # noqa: E402
 from orb.application.queries.request_query_handlers import ListRequestsHandler  # noqa: E402
 from orb.application.services.orchestration.dtos import (  # noqa: E402
     ListMachinesInput,
@@ -104,7 +104,7 @@ class _Bus:
 
 @pytest.fixture
 def machines_orchestrator(make_uow):
-    handler = ListMachinesHandler(
+    handler = SyncAndListMachinesHandler(
         uow_factory=_UowFactory(make_uow),  # type: ignore[arg-type]
         logger=MagicMock(),
         error_handler=MagicMock(),

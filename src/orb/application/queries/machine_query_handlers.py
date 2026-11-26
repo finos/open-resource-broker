@@ -1,4 +1,11 @@
-"""Query handlers for machine domain queries."""
+"""Query handlers for machine domain queries.
+
+Naming convention: a query handler that writes as a side effect of answering
+(for example persisting machine state refreshed from the provider) carries the
+``SyncAnd`` prefix, so the name tells the reader the query is not read-only.
+``SyncAndListMachinesHandler`` writes only when ``query.sync`` is set. Split a
+sync path into its own command when it needs its own failure or retry semantics.
+"""
 
 from __future__ import annotations
 
@@ -217,8 +224,8 @@ class GetMachineHealthHandler(BaseQueryHandler[GetMachineHealthQuery, MachineHea
 
 
 @query_handler(ListMachinesQuery)
-class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, Paginated[MachineDTO]]):
-    """Handler for listing machines."""
+class SyncAndListMachinesHandler(BaseQueryHandler[ListMachinesQuery, Paginated[MachineDTO]]):
+    """Handler for listing machines; refreshes and persists provider state when ``query.sync`` is set."""
 
     def __init__(
         self,

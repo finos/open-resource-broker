@@ -1,4 +1,11 @@
-"""Query handlers for request domain queries."""
+"""Query handlers for request domain queries.
+
+Naming convention: a query handler that writes as a side effect of answering
+(syncing machine and request state from the provider and persisting it) carries
+the ``SyncAnd`` prefix, so the name tells the reader the query is not read-only.
+Split a sync path into its own command when it needs its own failure or retry
+semantics.
+"""
 
 from __future__ import annotations
 
