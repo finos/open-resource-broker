@@ -185,3 +185,21 @@ async def test_status_read_marks_only_the_invalid_namespace_machine_unreadable()
 
     assert unreadable == {"m-bad"}
     handler.read_pods_for_return.assert_called_once_with("orb-team-a", "req-1", ["m-good"])
+
+
+@pytest.mark.asyncio
+async def test_return_with_invalid_namespace_and_failed_delete_stays_recoverable() -> None:
+    from orb.domain.base.operation_outcome import Failed
+
+    strategy, handler = _strategy_with_mock_handler()
+    handler.release_hosts = AsyncMock(return_value={"deleted": [], "failed_deletes": ["m-good"]})
+
+    outcome = await strategy._handler_registry.return_machines(
+        ["m-good", "m-bad"],
+        SimpleNamespace(request_id="req-RET", provider_data={}),
+        machine_coordinates=_PLACEMENTS,
+    )
+
+    assert isinstance(outcome, Failed)
+    assert outcome.recoverable is True
+    assert sorted(outcome.metadata["provider_data"]["failed_instance_ids"]) == ["m-bad", "m-good"]
