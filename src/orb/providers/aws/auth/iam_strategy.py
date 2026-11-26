@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from botocore.exceptions import ClientError, NoCredentialsError
 
+from orb.config.schemas.server_schema import IAMAuthSubConfig
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.adapters.ports.auth import (
     AuthContext,
@@ -20,7 +21,7 @@ from orb.providers.aws.session_factory import AWSSessionFactory
 from orb.providers.aws.utilities.boto_config import get_boto3_config
 
 if TYPE_CHECKING:
-    pass
+    from orb.config.schemas.server_schema import AuthConfig
 
 _DEFAULT_CONFIG = get_boto3_config()
 
@@ -243,7 +244,7 @@ class IAMAuthStrategy(AuthPort):
         return True
 
     @classmethod
-    def from_auth_config(cls, auth_config: Any) -> IAMAuthStrategy:
+    def from_auth_config(cls, auth_config: AuthConfig) -> IAMAuthStrategy:
         """
         Build strategy instance from AuthConfig.
 
@@ -259,20 +260,14 @@ class IAMAuthStrategy(AuthPort):
         """
         from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
 
-        provider_auth = getattr(auth_config, "provider_auth", None)
-        iam_cfg = getattr(provider_auth, "iam", None) if provider_auth is not None else None
+        provider_auth = auth_config.provider_auth
+        iam_cfg = (provider_auth.iam if provider_auth else None) or IAMAuthSubConfig()  # type: ignore[call-arg]  # pydantic field defaults
 
-        region: str = (
-            getattr(iam_cfg, "region", "us-east-1") if iam_cfg is not None else "us-east-1"
-        )
-        profile: Optional[str] = getattr(iam_cfg, "profile", None) if iam_cfg is not None else None
-        required_actions: list[str] = (
-            getattr(iam_cfg, "required_actions", []) if iam_cfg is not None else []
-        )
-        assume_permissions: bool = (
-            getattr(iam_cfg, "assume_permissions", False) if iam_cfg is not None else False
-        )
-        admin_arns: list[str] = getattr(iam_cfg, "admin_arns", []) if iam_cfg is not None else []
+        region: str = iam_cfg.region
+        profile: Optional[str] = iam_cfg.profile
+        required_actions: list[str] = iam_cfg.required_actions
+        assume_permissions: bool = iam_cfg.assume_permissions
+        admin_arns: list[str] = iam_cfg.admin_arns
 
         # Intentional service-locator: from_auth_config is called by the
         # AuthRegistry as ``strategy_factory.from_auth_config(auth_config)``
