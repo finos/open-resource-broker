@@ -39,6 +39,11 @@ depending on `mig_scope`) referencing that template, with
   are governed by the group's own autohealing/update policy, not by
   ORB's start/stop operations.
 
+When releasing selected instances, the handler looks the instances up
+with a name filter. Each name is validated against RFC 1035, escaped and
+anchored to the end of the instance URL, so releasing `vm-1` never matches
+`vm-10`.
+
 ### Template fields the MIG handler honours
 
 In addition to the shared fields in
@@ -70,6 +75,15 @@ involved.
 `SingleVM` templates require `max_machines == 1` and exactly one explicit
 `zones` entry — Google Cloud's `SingleVM` API operates on one VM in one zone per
 template, by design.
+
+## Machine status mapping
+
+Compute Engine reports a stopped instance with the status `TERMINATED` while
+the instance still exists and can be started again. ORB maps `TERMINATED`,
+`STOPPED` and `SUSPENDED` to the ORB status `stopped`. An instance that no
+longer exists is not reported with a status; when a return request queries
+it, ORB treats an instance missing from the provider response as terminated. The mapping is in
+`src/orb/providers/gcp/infrastructure/instance_status.py`.
 
 ## Capabilities summary
 

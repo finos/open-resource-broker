@@ -110,10 +110,10 @@ Key differences to keep in mind:
 * Azure Linux VMs never fall back to password authentication. Every
   template that is not `CycleCloud` must set `ssh_key_name` or
   `ssh_public_keys`, and must set `image` or `image_id`.
-* Azure does not support ORB's `start`/`stop` operations on any
-  `provider_api`. There is no equivalent to AWS `StartInstances`/
-  `StopInstances` in the current Azure provider; only create and terminate
-  are supported. See [Provider capabilities](configuration.md#provider-capabilities).
+* Azure supports ORB's `start`/`stop` operations on the `VMSS`,
+  `VMSSUniform` and `SingleVM` handlers. A stop deallocates the machine by
+  default, which ends compute billing; `CycleCloud` does not support either
+  operation. See [Provider capabilities](configuration.md#provider-capabilities).
 * `resource_group` and `location` are required per template; Azure's
   platform term is `location`, but `region` is also accepted as an alias
   for cross-provider configuration reuse.

@@ -100,6 +100,13 @@ Placement rules enforced at validation time:
 * `provider_api="SingleVM"` requires `max_machines == 1` and exactly one
   explicit zone.
 
+`template_id` becomes part of the names of generated Compute Engine
+resources, so it is validated when the template loads. It must be 1 to 46
+characters, match RFC 1035 (`[a-z]([-a-z0-9]*[a-z0-9])?`: lowercase letters,
+digits and hyphens, starting with a letter and not ending with a hyphen).
+The 46-character limit keeps the longest generated name, the MIG name
+`orb-mig-<template_id>-<hex>`, within Compute Engine's 63-character limit.
+
 ### Compute
 
 | Field          | Type   | Default | Description                                                                 |
@@ -119,7 +126,22 @@ Placement rules enforced at validation time:
 | Field                      | Type               | Default                                             | Description                                                                 |
 |------------------------------|--------------------|------------------------------------------------------|--------------------------------------------------------------------------------|
 | `service_account_email`      | string \| None      | `None`                                                 | Service account attached to created instances.                               |
-| `service_account_scopes`     | list[string]        | `["https://www.googleapis.com/auth/compute"]`         | OAuth scopes for the attached service account. Every scope must start with `https://www.googleapis.com/auth/` and the list cannot be empty. |
+| `service_account_scopes`     | list[string]        | The six scopes listed below                         | OAuth scopes for the attached service account. Every scope must start with `https://www.googleapis.com/auth/` and the list cannot be empty. |
+
+The default scopes match the "Allow default access" set that Google Cloud
+grants the default Compute Engine service account. They do not include the
+broader `https://www.googleapis.com/auth/compute` scope, which grants
+read and write access to every Compute Engine resource in the project; add it
+explicitly only if the workload needs it.
+
+| Default scope |
+|---------------|
+| `https://www.googleapis.com/auth/devstorage.read_only` |
+| `https://www.googleapis.com/auth/logging.write` |
+| `https://www.googleapis.com/auth/monitoring.write` |
+| `https://www.googleapis.com/auth/service.management.readonly` |
+| `https://www.googleapis.com/auth/servicecontrol` |
+| `https://www.googleapis.com/auth/trace.append` |
 
 ### Image
 
