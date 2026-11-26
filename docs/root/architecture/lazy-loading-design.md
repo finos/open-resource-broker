@@ -131,8 +131,6 @@ class Application:
         """Lazy container creation."""
         if self._container is None:
             self._container = get_container()
-            # Set up domain container for decorators
-            set_domain_container(self._container)
 
     def _ensure_config_manager(self):
         """Lazy config manager creation."""

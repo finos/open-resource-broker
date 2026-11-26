@@ -51,7 +51,6 @@ class Application:
         # Defer heavy initialization until first use
         self._container: Any = None
         self._config_manager: Any = None
-        self._domain_container_set = False
         self.provider_type = None
         self._dry_run_context = None
 
@@ -78,13 +77,6 @@ class Application:
                     config_file=self.config_path, config_dict=self.config_dict
                 )
                 self._container.register_instance(ConfigurationManager, cm)
-
-            # Set up domain container for decorators
-            if not self._domain_container_set:
-                from orb.domain.base.decorators import set_domain_container
-
-                set_domain_container(self._container)
-                self._domain_container_set = True
 
     def _ensure_config_manager(self) -> None:
         """Ensure config manager is created (lazy initialization)."""

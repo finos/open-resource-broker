@@ -90,8 +90,7 @@ class TestEnsureContainer:
         external = MagicMock()
         app = Application(skip_validation=True, container=external)
         # _ensure_container should set _container = external when not None
-        with patch("orb.domain.base.decorators.set_domain_container"):
-            app._ensure_container()
+        app._ensure_container()
         assert app._container is external
 
     def test_pre_registers_configuration_manager_when_config_dict_provided(self):
@@ -102,7 +101,6 @@ class TestEnsureContainer:
 
         with (
             patch("orb.config.managers.configuration_manager.ConfigurationManager") as mock_cm_cls,
-            patch("orb.domain.base.decorators.set_domain_container"),
         ):
             mock_cm = MagicMock()
             mock_cm_cls.return_value = mock_cm
@@ -119,8 +117,7 @@ class TestEnsureContainer:
         mock_container = MagicMock()
         app = Application(skip_validation=True, container=mock_container, config_path=str(cfg_file))
 
-        with patch("orb.domain.base.decorators.set_domain_container"):
-            app._ensure_container()
+        app._ensure_container()
 
         mock_container.register_instance.assert_called()
 
@@ -150,8 +147,7 @@ class TestEnsureConfigManager:
         app = Application(skip_validation=True, container=mock_container)
         app._container = mock_container
 
-        with patch("orb.domain.base.decorators.set_domain_container"):
-            app._ensure_config_manager()
+        app._ensure_config_manager()
 
         assert app.provider_type == "k8s"
 
@@ -166,8 +162,7 @@ class TestEnsureConfigManager:
         app = Application(skip_validation=True, container=mock_container)
         app._container = mock_container
 
-        with patch("orb.domain.base.decorators.set_domain_container"):
-            app._ensure_config_manager()
+        app._ensure_config_manager()
 
         assert app.provider_type == "aws"
 

@@ -45,6 +45,7 @@ from orb.application.services.admin.cleanup_database import (
 )
 from orb.application.services.admin.wipe_database import WipeDatabaseService
 from orb.domain.base import UnitOfWorkFactory
+from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.logging.logger import get_logger
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -129,6 +130,7 @@ async def wipe_database(
         # target a separate ``generic`` JSON bucket on single-file storage
         # and would silently no-op.
         uow_factory=container.get(UnitOfWorkFactory),
+        logger=container.get(LoggingPort),
     )
 
     # Capture caller identity for audit trail (AuditLogMiddleware also logs

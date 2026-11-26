@@ -65,22 +65,10 @@ class TestEnsureContainerNoExternal:
                 "orb.infrastructure.di.container.get_container",
                 return_value=global_container,
             ),
-            patch("orb.domain.base.decorators.set_domain_container"),
         ):
             app._ensure_container()
 
         assert app._container is global_container
-
-    def test_domain_container_only_set_once(self) -> None:
-        from orb.bootstrap import Application
-
-        app = Application(skip_validation=True, container=MagicMock())
-
-        with patch("orb.domain.base.decorators.set_domain_container") as mock_set:
-            app._ensure_container()
-            app._ensure_container()
-
-        mock_set.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -101,8 +89,7 @@ class TestConfigManagerAccessor:
         app = Application(skip_validation=True, container=mock_container)
         app._container = mock_container
 
-        with patch("orb.domain.base.decorators.set_domain_container"):
-            result = app.config_manager()
+        result = app.config_manager()
 
         assert result is mock_config
         assert app.provider_type == "aws"
@@ -152,7 +139,6 @@ class TestInitializeFullSuccess:
 
         with (
             patch("orb.bootstrap.setup_logging"),
-            patch("orb.domain.base.decorators.set_domain_container"),
         ):
             result = _run(app.initialize())
 
@@ -172,7 +158,6 @@ class TestInitializeFullSuccess:
 
         with (
             patch("orb.bootstrap.setup_logging"),
-            patch("orb.domain.base.decorators.set_domain_container"),
         ):
             result = _run(app.initialize())
 
@@ -191,7 +176,6 @@ class TestInitializeFullSuccess:
         fake_ctx = MagicMock()
         with (
             patch("orb.bootstrap.setup_logging"),
-            patch("orb.domain.base.decorators.set_domain_container"),
             patch.object(
                 _DRY_RUN_MODULE,
                 "dry_run_context",

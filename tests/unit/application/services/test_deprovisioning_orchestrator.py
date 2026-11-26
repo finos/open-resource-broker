@@ -449,6 +449,20 @@ class TestProviderReportedIdsReconciled:
         assert overall["failed_instance_ids"] == ["vm-2"]
 
     @pytest.mark.asyncio
+    async def test_failure_result_listing_every_id_as_succeeded_fails_the_group(self):
+        orchestrator, _ = _make_orchestrator(
+            provider_selection_result=_provider_failure(successful_instance_ids=["vm-1", "vm-2"])
+        )
+        request = MagicMock(request_id="req-correlation")
+        machines = [_make_machine("vm-1"), _make_machine("vm-2")]
+
+        group = await orchestrator._process_resource_group("azure", "VMSS", "g", machines, request)
+
+        assert group["success"] is False
+        assert group["successful_instance_ids"] == []
+        assert group["failed_instance_ids"] == ["vm-1", "vm-2"]
+
+    @pytest.mark.asyncio
     async def test_foreign_success_id_is_dropped_and_warned(self):
         orchestrator, _ = _make_orchestrator(
             provider_selection_result=_provider_failure(

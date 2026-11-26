@@ -315,16 +315,16 @@ class TestCleanArchitecture:
         """Test infrastructure layer boundaries and responsibilities."""
         # Infrastructure should handle external concerns
         from orb.infrastructure.di.container import DIContainer
-        from orb.infrastructure.storage.base.unit_of_work import StrategyUnitOfWork
+        from orb.infrastructure.storage.base.unit_of_work import BaseUnitOfWork
 
         # Infrastructure components should exist
-        assert StrategyUnitOfWork is not None
+        assert BaseUnitOfWork is not None
         assert DIContainer is not None
 
         # The unit of work should be a class that can be instantiated
         import inspect
 
-        assert inspect.isclass(StrategyUnitOfWork)
+        assert inspect.isclass(BaseUnitOfWork)
 
         # Infrastructure should not leak into domain
         # This is tested by the dependency direction rules

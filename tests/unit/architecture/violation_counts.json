@@ -4,11 +4,13 @@
   "provider_leaks_non_di": 22,
   "scheduler_leaks": 0,
   "storage_leaks_non_storage": 0,
-  "domain_pydantic_violations": 13,
   "interface_provider_direct_imports": 6,
   "circular_dependency_cycles": 5,
   "cli_infrastructure_direct_imports": 10,
   "getattr_justification_aws": 100,
   "getattr_justification_k8s": 294,
-  "application_service_locator_sites": 0
+  "application_service_locator_sites": 0,
+  "stdlib_logger_files_outside_boundary": 20,
+  "interface_service_locator_sites": 142,
+  "reasonless_suppressions": 856
 }

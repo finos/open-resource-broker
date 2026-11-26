@@ -59,6 +59,11 @@ def _service(config, registry, logger, requests=None):
     )
 
 
+def _orphan_warnings(logger):
+    """Warning calls about orphan GC; the audit lines share the same logger."""
+    return [c for c in logger.warning.call_args_list if "custom resources" in c.args[0]]
+
+
 def _bulk(service):
     return service.bulk_cleanup(statuses=["cancelled"])
 
@@ -69,9 +74,8 @@ def test_one_warning_naming_the_instance_when_the_gc_deletes() -> None:
 
     _bulk(_service(config, registry, logger))
 
-    assert logger.warning.call_count == 1
-    assert "k8s-a" in logger.warning.call_args.args[1]
-    assert "custom resources" in logger.warning.call_args.args[0]
+    (warning,) = _orphan_warnings(logger)
+    assert "k8s-a" in warning.args[1]
 
 
 def test_no_warning_when_the_gc_does_not_delete() -> None:
@@ -80,7 +84,7 @@ def test_no_warning_when_the_gc_does_not_delete() -> None:
 
     _bulk(_service(config, registry, logger))
 
-    logger.warning.assert_not_called()
+    assert not _orphan_warnings(logger)
 
 
 def test_no_provider_instance_builds_no_strategy_and_logs_nothing() -> None:
@@ -91,7 +95,7 @@ def test_no_provider_instance_builds_no_strategy_and_logs_nothing() -> None:
 
     registry.create_strategy_by_type.assert_not_called()
     registry.get_or_create_strategy.assert_not_called()
-    logger.warning.assert_not_called()
+    assert not _orphan_warnings(logger)
     logger.debug.assert_not_called()
 
 
@@ -107,7 +111,7 @@ def test_uncached_instance_builds_one_throwaway_strategy_and_caches_nothing() ->
     created.initialize.assert_not_called()
     created.start_daemon_services.assert_not_called()
     assert registry.get_strategy("k8s-a") is None
-    logger.warning.assert_not_called()
+    assert not _orphan_warnings(logger)
 
 
 def test_uncached_instance_of_an_unregistered_type_is_skipped() -> None:
@@ -125,7 +129,7 @@ def test_uncached_instance_warns_from_the_throwaway_strategy() -> None:
 
     _bulk(_service(config, registry, logger))
 
-    assert logger.warning.call_count == 1
+    assert len(_orphan_warnings(logger)) == 1
 
 
 def test_a_failing_lookup_does_not_block_the_cleanup() -> None:
@@ -137,7 +141,7 @@ def test_a_failing_lookup_does_not_block_the_cleanup() -> None:
     result = _bulk(_service(config, registry, logger, {"req-1": request}))
 
     assert result.requests_deleted == 1
-    logger.warning.assert_not_called()
+    assert not _orphan_warnings(logger)
     assert logger.debug.called
 
 
@@ -154,7 +158,24 @@ def test_machine_only_delete_does_not_warn() -> None:
 
     service.delete_machine("m-1")
 
-    logger.warning.assert_not_called()
+    assert not _orphan_warnings(logger)
+
+
+def test_machine_delete_audit_line_reaches_the_logging_port() -> None:
+    logger = MagicMock()
+    config, registry = _ports([_instance()], cached={"k8s-a": _strategy(True)})
+    uow = _make_uow(machine_map={"m-1": _make_machine("m-1")})
+    service = CleanupDatabaseService(
+        uow_factory=_make_uow_factory(uow),
+        configuration_port=config,
+        provider_registry=registry,
+        logger=logger,
+    )
+
+    service.delete_machine("m-1")
+
+    audit = [c for c in logger.warning.call_args_list if c.args[0].startswith("ADMIN_CLEANUP")]
+    assert len(audit) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +208,7 @@ def test_rest_bulk_cleanup_warns(cleanup_app) -> None:  # noqa: F811
         )
 
     assert response.status_code == 200, response.text
-    assert logger.warning.call_count == 1
+    assert len(_orphan_warnings(logger)) == 1
 
 
 def test_rest_purge_warns(cleanup_app) -> None:  # noqa: F811
@@ -205,7 +226,7 @@ def test_rest_purge_warns(cleanup_app) -> None:  # noqa: F811
         )
 
     assert response.status_code == 200, response.text
-    assert logger.warning.call_count == 1
+    assert len(_orphan_warnings(logger)) == 1
 
 
 @pytest.mark.parametrize("method", ["cleanup_old_requests", "cleanup_all_resources"])
@@ -218,4 +239,4 @@ def test_sdk_cleanup_warns(method) -> None:
 
     asyncio.run(getattr(client, method)())
 
-    assert logger.warning.call_count == 1
+    assert len(_orphan_warnings(logger)) == 1

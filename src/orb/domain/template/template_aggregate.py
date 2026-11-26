@@ -10,6 +10,23 @@ from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
 
+# Deprecated field name -> canonical name. Single source for the operator log,
+# the developer DeprecationWarning and ``Template.model_copy`` key translation.
+_DEPRECATED_ALIASES: dict[str, str] = {
+    "instance_type": "machine_type",
+    "instance_profile": "machine_role",
+    "image_id": "machine_image",
+    "max_instances": "max_machines",
+    "root_device_volume_size": "machine_disk_size_gb",
+    "volume_type": "machine_disk_type",
+    "key_name": "machine_ssh_key",
+    "user_data": "machine_bootstrap",
+}
+
+
+def _deprecation_message(old: str, new: str) -> str:
+    return f"Template field '{old}' is deprecated; use '{new}' instead."
+
 
 class Template(BaseModel):
     """Template configuration value object with both snake_case and camelCase support via aliases."""
@@ -144,37 +161,8 @@ class Template(BaseModel):
         """
         if not isinstance(data, dict):
             return data
-        if "instance_type" in data and "machine_type" not in data:
-            logger.warning(
-                "Template field 'instance_type' is deprecated; use 'machine_type' instead."
-            )
-        if "instance_profile" in data and "machine_role" not in data:
-            logger.warning(
-                "Template field 'instance_profile' is deprecated; use 'machine_role' instead."
-            )
-        if "image_id" in data and "machine_image" not in data:
-            logger.warning("Template field 'image_id' is deprecated; use 'machine_image' instead.")
-        if "max_instances" in data and "max_machines" not in data:
-            logger.warning(
-                "Template field 'max_instances' is deprecated; use 'max_machines' instead."
-            )
-        if "root_device_volume_size" in data and "machine_disk_size_gb" not in data:
-            logger.warning(
-                "Template field 'root_device_volume_size' is deprecated; "
-                "use 'machine_disk_size_gb' instead."
-            )
-        if "volume_type" in data and "machine_disk_type" not in data:
-            logger.warning(
-                "Template field 'volume_type' is deprecated; use 'machine_disk_type' instead."
-            )
-        if "key_name" in data and "machine_ssh_key" not in data:
-            logger.warning(
-                "Template field 'key_name' is deprecated; use 'machine_ssh_key' instead."
-            )
-        if "user_data" in data and "machine_bootstrap" not in data:
-            logger.warning(
-                "Template field 'user_data' is deprecated; use 'machine_bootstrap' instead."
-            )
+        for old, new in Template.deprecated_aliases_in(data).items():
+            logger.warning(_deprecation_message(old, new))
         return data
 
     def __init__(self, **data: Any) -> None:
@@ -202,62 +190,8 @@ class Template(BaseModel):
         # (mode="before") can see them and emit the operator-visible logger.warning.
         # AliasChoices will map instance_type → machine_type and
         # instance_profile → machine_role during Pydantic's validation pass.
-        if "instance_type" in data and "machine_type" not in data:
-            warnings.warn(
-                "Template field 'instance_type' is deprecated; use 'machine_type' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-        if "instance_profile" in data and "machine_role" not in data:
-            warnings.warn(
-                "Template field 'instance_profile' is deprecated; use 'machine_role' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-        if "image_id" in data and "machine_image" not in data:
-            warnings.warn(
-                "Template field 'image_id' is deprecated; use 'machine_image' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-        if "max_instances" in data and "max_machines" not in data:
-            warnings.warn(
-                "Template field 'max_instances' is deprecated; use 'max_machines' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-        if "root_device_volume_size" in data and "machine_disk_size_gb" not in data:
-            warnings.warn(
-                "Template field 'root_device_volume_size' is deprecated; "
-                "use 'machine_disk_size_gb' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-        if "volume_type" in data and "machine_disk_type" not in data:
-            warnings.warn(
-                "Template field 'volume_type' is deprecated; use 'machine_disk_type' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-        if "key_name" in data and "machine_ssh_key" not in data:
-            warnings.warn(
-                "Template field 'key_name' is deprecated; use 'machine_ssh_key' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-        if "user_data" in data and "machine_bootstrap" not in data:
-            warnings.warn(
-                "Template field 'user_data' is deprecated; use 'machine_bootstrap' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+        for old, new in self.deprecated_aliases_in(data).items():
+            warnings.warn(_deprecation_message(old, new), DeprecationWarning, stacklevel=2)
 
         # Set default name if not provided
         if "name" not in data and "template_id" in data:
@@ -378,16 +312,14 @@ class Template(BaseModel):
     # Maps each deprecated field name to its canonical ``machine_*`` name.  Used
     # by :meth:`model_copy` so callers passing old names in ``update=`` write the
     # canonical field rather than a silently-ignored extra attribute.
-    _DEPRECATED_FIELD_NAMES: dict[str, str] = {
-        "instance_type": "machine_type",
-        "image_id": "machine_image",
-        "max_instances": "max_machines",
-        "root_device_volume_size": "machine_disk_size_gb",
-        "volume_type": "machine_disk_type",
-        "key_name": "machine_ssh_key",
-        "user_data": "machine_bootstrap",
-        "instance_profile": "machine_role",
-    }
+    _DEPRECATED_FIELD_NAMES: dict[str, str] = _DEPRECATED_ALIASES
+
+    @staticmethod
+    def deprecated_aliases_in(data: dict[str, Any]) -> dict[str, str]:
+        """Return ``{old: new}`` for each deprecated key present without its canonical key."""
+        return {
+            old: new for old, new in _DEPRECATED_ALIASES.items() if old in data and new not in data
+        }
 
     def model_copy(self, *, update: Optional[dict[str, Any]] = None, deep: bool = False) -> Self:
         """Copy the model, translating deprecated field names in ``update``.

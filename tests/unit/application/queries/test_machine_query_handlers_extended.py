@@ -9,7 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from orb.application.dto.queries import GetMachineQuery, ListMachinesQuery
-from orb.application.queries.machine_query_handlers import GetMachineHandler, ListMachinesHandler
+from orb.application.queries.machine_query_handlers import (
+    GetMachineHandler,
+    SyncAndListMachinesHandler,
+)
 from orb.domain.base.exceptions import EntityNotFoundError
 
 # ---------------------------------------------------------------------------
@@ -146,7 +149,7 @@ class TestGetMachineHandler:
 
 
 # ---------------------------------------------------------------------------
-# ListMachinesHandler
+# SyncAndListMachinesHandler
 # ---------------------------------------------------------------------------
 
 
@@ -172,7 +175,7 @@ class TestListMachinesHandler:
         sync_svc.sync_machines_with_provider = AsyncMock(return_value=([], []))
         filter_svc = MagicMock()
         filter_svc.apply_filters.side_effect = lambda items, _: items
-        return ListMachinesHandler(
+        return SyncAndListMachinesHandler(
             uow_factory=uow_factory,
             logger=_make_logger(),
             error_handler=_make_error_handler(),
@@ -361,7 +364,7 @@ class TestListMachinesHandler:
         uow_factory = MagicMock()
         uow_factory.create_unit_of_work.side_effect = RuntimeError("db gone")
         sync_svc = MagicMock()
-        h = ListMachinesHandler(
+        h = SyncAndListMachinesHandler(
             uow_factory=uow_factory,
             logger=_make_logger(),
             error_handler=_make_error_handler(),

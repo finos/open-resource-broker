@@ -32,21 +32,12 @@ def _mock_container_with_query_bus(query_return=None):
 
 
 # ---------------------------------------------------------------------------
-# Stub handlers — not implemented, return error='Not implemented'
+# Reload handler
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestStubHandlers:
-    @pytest.mark.asyncio
-    async def test_handle_validate_provider_config_returns_not_implemented(self):
-        from orb.interface.system_command_handlers import handle_validate_provider_config
-
-        result = await handle_validate_provider_config(_ns())
-
-        assert isinstance(result, dict)
-        assert result.get("error") == "Not implemented"
-
     @pytest.mark.asyncio
     async def test_handle_reload_provider_config_returns_interface_response(self):
         from orb.application.dto.interface_response import InterfaceResponse

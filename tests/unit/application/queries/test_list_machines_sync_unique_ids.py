@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orb.application.dto.queries import ListMachinesQuery
-from orb.application.queries.machine_query_handlers import ListMachinesHandler
+from orb.application.queries.machine_query_handlers import SyncAndListMachinesHandler
 from orb.domain.base.value_objects import InstanceType
 from orb.domain.machine.aggregate import Machine
 from orb.domain.machine.machine_identifiers import MachineId
@@ -58,7 +58,7 @@ async def test_list_machines_sync_preserves_unique_ids():
     mock_sync.fetch_provider_machines.return_value = ([m1, m2, m3], {})
     mock_sync.sync_machines_with_provider.return_value = ([m1, m2, m3], {})
 
-    handler = ListMachinesHandler(
+    handler = SyncAndListMachinesHandler(
         logger=MagicMock(),
         error_handler=MagicMock(),
         uow_factory=mock_uow_factory,
@@ -70,7 +70,7 @@ async def test_list_machines_sync_preserves_unique_ids():
     query = ListMachinesQuery(all_resources=True)
     result = await handler.execute_query(query)
 
-    # ListMachinesHandler now returns Paginated[MachineDTO].
+    # SyncAndListMachinesHandler now returns Paginated[MachineDTO].
     ids = [dto.machine_id for dto in result.items]
     assert ids == ["i-aaa", "i-bbb", "i-ccc"], f"Expected 3 unique IDs, got {ids}"
     assert len(set(ids)) == 3, "All machine IDs should be unique"

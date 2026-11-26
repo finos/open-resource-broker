@@ -26,7 +26,6 @@ from orb.interface.system_command_handlers import (
     handle_provider_metrics,
     handle_reload_provider_config,
     handle_system_metrics,
-    handle_validate_provider_config,
 )
 
 
@@ -186,21 +185,6 @@ class TestHandleProviderConfig:
         orch.execute.assert_awaited_once()
         assert "config" in result.data
         assert result.data["message"] == "config loaded"
-
-
-@pytest.mark.unit
-class TestHandleValidateProviderConfig:
-    """Tests for handle_validate_provider_config (stub)."""
-
-    @pytest.mark.asyncio
-    async def test_returns_not_implemented_response(self):
-        container = MagicMock()
-        args = Namespace(_container=container)
-        result = await handle_validate_provider_config(args)
-
-        assert isinstance(result, dict)
-        assert result.get("error") == "Not implemented"
-        assert "validate_provider_config" in result.get("endpoint", "")
 
 
 @pytest.mark.unit

@@ -556,14 +556,6 @@ class AWSClient:
             self._logger.debug("Could not check provider_metrics_enabled flag: %s", e)
             return True  # Default to enabled
 
-    def get_metrics_stats(self) -> dict:
-        """Get metrics collection statistics."""
-        if self._metrics_handler:
-            stats = self._metrics_handler.get_stats()
-            stats["metrics_enabled"] = True
-            return stats
-        return {"metrics_enabled": False}
-
     def retry_attempts(self) -> tuple[int, int]:
         """Return ``(request_retries, describe_retries)`` for executor-routed calls.
 
