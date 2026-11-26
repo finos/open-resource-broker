@@ -386,3 +386,14 @@ def test_failed_attempt_expires_after_an_hour(tmp_path, tty, monkeypatch, minute
     clock[0] += minutes * 60
     tty.run(_args(), _Config(tmp_path), "1.0.0")
     assert (opener.open.call_count == 2) is expect_fetch
+
+
+def test_temp_file_cleanup_failure_is_logged_not_raised(tmp_path, monkeypatch):
+    log = MagicMock()
+    monkeypatch.setattr(update_check.os, "replace", MagicMock(side_effect=OSError("x")))
+    monkeypatch.setattr(update_check.os, "unlink", MagicMock(side_effect=OSError("y")))
+    update_check._write_cache(str(tmp_path / "update_check.json"), "1.0.0", 0.0, log)
+    assert [c.args[0] for c in log.debug.call_args_list] == [
+        "Update check cache write failed: %s",
+        "Update check temp file cleanup failed: %s",
+    ]

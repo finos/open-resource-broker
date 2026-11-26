@@ -123,8 +123,11 @@ def _write_cache(path: str, latest: Optional[str], now: float, logger: LoggingPo
         if tmp_path:
             try:
                 os.unlink(tmp_path)
-            except OSError:
-                pass
+            except OSError as cleanup_exc:
+                # The temp file is only a leftover; the next run does not read it.
+                logger.debug(
+                    "Update check temp file cleanup failed: %s", type(cleanup_exc).__name__
+                )
 
 
 def _interactive(args: Any) -> bool:
