@@ -402,18 +402,18 @@ class AWSLaunchTemplateManager:
         if ebs_optimized is not None:
             lt_data["EbsOptimized"] = ebs_optimized
 
-        if getattr(aws_template, "monitoring_enabled", None) is not None:
+        if aws_template.monitoring_enabled is not None:
             lt_data["Monitoring"] = {"Enabled": aws_template.monitoring_enabled}
 
-        root_size = getattr(aws_template, "machine_disk_size_gb", None)
+        root_size = aws_template.machine_disk_size_gb
         if root_size is not None:
-            volume_type = getattr(aws_template, "machine_disk_type", "gp3")
+            volume_type = aws_template.machine_disk_type
             ebs: dict[str, Any] = {
                 "VolumeSize": root_size,
                 "VolumeType": volume_type,
                 "DeleteOnTermination": True,
             }
-            iops = getattr(aws_template, "iops", None)
+            iops = aws_template.iops
             if iops is not None and volume_type in ["io1", "io2", "gp3"]:
                 ebs["Iops"] = iops
             lt_data["BlockDeviceMappings"] = [{"DeviceName": "/dev/xvda", "Ebs": ebs}]
@@ -464,7 +464,7 @@ class AWSLaunchTemplateManager:
                 return "warn_on_iam_denial"
             aws_config = self.aws_client.get_selected_aws_provider_config()
             if aws_config is not None and hasattr(aws_config, "launch_template"):
-                mode = getattr(aws_config.launch_template, "on_update_failure", None)
+                mode = aws_config.launch_template.on_update_failure
                 if mode in ("fail", "warn", "warn_on_iam_denial"):
                     return mode
                 if mode is not None:
@@ -511,7 +511,7 @@ class AWSLaunchTemplateManager:
             # on_update_failure cannot mask unrelated faults.
             if not isinstance(e, ClientError):
                 raise
-            if getattr(e, "operation_name", "") != "CreateLaunchTemplateVersion":
+            if e.operation_name != "CreateLaunchTemplateVersion":
                 raise
             if mode == "warn_on_iam_denial":
                 code = e.response.get("Error", {}).get("Code", "")
@@ -844,7 +844,7 @@ class AWSLaunchTemplateManager:
             hasattr(aws_template, "machine_disk_size_gb")
             and aws_template.machine_disk_size_gb is not None
         ):
-            volume_type = getattr(aws_template, "machine_disk_type", "gp3")
+            volume_type = aws_template.machine_disk_type
             self._logger.info(
                 "Adding block device mapping: volume_size=%s, volume_type=%s",
                 aws_template.machine_disk_size_gb,
