@@ -50,6 +50,7 @@ ORB_LOG_CONSOLE_ENABLED=true      # maps to config key: logging.console_enabled
 ORB_REQUEST_TIMEOUT=300           # maps to config key: request.default_timeout (seconds)
 ORB_MAX_MACHINES_PER_REQUEST=100  # maps to config key: request.max_machines_per_request
 ORB_CONFIG_FILE=/path/to/config   # maps to config key: config_file
+ORB_CLI_UPDATE_CHECK=true         # maps to config key: cli.update_check (true/false, default false)
 ```
 
 ## AWS provider variables
