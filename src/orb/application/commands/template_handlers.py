@@ -1,11 +1,8 @@
 """Template command handlers for CQRS pattern."""
 
-import logging
 from typing import Any, Optional
 
 from orb.application.base.handlers import BaseCommandHandler
-
-_logger = logging.getLogger(__name__)
 from orb.application.decorators import command_handler
 from orb.application.dto.template import TemplateDTO
 from orb.application.ports.template_dto_factory_port import TemplateDTOFactoryPort
@@ -120,7 +117,7 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
         }
         # instance_type → machine_types (backward compat)
         if command.instance_type is not None and "machine_types" not in dto_fields:
-            _logger.warning(
+            self.logger.warning(
                 "CreateTemplateCommand.instance_type is deprecated; use machine_type instead."
             )
             dto_fields["machine_types"] = {command.instance_type: 1}
@@ -203,7 +200,7 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
 
         # instance_type → machine_types (backward compat)
         if command.instance_type is not None and "machine_types" not in update_fields:
-            _logger.warning(
+            self.logger.warning(
                 "UpdateTemplateCommand.instance_type is deprecated; use machine_type instead."
             )
             update_fields["machine_types"] = {command.instance_type: 1}

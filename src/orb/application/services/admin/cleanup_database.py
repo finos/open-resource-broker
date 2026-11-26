@@ -8,7 +8,6 @@ reaching here.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -17,8 +16,6 @@ from orb.domain.base import UnitOfWorkFactory
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
-
-logger = logging.getLogger(__name__)
 
 # Non-terminal request status strings — the bulk cleanup body rejects
 # these. Enum-form constants were removed: the cleanup paths normalise
@@ -80,9 +77,9 @@ class CleanupDatabaseService:
     def __init__(
         self,
         uow_factory: UnitOfWorkFactory,
+        logger: LoggingPort,
         configuration_port: Optional[ConfigurationPort] = None,
         provider_registry: Optional[ProviderRegistryPort] = None,
-        logger: Optional[LoggingPort] = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._configuration_port = configuration_port
@@ -141,10 +138,10 @@ class CleanupDatabaseService:
                 )
 
     def _warn(self, message: str, *args: object) -> None:
-        (self._logger.warning if self._logger else logger.warning)(message, *args)
+        self._logger.warning(message, *args)
 
     def _debug(self, message: str, *args: object) -> None:
-        (self._logger.debug if self._logger else logger.debug)(message, *args)
+        self._logger.debug(message, *args)
 
     # ------------------------------------------------------------------
     # Per-row helpers
@@ -191,7 +188,7 @@ class CleanupDatabaseService:
             result.machines_deleted = machines_deleted
             result.details.append(f"request:{request_id}")
 
-            logger.warning(
+            self._warn(
                 "ADMIN_CLEANUP: deleted request=%s cascade_machines=%s machines_deleted=%d",
                 _safe_log_value(request_id),
                 cascade_machines,
@@ -228,7 +225,7 @@ class CleanupDatabaseService:
             result.machines_deleted = 1
             result.details.append(f"machine:{machine_id}")
 
-            logger.warning(
+            self._warn(
                 "ADMIN_CLEANUP: deleted machine=%s",
                 _safe_log_value(machine_id),
             )
@@ -319,7 +316,7 @@ class CleanupDatabaseService:
                 result.requests_deleted += 1
                 result.machines_deleted += machines_deleted
 
-            logger.warning(
+            self._warn(
                 "ADMIN_CLEANUP by user=%s statuses=%s older_than_days=%s "
                 "include_machines=%s requests_deleted=%d machines_deleted=%d",
                 caller_id,

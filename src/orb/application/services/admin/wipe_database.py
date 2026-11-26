@@ -7,12 +7,10 @@ by the admin router which enforces those guards before reaching here.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 
 from orb.domain.base import UnitOfWorkFactory
-
-logger = logging.getLogger(__name__)
+from orb.domain.base.ports import LoggingPort
 
 
 @dataclass
@@ -89,8 +87,10 @@ class WipeDatabaseService:
     def __init__(
         self,
         uow_factory: UnitOfWorkFactory,
+        logger: LoggingPort,
     ) -> None:
         self._uow_factory = uow_factory
+        self._logger = logger
 
     def execute(self) -> WipeResult:
         """Truncate all repositories and return a summary of what was deleted."""
@@ -103,9 +103,9 @@ class WipeDatabaseService:
                 count = _bulk_delete(uow.machines, "machine_id", machines)
                 result.tables_truncated.append("machines")
                 result.rows_deleted += count
-                logger.warning("ADMIN_WIPE: deleted %d machine record(s)", count)
+                self._logger.warning("ADMIN_WIPE: deleted %d machine record(s)", count)
             except Exception:
-                logger.exception("ADMIN_WIPE: failed to delete machines")
+                self._logger.exception("ADMIN_WIPE: failed to delete machines")
                 raise
 
             # 2. Requests (includes return requests — share the Request aggregate)
@@ -114,9 +114,9 @@ class WipeDatabaseService:
                 count = _bulk_delete(uow.requests, "request_id", requests)
                 result.tables_truncated.append("requests")
                 result.rows_deleted += count
-                logger.warning("ADMIN_WIPE: deleted %d request record(s)", count)
+                self._logger.warning("ADMIN_WIPE: deleted %d request record(s)", count)
             except Exception:
-                logger.exception("ADMIN_WIPE: failed to delete requests")
+                self._logger.exception("ADMIN_WIPE: failed to delete requests")
                 raise
 
             # 3. Templates
@@ -125,12 +125,12 @@ class WipeDatabaseService:
                 count = _bulk_delete(uow.templates, "template_id", templates)
                 result.tables_truncated.append("templates")
                 result.rows_deleted += count
-                logger.warning("ADMIN_WIPE: deleted %d template record(s)", count)
+                self._logger.warning("ADMIN_WIPE: deleted %d template record(s)", count)
             except Exception:
-                logger.exception("ADMIN_WIPE: failed to delete templates")
+                self._logger.exception("ADMIN_WIPE: failed to delete templates")
                 raise
 
-        logger.warning(
+        self._logger.warning(
             "ADMIN_WIPE: complete — %d total rows deleted across tables: %s",
             result.rows_deleted,
             result.tables_truncated,

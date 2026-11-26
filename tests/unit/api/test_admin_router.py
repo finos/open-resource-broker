@@ -112,13 +112,17 @@ def _make_container(
     uow_factory = MagicMock()
     uow_factory.create_unit_of_work = MagicMock(return_value=uow)
 
+    from orb.domain.base.ports import LoggingPort
+
+    logger = MagicMock()
     type_map = {
         ConfigurationPort: config_port,
         MachineRepository: machine_repo,
         RequestRepository: request_repo,
         TemplateRepository: template_repo,
         UnitOfWorkFactory: uow_factory,
-        CleanupDatabaseService: CleanupDatabaseService(uow_factory=uow_factory),
+        LoggingPort: logger,
+        CleanupDatabaseService: CleanupDatabaseService(uow_factory=uow_factory, logger=logger),
     }
     container = MagicMock()
     container.get.side_effect = lambda t: type_map[t]
@@ -297,6 +301,22 @@ class TestAdminWipeEndpoint:
         assert body["wiped"] is True
         assert body["rows_deleted"] == 3
         assert set(body["tables_truncated"]) == {"machines", "requests", "templates"}
+
+    def test_wipe_audit_lines_reach_the_logging_port(self, admin_app):
+        """Each table wipe and the completion summary are logged through the injected port."""
+        from orb.domain.base.ports import LoggingPort
+
+        config_port = _make_config_port(allow_destructive=True, environment="development")
+        machine_repo, request_repo, template_repo = _make_repositories(machines=[MagicMock()])
+        container = _make_container(config_port, machine_repo, request_repo, template_repo)
+
+        with _patch_ctx(container):
+            r = _wipe_post(TestClient(admin_app, raise_server_exceptions=False))
+
+        assert r.status_code == 200
+        messages = [c.args[0] for c in container.get(LoggingPort).warning.call_args_list]
+        assert sum(m.startswith("ADMIN_WIPE: deleted") for m in messages) == 3
+        assert any(m.startswith("ADMIN_WIPE: complete") for m in messages)
 
     def test_delete_called_for_each_entity(self, admin_app):
         """Verifies delete() is called once per entity in each repository.

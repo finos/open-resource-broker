@@ -183,7 +183,8 @@ def _make_container(config_port, uow_factory, cleanup_service=None):
     type_map = {
         ConfigurationPort: config_port,
         UnitOfWorkFactory: uow_factory,
-        CleanupDatabaseService: cleanup_service or CleanupDatabaseService(uow_factory=uow_factory),
+        CleanupDatabaseService: cleanup_service
+        or CleanupDatabaseService(uow_factory=uow_factory, logger=MagicMock()),
     }
     container = MagicMock()
     container.get.side_effect = lambda t: type_map[t]

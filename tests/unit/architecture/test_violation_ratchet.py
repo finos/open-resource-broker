@@ -239,6 +239,53 @@ def _count_application_service_locators() -> int:
     return count
 
 
+_STDLIB_LOGGER_EXEMPT = (
+    SRC_ORB / "api",
+    SRC_ORB / "cli",
+    SRC_ORB / "infrastructure" / "logging",
+    SRC_ORB / "k8s_legacy",
+)
+
+
+def _uses_stdlib_logging(source: str) -> bool:
+    """True when *source* imports ``logging`` (at any depth) or calls ``getLogger``."""
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import) and any(a.name == "logging" for a in node.names):
+            return True
+        if isinstance(node, ast.ImportFrom) and node.module == "logging":
+            return True
+        if isinstance(node, ast.Call):
+            func = node.func
+            if (isinstance(func, ast.Attribute) and func.attr == "getLogger") or (
+                isinstance(func, ast.Name) and func.id == "getLogger"
+            ):
+                return True
+    return False
+
+
+def _count_stdlib_logger_files() -> int:
+    """Count files that use the stdlib logger outside the logging boundary.
+
+    Code should receive a ``LoggingPort`` rather than build its own logger.
+    ``api/`` and ``cli/`` are process entry points, ``infrastructure/logging``
+    implements the port, and ``k8s_legacy`` is maintenance-mode.
+
+    ``application/machine/result_mapping.py`` is a pure mapping module with no
+    injected dependencies and stays on the baseline until its callers can pass
+    a logger.
+    """
+    count = 0
+    for f in collect_python_files(SRC_ORB):
+        if any(f.is_relative_to(d) for d in _STDLIB_LOGGER_EXEMPT):
+            continue
+        try:
+            if _uses_stdlib_logging(f.read_text(encoding="utf-8")):
+                count += 1
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+    return count
+
+
 # ---------------------------------------------------------------------------
 # Ratchet tests
 # ---------------------------------------------------------------------------
@@ -253,6 +300,7 @@ _COUNTERS = {
     "circular_dependency_cycles": _count_cycles,
     "cli_infrastructure_direct_imports": _count_cli_infrastructure,
     "application_service_locator_sites": _count_application_service_locators,
+    "stdlib_logger_files_outside_boundary": _count_stdlib_logger_files,
 }
 
 
@@ -295,3 +343,24 @@ class Handler:
     # two ContainerPort params, get + has + get on containers, get_container call
     assert _locator_sites_in_source(source) == 6
     assert _locator_sites_in_source("def f(port):\n    return port.get(1)\n") == 0
+
+
+@pytest.mark.unit
+@pytest.mark.architecture
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import logging\n",
+        "from logging import getLogger\n",
+        "x = getLogger('a')\n",
+        "def f():\n    import logging as _l\n    return _l.getLogger('a')\n",
+    ],
+)
+def test_stdlib_logger_counter_detects_each_form(source: str) -> None:
+    assert _uses_stdlib_logging(source)
+
+
+@pytest.mark.unit
+@pytest.mark.architecture
+def test_stdlib_logger_counter_ignores_unrelated_source() -> None:
+    assert not _uses_stdlib_logging("def f(logger):\n    logger.info('x')\n")
