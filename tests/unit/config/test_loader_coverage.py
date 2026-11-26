@@ -226,6 +226,21 @@ class TestLoadFromEnv:
         ConfigurationLoader._load_from_env(config, config_manager=None)
         assert config.get("request", {}).get("max_machines_per_request") == 50
 
+    @pytest.mark.parametrize(
+        ("raw", "expected"), [("true", True), ("TRUE", True), ("false", False), ("1", False)]
+    )
+    def test_orb_cli_update_check(self, monkeypatch, raw, expected):
+        self._clean_env(monkeypatch)
+        monkeypatch.setenv("ORB_CLI_UPDATE_CHECK", raw)
+        config = {}
+        ConfigurationLoader._load_from_env(config, config_manager=None)
+        assert config["cli"]["update_check"] is expected
+
+    def test_cli_update_check_defaults_off(self):
+        from orb.config.schemas.cli_schema import CliConfig
+
+        assert CliConfig().update_check is False
+
     def test_orb_config_file(self, monkeypatch):
         self._clean_env(monkeypatch)
         monkeypatch.setenv("ORB_CONFIG_FILE", "/tmp/test_cfg.json")
