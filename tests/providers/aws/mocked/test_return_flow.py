@@ -13,12 +13,8 @@ making it the only provider suitable for end-to-end return-flow testing.
 import asyncio
 import json
 import re
-import sys
-from pathlib import Path
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.application.dto.commands import CreateRequestCommand, CreateReturnRequestCommand
 from orb.application.dto.queries import SyncAndGetRequestQuery

@@ -13,15 +13,11 @@ is required.  Contract tests verify interface adherence, not wire fidelity
 from __future__ import annotations
 
 import asyncio
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 from orb.domain.base.ports.provider_validation_port import BaseProviderValidationAdapter
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult

@@ -5,14 +5,11 @@ Tests run against moto-backed AWS resources; no real AWS calls are made.
 """
 
 import json
-import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings

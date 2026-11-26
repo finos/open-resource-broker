@@ -1,13 +1,9 @@
 """The default configuration accepts and launches a spot RunInstances template."""
 
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import boto3
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tests.providers.aws.mocked import test_cli_cancel_onmoto as _cli
 

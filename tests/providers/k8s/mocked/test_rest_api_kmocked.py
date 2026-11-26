@@ -16,13 +16,8 @@ kmock limitations accounted for:
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
 import pytest_asyncio
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from tests.providers.k8s.mocked.kmock_delivery_conftest import (  # noqa: E402
     _inject_kmock_factory,

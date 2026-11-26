@@ -16,8 +16,6 @@ post-bootstrap, and k8s machine ids are ``orb-...`` pod names (not EC2 ids).
 from __future__ import annotations
 
 import json
-import sys
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -25,8 +23,6 @@ import mcp.types as mcp_types
 import pytest
 import pytest_asyncio
 from mcp.server.context import ServerRequestContext
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from tests.providers.k8s.mocked.kmock_delivery_conftest import (  # noqa: E402
     KINDS,

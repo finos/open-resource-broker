@@ -11,15 +11,11 @@ Covers:
 - Image resolution skipped when launch_template_id is set
 """
 
-import sys
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import boto3
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.launch_template.manager import (

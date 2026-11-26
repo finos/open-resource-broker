@@ -13,12 +13,8 @@ Moto limitations accounted for:
 """
 
 import re
-import sys
-from pathlib import Path
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tests.providers.aws.mocked.conftest import (
     _inject_moto_factory,

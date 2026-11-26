@@ -12,7 +12,6 @@ fixture that mustn't race with other tests.
 import json
 import logging
 import os
-import sys
 import uuid
 from pathlib import Path
 
@@ -54,11 +53,7 @@ def _find_repo_root(start: Path) -> Path:
     raise RuntimeError(f"Could not locate repo root (no pyproject.toml) above {start}")
 
 
-# Ensure repo root is on sys.path so hfmock.py and other root-level modules are importable
 repo_root = _find_repo_root(Path(__file__).resolve().parent)
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
 # Ensure logs/ directory exists before any test module is imported
 # (some test files create FileHandlers at module level)
 logs_dir = repo_root / "logs"

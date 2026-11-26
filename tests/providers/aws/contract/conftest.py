@@ -6,16 +6,12 @@ Supplies all fixtures required by the base contract classes:
     invalid_template_for_validation, validation_adapter, known_provider_api.
 """
 
-import sys
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import boto3
 import pytest
 from moto import mock_aws
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.aws_client import AWSClient

@@ -14,16 +14,12 @@ Moto limitations accounted for:
 - Spot Fleet requests are never fulfilled — no instances appear.
 """
 
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import boto3
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.handlers.spot_fleet.config_builder import (

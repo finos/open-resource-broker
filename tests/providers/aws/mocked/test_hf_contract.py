@@ -7,7 +7,6 @@ RunInstances moto data is used for status tests that require real machine entrie
 All other tests are pure unit tests with no AWS calls.
 """
 
-import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -15,8 +14,6 @@ from unittest.mock import MagicMock
 import boto3
 import jsonschema
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tests.providers.aws.live.plugin_io_schemas import (
     expected_get_available_templates_schema_default,

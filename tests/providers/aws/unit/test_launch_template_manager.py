@@ -6,15 +6,10 @@ Tests the launch template creation, versioning, and management functionality
 that was moved out of the base handler to fix architectural violations.
 """
 
-import os
-import sys
 from typing import cast
 from unittest.mock import Mock, patch
 
 import pytest
-
-# Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../..")))
 
 from orb.domain.base.exceptions import InfrastructureError
 from orb.domain.request.aggregate import Request

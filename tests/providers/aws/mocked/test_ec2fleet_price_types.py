@@ -11,14 +11,10 @@ Moto limitations accounted for:
 - release tests use fleet IDs (resource_ids from acquire), not instance IDs
 """
 
-import sys
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler

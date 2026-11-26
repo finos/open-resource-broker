@@ -5,12 +5,8 @@ errors, and response shape consistency.
 """
 
 import json
-import sys
-from pathlib import Path
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.providers.aws.exceptions.aws_exceptions import AWSValidationError
 from tests.providers.aws.mocked.conftest import (

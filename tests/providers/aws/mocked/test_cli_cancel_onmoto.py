@@ -12,13 +12,10 @@ import io
 import json
 import os
 import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import boto3
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tests.providers.aws.mocked.conftest import _make_logger, _make_moto_aws_client
 from tests.providers.aws.mocked.test_cli_onmoto import _make_patched_initialize

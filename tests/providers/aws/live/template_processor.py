@@ -263,10 +263,8 @@ class TemplateProcessor:
         Returns:
             {"templates": [...]} dict in the format expected by the scheduler
         """
-        import sys
 
         repo_root = _find_repo_root(Path(__file__).resolve().parent)
-        sys.path.insert(0, str(repo_root / "src"))
 
         # Find the real generated templates file in config/
         config_dir = repo_root / "config"
