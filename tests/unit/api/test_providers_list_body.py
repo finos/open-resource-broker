@@ -20,7 +20,7 @@ from tests.unit.api.providers_support import serve_providers_from
 def _provider(name: str, enabled: bool = True) -> MagicMock:
     p = MagicMock()
     p.name, p.type, p.enabled = name, "aws", enabled
-    p.config = {"region": "eu-west-2"}
+    p.config = {"region": "eu-west-2", "profile": "internal-profile"}
     p.weight, p.priority = 5, 1
     p.get_effective_handlers.return_value = {"EC2Fleet": {}}
     return p
@@ -56,10 +56,17 @@ def test_body_validates_against_the_declared_model_and_keeps_legacy_keys():
     assert parsed.selection_policy == "weighted_round_robin"
     first = parsed.providers[0]
     assert (first.name, first.type, first.enabled) == ("aws-1", "aws", True)
-    assert first.config == {"region": "eu-west-2"}
+    assert first.config == {}
     assert first.capabilities == ["EC2Fleet"]
     assert parsed.providers[1].enabled is False
     assert parsed.providers[1].status == "disabled"
+
+
+def test_raw_body_does_not_contain_provider_configuration():
+    response = _client(_config(_provider("aws-1"))).get("/providers/")
+
+    assert "internal-profile" not in response.text
+    assert "eu-west-2" not in response.text
 
 
 def test_rest_body_equals_the_catalog_renderer_output_for_every_interface():

@@ -169,6 +169,8 @@ class ListAvailableProvidersHandler(BaseQueryHandler[ListAvailableProvidersQuery
                 effective_handlers = provider_instance.get_effective_handlers(provider_defaults)
                 handler_names = list(effective_handlers.keys())
 
+                # Only allowlisted display fields are emitted; provider config
+                # (profiles, role ARNs, paths) is never part of the list output.
                 providers_info.append(
                     {
                         "name": provider_instance.name,
@@ -178,7 +180,6 @@ class ListAvailableProvidersHandler(BaseQueryHandler[ListAvailableProvidersQuery
                         "weight": provider_instance.weight,
                         "priority": provider_instance.priority,
                         "enabled": bool(provider_instance.enabled),
-                        "config": provider_instance.config or {},
                     }
                 )
 
