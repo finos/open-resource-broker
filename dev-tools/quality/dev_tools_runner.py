@@ -106,7 +106,7 @@ def _load_baseline(baseline_path):
         return files
     except (OSError, ValueError, KeyError, TypeError) as e:
         logger.error(f"Cannot read file size baseline {baseline_path}: {e}")
-        sys.exit(1)
+        raise SystemExit(1) from e
 
 
 def _write_baseline(baseline_path, files):
