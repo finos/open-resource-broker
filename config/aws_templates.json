@@ -186,6 +186,32 @@
       "allocationStrategyOnDemand": "prioritized"
     },
     {
+      "templateId": "EC2Fleet-Request-ABIS",
+      "maxNumber": 100,
+      "fleetType": "request",
+      "priceType": "spot",
+      "maxSpotPrice": 0.1,
+      "allocationStrategy": "priceCapacityOptimized",
+      "volumeType": "gp3",
+      "instanceTags": {
+        "Environment": "dev"
+      },
+      "name": "EC2 Fleet Request Attribute-Based Instance Selection",
+      "providerApi": "EC2Fleet",
+      "providerType": "aws",
+      "createdAt": "2026-11-26T00:00:00.000000",
+      "abisInstanceRequirements": {
+        "VCpuCount": {
+          "Min": 2,
+          "Max": 4
+        },
+        "MemoryMiB": {
+          "Min": 4096,
+          "Max": 16384
+        }
+      }
+    },
+    {
       "templateId": "SpotFleet-Request-LowestPrice",
       "maxNumber": 100,
       "fleetType": "request",
@@ -312,6 +338,32 @@
       "createdAt": "2026-07-06T22:07:11.806910"
     },
     {
+      "templateId": "SpotFleet-Request-ABIS",
+      "maxNumber": 100,
+      "fleetType": "request",
+      "priceType": "spot",
+      "maxSpotPrice": 0.1,
+      "allocationStrategy": "priceCapacityOptimized",
+      "volumeType": "gp3",
+      "instanceTags": {
+        "Environment": "dev"
+      },
+      "name": "Spot Fleet Request - Attribute-Based Instance Selection",
+      "providerApi": "SpotFleet",
+      "providerType": "aws",
+      "createdAt": "2026-11-26T00:00:00.000000",
+      "abisInstanceRequirements": {
+        "VCpuCount": {
+          "Min": 2,
+          "Max": 4
+        },
+        "MemoryMiB": {
+          "Min": 4096,
+          "Max": 16384
+        }
+      }
+    },
+    {
       "templateId": "ASG-OnDemand",
       "maxNumber": 100,
       "vmTypes": {
@@ -367,6 +419,29 @@
       "providerType": "aws",
       "createdAt": "2026-07-06T22:07:11.806937",
       "percentOnDemand": 30
+    },
+    {
+      "templateId": "ASG-ABIS",
+      "maxNumber": 100,
+      "priceType": "ondemand",
+      "volumeType": "gp3",
+      "instanceTags": {
+        "Environment": "prod"
+      },
+      "name": "Auto Scaling Group Attribute-Based Instance Selection",
+      "providerApi": "ASG",
+      "providerType": "aws",
+      "createdAt": "2026-11-26T00:00:00.000000",
+      "abisInstanceRequirements": {
+        "VCpuCount": {
+          "Min": 2,
+          "Max": 4
+        },
+        "MemoryMiB": {
+          "Min": 4096,
+          "Max": 16384
+        }
+      }
     },
     {
       "templateId": "RunInstances-OnDemand",

@@ -992,4 +992,20 @@ class ASGHandler(AWSHandler, FleetGroupingMixin):
                 security_group_ids=[],
                 tags={"Environment": "prod"},
             ),
+            # Attribute-based instance selection (no explicit machine types)
+            AWSTemplate(
+                template_id="ASG-ABIS",
+                name="Auto Scaling Group Attribute-Based Instance Selection",
+                description="Auto Scaling Group that selects instance types from vCPU and memory requirements",
+                provider_api="ASG",
+                abis_instance_requirements={
+                    "vcpu_count": {"min": 2, "max": 4},
+                    "memory_mib": {"min": 4096, "max": 16384},
+                },
+                max_machines=100,
+                price_type="ondemand",
+                subnet_ids=[],
+                security_group_ids=[],
+                tags={"Environment": "prod"},
+            ),
         ]

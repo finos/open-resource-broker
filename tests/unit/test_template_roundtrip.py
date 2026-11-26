@@ -112,6 +112,8 @@ class TestTemplateRoundTrip:
 
     def test_machine_types_survives_roundtrip(self):
         for template in self.example_templates:
+            if template.abis_instance_requirements:
+                continue  # attribute-based examples select types from requirements
             result = self._roundtrip(template)
             assert result.get("machine_types"), f"machine_types missing for {template.template_id}"
             assert result["machine_types"] == template.machine_types, (
@@ -198,7 +200,8 @@ class TestTemplateRoundTrip:
         assert result.get("name") == template.name
         assert result.get("provider_api") == "EC2Fleet"
         assert result.get("price_type") == template.price_type
-        assert result.get("machine_types") == template.machine_types
+        if not template.abis_instance_requirements:
+            assert result.get("machine_types") == template.machine_types
         assert "created_at" in result
         assert result.get("subnet_ids", []) == []
         assert result.get("security_group_ids", []) == []
