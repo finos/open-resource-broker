@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import socket
+import threading
 import time
 import urllib.request
 from collections import namedtuple
@@ -13,7 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from orb.cli import update_check
-from orb.cli.update_check import is_newer, maybe_notify, parse_release
+from orb.cli.update_check import is_newer, parse_release, start
 
 
 class _Config:
@@ -64,10 +65,16 @@ class _Streams:
     def __init__(self):
         self.out, self.err = _Stream(), _Stream()
 
-    def run(self, args, config, version):
+    def run(self, args, config, version, wait=True):
+        """Start the check, optionally let the lookup finish, then finish like main does."""
         # Streams are swapped only for the call: pytest re-installs its own between phases.
         with contextlib.redirect_stdout(self.out), contextlib.redirect_stderr(self.err):
-            maybe_notify(args, config, version, MagicMock())
+            check = start(args, config, version, MagicMock())
+            if check is not None:
+                if wait and check._thread is not None:
+                    check._thread.join(5)
+                check.finish()
+        return check
 
     def read(self):
         return _Captured(self.out.getvalue(), self.err.getvalue())
@@ -180,7 +187,7 @@ def test_expired_cache_refetches_and_rewrites(tmp_path, tty, network):
 
 
 @pytest.mark.parametrize("error", [TimeoutError("slow"), OSError("down"), ValueError("bad")])
-def test_request_error_is_silent_and_cached(tmp_path, tty, monkeypatch, error):
+def test_request_error_is_silent_and_negative_cached(tmp_path, tty, monkeypatch, error):
     opener = MagicMock()
     opener.open.side_effect = error
     monkeypatch.setattr(urllib.request, "build_opener", lambda *a, **k: opener)
@@ -190,6 +197,10 @@ def test_request_error_is_silent_and_cached(tmp_path, tty, monkeypatch, error):
 
     assert tty.read() == ("", "")
     assert opener.open.call_count == 1
+    cached = json.loads((tmp_path / "update_check.json").read_text())
+    assert cached["latest"] is None
+    # The failure entry expires after about an hour, not a day.
+    assert 3 * 3600 < time.time() - cached["checked_at"] + 3600 < 24 * 3600 + 5
 
 
 @pytest.mark.parametrize(
@@ -250,6 +261,9 @@ class TestRedirectPolicy:
             "https://example.com/pypi/orb-py/json",
             "https://pypi.org.example.com/json",
             "file:///etc/passwd",
+            "https://evil@pypi.org/x",
+            "https://pypi.org:8443/x",
+            "https://evil.com\\@pypi.org/x",
         ],
     )
     def test_other_targets_refused(self, url):
@@ -260,4 +274,59 @@ def test_main_hook_swallows_failures(monkeypatch):
     from orb.cli import main as cli_main
 
     monkeypatch.setattr(cli_main, "get_container", MagicMock(side_effect=RuntimeError("boom")))
-    cli_main._notify_update(_args())
+    assert cli_main._start_update_check(_args()) is None
+
+
+@pytest.mark.parametrize("resource", ["server", "mcp"])
+def test_server_and_mcp_are_skipped(tmp_path, tty, network, resource):
+    assert tty.run(_args(resource=resource), _Config(tmp_path), "1.0.0") is None
+    network.assert_not_called()
+    assert tty.read() == ("", "")
+
+
+def test_slow_lookup_does_not_delay_and_fills_cache(tmp_path, tty, monkeypatch):
+    release = threading.Event()
+    opener = MagicMock()
+
+    def _slow(req, timeout=None):
+        release.wait(5)
+        return _Response(_pypi_body("9.9.9"))
+
+    opener.open.side_effect = _slow
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *a, **k: opener)
+
+    began = time.monotonic()
+    check = tty.run(_args(), _Config(tmp_path), "1.0.0", wait=False)
+    elapsed = time.monotonic() - began
+    assert elapsed < 1.0
+    assert tty.read() == ("", "")
+
+    release.set()
+    check._thread.join(5)
+    assert json.loads((tmp_path / "update_check.json").read_text())["latest"] == "9.9.9"
+    # Next run uses the cache and notifies.
+    tty.run(_args(), _Config(tmp_path), "1.0.0")
+    assert "9.9.9" in tty.read().err
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["1" * 5000, "9" * 65, "1.0.0" + "\x1b[31mred", "١.٢.٣", "1." + "1." * 10 + "1"],
+)
+def test_hostile_versions_are_never_printed_raw(tmp_path, tty, network, version):
+    network.response = _Response(_pypi_body(version))
+    tty.run(_args(), _Config(tmp_path), "0.0.1")
+    assert "\x1b" not in tty.read().err
+
+
+def test_escape_suffix_prints_normalised_release_only(tmp_path, tty, network):
+    network.response = _Response(_pypi_body("2.1.0\x1b[31m\nforged"))
+    tty.run(_args(), _Config(tmp_path), "1.0.0")
+    err = tty.read().err
+    assert "2.1.0 " in err and "\x1b" not in err and "forged" not in err
+    assert err.count("\n") == 1
+
+
+@pytest.mark.parametrize("value", ["1" * 5000, "١.٢.٣", "1.1.1.1.1.1.1", "\x1b[0m1.0", " 1.0"])
+def test_parse_release_rejects(value):
+    assert parse_release(value) is None

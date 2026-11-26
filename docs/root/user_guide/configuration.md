@@ -240,17 +240,17 @@ The CLI can tell you when a newer `orb-py` release is on PyPI. This is off by de
 }
 ```
 
-The environment variable `ORB_CLI_UPDATE_CHECK=true` has the same effect and takes precedence over the config file.
+The environment variable `ORB_CLI_UPDATE_CHECK=true` has the same effect and takes precedence over the config file. Only `true` enables the check; any other value leaves it off.
 
-When enabled, after an interactive command finishes, ORB prints one line on stderr if a newer release exists:
+When enabled, ORB starts the lookup in the background before the command runs. After the command finishes, it prints one line on stderr if a newer release exists:
 
 ```text
 A newer orb-py release is available: 1.11.0 (installed 1.10.0). Upgrade with: pip install --upgrade orb-py
 ```
 
-The notice is only shown when both stdout and stderr are terminals, and never with `--quiet`, `--format json` (the default) or `--format yaml`. It never changes command output or exit codes.
+The lookup never delays the command: ORB waits at most 0.2 seconds for it after the output, so on a run where the lookup is still in progress nothing is shown and the result is cached for the next run. The notice is never shown for the `server` and `mcp` commands, and only shown when both stdout and stderr are terminals, and never with `--quiet`, `--format json` (the default) or `--format yaml`. It never changes command output or exit codes.
 
-Privacy: the check sends one HTTPS `GET` to `https://pypi.org/pypi/orb-py/json` with a 2 second timeout, at most once every 24 hours. The result, including a failed lookup, is cached in `update_check.json` in the ORB cache directory. No installed version, configuration or host details are sent in the request body or query string; PyPI sees your IP address and the default Python `urllib` user agent, as with any download. Redirects are followed only to `https://pypi.org`. Errors are logged at debug level and otherwise ignored.
+Privacy: the check sends one HTTPS `GET` to `https://pypi.org/pypi/orb-py/json` with a 2 second timeout, at most once every 24 hours. The result is cached in `update_check.json` in the ORB cache directory; a failed lookup is cached for one hour. No installed version, configuration or host details are sent in the request body or query string; PyPI sees your IP address and the default Python `urllib` user agent, as with any download. Redirects are followed only to `https://pypi.org`. Errors are logged at debug level and otherwise ignored.
 
 ### Configuration Best Practices
 

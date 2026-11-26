@@ -1,9 +1,11 @@
 """Opt-in update-availability notice for the CLI.
 
 Disabled unless ``cli.update_check`` is true (env: ``ORB_CLI_UPDATE_CHECK``).
-When enabled, the latest release is looked up on PyPI at most once every 24
-hours and a single line is written to stderr after an interactive command.
-Every failure is swallowed: the check never changes a command's result.
+When enabled, the lookup starts in a daemon thread before the command runs.
+After the command output, a cached or already-finished result is used (waiting
+at most a fraction of a second) and one line is written to stderr if a newer
+release exists. A slow lookup shows nothing and fills the cache for the next
+run. Every failure is swallowed: the check never changes a command's result.
 """
 
 import json
@@ -23,29 +25,47 @@ PYPI_URL = "https://pypi.org/pypi/orb-py/json"
 _PYPI_HOST = "pypi.org"
 _CACHE_FILE = "update_check.json"
 _CACHE_TTL_SECONDS = 24 * 60 * 60
+_FAILURE_TTL_SECONDS = 60 * 60
 _TIMEOUT_SECONDS = 2.0
+_FINISH_WAIT_SECONDS = 0.2
 _MAX_RESPONSE_BYTES = 5 * 1024 * 1024
-_RELEASE_RE = re.compile(r"^\s*v?(\d+(?:\.\d+)*)")
+_MAX_VERSION_LENGTH = 64
+_MAX_VERSION_SEGMENTS = 6
+_RELEASE_RE = re.compile(r"^v?([0-9]+(?:\.[0-9]+)*)", re.ASCII)
+_SKIPPED_RESOURCES = frozenset({"server", "mcp"})
 
 
 def parse_release(version: Any) -> Optional[tuple[int, ...]]:
     """Return the numeric release segment of a version, or None if unparsable.
 
-    Pre-release, dev and post suffixes are ignored.
+    Pre-release, dev and post suffixes are ignored. Only ASCII digits are
+    accepted and length is bounded.
     """
-    if not isinstance(version, str):
+    if not isinstance(version, str) or len(version) > _MAX_VERSION_LENGTH:
         return None
     match = _RELEASE_RE.match(version)
-    return tuple(int(part) for part in match.group(1).split(".")) if match else None
+    if match is None:
+        return None
+    try:
+        parts = tuple(int(part) for part in match.group(1).split("."))
+    except ValueError:
+        return None
+    return parts if len(parts) <= _MAX_VERSION_SEGMENTS else None
+
+
+def format_release(parts: tuple[int, ...]) -> str:
+    return ".".join(str(part) for part in parts)
+
+
+def _newer(new: tuple[int, ...], old: tuple[int, ...]) -> bool:
+    width = max(len(new), len(old))
+    return new + (0,) * (width - len(new)) > old + (0,) * (width - len(old))
 
 
 def is_newer(latest: Any, current: Any) -> bool:
     """Return True only when both versions parse and latest is greater."""
     new, old = parse_release(latest), parse_release(current)
-    if new is None or old is None:
-        return False
-    width = max(len(new), len(old))
-    return new + (0,) * (width - len(new)) > old + (0,) * (width - len(old))
+    return new is not None and old is not None and _newer(new, old)
 
 
 class _SamePypiRedirect(urllib.request.HTTPRedirectHandler):
@@ -55,7 +75,7 @@ class _SamePypiRedirect(urllib.request.HTTPRedirectHandler):
         self, req: urllib.request.Request, fp: Any, code: int, msg: str, headers: Any, newurl: str
     ) -> Optional[urllib.request.Request]:
         target = urlparse(newurl)
-        if target.scheme != "https" or target.hostname != _PYPI_HOST:
+        if target.scheme != "https" or target.netloc.lower() != _PYPI_HOST or "\\" in newurl:
             return None
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -76,22 +96,14 @@ def _fetch_latest(logger: LoggingPort) -> Optional[str]:
         return None
 
 
-def _fetch_bounded(logger: LoggingPort) -> Optional[str]:
-    """Run the lookup in a daemon thread so a stalled DNS lookup cannot hold the CLI."""
-    result: list[Optional[str]] = []
-    worker = threading.Thread(target=lambda: result.append(_fetch_latest(logger)), daemon=True)
-    worker.start()
-    worker.join(_TIMEOUT_SECONDS + 0.5)
-    return result[0] if result else None
-
-
 def _read_cache(path: str, now: float, logger: LoggingPort) -> Optional[dict[str, Any]]:
     try:
         with open(path, encoding="utf-8") as handle:
             data = json.load(handle)
         checked_at = data["checked_at"]
         if isinstance(checked_at, (int, float)) and 0 <= now - checked_at < _CACHE_TTL_SECONDS:
-            return {"latest": data.get("latest")}
+            latest = data.get("latest")
+            return {"latest": latest if isinstance(latest, str) else None}
     except Exception as exc:
         logger.debug("Update check cache not usable: %s", type(exc).__name__)
     return None
@@ -115,37 +127,67 @@ def _write_cache(path: str, latest: Optional[str], now: float, logger: LoggingPo
                 pass
 
 
-def latest_version(cache_dir: str, logger: LoggingPort) -> Optional[str]:
-    """Return the latest version, using a 24 hour cache (failures are cached too)."""
-    path = os.path.join(cache_dir, _CACHE_FILE)
-    now = time.time()
-    cached = _read_cache(path, now, logger)
-    if cached is not None:
-        return cached["latest"] if isinstance(cached["latest"], str) else None
-    latest = _fetch_bounded(logger)
-    _write_cache(path, latest, now, logger)
-    return latest
-
-
 def _interactive(args: Any) -> bool:
     if getattr(args, "quiet", False) or getattr(args, "format", "json") in ("json", "yaml"):
         return False
     return sys.stdout.isatty() and sys.stderr.isatty()
 
 
-def maybe_notify(args: Any, config: Any, current_version: str, logger: LoggingPort) -> None:
-    """Print one stderr line when enabled, interactive and a newer release exists."""
+class UpdateCheck:
+    """A started check; call ``finish`` after the command output."""
+
+    def __init__(self, current: tuple[int, ...], logger: LoggingPort) -> None:
+        self._current = current
+        self._logger = logger
+        self._result: list[Optional[str]] = []
+        self._thread: Optional[threading.Thread] = None
+
+    def _run(self, path: str) -> None:
+        latest = _fetch_latest(self._logger)
+        now = time.time()
+        # A failed lookup is cached for a shorter period than a successful one.
+        stamp = now if latest else now - (_CACHE_TTL_SECONDS - _FAILURE_TTL_SECONDS)
+        _write_cache(path, latest, stamp, self._logger)
+        self._result.append(latest)
+
+    def finish(self) -> None:
+        """Print the notice if a newer release is known; never raises or blocks long."""
+        try:
+            if self._thread is not None:
+                self._thread.join(_FINISH_WAIT_SECONDS)
+            latest = parse_release(self._result[0]) if self._result else None
+            if latest is not None and _newer(latest, self._current):
+                print(
+                    f"A newer orb-py release is available: {format_release(latest)} "
+                    f"(installed {format_release(self._current)}). "
+                    "Upgrade with: pip install --upgrade orb-py",
+                    file=sys.stderr,
+                )
+        except Exception as exc:
+            self._logger.debug("Update notice skipped: %s", type(exc).__name__)
+
+
+def start(
+    args: Any, config: Any, current_version: str, logger: LoggingPort
+) -> Optional[UpdateCheck]:
+    """Begin the check when enabled and interactive; return None otherwise."""
     try:
         if config.get_configuration_value("cli.update_check", False) is not True:
-            return
-        if not _interactive(args):
-            return
-        latest = latest_version(config.get_cache_dir(), logger)
-        if latest and is_newer(latest, current_version):
-            print(
-                f"A newer orb-py release is available: {latest} (installed {current_version}). "
-                "Upgrade with: pip install --upgrade orb-py",
-                file=sys.stderr,
-            )
+            return None
+        if getattr(args, "resource", None) in _SKIPPED_RESOURCES or not _interactive(args):
+            return None
+        current = parse_release(current_version)
+        if current is None:
+            return None
+        check = UpdateCheck(current, logger)
+        path = os.path.join(config.get_cache_dir(), _CACHE_FILE)
+        cached = _read_cache(path, time.time(), logger)
+        if cached is not None:
+            check._result.append(cached["latest"])
+        else:
+            check._thread = threading.Thread(target=check._run, args=(path,), daemon=True)
+            check._thread.start()
+        return check
     except Exception as exc:
         logger.debug("Update check skipped: %s", type(exc).__name__)
+        return None

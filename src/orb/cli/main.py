@@ -94,20 +94,21 @@ def _apply_log_level_flag(args: Any) -> None:
         logging.getLogger().setLevel(getattr(logging, level.upper()))
 
 
-def _notify_update(args: Any) -> None:
-    """Opt-in update notice; runs after the command output and never raises."""
+def _start_update_check(args: Any) -> Any:
+    """Start the opt-in update lookup; never raises."""
     try:
         from orb import _package
-        from orb.cli.update_check import maybe_notify
+        from orb.cli.update_check import start
         from orb.domain.base.ports.configuration_port import ConfigurationPort
         from orb.domain.base.ports.logging_port import LoggingPort
 
         container = get_container()
-        maybe_notify(
+        return start(
             args, container.get(ConfigurationPort), _package.__version__, container.get(LoggingPort)
         )
     except Exception as e:
-        get_logger(__name__).debug("Update notice skipped: %s", type(e).__name__)
+        get_logger(__name__).debug("Update check skipped: %s", type(e).__name__)
+        return None
 
 
 async def main() -> None:
@@ -291,6 +292,7 @@ async def main() -> None:
                 traceback.print_exc()
             sys.exit(1)
 
+        update_check = _start_update_check(args)
         try:
             from orb.infrastructure.mocking.dry_run_context import dry_run_context
 
@@ -315,7 +317,8 @@ async def main() -> None:
             else:
                 print(formatted_output)
 
-            _notify_update(args)
+            if update_check is not None:
+                update_check.finish()
 
             if exit_code != 0:
                 sys.exit(exit_code)
