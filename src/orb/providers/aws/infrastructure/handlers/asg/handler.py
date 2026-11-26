@@ -51,7 +51,6 @@ from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.asg.capacity_manager import ASGCapacityManager
 from orb.providers.aws.infrastructure.handlers.asg.config_builder import ASGConfigBuilder
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
     delete_asg_or_confirm_gone,
     emit_alert,
@@ -64,7 +63,7 @@ from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 
 @injectable
-class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
+class ASGHandler(AWSHandler, FleetGroupingMixin):
     """Handler for Auto Scaling Group operations."""
 
     def __init__(

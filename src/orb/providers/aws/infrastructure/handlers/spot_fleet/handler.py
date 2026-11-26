@@ -46,7 +46,6 @@ from orb.providers.aws.exceptions.aws_exceptions import (
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
     emit_alert,
     region_of,
@@ -70,7 +69,7 @@ from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 
 @injectable
-class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
+class SpotFleetHandler(AWSHandler, FleetGroupingMixin):
     """Handler for Spot Fleet operations."""
 
     def __init__(

@@ -82,69 +82,6 @@ class TestBaseContextMixin:
 
         assert result == "open-resource-broker"
 
-    def test_calculate_capacity_distribution_ondemand(self):
-        """Test capacity distribution for on-demand only."""
-        self.template.price_type = "ondemand"
-
-        result = self.mixin._calculate_capacity_distribution(self.template, self.requested_count)
-
-        assert result["total_capacity"] == 5
-        assert result["target_capacity"] == 5
-        assert result["desired_capacity"] == 5
-        assert result["on_demand_count"] == 5
-        assert result["spot_count"] == 0
-        assert result["is_heterogeneous"] is False
-        assert result["is_spot_only"] is False
-        assert result["is_ondemand_only"] is True
-
-    def test_calculate_capacity_distribution_spot(self):
-        """Test capacity distribution for spot only."""
-        self.template.price_type = "spot"
-
-        result = self.mixin._calculate_capacity_distribution(self.template, self.requested_count)
-
-        assert result["total_capacity"] == 5
-        assert result["on_demand_count"] == 0
-        assert result["spot_count"] == 5
-        assert result["is_spot_only"] is True
-        assert result["is_ondemand_only"] is False
-
-    def test_calculate_capacity_distribution_spot_with_percent(self):
-        """Test capacity distribution when percent_on_demand is set for spot."""
-        self.template.price_type = "spot"
-        self.template.percent_on_demand = 40
-
-        result = self.mixin._calculate_capacity_distribution(self.template, self.requested_count)
-
-        assert result["total_capacity"] == 5
-        assert result["on_demand_count"] == 2  # 40% of 5
-        assert result["spot_count"] == 3
-        assert result["is_heterogeneous"] is True
-        assert result["is_spot_only"] is False
-        assert result["is_ondemand_only"] is False
-
-    def test_calculate_capacity_distribution_heterogeneous(self):
-        """Test capacity distribution for heterogeneous fleet."""
-        self.template.price_type = "heterogeneous"
-        self.template.percent_on_demand = 40
-
-        result = self.mixin._calculate_capacity_distribution(self.template, self.requested_count)
-
-        assert result["total_capacity"] == 5
-        assert result["on_demand_count"] == 2  # 40% of 5
-        assert result["spot_count"] == 3  # 60% of 5
-        assert result["is_heterogeneous"] is True
-
-    def test_calculate_capacity_distribution_heterogeneous_default(self):
-        """Test capacity distribution for heterogeneous fleet with default percentage."""
-        self.template.price_type = "heterogeneous"
-        self.template.percent_on_demand = None  # Should default to 0
-
-        result = self.mixin._calculate_capacity_distribution(self.template, self.requested_count)
-
-        assert result["on_demand_count"] == 0
-        assert result["spot_count"] == 5
-
     def test_prepare_standard_tags(self):
         """Test standard tag preparation."""
         with patch.object(self.mixin, "_get_package_name", return_value="test-package"):

@@ -100,7 +100,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
         self, template: AWSTemplate, requested_count: int
     ) -> dict[str, Any]:
         """Delegate capacity distribution to the template's own logic."""
-        # Mirrors BaseContextMixin._calculate_capacity_distribution
+        # Differs on purpose from the ASG builder (on-demand floor of 1 when a percentage is set)
         price_type = template.price_type
         percent_on_demand = getattr(template, "percent_on_demand", None)
 
