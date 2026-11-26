@@ -175,3 +175,68 @@ class TestHFFormatRequestResponseUsesCoerceAndUnwrap:
         result = self.strategy.format_request_response(data)
         assert "requests" in result
         assert result["requests"] == [{"requestId": "r1"}]
+
+
+class TestMapTemplateFieldsTransformsOnce:
+    """The field mapper already applies the HostFactory transformations."""
+
+    def setup_method(self):
+        from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
+
+        self.strategy = make_strategy()
+        self.strategy._field_mapper = HostFactoryFieldMapper("aws")
+        self.strategy._template_defaults_service = cast(None, None)
+
+    def _map(self, template: dict[str, Any]) -> dict[str, Any]:
+        with (
+            patch("orb.infrastructure.di.container.is_container_ready", return_value=False),
+            patch.object(self.strategy, "_get_provider_name", return_value="test-provider"),
+        ):
+            return self.strategy._map_template_fields(template, None)
+
+    def test_transformations_applied_once(self):
+        from orb.infrastructure.scheduler.hostfactory.transformations import (
+            HostFactoryTransformations,
+        )
+
+        with patch.object(
+            HostFactoryTransformations,
+            "apply_transformations",
+            side_effect=lambda mapped: mapped,
+        ) as spy:
+            self._map({"templateId": "t1", "vmType": "t2.micro", "imageId": "ami-abc"})
+
+        assert spy.call_count == 1
+
+    def test_user_data_file_is_read_once(self, tmp_path):
+        # The script's only line names another existing file: a second pass
+        # would read that file in place of the script.
+        other = tmp_path / "other.txt"
+        other.write_text("other file content\n")
+        script = tmp_path / "script.sh"
+        script.write_text(str(other))
+
+        result = self._map(
+            {
+                "templateId": "t1",
+                "vmType": "t2.micro",
+                "imageId": "ami-abc",
+                "userDataScript": str(script),
+            }
+        )
+
+        assert result["machine_bootstrap"] == str(other)
+
+    def test_volume_fields_map_to_internal_names(self):
+        result = self._map(
+            {
+                "templateId": "t1",
+                "vmType": "t2.micro",
+                "imageId": "ami-abc",
+                "rootDeviceVolumeSize": 50,
+                "volumeType": "gp3",
+            }
+        )
+
+        assert result["machine_disk_size_gb"] == 50
+        assert result["machine_disk_type"] == "gp3"

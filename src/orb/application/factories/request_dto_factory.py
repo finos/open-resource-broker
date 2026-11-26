@@ -52,6 +52,8 @@ class RequestDTOFactory:
                 return_request_id=machine.return_request_id,
                 tags=machine.tags.tags if machine.tags.tags else None,
                 message=machine.status_reason or "",
+                availability_zone=machine.provider_data.get("availability_zone"),
+                vcpus=machine.provider_data.get("vcpus"),
             )
             for machine in machines
         ]

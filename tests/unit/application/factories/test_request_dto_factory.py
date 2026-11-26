@@ -53,6 +53,21 @@ def sample_machine():
     )
 
 
+def sample_machine_with(provider_data):
+    return Machine(
+        machine_id=MachineId(value="i-abc123"),
+        template_id="tmpl-1",
+        request_id="req-00000000-0000-0000-0000-000000000001",
+        provider_type="aws",
+        provider_name="aws_test",
+        provider_api="ec2fleet",
+        instance_type=InstanceType(value="t3.large"),
+        image_id="ami-123",
+        status=MachineStatus.RUNNING,
+        provider_data=provider_data,
+    )
+
+
 class TestMapMachineStatusToResultReturnRequest:
     def test_shutting_down_is_executing(self, factory):
         assert (
@@ -89,11 +104,32 @@ class TestCreateFromDomainFields:
         ref = dto.machine_references[0]
         assert ref.price_type == "spot"
 
-    def test_vcpus_not_in_model_fields(self):
-        assert "vcpus" not in MachineReferenceDTO.model_fields
+    def test_placement_fields_read_from_provider_data(self, factory, sample_request):
+        machine = sample_machine_with(provider_data={"availability_zone": "eu-west-1a", "vcpus": 2})
+        ref = factory.create_from_domain(sample_request, [machine]).machine_references[0]
+        assert ref.availability_zone == "eu-west-1a"
+        assert ref.vcpus == 2
 
-    def test_availability_zone_not_in_model_fields(self):
-        assert "availability_zone" not in MachineReferenceDTO.model_fields
+    def test_from_machine_reads_placement_fields(self):
+        machine = sample_machine_with(provider_data={"availability_zone": "eu-west-1b", "vcpus": 4})
+        ref = MachineReferenceDTO.from_machine(machine, RequestType.ACQUIRE)
+        assert ref.availability_zone == "eu-west-1b"
+        assert ref.vcpus == 4
+
+    def test_placement_fields_are_not_serialised(self, factory, sample_request):
+        # The watch view reads these; the request response format must not change.
+        with_fields = sample_machine_with(
+            provider_data={"availability_zone": "eu-west-1a", "vcpus": 2}
+        )
+        without_fields = sample_machine_with(provider_data={})
+        dto_with = factory.create_from_domain(sample_request, [with_fields])
+        dto_without = factory.create_from_domain(sample_request, [without_fields])
+        ref_with = dto_with.machine_references[0]
+        ref_without = dto_without.machine_references[0]
+        assert ref_with.to_dict() == ref_without.to_dict()
+        assert ref_with.model_dump_json() == ref_without.model_dump_json()
+        assert "availability_zone" not in ref_with.to_dict()
+        assert "vcpus" not in ref_with.to_dict()
 
     def test_missing_metadata_fields_are_none(self, factory, sample_request):
         machine = Machine(

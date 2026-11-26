@@ -20,8 +20,8 @@ if [ "$DRY_RUN" = "true" ]; then
     exit 0
 fi
 
-# Build historical package (keep artifacts)
-KEEP_ARTIFACTS=true ./dev-tools/release/build_historical.sh "$TO_COMMIT" "$RELEASE_VERSION"
+# Build historical package
+./dev-tools/release/build_historical.sh "$TO_COMMIT" "$RELEASE_VERSION"
 
 # Generate enhanced release notes using our release notes script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"

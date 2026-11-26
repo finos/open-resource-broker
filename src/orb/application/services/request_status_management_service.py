@@ -577,4 +577,5 @@ class RequestStatusManagementService:
             launch_time=launch_time,
             name=instance_data.get("name"),
             metadata=instance_data.get("metadata", {}),
+            provider_data=instance_data.get("provider_data") or {},
         )

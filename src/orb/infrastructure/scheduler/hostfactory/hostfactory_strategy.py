@@ -19,7 +19,6 @@ from orb.infrastructure.scheduler.hostfactory.formatters.status_mapper import (
     map_machine_status_to_result,
     summarise_diagnostic,
 )
-from orb.infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
 from orb.infrastructure.template.dtos import TemplateDTO
 from orb.infrastructure.utilities.common.string_utils import extract_provider_type
 
@@ -160,8 +159,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         field_mapper = HostFactoryFieldMapper(declared_type) if declared_type else self.field_mapper
         mapped = field_mapper.map_input_fields(template)
 
-        # Apply HostFactory transformations
-        mapped = HostFactoryTransformations.apply_transformations(mapped)
+        # map_input_fields has already applied the HostFactory transformations
 
         # Transform machine types from HF format to internal format
         machine_types_data = self._transform_machine_types_input(template)

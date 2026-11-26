@@ -72,19 +72,23 @@ def _extract_invoke_provider_subcommand(path: Path) -> list[str]:
     return match.group(1).split()
 
 
-# (script stem, is covered by the CLI parser today)
-# templateWizard is intentionally excluded from parser validation: both
-# scripts agree on calling "templateWizard", but no such CLI command exists
-# yet (tracked separately) — this test only checks the HF scripts that are
-# supposed to be live today.
+# Every entry script must call a real CLI command: the tests below parse each
+# one against the CLI parser, and test_every_hostfactory_script_is_listed keeps
+# a new script from being added without being covered.
 _HOSTFACTORY_SCRIPT_STEMS = [
     "requestMachines",
     "getRequestStatus",
     "getReturnRequests",
     "requestReturnMachines",
     "getAvailableTemplates",
-    "templateWizard",
 ]
+
+
+@pytest.mark.parametrize("suffix", [".sh", ".bat"])
+def test_every_hostfactory_script_is_listed(suffix: str) -> None:
+    """A script that is not in the list would escape the CLI-command checks."""
+    shipped = {p.stem for p in HOSTFACTORY_SCRIPTS.glob(f"*{suffix}")} - {"invoke_provider"}
+    assert shipped == set(_HOSTFACTORY_SCRIPT_STEMS)
 
 
 @pytest.mark.parametrize("stem", _HOSTFACTORY_SCRIPT_STEMS)
@@ -96,7 +100,7 @@ def test_hostfactory_bat_and_sh_invoke_same_subcommand(stem: str) -> None:
 
 @pytest.mark.parametrize(
     "stem",
-    [s for s in _HOSTFACTORY_SCRIPT_STEMS if s != "templateWizard"],
+    _HOSTFACTORY_SCRIPT_STEMS,
 )
 def test_hostfactory_subcommand_is_a_real_cli_action(stem: str) -> None:
     """Both scripts' ORB resource/action must be a command the CLI parser knows."""
@@ -111,7 +115,7 @@ def test_hostfactory_subcommand_is_a_real_cli_action(stem: str) -> None:
 
 @pytest.mark.parametrize(
     "stem",
-    [s for s in _HOSTFACTORY_SCRIPT_STEMS if s != "templateWizard"],
+    _HOSTFACTORY_SCRIPT_STEMS,
 )
 @pytest.mark.parametrize(
     "flag,value,dest",

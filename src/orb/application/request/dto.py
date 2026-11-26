@@ -32,6 +32,10 @@ class MachineReferenceDTO(BaseDTO):
     request_id: Optional[str] = None
     return_request_id: Optional[str] = None
     message: str = ""
+    # Read by the watch view only; kept out of serialised output so the wire
+    # format does not change.
+    availability_zone: Optional[str] = Field(default=None, exclude=True)
+    vcpus: Optional[int] = Field(default=None, exclude=True)
 
     @classmethod
     def from_machine(cls, machine: Machine, request_type: RequestType) -> "MachineReferenceDTO":
@@ -68,6 +72,8 @@ class MachineReferenceDTO(BaseDTO):
             return_request_id=machine.return_request_id,
             tags=machine.tags.tags if machine.tags and machine.tags.tags else None,
             message=machine.status_reason or "",
+            availability_zone=machine.provider_data.get("availability_zone"),
+            vcpus=machine.provider_data.get("vcpus"),
         )
 
     def to_dict(self) -> dict[str, Any]:
