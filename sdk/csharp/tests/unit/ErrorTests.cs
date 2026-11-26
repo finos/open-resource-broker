@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using FINOS.OpenResourceBroker;
+using FINOS.OpenResourceBroker.Transport;
 using Xunit;
 
 namespace UnitTests;
@@ -106,37 +107,31 @@ public class ErrorTests
     [InlineData("not json")]
     public async Task UnparseableErrorBody_StillYieldsOrbApiException(string body)
     {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        try
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        var port = ((IPEndPoint)listener.LocalEndPoint!).Port;
+        var serve = Task.Run(async () =>
         {
-            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            var serve = Task.Run(async () =>
-            {
-                using var conn = await listener.AcceptTcpClientAsync();
-                var stream = conn.GetStream();
-                var buf = new byte[4096];
-                _ = await stream.ReadAsync(buf);
-                var payload = Encoding.UTF8.GetBytes(body);
-                var head = Encoding.ASCII.GetBytes(
-                    $"HTTP/1.1 400 Bad Request\r\nContent-Length: {payload.Length}\r\nConnection: close\r\n\r\n");
-                await stream.WriteAsync(head);
-                await stream.WriteAsync(payload);
-            });
+            using var conn = await listener.AcceptAsync();
+            using var stream = new NetworkStream(conn);
+            var buf = new byte[4096];
+            _ = await stream.ReadAsync(buf);
+            var payload = Encoding.UTF8.GetBytes(body);
+            var head = Encoding.ASCII.GetBytes(
+                $"HTTP/1.1 400 Bad Request\r\nContent-Length: {payload.Length}\r\nConnection: close\r\n\r\n");
+            await stream.WriteAsync(head);
+            await stream.WriteAsync(payload);
+        });
 
-            await using var client = await OrbClient.CreateAsync(new ClientConfig
-            {
-                BaseUrl = $"http://127.0.0.1:{port}",
-                Retry = new RetryConfig { MaxRetries = 0 },
-            });
-            var ex = await Assert.ThrowsAsync<OrbApiException>(() => client.HealthAsync());
-            Assert.Equal(400, ex.StatusCode);
-            Assert.Null(ex.Code);
-            await serve;
-        }
-        finally
+        await using var client = await OrbClient.CreateAsync(new ClientConfig
         {
-            listener.Stop();
-        }
+            BaseUrl = $"http://127.0.0.1:{port}",
+            Retry = new RetryConfig { MaxRetries = 0 },
+        });
+        var ex = await Assert.ThrowsAsync<OrbApiException>(() => client.HealthAsync());
+        Assert.Equal(400, ex.StatusCode);
+        Assert.Null(ex.Code);
+        await serve;
     }
 }

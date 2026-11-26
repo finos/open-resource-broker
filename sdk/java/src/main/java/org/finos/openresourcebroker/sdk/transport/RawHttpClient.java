@@ -146,7 +146,7 @@ public class RawHttpClient {
      */
     public HttpResult getNoRetry(String path, Map<String, String> params) throws IOException {
         String fullPath = buildPath(path, params);
-        return execute("GET", fullPath, null, "application/json", true);
+        return execute("GET", fullPath, null, "application/json");
     }
 
     /** Perform GET request for plain text (e.g. metrics). */
