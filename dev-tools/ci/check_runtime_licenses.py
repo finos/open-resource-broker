@@ -17,7 +17,7 @@ if the two differ.
 
 Before either stage, known non-SPDX spellings of the same license (e.g. the
 several "...BSD..." classifier strings packaging tools emit instead of
-"BSD-3-Clause"/"BSD-2-Clause") are normalised to their SPDX id; see
+"BSD-3-Clause"/"BSD-2-Clause", and the names Maven POMs use) are normalised to their SPDX id; see
 `ALIAS_TO_SPDX`.
 
 Each package's license string is checked in two stages:
@@ -86,6 +86,7 @@ SPDX_ALLOW = {
     "MPL-1.1",
     "MPL-2.0",
     "EPL-1.0",
+    "EPL-2.0",
     "CDDL-1.0",
     "CDDL-1.1",
     "CPL-1.0",
@@ -139,9 +140,28 @@ ALIAS_TO_SPDX = {
     "bsd 2-clause": "BSD-2-Clause",
     "simplified bsd license": "BSD-2-Clause",
     "freebsd license": "BSD-2-Clause",
+    # Spellings Maven POM <license><name> elements use for the same licenses.
+    # A value may be an SPDX expression: Maven's dual-license shorthands name
+    # both licenses in one string.
+    "the apache software license, version 2.0": "Apache-2.0",
+    "the apache license, version 2.0": "Apache-2.0",
+    "apache license, version 2.0": "Apache-2.0",
+    "apache license 2.0": "Apache-2.0",
+    "apache 2.0": "Apache-2.0",
+    "mit license": "MIT",
+    "epl 2.0": "EPL-2.0",
+    "gpl2 w/ cpe": "GPL-2.0-only WITH Classpath-exception-2.0",
+    "cddl + gplv2 with classpath exception": (
+        "CDDL-1.1 OR GPL-2.0-only WITH Classpath-exception-2.0"
+    ),
 }
 
 _TOKEN_RE = re.compile(r"\(|\)|\bAND\b|\bOR\b|\bWITH\b|[^\s()]+")
+
+
+def to_spdx(name: str) -> str:
+    """Return the SPDX id or expression for a known alias, else `name` unchanged."""
+    return ALIAS_TO_SPDX.get(name.strip().lower(), name)
 
 
 def _normalise_aliases(license_str: str) -> str:
@@ -156,7 +176,7 @@ def _normalise_aliases(license_str: str) -> str:
     unchanged for stage 2 to parse.
     """
     pieces = license_str.split("; ")
-    normalised = [ALIAS_TO_SPDX.get(piece.strip().lower(), piece) for piece in pieces]
+    normalised = [to_spdx(piece) for piece in pieces]
     return "; ".join(normalised)
 
 
