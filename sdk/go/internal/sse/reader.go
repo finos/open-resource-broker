@@ -57,7 +57,6 @@ func (r *Reader) Next() *Frame {
 				continue
 			}
 			data := bytes.Join(dataLines, []byte("\n"))
-			dataLines = dataLines[:0]
 			return &Frame{Data: data, Event: event}
 		}
 

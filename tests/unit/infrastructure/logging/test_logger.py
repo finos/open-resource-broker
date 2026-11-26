@@ -10,12 +10,12 @@ from orb.infrastructure.logging import logger as logger_module
 
 @pytest.fixture(autouse=True)
 def reset_logging():
-    logger_module._logging_initialized = False
+    logger_module._LoggingState.initialized = False
     root = logging.getLogger()
     for h in list(root.handlers):
         root.removeHandler(h)
     yield
-    logger_module._logging_initialized = False
+    logger_module._LoggingState.initialized = False
     for h in list(root.handlers):
         root.removeHandler(h)
 

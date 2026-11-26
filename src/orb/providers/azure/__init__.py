@@ -1,9 +1,11 @@
 """Azure Provider implementation."""
 
 from orb.providers.azure.configuration.config import AzureProviderConfig
-from orb.providers.azure.configuration.template_extension import AzureTemplateExtensionConfig
-from orb.providers.azure.registration import (
+from orb.providers.azure.configuration.template_extension import (
+    AzureTemplateExtensionConfig,
     get_azure_extension_defaults,
+)
+from orb.providers.azure.registration import (
     initialize_azure_provider,
     is_azure_provider_registered,
     register_azure_extensions,

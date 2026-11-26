@@ -22,6 +22,7 @@ from orb.providers.oci.cli_client import OCICommandError, run_oci
 from orb.providers.oci.configuration.config import OCIProviderConfig
 from orb.providers.oci.handlers import OCIComputeHandler
 from orb.providers.oci.mapping import OCITemplateMapper
+from orb.providers.oci.naming import generate_oci_provider_name
 from orb.providers.oci.services import OCIPricingService
 
 
@@ -172,10 +173,7 @@ class OCIProviderStrategy(ProviderStrategy):
 
     @classmethod
     def generate_provider_name(cls, config: dict[str, Any]) -> str:
-        profile = config.get("profile") or "instance-profile"
-        region = config.get("region", "us-phoenix-1")
-        sanitized_profile = re.sub(r"[^a-zA-Z0-9_-]", "-", profile)
-        return f"oci_{sanitized_profile}_{region}"
+        return generate_oci_provider_name(config)
 
     def parse_provider_name(self, provider_name: str) -> dict[str, str]:
         # The region never contains an underscore, the profile may, so split from the right.

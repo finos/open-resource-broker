@@ -3,6 +3,8 @@
 import argparse
 from typing import Any
 
+from orb.providers.oci.naming import generate_oci_provider_name
+
 
 class OCICLISpec:
     FIELDS = (
@@ -51,9 +53,7 @@ class OCICLISpec:
         return [] if valid else [f"{message}: {', '.join(missing)}"]
 
     def generate_name(self, args: argparse.Namespace) -> str:
-        from orb.providers.oci.strategy.oci_provider_strategy import OCIProviderStrategy
-
-        return OCIProviderStrategy.generate_provider_name(self.extract_config(args))
+        return generate_oci_provider_name(self.extract_config(args))
 
     def format_display(self, config: dict[str, Any]) -> list[tuple[str, str]]:
         return [

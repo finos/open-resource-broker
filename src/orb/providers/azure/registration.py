@@ -111,7 +111,7 @@ def create_azure_strategy(
     provider_instance_name: str,
     performance_config: PerformanceConfig | None = None,
     config_port: PerformanceConfigSource | None = None,
-    azure_native_spec_service: Optional["AzureNativeSpecService"] = None,
+    azure_native_spec_service: AzureNativeSpecService | None = None,
 ) -> "AzureProviderStrategy":
     """Create an ``AzureProviderStrategy`` from raw provider config data.
 
@@ -504,13 +504,6 @@ def register_azure_template_factory(
     except Exception as exc:
         if logger:
             logger.error("Failed to register Azure template factory: %s", exc, exc_info=True)
-
-
-def get_azure_extension_defaults() -> dict[str, Any]:
-    """Get default Azure extension configuration."""
-    return AzureTemplateExtensionConfig(
-        os_disk_type="Premium_LRS",
-    ).to_template_defaults()
 
 
 def initialize_azure_provider(
