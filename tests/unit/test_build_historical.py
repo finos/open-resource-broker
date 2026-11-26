@@ -1,7 +1,7 @@
 """Tests for dev-tools/release/build_historical.sh.
 
-The script checks out an old commit on a temporary branch, overlays a modern
-pyproject.toml and builds a wheel. These tests run it in a throwaway git
+The script builds an old commit in a temporary worktree, overlaying a modern
+pyproject.toml, and leaves the wheel in the caller's dist/. These tests run it in a throwaway git
 repository with a fake ``python`` on PATH: its ``-m pip install -r FILE`` step
 records that FILE existed, and its ``-m build`` step fails unless that
 happened, so the build tooling must really be installed from the lock file.
@@ -35,8 +35,16 @@ if [ "$1" = "-m" ] && [ "$2" = "pip" ]; then
 fi
 if [ "$1" = "-m" ] && [ "$2" = "build" ]; then
     [ -f "$FAKE_MARKER" ] || exit 1
-    mkdir -p dist
-    touch dist/open_resource_broker-0.0.1-py3-none-any.whl
+    # The build runs in the historical tree with the overlay applied
+    [ -f pyproject.toml ] || exit 1
+    outdir=""
+    while [ $# -gt 0 ]; do
+        if [ "$1" = "--outdir" ]; then outdir="$2"; fi
+        shift
+    done
+    [ -n "$outdir" ] || exit 1
+    mkdir -p "$outdir"
+    touch "$outdir/open_resource_broker-0.0.1-py3-none-any.whl"
     exit 0
 fi
 exit 1
@@ -117,42 +125,58 @@ def _temp_branches(root: Path, env: dict[str, str]) -> str:
     return _git(root, env, "branch", "--list", "historical-build-*")
 
 
-def test_build_tooling_is_installed_from_the_lock(repo) -> None:
+def _assert_caller_untouched(root: Path, env: dict[str, str]) -> None:
+    assert _git(root, env, "branch", "--show-current") == "main"
+    assert _temp_branches(root, env) == ""
+    # Only the caller's own checkout remains registered
+    assert len(_git(root, env, "worktree", "list").splitlines()) == 1
+    assert (root / "notes.txt").read_text() == "caller's untracked work\n"
+    assert (root / "README.md").read_text() == "new, edited locally\n"
+    assert not (root / "pyproject.toml").exists()
+    assert _git(root, env, "diff", "--name-only") == "README.md"
+    untracked = _git(root, env, "ls-files", "--others", "--exclude-standard").splitlines()
+    assert [f for f in untracked if not f.startswith("dist/")] == ["notes.txt"]
+
+
+@pytest.fixture
+def dirty_repo(repo) -> tuple[Path, dict[str, str], str]:
     root, env, old = repo
+    (root / "notes.txt").write_text("caller's untracked work\n")
+    (root / "README.md").write_text("new, edited locally\n")
+    return root, env, old
+
+
+def test_build_tooling_is_installed_from_the_lock(dirty_repo) -> None:
+    root, env, old = dirty_repo
 
     result = _run(root, env, old)
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert Path(env["FAKE_MARKER"]).exists()
-    assert _git(root, env, "branch", "--show-current") == "main"
-    assert _temp_branches(root, env) == ""
+    # The wheel is left in the caller's dist/ and the caller's checkout is untouched
+    assert (root / "dist" / "open_resource_broker-0.0.1-py3-none-any.whl").exists()
+    _assert_caller_untouched(root, env)
 
 
-def test_failed_install_returns_to_the_original_branch(repo) -> None:
-    root, env, old = repo
-    (root / "notes.txt").write_text("caller's untracked work\n")
+def test_failed_install_leaves_the_caller_untouched(dirty_repo) -> None:
+    root, env, old = dirty_repo
     env["FAKE_PIP_FAIL"] = "1"
 
     result = _run(root, env, old)
 
     assert result.returncode != 0
-    assert _git(root, env, "branch", "--show-current") == "main"
-    assert _temp_branches(root, env) == ""
-    # The overlay is gone and the caller's untracked file is kept
-    assert not (root / "pyproject.toml").exists()
-    assert (root / "notes.txt").read_text() == "caller's untracked work\n"
-    assert _git(root, env, "status", "--porcelain") == "?? notes.txt"
+    assert not (root / "dist").exists()
+    _assert_caller_untouched(root, env)
 
 
-def test_failed_install_returns_a_detached_caller_to_its_commit(repo) -> None:
+def test_detached_caller_stays_on_its_commit(repo) -> None:
     root, env, old = repo
     head = _git(root, env, "rev-parse", "HEAD")
     _git(root, env, "checkout", "-q", "--detach", head)
-    env["FAKE_PIP_FAIL"] = "1"
 
     result = _run(root, env, old)
 
-    assert result.returncode != 0
+    assert result.returncode == 0, result.stdout + result.stderr
     assert _git(root, env, "branch", "--show-current") == ""
     assert _git(root, env, "rev-parse", "HEAD") == head
-    assert _temp_branches(root, env) == ""
+    assert len(_git(root, env, "worktree", "list").splitlines()) == 1
