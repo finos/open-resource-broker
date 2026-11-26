@@ -3,6 +3,7 @@
 from typing import Any, Optional, TypeVar
 
 from orb.domain.base.exceptions import ConfigurationError
+from orb.infrastructure.interfaces.provider import BaseProviderConfig
 from orb.infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")
@@ -106,6 +107,15 @@ class ConfigTypeConverter:
 
             # Other config classes use their respective sections
             section_name = class_name.replace("Config", "").lower()
+
+            if isinstance(config_class, type) and issubclass(config_class, BaseProviderConfig):
+                logger.warning(
+                    "No provider settings registered for %s; using the top-level '%s' "
+                    "section, which yields default values",
+                    class_name,
+                    section_name,
+                )
+
             config_data = self.get_dict(section_name, {})
 
             # Create instance with validation

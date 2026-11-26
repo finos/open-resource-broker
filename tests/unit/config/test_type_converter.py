@@ -48,14 +48,12 @@ class TestGetTypedProviderConfig:
             }
         }
 
-    def test_get_typed_aws_provider_config_via_registry(self):
+    def test_get_typed_aws_provider_config_via_registry(self, monkeypatch):
         """get_typed(AWSProviderConfig) resolves through ProviderSettingsRegistry."""
-        # Ensure AWS is registered
-        from orb.providers.aws.registration import register_aws_provider_settings
-
-        register_aws_provider_settings()
-
+        from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
         from orb.providers.aws.configuration.config import AWSProviderConfig
+
+        monkeypatch.setitem(ProviderSettingsRegistry._settings_classes, "aws", AWSProviderConfig)
 
         converter = type_converter_module.ConfigTypeConverter(self._raw_config_with_aws())
         result = converter.get_typed(AWSProviderConfig)
@@ -99,3 +97,67 @@ class TestGetTypedProviderConfig:
 
         with pytest.raises(Exception, match="gcp"):
             converter._get_provider_config_for_type("gcp", AWSProviderConfig)
+
+
+@pytest.mark.unit
+class TestGetTypedUnregisteredProviderWarning:
+    """get_typed warns when a provider settings class has no registration."""
+
+    _WARNING = "No provider settings registered for"
+
+    @pytest.fixture
+    def module_logger(self, monkeypatch):
+        from unittest.mock import MagicMock
+
+        mock_logger = MagicMock()
+        monkeypatch.setattr(type_converter_module, "logger", mock_logger)
+        return mock_logger
+
+    def _warned(self, mock_logger) -> bool:
+        return any(
+            call.args and str(call.args[0]).startswith(self._WARNING)
+            for call in mock_logger.warning.call_args_list
+        )
+
+    def test_warns_and_returns_defaults_when_provider_not_registered(
+        self, monkeypatch, module_logger
+    ):
+        from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
+        from orb.providers.aws.configuration.config import AWSProviderConfig
+
+        monkeypatch.setattr(ProviderSettingsRegistry, "_settings_classes", {})
+        converter = type_converter_module.ConfigTypeConverter({})
+
+        result = converter.get_typed(AWSProviderConfig)
+
+        assert isinstance(result, AWSProviderConfig)
+        assert self._warned(module_logger)
+        assert module_logger.warning.call_args.args[1] == "AWSProviderConfig"
+
+    def test_no_warning_when_provider_registered(self, monkeypatch, module_logger):
+        from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
+        from orb.providers.aws.configuration.config import AWSProviderConfig
+
+        monkeypatch.setattr(
+            ProviderSettingsRegistry, "_settings_classes", {"aws": AWSProviderConfig}
+        )
+        raw = {"provider": {"providers": [{"name": "a", "type": "aws", "config": {}}]}}
+        converter = type_converter_module.ConfigTypeConverter(raw)
+
+        converter.get_typed(AWSProviderConfig)
+
+        assert not self._warned(module_logger)
+
+    def test_no_warning_for_non_provider_class(self, monkeypatch, module_logger):
+        from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
+
+        monkeypatch.setattr(ProviderSettingsRegistry, "_settings_classes", {})
+
+        class PerformanceConfig:
+            def __init__(self, max_workers: int = 4, **kwargs):
+                self.max_workers = max_workers
+
+        converter = type_converter_module.ConfigTypeConverter({"performance": {"max_workers": 2}})
+
+        assert converter.get_typed(PerformanceConfig).max_workers == 2
+        assert not self._warned(module_logger)

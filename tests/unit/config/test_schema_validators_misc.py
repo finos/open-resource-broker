@@ -756,7 +756,7 @@ class TestConfigValidatorBusinessRules:
 class TestProviderSettingsRegistry:
     """ProviderSettingsRegistry registers and retrieves settings classes."""
 
-    def test_register_and_retrieve(self):
+    def test_register_and_retrieve(self, monkeypatch):
         from pydantic_settings import BaseSettings
 
         from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
@@ -764,11 +764,10 @@ class TestProviderSettingsRegistry:
         class FakeSettings(BaseSettings):
             model_config = {"extra": "ignore"}
 
+        monkeypatch.setitem(ProviderSettingsRegistry._settings_classes, "_test_fake_", FakeSettings)
         ProviderSettingsRegistry.register_provider_settings("_test_fake_", FakeSettings)
         assert "_test_fake_" in ProviderSettingsRegistry.get_registered_provider_types()
         assert ProviderSettingsRegistry.get_or_none("_test_fake_") is FakeSettings
-        # Cleanup
-        del ProviderSettingsRegistry._settings_classes["_test_fake_"]
 
     def test_get_or_none_returns_none_for_unknown(self):
         from orb.config.schemas.provider_settings_registry import ProviderSettingsRegistry
