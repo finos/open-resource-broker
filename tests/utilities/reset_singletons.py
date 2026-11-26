@@ -95,22 +95,6 @@ def _restore_canonical_container_factory() -> None:
         pass  # bootstrap not importable in this environment; skip
 
 
-def _reset_domain_container() -> None:
-    """Clear the module-level domain container set during app bootstrap.
-
-    ``orb.bootstrap.Application`` calls ``set_domain_container(self._container)``
-    the first time it wires up the container.  Tests that build an Application (or
-    call ``_ensure_container``) with a mock container leak that mock into the
-    global, breaking later tests that assert the default is ``None``.
-    """
-    try:
-        from orb.domain.base.decorators import set_domain_container
-
-        set_domain_container(None)  # type: ignore[arg-type]
-    except ImportError:
-        pass  # decorators module not present; skip
-
-
 def reset_all_singletons() -> None:
     """
     Reset all singletons for testing.
@@ -128,9 +112,6 @@ def reset_all_singletons() -> None:
 
     # Restore the canonical container factory in case a test replaced it.
     _restore_canonical_container_factory()
-
-    # Clear the leaked domain-container global set during app bootstrap.
-    _reset_domain_container()
 
     # Reset circuit breaker shared state
     _reset_circuit_breaker_states()

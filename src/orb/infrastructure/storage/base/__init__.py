@@ -5,15 +5,11 @@ from orb.infrastructure.storage.base.strategy import (
     BaseStorageStrategy,
     StorageStrategy,
 )
-from orb.infrastructure.storage.base.unit_of_work import (
-    BaseUnitOfWork,
-    StrategyUnitOfWork,
-)
+from orb.infrastructure.storage.base.unit_of_work import BaseUnitOfWork
 
 __all__: list[str] = [
     "BaseStorageStrategy",
     "BaseUnitOfWork",
     "StorageRepositoryMixin",
     "StorageStrategy",
-    "StrategyUnitOfWork",
 ]

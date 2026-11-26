@@ -13,7 +13,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 def test_decorator_imports():
     """Test that decorators can be imported without circular imports."""
-    from orb.domain.base.decorators import handle_domain_exceptions
     from orb.infrastructure.error.decorators import (
         handle_infrastructure_exceptions,
         handle_provider_exceptions,
@@ -22,7 +21,6 @@ def test_decorator_imports():
     # Test that decorators are callable
     assert callable(handle_provider_exceptions)
     assert callable(handle_infrastructure_exceptions)
-    assert callable(handle_domain_exceptions)
 
 
 def test_decorator_functionality():
