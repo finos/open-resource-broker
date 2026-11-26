@@ -24,10 +24,15 @@ PROVIDERS_DIR = Path(__file__).resolve().parents[1]
 # gain contract subclasses or be exempted below.
 KNOWN_PROVIDERS = ("aws", "azure", "gcp", "k8s", "oci")
 
-# Providers for which the registry creates no validator when asked without a config.
-# The xfail applies only while that holds, so a provider that gains a validator
-# passes without a marker.
-NO_VALIDATOR_ON_VALIDATION_PATH = ("aws", "azure", "gcp")
+# Minimal valid provider instance configuration per provider, as the validate
+# path hands it to the registry.  k8s and OCI factories ignore configuration.
+MINIMAL_VALIDATOR_CONFIG: dict[str, dict | None] = {
+    "aws": {},
+    "azure": {},
+    "gcp": {"project_id": "orb-example-12345", "region": "us-central1", "zones": ["us-central1-a"]},
+    "k8s": None,
+    "oci": None,
+}
 
 BASE_CONTRACTS = (
     "BaseMonitoringContract",
@@ -86,18 +91,10 @@ class TestRegistrationExports:
         validator_factory = registry._get_type_registration(provider).validator_factory
         assert callable(validator_factory)
 
-    def test_validator_is_created(self, registry, provider, request) -> None:
-        # Template validation asks the registry exactly like this, with no config.
-        validator = registry.create_validator(provider)
-        if validator is None and provider in NO_VALIDATOR_ON_VALIDATION_PATH:
-            request.applymarker(
-                pytest.mark.xfail(
-                    strict=True,
-                    raises=AssertionError,
-                    reason="#789: no validator is created on the template validation path",
-                )
-            )
+    def test_validator_is_created(self, registry, provider) -> None:
+        validator = registry.create_validator(provider, MINIMAL_VALIDATOR_CONFIG[provider])
         assert validator is not None
+        assert callable(getattr(validator, "validate", None))
 
 
 def test_contract_subclasses_match_exemptions(registry) -> None:

@@ -149,3 +149,13 @@ class BaseProviderValidationAdapter(ABC):
             "warnings": warnings,
             "validated_fields": list(template_config.keys()),
         }
+
+    def validate(self, template: Any) -> dict[str, Any]:
+        """Validate a template given as a dict or a model.
+
+        Template validation looks validators up through the registry and calls
+        ``validate``; this makes every adapter answer that call.
+        """
+        if hasattr(template, "model_dump"):
+            template = template.model_dump()
+        return self.validate_template_configuration(template)

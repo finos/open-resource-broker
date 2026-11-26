@@ -115,3 +115,28 @@ def test_validate_template_configuration_accepts_spot_percentage_without_spot_pr
 
     assert result["valid"] is True
     assert result["errors"] == []
+
+
+def test_validate_accepts_a_dict_and_reports_model_errors():
+    adapter = AzureValidationAdapter(config=AzureProviderConfig(), logger=MagicMock())
+
+    result = adapter.validate(
+        {
+            "template_id": "t1",
+            "provider_api": "VMSS",
+            "location": "eastus",
+            "region": "westus",
+        }
+    )
+
+    assert any("conflicting" in error for error in result["errors"])
+
+
+def test_validate_accepts_a_model():
+    adapter = AzureValidationAdapter(config=AzureProviderConfig(), logger=MagicMock())
+    model = MagicMock()
+    model.model_dump.return_value = {"provider_api": "BogusApi"}
+
+    result = adapter.validate(model)
+
+    assert any("Unsupported provider API" in error for error in result["errors"])
