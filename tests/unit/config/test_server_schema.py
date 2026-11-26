@@ -274,6 +274,8 @@ def test_destructive_admin_blocked_for_no_strategy(monkeypatch):
     mock_server_cfg.auth = mock_auth
 
     mock_request = MagicMock()
+    # The guard rejects before it uses the container; avoid building the real one.
+    monkeypatch.setattr("orb.api.dependencies.get_di_container", lambda: MagicMock())
     monkeypatch.setattr(
         "orb.api.dependencies.get_server_config",
         lambda: mock_server_cfg,
@@ -303,6 +305,8 @@ def test_destructive_admin_blocked_when_auth_disabled(monkeypatch):
     mock_server_cfg.auth = mock_auth
 
     mock_request = MagicMock()
+    # The guard rejects before it uses the container; avoid building the real one.
+    monkeypatch.setattr("orb.api.dependencies.get_di_container", lambda: MagicMock())
     monkeypatch.setattr(
         "orb.api.dependencies.get_server_config",
         lambda: mock_server_cfg,
