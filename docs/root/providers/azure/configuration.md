@@ -85,13 +85,17 @@ CycleCloud-specific flags: `--azure-cyclecloud-url`,
 | `SingleVM`      | yes          | yes                  | 1000            |
 | `CycleCloud`    | no           | yes                  | -               |
 
-The Azure provider strategy supports `create_instances`,
-`terminate_instances`, `get_instance_status`, `describe_resource_instances`,
-`validate_template` and `health_check`. It does
-**not** support `start_instances` or `stop_instances` on any
-`provider_api` — there is no equivalent to AWS/Google Cloud start/stop in the current
-Azure provider; terminating and re-acquiring is the only way to resize a
-pool today.
+The Azure provider strategy reports these operations from `get_capabilities`:
+`CREATE_INSTANCES`, `TERMINATE_INSTANCES`, `GET_INSTANCE_STATUS`,
+`DESCRIBE_RESOURCE_INSTANCES`, `VALIDATE_TEMPLATE`, `HEALTH_CHECK`,
+`START_INSTANCES` and `STOP_INSTANCES`.
+
+`START_INSTANCES` and `STOP_INSTANCES` are implemented by the `VMSS`,
+`VMSSUniform` and `SingleVM` handlers. The `CycleCloud` handler rejects them,
+and every machine in the request is reported as failed.
+`STOP_INSTANCES` deallocates the machine by default, which stops compute
+billing. Pass the operation parameter `deallocate` as `false` for a plain
+power-off that keeps the compute allocation, and its billing, in place.
 
 ## Template fields
 

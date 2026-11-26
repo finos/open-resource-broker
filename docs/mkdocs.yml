@@ -114,6 +114,7 @@ nav:
       - Lazy Loading Design: architecture/lazy-loading-design.md
       - Machine Discovery Flow: architecture/machine-discovery-flow.md
       - Multi-Provider Design: architecture/multi-provider-design.md
+      - Provider Selection Decision Record: architecture/provider-selection-decision-record.md
       - Daemon Mode Design: architecture/daemon-mode.md
       - Field Mapping Architecture: architecture/field_mapping_architecture.md
       - Metrics Report: architecture/metrics_report.md
@@ -134,6 +135,7 @@ nav:
       - Data Models: developer_guide/data_models.md
       - Event System: developer_guide/events.md
       - Provider System: developer_guide/providers.md
+      - Adding a Scheduler: developer_guide/adding_a_scheduler.md
       - Resilience Patterns: developer_guide/resilience.md
       - Performance Optimization: developer_guide/performance-optimization.md
       - Development Setup: developer_guide/development.md

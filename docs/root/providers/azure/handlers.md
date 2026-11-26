@@ -113,12 +113,16 @@ CycleCloud itself.
 | `SingleVM`         | yes  | yes          | 1000              |
 | `CycleCloud`       | no   | yes          | -                 |
 
-None of the four handlers support ORB's `start`/`stop` operations — the
-Azure provider strategy only advertises `create_instances`,
-`terminate_instances`, `get_instance_status`,
-`describe_resource_instances`, `validate_template`,
-and `health_check` in its capabilities. To
-resize a pool, release machines and acquire new ones.
+The `VMSS`, `VMSSUniform` and `SingleVM` handlers support ORB's `start` and
+`stop` operations (`START_INSTANCES` and `STOP_INSTANCES`). The `CycleCloud`
+handler does not; it reports every machine in such a request as failed.
+`STOP_INSTANCES` deallocates machines by default, so compute billing stops.
+Pass the operation parameter `deallocate` as `false` to power machines off
+without deallocating them.
+
+The provider strategy reports `CREATE_INSTANCES`, `TERMINATE_INSTANCES`,
+`GET_INSTANCE_STATUS`, `DESCRIBE_RESOURCE_INSTANCES`, `VALIDATE_TEMPLATE`,
+`HEALTH_CHECK`, `START_INSTANCES` and `STOP_INSTANCES` in its capabilities.
 
 ## Choosing a `provider_api` at template-generate time
 

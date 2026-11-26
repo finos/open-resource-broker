@@ -805,7 +805,6 @@ orb providers list [OPTIONS]
 | Flag | Description | Example |
 |------|-------------|---------|
 | `--format` | Output format | `--format table` |
-| `--detailed` | Show detailed provider information | `--detailed` |
 
 #### `providers show`
 
