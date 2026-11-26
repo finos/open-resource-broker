@@ -14,6 +14,7 @@ import pytest
     [
         "orb.domain.base.decorators",
         "orb.application.machine.queries",
+        "orb.application.value_objects",
     ],
 )
 def test_removed_module_is_not_importable(module: str) -> None:
