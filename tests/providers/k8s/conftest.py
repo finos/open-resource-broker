@@ -72,3 +72,22 @@ def _register_k8s_retry_classifier():
     register_retry_classifier(K8sRetryClassifier())
     yield
     clear_classifiers()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_k8s_handler_plugins():
+    """Run each test with an empty plugin-handler registry; restore it afterwards.
+
+    ``register_k8s_provider`` registers the custom-resource handlers that ship
+    with ORB (``KubeSwiftSandbox``) in the process-wide registry of
+    :mod:`orb.providers.k8s.handler_plugins`.  A test that bootstraps the
+    provider would otherwise leak them into every later test in the worker,
+    so lists of supported APIs would depend on test order.
+    """
+    from orb.providers.k8s import handler_plugins
+
+    saved = dict(handler_plugins._PLUGIN_HANDLERS)
+    handler_plugins._PLUGIN_HANDLERS.clear()
+    yield
+    handler_plugins._PLUGIN_HANDLERS.clear()
+    handler_plugins._PLUGIN_HANDLERS.update(saved)
