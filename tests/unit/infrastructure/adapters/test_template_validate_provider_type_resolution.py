@@ -37,8 +37,21 @@ def _adapter(registry, instances, logger=None) -> TemplateConfigurationAdapter:
 
 @pytest.fixture
 def registry():
-    with freshly_registered_providers() as populated:
-        yield populated
+    from orb.infrastructure.scheduler.hostfactory.field_mapping_registry import FieldMappingRegistry
+    from orb.providers.azure.scheduler.hostfactory_field_mapping import AzureFieldMapping
+    from orb.providers.gcp.scheduler.hostfactory_field_mapping import GCPFieldMapping
+
+    # Bootstrap registers the HostFactory field mappings; mirror it here.
+    saved = FieldMappingRegistry.all()
+    FieldMappingRegistry.register("azure", AzureFieldMapping())
+    FieldMappingRegistry.register("gcp", GCPFieldMapping())
+    try:
+        with freshly_registered_providers() as populated:
+            yield populated
+    finally:
+        FieldMappingRegistry.clear()
+        for key, value in saved.items():
+            FieldMappingRegistry.register(key, value)
 
 
 def _azure_row(api: str = "VMSS", **extra) -> dict:
@@ -264,3 +277,90 @@ def test_aws_row_with_bad_subnet_gets_no_provider_rule_error(registry) -> None:
         }
     )
     assert errors == []
+
+
+# HostFactory-format (camelCase) rows, as `templates validate --file` reads them.
+
+_SSH_KEY = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7 test@host"
+
+
+def _hf_azure_row(**extra) -> dict:
+    return {
+        "templateId": "t1",
+        "providerApi": "VMSS",
+        "imageId": "Canonical:ubuntu:22_04-lts:latest",
+        "resourceGroup": "rg",
+        "location": "eastus2",
+        "vmSize": "Standard_D4s_v5",
+        "maxNumber": 3,
+        "ssh_public_keys": [_SSH_KEY],
+        **extra,
+    }
+
+
+def _hf_gcp_row(**extra) -> dict:
+    return {
+        "templateId": "t1",
+        "providerApi": "MIG",
+        "imageId": "projects/p/global/images/i",
+        "maxNumber": 2,
+        "vmType": "n2-standard-2",
+        "projectId": "orb-example-12345",
+        "region": "us-central1",
+        "zones": ["us-central1-a", "us-central1-b"],
+        **extra,
+    }
+
+
+def test_camel_case_azure_row_gets_no_extra_inputs_errors(registry) -> None:
+    adapter = _adapter(registry, [_instance("azure-1", "azure")])
+    errors = adapter.validate_template_config(_hf_azure_row())
+    assert not _has(errors, "Extra inputs")
+    assert not _has(errors, "Field required")
+
+
+def test_camel_case_gcp_row_gets_no_extra_inputs_errors(registry) -> None:
+    adapter = _adapter(registry, [_instance("gcp-1", "gcp", GCP_CONFIG)])
+    errors = adapter.validate_template_config(_hf_gcp_row())
+    assert not _has(errors, "Extra inputs")
+    assert not _has(errors, "Field required")
+
+
+def test_camel_case_row_still_reports_a_real_provider_error(registry) -> None:
+    adapter = _adapter(registry, [_instance("azure-1", "azure")])
+    errors = adapter.validate_template_config(_hf_azure_row(region="westus"))
+    assert _has(errors, "conflicting")
+
+
+def test_mixed_snake_and_camel_row_gets_no_extra_inputs_errors(registry) -> None:
+    # The create path merges snake_case template_id/provider_api/image_id with
+    # camelCase configuration keys.
+    adapter = _adapter(registry, [_instance("azure-1", "azure")])
+    row = {
+        "template_id": "t1",
+        "provider_api": "VMSS",
+        "image_id": "Canonical:ubuntu:22_04-lts:latest",
+        "resourceGroup": "rg",
+        "location": "eastus2",
+        "vmSize": "Standard_D4s_v5",
+        "maxNumber": 3,
+        "ssh_public_keys": [_SSH_KEY],
+    }
+    errors = adapter.validate_template_config(row)
+    assert not _has(errors, "Extra inputs")
+    assert not _has(errors, "Field required")
+
+
+def test_normalisation_failure_skips_provider_rules_with_a_warning(registry, monkeypatch) -> None:
+    logger = MagicMock()
+    adapter = _adapter(registry, [_instance("azure-1", "azure")], logger)
+
+    def boom(*_a, **_k):
+        raise ValueError("secret-detail")
+
+    monkeypatch.setattr(TemplateConfigurationAdapter, "_to_internal_fields", staticmethod(boom))
+    errors = adapter.validate_template_config(_hf_azure_row(region="westus"))
+    assert not _has(errors, "conflicting")
+    logged = " ".join(str(a) for c in logger.warning.call_args_list for a in c.args)
+    assert "ValueError" in logged
+    assert "secret-detail" not in logged

@@ -76,10 +76,12 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         # Delegate to the active provider's registered validator so
         # provider-specific rules apply (e.g. the k8s validator rejects an
         # unknown provider_api, a bad namespace, or a per-kind-invalid restart
-        # policy).  The raw config dict is passed straight through — the
-        # provider validator coerces it to its own typed template internally,
-        # so this infrastructure adapter imports no provider package.  When no
+        # policy).  The provider validator coerces the row to its own typed
+        # template internally, so this infrastructure adapter imports no
+        # provider package.  Azure and GCP rows are first normalised to the
+        # internal field names, since their templates reject unknown keys.  When no
         # provider validator is available the generic checks are the verdict.
+        provider_type = declared_type
         try:
             provider_type = declared_type or self._type_from_provider_config(config)
             if not provider_type:
@@ -95,7 +97,8 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         # Build the provider template, as loading does, so a value the provider
         # template rejects is reported here rather than only at load.
         if config.get("template_id"):
-            conversion_error = self._template_conversion_error(provider_type, config)
+            # Unchanged by configuration-based resolution: it reads the declared type.
+            conversion_error = self._template_conversion_error(declared_type, config)
             if conversion_error:
                 errors.append(conversion_error)
 
@@ -136,6 +139,18 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
     # adapter reads legacy field names only and would reject current AWS
     # templates, so AWS validation stays as it was until its rules are updated.
     _VALIDATE_PATH_PENDING: frozenset[str] = frozenset({"aws"})
+
+    @staticmethod
+    def _to_internal_fields(provider_type: str, row: Any) -> Any:
+        """Map a HostFactory (camelCase) row to internal snake_case field names.
+
+        Keys already in internal form pass through, so mixed rows are fine.
+        """
+        if not isinstance(row, dict):
+            return row
+        from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
+
+        return HostFactoryFieldMapper(provider_type).map_input_fields(row)
 
     def _enabled_instances(self) -> list[Any]:
         """Enabled provider instances from configuration; empty when unreadable."""
@@ -216,6 +231,18 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         if provider_type in self._VALIDATE_PATH_PENDING:
             return []
 
+        validated_row = domain_template
+        if provider_type not in self._UNCHANGED_TYPES:
+            try:
+                validated_row = self._to_internal_fields(provider_type, domain_template)
+            except Exception as e:
+                self._logger.warning(
+                    "Could not normalise template fields for %s: %s; provider rules not applied",
+                    provider_type,
+                    type(e).__name__,
+                )
+                return []
+
         try:
             validator = self._create_validator(registry, provider_type, domain_template)
         except Exception as e:  # pragma: no cover — defensive
@@ -225,9 +252,11 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
             return []
 
         try:
-            result = validator.validate(domain_template)
+            result = validator.validate(validated_row)
         except Exception as e:  # pragma: no cover — defensive
-            self._logger.warning("%s template validator raised: %s", provider_type, e)
+            self._logger.warning(
+                "%s template validator raised: %s", provider_type, type(e).__name__
+            )
             return []
 
         raw_errors = getattr(result, "errors", None)
