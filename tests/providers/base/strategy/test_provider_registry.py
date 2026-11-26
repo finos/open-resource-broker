@@ -636,3 +636,61 @@ class TestProviderRegistryCreateStrategy:
         reg._strategy_cache["delegate_prov"] = sentinel
         result = reg.create_strategy("delegate_prov")
         assert result is sentinel
+
+
+@pytest.mark.unit
+class TestCreateValidatorConfig:
+    @staticmethod
+    def _registry_with(factory):
+        reg = _fresh_registry()
+        reg._logger = MagicMock()
+        reg.register_provider(
+            "cfg_provider",
+            _noop_strategy_factory,
+            _noop_config_factory,
+            validator_factory=factory,
+        )
+        return reg
+
+    def test_config_is_passed_to_factory(self):
+        factory = MagicMock(return_value=object())
+        reg = self._registry_with(factory)
+        reg.create_validator("cfg_provider", {"a": 1})
+        factory.assert_called_once_with({"a": 1})
+
+    def test_empty_config_is_a_real_config(self):
+        factory = MagicMock(return_value=object())
+        reg = self._registry_with(factory)
+        reg.create_validator("cfg_provider", {})
+        factory.assert_called_once_with({})
+
+    def test_no_config_calls_factory_without_arguments(self):
+        factory = MagicMock(return_value=object())
+        reg = self._registry_with(factory)
+        reg.create_validator("cfg_provider")
+        factory.assert_called_once_with()
+
+    def test_factory_failure_warns_with_class_name_only(self):
+        secret = "sentinel-secret-value"
+
+        def boom(config):
+            raise KeyError(f"bad {config['token']}")
+
+        reg = self._registry_with(boom)
+        assert reg.create_validator("cfg_provider", {"token": secret}) is None
+        reg._logger.warning.assert_called_once()
+        logged = " ".join(str(a) for a in reg._logger.warning.call_args.args)
+        assert "cfg_provider" in logged
+        assert "KeyError" in logged
+        assert secret not in logged
+
+    def test_none_result_for_a_config_warns(self):
+        reg = self._registry_with(lambda config: None)
+        assert reg.create_validator("cfg_provider", {"x": 1}) is None
+        reg._logger.warning.assert_called_once()
+        assert "cfg_provider" in " ".join(str(a) for a in reg._logger.warning.call_args.args)
+
+    def test_none_result_without_config_is_quiet(self):
+        reg = self._registry_with(lambda config=None: None)
+        assert reg.create_validator("cfg_provider") is None
+        reg._logger.warning.assert_not_called()
