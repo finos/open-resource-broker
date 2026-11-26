@@ -29,6 +29,7 @@ Note:
 
 import time
 import uuid
+from collections.abc import Iterator
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
@@ -690,15 +691,11 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
             for resource_id in resource_ids:
                 try:
-                    response = self.aws_client.ec2_client.describe_instances(
-                        Filters=[{"Name": "reservation-id", "Values": [resource_id]}]
-                    )
-
-                    instance_ids = []
-                    for reservation in response.get("Reservations", []):
-                        instance_ids.extend(
-                            instance["InstanceId"] for instance in reservation.get("Instances", [])
-                        )
+                    instance_ids = [
+                        instance["InstanceId"]
+                        for reservation in self._describe_reservation_pages(resource_id)
+                        for instance in reservation.get("Instances", [])
+                    ]
 
                     if instance_ids:
                         detailed_instances = self._get_instance_details(
@@ -712,8 +709,8 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                         )
                         all_instances.extend(formatted)
 
-                except ClientError as e:
-                    if e.response["Error"]["Code"] == "InvalidReservationID.NotFound":
+                except Exception as e:
+                    if error_code_of(e) == "InvalidReservationID.NotFound":
                         self._logger.warning("Reservation ID %s not found", resource_id)
                         continue
                     raise
@@ -780,6 +777,20 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         caller can tell "lookup failed" apart from "no instances".
         """
         instance_ids: list[str] = []
+        try:
+            for reservation in self._describe_reservation_pages(resource_id):
+                for instance in reservation.get("Instances", []):
+                    iid = instance.get("InstanceId")
+                    state = (instance.get("State") or {}).get("Name")
+                    if iid and state != "terminated":
+                        instance_ids.append(iid)
+        except Exception as e:
+            if error_code_of(e) != "InvalidReservationID.NotFound":
+                raise
+        return instance_ids
+
+    def _describe_reservation_pages(self, resource_id: str) -> Iterator[dict[str, Any]]:
+        """Yield the reservations matching ``resource_id``, walking every ``NextToken`` page."""
         next_token: Optional[str] = None
         while True:
             kwargs: dict[str, Any] = {
@@ -787,25 +798,15 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             }
             if next_token:
                 kwargs["NextToken"] = next_token
-            try:
-                response = self._retry_with_backoff(
-                    self.aws_client.ec2_client.describe_instances,
-                    operation_type="read_only",
-                    **kwargs,
-                )
-            except Exception as e:
-                if error_code_of(e) == "InvalidReservationID.NotFound":
-                    return instance_ids
-                raise
-            for reservation in response.get("Reservations", []):
-                for instance in reservation.get("Instances", []):
-                    iid = instance.get("InstanceId")
-                    state = (instance.get("State") or {}).get("Name")
-                    if iid and state != "terminated":
-                        instance_ids.append(iid)
+            response = self._retry_with_backoff(
+                self.aws_client.ec2_client.describe_instances,
+                operation_type="read_only",
+                **kwargs,
+            )
+            yield from response.get("Reservations", [])
             next_token = response.get("NextToken")
             if not next_token:
-                return instance_ids
+                return
 
     # An empty reservation lookup right after a launch may only be describe lag.
     _CANCEL_LOOKUP_RETRIES = 2
