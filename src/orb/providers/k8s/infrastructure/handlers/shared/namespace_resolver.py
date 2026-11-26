@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from orb.providers.k8s.configuration.config import K8sProviderConfig
+from orb.providers.k8s.utilities.labels import validate_namespace
 
 
 def resolve_namespace(
@@ -100,6 +101,11 @@ def resolve_namespace_from_provider_data(
     ``_resolve_namespace`` model_validator on :class:`K8sProviderConfig`
     guarantees the default is always a non-empty string.
 
+    A stored namespace is checked against the RFC 1123 label rules before it
+    is used in an API path.  The ``namespaces`` allowlist is deliberately not
+    applied: it is a creation-time control, and a pod launched before the list
+    was narrowed must still be releasable.
+
     Args:
         provider_data: The ``provider_data`` dict stored on the Request
             aggregate by ``acquire_hosts``.
@@ -107,9 +113,14 @@ def resolve_namespace_from_provider_data(
 
     Returns:
         The resolved namespace as a non-empty string.
+
+    Raises:
+        K8sValidationError: When the stored namespace is not a valid RFC 1123
+            DNS label.
     """
     ns = provider_data.get("namespace")
     if isinstance(ns, str) and ns:
+        validate_namespace(ns)
         return ns
     namespace = config.namespace
     assert namespace is not None, (  # noqa: S101  # type-narrowing; K8sProviderConfig's model_validator guarantees this

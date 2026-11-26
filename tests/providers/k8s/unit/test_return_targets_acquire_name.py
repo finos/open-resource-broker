@@ -138,3 +138,49 @@ async def test_terminate_forwards_machine_coordinates() -> None:
         strategy._handler_registry.return_machines.await_args_list[0].kwargs["machine_coordinates"]
         == coordinates
     )
+
+
+_PLACEMENTS = {
+    "m-good": {"provider_data": {"namespace": "orb-team-a"}, "request_id": "req-1"},
+    "m-bad": {"provider_data": {"namespace": "Bad_NS"}, "request_id": "req-1"},
+}
+
+
+@pytest.mark.asyncio
+async def test_return_with_invalid_stored_namespace_releases_only_the_rest() -> None:
+    from orb.domain.base.operation_outcome import Failed
+
+    strategy, handler = _strategy_with_mock_handler()
+    handler.release_hosts = AsyncMock(return_value={"deleted": ["m-good"]})
+
+    outcome = await strategy._handler_registry.return_machines(
+        ["m-good", "m-bad"],
+        SimpleNamespace(request_id="req-RET", provider_data={}),
+        machine_coordinates=_PLACEMENTS,
+    )
+
+    handler.release_hosts.assert_awaited_once()
+    released, provider_data = handler.release_hosts.await_args[0]
+    assert released == ["m-good"]
+    assert provider_data["namespace"] == "orb-team-a"
+    assert isinstance(outcome, Failed)
+    assert outcome.metadata["provider_data"]["successful_instance_ids"] == ["m-good"]
+    assert outcome.metadata["provider_data"]["failed_instance_ids"] == ["m-bad"]
+
+
+@pytest.mark.asyncio
+async def test_status_read_marks_only_the_invalid_namespace_machine_unreadable() -> None:
+    strategy, handler = _strategy_with_mock_handler()
+    handler.read_pods_for_return = MagicMock(
+        return_value=SimpleNamespace(instances=[], unreadable=set())
+    )
+
+    _, unreadable, _ = await strategy._handler_registry._read_return_pods(
+        handler,
+        ["m-good", "m-bad"],
+        SimpleNamespace(request_id="req-RET", provider_data={}),
+        _PLACEMENTS,
+    )
+
+    assert unreadable == {"m-bad"}
+    handler.read_pods_for_return.assert_called_once_with("orb-team-a", "req-1", ["m-good"])

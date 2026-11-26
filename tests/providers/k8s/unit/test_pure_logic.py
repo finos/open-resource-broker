@@ -1195,6 +1195,25 @@ class TestResolveNamespaceFromProviderData:
         result = resolve_namespace_from_provider_data({"namespace": None}, config)
         assert result == "fallback-ns"
 
+    @pytest.mark.parametrize("stored", ["Bad_NS", "a;b", "x" * 64, "UPPER", "-lead"])
+    def test_invalid_stored_namespace_rejected(self, stored: str) -> None:
+        from orb.providers.k8s.infrastructure.handlers.shared.namespace_resolver import (
+            resolve_namespace_from_provider_data,
+        )
+        from orb.providers.k8s.utilities.labels import K8sValidationError
+
+        with pytest.raises(K8sValidationError):
+            resolve_namespace_from_provider_data({"namespace": stored}, self._make_config())
+
+    def test_stored_namespace_outside_allowlist_still_returned(self) -> None:
+        from orb.providers.k8s.configuration.config import K8sProviderConfig
+        from orb.providers.k8s.infrastructure.handlers.shared.namespace_resolver import (
+            resolve_namespace_from_provider_data,
+        )
+
+        config = K8sProviderConfig(namespace="team-a", namespaces=["team-a"])  # type: ignore[call-arg]
+        assert resolve_namespace_from_provider_data({"namespace": "older-ns"}, config) == "older-ns"
+
 
 # ---------------------------------------------------------------------------
 # Status resolvers — compute_fulfilment (pure logic, no handler needed)
