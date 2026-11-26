@@ -1,9 +1,12 @@
 """Integration tests for provider strategy system."""
 
+import pytest
+
 from orb.config.managers.type_converter import ConfigTypeConverter
 from orb.providers.aws.configuration.config import AWSProviderConfig
 
 
+@pytest.mark.usefixtures("aws_provider_settings_registered")
 class TestProviderStrategyIntegration:
     """Test provider strategy system integration scenarios."""
 
