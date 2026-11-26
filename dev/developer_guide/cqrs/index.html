@@ -1208,6 +1208,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/domain_pydantic_convention/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pydantic in the Domain
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../architecture/template-infrastructure/" class="md-nav__link">
         
   
@@ -2158,6 +2186,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Query Handlers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#handler-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handler naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -6598,6 +6643,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Query Handlers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#handler-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handler naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -7118,6 +7180,9 @@
 <a id="__codelineno-8-50" name="__codelineno-8-50" href="#__codelineno-8-50"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to list requests: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <a id="__codelineno-8-51" name="__codelineno-8-51" href="#__codelineno-8-51"></a>            <span class="k">raise</span>
 </code></pre></div>
+<h4 id="handler-naming">Handler naming<a class="headerlink" href="#handler-naming" title="Permanent link">&para;</a></h4>
+<p>A query handler that writes as a side effect of answering, for example by persisting machine or request state it just refreshed from the provider, carries the <code>SyncAnd</code> prefix (<code>SyncAndGetRequestHandler</code>, <code>SyncAndListMachinesHandler</code>). The name tells the reader the query is not read-only. A handler whose query can only read keeps the plain name.</p>
+<p>If a sync path needs its own failure or retry semantics, split it out of the query into a command instead of growing the handler. An architecture test fails when a registered query handler calls a <code>sync_*</code> or <code>populate_*</code> method on a sync service without the prefix.</p>
 <h3 id="query-bus">Query Bus<a class="headerlink" href="#query-bus" title="Permanent link">&para;</a></h3>
 <p>The query bus routes queries to their appropriate handlers:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">QueryBus</span><span class="p">:</span>

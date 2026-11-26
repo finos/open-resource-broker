@@ -1208,6 +1208,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../domain_pydantic_convention/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pydantic in the Domain
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../template-infrastructure/" class="md-nav__link">
         
   
@@ -7149,13 +7177,11 @@
 <a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Lazy container creation.&quot;&quot;&quot;</span>
 <a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_container</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 <a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_container</span> <span class="o">=</span> <span class="n">get_container</span><span class="p">()</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>            <span class="c1"># Set up domain container for decorators</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>            <span class="n">set_domain_container</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_container</span><span class="p">)</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_ensure_config_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Lazy config manager creation.&quot;&quot;&quot;</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config_manager</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_config_manager</span> <span class="o">=</span> <span class="n">get_config_manager</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config_path</span><span class="p">)</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_ensure_config_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Lazy config manager creation.&quot;&quot;&quot;</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_config_manager</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_config_manager</span> <span class="o">=</span> <span class="n">get_config_manager</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config_path</span><span class="p">)</span>
 </code></pre></div>
 <p><strong>Performance Impact</strong>:
 - <strong>Constructor</strong>: ~0ms (only logger creation)
