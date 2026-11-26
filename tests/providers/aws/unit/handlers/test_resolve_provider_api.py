@@ -173,10 +173,19 @@ class TestSpotFleetHandlerResolveProviderApi:
         request = _make_request(metadata={"other_key": "value"}, provider_api="ReqSpot2")
         assert handler._resolve_provider_api(request) == "ReqSpot2"
 
-    # metadata absent entirely (None) — gracefully handled
-    def test_none_metadata_does_not_raise(self):
+    # metadata left at its default (empty dict) on a real Request
+    def test_default_metadata_does_not_raise(self):
+        from orb.domain.request.aggregate import Request
+        from orb.domain.request.value_objects import RequestId, RequestType
+
         handler = self._make()
-        request = MagicMock()
-        request.metadata = None
-        request.provider_api = "FromReqDirectly"
+        request = Request(
+            request_id=RequestId(value="req-00000000-0000-0000-0000-000000000123"),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
+            template_id="tpl-1",
+            requested_count=1,
+            provider_api="FromReqDirectly",
+        )
+        assert request.metadata == {}
         assert handler._resolve_provider_api(request) == "FromReqDirectly"

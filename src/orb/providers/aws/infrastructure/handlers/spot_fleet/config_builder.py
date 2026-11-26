@@ -102,7 +102,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
         """Delegate capacity distribution to the template's own logic."""
         # Differs on purpose from the ASG builder (on-demand floor of 1 when a percentage is set)
         price_type = template.price_type
-        percent_on_demand = getattr(template, "percent_on_demand", None)
+        percent_on_demand = template.percent_on_demand
 
         if price_type == "ondemand":
             on_demand_count = requested_count
@@ -122,7 +122,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
 
     def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Build the context dict used by native spec rendering."""
-        requested_count = int(getattr(request, "requested_count", 1) or 1)
+        requested_count = int(request.requested_count or 1)
         capacity = self._calculate_capacity_distribution(template, requested_count)
 
         if self._config_port is None:
@@ -236,7 +236,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
                 fleet_role,
             )
 
-        requested_count = int(getattr(request, "requested_count", 0) or 1)
+        requested_count = int(request.requested_count or 1)
         capacity = self._calculate_capacity_distribution(template, requested_count)
         target_capacity = capacity["target_capacity"]
         on_demand_capacity = capacity["on_demand_count"]
@@ -321,7 +321,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
             if overrides:
                 fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
 
-        expiry_minutes = getattr(template, "spot_fleet_request_expiry", None)
+        expiry_minutes = template.spot_fleet_request_expiry
         if expiry_minutes is not None and isinstance(expiry_minutes, (int, float)):
             valid_until = datetime.now(timezone.utc) + timedelta(minutes=int(expiry_minutes))
             fleet_config["ValidUntil"] = valid_until.strftime("%Y-%m-%dT%H:%M:%SZ")
