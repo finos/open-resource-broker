@@ -770,6 +770,28 @@ def _get_default_config(
     )
 
 
+# Options the init parser defines directly (not through a provider spec).
+_CORE_INIT_OPTIONS = frozenset({"subnet_ids", "security_group_ids", "fleet_role"})
+
+
+def validate_init_options(options: Mapping[str, Any]) -> None:
+    """Reject option names the ``orb init`` command does not define.
+
+    The allowed names are the core init options plus every argument a registered
+    provider spec adds to the init parser, so a new provider is picked up
+    without a change here. Used for options that arrive from outside the command
+    line (the REST init endpoint).
+    """
+    allowed = set(_CORE_INIT_OPTIONS)
+    for spec in CLISpecRegistry.all().values():
+        scratch = argparse.ArgumentParser(add_help=False)
+        spec.add_arguments(scratch)
+        allowed.update(vars(scratch.parse_args([])))
+    for key in options:
+        if key not in allowed:
+            raise InvalidInitInputError(f"Unknown option: {key!r}")
+
+
 def build_default_config(
     container: Any,
     *,

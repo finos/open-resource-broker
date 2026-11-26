@@ -302,10 +302,12 @@ async def init_orb(
                 InvalidInitInputError,
                 _test_provider_credentials,
                 build_default_config,
+                validate_init_options,
             )
 
             container = get_di_container()
             try:
+                validate_init_options(body.options)
                 init_config = build_default_config(
                     container,
                     provider_type=body.provider_type,
