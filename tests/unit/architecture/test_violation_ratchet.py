@@ -114,15 +114,6 @@ def _count_storage_leaks() -> int:
     return count
 
 
-def _count_domain_pydantic() -> int:
-    count = 0
-    for f in collect_python_files(SRC_ORB / "domain"):
-        for imp in extract_imports(f):
-            if imp == "pydantic" or imp.startswith("pydantic."):
-                count += 1
-    return count
-
-
 def _count_interface_provider() -> int:
     iface_dirs = [SRC_ORB / "interface", SRC_ORB / "api", SRC_ORB / "cli"]
     count = 0
@@ -258,7 +249,6 @@ _COUNTERS = {
     "provider_leaks_non_di": _count_provider_leaks,
     "scheduler_leaks": _count_scheduler_leaks,
     "storage_leaks_non_storage": _count_storage_leaks,
-    "domain_pydantic_violations": _count_domain_pydantic,
     "interface_provider_direct_imports": _count_interface_provider,
     "circular_dependency_cycles": _count_cycles,
     "cli_infrastructure_direct_imports": _count_cli_infrastructure,

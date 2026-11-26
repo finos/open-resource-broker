@@ -106,6 +106,7 @@ nav:
     - Architecture:
       - System Overview: architecture/system_overview.md
       - Clean Architecture: architecture/clean_architecture.md
+      - Pydantic in the Domain: architecture/domain_pydantic_convention.md
       - Template Infrastructure: architecture/template-infrastructure.md
       - System Diagrams: architecture/system_diagrams.md
       - CQRS Pattern: architecture/cqrs_pattern.md
