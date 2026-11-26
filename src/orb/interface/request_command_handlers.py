@@ -330,6 +330,8 @@ async def handle_list_requests(
             provider_name=getattr(args, "provider_name", None),
             provider_type=getattr(args, "provider_type", None),
             filter_expressions=getattr(args, "filter", None) or [],
+            start_time=getattr(args, "start_time", None),
+            end_time=getattr(args, "end_time", None),
         )
     )
     print_cursor_hint(args, result)

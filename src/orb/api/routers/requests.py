@@ -79,6 +79,11 @@ CANCEL_ORCHESTRATOR = Depends(get_cancel_request_orchestrator)
 CONFIRM_TERMINATED_ORCHESTRATOR = Depends(get_confirm_terminated_orchestrator)
 FORMATTER = Depends(get_request_formatter)
 STATUS_QUERY = Query(None, description="Filter by request status")
+TIME_RANGE_DESCRIPTION = (
+    "Only requests created at or {} the given time, inclusive. ISO-8601: YYYY-MM-DD or "
+    "YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+HH:MM]; no offset means UTC and a date-only value is "
+    "midnight UTC. A malformed value is rejected with 400."
+)
 LIMIT_QUERY = Query(50, ge=1, le=1000, description="Limit number of results")
 OFFSET_QUERY = Query(0, ge=0, description="Number of results to skip")
 
@@ -153,6 +158,8 @@ async def list_requests(
     template_id: Optional[str] = Query(None, description="Filter by template ID"),
     request_type: Optional[str] = Query(None, description="Filter by request type"),
     filter_expressions: list[str] = Query(default=[]),
+    start_time: Optional[str] = Query(None, description=TIME_RANGE_DESCRIPTION.format("after")),
+    end_time: Optional[str] = Query(None, description=TIME_RANGE_DESCRIPTION.format("before")),
     _user=Depends(require_role("viewer")),
     orchestrator=LIST_ORCHESTRATOR,
     formatter=FORMATTER,
@@ -172,6 +179,8 @@ async def list_requests(
             template_id=template_id,
             request_type=request_type,
             filter_expressions=filter_expressions,
+            start_time=start_time,
+            end_time=end_time,
         )
     )
     return render_rest("list_requests", formatter, result)

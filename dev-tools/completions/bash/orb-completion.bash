@@ -71,7 +71,7 @@ _orb_completion() {
                     COMPREPLY=($(compgen -W "$global_opts" -- "$cur"))
                     ;;
                 list)
-                    COMPREPLY=($(compgen -W "--status --limit $global_opts" -- "$cur"))
+                    COMPREPLY=($(compgen -W "--status --limit --start-time --end-time $global_opts" -- "$cur"))
                     ;;
                 *)
                     COMPREPLY=($(compgen -W "status list show cancel $global_opts" -- "$cur"))

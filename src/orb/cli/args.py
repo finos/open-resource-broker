@@ -366,6 +366,20 @@ def add_request_actions(subparsers, pp: "ParentParsers | None" = None):
         choices=["acquire", "return"],
         help="Filter by request type (specific filter)",
     )
+    requests_list.add_argument(
+        "--start-time",
+        help=(
+            "Only requests created at or after this time (inclusive). ISO-8601: "
+            "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+HH:MM]; no offset means UTC"
+        ),
+    )
+    requests_list.add_argument(
+        "--end-time",
+        help=(
+            "Only requests created at or before this time (inclusive). Same formats as "
+            "--start-time; a date-only value is midnight UTC and so excludes that day"
+        ),
+    )
 
     requests_show = subparsers.add_parser(
         "show",

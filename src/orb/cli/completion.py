@@ -84,7 +84,7 @@ _orb_completion() {
                 COMPREPLY=($(compgen -W "--status --template-id --format" -- "$cur"))
                 ;;
             "requests list")
-                COMPREPLY=($(compgen -W "--status --template-id --format" -- "$cur"))
+                COMPREPLY=($(compgen -W "--status --template-id --start-time --end-time --format" -- "$cur"))
                 ;;
         esac
     fi
@@ -231,6 +231,8 @@ _orb_options() {
             _arguments \
                 '--status[Filter by status]:status:' \
                 '--template-id[Filter by template]:template:' \
+                '--start-time[Created at or after (ISO-8601)]:time:' \
+                '--end-time[Created at or before (ISO-8601)]:time:' \
                 '--format[Output format]:(json yaml table list)'
             ;;
     esac
