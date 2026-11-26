@@ -3,11 +3,6 @@
 No file I/O, no DI container, no AWS.
 """
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
-
 from orb.infrastructure.scheduler.default.field_mapper import DefaultFieldMapper
 from orb.infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
 from orb.infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings

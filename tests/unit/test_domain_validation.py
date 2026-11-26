@@ -6,14 +6,10 @@ This test isolates domain model validation issues to understand what's failing
 and ensure we're creating valid domain objects correctly.
 """
 
-import os
 import sys
 import traceback
 
 import pytest
-
-# Add project root to path
-sys.path.insert(0, os.path.abspath("."))
 
 
 def test_domain_validation():

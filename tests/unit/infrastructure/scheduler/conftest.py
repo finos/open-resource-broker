@@ -1,14 +1,11 @@
 """Shared fixtures and SCHEDULER_CONFIGS for parametric scheduler tests."""
 
 import json
-import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy

@@ -6,14 +6,9 @@ Tests the complete flow from request creation through AWS provisioning
 with launch template management, provider tracking, and machine creation.
 """
 
-import os
-import sys
 from unittest.mock import Mock
 
 import pytest
-
-# Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from orb.domain.base.value_objects import InstanceType
 from orb.domain.machine.aggregate import Machine

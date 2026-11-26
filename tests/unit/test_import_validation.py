@@ -4,14 +4,7 @@ This test suite validates that all critical imports work correctly and catches
 issues that might be introduced during code refactoring or module reorganization.
 """
 
-import sys
-from pathlib import Path
-
 import pytest
-
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 
 class TestCriticalImports:

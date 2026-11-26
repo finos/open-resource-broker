@@ -4,11 +4,7 @@ Uses tmp_path to write fixture files. No DI container, no AWS.
 """
 
 import json
-import sys
-from pathlib import Path
 from typing import Any
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (

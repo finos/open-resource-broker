@@ -6,12 +6,7 @@ They mock the CQRS buses so no real AWS or moto context is needed.
 If FastAPI or httpx is not available, tests are skipped with a clear message.
 """
 
-import sys
-from pathlib import Path
-
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 try:
     import jsonschema

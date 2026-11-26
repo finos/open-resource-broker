@@ -4,13 +4,10 @@ Test for Integration Flow: Integration Flow Fix
 Tests that the AWS provider strategy now uses the appropriate handler system instead of bypassing it.
 """
 
-import os
 import sys
 from unittest.mock import MagicMock
 
 import pytest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 
 @pytest.mark.asyncio

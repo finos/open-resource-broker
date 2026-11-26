@@ -13,17 +13,11 @@ from __future__ import annotations
 import os
 import tempfile
 import threading
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 import sqlalchemy as sa
-
-# ---------------------------------------------------------------------------
-# Locate the strategy module
-# ---------------------------------------------------------------------------
-_SRC_DIR = Path(__file__).parent.parent.parent.parent.parent / "src"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -84,9 +78,7 @@ def _stamp_value(engine: sa.Engine) -> str | None:
 
 def _make_strategy(engine: sa.Engine) -> Any:
     """Import SQLStorageStrategy and return an instance wired to *engine*."""
-    import sys
 
-    sys.path.insert(0, str(_SRC_DIR))
     from orb.infrastructure.storage.sql.strategy import SQLStorageStrategy
 
     # Patch _initialize_table so the constructor doesn't open the DB.
