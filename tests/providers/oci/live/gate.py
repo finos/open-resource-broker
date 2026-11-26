@@ -214,12 +214,18 @@ def _load_resolved_template(
     """Adapt a template catalog to the current CLI's single-template file contract."""
     from orb.application.services.template_defaults_service import TemplateDefaultsService
     from orb.config.manager import ConfigurationManager
+    from orb.domain.template.factory import TemplateFactory
     from orb.infrastructure.adapters.configuration_adapter import ConfigurationAdapter
     from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
     from orb.infrastructure.registry.template_extension_registry import (
         TemplateExtensionRegistryAdapter,
     )
-    from orb.providers.oci.registration import initialize_oci_provider
+    from orb.providers.oci.registration import (
+        initialize_oci_provider,
+        register_oci_provider,
+        register_oci_template_factory,
+    )
+    from orb.providers.registry import ProviderRegistry
 
     data = json.loads(template_file.read_text(encoding="utf-8"))
     candidates = data.get("templates", [data])
@@ -236,8 +242,17 @@ def _load_resolved_template(
     initialize_oci_provider()
     logger = LoggingAdapter()
     config = ConfigurationAdapter(ConfigurationManager(config_file=str(config_file)), logger)
+    extension_registry = TemplateExtensionRegistryAdapter()
+    template_factory = TemplateFactory(extension_registry=extension_registry, logger=logger)
+    register_oci_template_factory(template_factory, logger)
+    registry = ProviderRegistry()
+    register_oci_provider(registry, logger)
     defaults = TemplateDefaultsService(
-        config, logger, extension_registry=TemplateExtensionRegistryAdapter()
+        config,
+        logger,
+        template_factory=template_factory,
+        extension_registry=extension_registry,
+        provider_registry=registry,
     )
     return defaults.resolve_template_defaults(
         {**template, "provider_name": provider, "provider_type": "oci"}, provider

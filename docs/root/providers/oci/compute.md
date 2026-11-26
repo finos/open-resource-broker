@@ -91,18 +91,21 @@ orb requests status <return-request-id>
 | `compartment_id` | Yes | string | Target compartment OCID. |
 | `availability_domain` | For compute clusters; recommended otherwise | string | Target AD. Otherwise the handler attempts resolution from subnet/compartment information. |
 | `security_group_ids` | No | list[string] | OCI NSG OCIDs attached to the worker VNIC. |
+| `public_ip_assignment` | No | boolean or null | Whether to assign a public IPv4 address to the primary VNIC. Omitted or null leaves OCI's subnet-based default in effect when no provider default is configured. |
 | `shape_config` | Explicit in shipped VM examples | object | `ocpus` and `memoryInGBs`; DenseIO requires a supported pair. Omit for bare metal. |
 | `ocpus`, `memory_gbs` | No | number | Alternate top-level sizing inputs; override the corresponding `shape_config` values. |
 | `capacity_type` | No | string | `ondemand` (default) or `preemptible`. |
 | `fallback_to_ondemand` | No | boolean | Retry a failed preemptible launch as on-demand using the same shape and image. Default from `template.default_fallback_to_ondemand` (`false`), overridable per provider type, provider instance, template and request. |
 | `preemptible_preserve_boot_volume` | No | boolean | Preserve the boot disk on preemption. Default `false`; does not configure ordinary worker return. |
 | `boot_volume_gbs` | No | number | Boot disk size in GB, independent of DenseIO local NVMe. |
+| `boot_volume_vpus_per_gb` | No | integer | Optional boot disk performance: `10`, `20`, or `30`–`120` VPUs/GB. Independent of boot disk size; also accepts `bootVolumeVpusPerGB`. |
 | `max_machines` | No | integer | Maximum machines for the template; accepts `max_instances`. |
 | `ssh_authorized_keys` | No | string | SSH public key text. |
 | `machine_bootstrap` | No | string | Base64 cloud-init/user data; also accepts `user_data`. |
 | `tags` | No | object | OCI freeform instance tags. |
 | `compute_cluster_id` | No | string | Existing cluster OCID; requires bare metal, explicit AD, and on-demand capacity. |
 | `agent_config` | No | object | OCI agent configuration, including HPC plugin settings. |
+| `instance_options` | No | object | OCI instance metadata options; set `areLegacyImdsEndpointsDisabled` to `true` to require IMDSv2. |
 | `pricing` | No | object | Static estimate overrides; does not constrain OCI billing. |
 
 Required deployment fields may come from provider template defaults. OCI-specific
@@ -111,6 +114,99 @@ over defaults. Shape aliases include `shape`, `machine_type`, and `instance_type
 The complete shipped shape matrix and architecture requirements are in the
 [template guide](templates.md).
 
+Explicit saved IMDS booleans and `capacity_type` choices retain precedence over
+provider template defaults after reloading. An absent or null `instance_options`,
+`{}`, or a null nested IMDS option remains unset and inherits the configured
+default; these values do not clear it. Review saved `capacity_type` values before
+upgrading: a persisted `preemptible` choice previously masked by a lower
+`ondemand` default will now request preemptible capacity.
+
+### Instance metadata service
+
+To disable legacy IMDSv1 endpoints for new workers, add this entry to the
+template's `provider_config`:
+
+```json
+{
+  "provider_config": {
+    "instance_options": {
+      "areLegacyImdsEndpointsDisabled": true
+    }
+  }
+}
+```
+
+The option is omitted by default, preserving the existing OCI launch behavior.
+An explicit `false` is passed through unchanged, but tenancy policy can reject
+launches that permit IMDSv1. Before setting `true`, verify that the selected image,
+cloud-init, agents, and workload bootstrap support IMDSv2. Applications must use
+the `/opc/v2` metadata endpoints with the required authorization header; legacy
+metadata requests stop working. See Oracle's
+[instance metadata guide](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/gettingmetadata.htm).
+
+An IAM-denied launch can surface as `404 NotAuthorizedOrNotFound`; this error also
+has other causes. Check the stored OCI error and applicable policies. A tenancy
+may deny instance creation unless legacy metadata endpoints are disabled, and
+Deny takes precedence over Allow. Members of the default administrator group in
+the default domain are exempt from Deny policies, so an operator's successful
+launch does not establish that the broker's instance principal has the same
+access. See Oracle's [Deny policy documentation](https://docs.oracle.com/en-us/iaas/Content/Identity/policysyntax/denypolicies.htm).
+
+### Public-IP assignment
+
+Set `"public_ip_assignment": false` on a template to request a worker without a public
+IPv4 address, including in a public subnet. Set it to `true` only when the chosen
+subnet permits public addresses. The value must be a JSON boolean; strings such
+as `"false"` and numbers are rejected before launch. The choice is preserved
+during an on-demand capacity fallback and does not change the subnet or NSGs.
+
+If no value is supplied through the template or provider defaults, ORB omits
+`createVnicDetails.assignPublicIp`. OCI then assigns a public address in a public
+subnet and none in a private subnet. OCI rejects `true` when the subnet's
+`prohibitPublicIpOnVnic` setting is enabled. This handler relies on that launch
+validation; it does not read the subnet to validate this setting beforehand.
+See Oracle's [CreateVnicDetails reference](https://docs.oracle.com/en-us/iaas/tools/python/latest/api/core/models/oci.core.models.CreateVnicDetails.html#oci.core.models.CreateVnicDetails.assign_public_ip).
+
+This uses ORB's existing top-level `public_ip_assignment` field. It can also be
+set in provider `template_defaults`; an explicit template value, including
+`false`, overrides that default and survives saving and reloading the template.
+
+### Boot-volume performance
+
+To select boot disk performance independently of its capacity, add an optional
+integer to the template or its provider template defaults:
+
+```json
+{
+  "provider_config": {
+    "boot_volume_gbs": 200,
+    "boot_volume_vpus_per_gb": 20
+  }
+}
+```
+
+`10` selects Balanced, `20` Higher Performance, and integers from `30` through
+`120` Ultra High Performance, following Oracle's
+[image-source API contract](https://docs.oracle.com/en-us/iaas/tools/python/latest/api/core/models/oci.core.models.InstanceSourceViaImageDetails.html).
+Use a JSON integer: booleans, quoted numbers and floating-point values are
+rejected before launch. `0` (Lower Cost) is not supported for boot volumes.
+The option maps to `sourceDetails.bootVolumeVpusPerGB`; omitting it leaves the
+existing launch request unchanged and uses OCI's Balanced default. It does not
+set or resize the boot disk, change the image, configure performance autotuning,
+or affect the shape's DenseIO local NVMe disks. An on-demand fallback retains
+the same boot disk settings.
+
+Check the selected shape, image and attachment support before choosing Ultra
+High Performance. Oracle documents this boot-volume level for VM instances
+with paravirtualized attachments; achieved performance also depends on boot
+disk capacity and instance resources. See
+[Boot Volumes and Ultra High Performance](https://docs.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeultrahighperformance.htm#Boot_Volumes_and_Ultra_High_Performance).
+ORB's static price estimate includes its configured capacity rate and does not
+add a VPU performance premium. Verify current storage and performance charges
+with OCI pricing for your deployment. Live acceptance must independently read
+the boot volume's `vpus-per-gb` and verify boot-volume cleanup after worker
+return; instance status alone does not establish either result.
+
 ### Preemptible capacity
 
 Use `capacity_type: "preemptible"`; the AWS `price_type: "spot"` field does not
@@ -118,6 +214,51 @@ select OCI preemptible capacity. With `fallback_to_ondemand: true`, a failed
 preemptible launch triggers an on-demand attempt. This is a retry after a launch
 error, not a replacement service for workers that are preempted later.
 Fallback never changes the shape, image, or architecture.
+
+## Optional launch preflight
+
+Set `launch_preflight` to `true` in an OCI provider instance's `config` to check
+live compatibility before each acquisition batch:
+
+```json
+{
+  "region": "us-phoenix-1",
+  "credential_source": "instance_principal",
+  "launch_preflight": true
+}
+```
+
+The default is `false`. Enabling it adds OCI reads using the same configured
+region and credentials as the launch. Preflight checks that the image and
+subnet are `AVAILABLE`, that an AD-specific subnet matches the selected AD, and
+that OCI lists the shape for the compartment, image and AD. It checks OCPU,
+total memory and memory-per-OCPU limits, including any stricter image limits.
+Regional subnets are supported; without an explicit AD, the existing first-AD
+selection is used. Checks run once per batch, with fresh reads on the next
+request. Dry runs and template registration/validation remain offline.
+
+For Flex templates, specify both OCPUs and memory, for example
+`"shape_config": {"ocpus": 4, "memoryInGBs": 32}`. If both are omitted for a
+`Flex` shape, preflight checks the launcher's existing 1 OCPU / 16 GB defaults.
+Partial sizing requires both values to be made explicit so preflight can check
+the actual requested size without guessing OCI's server-side defaults.
+
+Known incompatible settings return `OCI_PREFLIGHT_REJECTED` without submitting
+a launch. Missing read access, a 404, transient failures, incomplete responses
+or unresolved partial sizing return `OCI_PREFLIGHT_UNAVAILABLE`, also without
+launching. Correct the settings or restore access and retry. Raw CLI error
+responses and private bootstrap data are excluded from these errors.
+
+The principal needs access to `GetImage`, `GetSubnet`, `ListShapes` and
+`GetImageShapeCompatibilityEntry`, plus `ListAvailabilityDomains` when an AD
+must be selected. Existing operation-conditioned launch policies may need
+additional read permissions. See Oracle's
+[API permission reference](https://docs.oracle.com/en-us/iaas/Content/Identity/policyreference/corepolicyreference_topic-Permissions_Required_for_Each_API_Operation.htm).
+
+These checks do not reserve resources or establish live host capacity, quota
+availability, pricing, all launch permissions, or scheduler readiness. OCI still
+validates each launch, and the existing retry, reconciliation, capacity fallback
+and rollback behavior applies after preflight succeeds.
 
 ## Machine data
 
@@ -280,7 +421,8 @@ permissions. Cluster placement additionally needs `use compute-clusters`.
 - Pricing estimates are static and may be unknown for a shape.
 - HostFactory field mapping and CLI workflows are tested offline; actual Symphony
   registration remains unvalidated.
-- Availability and image compatibility must be validated for each selected shape.
+- Each selected shape needs deployment validation; optional launch preflight
+  checks current image/network compatibility and sizing without reserving capacity.
 - Launch and status calls are sequential; large batches incur per-instance CLI overhead.
 
 ## Related
