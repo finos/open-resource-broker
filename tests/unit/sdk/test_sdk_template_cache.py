@@ -331,3 +331,125 @@ class TestTemplateCacheConfig:
         from orb.sdk.protocols import ORBClientProtocol
 
         assert hasattr(ORBClientProtocol, "clear_cache")
+
+
+class TestInvalidatingCommandSet:
+    def test_set_is_exactly_the_audited_commands(self):
+        assert ORBClient._CACHE_INVALIDATING_METHODS == {
+            "set_configuration",
+            "reload_provider_config",
+            "register_provider_strategy",
+            "execute_provider_operation",
+            "update_provider_health",
+        }
+
+    def test_every_name_is_a_discovered_command(self):
+        import importlib
+        import pkgutil
+
+        import orb.application.commands as commands_package
+        from orb.application.decorators import get_registered_command_handlers
+        from orb.sdk.discovery import SDKMethodDiscovery
+
+        for module in pkgutil.iter_modules(commands_package.__path__):
+            importlib.import_module(f"{commands_package.__name__}.{module.name}")
+        discovery = SDKMethodDiscovery()
+        names = {discovery._command_to_method_name(c) for c in get_registered_command_handlers()}
+        assert ORBClient._CACHE_INVALIDATING_METHODS <= names
+
+
+class TestInitializeWiring:
+    @staticmethod
+    async def _initialized(clock, middlewares=()):
+        from tests.unit.sdk.test_sdk_initialize_e2e import _patched_init
+
+        sdk = ORBClient(config={"provider_type": "aws"}, template_cache_ttl_seconds=60)
+        for middleware in middlewares:
+            sdk.add_middleware(middleware)
+        command = AsyncMock(return_value={"ok": True})
+        app_patch, disc_patch, container_patch, _app, _disc = _patched_init(
+            {"set_configuration": command, "get_system_status": AsyncMock()}
+        )
+        with app_patch, disc_patch, container_patch:
+            await sdk.initialize()
+        sdk._dispatch_catalog = AsyncMock(  # type: ignore[method-assign]
+            side_effect=lambda key, dto, format=None: {"templates": []}
+        )
+        return sdk, command
+
+    @pytest.mark.asyncio
+    async def test_initialize_wires_invalidation(self, clock):
+        sdk, command = await self._initialized(clock)
+        await sdk.list_templates()
+        await sdk.list_templates()
+        assert _calls(sdk) == 1
+        assert await sdk.set_configuration(key="a") == {"ok": True}  # type: ignore[attr-defined]
+        command.assert_awaited_once_with(key="a")
+        await sdk.list_templates()
+        assert _calls(sdk) == 2
+
+    @pytest.mark.asyncio
+    async def test_middleware_before_initialize_runs_once_and_invalidates(self, clock):
+        class Recorder(SDKMiddleware):
+            def __init__(self):
+                self.seen: list[str] = []
+
+            async def process(self, method_name, args, kwargs, next_fn):
+                self.seen.append(method_name)
+                return await next_fn(args, kwargs)
+
+        recorder = Recorder()
+        sdk, command = await self._initialized(clock, [recorder])
+        await sdk.list_templates()
+        await sdk.set_configuration(key="a")  # type: ignore[attr-defined]
+        assert recorder.seen == ["set_configuration"]
+        command.assert_awaited_once_with(key="a")
+        await sdk.list_templates()
+        assert _calls(sdk) == 2
+
+    @pytest.mark.asyncio
+    async def test_discovered_command_finishing_during_a_load_is_not_overwritten(self, clock):
+        sdk, _command = await self._initialized(clock)
+        gate = asyncio.Event()
+        stale = {"templates": [{"template_id": "old"}]}
+
+        async def dispatch(key, dto, format=None):
+            if not gate.is_set():
+                await gate.wait()
+                return stale
+            return {"templates": [{"template_id": "new"}]}
+
+        sdk._dispatch_catalog.side_effect = dispatch  # type: ignore[attr-defined]
+        pending = asyncio.ensure_future(sdk.list_templates())
+        await asyncio.sleep(0)
+        await sdk.set_configuration(key="a")  # type: ignore[attr-defined]
+        gate.set()
+        assert await pending == stale
+        assert (await sdk.list_templates())["templates"][0]["template_id"] == "new"
+
+    @pytest.mark.asyncio
+    async def test_listing_stored_while_a_command_runs_is_dropped_when_it_finishes(self, clock):
+        from tests.unit.sdk.test_sdk_initialize_e2e import _patched_init
+
+        sdk = ORBClient(config={"provider_type": "aws"}, template_cache_ttl_seconds=60)
+        gate = asyncio.Event()
+
+        async def slow_command(**_kwargs):
+            await gate.wait()
+            return {"ok": True}
+
+        app_patch, disc_patch, container_patch, _app, _disc = _patched_init(
+            {"set_configuration": slow_command}
+        )
+        with app_patch, disc_patch, container_patch:
+            await sdk.initialize()
+        sdk._dispatch_catalog = AsyncMock(  # type: ignore[method-assign]
+            side_effect=lambda key, dto, format=None: {"templates": []}
+        )
+        running = asyncio.ensure_future(sdk.set_configuration(key="a"))  # type: ignore[attr-defined]
+        await asyncio.sleep(0)
+        await sdk.list_templates()  # cached while the command is still running
+        gate.set()
+        await running
+        await sdk.list_templates()
+        assert _calls(sdk) == 2
