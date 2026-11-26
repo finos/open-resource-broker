@@ -6,6 +6,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.finos.openresourcebroker.sdk.auth.AuthOption
 import org.finos.openresourcebroker.sdk.client.ClientConfig
+import org.finos.openresourcebroker.sdk.client.ListRequestsParams
 import org.finos.openresourcebroker.sdk.client.OrbClient
 import org.finos.openresourcebroker.sdk.client.OrbApiError
 import org.finos.openresourcebroker.sdk.client.OrbConflictError
@@ -125,6 +126,32 @@ class OrbClientMockTest {
             val client = makeClient(server)
             val err = assertThrows<OrbApiError> { client.getMachine("no-such-machine") }
             assertEquals(404, err.statusCode)
+            client.close()
+        } finally { server.shutdown() }
+    }
+
+    @Test
+    fun `listRequests - sends the time range when set and omits it otherwise`() = runTest {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"requests":[]}"""))
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"requests":[]}"""))
+            val client = makeClient(server)
+            client.listRequests(
+                ListRequestsParams(
+                    startTime = "2026-11-01T00:00:00Z",
+                    endTime = "2026-11-02T00:00:00.000000Z",
+                ),
+            )
+            val ranged = server.takeRequest().requestUrl!!
+            assertEquals("2026-11-01T00:00:00Z", ranged.queryParameter("start_time"))
+            assertEquals("2026-11-02T00:00:00.000000Z", ranged.queryParameter("end_time"))
+
+            client.listRequests(ListRequestsParams(status = "pending"))
+            val plain = server.takeRequest().requestUrl!!
+            assertNull(plain.queryParameter("start_time"))
+            assertNull(plain.queryParameter("end_time"))
             client.close()
         } finally { server.shutdown() }
     }

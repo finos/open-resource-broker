@@ -85,6 +85,10 @@ data class ListRequestsParams(
     val templateId: String? = null,
     val requestType: String? = null,
     val filterExpressions: List<String>? = null,
+    /** Inclusive lower bound on created_at, ISO-8601 (e.g. `2026-11-01T00:00:00Z`); no offset means UTC. */
+    val startTime: String? = null,
+    /** Inclusive upper bound on created_at, ISO-8601; a date-only value is midnight UTC. */
+    val endTime: String? = null,
 )
 
 /**
@@ -558,6 +562,8 @@ class OrbClient private constructor(
             params.requestType?.let { put("request_type", it) }
             params.filterExpressions?.takeIf { it.isNotEmpty() }
                 ?.let { put("filter_expressions", it.joinToString(",")) }
+            params.startTime?.let { put("start_time", it) }
+            params.endTime?.let { put("end_time", it) }
         }
         return execute(get("/api/v1/requests/", query))
     }
