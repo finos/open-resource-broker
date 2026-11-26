@@ -9,7 +9,7 @@ machine rows and the stored return request.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -184,10 +184,12 @@ class World:
         )
         return dict(body["metadata"]["labels"])
 
-    def add_pod(self, name: str, **kw: Any) -> None:
-        self.core.add_pod(NS, name, self._labels(name), **kw)
+    def add_pod(self, name: str, namespace: str = NS, **kw: Any) -> None:
+        self.core.add_pod(namespace, name, self._labels(name), **kw)
         # A real pod always runs an image; the machine row needs it.
-        self.core.pods[(NS, name)].spec.containers = [V1Container(name="main", image="busybox")]
+        self.core.pods[(namespace, name)].spec.containers = [
+            V1Container(name="main", image="busybox")
+        ]
 
     def list_fails(self) -> None:
         self.core.list_errors[NS] = ApiException(status=500)
@@ -197,8 +199,17 @@ class World:
 
     # -- storage -----------------------------------------------------------
 
-    def add_return(self, names: list[str], *, age_seconds: int = 0) -> None:
-        """An in-progress return of ``names``, filed ``age_seconds`` ago."""
+    def add_return(
+        self,
+        names: list[str],
+        *,
+        age_seconds: int = 0,
+        placement: Optional[dict[str, str]] = None,
+    ) -> None:
+        """An in-progress return of ``names``, filed ``age_seconds`` ago.
+
+        ``placement`` maps a machine to the namespace its pod lives in (default ``NS``).
+        """
         self.uow.requests.save(
             Request(
                 request_id=RequestId(value=ACQUIRE_ID),
@@ -226,7 +237,7 @@ class World:
                     instance_type=InstanceType(value="k8s/Pod"),
                     image_id="busybox",
                     status=MachineStatus.SHUTTING_DOWN,
-                    provider_data={"namespace": NS},
+                    provider_data={"namespace": (placement or {}).get(name, NS)},
                 )
             )
         self.uow.requests.save(
@@ -322,3 +333,93 @@ async def test_placement_survives_an_unreadable_poll(world: World) -> None:
     assert {call[1] for call in world.core.calls} == {NS}
     assert world.machine("pod-a").status == MachineStatus.RUNNING
     assert recovered.status == RequestStatus.IN_PROGRESS
+
+
+# ---------------------------------------------------------------------------
+# The wait ends
+# ---------------------------------------------------------------------------
+
+PAST_LIMIT = 2 * 3600
+UNDER_LIMIT = 3600 - 60
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_return_that_recovers_before_the_limit_completes(world: World) -> None:
+    world.add_return(["pod-a"], age_seconds=UNDER_LIMIT)
+    world.list_fails()
+    assert (await world.poll()).status == RequestStatus.IN_PROGRESS
+
+    world.list_works()  # the pod is gone
+    request = await world.poll()
+
+    assert request.status == RequestStatus.COMPLETED
+    assert world.machine("pod-a").status == MachineStatus.TERMINATED
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_unreadable_return_past_the_limit_fails(world: World) -> None:
+    world.add_return(["pod-a", "pod-b"], age_seconds=PAST_LIMIT)
+    world.list_fails()
+
+    request = await world.poll()
+
+    assert request.status == RequestStatus.FAILED
+    assert {world.machine(n).status for n in ("pod-a", "pod-b")} == {MachineStatus.FAILED}
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_unreadable_return_under_the_limit_keeps_waiting(world: World) -> None:
+    world.add_return(["pod-a"], age_seconds=UNDER_LIMIT)
+    world.list_fails()
+
+    request = await world.poll()
+
+    assert request.status == RequestStatus.IN_PROGRESS
+    assert world.machine("pod-a").status == MachineStatus.SHUTTING_DOWN
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_only_the_unreadable_machine_fails(world: World) -> None:
+    world.add_return(["pod-a", "pod-b"], age_seconds=PAST_LIMIT, placement={"pod-a": "orb-team-b"})
+    world.list_fails()  # NS, where pod-b lives, cannot be listed; orb-team-b can
+
+    request = await world.poll()
+
+    assert request.status == RequestStatus.FAILED
+    assert world.machine("pod-a").status == MachineStatus.TERMINATED
+    assert world.machine("pod-b").status == MachineStatus.FAILED
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "pod",
+    [
+        {"phase": "Running"},
+        {"phase": "Running", "ready": False},
+        {"phase": "Pending", "ready": False},
+    ],
+    ids=["running", "starting", "pending"],
+)
+async def test_a_readable_pod_still_leaving_defers_the_failure(
+    world: World, pod: dict[str, Any]
+) -> None:
+    world.add_return(["pod-a", "pod-b"], age_seconds=PAST_LIMIT, placement={"pod-a": "orb-team-b"})
+    world.add_pod("pod-a", namespace="orb-team-b", **pod)
+    world.list_fails()
+
+    waiting = await world.poll()
+
+    assert waiting.status == RequestStatus.IN_PROGRESS
+    assert world.machine("pod-b").status == MachineStatus.SHUTTING_DOWN
+
+    del world.core.pods[("orb-team-b", "pod-a")]  # the readable pod finishes
+    request = await world.poll()
+
+    assert request.status == RequestStatus.FAILED
+    assert world.machine("pod-a").status == MachineStatus.TERMINATED
+    assert world.machine("pod-b").status == MachineStatus.FAILED

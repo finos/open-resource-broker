@@ -14,8 +14,10 @@ between its strategy shell and its handler factory.
 from __future__ import annotations
 
 import asyncio
+from datetime import timezone
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
 
+from orb.domain.base.clock import Clock, SystemClock
 from orb.domain.base.operation_outcome import Accepted, Completed, Failed, OperationOutcome
 from orb.domain.base.ports import LoggingPort
 from orb.domain.base.provider_fulfilment import ProviderFulfilment
@@ -83,8 +85,10 @@ class K8sHandlerRegistry:
         default_api: str = KubernetesProviderApi.POD.value,
         provider_type: str = "k8s",
         template_class: Optional[type[K8sTemplate]] = None,
+        clock: Optional[Clock] = None,
     ) -> None:
         self._config = config
+        self._clock: Clock = clock or SystemClock()
         self._logger = logger
         self._client_provider = client_provider
         self._watch_manager_provider = watch_manager_provider
@@ -588,10 +592,20 @@ class K8sHandlerRegistry:
                         }
                     )
 
-            if is_return:
+            unreadable_timed_out = False
+            if is_return and unreadable:
+                # Once the wait is over the unreadable machines are reported as
+                # failed so the return can end, but never while a readable pod
+                # is still on its way out: that return must finish first.
+                unreadable_timed_out = self._return_wait_is_over(request) and not any(
+                    i.get("status") not in ("terminated", "failed", "unknown") for i in instances
+                )
                 instances.extend(
                     self._unreadable_placeholders(
-                        sorted(unreadable), machine_coordinates, synthetic_instance_type
+                        sorted(unreadable),
+                        machine_coordinates,
+                        synthetic_instance_type,
+                        status="failed" if unreadable_timed_out else "unknown",
                     )
                 )
 
@@ -615,6 +629,14 @@ class K8sHandlerRegistry:
                 if unreadable:
                     # A failed list proves nothing: never close these out.
                     metadata["unreadable_resource_ids"] = sorted(unreadable)
+                if unreadable_timed_out:
+                    metadata["return_unreadable_timed_out"] = True
+                    self._logger.warning(
+                        "Kubernetes return stopped waiting for unreadable machines: "
+                        "request_id=%s count=%d",
+                        request.request_id,
+                        len(unreadable),
+                    )
                 all_confirmed_gone = (
                     not non_terminal
                     and not unreadable
@@ -628,7 +650,9 @@ class K8sHandlerRegistry:
                     ]
                     return Completed(resource_ids=completed_ids, metadata=metadata)
                 # Otherwise still draining.
-                pending_ids = non_terminal + sorted(unreadable) or list(resource_ids)
+                pending_ids = non_terminal + sorted(unreadable - set(non_terminal)) or list(
+                    resource_ids
+                )
                 return Accepted(
                     request_id=str(request.request_id),
                     pending_resource_ids=pending_ids,
@@ -652,6 +676,25 @@ class K8sHandlerRegistry:
         except Exception as exc:
             self._logger.error("Kubernetes get_status failed: %s", exc, exc_info=True)
             return Failed(error=str(exc), recoverable=True)
+
+    def _return_wait_is_over(self, request: Request) -> bool:
+        """Whether a return has waited longer than ``return_unreadable_timeout_seconds``.
+
+        The age is measured from the creation of the return request. A request
+        without a creation time never times out.
+        """
+        created = getattr(request, "created_at", None)
+        if created is None:
+            self._logger.warning(
+                "Kubernetes return has no creation time, so its unreadable wait cannot end: "
+                "request_id=%s",
+                request.request_id,
+            )
+            return False
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        waited = (self._clock.now() - created).total_seconds()
+        return waited >= self._config.return_unreadable_timeout_seconds
 
     @staticmethod
     def _unreadable_placeholders(
