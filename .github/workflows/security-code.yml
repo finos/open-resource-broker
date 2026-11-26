@@ -19,6 +19,7 @@ on:
       - 'sdk/**/packages.lock.json'
       - 'sdk/**/*.csproj'
       - 'dev-tools/ci/check_runtime_licenses.py'
+      - 'dev-tools/ci/sdk_dependency_licenses.py'
       - 'dev-tools/ci/ci_security_dispatcher.py'
       - '.trivyignore.yaml'
       - '.github/workflows/**'
@@ -114,6 +115,7 @@ jobs:
             - 'sdk/**/packages.lock.json'
             - 'sdk/**/*.csproj'
             - 'dev-tools/ci/check_runtime_licenses.py'
+            - 'dev-tools/ci/sdk_dependency_licenses.py'
             - 'dev-tools/ci/ci_security_dispatcher.py'
             - '.trivyignore.yaml'
             - '.github/workflows/**'
@@ -448,6 +450,40 @@ jobs:
           --excludePackages "@finos/open-resource-broker@0.1.0" \
           --json \
           | python3 ../../dev-tools/ci/check_runtime_licenses.py
+
+  # Runtime licences of the Java, Kotlin and C# SDKs, read from the committed
+  # lockfiles (Gradle `runtimeClasspath` only, NuGet Direct/Transitive/
+  # CentralTransitive; test scope is excluded) and looked up in POM / nuspec
+  # metadata, then evaluated by the same allowlist as license-gate above.
+  # Network egress: repo1.maven.org and api.nuget.org over HTTPS only
+  # (enforced in the script). The resolved set per SDK is written to the job
+  # summary.
+  #
+  # Advisory (job-level continue-on-error): findings do not block merges.
+  # Promotion: one run on main with zero violations and a non-empty resolved
+  # set for all three SDKs, then a follow-up change that removes
+  # continue-on-error and adds this job to the required checks.
+  sdk-license-gate:
+    name: SDK Runtime License Gate (advisory)
+    needs: [config, changes]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.relevant == 'true' && needs.config.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Check SDK runtime dependency licenses
+      run: |
+        python3 -I dev-tools/ci/sdk_dependency_licenses.py \
+          --java sdk/java/gradle.lockfile \
+          --kotlin sdk/kotlin/gradle.lockfile \
+          --csharp sdk/csharp/src/FINOS.OpenResourceBroker/packages.lock.json
 
   # Weekly scan of the image users actually pull. Images are otherwise scanned
   # only when they are built, so a CVE that gets a Debian fix after a release
