@@ -7,6 +7,7 @@ SDK-specific configuration options and validation.
 
 import json
 import logging
+import math
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -80,6 +81,9 @@ class SDKConfig:
     # Dry-run mode: mocks provider operations so nothing is provisioned. Mirrors
     # the CLI's --dry-run flag and is applied to Application.initialize().
     dry_run: bool = False
+
+    # Seconds list_templates results are reused by one client; 0 disables the cache.
+    template_cache_ttl_seconds: float = 0
 
     # Logging configuration
     log_level: str = "INFO"
@@ -187,6 +191,14 @@ class SDKConfig:
             if legacy_profile is not None:
                 provider_config["profile"] = legacy_profile
 
+        raw_ttl = os.getenv("ORB_TEMPLATE_CACHE_TTL_SECONDS", "0")
+        try:
+            template_cache_ttl = float(raw_ttl)
+        except ValueError:
+            raise ConfigurationError(
+                f"ORB_TEMPLATE_CACHE_TTL_SECONDS must be a number of seconds, got {raw_ttl!r}"
+            )
+
         return cls(
             provider=os.getenv("ORB_PROVIDER"),
             provider_type=os.getenv("ORB_PROVIDER_TYPE"),
@@ -196,6 +208,7 @@ class SDKConfig:
             retry_attempts=int(os.getenv("ORB_RETRY_ATTEMPTS", "3")),
             log_level=os.getenv("ORB_LOG_LEVEL", "INFO"),
             dry_run=os.getenv("ORB_DRY_RUN", "").lower() in ("1", "true", "yes", "on"),
+            template_cache_ttl_seconds=template_cache_ttl,
             config_path=os.getenv("ORB_CONFIG_FILE"),
         )
 
@@ -303,6 +316,7 @@ class SDKConfig:
             "retry_attempts": self.retry_attempts,
             "log_level": self.log_level,
             "dry_run": self.dry_run,
+            "template_cache_ttl_seconds": self.template_cache_ttl_seconds,
         }
 
         if self.provider_config:
@@ -325,6 +339,12 @@ class SDKConfig:
 
         if self.retry_attempts < 0:
             raise ConfigurationError("Retry attempts cannot be negative")
+
+        ttl = self.template_cache_ttl_seconds
+        if isinstance(ttl, bool) or not isinstance(ttl, (int, float)):
+            raise ConfigurationError("template_cache_ttl_seconds must be a number of seconds")
+        if not math.isfinite(ttl) or ttl < 0:
+            raise ConfigurationError("template_cache_ttl_seconds must be a finite value >= 0")
 
         valid_log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if self.log_level.upper() not in valid_log_levels:

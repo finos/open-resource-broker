@@ -7,6 +7,9 @@ handler discovery for zero code duplication.
 """
 
 import asyncio
+import copy
+import json
+import time
 from contextlib import suppress
 from typing import Any, Callable, Dict, Optional
 
@@ -59,6 +62,10 @@ class ORBClient:
     ``provider_config={"region": ..., "profile": ...}`` instead.
     """
 
+    # Class-level defaults keep instances built without __init__ usable.
+    _template_cache: Optional[dict[str, tuple[float, dict]]] = None
+    _template_cache_gen: int = 0
+
     def __init__(
         self,
         provider: Optional[str] = None,
@@ -70,6 +77,7 @@ class ORBClient:
         provider_name: Optional[str] = None,
         provider_config: Optional[dict[str, Any]] = None,
         dry_run: Optional[bool] = None,
+        template_cache_ttl_seconds: Optional[float] = None,
         region: Optional[str] = None,  # DEPRECATED — use provider_config
         profile: Optional[str] = None,  # DEPRECATED — use provider_config
         **kwargs,
@@ -94,6 +102,10 @@ class ORBClient:
             provider_config: Provider-specific key/value pairs (e.g. ``{"region": "us-east-1"}``).
             dry_run: Run in dry-run mode — provider operations are mocked so nothing is
                      provisioned. Mirrors the CLI ``--dry-run`` flag.
+            template_cache_ttl_seconds: Seconds this client reuses ``list_templates``
+                     results. ``0`` (the default) disables the cache. Templates changed
+                     outside this client are not seen until the lifetime ends or
+                     ``clear_cache()`` is called.
             region: **Deprecated.** Use ``provider_config={"region": ...}`` instead.
             profile: **Deprecated.** Use ``provider_config={"profile": ...}`` instead.
             **kwargs: Additional configuration options
@@ -145,6 +157,8 @@ class ORBClient:
             self._config.provider_config = {**self._config.provider_config, **provider_config}
         if dry_run is not None:
             self._config.dry_run = dry_run
+        if template_cache_ttl_seconds is not None:
+            self._config.template_cache_ttl_seconds = template_cache_ttl_seconds
 
         # Add any additional kwargs to custom config
         if kwargs:
@@ -165,6 +179,7 @@ class ORBClient:
         self._methods: dict[str, Callable] = {}
         self._middlewares: list[SDKMiddleware] = []
         self._initialized = False
+        self._template_cache = {}
 
     async def initialize(self) -> bool:
         """
@@ -295,6 +310,7 @@ class ORBClient:
         # Always clean up state
         self._initialized = False
         self._methods.clear()
+        self.clear_cache()
 
         if self._container:
             self._container.clear()
@@ -765,19 +781,64 @@ class ORBClient:
 
         from orb.application.services.orchestration.dtos import ListTemplatesInput
 
-        return await self._dispatch_catalog(
+        ttl = self._config.template_cache_ttl_seconds
+        active_only = kwargs.get("active_only", True)
+        provider_name = kwargs.get("provider_name") or self._config.provider_name
+        provider_type = kwargs.get("provider_type") or self._config.provider_type
+        provider_api = kwargs.get("provider_api")
+        limit = kwargs.get("limit", 50)
+        offset = kwargs.get("offset", 0)
+        filter_expressions = kwargs.get("filter_expressions") or []
+        fmt = kwargs.get("format")
+
+        key = ""
+        generation = self._template_cache_gen
+        if ttl > 0:
+            key = json.dumps(
+                [
+                    active_only,
+                    provider_name,
+                    provider_type,
+                    provider_api,
+                    limit,
+                    offset,
+                    filter_expressions,
+                    fmt,
+                ],
+                sort_keys=True,
+                default=str,
+            )
+            hit = (self._template_cache or {}).get(key)
+            if hit is not None and time.monotonic() < hit[0]:
+                return copy.deepcopy(hit[1])
+
+        result = await self._dispatch_catalog(
             "list_templates",
             ListTemplatesInput(
-                active_only=kwargs.get("active_only", True),
-                provider_name=kwargs.get("provider_name") or self._config.provider_name,
-                provider_type=kwargs.get("provider_type") or self._config.provider_type,
-                provider_api=kwargs.get("provider_api"),
-                limit=kwargs.get("limit", 50),
-                offset=kwargs.get("offset", 0),
-                filter_expressions=kwargs.get("filter_expressions") or [],
+                active_only=active_only,
+                provider_name=provider_name,
+                provider_type=provider_type,
+                provider_api=provider_api,
+                limit=limit,
+                offset=offset,
+                filter_expressions=filter_expressions,
             ),
-            format=kwargs.get("format"),
+            format=fmt,
         )
+
+        # A mutation or clear_cache() that finished while the load ran bumps the
+        # generation; the result may predate it, so it is returned but not stored.
+        if ttl > 0 and self._template_cache_gen == generation:
+            if self._template_cache is None:
+                self._template_cache = {}
+            self._template_cache[key] = (time.monotonic() + ttl, copy.deepcopy(result))
+        return result
+
+    def clear_cache(self) -> None:
+        """Drop cached ``list_templates`` results so the next call reloads them."""
+        if self._template_cache:
+            self._template_cache.clear()
+        self._template_cache_gen += 1
 
     async def get_template(self, template_id: str, **kwargs) -> dict:
         """Get a single template via GetTemplateOrchestrator with unified formatting."""
@@ -822,21 +883,24 @@ class ORBClient:
         extra = {k: v for k, v in kwargs.items() if k not in _explicit}
         configuration = {**extra, **kwargs.get("configuration", {})}
 
-        return await self._dispatch_catalog(
-            "create_template",
-            CreateTemplateInput(
-                template_id=template_id,
-                provider_api=provider_api,
-                image_id=image_id,
-                name=kwargs.get("name"),
-                description=kwargs.get("description"),
-                machine_type=kwargs.get("machine_type"),
-                instance_type=kwargs.get("instance_type"),
-                tags=kwargs.get("tags", {}),
-                configuration=configuration,
-            ),
-            format=kwargs.get("format"),
-        )
+        try:
+            return await self._dispatch_catalog(
+                "create_template",
+                CreateTemplateInput(
+                    template_id=template_id,
+                    provider_api=provider_api,
+                    image_id=image_id,
+                    name=kwargs.get("name"),
+                    description=kwargs.get("description"),
+                    machine_type=kwargs.get("machine_type"),
+                    instance_type=kwargs.get("instance_type"),
+                    tags=kwargs.get("tags", {}),
+                    configuration=configuration,
+                ),
+                format=kwargs.get("format"),
+            )
+        finally:
+            self.clear_cache()
 
     async def update_template(self, template_id: str, **kwargs) -> dict:
         """Update a template via UpdateTemplateOrchestrator with unified formatting."""
@@ -859,19 +923,22 @@ class ORBClient:
         extra = {k: v for k, v in kwargs.items() if k not in _explicit}
         configuration = {**extra, **kwargs.get("configuration", {})}
 
-        return await self._dispatch_catalog(
-            "update_template",
-            UpdateTemplateInput(
-                template_id=template_id,
-                name=kwargs.get("name"),
-                description=kwargs.get("description"),
-                machine_type=kwargs.get("machine_type"),
-                instance_type=kwargs.get("instance_type"),
-                image_id=kwargs.get("image_id"),
-                configuration=configuration,
-            ),
-            format=kwargs.get("format"),
-        )
+        try:
+            return await self._dispatch_catalog(
+                "update_template",
+                UpdateTemplateInput(
+                    template_id=template_id,
+                    name=kwargs.get("name"),
+                    description=kwargs.get("description"),
+                    machine_type=kwargs.get("machine_type"),
+                    instance_type=kwargs.get("instance_type"),
+                    image_id=kwargs.get("image_id"),
+                    configuration=configuration,
+                ),
+                format=kwargs.get("format"),
+            )
+        finally:
+            self.clear_cache()
 
     async def delete_template(self, template_id: str, **kwargs) -> dict:
         """Delete a template via DeleteTemplateOrchestrator with unified formatting."""
@@ -890,6 +957,8 @@ class ORBClient:
             )
         except EntityNotFoundError:
             raise NotFoundError("Template", template_id)
+        finally:
+            self.clear_cache()
 
     async def validate_template(self, **kwargs) -> dict:
         """Validate a template via ValidateTemplateOrchestrator with unified formatting."""
@@ -916,11 +985,14 @@ class ORBClient:
 
         from orb.application.services.orchestration.dtos import RefreshTemplatesInput
 
-        return await self._dispatch_catalog(
-            "refresh_templates",
-            RefreshTemplatesInput(provider_name=kwargs.get("provider_name")),
-            format=kwargs.get("format"),
-        )
+        try:
+            return await self._dispatch_catalog(
+                "refresh_templates",
+                RefreshTemplatesInput(provider_name=kwargs.get("provider_name")),
+                format=kwargs.get("format"),
+            )
+        finally:
+            self.clear_cache()
 
     async def show_template(self, template_id: str) -> Any:
         """Show template details (CLI-style convenience method).

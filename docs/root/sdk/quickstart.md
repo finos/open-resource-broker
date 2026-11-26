@@ -110,6 +110,7 @@ export ORB_PROFILE=default
 export ORB_TIMEOUT=300
 export ORB_RETRY_ATTEMPTS=3
 export ORB_LOG_LEVEL=INFO
+export ORB_TEMPLATE_CACHE_TTL_SECONDS=0       # seconds to reuse list_templates results; 0 = off
 export ORB_CONFIG_FILE=/path/to/config.json   # app config file path
 ```
 
@@ -165,6 +166,26 @@ async with orb(app_config=app_config) as sdk:
 async with orb(app_config=app_config, config={"timeout": 600, "log_level": "DEBUG"}) as sdk:
     pass
 ```
+
+### Caching Template Listings
+
+By default every `list_templates()` call loads the templates again. To reuse results within one client, set `template_cache_ttl_seconds` (constructor argument, `config=` dict or config file key, or `ORB_TEMPLATE_CACHE_TTL_SECONDS`). The value is a number of seconds; `0` (the default) turns the cache off.
+
+```python
+async with orb(template_cache_ttl_seconds=60) as sdk:
+    first = await sdk.list_templates()   # loads
+    second = await sdk.list_templates()  # served from the cache for the next 60 seconds
+    sdk.clear_cache()                    # drop cached listings
+    third = await sdk.list_templates()   # loads again
+```
+
+Behaviour to be aware of:
+
+- The cache belongs to one client instance and is keyed on the call's arguments (`active_only`, provider selection, `limit`, `offset`, filters and `format`). Different arguments are cached separately.
+- Calling `create_template`, `update_template`, `delete_template` or `refresh_templates` on the same client clears it, as does `cleanup()`.
+- Changes made elsewhere (the CLI, another client, a config file edit, or provider-side changes) are not seen until the lifetime ends or you call `clear_cache()`. Choose a lifetime that matches how stale a listing may be.
+- Callers receive copies, so modifying a returned listing does not alter the cache.
+- Only `list_templates()` is cached. `get_template()` and request operations always load fresh data.
 
 ### Per-Client Isolation
 
