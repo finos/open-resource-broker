@@ -456,8 +456,8 @@ jobs:
   # CentralTransitive; test scope is excluded) and looked up in POM / nuspec
   # metadata, then evaluated by the same allowlist as license-gate above.
   # Network egress: repo1.maven.org and api.nuget.org over HTTPS only
-  # (enforced in the script). The resolved set per SDK is written to the job
-  # summary.
+  # (enforced in the script), plus PyPI for the hash-locked defusedxml install.
+  # The resolved set per SDK is written to the job summary.
   #
   # Advisory (job-level continue-on-error): findings do not block merges.
   # Promotion: one run on main with zero violations and a non-empty resolved
@@ -478,9 +478,16 @@ jobs:
       with:
         persist-credentials: false
 
+    # defusedxml parses the POM and nuspec XML. It comes from a hash-locked
+    # requirements file (PyPI only) into a throwaway virtualenv.
+    - name: Install defusedxml
+      run: |
+        python3 -m venv "$RUNNER_TEMP/sdk-license-venv"
+        "$RUNNER_TEMP/sdk-license-venv/bin/python" -m pip install --require-hashes --no-deps -r .github/requirements/defusedxml.txt
+
     - name: Check SDK runtime dependency licenses
       run: |
-        python3 -I dev-tools/ci/sdk_dependency_licenses.py \
+        "$RUNNER_TEMP/sdk-license-venv/bin/python" -I dev-tools/ci/sdk_dependency_licenses.py \
           --java sdk/java/gradle.lockfile \
           --kotlin sdk/kotlin/gradle.lockfile \
           --csharp sdk/csharp/src/FINOS.OpenResourceBroker/packages.lock.json

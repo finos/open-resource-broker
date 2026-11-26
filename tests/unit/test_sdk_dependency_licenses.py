@@ -430,6 +430,13 @@ class TestWorkflowWiring:
             assert fragment in run
         assert "github.event" not in run
 
+    def test_defusedxml_install_is_hash_locked(self):
+        run = "\n".join(s.get("run", "") for s in self._job()["steps"])
+        assert "--require-hashes --no-deps -r .github/requirements/defusedxml.txt" in run
+        lock = (ROOT / ".github/requirements/defusedxml.txt").read_text()
+        assert "defusedxml==" in lock
+        assert "--hash=sha256:" in lock
+
     def test_script_is_a_trigger_path(self):
         text = WORKFLOW.read_text()
         assert text.count("'dev-tools/ci/sdk_dependency_licenses.py'") == 2

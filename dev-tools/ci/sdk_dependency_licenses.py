@@ -18,6 +18,9 @@ Metadata
   with no `<licenses>` inherits from its `<parent>`, which is walked up.
 - NuGet: the `<license type="expression">` element of the package's nuspec.
 
+Parsing needs defusedxml, installed in the job from
+`.github/requirements/defusedxml.txt` (hash-locked).
+
 Network egress is limited to `repo1.maven.org` and `api.nuget.org` over HTTPS,
 including every redirect hop. XML with a DOCTYPE or entity declaration is refused.
 
@@ -38,10 +41,11 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
-from xml.parsers import expat
+from typing import Any
+
+from defusedxml.ElementTree import ParseError, fromstring
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_runtime_licenses import check, to_spdx
@@ -137,54 +141,24 @@ def parse_nuget_lockfile(path: Path) -> list[Package]:
 # ---------------------------------------------------------------------------
 
 
-def parse_xml(data: bytes) -> ET.Element:
-    """Parse registry XML, refusing any DOCTYPE or entity declaration.
+def parse_xml(data: bytes) -> Any:
+    """Parse registry XML with defusedxml, refusing DTDs, entities and external refs.
 
     Registry metadata never needs them, and they are the vector for entity
-    expansion attacks. The refusal is a handler on the expat parser itself, so
-    it holds for any encoding the payload declares. Tags keep the
-    "namespace}local" form, which `_local` strips.
+    expansion attacks. Every failure surfaces as ValueError so the caller
+    marks just that package unresolved.
     """
-
-    def refuse(*_args: object) -> None:
-        raise ValueError("DOCTYPE and entity declarations are not allowed")
-
-    stack: list[ET.Element] = []
-    roots: list[ET.Element] = []
-
-    def start(tag: str, attrs: dict[str, str]) -> None:
-        element = ET.Element(tag, attrs)
-        if stack:
-            stack[-1].append(element)
-        else:
-            roots.append(element)
-        stack.append(element)
-
-    def text(chunk: str) -> None:
-        if stack:
-            stack[-1].text = (stack[-1].text or "") + chunk
-
-    parser = expat.ParserCreate(namespace_separator="}")
-    # Without buffering, each newline is a separate callback and the repeated
-    # string concatenation in `text` becomes quadratic.
-    parser.buffer_text = True
-    parser.StartDoctypeDeclHandler = refuse
-    parser.EntityDeclHandler = refuse
-    parser.StartElementHandler = start
-    parser.EndElementHandler = lambda _tag: stack.pop()
-    parser.CharacterDataHandler = text
     try:
-        parser.Parse(data, True)
-    except (expat.ExpatError, LookupError) as exc:
+        return fromstring(data, forbid_dtd=True, forbid_entities=True, forbid_external=True)
+    except (ParseError, LookupError) as exc:
         raise ValueError(f"malformed XML: {exc}") from exc
-    return roots[0]
 
 
 def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
-def _child_text(element: ET.Element, name: str) -> str | None:
+def _child_text(element: Any, name: str) -> str | None:
     for child in element:
         if _local(child.tag) == name and child.text and child.text.strip():
             return child.text.strip()
