@@ -173,10 +173,10 @@ By default every `list_templates()` call loads the templates again. To reuse res
 
 ```python
 async with orb(template_cache_ttl_seconds=60) as sdk:
-    first = await sdk.list_templates()   # loads
+    first = await sdk.list_templates()  # loads
     second = await sdk.list_templates()  # served from the cache for the next 60 seconds
-    sdk.clear_cache()                    # drop cached listings
-    third = await sdk.list_templates()   # loads again
+    sdk.clear_cache()  # drop cached listings
+    third = await sdk.list_templates()  # loads again
 ```
 
 Behaviour to be aware of:
