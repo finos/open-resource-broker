@@ -1426,6 +1426,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../architecture/provider-selection-decision-record/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Selection Decision Record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../architecture/daemon-mode/" class="md-nav__link">
         
   
@@ -2068,6 +2096,34 @@
     
   
     Provider System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/adding_a_scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Scheduler
   
 
     
@@ -6747,6 +6803,12 @@ follow the group's own lifecycle policy.</p>
 <li><code>provider_api="SingleVM"</code> requires <code>max_machines == 1</code> and exactly one
   explicit zone.</li>
 </ul>
+<p><code>template_id</code> becomes part of the names of generated Compute Engine
+resources, so it is validated when the template loads. It must be 1 to 46
+characters, match RFC 1035 (<code>[a-z]([-a-z0-9]*[a-z0-9])?</code>: lowercase letters,
+digits and hyphens, starting with a letter and not ending with a hyphen).
+The 46-character limit keeps the longest generated name, the MIG name
+<code>orb-mig-&lt;template_id&gt;-&lt;hex&gt;</code>, within Compute Engine's 63-character limit.</p>
 <h3 id="compute">Compute<a class="headerlink" href="#compute" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -6813,8 +6875,40 @@ follow the group's own lifecycle policy.</p>
 <tr>
 <td><code>service_account_scopes</code></td>
 <td>list[string]</td>
-<td><code>["https://www.googleapis.com/auth/compute"]</code></td>
+<td>The six scopes listed below</td>
 <td>OAuth scopes for the attached service account. Every scope must start with <code>https://www.googleapis.com/auth/</code> and the list cannot be empty.</td>
+</tr>
+</tbody>
+</table>
+<p>The default scopes match the "Allow default access" set that Google Cloud
+grants the default Compute Engine service account. They do not include the
+broader <code>https://www.googleapis.com/auth/compute</code> scope, which grants
+read and write access to every Compute Engine resource in the project; add it
+explicitly only if the workload needs it.</p>
+<table>
+<thead>
+<tr>
+<th>Default scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>https://www.googleapis.com/auth/devstorage.read_only</code></td>
+</tr>
+<tr>
+<td><code>https://www.googleapis.com/auth/logging.write</code></td>
+</tr>
+<tr>
+<td><code>https://www.googleapis.com/auth/monitoring.write</code></td>
+</tr>
+<tr>
+<td><code>https://www.googleapis.com/auth/service.management.readonly</code></td>
+</tr>
+<tr>
+<td><code>https://www.googleapis.com/auth/servicecontrol</code></td>
+</tr>
+<tr>
+<td><code>https://www.googleapis.com/auth/trace.append</code></td>
 </tr>
 </tbody>
 </table>

@@ -1426,6 +1426,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/provider-selection-decision-record/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Selection Decision Record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../architecture/daemon-mode/" class="md-nav__link">
         
   
@@ -2068,6 +2096,34 @@
     
   
     Provider System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer_guide/adding_a_scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Scheduler
   
 
     
@@ -6486,10 +6542,10 @@ VMSS members (or the whole VMSS when every member is released) for
 <li>Azure Linux VMs never fall back to password authentication. Every
   template that is not <code>CycleCloud</code> must set <code>ssh_key_name</code> or
   <code>ssh_public_keys</code>, and must set <code>image</code> or <code>image_id</code>.</li>
-<li>Azure does not support ORB's <code>start</code>/<code>stop</code> operations on any
-  <code>provider_api</code>. There is no equivalent to AWS <code>StartInstances</code>/
-  <code>StopInstances</code> in the current Azure provider; only create and terminate
-  are supported. See <a href="configuration/#provider-capabilities">Provider capabilities</a>.</li>
+<li>Azure supports ORB's <code>start</code>/<code>stop</code> operations on the <code>VMSS</code>,
+  <code>VMSSUniform</code> and <code>SingleVM</code> handlers. A stop deallocates the machine by
+  default, which ends compute billing; <code>CycleCloud</code> does not support either
+  operation. See <a href="configuration/#provider-capabilities">Provider capabilities</a>.</li>
 <li><code>resource_group</code> and <code>location</code> are required per template; Azure's
   platform term is <code>location</code>, but <code>region</code> is also accepted as an alias
   for cross-provider configuration reuse.</li>

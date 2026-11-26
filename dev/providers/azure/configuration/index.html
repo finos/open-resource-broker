@@ -1426,6 +1426,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../architecture/provider-selection-decision-record/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Selection Decision Record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../architecture/daemon-mode/" class="md-nav__link">
         
   
@@ -2068,6 +2096,34 @@
     
   
     Provider System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/adding_a_scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Scheduler
   
 
     
@@ -6891,13 +6947,16 @@ construction time; CycleCloud credentials must come from the file at
 </tr>
 </tbody>
 </table>
-<p>The Azure provider strategy supports <code>create_instances</code>,
-<code>terminate_instances</code>, <code>get_instance_status</code>, <code>describe_resource_instances</code>,
-<code>validate_template</code> and <code>health_check</code>. It does
-<strong>not</strong> support <code>start_instances</code> or <code>stop_instances</code> on any
-<code>provider_api</code> — there is no equivalent to AWS/Google Cloud start/stop in the current
-Azure provider; terminating and re-acquiring is the only way to resize a
-pool today.</p>
+<p>The Azure provider strategy reports these operations from <code>get_capabilities</code>:
+<code>CREATE_INSTANCES</code>, <code>TERMINATE_INSTANCES</code>, <code>GET_INSTANCE_STATUS</code>,
+<code>DESCRIBE_RESOURCE_INSTANCES</code>, <code>VALIDATE_TEMPLATE</code>, <code>HEALTH_CHECK</code>,
+<code>START_INSTANCES</code> and <code>STOP_INSTANCES</code>.</p>
+<p><code>START_INSTANCES</code> and <code>STOP_INSTANCES</code> are implemented by the <code>VMSS</code>,
+<code>VMSSUniform</code> and <code>SingleVM</code> handlers. The <code>CycleCloud</code> handler rejects them,
+and every machine in the request is reported as failed.
+<code>STOP_INSTANCES</code> deallocates the machine by default, which stops compute
+billing. Pass the operation parameter <code>deallocate</code> as <code>false</code> for a plain
+power-off that keeps the compute allocation, and its billing, in place.</p>
 <h2 id="template-fields">Template fields<a class="headerlink" href="#template-fields" title="Permanent link">&para;</a></h2>
 <p>Every field below lives on <code>AzureTemplate</code>. Fields accept both
 <code>snake_case</code> and <code>camelCase</code> keys (e.g. <code>resource_group</code> or

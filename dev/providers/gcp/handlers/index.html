@@ -1426,6 +1426,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../architecture/provider-selection-decision-record/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Selection Decision Record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../architecture/daemon-mode/" class="md-nav__link">
         
   
@@ -2068,6 +2096,34 @@
     
   
     Provider System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/adding_a_scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Scheduler
   
 
     
@@ -4307,6 +4363,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#machine-status-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Machine status mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#capabilities-summary" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6265,6 +6332,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#machine-status-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Machine status mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#capabilities-summary" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6366,6 +6444,10 @@ depending on <code>mig_scope</code>) referencing that template, with
   are governed by the group's own autohealing/update policy, not by
   ORB's start/stop operations.</li>
 </ul>
+<p>When releasing selected instances, the handler looks the instances up
+with a name filter. Each name is validated against RFC 1035, escaped and
+anchored to the end of the instance URL, so releasing <code>vm-1</code> never matches
+<code>vm-10</code>.</p>
 <h3 id="template-fields-the-mig-handler-honours">Template fields the MIG handler honours<a class="headerlink" href="#template-fields-the-mig-handler-honours" title="Permanent link">&para;</a></h3>
 <p>In addition to the shared fields in
 <a href="../configuration/#template-fields">Configuration reference</a>:
@@ -6393,6 +6475,13 @@ involved.</p>
 <p><code>SingleVM</code> templates require <code>max_machines == 1</code> and exactly one explicit
 <code>zones</code> entry — Google Cloud's <code>SingleVM</code> API operates on one VM in one zone per
 template, by design.</p>
+<h2 id="machine-status-mapping">Machine status mapping<a class="headerlink" href="#machine-status-mapping" title="Permanent link">&para;</a></h2>
+<p>Compute Engine reports a stopped instance with the status <code>TERMINATED</code> while
+the instance still exists and can be started again. ORB maps <code>TERMINATED</code>,
+<code>STOPPED</code> and <code>SUSPENDED</code> to the ORB status <code>stopped</code>. An instance that no
+longer exists is not reported with a status; when a return request queries
+it, ORB treats an instance missing from the provider response as terminated. The mapping is in
+<code>src/orb/providers/gcp/infrastructure/instance_status.py</code>.</p>
 <h2 id="capabilities-summary">Capabilities summary<a class="headerlink" href="#capabilities-summary" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

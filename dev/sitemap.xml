@@ -93,6 +93,10 @@
          <lastmod>2026-11-26</lastmod>
     </url>
     <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/architecture/provider-selection-decision-record/</loc>
+         <lastmod>2026-11-26</lastmod>
+    </url>
+    <url>
          <loc>https://finos.github.io/open-resource-broker/dev/architecture/system_diagrams/</loc>
          <lastmod>2026-11-26</lastmod>
     </url>
@@ -206,6 +210,10 @@
     </url>
     <url>
          <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/adding_a_provider/</loc>
+         <lastmod>2026-11-26</lastmod>
+    </url>
+    <url>
+         <loc>https://finos.github.io/open-resource-broker/dev/developer_guide/adding_a_scheduler/</loc>
          <lastmod>2026-11-26</lastmod>
     </url>
     <url>

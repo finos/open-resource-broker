@@ -1426,6 +1426,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../architecture/provider-selection-decision-record/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Selection Decision Record
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../architecture/daemon-mode/" class="md-nav__link">
         
   
@@ -2068,6 +2096,34 @@
     
   
     Provider System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developer_guide/adding_a_scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Scheduler
   
 
     
@@ -6489,12 +6545,15 @@ CycleCloud itself.</p>
 </tr>
 </tbody>
 </table>
-<p>None of the four handlers support ORB's <code>start</code>/<code>stop</code> operations — the
-Azure provider strategy only advertises <code>create_instances</code>,
-<code>terminate_instances</code>, <code>get_instance_status</code>,
-<code>describe_resource_instances</code>, <code>validate_template</code>,
-and <code>health_check</code> in its capabilities. To
-resize a pool, release machines and acquire new ones.</p>
+<p>The <code>VMSS</code>, <code>VMSSUniform</code> and <code>SingleVM</code> handlers support ORB's <code>start</code> and
+<code>stop</code> operations (<code>START_INSTANCES</code> and <code>STOP_INSTANCES</code>). The <code>CycleCloud</code>
+handler does not; it reports every machine in such a request as failed.
+<code>STOP_INSTANCES</code> deallocates machines by default, so compute billing stops.
+Pass the operation parameter <code>deallocate</code> as <code>false</code> to power machines off
+without deallocating them.</p>
+<p>The provider strategy reports <code>CREATE_INSTANCES</code>, <code>TERMINATE_INSTANCES</code>,
+<code>GET_INSTANCE_STATUS</code>, <code>DESCRIBE_RESOURCE_INSTANCES</code>, <code>VALIDATE_TEMPLATE</code>,
+<code>HEALTH_CHECK</code>, <code>START_INSTANCES</code> and <code>STOP_INSTANCES</code> in its capabilities.</p>
 <h2 id="choosing-a-provider_api-at-template-generate-time">Choosing a <code>provider_api</code> at template-generate time<a class="headerlink" href="#choosing-a-provider_api-at-template-generate-time" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># VMSS (default)</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>orb<span class="w"> </span>templates<span class="w"> </span>generate<span class="w"> </span>--provider-type<span class="w"> </span>azure<span class="w"> </span>--provider-api<span class="w"> </span>VMSS
