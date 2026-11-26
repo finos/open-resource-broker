@@ -141,6 +141,24 @@ Note: the REST handler uses `ListRequestsQuery` (from `orb.application.request.q
 
 ---
 
+### List Requests
+
+List provisioning requests, optionally within a creation-time range.
+
+| Interface | Parameter | Notes |
+|-----------|-----------|-------|
+| SDK | `start_time` | optional; ISO-8601 string or `datetime`; inclusive lower bound on `created_at`. A naive `datetime` or a string without an offset is read as UTC |
+| SDK | `end_time` | optional; same forms; inclusive upper bound. A date-only value is midnight UTC |
+| REST query | `start_time`, `end_time` | same values; 400 when malformed or start is after end |
+| CLI | `--start-time`, `--end-time` | same values |
+| MCP | `start_time`, `end_time` | same values |
+
+The range cannot be combined with `sync=true`. The other SDKs expose the same bounds: Go `WithRequestStartTime` / `WithRequestEndTime` (`time.Time`), TypeScript `start_time` / `end_time` strings, Java `ListRequestsParams.startTime` / `endTime`, Kotlin `ListRequestsParams(startTime, endTime)`, C# `ListRequestsAsync(..., startTime, endTime)` (`DateTimeOffset`, after the cancellation token).
+
+**REST endpoint:** `GET /api/v1/requests/`
+
+---
+
 ### List Return Requests
 
 List requests pending machine return.

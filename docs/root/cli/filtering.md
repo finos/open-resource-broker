@@ -55,7 +55,12 @@ orb machines list --filter "template_id~fleet"
 orb requests list --filter "status=pending"
 orb requests list --filter "template_id~spot"
 orb requests list --filter "machine_types~large"
+
+# Requests by creation time: a dedicated range, not a --filter expression
+orb requests list --start-time 2026-11-01 --end-time 2026-11-30T23:59:59.999999Z
 ```
+
+`--start-time` and `--end-time` apply to the whole result before pagination, so the total and `--cursor` paging stay inside the range. `--filter` expressions run on each page after it is cut, so use the range, not `--filter`, to narrow by date.
 
 ### Combining Filters
 

@@ -475,7 +475,11 @@ orb requests list [OPTIONS]
 | `--status` | Filter by request status (specific filter) | `--status pending` |
 | `--template-id` | Filter by template ID (specific filter) | `--template-id aws-basic` |
 | `--filter` | Generic filter: `field=value`, `field~value`, `field=~regex`. Repeatable (AND logic). | `--filter "template_id~spot"` |
+| `--start-time` | Only requests created at or after this time (inclusive) | `--start-time 2026-11-01` |
+| `--end-time` | Only requests created at or before this time (inclusive) | `--end-time 2026-11-30T23:59:59Z` |
 | `--format` | Output format | `--format table` |
+
+**Time range:** `--start-time` and `--end-time` filter on the request creation time and combine with the other filters, `--cursor` and the reported total. Either may be given alone. Accepted values are ISO-8601 as read by Python `datetime.fromisoformat`: `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+HH:MM]`. A value without an offset is read as UTC and a date-only value is midnight UTC, so `--end-time 2026-11-30` does not include 30 November; use `--end-time 2026-11-30T23:59:59.999999Z` or the next day's date as the upper bound. A malformed value, or a start after the end, is rejected. A cursor is only valid for the range it was issued for. The range cannot be combined with `--sync`.
 
 **Status Values:**
 - `pending` - Request submitted but not started
@@ -496,6 +500,9 @@ orb requests list --filter "template_id~spot"
 
 # Combine filters (AND logic)
 orb requests list --status in_progress --filter "template_id~ec2fleet"
+
+# Requests created during November 2026
+orb requests list --start-time 2026-11-01 --end-time 2026-11-30T23:59:59.999999Z
 ```
 
 #### `requests show`

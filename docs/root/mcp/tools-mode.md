@@ -121,7 +121,7 @@ operations:
 ### Request and machine operations
 - `request_machines` — request instances (`requested_count`)
 - `get_request_status` — status of one or more requests (`request_ids`)
-- `list_requests` — list provisioning requests
+- `list_requests` — list provisioning requests; `start_time` and `end_time` (ISO-8601) limit them to a creation-time range
 - `list_machines` — list provisioned machines
 - `return_machines` — return instances (`machine_ids`)
 - `list_return_requests` — list return requests
