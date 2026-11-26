@@ -8,6 +8,7 @@ lockfiles can be run through the gate without network access.
 import json
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -301,6 +302,9 @@ class TestFailClosed:
             "https://evil.example.com/a.pom",
             "https://repo1.maven.org.evil.example.com/a.pom",
             "file:///etc/passwd",
+            "https://evil.example.com\\@repo1.maven.org/x",
+            "https://repo1.maven.org:8443/x",
+            "https://user@repo1.maven.org/x",
         ],
     )
     def test_fetch_refuses_other_hosts_and_schemes(self, url):
@@ -378,6 +382,23 @@ class TestRedirectsAndXml:
             return b'<!DOCTYPE p [<!ENTITY a "b">]><project/>'
 
         assert gate.maven_license("g:a", "1", bomb) == gate.UNRESOLVED
+
+    def test_many_newlines_parse_in_bounded_time(self):
+        started = time.monotonic()
+        root = gate.parse_xml(b"<p>" + b"\n" * 1_000_000 + b"</p>")
+        assert time.monotonic() - started < 5
+        assert len(root.text or "") == 1_000_000
+
+    def test_unknown_encoding_is_a_value_error(self):
+        with pytest.raises(ValueError):
+            gate.parse_xml(b'<?xml version="1.0" encoding="x-bogus"?><p/>')
+
+    def test_unknown_encoding_marks_the_package_unresolved(self):
+        def bogus(url: str) -> bytes:
+            return b'<?xml version="1.0" encoding="x-bogus"?><project/>'
+
+        assert gate.maven_license("g:a", "1", bogus) == gate.UNRESOLVED
+        assert gate.nuget_license("P", "1", bogus) == gate.UNRESOLVED
 
     def test_plain_pom_still_parses(self):
         assert gate.parse_xml(_pom_xml(["MIT"], None)).tag.endswith("project")

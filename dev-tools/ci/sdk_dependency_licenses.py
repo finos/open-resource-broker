@@ -62,7 +62,11 @@ _SPDX_TOKEN_RE = re.compile(r"^[A-Za-z0-9.+-]+$")
 
 def _require_allowed(url: str) -> None:
     parts = urllib.parse.urlsplit(url)
-    if parts.scheme != "https" or parts.hostname not in ALLOWED_HOSTS:
+    if (
+        parts.scheme != "https"
+        or parts.hostname not in ALLOWED_HOSTS
+        or parts.netloc.lower() not in ALLOWED_HOSTS
+    ):
         raise ValueError(f"refusing to fetch {url}")
 
 
@@ -161,6 +165,9 @@ def parse_xml(data: bytes) -> ET.Element:
             stack[-1].text = (stack[-1].text or "") + chunk
 
     parser = expat.ParserCreate(namespace_separator="}")
+    # Without buffering, each newline is a separate callback and the repeated
+    # string concatenation in `text` becomes quadratic.
+    parser.buffer_text = True
     parser.StartDoctypeDeclHandler = refuse
     parser.EntityDeclHandler = refuse
     parser.StartElementHandler = start
@@ -168,7 +175,7 @@ def parse_xml(data: bytes) -> ET.Element:
     parser.CharacterDataHandler = text
     try:
         parser.Parse(data, True)
-    except expat.ExpatError as exc:
+    except (expat.ExpatError, LookupError) as exc:
         raise ValueError(f"malformed XML: {exc}") from exc
     return roots[0]
 
