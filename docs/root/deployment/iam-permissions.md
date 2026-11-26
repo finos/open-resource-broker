@@ -108,7 +108,17 @@ To limit the delete permissions to what ORB creates, `ec2:DeleteLaunchTemplate` 
 
 ## Tagging (optional)
 
-ORB tags all resources it creates with `orb:` prefixed keys (`orb:managed-by`, `orb:request-id`, `orb:template-id`, `orb:provider-api`, `orb:created-at`). The tagging call uses:
+ORB tags all resources it creates with `orb:` prefixed keys (`orb:managed-by`, `orb:request-id`, `orb:template-id`, `orb:provider-api`, `orb:created-at`).
+
+Auto Scaling groups, the instances they launch, and the launch templates ORB creates also carry `orb:resource-id`, the identifier of the ORB-created resource that owns the tag:
+
+| Resource | `orb:resource-id` value |
+|----------|-------------------------|
+| Auto Scaling group | the group name |
+| Instances launched by the group | the group name (propagated at launch) |
+| Launch template created by ORB | the template ID; the template name if the follow-up tagging call fails and `on_tag_failure` is `warn` |
+
+Other resource types do not carry this tag yet. Existing groups and templates are not re-tagged. The tagging call uses:
 
 ```
 ec2:CreateTags

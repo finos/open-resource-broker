@@ -586,7 +586,11 @@ class AWSLaunchTemplateManager:
             "Launch template %s does not exist. Creating new template.", template_name
         )
 
-        lt_tags = self._create_launch_template_tags(aws_template, request)
+        # The AWS launch template ID does not exist until the create call returns,
+        # so the tag carries the template name at create time.
+        lt_tags = self._create_launch_template_tags(
+            aws_template, request, resource_id=template_name
+        )
 
         response = self._call(
             self.aws_client.ec2_client.create_launch_template,
@@ -602,9 +606,11 @@ class AWSLaunchTemplateManager:
         lt_id = launch_template["LaunchTemplateId"]
         self._logger.info("Created launch template %s", lt_id)
 
+        # Re-tag with the AWS ID so the final orb:resource-id is the template ID.
+        # If this call fails in warn mode, the tag keeps the template name.
         self._tag_resource_safe(
             lt_id,
-            self._create_launch_template_tags(aws_template, request),
+            self._create_launch_template_tags(aws_template, request, resource_id=lt_id),
             resource_description="launch-template",
         )
 
@@ -910,7 +916,11 @@ class AWSLaunchTemplateManager:
         )
 
     def _create_launch_template_tags(
-        self, aws_template: AWSTemplate, request: Request
+        self,
+        aws_template: AWSTemplate,
+        request: Request,
+        *,
+        resource_id: Optional[str] = None,
     ) -> list[dict[str, str]]:
         """
         Create tags for the launch template resource itself.
@@ -918,6 +928,8 @@ class AWSLaunchTemplateManager:
         Args:
             aws_template: The AWS template configuration
             request: The associated request
+            resource_id: Value for the orb:resource-id tag (template name or ID).
+                Omitted from the tags when not given.
 
         Returns:
             List of tag dictionaries
@@ -937,6 +949,7 @@ class AWSLaunchTemplateManager:
                 request_id=str(request.request_id),
                 template_id=str(aws_template.template_id),
                 provider_api="LaunchTemplate",
+                resource_id=resource_id,
             ),
         )
 

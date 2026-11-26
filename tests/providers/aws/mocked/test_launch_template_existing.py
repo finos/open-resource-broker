@@ -1038,6 +1038,7 @@ class TestFailureModeConfig:
         tags = {t["Key"]: t["Value"] for t in described["LaunchTemplates"][0].get("Tags", [])}
         assert "orb:managed-by" not in tags
         assert "orb:request-id" not in tags
+        assert "orb:resource-id" not in tags
 
     def test_orb_created_launch_template_is_still_tagged_as_managed(
         self, moto_aws, moto_vpc_resources
@@ -1067,3 +1068,84 @@ class TestFailureModeConfig:
         tags = {t["Key"]: t["Value"] for t in described["LaunchTemplates"][0].get("Tags", [])}
         assert tags["orb:managed-by"] == "open-resource-broker"
         assert tags["orb:request-id"] == "req-orb-lt-1"
+
+    @staticmethod
+    def _new_lt_template(moto_vpc_resources: dict[str, Any]) -> AWSTemplate:
+        return AWSTemplate(
+            template_id="tpl-resource-id",
+            name="resource-id",
+            provider_api="EC2Fleet",
+            machine_types={"t3.micro": 1},
+            image_id="ami-12345678",
+            max_instances=5,
+            price_type="ondemand",
+            subnet_ids=[moto_vpc_resources["subnet_ids"][0]],
+            security_group_ids=[moto_vpc_resources["sg_id"]],
+        )
+
+    @staticmethod
+    def _lt_tags(aws_client: Any, lt_id: str) -> dict[str, str]:
+        # describe_launch_templates in moto returns only the create-time tags;
+        # describe_tags reflects later create_tags calls as AWS does.
+        described = aws_client.ec2_client.describe_tags(
+            Filters=[{"Name": "resource-id", "Values": [lt_id]}]
+        )
+        return {t["Key"]: t["Value"] for t in described["Tags"]}
+
+    def test_orb_created_launch_template_resource_id_is_the_template_id(
+        self, moto_aws, moto_vpc_resources
+    ):
+        """The follow-up tagging call replaces the create-time name with the AWS ID."""
+        aws_client = _make_aws_client()
+        manager = AWSLaunchTemplateManager(
+            aws_client=aws_client, logger=_make_logger(), config_port=_make_config_port()
+        )
+
+        result = manager.create_or_update_launch_template(
+            self._new_lt_template(moto_vpc_resources), _make_request("req-orb-lt-2")
+        )
+
+        tags = self._lt_tags(aws_client, result.template_id)
+        assert tags["orb:resource-id"] == result.template_id
+
+    def test_create_call_carries_the_template_name_as_resource_id(
+        self, moto_aws, moto_vpc_resources
+    ):
+        """The ID does not exist yet at create time, so the create call carries the name."""
+        aws_client = _make_aws_client()
+        real_create = aws_client.ec2_client.create_launch_template
+        aws_client.ec2_client.create_launch_template = MagicMock(side_effect=real_create)
+        manager = AWSLaunchTemplateManager(
+            aws_client=aws_client, logger=_make_logger(), config_port=_make_config_port()
+        )
+
+        result = manager.create_or_update_launch_template(
+            self._new_lt_template(moto_vpc_resources), _make_request("req-orb-lt-3")
+        )
+
+        kwargs = aws_client.ec2_client.create_launch_template.call_args.kwargs
+        spec = next(
+            s for s in kwargs["TagSpecifications"] if s["ResourceType"] == "launch-template"
+        )
+        create_tags = {t["Key"]: t["Value"] for t in spec["Tags"]}
+        assert create_tags["orb:resource-id"] == kwargs["LaunchTemplateName"]
+        assert create_tags["orb:resource-id"] != result.template_id
+
+    def test_resource_id_keeps_the_name_when_follow_up_tagging_fails_in_warn_mode(
+        self, moto_aws, moto_vpc_resources
+    ):
+        """Warn mode: a failed follow-up tag call leaves the create-time name in place."""
+        aws_client = _make_aws_client()
+        aws_client.ec2_client.create_tags = MagicMock(side_effect=Exception("tags denied"))
+        manager = AWSLaunchTemplateManager(
+            aws_client=aws_client, logger=_make_logger(), config_port=_make_config_port()
+        )
+
+        with patch("orb.infrastructure.resilience.retry_decorator.time.sleep"):
+            result = manager.create_or_update_launch_template(
+                self._new_lt_template(moto_vpc_resources), _make_request("req-orb-lt-4")
+            )
+
+        tags = self._lt_tags(aws_client, result.template_id)
+        assert tags["orb:resource-id"] == tags["Name"]
+        assert tags["orb:resource-id"] != result.template_id

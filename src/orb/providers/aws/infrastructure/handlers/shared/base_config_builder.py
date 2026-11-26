@@ -119,12 +119,15 @@ class BaseConfigBuilder(ABC):
         template_id: str,
         provider_api: str,
         template_tags: Optional[dict[str, Any]] = None,
+        *,
+        resource_id: Optional[str] = None,
     ) -> dict[str, Any]:
         """Build base_tags and custom_tags for Jinja template rendering.
 
         Returns a dict with keys: base_tags, custom_tags, has_custom_tags.
         Tags are in lowercase-key format ({"key": ..., "value": ...}) as
-        expected by the Jinja default specs.
+        expected by the Jinja default specs.  ``resource_id`` is opt-in: only
+        builders that know the resource name before creation pass it.
         """
         from orb.providers.aws.infrastructure.tags import SYSTEM_TAG_PREFIX, build_system_tags
 
@@ -132,6 +135,7 @@ class BaseConfigBuilder(ABC):
             request_id=request_id,
             template_id=template_id,
             provider_api=provider_api,
+            resource_id=resource_id,
         )
         base_tags = [{"key": t["Key"], "value": t["Value"]} for t in system_tags]
 

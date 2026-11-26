@@ -253,6 +253,7 @@ class ASGHandler(AWSHandler, FleetGroupingMixin):
                 template=aws_template,
                 resource_prefix_key="asg",
                 provider_api="ASG",
+                resource_id=asg_name,
             )
 
             # ASG create_or_update_tags requires ResourceId, ResourceType, PropagateAtLaunch

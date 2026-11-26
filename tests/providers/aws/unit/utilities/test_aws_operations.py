@@ -457,6 +457,17 @@ class TestApplyBaseTagsToResource:
         _, kwargs = ops.aws_client.ec2_client.create_tags.call_args
         assert kwargs["Resources"] == ["i-abc"]
 
+    def test_applied_tags_carry_no_resource_id(self):
+        ops = _make_ops()
+        request, template = _make_request_and_template()
+
+        ops.apply_base_tags_to_resource("i-abc", request, template)
+
+        _, kwargs = ops.aws_client.ec2_client.create_tags.call_args
+        keys = {t["Key"] for t in kwargs["Tags"]}
+        assert "orb:request-id" in keys
+        assert "orb:resource-id" not in keys
+
     def test_returns_false_and_logs_warning_on_failure(self):
         ops = _make_ops()
         request, template = _make_request_and_template()

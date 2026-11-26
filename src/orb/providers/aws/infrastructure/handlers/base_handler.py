@@ -819,6 +819,8 @@ class AWSHandler(ProviderHandlerBase, ABC):
         template: AWSTemplate,
         resource_prefix_key: str,
         provider_api: str,
+        *,
+        resource_id: Optional[str] = None,
     ) -> list[dict]:
         """Build the flat tag list for an AWS resource.
 
@@ -831,6 +833,8 @@ class AWSHandler(ProviderHandlerBase, ABC):
             resource_prefix_key: Key passed to config_port.get_resource_prefix
                                  (e.g. "fleet", "spot_fleet", "asg").
             provider_api:        AWS API label for the system tag (e.g. "EC2Fleet").
+            resource_id:         Optional name or ID of the ORB-created resource; adds
+                                 an orb:resource-id tag when given.
 
         Returns:
             Merged list of {"Key": k, "Value": v} dicts ready for AWS API calls.
@@ -847,6 +851,7 @@ class AWSHandler(ProviderHandlerBase, ABC):
             provider_api=provider_api,
             template_tags=template.tags,
             logger=self._logger,
+            resource_id=resource_id,
         )
 
     def _get_tag_failure_mode(self) -> str:
