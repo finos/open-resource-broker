@@ -185,10 +185,6 @@ class TestAWSTemplateExtensionConfig:
         assert "fleet_type" not in defaults
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
-
-
 ABIS_EXAMPLE_IDS = {
     "EC2Fleet-Request-ABIS": "ec2_fleet",
     "SpotFleet-Request-ABIS": "spot_fleet",
@@ -289,3 +285,7 @@ class TestBundledAbisExamples:
         from tests.providers.aws.live.scenarios import _load_template_vm_types
 
         assert _load_template_vm_types(template_id) == {}
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
