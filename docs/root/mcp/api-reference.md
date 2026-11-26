@@ -329,7 +329,7 @@ Get provider configuration details.
 **Parameters**:
 - `provider` (optional): Specific provider name
 
-**Returns**: Provider configuration
+**Returns**: A configuration summary (provider mode, active provider names and counts, default provider, configuration source, file paths and last-updated time), not per-provider configuration
 
 #### get_provider_metrics
 Get provider performance metrics.
