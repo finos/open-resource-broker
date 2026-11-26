@@ -600,6 +600,8 @@ include-package-data = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src/orb/k8s_legacy/tests"]
+# Resolve `orb` from the source tree so tests do not need to edit sys.path.
+pythonpath = ["src"]
 norecursedirs = [
     # atheris fuzz harnesses (fuzz_*.py scripts run by the fuzz workflow, not
     # pytest tests); atheris is only installed in the ``fuzz`` group.
