@@ -383,7 +383,7 @@ class HealthCheck(HealthCheckPort):
             # Check disk space
             import shutil
 
-            total, used, free = shutil.disk_usage("/")
+            total, used, free = shutil.disk_usage(self.health_dir)
             percent_used = (used / total) * 100
 
             status = "healthy"

@@ -279,6 +279,14 @@ class TestCheckDiskHealth:
             result = hc._check_disk_health()
         assert result.status in ("degraded", "unhealthy")
 
+    def test_measures_disk_usage_of_health_dir(self, tmp_path) -> None:
+        import shutil
+
+        hc = _make_health_check(tmp_path)
+        with patch.object(shutil, "disk_usage", return_value=(100, 10, 90)) as usage:
+            hc._check_disk_health()
+        usage.assert_called_once_with(hc.health_dir)
+
     def test_returns_unhealthy_on_write_failure(self, tmp_path) -> None:
         import tempfile
 
