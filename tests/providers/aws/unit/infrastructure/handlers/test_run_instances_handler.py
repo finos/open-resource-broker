@@ -420,6 +420,20 @@ class TestRunInstancesHandlerMachineAdapterContext:
         assert describe.call_args_list[1].kwargs["NextToken"] == "page-2"
         assert mock_details.call_args.args[0] == ["i-1", "i-2"]
 
+    def test_lookup_reservation_instance_ids_returns_empty_for_unknown_reservation(self):
+        """An unknown reservation on the cancel path yields no instances, not an error."""
+        handler = _make_handler()
+        handler.aws_client.ec2_client.configure_mock(
+            describe_instances=MagicMock(
+                side_effect=ClientError(
+                    {"Error": {"Code": "InvalidReservationID.NotFound", "Message": "gone"}},
+                    "DescribeInstances",
+                )
+            )
+        )
+
+        assert handler._lookup_reservation_instance_ids("r-gone") == []
+
     def test_find_instances_by_resource_ids_skips_unknown_reservation(self):
         """A reservation AWS no longer knows about is skipped, not fatal."""
         handler = _make_handler()
