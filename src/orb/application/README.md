@@ -41,7 +41,7 @@ Handle read operations that retrieve data:
 
 ```python
 @query_handler(ListMachinesQuery)
-class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, List[MachineDTO]]):
+class ListStoredMachinesHandler(BaseQueryHandler[ListMachinesQuery, List[MachineDTO]]):
     async def execute_query(self, query: ListMachinesQuery) -> List[MachineDTO]:
         machines = await self.machine_repository.find_all()
         return [MachineDTO.from_domain(m) for m in machines]

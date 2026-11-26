@@ -74,6 +74,14 @@ def _banned_findings(source: str) -> list[str]:
             if node.module and _is_banned_module(node.module):
                 found.append(node.module)
             found += [a.name for a in node.names if a.name in _BANNED_NAMES]
+            if node.module:
+                # ``from orb import infrastructure`` and ``from pydantic import v1``
+                found += [
+                    f"{node.module}.{a.name}"
+                    for a in node.names
+                    if _is_banned_module(f"{node.module}.{a.name}")
+                    and not _is_banned_module(node.module)
+                ]
     return found
 
 
@@ -128,6 +136,10 @@ def test_domain_has_no_banned_imports() -> None:
         "from orb.config.schemas import AppConfig\n",
         "import orb.infrastructure.logging\n",
         "def f():\n    from orb.providers.aws import x\n",
+        "from orb import infrastructure\n",
+        "from orb import config\n",
+        "from orb import providers\n",
+        "from pydantic import v1\n",
     ],
 )
 def test_banned_import_detector_sees_each_form(source: str) -> None:

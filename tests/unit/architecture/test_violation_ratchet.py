@@ -268,10 +268,8 @@ def _reasonless_suppressions_in_source(source: str) -> int:
     its optional bracket or code list, ignoring separators.
     """
     count = 0
-    try:
-        tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
-    except (tokenize.TokenError, IndentationError):
-        return 0
+    # An untokenizable file raises, so a broken file cannot silently count as zero.
+    tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
     for tok in tokens:
         if tok.type != tokenize.COMMENT:
             continue
@@ -284,10 +282,7 @@ def _reasonless_suppressions_in_source(source: str) -> int:
 def _count_reasonless_suppressions() -> int:
     count = 0
     for f in collect_python_files(SRC_ORB):
-        try:
-            count += _reasonless_suppressions_in_source(f.read_text(encoding="utf-8"))
-        except UnicodeDecodeError:
-            continue
+        count += _reasonless_suppressions_in_source(f.read_text(encoding="utf-8"))
     return count
 
 
@@ -455,3 +450,10 @@ def test_reasonless_suppression_counter_detects_each_form(line: str) -> None:
 )
 def test_reasonless_suppression_counter_ignores_explained_and_non_comments(line: str) -> None:
     assert _reasonless_suppressions_in_source(line + "\n") == 0
+
+
+@pytest.mark.unit
+@pytest.mark.architecture
+def test_reasonless_suppression_counter_raises_on_untokenizable_source() -> None:
+    with pytest.raises((tokenize.TokenError, IndentationError, SyntaxError)):
+        _reasonless_suppressions_in_source("x = (1,\n")
