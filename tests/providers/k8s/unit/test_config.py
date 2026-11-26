@@ -26,6 +26,7 @@ def test_defaults_match_documented_spec() -> None:
     assert cfg.default_tolerations is None
     assert cfg.default_image_pull_secret is None
     assert cfg.pod_timeout_seconds == 300
+    assert cfg.return_unreadable_timeout_seconds == 3600
     assert cfg.stale_cache_timeout_seconds == 600
     assert cfg.watch_enabled is True
     assert cfg.min_kubernetes_version == "1.28"
@@ -293,3 +294,18 @@ class TestResilienceKnobBounds:
         assert cfg.max_retries == 0
         assert cfg.retry_base_delay == 0.01
         assert cfg.retry_max_delay == 0.01
+
+
+def test_return_unreadable_timeout_override_and_env(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    assert (
+        K8sProviderConfig(return_unreadable_timeout_seconds=90).return_unreadable_timeout_seconds
+        == 90
+    )
+    monkeypatch.setenv("ORB_K8S_RETURN_UNREADABLE_TIMEOUT_SECONDS", "120")
+    assert K8sProviderConfig().return_unreadable_timeout_seconds == 120
+
+
+@pytest.mark.parametrize("value", [0, -1])
+def test_return_unreadable_timeout_must_be_positive(value: int) -> None:
+    with pytest.raises(ValidationError):
+        K8sProviderConfig(return_unreadable_timeout_seconds=value)
