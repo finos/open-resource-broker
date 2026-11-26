@@ -13,6 +13,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from kubernetes.client import V1Container
 from kubernetes.client.exceptions import ApiException
 
 from orb.application.commands.request_sync_handlers import PopulateMachineIdsHandler
@@ -169,7 +170,7 @@ class World:
 
     # -- cluster -----------------------------------------------------------
 
-    def _labels(self) -> dict[str, str]:
+    def _labels(self, name: str) -> dict[str, str]:
         acquire = Request(
             request_id=RequestId(value=ACQUIRE_ID),
             request_type=RequestType.ACQUIRE,
@@ -179,12 +180,14 @@ class World:
             requested_count=1,
         )
         body = self.registry.get_handler("Pod")._stamp_native_pod_body(  # type: ignore[attr-defined]
-            {}, pod_name="p", machine_id="p", namespace=NS, request=acquire
+            {}, pod_name=name, machine_id=name, namespace=NS, request=acquire
         )
         return dict(body["metadata"]["labels"])
 
     def add_pod(self, name: str, **kw: Any) -> None:
-        self.core.add_pod(NS, name, self._labels(), **kw)
+        self.core.add_pod(NS, name, self._labels(name), **kw)
+        # A real pod always runs an image; the machine row needs it.
+        self.core.pods[(NS, name)].spec.containers = [V1Container(name="main", image="busybox")]
 
     def list_fails(self) -> None:
         self.core.list_errors[NS] = ApiException(status=500)

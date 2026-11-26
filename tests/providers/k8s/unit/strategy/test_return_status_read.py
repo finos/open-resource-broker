@@ -24,6 +24,7 @@ from orb.providers.k8s.infrastructure.handlers.shared.label_stamper import (
     stamp_native_workload_body,
 )
 from orb.providers.k8s.strategy.handler_registry import K8sHandlerRegistry
+from orb.providers.k8s.strategy.outcome_bridge import _outcome_to_provider_result
 from tests.providers.k8s.unit.strategy.fake_core_v1 import FakeCoreV1, fake_client
 
 NS = "orb-team-a"
@@ -201,7 +202,19 @@ async def test_one_unreadable_namespace_does_not_complete_the_other(env: Env) ->
     assert isinstance(outcome, Accepted)
     assert outcome.pending_resource_ids == [other]
     statuses = {i["instance_id"]: i["status"] for i in outcome.metadata["instances"]}
-    assert statuses == {env.name: "terminated"}
+    assert statuses == {env.name: "terminated", other: "unknown"}
+    # The unreadable machine is reported with the placement it already has.
+    placeholder = next(i for i in outcome.metadata["instances"] if i["instance_id"] == other)
+    assert placeholder["provider_data"] == {"namespace": "orb-team-b"}
+
+
+@pytest.mark.asyncio
+async def test_unreadable_return_is_never_promoted_to_final(env: Env) -> None:
+    env.core.list_errors[NS] = ApiException(status=500)
+    outcome = await env.status([env.name], env.coords([env.name]))
+    result = _outcome_to_provider_result(outcome, fallback_operation="get_instance_status")
+    assert "fulfillment_final" not in result.data["provider_data"]
+    assert [i["status"] for i in result.data["instances"]] == ["unknown"]
 
 
 @pytest.mark.asyncio
