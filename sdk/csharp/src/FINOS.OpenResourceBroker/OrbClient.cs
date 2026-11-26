@@ -302,11 +302,14 @@ public sealed class OrbClient : IAsyncDisposable
     {
         try
         {
-            var doc = JsonDocument.Parse(body);
+            using var doc = JsonDocument.Parse(body);
             if (doc.RootElement.TryGetProperty("code", out var code)) return code.GetString();
             if (doc.RootElement.TryGetProperty("error", out var error)) return error.GetString();
         }
-        catch { }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            // Body is not the expected error JSON; fall back to the HTTP status.
+        }
         return null;
     }
 
@@ -314,7 +317,7 @@ public sealed class OrbClient : IAsyncDisposable
     {
         try
         {
-            var doc = JsonDocument.Parse(body);
+            using var doc = JsonDocument.Parse(body);
             if (doc.RootElement.TryGetProperty("message", out var msg)) return msg.GetString();
             if (doc.RootElement.TryGetProperty("detail", out var detail))
             {
@@ -322,7 +325,10 @@ public sealed class OrbClient : IAsyncDisposable
                 return detail.GetRawText();
             }
         }
-        catch { }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            // Body is not the expected error JSON; fall back to the HTTP status.
+        }
         return null;
     }
 

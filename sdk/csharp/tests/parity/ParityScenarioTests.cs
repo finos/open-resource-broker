@@ -106,8 +106,8 @@ public class ParityScenarioTests : IClassFixture<OrbFixture>
         // Step 1 — health_check
         _out.WriteLine($"step 1 health_check -> {MethodFor(scenario, 1)}");
         var health = await client.HealthAsync();
-        Assert.True(health.ContainsKey("status"), "health response must have a status field");
-        var status = health["status"]?.ToString();
+        Assert.True(health.TryGetValue("status", out var statusObj), "health response must have a status field");
+        var status = statusObj?.ToString();
         Assert.True(status is "healthy" or "degraded", $"status should be healthy|degraded, got: {status}");
         results[1] = "PASS";
 
