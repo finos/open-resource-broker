@@ -51,7 +51,6 @@ from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.asg.capacity_manager import ASGCapacityManager
 from orb.providers.aws.infrastructure.handlers.asg.config_builder import ASGConfigBuilder
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
     delete_asg_or_confirm_gone,
     emit_alert,
@@ -64,7 +63,7 @@ from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 
 @injectable
-class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
+class ASGHandler(AWSHandler, FleetGroupingMixin):
     """Handler for Auto Scaling Group operations."""
 
     def __init__(
@@ -989,6 +988,22 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="heterogeneous",
                 percent_on_demand=30,
                 allocation_strategy="lowestPrice",
+                subnet_ids=[],
+                security_group_ids=[],
+                tags={"Environment": "prod"},
+            ),
+            # Attribute-based instance selection (no explicit machine types)
+            AWSTemplate(
+                template_id="ASG-ABIS",
+                name="Auto Scaling Group Attribute-Based Instance Selection",
+                description="Auto Scaling Group that selects instance types from vCPU and memory requirements",
+                provider_api="ASG",
+                abis_instance_requirements={
+                    "vcpu_count": {"min": 2, "max": 4},
+                    "memory_mib": {"min": 4096, "max": 16384},
+                },
+                max_machines=100,
+                price_type="ondemand",
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "prod"},

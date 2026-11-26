@@ -9,6 +9,7 @@ import json
 import os
 import tempfile
 from datetime import date, datetime
+from typing import Any
 
 import pytest
 
@@ -20,7 +21,9 @@ from orb.infrastructure.scheduler.hostfactory.hostfactory_strategy import (
 from orb.infrastructure.template.factories import TemplateDTOFactory
 
 _template_dto_factory = TemplateDTOFactory()
+from orb.infrastructure.registry.template_extension_registry import TemplateExtensionRegistry
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from orb.providers.aws.domain.template.aws_template_dto_config import AWSTemplateDTOConfig
 from orb.providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
 
 
@@ -39,6 +42,11 @@ def _template_to_dto(template: Template) -> TemplateDTO:
 
 class TestTemplateRoundTrip:
     """Verify generate → load round-trip preserves all expected fields."""
+
+    @pytest.fixture(autouse=True)
+    def _aws_dto_extension(self, monkeypatch):
+        """Register the AWS DTO extension, as provider bootstrap does at runtime."""
+        monkeypatch.setitem(TemplateExtensionRegistry._extensions, "aws", AWSTemplateDTOConfig)
 
     def setup_method(self):
         self.strategy = _make_strategy()
@@ -110,9 +118,40 @@ class TestTemplateRoundTrip:
                 f"price_type mismatch for {template.template_id}"
             )
 
+    def _assert_abis_survives(self, template: Any, result: dict) -> None:
+        """Attribute-based templates keep their requirements and carry no machine types.
+
+        Checked on both paths that carry the field: the DTO (requirements live in
+        ``provider_config``) and the generate path (model_dump -> dispatch format
+        -> load -> AWSTemplate).
+        """
+        assert not result.get("machine_types"), template.template_id
+        expected = template.get_instance_requirements_payload()
+        assert expected is not None
+
+        dto = _template_to_dto(template)
+        assert not dto.machine_types
+        assert dto.provider_config is not None
+        assert dto.provider_config.abis_instance_requirements, template.template_id  # type: ignore[attr-defined]
+
+        dispatched = self.strategy.format_templates_for_dispatch(
+            [template.model_dump(exclude_none=True, mode="json")]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "templates.json")
+            with open(path, "w") as f:
+                json.dump(dispatched, f)
+            loaded = self.strategy.load_templates_from_path(path)
+        assert not loaded[0].get("machine_types")
+        reloaded = AWSTemplate(**loaded[0])
+        assert reloaded.get_instance_requirements_payload() == expected, template.template_id
+
     def test_machine_types_survives_roundtrip(self):
         for template in self.example_templates:
             result = self._roundtrip(template)
+            if template.abis_instance_requirements:  # type: ignore[attr-defined]
+                self._assert_abis_survives(template, result)
+                continue
             assert result.get("machine_types"), f"machine_types missing for {template.template_id}"
             assert result["machine_types"] == template.machine_types, (
                 f"machine_types mismatch for {template.template_id}"
@@ -198,7 +237,10 @@ class TestTemplateRoundTrip:
         assert result.get("name") == template.name
         assert result.get("provider_api") == "EC2Fleet"
         assert result.get("price_type") == template.price_type
-        assert result.get("machine_types") == template.machine_types
+        if template.abis_instance_requirements:
+            self._assert_abis_survives(template, result)
+        else:
+            assert result.get("machine_types") == template.machine_types
         assert "created_at" in result
         assert result.get("subnet_ids", []) == []
         assert result.get("security_group_ids", []) == []

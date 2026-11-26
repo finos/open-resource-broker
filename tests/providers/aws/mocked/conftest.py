@@ -28,6 +28,7 @@ from tests.providers.aws.conftest import (
     make_run_instances_handler,
     make_spot_fleet_handler,
 )
+from tests.shared.moto_reservation_filter import emulate_reservation_id_filter
 
 __all__ = [
     "REGION",
@@ -57,4 +58,11 @@ def patch_moto_compat():
        from instance_ids so the orchestration loop sees fulfilled_count > 0.
     """
     with make_patch_moto_compat():
+        yield
+
+
+@pytest.fixture(autouse=True)
+def moto_reservation_id_filter():
+    """Answer the ``reservation-id`` filter that moto does not implement."""
+    with emulate_reservation_id_filter():
         yield

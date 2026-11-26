@@ -46,7 +46,6 @@ from orb.providers.aws.exceptions.aws_exceptions import (
 from orb.providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from orb.providers.aws.infrastructure.aws_client import AWSClient
 from orb.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
     emit_alert,
     region_of,
@@ -70,7 +69,7 @@ from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 
 @injectable
-class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
+class SpotFleetHandler(AWSHandler, FleetGroupingMixin):
     """Handler for Spot Fleet operations."""
 
     def __init__(
@@ -848,5 +847,24 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "prod"},
+            ),
+            # Attribute-based instance selection (no explicit machine types)
+            AWSTemplate(
+                template_id="SpotFleet-Request-ABIS",
+                name="Spot Fleet Request - Attribute-Based Instance Selection",
+                description="Spot Fleet request that selects instance types from vCPU and memory requirements",
+                provider_api="SpotFleet",
+                abis_instance_requirements={
+                    "vcpu_count": {"min": 2, "max": 4},
+                    "memory_mib": {"min": 4096, "max": 16384},
+                },
+                max_machines=100,
+                price_type="spot",
+                allocation_strategy="priceCapacityOptimized",
+                fleet_type="request",
+                max_price=0.10,
+                subnet_ids=[],
+                security_group_ids=[],
+                tags={"Environment": "dev"},
             ),
         ]

@@ -40,37 +40,6 @@ class BaseContextMixin:
                 _logger.debug("Could not get package name from config port: %s", e)
         return "open-resource-broker"
 
-    def _calculate_capacity_distribution(
-        self, template: AWSTemplate, requested_count: int
-    ) -> dict[str, Any]:
-        """Standard capacity calculation for all fleet types."""
-        total_capacity = requested_count
-        price_type = template.price_type
-        percent_on_demand = template.percent_on_demand or 0
-
-        if price_type == "ondemand":
-            on_demand_count = total_capacity
-        elif price_type == "heterogeneous":
-            on_demand_count = int(total_capacity * percent_on_demand / 100)
-        else:
-            on_demand_count = (
-                int(total_capacity * percent_on_demand / 100) if percent_on_demand else 0
-            )
-
-        on_demand_count = max(0, min(total_capacity, on_demand_count))
-        spot_count = max(0, total_capacity - on_demand_count)
-
-        return {
-            "total_capacity": total_capacity,
-            "target_capacity": total_capacity,  # For Fleet APIs
-            "desired_capacity": total_capacity,  # For ASG
-            "on_demand_count": on_demand_count,
-            "spot_count": spot_count,
-            "is_heterogeneous": on_demand_count > 0 and spot_count > 0,
-            "is_spot_only": spot_count > 0 and on_demand_count == 0,
-            "is_ondemand_only": on_demand_count > 0 and spot_count == 0,
-        }
-
     def _prepare_standard_tags(self, template: AWSTemplate, request_id: str) -> dict[str, Any]:
         """Standard tag preparation for all handlers."""
         created_by = self._get_package_name()

@@ -58,7 +58,6 @@ from orb.providers.aws.infrastructure.handlers.ec2_fleet.example_templates impor
 from orb.providers.aws.infrastructure.handlers.ec2_fleet.release_manager import (
     EC2FleetReleaseManager,
 )
-from orb.providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from orb.providers.aws.infrastructure.handlers.shared.delete_outcome import (
     emit_alert,
     region_of,
@@ -75,7 +74,7 @@ from orb.providers.aws.utilities.aws_operations import AWSOperations
 
 
 @injectable
-class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
+class EC2FleetHandler(AWSHandler, FleetGroupingMixin):
     """Handler for EC2 Fleet operations."""
 
     def __init__(

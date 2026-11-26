@@ -29,6 +29,7 @@ Note:
 
 import time
 import uuid
+from collections.abc import Iterator
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
@@ -690,15 +691,11 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
             for resource_id in resource_ids:
                 try:
-                    response = self.aws_client.ec2_client.describe_instances(
-                        Filters=[{"Name": "reservation-id", "Values": [resource_id]}]
-                    )
-
-                    instance_ids = []
-                    for reservation in response.get("Reservations", []):
-                        instance_ids.extend(
-                            instance["InstanceId"] for instance in reservation.get("Instances", [])
-                        )
+                    instance_ids = [
+                        instance["InstanceId"]
+                        for reservation in self._describe_reservation_pages(resource_id)
+                        for instance in reservation.get("Instances", [])
+                    ]
 
                     if instance_ids:
                         detailed_instances = self._get_instance_details(
@@ -712,22 +709,10 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                         )
                         all_instances.extend(formatted)
 
-                except ClientError as e:
-                    if e.response["Error"]["Code"] == "InvalidReservationID.NotFound":
+                except Exception as e:
+                    if error_code_of(e) == "InvalidReservationID.NotFound":
                         self._logger.warning("Reservation ID %s not found", resource_id)
                         continue
-                    if "Filter dicts have not been implemented" in str(e):
-                        self._logger.info(
-                            "Reservation-id filter not supported (likely moto), falling back to describe all instances"
-                        )
-                        return self._find_instances_by_tags_fallback(request, resource_ids)
-                    raise
-                except Exception as e:
-                    if "Filter dicts have not been implemented" in str(e):
-                        self._logger.info(
-                            "Reservation-id filter not supported (likely moto), falling back to describe all instances"
-                        )
-                        return self._find_instances_by_tags_fallback(request, resource_ids)
                     raise
 
             self._logger.info(
@@ -747,58 +732,6 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             )
             raise AWSInfrastructureError(
                 f"Failed to find instances by resource IDs {resource_ids}: {e!s}"
-            )
-
-    def _find_instances_by_tags_fallback(
-        self, request: Request, resource_ids: list[str]
-    ) -> CheckHostsStatusResult:
-        """Fallback method to find instances by tags when reservation-id filter is not supported."""
-        try:
-            response = self.aws_client.ec2_client.describe_instances()
-            formatted_instances: list[dict[str, Any]] = []
-
-            for reservation in response.get("Reservations", []):
-                reservation_id = reservation.get("ReservationId")
-                if reservation_id not in resource_ids:
-                    continue
-
-                instance_ids = [
-                    instance.get("InstanceId") for instance in reservation.get("Instances", [])
-                ]
-                instance_ids = [instance_id for instance_id in instance_ids if instance_id]
-
-                if not instance_ids:
-                    continue
-
-                detailed_instances = self._get_instance_details(
-                    instance_ids,
-                    request_id=str(request.request_id),
-                    resource_id=reservation_id,
-                    provider_api="RunInstances",
-                )
-                formatted_instances.extend(
-                    self._format_instance_data(
-                        detailed_instances, reservation_id, self._resolve_provider_api(request)
-                    )
-                )
-
-            fulfilment = self._compute_run_instances_fulfilment(
-                formatted_instances, request.requested_count, str(request.request_id)
-            )
-            return CheckHostsStatusResult(instances=formatted_instances, fulfilment=fulfilment)
-
-        except Exception as e:
-            self._logger.error("FALLBACK: Fallback method failed to find instances: %s", e)
-            return CheckHostsStatusResult(
-                instances=[],
-                fulfilment=ProviderFulfilment(
-                    state="in_progress",
-                    message="Instance lookup failed — will retry",
-                    target_units=request.requested_count,
-                    running_count=0,
-                    pending_count=0,
-                    failed_count=0,
-                ),
             )
 
     def release_hosts(
@@ -844,6 +777,20 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         caller can tell "lookup failed" apart from "no instances".
         """
         instance_ids: list[str] = []
+        try:
+            for reservation in self._describe_reservation_pages(resource_id):
+                for instance in reservation.get("Instances", []):
+                    iid = instance.get("InstanceId")
+                    state = (instance.get("State") or {}).get("Name")
+                    if iid and state != "terminated":
+                        instance_ids.append(iid)
+        except Exception as e:
+            if error_code_of(e) != "InvalidReservationID.NotFound":
+                raise
+        return instance_ids
+
+    def _describe_reservation_pages(self, resource_id: str) -> Iterator[dict[str, Any]]:
+        """Yield the reservations matching ``resource_id``, walking every ``NextToken`` page."""
         next_token: Optional[str] = None
         while True:
             kwargs: dict[str, Any] = {
@@ -851,25 +798,15 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             }
             if next_token:
                 kwargs["NextToken"] = next_token
-            try:
-                response = self._retry_with_backoff(
-                    self.aws_client.ec2_client.describe_instances,
-                    operation_type="read_only",
-                    **kwargs,
-                )
-            except Exception as e:
-                if error_code_of(e) == "InvalidReservationID.NotFound":
-                    return instance_ids
-                raise
-            for reservation in response.get("Reservations", []):
-                for instance in reservation.get("Instances", []):
-                    iid = instance.get("InstanceId")
-                    state = (instance.get("State") or {}).get("Name")
-                    if iid and state != "terminated":
-                        instance_ids.append(iid)
+            response = self._retry_with_backoff(
+                self.aws_client.ec2_client.describe_instances,
+                operation_type="read_only",
+                **kwargs,
+            )
+            yield from response.get("Reservations", [])
             next_token = response.get("NextToken")
             if not next_token:
-                return instance_ids
+                return
 
     # An empty reservation lookup right after a launch may only be describe lag.
     _CANCEL_LOOKUP_RETRIES = 2

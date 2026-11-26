@@ -157,6 +157,25 @@ def build_ec2_fleet_example_templates() -> list[AWSTemplate]:
             tags={"Environment": "prod"},
             metadata={"fleet_type": "maintain", "percent_on_demand": 50},
         ),
+        # Attribute-based instance selection (no explicit machine types)
+        AWSTemplate(
+            template_id="EC2Fleet-Request-ABIS",
+            name="EC2 Fleet Request Attribute-Based Instance Selection",
+            description="EC2 Fleet request that selects instance types from vCPU and memory requirements",
+            provider_api="EC2Fleet",
+            abis_instance_requirements={
+                "vcpu_count": {"min": 2, "max": 4},
+                "memory_mib": {"min": 4096, "max": 16384},
+            },
+            max_machines=100,
+            price_type="spot",
+            allocation_strategy="priceCapacityOptimized",
+            max_price=0.10,
+            subnet_ids=[],
+            security_group_ids=[],
+            tags={"Environment": "dev"},
+            metadata={"fleet_type": "request"},
+        ),
     ]
 
 

@@ -272,8 +272,8 @@ Reloads templates from configuration files and clears the cache.
 **Response (200):**
 ```json
 {
-  "message": "Templates refreshed successfully. Found 20 templates.",
-  "templateCount": 20,
+  "message": "Templates refreshed successfully. Found 23 templates.",
+  "templateCount": 23,
   "cacheStats": {"refreshed": true},
   "timestamp": "2026-02-23T22:00:00.000000"
 }
