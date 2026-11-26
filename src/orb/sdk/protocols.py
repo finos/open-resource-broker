@@ -29,6 +29,9 @@ class ORBClientProtocol(Protocol):
     ) -> list[dict[str, Any]]:  # type: ignore[return]
         pass
 
+    def clear_cache(self) -> None:
+        pass
+
     async def validate_template(self, *, template_id: str, **kwargs: Any) -> dict[str, Any]:  # type: ignore[return]
         pass
 
