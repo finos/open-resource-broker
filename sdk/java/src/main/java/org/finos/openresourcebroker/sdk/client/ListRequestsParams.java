@@ -28,6 +28,8 @@ public class ListRequestsParams {
     private String templateId;
     private String requestType;
     private List<String> filterExpressions;
+    private String startTime;
+    private String endTime;
 
     public ListRequestsParams status(String v) { this.status = v; return this; }
     public ListRequestsParams limit(Integer v) { this.limit = v; return this; }
@@ -41,6 +43,10 @@ public class ListRequestsParams {
     public ListRequestsParams templateId(String v) { this.templateId = v; return this; }
     public ListRequestsParams requestType(String v) { this.requestType = v; return this; }
     public ListRequestsParams filterExpressions(List<String> v) { this.filterExpressions = v; return this; }
+    /** Inclusive lower bound on created_at, ISO-8601 (e.g. {@code 2026-11-01T00:00:00Z}); no offset means UTC. */
+    public ListRequestsParams startTime(String v) { this.startTime = v; return this; }
+    /** Inclusive upper bound on created_at, ISO-8601; a date-only value is midnight UTC. */
+    public ListRequestsParams endTime(String v) { this.endTime = v; return this; }
 
     public String getStatus() { return status; }
     public Integer getLimit() { return limit; }
@@ -54,4 +60,6 @@ public class ListRequestsParams {
     public String getTemplateId() { return templateId; }
     public String getRequestType() { return requestType; }
     public List<String> getFilterExpressions() { return filterExpressions; }
+    public String getStartTime() { return startTime; }
+    public String getEndTime() { return endTime; }
 }

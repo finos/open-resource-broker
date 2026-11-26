@@ -357,7 +357,7 @@ public class OrbClient implements Closeable {
      *
      * <p>Exposes the canonical filter set shared with the Go/TypeScript SDKs:
      * status, limit, offset, sync, cursor, q, sort, provider_name, provider_type,
-     * template_id, request_type, filter_expressions.
+     * template_id, request_type, filter_expressions, start_time, end_time.
      *
      * @param p filter/pagination parameters (may be {@code null} for none)
      */
@@ -378,6 +378,8 @@ public class OrbClient implements Closeable {
             if (p.getFilterExpressions() != null && !p.getFilterExpressions().isEmpty()) {
                 params.put("filter_expressions", String.join(",", p.getFilterExpressions()));
             }
+            if (p.getStartTime() != null) params.put("start_time", p.getStartTime());
+            if (p.getEndTime() != null) params.put("end_time", p.getEndTime());
         }
         return get("/api/v1/requests/", params.isEmpty() ? null : params,
                 new TypeReference<>() {});
