@@ -81,15 +81,14 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         # provider package.  Azure and GCP rows are first normalised to the
         # internal field names, since their templates reject unknown keys.  When no
         # provider validator is available the generic checks are the verdict.
-        provider_type = declared_type
         try:
-            provider_type = declared_type or self._type_from_provider_config(config)
-            if not provider_type:
+            resolved_type = declared_type or self._type_from_provider_config(config)
+            if not resolved_type:
                 self._logger.warning(
                     "Provider type not resolved for template %s; provider rules not applied",
                     template_id,
                 )
-            errors.extend(self._provider_validation_errors(provider_type, config))
+            errors.extend(self._provider_validation_errors(resolved_type, config))
         except Exception as e:
             self._logger.warning("Template validation failed: %s", e)
             errors.append(f"Template validation error: {e!s}")
