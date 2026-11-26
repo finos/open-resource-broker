@@ -129,6 +129,27 @@ jobs:
         run: make ci-quality-ruff-optional
         continue-on-error: true
 
+  # Advisory: the job-level continue-on-error keeps a red run off the merge
+  # gate. Needs only config (not lint-ruff): it reads the diff, not the venv.
+  custom-quality:
+    name: Custom Quality Checks (advisory)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [config]
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run custom quality checks on changed Python files
+        run: make ci-quality-custom-changed
+
   lint-pyright:
     name: Type Checking (pyright)
     runs-on: ubuntu-latest

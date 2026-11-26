@@ -81,6 +81,15 @@ repos:
         description: "Check Clean Architecture compliance"
         stages: [pre-push]
 
+      - id: export-openapi-spec
+        name: Export OpenAPI spec
+        entry: make sdk-go-export-spec
+        language: system
+        files: ^(src/orb/|dev-tools/release/export_openapi_spec\.sh$)
+        pass_filenames: false
+        description: "Regenerate sdk/spec/openapi.json; fails if the committed spec is stale"
+        stages: [pre-push]
+
       - id: check-file-sizes-arch
         name: Check File Sizes (Architecture)
         entry: make ci-arch-file-sizes

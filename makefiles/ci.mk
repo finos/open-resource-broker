@@ -23,6 +23,15 @@ ci-quality-radon:  ## Run radon complexity analysis
 	$(call run-tool,radon,cc $(PACKAGE) --min B --show-complexity)
 	$(call run-tool,radon,mi $(PACKAGE) --min B)
 
+ci-quality-custom-changed:  ## Run custom quality checks on Python files changed in a pull request
+	@# Needs the base ref (checkout with fetch-depth: 0). Without it a shallow
+	@# clone would diff nothing and pass; fail instead.
+	@test "$$GITHUB_EVENT_NAME" = "pull_request" || { echo "Only runs for pull requests (GITHUB_EVENT_NAME=pull_request)." >&2; exit 1; }
+	@git rev-parse --verify -q "origin/$$GITHUB_BASE_REF" >/dev/null || { echo "origin/$$GITHUB_BASE_REF not found: fetch full history." >&2; exit 1; }
+	@files=$$(git diff --name-only --diff-filter=d "origin/$$GITHUB_BASE_REF...HEAD" -- '*.py'); \
+	if [ -z "$$files" ]; then echo "No Python files changed."; exit 0; fi; \
+	python3 ./dev-tools/quality/quality_check.py --strict --files $$files
+
 ci-quality-pyright:  ## Run pyright type checking
 	@echo "Running pyright type check..."
 	$(call run-tool,pyright,)
