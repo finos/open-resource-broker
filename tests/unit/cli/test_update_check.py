@@ -197,10 +197,7 @@ def test_request_error_is_silent_and_negative_cached(tmp_path, tty, monkeypatch,
 
     assert tty.read() == ("", "")
     assert opener.open.call_count == 1
-    cached = json.loads((tmp_path / "update_check.json").read_text())
-    assert cached["latest"] is None
-    # The failure entry expires after about an hour, not a day.
-    assert 3 * 3600 < time.time() - cached["checked_at"] + 3600 < 24 * 3600 + 5
+    assert json.loads((tmp_path / "update_check.json").read_text())["latest"] is None
 
 
 @pytest.mark.parametrize(
@@ -330,3 +327,62 @@ def test_escape_suffix_prints_normalised_release_only(tmp_path, tty, network):
 @pytest.mark.parametrize("value", ["1" * 5000, "١.٢.٣", "1.1.1.1.1.1.1", "\x1b[0m1.0", " 1.0"])
 def test_parse_release_rejects(value):
     assert parse_release(value) is None
+
+
+def test_hung_lookup_is_not_retried_by_next_run(tmp_path, tty, monkeypatch):
+    release = threading.Event()
+    opener = MagicMock()
+    opener.open.side_effect = lambda req, timeout=None: release.wait(5) and None
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *a, **k: opener)
+    try:
+        first = tty.run(_args(), _Config(tmp_path), "1.0.0", wait=False)
+        assert first._thread is not None
+        second = tty.run(_args(), _Config(tmp_path), "1.0.0", wait=False)
+        assert second._thread is None
+        assert opener.open.call_count == 1
+    finally:
+        release.set()
+        first._thread.join(5)
+
+
+def _cache_entry(tmp_path, latest, age_seconds, now):
+    (tmp_path / "update_check.json").write_text(
+        json.dumps({"checked_at": now - age_seconds, "latest": latest})
+    )
+
+
+@pytest.mark.parametrize(
+    ("latest", "age", "expect_fetch"),
+    [
+        (None, 59 * 60, False),
+        (None, 61 * 60, True),
+        ("5.0.0", 23 * 3600, False),
+        ("5.0.0", 24 * 3600 + 1, True),
+    ],
+)
+def test_cache_expiry_with_frozen_time(
+    tmp_path, tty, network, monkeypatch, latest, age, expect_fetch
+):
+    now = 1_800_000_000.0
+    monkeypatch.setattr(update_check.time, "time", lambda: now)
+    # A failure entry is written pre-aged so it expires one hour after the attempt.
+    failure_age = age + (24 * 3600 - 3600) if latest is None else age
+    _cache_entry(tmp_path, latest, failure_age, now)
+    check = tty.run(_args(), _Config(tmp_path), "1.0.0")
+    assert (check._thread is not None) is expect_fetch
+    assert (network.call_count > 0) is expect_fetch
+
+
+@pytest.mark.parametrize(("minutes", "expect_fetch"), [(59, False), (61, True)])
+def test_failed_attempt_expires_after_an_hour(tmp_path, tty, monkeypatch, minutes, expect_fetch):
+    clock = [1_800_000_000.0]
+    monkeypatch.setattr(update_check.time, "time", lambda: clock[0])
+    opener = MagicMock()
+    opener.open.side_effect = OSError("down")
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *a, **k: opener)
+
+    tty.run(_args(), _Config(tmp_path), "1.0.0")
+    assert opener.open.call_count == 1
+    clock[0] += minutes * 60
+    tty.run(_args(), _Config(tmp_path), "1.0.0")
+    assert (opener.open.call_count == 2) is expect_fetch

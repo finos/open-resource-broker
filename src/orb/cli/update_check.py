@@ -144,10 +144,8 @@ class UpdateCheck:
 
     def _run(self, path: str) -> None:
         latest = _fetch_latest(self._logger)
-        now = time.time()
-        # A failed lookup is cached for a shorter period than a successful one.
-        stamp = now if latest else now - (_CACHE_TTL_SECONDS - _FAILURE_TTL_SECONDS)
-        _write_cache(path, latest, stamp, self._logger)
+        if latest:
+            _write_cache(path, latest, time.time(), self._logger)
         self._result.append(latest)
 
     def finish(self) -> None:
@@ -185,6 +183,10 @@ def start(
         if cached is not None:
             check._result.append(cached["latest"])
         else:
+            # Record a pending attempt first so a slow or failing lookup is not retried
+            # by every command: it expires after the failure TTL, success overwrites it.
+            stamp = time.time() - (_CACHE_TTL_SECONDS - _FAILURE_TTL_SECONDS)
+            _write_cache(path, None, stamp, logger)
             check._thread = threading.Thread(target=check._run, args=(path,), daemon=True)
             check._thread.start()
         return check
