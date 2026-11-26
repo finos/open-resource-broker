@@ -1,6 +1,8 @@
 # Provider Selection, Fallback and Pricing: Decision Record
 
-Status: proposed. The decisions take effect when this record is merged. This record changes no code. Each decision names the work that implements it under [Follow-up work](#follow-up-work).
+Status: accepted. The maintainers accepted these decisions on #434, #439 and #442. This record changes no code; the work that implements each decision is listed under [Follow-up work](#follow-up-work).
+
+D2, D3 and D5 follow from those decisions and are open to maintainer review.
 
 This record covers three questions: how ORB balances load across provider instances and provider types, what happens when the selected provider cannot fulfil a request, and whether price is an input to either decision.
 
@@ -53,24 +55,23 @@ Balancing across provider types and across instances of one type uses the same `
 
 `selection_policy` stays installation-wide. A template that needs a specific placement pins it with `provider_name`, `provider_type` or `provider_api`. Per-template and per-type policies are not added without a use case that pinning does not cover.
 
-### D4. Every accepted policy gets real behaviour or is removed
+### D4. Policies without distinct behaviour are removed
 
-A policy that validates but behaves like the fallthrough misleads operators. Each of the ten is decided:
+A policy that validates but behaves like the fallthrough misleads operators. `WEIGHTED_ROUND_ROBIN` and `FIRST_AVAILABLE` have distinct behaviour and stay. The seven policies below have none and are each removed:
 
 | Policy | Decision | Reason |
 |---|---|---|
-| `WEIGHTED_ROUND_ROBIN` | Keep | Has distinct behaviour. |
-| `FIRST_AVAILABLE` | Keep | Has distinct behaviour. |
-| `HEALTH_BASED` | Implement | The provider health probe behind `orb providers health` exists; the policy should exclude unhealthy instances before ranking. |
-| `ROUND_ROBIN` | Implement | Needs only a rotation counter in the selection service. |
-| `RANDOM` | Implement | Needs no state. |
+| `ROUND_ROBIN` | Remove | No rotation state exists; the policy resolves to the lowest `priority` number. |
+| `RANDOM` | Remove | It resolves to the lowest `priority` number, and random choice has no use case that `WEIGHTED_ROUND_ROBIN` does not cover. |
 | `CAPABILITY_BASED` | Remove | Capability matching is already step four of the selection precedence; as a policy it adds nothing. |
 | `LEAST_CONNECTIONS` | Remove | The selection service has no per-provider connection or in-flight operation count. |
 | `FASTEST_RESPONSE` | Remove | The selection service has no latency history. |
 | `HIGHEST_SUCCESS_RATE` | Remove | The selection service has no per-provider success history. |
-| `PERFORMANCE_BASED` | Remove | Same missing data as the two rows above. |
+| `PERFORMANCE_BASED` | Remove | It needs the same missing performance data as the two rows above. |
 
-A removed policy is first deprecated under the [deprecation policy](../developer_guide/deprecation.md), with a warning when configuration names it, and then rejected by validation. A removed policy can return when the data it needs exists.
+Removal has two steps. First the policy is deprecated under the [deprecation policy](../developer_guide/deprecation.md), with a warning when configuration names it. Then validation rejects it. A removed policy can return when the data it needs exists.
+
+`HEALTH_BASED` is separate. It validates today but is identical to the fallthrough, because `_health_based_selection` does not read health data. The author's recommendation, not an accepted decision, is to implement it by excluding unhealthy instances before ranking, using the probe behind `orb providers health`. If it is not implemented, it falls under the same removal.
 
 ### D5. Unused strategy classes are removed
 
@@ -96,17 +97,16 @@ Ruled out: a pricing port feeding selection. It requires price sources for every
 
 ## Follow-up work
 
-Sizes are rough: S under a day, M a few days, L a week or more. These are proposals; each becomes an issue when a maintainer files it.
+Sizes are rough: S under a day, M a few days, L a week or more. Each item is tracked in the issue linked in the table.
 
-| # | Work | Size | Decision |
-|---|---|---|---|
-| 1 | Implement `HEALTH_BASED` using provider health results | M | D4 |
-| 2 | Implement `ROUND_ROBIN` and `RANDOM` | S | D4 |
-| 3 | Deprecate, then remove, `CAPABILITY_BASED`, `LEAST_CONNECTIONS`, `FASTEST_RESPONSE`, `HIGHEST_SUCCESS_RATE` and `PERFORMANCE_BASED` | M | D4 |
-| 4 | Remove `LoadBalancingProviderStrategy`, `FallbackProviderStrategy`, their factories, `register_fallback_provider` and the usage example | M | D5 |
-| 5 | Whole-request fallback on `QuotaError` across ordered candidates, honouring pinned `provider_name`, `provider_type` and `provider_api`, with the failed attempt visible to the caller | L | D6 |
-| 6 | Update [Multi-Provider Design](multi-provider-design.md) and the [Provider Strategy Guide](../provider_strategy_guide.md) when items 1 to 5 land | S | D4, D5, D6 |
-| 7 | AWS spot placement scoring, then revisit D7 | L | D7 |
+| # | Work | Size | Decision | Tracked in |
+|---|---|---|---|---|
+| 1 | Deprecate, then remove, `ROUND_ROBIN`, `RANDOM`, `CAPABILITY_BASED`, `LEAST_CONNECTIONS`, `FASTEST_RESPONSE`, `HIGHEST_SUCCESS_RATE` and `PERFORMANCE_BASED` | M | D4 | [#434](https://github.com/finos/open-resource-broker/issues/434) |
+| 2 | Decide `HEALTH_BASED`: implement it using provider health results (recommended), or remove it with the policies in item 1 | M | D4 | [#434](https://github.com/finos/open-resource-broker/issues/434) |
+| 3 | Remove `LoadBalancingProviderStrategy`, `FallbackProviderStrategy`, their factories, `register_fallback_provider` and the usage example | M | D5 | [#434](https://github.com/finos/open-resource-broker/issues/434) |
+| 4 | Whole-request fallback on `QuotaError` across ordered candidates, honouring pinned `provider_name`, `provider_type` and `provider_api`, with the failed attempt visible to the caller | L | D6 | [#439](https://github.com/finos/open-resource-broker/issues/439) |
+| 5 | AWS spot placement scoring, then revisit D7 | L | D7 | [#442](https://github.com/finos/open-resource-broker/issues/442) |
+| 6 | Update [Multi-Provider Design](multi-provider-design.md) and the [Provider Strategy Guide](../provider_strategy_guide.md) when items 1 to 5 land | S | D4 to D7 | [#434](https://github.com/finos/open-resource-broker/issues/434) |
 
 ## Related documentation
 

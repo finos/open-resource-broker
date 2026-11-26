@@ -55,7 +55,7 @@ orb requests status req-123
 
 ### Provider Operations
 ```bash
-orb providers list --detailed --format table
+orb providers list --format table
 orb --provider-name aws-prod providers health
 orb --provider-name aws-dev templates generate
 ```

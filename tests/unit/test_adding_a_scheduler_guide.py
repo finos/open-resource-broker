@@ -1,7 +1,9 @@
 """The scheduler authoring guide must reference code that exists."""
 
+import ast
 import importlib
 import re
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -31,16 +33,6 @@ def test_guide_names_every_port():
 @pytest.mark.parametrize("name", PORT_NAMES)
 def test_named_ports_exist(name):
     assert hasattr(importlib.import_module(PORTS_MODULE), name)
-
-
-def test_dotted_orb_paths_resolve():
-    for dotted in sorted(set(re.findall(r"`(orb(?:\.\w+)+)`", _guide_text()))):
-        module_path, _, attr = dotted.rpartition(".")
-        try:
-            module = importlib.import_module(dotted)
-        except ImportError:
-            module = importlib.import_module(module_path)
-            assert hasattr(module, attr), dotted
 
 
 def test_cited_source_paths_exist():
@@ -79,3 +71,70 @@ def test_documented_types_match_schema():
     literal_args = SchedulerConfig.model_fields["type"].annotation.__args__
     for name in literal_args:
         assert f"`{name}`" in _guide_text()
+
+
+# Backticked names in the guide that are not classes or constants defined in src/orb.
+NON_CODE_NAMES = {"Literal", "None", "TypeError"}
+
+
+@cache
+def _source_index() -> tuple[dict[str, tuple[set[str], set[str]]], set[str]]:
+    """Map class name to (member names, base names), and collect module-level names."""
+    classes: dict[str, tuple[set[str], set[str]]] = {}
+    module_names: set[str] = set()
+    for path in (REPO_ROOT / "src" / "orb").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                module_names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                module_names.add(node.target.id)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            members, bases = classes.setdefault(node.name, (set(), set()))
+            bases.update(b.id for b in node.bases if isinstance(b, ast.Name))
+            bases.update(b.attr for b in node.bases if isinstance(b, ast.Attribute))
+            for item in node.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    members.add(item.name)
+                elif isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                    members.add(item.target.id)
+                elif isinstance(item, ast.Assign):
+                    members.update(t.id for t in item.targets if isinstance(t, ast.Name))
+    return classes, module_names
+
+
+def _has_member(class_name: str, member: str, seen: frozenset[str] = frozenset()) -> bool:
+    classes, _ = _source_index()
+    if class_name in seen or class_name not in classes:
+        return False
+    members, bases = classes[class_name]
+    return member in members or any(
+        _has_member(base, member, seen | {class_name}) for base in bases
+    )
+
+
+def test_every_cited_class_exists_in_source():
+    classes, _ = _source_index()
+    cited = set(
+        re.findall(r"`([A-Z][A-Za-z0-9]*[a-z][A-Za-z0-9]*)(?:\.\w+)?(?:\(\))?`", _guide_text())
+    )
+    cited -= NON_CODE_NAMES
+    assert {"SchedulerPort", "SlurmSchedulerStrategy", "FieldMappingRegistry"} <= cited
+    assert not [name for name in sorted(cited) if name not in classes]
+
+
+def test_every_cited_class_member_exists():
+    pairs = set(
+        re.findall(r"`([A-Z][A-Za-z0-9]*[a-z][A-Za-z0-9]*)\.(\w+)(?:\(\))?`", _guide_text())
+    )
+    assert ("ConfigurationManager", "override_scheduler_strategy") in pairs
+    assert not [f"{c}.{m}" for c, m in sorted(pairs) if not _has_member(c, m)]
+
+
+def test_every_cited_constant_exists_in_source():
+    _, module_names = _source_index()
+    constants = set(re.findall(r"`([A-Z][A-Z0-9_]{3,})`", _guide_text()))
+    assert "BUILT_IN_FORMATS" in constants
+    assert not [name for name in sorted(constants) if name not in module_names]

@@ -37,6 +37,8 @@ Selection decides which configured provider instance serves a request. The prece
 4. The template's `provider_api`, matched against instances whose handlers or declared `capabilities` support it.
 5. The configured default: `default_provider_instance`, then `default_provider_type`, then the first enabled instance.
 
+For operator commands that are not tied to a template, the `--provider-type` flag restricts the choice to enabled instances of that type, and the configured `selection_policy` balances among them.
+
 Provider instances, their `priority` and `weight`, and the `selection_policy` are configured under `providers` in the configuration file. The schema is `ProviderConfig` in `src/orb/config/schemas/provider_strategy_schema.py`; [Multi-Provider Design](architecture/multi-provider-design.md#configuration-schema) documents each field and which policies have behaviour today. [Multi-Provider Configuration](configuration/multi-provider.md) has configuration examples.
 
 ## Provider commands
@@ -44,7 +46,7 @@ Provider instances, their `priority` and `weight`, and the `selection_policy` ar
 The `orb providers` command group inspects and manages provider instances. The [CLI reference](cli/cli-reference.md#providers) documents every option.
 
 ```bash
-orb providers list --detailed
+orb providers list
 orb providers show --provider-name aws_prod_us-east-1
 orb providers health
 orb providers metrics --provider-name aws_prod_us-east-1

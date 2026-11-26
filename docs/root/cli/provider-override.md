@@ -277,7 +277,7 @@ orb --provider-name aws-prod providers health
 orb providers list --format table
 
 # Show detailed provider information
-orb providers list --detailed --format yaml
+orb providers list --format yaml
 ```
 
 ### Provider Configuration Details
