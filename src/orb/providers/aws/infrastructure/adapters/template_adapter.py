@@ -174,7 +174,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             Dictionary mapping field names to validation error messages
         """
         errors = {}
-        is_microvm = getattr(template, "provider_api", None) == "MicroVM"
+        is_microvm = template.provider_api == "MicroVM"
 
         # Validate image ID
         if not template.machine_image:
@@ -394,7 +394,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         # MicroVM templates are individual Firecracker sandboxes launched from an
         # image ARN — they have no machine type or subnet, so those EC2-only
         # requirements are skipped here (mirrors validate_field_values).
-        if getattr(template, "provider_api", None) != "MicroVM":
+        if template.provider_api != "MicroVM":
             if not template.machine_types:
                 errors.append("Machine types are required for AWS templates")
 
