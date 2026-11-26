@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import ast
 import collections
+import io
 import json
+import re
+import tokenize
 from pathlib import Path
 
 import pytest
@@ -239,6 +242,55 @@ def _count_application_service_locators() -> int:
     return count
 
 
+def _count_interface_service_locators() -> int:
+    """Count service-locator uses under ``interface/`` (same rules as ``application/``)."""
+    count = 0
+    for f in collect_python_files(SRC_ORB / "interface"):
+        try:
+            count += _locator_sites_in_source(f.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+    return count
+
+
+_SUPPRESSION = re.compile(
+    r"#\s*(?:type:\s*ignore|pyright:\s*ignore|noqa|nosec)\b"
+    r"(?:\s*\[[^\]]*\]|\s*:\s*[A-Za-z]+\d+(?:\s*,\s*[A-Za-z]+\d+)*)?"
+    r"(?P<rest>.*)$"
+)
+
+
+def _reasonless_suppressions_in_source(source: str) -> int:
+    """Count suppression comments that carry no explanation.
+
+    Only real comments are examined (``tokenize``), so strings that mention a
+    directive do not count. A reason is any text left after the directive and
+    its optional bracket or code list, ignoring separators.
+    """
+    count = 0
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
+    except (tokenize.TokenError, IndentationError):
+        return 0
+    for tok in tokens:
+        if tok.type != tokenize.COMMENT:
+            continue
+        match = _SUPPRESSION.search(tok.string)
+        if match and not match.group("rest").strip(" \t#-:;,\u2013\u2014"):
+            count += 1
+    return count
+
+
+def _count_reasonless_suppressions() -> int:
+    count = 0
+    for f in collect_python_files(SRC_ORB):
+        try:
+            count += _reasonless_suppressions_in_source(f.read_text(encoding="utf-8"))
+        except UnicodeDecodeError:
+            continue
+    return count
+
+
 _STDLIB_LOGGER_EXEMPT = (
     SRC_ORB / "api",
     SRC_ORB / "cli",
@@ -301,6 +353,8 @@ _COUNTERS = {
     "cli_infrastructure_direct_imports": _count_cli_infrastructure,
     "application_service_locator_sites": _count_application_service_locators,
     "stdlib_logger_files_outside_boundary": _count_stdlib_logger_files,
+    "interface_service_locator_sites": _count_interface_service_locators,
+    "reasonless_suppressions": _count_reasonless_suppressions,
 }
 
 
@@ -364,3 +418,40 @@ def test_stdlib_logger_counter_detects_each_form(source: str) -> None:
 @pytest.mark.architecture
 def test_stdlib_logger_counter_ignores_unrelated_source() -> None:
     assert not _uses_stdlib_logging("def f(logger):\n    logger.info('x')\n")
+
+
+@pytest.mark.unit
+@pytest.mark.architecture
+@pytest.mark.parametrize(
+    "line",
+    [
+        "x = 1  # type: ignore",
+        "x = 1  # type: ignore[attr-defined]",
+        "x = 1  # pyright: ignore",
+        "x = 1  # pyright: ignore[reportGeneralTypeIssues]",
+        "x = 1  # noqa",
+        "x = 1  # noqa: E501",
+        "x = 1  # noqa: E501, F401",
+        "x = 1  # nosec",
+        "x = 1  # nosec - ",
+    ],
+)
+def test_reasonless_suppression_counter_detects_each_form(line: str) -> None:
+    assert _reasonless_suppressions_in_source(line + "\n") == 1
+
+
+@pytest.mark.unit
+@pytest.mark.architecture
+@pytest.mark.parametrize(
+    "line",
+    [
+        "x = 1  # type: ignore[attr-defined]  # stub has no attribute",
+        "x = 1  # noqa: E501 - long URL",
+        "x = 1  # noqa: F401  re-exported for callers",
+        "x = 1  # type: ignore  # third-party stubs are incomplete",
+        "x = 'a  # noqa'",
+        "x = 1  # an ordinary comment",
+    ],
+)
+def test_reasonless_suppression_counter_ignores_explained_and_non_comments(line: str) -> None:
+    assert _reasonless_suppressions_in_source(line + "\n") == 0

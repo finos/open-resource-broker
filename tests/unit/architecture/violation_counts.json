@@ -10,5 +10,7 @@
   "getattr_justification_aws": 100,
   "getattr_justification_k8s": 294,
   "application_service_locator_sites": 0,
-  "stdlib_logger_files_outside_boundary": 20
+  "stdlib_logger_files_outside_boundary": 20,
+  "interface_service_locator_sites": 142,
+  "reasonless_suppressions": 857
 }
