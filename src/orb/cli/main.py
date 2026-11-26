@@ -94,6 +94,22 @@ def _apply_log_level_flag(args: Any) -> None:
         logging.getLogger().setLevel(getattr(logging, level.upper()))
 
 
+def _notify_update(args: Any) -> None:
+    """Opt-in update notice; runs after the command output and never raises."""
+    try:
+        from orb import _package
+        from orb.cli.update_check import maybe_notify
+        from orb.domain.base.ports.configuration_port import ConfigurationPort
+        from orb.domain.base.ports.logging_port import LoggingPort
+
+        container = get_container()
+        maybe_notify(
+            args, container.get(ConfigurationPort), _package.__version__, container.get(LoggingPort)
+        )
+    except Exception as e:
+        get_logger(__name__).debug("Update notice skipped: %s", type(e).__name__)
+
+
 async def main() -> None:
     """Serve as main CLI entry point."""
     try:
@@ -298,6 +314,8 @@ async def main() -> None:
                     print_success(f"Output written to {args.output}")
             else:
                 print(formatted_output)
+
+            _notify_update(args)
 
             if exit_code != 0:
                 sys.exit(exit_code)
