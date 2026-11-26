@@ -133,6 +133,7 @@ nav:
       - Data Models: developer_guide/data_models.md
       - Event System: developer_guide/events.md
       - Provider System: developer_guide/providers.md
+      - Adding a Scheduler: developer_guide/adding_a_scheduler.md
       - Resilience Patterns: developer_guide/resilience.md
       - Performance Optimization: developer_guide/performance-optimization.md
       - Development Setup: developer_guide/development.md
