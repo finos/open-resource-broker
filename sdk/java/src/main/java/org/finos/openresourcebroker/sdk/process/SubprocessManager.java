@@ -216,13 +216,11 @@ public class SubprocessManager {
 
     private boolean pollHealth() {
         try {
-            String healthUrl;
             if (config.getSocketPath() != null && !config.getSocketPath().isEmpty()) {
-                healthUrl = "http://localhost/health";
-                return pollHealthUds(config.getSocketPath(), healthUrl);
+                return pollHealthUds(config.getSocketPath());
             } else {
                 int port = config.getPort() > 0 ? config.getPort() : 8000;
-                healthUrl = "http://localhost:" + port + "/health";
+                String healthUrl = "http://localhost:" + port + "/health";
                 return pollHealthTcp(healthUrl);
             }
         } catch (Exception e) {
@@ -230,7 +228,7 @@ public class SubprocessManager {
         }
     }
 
-    private boolean pollHealthUds(String socketPath, String url) {
+    private boolean pollHealthUds(String socketPath) {
         try {
             UnixDomainSocketAddress addr = UnixDomainSocketAddress.of(socketPath);
             try (SocketChannel ch = SocketChannel.open()) {

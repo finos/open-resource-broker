@@ -15,11 +15,15 @@ import org.finos.openresourcebroker.sdk.client.SchedulerMismatchError;
 import org.finos.openresourcebroker.sdk.model.MachineItem;
 import org.finos.openresourcebroker.sdk.model.TemplateItem;
 import org.finos.openresourcebroker.sdk.model.TemplateListResponse;
+import org.finos.openresourcebroker.sdk.transport.RawHttpClient;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
@@ -798,6 +802,49 @@ class OrbClientUnitTest {
         if (leaked != null) {
             assertNull(leaked.getHeader("Authorization"),
                     "Bearer token must never be transmitted over a plaintext connection");
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Malformed responses surface as a non-retried IOException
+    // ──────────────────────────────────────────────────────────────────────
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "HTTP/1.1 abc OK\r\n\r\n",
+            "HTTP/1.1 200 OK\r\nContent-Length: xyz\r\n\r\n",
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n"
+    })
+    void testMalformedResponse_isIOExceptionAndNotRetried(String rawResponse) throws Exception {
+        AtomicInteger connections = new AtomicInteger();
+        try (ServerSocket raw = new ServerSocket(0)) {
+            Thread acceptor = new Thread(() -> {
+                try {
+                    while (true) {
+                        try (Socket s = raw.accept()) {
+                            connections.incrementAndGet();
+                            s.getOutputStream().write(
+                                    rawResponse.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                            s.getOutputStream().flush();
+                        }
+                    }
+                } catch (IOException closed) {
+                    // listener closed by the test
+                }
+            });
+            acceptor.setDaemon(true);
+            acceptor.start();
+
+            RawHttpClient http = new RawHttpClient(null,
+                    "http://localhost:" + raw.getLocalPort(),
+                    Duration.ofSeconds(5), Duration.ofSeconds(5));
+            http.setMaxRetries(2);
+            http.setBaseDelay(Duration.ofMillis(1));
+
+            IOException ex = assertThrows(IOException.class, () -> http.get("/health", null));
+            assertTrue(ex.getCause() instanceof NumberFormatException,
+                    "should wrap the parse failure: " + ex);
+            assertEquals(1, connections.get(), "malformed responses must not be retried");
         }
     }
 }
