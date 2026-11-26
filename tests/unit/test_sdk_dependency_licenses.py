@@ -9,6 +9,7 @@ import json
 import re
 import sys
 import urllib.error
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -305,6 +306,81 @@ class TestFailClosed:
     def test_fetch_refuses_other_hosts_and_schemes(self, url):
         with pytest.raises(ValueError):
             gate.fetch_url(url)
+
+
+class _FakeResponse:
+    def __init__(self, data: bytes = b"<project/>") -> None:
+        self._data = data
+
+    def read(self, _n: int = -1) -> bytes:
+        return self._data
+
+    def __enter__(self):  # type: ignore[no-untyped-def]
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+
+@pytest.mark.unit
+class TestRedirectsAndXml:
+    @pytest.mark.parametrize(
+        "target",
+        ["https://evil.example.com/a.pom", "http://repo1.maven.org/a.pom", "file:///etc/passwd"],
+    )
+    def test_redirect_to_disallowed_target_is_refused(self, target):
+        handler = gate._AllowedRedirects()
+        request = urllib.request.Request("https://repo1.maven.org/a.pom")
+        with pytest.raises(ValueError):
+            handler.redirect_request(request, None, 302, "Found", {}, target)
+
+    def test_redirect_to_allowed_host_is_followed(self):
+        handler = gate._AllowedRedirects()
+        request = urllib.request.Request("https://repo1.maven.org/a.pom")
+        new = handler.redirect_request(
+            request, None, 302, "Found", {}, "https://api.nuget.org/b.nuspec"
+        )
+        assert new is not None
+        assert new.full_url == "https://api.nuget.org/b.nuspec"
+
+    def test_fetch_url_uses_the_redirect_checking_opener(self, monkeypatch):
+        seen = []
+
+        def fake_open(url, timeout):  # type: ignore[no-untyped-def]
+            seen.append(url)
+            return _FakeResponse()
+
+        monkeypatch.setattr(gate._OPENER, "open", fake_open)
+        assert gate.fetch_url("https://repo1.maven.org/a.pom") == b"<project/>"
+        assert seen == ["https://repo1.maven.org/a.pom"]
+
+    def test_doctype_is_refused(self):
+        with pytest.raises(ValueError):
+            gate.parse_xml(b'<!DOCTYPE project SYSTEM "http://evil.example.com/x.dtd"><project/>')
+
+    def test_billion_laughs_is_refused(self):
+        bomb = (
+            b'<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol">'
+            b'<!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">'
+            b'<!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">]>'
+            b"<project>&lol3;</project>"
+        )
+        with pytest.raises(ValueError):
+            gate.parse_xml(bomb)
+
+    def test_utf16_encoded_doctype_is_refused(self):
+        payload = '<?xml version="1.0" encoding="utf-16"?><!DOCTYPE p [<!ENTITY a "b">]><p/>'
+        with pytest.raises(ValueError):
+            gate.parse_xml(payload.encode("utf-16"))
+
+    def test_bomb_in_a_pom_is_an_unresolved_violation(self):
+        def bomb(url: str) -> bytes:
+            return b'<!DOCTYPE p [<!ENTITY a "b">]><project/>'
+
+        assert gate.maven_license("g:a", "1", bomb) == gate.UNRESOLVED
+
+    def test_plain_pom_still_parses(self):
+        assert gate.parse_xml(_pom_xml(["MIT"], None)).tag.endswith("project")
 
 
 @pytest.mark.unit

@@ -18,7 +18,8 @@ Metadata
   with no `<licenses>` inherits from its `<parent>`, which is walked up.
 - NuGet: the `<license type="expression">` element of the package's nuspec.
 
-Network egress is limited to `repo1.maven.org` and `api.nuget.org` over HTTPS.
+Network egress is limited to `repo1.maven.org` and `api.nuget.org` over HTTPS,
+including every redirect hop. XML with a DOCTYPE or entity declaration is refused.
 
 Fail closed: a lockfile with no runtime packages, a package whose metadata
 cannot be fetched or has no license, and any license string that does not
@@ -40,6 +41,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
+from xml.parsers import expat
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_runtime_licenses import check, to_spdx
@@ -58,15 +60,30 @@ Package = tuple[str, str]  # (name, version)
 _SPDX_TOKEN_RE = re.compile(r"^[A-Za-z0-9.+-]+$")
 
 
-def fetch_url(url: str) -> bytes:
-    """GET `url` over HTTPS from an allowlisted host, with retries and a size cap."""
+def _require_allowed(url: str) -> None:
     parts = urllib.parse.urlsplit(url)
     if parts.scheme != "https" or parts.hostname not in ALLOWED_HOSTS:
         raise ValueError(f"refusing to fetch {url}")
+
+
+class _AllowedRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow redirects only to an allowlisted HTTPS host."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        _require_allowed(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_AllowedRedirects)
+
+
+def fetch_url(url: str) -> bytes:
+    """GET `url` over HTTPS from an allowlisted host, with retries and a size cap."""
+    _require_allowed(url)
     last: Exception | None = None
     for attempt in range(3):
         try:
-            with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310 (host checked above)
+            with _OPENER.open(url, timeout=30) as resp:
                 data = resp.read(MAX_BYTES + 1)
             if len(data) > MAX_BYTES:
                 raise ValueError(f"response from {url} exceeds {MAX_BYTES} bytes")
@@ -116,6 +133,46 @@ def parse_nuget_lockfile(path: Path) -> list[Package]:
 # ---------------------------------------------------------------------------
 
 
+def parse_xml(data: bytes) -> ET.Element:
+    """Parse registry XML, refusing any DOCTYPE or entity declaration.
+
+    Registry metadata never needs them, and they are the vector for entity
+    expansion attacks. The refusal is a handler on the expat parser itself, so
+    it holds for any encoding the payload declares. Tags keep the
+    "namespace}local" form, which `_local` strips.
+    """
+
+    def refuse(*_args: object) -> None:
+        raise ValueError("DOCTYPE and entity declarations are not allowed")
+
+    stack: list[ET.Element] = []
+    roots: list[ET.Element] = []
+
+    def start(tag: str, attrs: dict[str, str]) -> None:
+        element = ET.Element(tag, attrs)
+        if stack:
+            stack[-1].append(element)
+        else:
+            roots.append(element)
+        stack.append(element)
+
+    def text(chunk: str) -> None:
+        if stack:
+            stack[-1].text = (stack[-1].text or "") + chunk
+
+    parser = expat.ParserCreate(namespace_separator="}")
+    parser.StartDoctypeDeclHandler = refuse
+    parser.EntityDeclHandler = refuse
+    parser.StartElementHandler = start
+    parser.EndElementHandler = lambda _tag: stack.pop()
+    parser.CharacterDataHandler = text
+    try:
+        parser.Parse(data, True)
+    except expat.ExpatError as exc:
+        raise ValueError(f"malformed XML: {exc}") from exc
+    return roots[0]
+
+
 def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -141,7 +198,7 @@ def pom_license_names(group: str, artifact: str, version: str, fetch: Fetcher) -
         if key in seen or "${" in version:
             return []
         seen.add(key)
-        root = ET.fromstring(fetch(_pom_url(*key)))  # noqa: S314 (Maven Central POM, stdlib parser)
+        root = parse_xml(fetch(_pom_url(*key)))
         licenses = next((c for c in root if _local(c.tag) == "licenses"), None)
         names = [
             name
@@ -185,7 +242,7 @@ def maven_license(group_artifact: str, version: str, fetch: Fetcher) -> str:
     group, _, artifact = group_artifact.partition(":")
     try:
         return to_expression(pom_license_names(group, artifact, version, fetch))
-    except (OSError, ValueError, ET.ParseError, RuntimeError):
+    except (OSError, ValueError, RuntimeError):
         return UNRESOLVED
 
 
@@ -193,8 +250,8 @@ def nuget_license(name: str, version: str, fetch: Fetcher) -> str:
     lower = name.lower()
     url = f"{NUGET_FLAT}/{lower}/{version.lower()}/{lower}.nuspec"
     try:
-        root = ET.fromstring(fetch(url))  # noqa: S314 (nuget.org nuspec, stdlib parser)
-    except (OSError, ValueError, ET.ParseError, RuntimeError):
+        root = parse_xml(fetch(url))
+    except (OSError, ValueError, RuntimeError):
         return UNRESOLVED
     for element in root.iter():
         if _local(element.tag) == "license" and element.get("type") == "expression":
