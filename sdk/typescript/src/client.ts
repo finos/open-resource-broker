@@ -517,6 +517,10 @@ export class OrbClient {
     template_id?: string;
     request_type?: string;
     filter_expressions?: string[];
+    /** Inclusive lower bound on created_at, ISO-8601 (e.g. 2026-11-01T00:00:00Z); no offset means UTC. */
+    start_time?: string;
+    /** Inclusive upper bound on created_at; a date-only value is midnight UTC. */
+    end_time?: string;
   }): Promise<{ requests: import("../generated/models/index.js").RequestItem[] }> {
     return this.get<{ requests: import("../generated/models/index.js").RequestItem[] }>(
       "/api/v1/requests/",
