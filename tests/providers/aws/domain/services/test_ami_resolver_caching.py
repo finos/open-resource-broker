@@ -2,13 +2,21 @@
 
 import os
 import tempfile
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from orb.infrastructure.caching.ami_cache_service import AMICacheService
 from orb.providers.aws.domain.services.ami_resolver import AWSAMIResolver
+from tests.shared.manual_clock import ManualClock
+
+
+@pytest.fixture
+def clock():
+    """Replace ``time`` inside the cache module with a manually advanced clock."""
+    fake = ManualClock()
+    with patch("orb.infrastructure.caching.ami_cache_service.time", fake):
+        yield fake
 
 
 class TestAMICacheService:
@@ -45,18 +53,17 @@ class TestAMICacheService:
         assert stats["misses"] == 1
         assert stats["total_requests"] == 1
 
-    def test_cache_expiration(self):
+    def test_cache_expiration(self, clock):
         """Test TTL-based expiration."""
-        cache = AMICacheService(ttl_seconds=1)  # 1 second TTL
+        cache = AMICacheService(ttl_seconds=10)
         cache.set("test-key", "ami-12345678")
 
-        # Should hit immediately
+        # Still a hit one second before the TTL
+        clock.advance(9)
         assert cache.get("test-key") == "ami-12345678"
 
-        # Wait for expiration
-        time.sleep(1.1)
-
-        # Should miss after expiration
+        # A miss once the full TTL has elapsed
+        clock.advance(1)
         assert cache.get("test-key") is None
 
     def test_cache_size_limit(self):
@@ -82,22 +89,23 @@ class TestAMICacheService:
         assert cache.is_failed("failed-key") is True
         assert cache.is_failed("other-key") is False
 
-    def test_failed_expiration(self):
+    def test_failed_expiration(self, clock):
         """Test failed entries expire."""
-        cache = AMICacheService(ttl_seconds=1)
+        cache = AMICacheService(ttl_seconds=10)
 
         cache.mark_failed("failed-key")
+        clock.advance(9)
         assert cache.is_failed("failed-key") is True
 
-        time.sleep(1.1)
+        clock.advance(1)
         assert cache.is_failed("failed-key") is False
 
-    def test_stale_cache_access(self):
+    def test_stale_cache_access(self, clock):
         """Test accessing stale cache entries."""
         cache = AMICacheService(ttl_seconds=1)
         cache.set("test-key", "ami-12345678")
 
-        time.sleep(1.1)  # Expire entry
+        clock.advance(1)  # Expire entry
 
         # Normal get should return None
         assert cache.get("test-key") is None
@@ -117,16 +125,26 @@ class TestAMICacheService:
         assert cache.is_failed("failed-key") is False
         assert cache.get_stats()["cache_size"] == 0
 
-    def test_clear_expired_entries(self):
+    def test_clear_expired_entries(self, clock):
         """Test manual expired entry removal."""
-        cache = AMICacheService(ttl_seconds=1)
-        cache.set("key1", "ami-1")
-        cache.mark_failed("failed-key")
-
-        time.sleep(1.1)
+        cache = AMICacheService(ttl_seconds=10)
+        cache.set("old", "ami-old")
+        cache.mark_failed("old-failed")
+        clock.advance(5)
+        cache.set("new", "ami-new")
+        cache.mark_failed("new-failed")
+        clock.advance(5)  # "old" entries are exactly one TTL old
 
         removed_count = cache.clear_expired()
+
         assert removed_count == 2  # One cache entry + one failed entry
+        stats = cache.get_stats()
+        assert stats["cache_size"] == 1
+        assert stats["failed_size"] == 1
+        assert cache.get("new") == "ami-new"
+        assert cache.is_failed("new-failed") is True
+        assert cache.get_stale("old") is None
+        assert cache.is_failed("old-failed") is False
 
 
 class TestAWSAMIResolver:
@@ -214,7 +232,7 @@ class TestAWSAMIResolver:
         assert mock_ssm.get_parameter.call_count == 1  # Only one AWS call
 
     @patch("boto3.client")
-    def test_stale_fallback_on_failure(self, mock_boto3):
+    def test_stale_fallback_on_failure(self, mock_boto3, clock):
         """Test stale cache fallback on AWS failure."""
         # Mock SSM client - first success, then failure
         mock_ssm = MagicMock()
@@ -233,8 +251,8 @@ class TestAWSAMIResolver:
         result1 = resolver.resolve_image_id(ssm_param)
         assert result1 == "ami-cached123"
 
-        # Wait for cache to expire
-        time.sleep(1.1)
+        # Let the cache entry expire
+        clock.advance(1)
 
         # Second call should use stale cache as fallback
         result2 = resolver.resolve_image_id(ssm_param)
@@ -282,7 +300,7 @@ class TestAWSAMIResolver:
         assert stats["misses"] == 1
         assert stats["hit_rate"] == 0.5
 
-    def test_cache_management_methods(self):
+    def test_cache_management_methods(self, clock):
         """Test cache management operations."""
         cache_service = AMICacheService()
         resolver = AWSAMIResolver(cache_service=cache_service)
@@ -300,7 +318,7 @@ class TestAWSAMIResolver:
         cache_service_ttl = AMICacheService(ttl_seconds=1)
         resolver._cache = cache_service_ttl
         resolver._cache.set("key1", "ami-1")
-        time.sleep(1.1)
+        clock.advance(1)
 
         removed = resolver.remove_expired_entries()
         assert removed == 1
