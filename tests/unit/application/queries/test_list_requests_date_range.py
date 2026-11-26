@@ -7,8 +7,6 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from orb.application.queries.request_query_handlers import ListRequestsHandler
 from orb.application.request.queries import ListRequestsQuery
 from orb.domain.base.pagination import StoragePage
