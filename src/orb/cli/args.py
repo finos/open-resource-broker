@@ -61,6 +61,7 @@ try:
 
         @property
         def console(self) -> _rich_console.Console:
+            """Return a stderr console that only colours output on a TTY."""
             if self._console is None:
                 is_tty = _sys.stderr.isatty() and "--no-color" not in _sys.argv
                 self._console = _rich_console.Console(

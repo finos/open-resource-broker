@@ -53,6 +53,7 @@ class ParentParsers:
     """
 
     def __init__(self) -> None:
+        """Build the common, list, write, provider-scope and hf-compat parents."""
         # common — cross-cutting flags on every command
         common = argparse.ArgumentParser(add_help=False)
         common.add_argument("--verbose", action="store_true", help="Verbose output")
