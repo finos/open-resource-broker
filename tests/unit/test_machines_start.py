@@ -1,7 +1,7 @@
 """Test for machines start command implementation."""
 
 import argparse
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
@@ -60,7 +60,10 @@ async def test_machines_start_specific_ids():
 
     mock_container.get.side_effect = mock_get
 
-    from orb.interface.machine_command_handlers import handle_start_machines
+    from orb.interface.machine_command_handlers import MachineHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_start_machines = handler_method(MachineHandlers, "start_machines")
 
     args._container = mock_container
     result = await handle_start_machines(args)
@@ -151,7 +154,10 @@ async def test_machines_start_all():
 
     mock_container.get.side_effect = mock_get
 
-    from orb.interface.machine_command_handlers import handle_start_machines
+    from orb.interface.machine_command_handlers import MachineHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_start_machines = handler_method(MachineHandlers, "start_machines")
 
     args._container = mock_container
     result = await handle_start_machines(args)
@@ -162,12 +168,16 @@ async def test_machines_start_all():
 @pytest.mark.asyncio
 async def test_machines_start_validation_errors():
     """Test validation errors."""
-    from orb.interface.machine_command_handlers import handle_start_machines
+    from orb.interface.machine_command_handlers import MachineHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_start_machines = handler_method(MachineHandlers, "start_machines")
 
     # Test: no machine IDs and no --all
     args1 = argparse.Namespace()
     args1.machine_ids = []
     args1.all = False
+    args1._container = MagicMock()
 
     result1 = await handle_start_machines(args1)
     assert result1.data["error"] == "No machines specified"
@@ -176,6 +186,7 @@ async def test_machines_start_validation_errors():
     args2 = argparse.Namespace()
     args2.machine_ids = ["i-123"]
     args2.all = True
+    args2._container = MagicMock()
 
     result2 = await handle_start_machines(args2)
     assert result2.data["error"] == "Cannot use --all with specific machine IDs"

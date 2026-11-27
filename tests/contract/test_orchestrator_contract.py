@@ -265,7 +265,10 @@ async def _call_cli(
 @pytest.mark.asyncio
 async def test_list_machines_cli_equals_rest_top_level_keys(scheduler_type: str) -> None:
     """CLI handle_list_machines and GET /api/v1/machines/ return the same top-level keys."""
-    from orb.interface.machine_command_handlers import handle_list_machines
+    from orb.interface.machine_command_handlers import MachineHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_list_machines = handler_method(MachineHandlers, "list_machines")
 
     strategy = _make_scheduler_strategy(scheduler_type)
     machine_dto = _make_machine_dto()
@@ -533,7 +536,10 @@ async def test_list_templates_cli_equals_rest_top_level_keys(scheduler_type: str
 async def test_list_machines_cli_returns_dict(scheduler_type: str) -> None:
     """handle_list_machines always returns a dict, never a bare list."""
     from orb.application.dto.interface_response import InterfaceResponse
-    from orb.interface.machine_command_handlers import handle_list_machines
+    from orb.interface.machine_command_handlers import MachineHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_list_machines = handler_method(MachineHandlers, "list_machines")
 
     strategy = _make_scheduler_strategy(scheduler_type)
     result = await _call_cli(handle_list_machines, _make_args(), strategy)

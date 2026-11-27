@@ -12,7 +12,10 @@ from orb.application.services.orchestration.dtos import ListMachinesOutput, List
 from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
 from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
 from orb.cli.args import add_machine_actions, add_request_actions
-from orb.interface.machine_command_handlers import handle_list_machines
+from orb.interface.machine_command_handlers import MachineHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_list_machines = handler_method(MachineHandlers, "list_machines")
 from orb.interface.request_query_handlers import RequestReadHandlers
 from tests.utilities.cli_handlers import handler_method
 

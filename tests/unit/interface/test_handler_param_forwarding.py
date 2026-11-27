@@ -54,7 +54,10 @@ class TestHandleListMachinesForwardsParams:
     def test_handle_list_machines_forwards_limit_and_offset(self):
         from orb.application.services.orchestration.dtos import ListMachinesInput
         from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
-        from orb.interface.machine_command_handlers import handle_list_machines
+        from orb.interface.machine_command_handlers import MachineHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_list_machines = handler_method(MachineHandlers, "list_machines")
 
         mock_orch = MagicMock(spec=ListMachinesOrchestrator)
         mock_orch.execute = AsyncMock(return_value=MagicMock(machines=[]))

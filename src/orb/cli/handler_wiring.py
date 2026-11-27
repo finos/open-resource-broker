@@ -79,3 +79,27 @@ def register_request_handlers(container: Any) -> None:
             scheduler=c.get(SchedulerPort),
         ),
     )
+
+
+def register_machine_handlers(container: Any) -> None:
+    """Register the machine handler class."""
+    from orb.application.ports.query_bus_port import QueryBusPort
+    from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
+    from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
+    from orb.application.services.orchestration.start_machines import StartMachinesOrchestrator
+    from orb.application.services.orchestration.stop_machines import StopMachinesOrchestrator
+    from orb.interface.machine_command_handlers import MachineHandlers
+    from orb.interface.response_formatting_service import ResponseFormattingService
+
+    _register(
+        container,
+        MachineHandlers,
+        lambda c: MachineHandlers(
+            list_orchestrator=c.get(ListMachinesOrchestrator),
+            get_orchestrator=c.get(GetMachineOrchestrator),
+            stop_orchestrator=c.get(StopMachinesOrchestrator),
+            start_orchestrator=c.get(StartMachinesOrchestrator),
+            query_bus=c.get(QueryBusPort),
+            formatter=c.get(ResponseFormattingService),
+        ),
+    )

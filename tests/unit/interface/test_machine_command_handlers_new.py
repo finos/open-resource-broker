@@ -18,14 +18,15 @@ from orb.application.services.orchestration.dtos import (
     StartMachinesOutput,
     StopMachinesOutput,
 )
-from orb.interface.machine_command_handlers import (
-    handle_get_machine,
-    handle_get_machine_status,
-    handle_get_multiple_machines,
-    handle_list_machines,
-    handle_start_machines,
-    handle_stop_machines,
-)
+from orb.interface.machine_command_handlers import MachineHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_get_machine = handler_method(MachineHandlers, "get_machine")
+handle_get_machine_status = handler_method(MachineHandlers, "get_machine_status")
+handle_get_multiple_machines = handler_method(MachineHandlers, "get_multiple_machines")
+handle_list_machines = handler_method(MachineHandlers, "list_machines")
+handle_start_machines = handler_method(MachineHandlers, "start_machines")
+handle_stop_machines = handler_method(MachineHandlers, "stop_machines")
 from orb.interface.response_formatting_service import ResponseFormattingService
 
 
@@ -578,9 +579,9 @@ class TestHandleGetMultipleMachines:
 
     @pytest.mark.asyncio
     async def test_happy_path_via_query_bus(self):
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_result = MagicMock()
         mock_result.machines = []
         mock_result.found_count = 0
@@ -590,7 +591,7 @@ class TestHandleGetMultipleMachines:
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
-            QueryBus: mock_bus,
+            QueryBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(
@@ -608,9 +609,9 @@ class TestHandleGetMultipleMachines:
 
     @pytest.mark.asyncio
     async def test_flag_ids_merged(self):
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_result = MagicMock()
         mock_result.machines = []
         mock_result.found_count = 0
@@ -619,7 +620,7 @@ class TestHandleGetMultipleMachines:
         mock_bus.execute.return_value = mock_result
 
         container = MagicMock()
-        container.get.side_effect = lambda t: {QueryBus: mock_bus}.get(t, MagicMock())
+        container.get.side_effect = lambda t: {QueryBusPort: mock_bus}.get(t, MagicMock())
 
         args = Namespace(
             _container=container,

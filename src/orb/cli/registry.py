@@ -266,24 +266,21 @@ def build_registry() -> None:
     register("requests", "get-bulk", _request_queries("get_multiple_requests"))
 
     # --- machines ---
-    from orb.interface.machine_command_handlers import (
-        handle_get_machine,
-        handle_get_machine_status,
-        handle_get_multiple_machines,
-        handle_list_machines,
-        handle_start_machines,
-        handle_stop_machines,
-    )
+    from orb.cli.handler_wiring import register_machine_handlers
+    from orb.interface.machine_command_handlers import MachineHandlers
 
-    register("machines", "list", handle_list_machines)
-    register("machines", "show", handle_get_machine)
-    register("machines", "status", handle_get_machine_status)
+    def _machines(method: str) -> Handler:
+        return bind(MachineHandlers, method, group=register_machine_handlers)
+
+    register("machines", "list", _machines("list_machines"))
+    register("machines", "show", _machines("get_machine"))
+    register("machines", "status", _machines("get_machine_status"))
     register("machines", "request", _request_commands("request_machines"))
     register("machines", "return", _request_commands("request_return_machines"))
     register("machines", "terminate", _request_commands("request_return_machines"))
-    register("machines", "stop", handle_stop_machines)
-    register("machines", "start", handle_start_machines)
-    register("machines", "get-bulk", handle_get_multiple_machines)
+    register("machines", "stop", _machines("stop_machines"))
+    register("machines", "start", _machines("start_machines"))
+    register("machines", "get-bulk", _machines("get_multiple_machines"))
 
     # --- scheduler ---
     from orb.interface.scheduler_command_handlers import (

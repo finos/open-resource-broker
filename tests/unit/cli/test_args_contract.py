@@ -338,7 +338,10 @@ async def test_stop_machines_uses_machine_ids_flag():
 
     from orb.application.services.orchestration.dtos import StopMachinesOutput
     from orb.application.services.orchestration.stop_machines import StopMachinesOrchestrator
-    from orb.interface.machine_command_handlers import handle_stop_machines
+    from orb.interface.machine_command_handlers import MachineHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_stop_machines = handler_method(MachineHandlers, "stop_machines")
     from orb.interface.response_formatting_service import ResponseFormattingService
 
     orch = AsyncMock(spec=StopMachinesOrchestrator)
@@ -368,7 +371,10 @@ async def test_start_machines_uses_machine_ids_flag():
 
     from orb.application.services.orchestration.dtos import StartMachinesOutput
     from orb.application.services.orchestration.start_machines import StartMachinesOrchestrator
-    from orb.interface.machine_command_handlers import handle_start_machines
+    from orb.interface.machine_command_handlers import MachineHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_start_machines = handler_method(MachineHandlers, "start_machines")
     from orb.interface.response_formatting_service import ResponseFormattingService
 
     orch = AsyncMock(spec=StartMachinesOrchestrator)

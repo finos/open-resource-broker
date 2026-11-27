@@ -11,9 +11,7 @@ This module provides a integrated interface to all command handlers organized by
 # Import base handler
 from orb.application.base.command_handler import CLICommandHandler
 from orb.interface.config_command_handlers import handle_validate_provider_config
-from orb.interface.machine_command_handlers import (
-    handle_get_machine_status,
-)
+from orb.interface.machine_command_handlers import MachineHandlers
 from orb.interface.request_command_handlers import RequestWriteHandlers
 from orb.interface.request_query_handlers import RequestReadHandlers
 from orb.interface.scheduler_command_handlers import (
@@ -50,10 +48,11 @@ __all__: list[str] = [
     # Base handler
     "CLICommandHandler",
     "handle_execute_provider_operation",
+    # Machine handlers (class-based)
+    "MachineHandlers",
     # Request handlers (class-based)
     "RequestWriteHandlers",
     "RequestReadHandlers",
-    "handle_get_machine_status",
     "handle_get_template",
     "handle_list_providers",
     # Scheduler handlers (function-based)
