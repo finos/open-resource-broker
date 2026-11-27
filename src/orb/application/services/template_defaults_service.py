@@ -5,6 +5,12 @@ from typing import Any, Optional
 
 from pydantic import BaseModel
 
+from orb.application.services.template_instance_defaults import (
+    has_region_value,
+    region_seed,
+    sole_enabled_instance,
+)
+from orb.application.services.template_stamp_type import StampTypeResolver
 from orb.domain.base.ports.configuration_port import ConfigurationPort
 from orb.domain.base.ports.logging_port import LoggingPort
 from orb.domain.base.ports.provider_registry_port import ProviderRegistryPort
@@ -336,12 +342,20 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         # so a row resolved against a known instance must carry that type.
         # The row's value always wins.
         if not result.get("provider_type"):
-            stamp_type = self._trusted_stamp_type(template_dict, provider_instance_name)
+            stamp_type = StampTypeResolver(
+                self.config_manager, self.logger, self.provider_registry
+            ).trusted_stamp_type(template_dict, provider_instance_name)
             if stamp_type:
                 result["provider_type"] = stamp_type
         result = self._apply_template_row_migration(
             provider_type, template_dict, resolved_defaults, result
         )
+        # Runs last so a legacy-row migration cannot rename or drop the seed.
+        # Lowest precedence by construction: only when nothing above set a location.
+        if provider_type and not has_region_value(result):
+            result.update(
+                self._instance_region_seed(provider_type, matching_instance, template_dict)
+            )
 
         self.logger.debug("Final template has %s fields after default resolution", len(result))
 
@@ -354,6 +368,29 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             )
 
         return result
+
+    def _instance_region_seed(
+        self, provider_type: str, matching_instance: Optional[str], row: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Region/location from the row's instance, or the sole enabled instance of its type.
+
+        The sole-instance fallback needs the row to declare its type: an untyped
+        row is not stamped from an instance it never named.
+        """
+        if self.extension_registry is None:
+            return {}
+        try:
+            providers = getattr(self.config_manager.get_provider_config(), "providers", None) or []
+            named = next((p for p in providers if p.name == matching_instance), None)
+            declared = row.get("provider_type") or row.get("providerType")
+            instance = named or (sole_enabled_instance(providers, declared) if declared else None)
+            if instance is None:
+                return {}
+            extension_class = self.extension_registry.get_extension_class(provider_type)
+            return region_seed(extension_class, instance.config)
+        except Exception as e:
+            self.logger.warning("Could not read the region of provider %s: %s", provider_type, e)
+            return {}
 
     def _apply_template_row_migration(
         self,
@@ -401,75 +438,6 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         provider_type = declared_type or instance_type
         matching_instance = instance if instance_type == provider_type else None
         return provider_type, matching_instance
-
-    def _trusted_stamp_type(
-        self, template_dict: dict[str, Any], selected_instance: Optional[str]
-    ) -> Optional[str]:
-        """Return the type to stamp, or None when stamping would lose the row.
-
-        The load filter drops rows whose type is not active. The selected
-        instance (the active one, or the override) counts as active; a row
-        pointing at another inactive instance is left as it is today.
-        """
-        candidate = self._candidate_stamp_type(template_dict, selected_instance)
-        if not candidate:
-            return None
-        try:
-            provider_config = self.config_manager.get_provider_config()
-            admitted = {p.type for p in provider_config.get_active_providers()}  # type: ignore[union-attr]
-        except Exception as e:
-            self.logger.debug("Could not read active provider types: %s", e)
-            return candidate
-        if not admitted:
-            return candidate  # the filter keeps every row when no active type is known
-        if selected_instance:
-            selected_type = self._configured_provider_type(selected_instance)
-            if selected_type:
-                admitted.add(selected_type)
-        return candidate if candidate in admitted else None
-
-    def _candidate_stamp_type(
-        self, template_dict: dict[str, Any], selected_instance: Optional[str]
-    ) -> Optional[str]:
-        """Return the provider type that may be written onto a row, or None.
-
-        Trusted: the row's own declared type, the type of an instance found in
-        ``config.providers``, or a name-prefix type the provider registry
-        accepts. A name-prefix guess for an unknown instance ("default",
-        "My_Cluster") is never stamped.
-        """
-        declared = template_dict.get("provider_type") or template_dict.get("providerType")
-        if declared:
-            return declared
-        instance = (
-            template_dict.get("provider_name") or template_dict.get("providerName")
-        ) or selected_instance
-        if not instance:
-            return None
-        configured = self._configured_provider_type(instance)
-        if configured:
-            return configured
-        guess = extract_provider_type(instance)
-        if guess and self.provider_registry is not None:
-            try:
-                if self.provider_registry.is_provider_registered(guess):
-                    return guess
-            except Exception as e:
-                self.logger.warning("Could not check provider type %s: %s", guess, e)
-        return None
-
-    def _configured_provider_type(self, provider_instance_name: str) -> Optional[str]:
-        """Type of an instance listed in config.providers, else None (no name guessing)."""
-        try:
-            provider_config = self.config_manager.get_provider_config()
-            for provider in getattr(provider_config, "providers", None) or []:
-                if provider.name == provider_instance_name:
-                    return provider.type
-        except Exception as e:
-            self.logger.warning(
-                "Could not determine provider type for %s: %s", provider_instance_name, e
-            )
-        return None
 
     def _coalesce_merge(
         self, defaults: dict[str, Any], overrides: dict[str, Any]
