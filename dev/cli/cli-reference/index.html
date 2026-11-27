@@ -9065,7 +9065,10 @@
 | <code>--status</code> | Filter by request status (specific filter) | <code>--status pending</code> |
 | <code>--template-id</code> | Filter by template ID (specific filter) | <code>--template-id aws-basic</code> |
 | <code>--filter</code> | Generic filter: <code>field=value</code>, <code>field~value</code>, <code>field=~regex</code>. Repeatable (AND logic). | <code>--filter "template_id~spot"</code> |
+| <code>--start-time</code> | Only requests created at or after this time (inclusive) | <code>--start-time 2026-11-01</code> |
+| <code>--end-time</code> | Only requests created at or before this time (inclusive) | <code>--end-time 2026-11-30T23:59:59Z</code> |
 | <code>--format</code> | Output format | <code>--format table</code> |</p>
+<p><strong>Time range:</strong> <code>--start-time</code> and <code>--end-time</code> filter on the request creation time and combine with the other filters, <code>--cursor</code> and the reported total. Either may be given alone. Accepted values are ISO-8601 as read by Python <code>datetime.fromisoformat</code>: <code>YYYY-MM-DD</code> or <code>YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+HH:MM]</code>. A value without an offset is read as UTC and a date-only value is midnight UTC, so <code>--end-time 2026-11-30</code> does not include 30 November; use <code>--end-time 2026-11-30T23:59:59.999999Z</code> or the next day's date as the upper bound. A malformed value, or a start after the end, is rejected. A cursor is only valid for the range it was issued for. The range cannot be combined with <code>--sync</code>.</p>
 <p><strong>Status Values:</strong>
 - <code>pending</code> - Request submitted but not started
 - <code>in_progress</code> - Request being processed
@@ -9083,6 +9086,9 @@
 <a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>
 <a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a><span class="c1"># Combine filters (AND logic)</span>
 <a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>orb<span class="w"> </span>requests<span class="w"> </span>list<span class="w"> </span>--status<span class="w"> </span>in_progress<span class="w"> </span>--filter<span class="w"> </span><span class="s2">&quot;template_id~ec2fleet&quot;</span>
+<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>
+<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a><span class="c1"># Requests created during November 2026</span>
+<a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>orb<span class="w"> </span>requests<span class="w"> </span>list<span class="w"> </span>--start-time<span class="w"> </span><span class="m">2026</span>-11-01<span class="w"> </span>--end-time<span class="w"> </span><span class="m">2026</span>-11-30T23:59:59.999999Z
 </code></pre></div></p>
 <h4 id="requests-show"><code>requests show</code><a class="headerlink" href="#requests-show" title="Permanent link">&para;</a></h4>
 <p>Show details for a specific request.</p>
@@ -9299,6 +9305,7 @@ the parent.</p>
 <p>Provider management and operations.</p>
 <h4 id="providers-list"><code>providers list</code><a class="headerlink" href="#providers-list" title="Permanent link">&para;</a></h4>
 <p>List available providers.</p>
+<p>The list shows <code>name</code>, <code>type</code>, <code>status</code>, <code>capabilities</code>, <code>weight</code>, <code>priority</code> and <code>enabled</code> for each provider. It omits the per-provider <code>config</code>; use <code>orb providers show &lt;name&gt;</code> to see the full configuration.</p>
 <p><strong>Usage:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>orb<span class="w"> </span>providers<span class="w"> </span>list<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>
@@ -9307,7 +9314,7 @@ the parent.</p>
 |------|-------------|---------|
 | <code>--format</code> | Output format | <code>--format table</code> |</p>
 <h4 id="providers-show"><code>providers show</code><a class="headerlink" href="#providers-show" title="Permanent link">&para;</a></h4>
-<p>Show provider details.</p>
+<p>Show provider details, including the full provider configuration. This is a local command that reads <code>config.json</code>; REST, MCP and the SDKs have no equivalent.</p>
 <p><strong>Usage:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>orb<span class="w"> </span>providers<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div></p>

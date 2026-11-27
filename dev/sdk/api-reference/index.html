@@ -5217,6 +5217,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#list-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        List Requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#list-return-requests" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6446,6 +6457,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#list-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        List Requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#list-return-requests" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7077,6 +7099,47 @@
 </table>
 <p><strong>REST endpoint:</strong> <code>GET /api/v1/requests</code></p>
 <p>Note: the REST handler uses <code>ListRequestsQuery</code> (from <code>orb.application.request.queries</code>), not <code>ListActiveRequestsQuery</code>. The CLI <code>--all</code> path uses <code>ListActiveRequestsQuery</code>.</p>
+<hr />
+<h3 id="list-requests">List Requests<a class="headerlink" href="#list-requests" title="Permanent link">&para;</a></h3>
+<p>List provisioning requests, optionally within a creation-time range.</p>
+<table>
+<thead>
+<tr>
+<th>Interface</th>
+<th>Parameter</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SDK</td>
+<td><code>start_time</code></td>
+<td>optional; ISO-8601 string or <code>datetime</code>; inclusive lower bound on <code>created_at</code>. A naive <code>datetime</code> or a string without an offset is read as UTC</td>
+</tr>
+<tr>
+<td>SDK</td>
+<td><code>end_time</code></td>
+<td>optional; same forms; inclusive upper bound. A date-only value is midnight UTC</td>
+</tr>
+<tr>
+<td>REST query</td>
+<td><code>start_time</code>, <code>end_time</code></td>
+<td>same values; 400 when malformed or start is after end</td>
+</tr>
+<tr>
+<td>CLI</td>
+<td><code>--start-time</code>, <code>--end-time</code></td>
+<td>same values</td>
+</tr>
+<tr>
+<td>MCP</td>
+<td><code>start_time</code>, <code>end_time</code></td>
+<td>same values</td>
+</tr>
+</tbody>
+</table>
+<p>The range cannot be combined with <code>sync=true</code>. The other SDKs expose the same bounds: Go <code>WithRequestStartTime</code> / <code>WithRequestEndTime</code> (<code>time.Time</code>), TypeScript <code>start_time</code> / <code>end_time</code> strings, Java <code>ListRequestsParams.startTime</code> / <code>endTime</code>, Kotlin <code>ListRequestsParams(startTime, endTime)</code>, C# <code>ListRequestsAsync(..., startTime, endTime)</code> (<code>DateTimeOffset</code>, after the cancellation token).</p>
+<p><strong>REST endpoint:</strong> <code>GET /api/v1/requests/</code></p>
 <hr />
 <h3 id="list-return-requests">List Return Requests<a class="headerlink" href="#list-return-requests" title="Permanent link">&para;</a></h3>
 <p>List requests pending machine return.</p>

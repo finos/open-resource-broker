@@ -7389,12 +7389,12 @@ stateless 2026-07-28 revision send per-request headers instead of an
 <h4 id="list_providers">list_providers<a class="headerlink" href="#list_providers" title="Permanent link">&para;</a></h4>
 <p>List available cloud providers.</p>
 <p><strong>Parameters</strong>: None</p>
-<p><strong>Returns</strong>: List of configured providers</p>
+<p><strong>Returns</strong>: List of configured providers with <code>name</code>, <code>type</code>, <code>status</code>, <code>capabilities</code>, <code>weight</code>, <code>priority</code> and <code>enabled</code>. The per-provider <code>config</code> is not included.</p>
 <h4 id="get_provider_config">get_provider_config<a class="headerlink" href="#get_provider_config" title="Permanent link">&para;</a></h4>
 <p>Get provider configuration details.</p>
 <p><strong>Parameters</strong>:
 - <code>provider</code> (optional): Specific provider name</p>
-<p><strong>Returns</strong>: Provider configuration</p>
+<p><strong>Returns</strong>: A configuration summary (provider mode, active provider names and counts, default provider, configuration source, file paths and last-updated time), not per-provider configuration</p>
 <h4 id="get_provider_metrics">get_provider_metrics<a class="headerlink" href="#get_provider_metrics" title="Permanent link">&para;</a></h4>
 <p>Get provider performance metrics.</p>
 <p><strong>Parameters</strong>:

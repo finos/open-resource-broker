@@ -6430,7 +6430,7 @@
 </ul>
 <h4 id="requests">Requests<a class="headerlink" href="#requests" title="Permanent link">&para;</a></h4>
 <ul>
-<li><code>GET /requests</code> - List provisioning requests</li>
+<li><code>GET /requests</code> - List provisioning requests. Optional <code>start_time</code> and <code>end_time</code> query parameters keep only requests created within the range (inclusive, ISO-8601; no offset means UTC, a date-only value is midnight UTC). A malformed value or a start after the end returns 400, and they cannot be combined with <code>sync=true</code>.</li>
 <li><code>GET /requests/{id}</code> - Get request status</li>
 <li><code>POST /requests/{id}/cancel</code> - Cancel request</li>
 <li><code>POST /requests/{id}/confirm-terminated</code> - Confirm return-request machines are terminated (operator role)</li>

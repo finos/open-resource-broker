@@ -6651,7 +6651,31 @@
 </code></pre></div>
 <p><code>ec2:DeleteLaunchTemplateVersions</code> cannot be limited this way for the versions ORB adds to a template you provide: that template is yours and is not tagged by ORB, so grant it on the templates you use with overrides, or accept the warning logged when it is denied.</p>
 <h2 id="tagging-optional">Tagging (optional)<a class="headerlink" href="#tagging-optional" title="Permanent link">&para;</a></h2>
-<p>ORB tags all resources it creates with <code>orb:</code> prefixed keys (<code>orb:managed-by</code>, <code>orb:request-id</code>, <code>orb:template-id</code>, <code>orb:provider-api</code>, <code>orb:created-at</code>). The tagging call uses:</p>
+<p>ORB tags all resources it creates with <code>orb:</code> prefixed keys (<code>orb:managed-by</code>, <code>orb:request-id</code>, <code>orb:template-id</code>, <code>orb:provider-api</code>, <code>orb:created-at</code>).</p>
+<p>Auto Scaling groups, the instances they launch, and the launch templates ORB creates also carry <code>orb:resource-id</code>, the identifier of the ORB-created resource that owns the tag:</p>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th><code>orb:resource-id</code> value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auto Scaling group</td>
+<td>the group name</td>
+</tr>
+<tr>
+<td>Instances launched by the group</td>
+<td>the group name (propagated at launch)</td>
+</tr>
+<tr>
+<td>Launch template created by ORB</td>
+<td>the template ID; the template name if the follow-up tagging call fails and <code>on_tag_failure</code> is <code>warn</code></td>
+</tr>
+</tbody>
+</table>
+<p>Other resource types do not carry this tag yet. Existing groups and templates are not re-tagged. The tagging call uses:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ec2:CreateTags
 </code></pre></div>
 <p>For ASG resources, tagging uses the Auto Scaling API instead:</p>
