@@ -16,6 +16,10 @@ from orb.domain.base.ports import LoggingPort
 # No existing k8s config timeout fits shutdown; matches the watch-stop timeout.
 BACKGROUND_DRAIN_TIMEOUT_SECONDS = 10.0
 
+# Extra time a foreign-thread caller waits beyond the drain timeout, so the
+# drain's own cancel-and-log step can finish before the wait gives up.
+FOREIGN_THREAD_WAIT_MARGIN_SECONDS = 5.0
+
 
 class BackgroundTasks:
     """Owner-scoped set of running background tasks."""
@@ -116,6 +120,8 @@ def drain_all_sync(
     if loop.is_closed():
         return
     if loop.is_running():
-        asyncio.run_coroutine_threadsafe(_drain(), loop).result(timeout + 5.0)
+        asyncio.run_coroutine_threadsafe(_drain(), loop).result(
+            timeout + FOREIGN_THREAD_WAIT_MARGIN_SECONDS
+        )
     else:
         loop.run_until_complete(_drain())

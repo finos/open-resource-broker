@@ -189,3 +189,63 @@ async def test_drain_all_sync_on_loop_thread_neither_blocks_nor_cancels() -> Non
     logger.warning.assert_called_once()
     gate.set()
     await task
+
+
+def test_drain_all_sync_with_pending_task_on_closed_loop_returns() -> None:
+    logger = MagicMock()
+    tasks = BackgroundTasks(logger)
+    loop = asyncio.new_event_loop()
+
+    async def _forever() -> None:
+        await asyncio.Event().wait()
+
+    tasks.spawn(loop, _forever(), name="w")
+    loop.close()
+    drain_all_sync([tasks], logger, timeout=0.01)
+
+
+def test_cleanup_continues_to_client_stage_when_owning_loop_is_blocked(monkeypatch) -> None:
+    import time
+
+    from orb.providers.k8s.configuration.config import K8sProviderConfig
+    from orb.providers.k8s.infrastructure.handlers.pod_handler import K8sPodHandler
+    from orb.providers.k8s.strategy.k8s_provider_strategy import K8sProviderStrategy
+    from orb.providers.k8s.utilities import background_tasks
+
+    monkeypatch.setattr(background_tasks, "FOREIGN_THREAD_WAIT_MARGIN_SECONDS", 0.05)
+    monkeypatch.setattr(
+        "orb.providers.k8s.strategy.k8s_provider_strategy.BACKGROUND_DRAIN_TIMEOUT_SECONDS", 0.05
+    )
+    client = MagicMock()
+    strategy = K8sProviderStrategy(
+        config=K8sProviderConfig(namespace="ns"), logger=MagicMock(), kubernetes_client=client
+    )
+    handler = K8sPodHandler(
+        kubernetes_client=MagicMock(), config=K8sProviderConfig(namespace="ns"), logger=MagicMock()
+    )
+    strategy._handler_registry.handlers["Pod"] = handler
+
+    loop = asyncio.new_event_loop()
+    thread = threading.Thread(target=loop.run_forever)
+    thread.start()
+    release = threading.Event()
+
+    async def _forever() -> None:
+        await asyncio.Event().wait()
+
+    async def _spawn_then_block() -> None:
+        handler.background_tasks.spawn(loop, _forever(), name="w")
+
+    try:
+        asyncio.run_coroutine_threadsafe(_spawn_then_block(), loop).result(2.0)
+        loop.call_soon_threadsafe(release.wait, 2.0)  # blocks the loop thread
+        start = time.monotonic()
+        strategy.cleanup()
+        assert time.monotonic() - start < 1.5
+        client.cleanup.assert_called_once()
+    finally:
+        release.set()
+        asyncio.run_coroutine_threadsafe(handler.background_tasks.drain(0.01), loop).result(2.0)
+        loop.call_soon_threadsafe(loop.stop)
+        thread.join()
+        loop.close()
