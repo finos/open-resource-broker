@@ -16,6 +16,7 @@ import requests
 from botocore.exceptions import ClientError
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
 
+from orb.config.schemas.server_schema import CognitoAuthSubConfig
 from orb.domain.base.ports import LoggingPort
 from orb.infrastructure.adapters.ports.auth import (
     AuthContext,
@@ -31,7 +32,7 @@ from orb.providers.aws.utilities.boto_config import get_boto3_config
 _DEFAULT_CONFIG = get_boto3_config()
 
 if TYPE_CHECKING:
-    pass
+    from orb.config.schemas.server_schema import AuthConfig
 
 # Minimal structural check for a JWT: three dot-separated base64url segments with a
 # coarse length bound to reject obvious garbage before a denylist lookup.
@@ -358,7 +359,7 @@ class CognitoAuthStrategy(AuthPort):
             return False
 
     @classmethod
-    def from_auth_config(cls, auth_config: Any) -> CognitoAuthStrategy:
+    def from_auth_config(cls, auth_config: AuthConfig) -> CognitoAuthStrategy:
         """
         Build strategy instance from AuthConfig.
 
@@ -374,19 +375,13 @@ class CognitoAuthStrategy(AuthPort):
         """
         from orb.infrastructure.adapters.logging_adapter import LoggingAdapter
 
-        provider_auth = getattr(auth_config, "provider_auth", None)
-        cognito_cfg = getattr(provider_auth, "cognito", None) if provider_auth is not None else None
+        provider_auth = auth_config.provider_auth
+        cognito_cfg = (provider_auth.cognito if provider_auth else None) or CognitoAuthSubConfig()  # type: ignore[call-arg]  # pydantic field defaults
 
-        user_pool_id: str = (
-            getattr(cognito_cfg, "user_pool_id", "") if cognito_cfg is not None else ""
-        )
-        client_id: str = getattr(cognito_cfg, "client_id", "") if cognito_cfg is not None else ""
-        region: str = (
-            getattr(cognito_cfg, "region", "us-east-1") if cognito_cfg is not None else "us-east-1"
-        )
-        jwks_url: Optional[str] = (
-            getattr(cognito_cfg, "jwks_url", None) if cognito_cfg is not None else None
-        )
+        user_pool_id: str = cognito_cfg.user_pool_id
+        client_id: str = cognito_cfg.client_id
+        region: str = cognito_cfg.region
+        jwks_url: Optional[str] = cognito_cfg.jwks_url
 
         # Intentional service-locator: from_auth_config is called by the
         # AuthRegistry as ``strategy_factory.from_auth_config(auth_config)``

@@ -911,3 +911,101 @@ async def test_iam_check_permissions_empty_required_actions_returns_empty_grante
     permissions = await strategy._check_permissions({"Arn": "arn:aws:iam::123:user/u"})
 
     assert permissions == []
+
+
+# ---------------------------------------------------------------------------
+# from_auth_config default paths (real AuthConfig objects)
+# ---------------------------------------------------------------------------
+
+
+def _build_iam_from_auth_config(auth_config):
+    from orb.providers.aws.auth.iam_strategy import IAMAuthStrategy
+
+    with patch("orb.providers.aws.auth.iam_strategy.AWSSessionFactory") as mock_factory:
+        mock_session = MagicMock()
+        mock_session.client.return_value = MagicMock()
+        mock_factory.create_session.return_value = mock_session
+        return IAMAuthStrategy.from_auth_config(auth_config)
+
+
+def _iam_auth_configs():
+    from orb.config.schemas.server_schema import AuthConfig, IAMAuthSubConfig, ProviderAuthSubConfig
+
+    return {
+        "provider_auth_none": AuthConfig(strategy="iam"),  # type: ignore[call-arg]
+        "iam_none": AuthConfig(  # type: ignore[call-arg]
+            strategy="iam",
+            provider_auth=ProviderAuthSubConfig(),  # type: ignore[call-arg]
+        ),
+        "iam_partial": AuthConfig(  # type: ignore[call-arg]
+            strategy="iam",
+            provider_auth=ProviderAuthSubConfig(  # type: ignore[call-arg]
+                iam=IAMAuthSubConfig(region="eu-west-1")  # type: ignore[call-arg]
+            ),
+        ),
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("case", ["provider_auth_none", "iam_none", "iam_partial"])
+def test_iam_from_auth_config_default_paths_fail_closed(case, monkeypatch):
+    """Missing or partial IAM sub-config keeps assume_permissions off and admin_arns empty."""
+    monkeypatch.delenv("ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY", raising=False)
+
+    strategy = _build_iam_from_auth_config(_iam_auth_configs()[case])
+
+    assert strategy.region == ("eu-west-1" if case == "iam_partial" else "us-east-1")
+    assert strategy.profile is None
+    assert strategy.required_actions == []
+    assert strategy._assume_permissions is False
+    assert strategy._admin_arns == frozenset()
+
+
+@pytest.mark.unit
+def test_iam_from_auth_config_full_sub_config(monkeypatch):
+    """Every IAM sub-config field reaches the strategy."""
+    from orb.config.schemas.server_schema import AuthConfig, IAMAuthSubConfig, ProviderAuthSubConfig
+
+    monkeypatch.delenv("ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY", raising=False)
+    auth_config = AuthConfig(  # type: ignore[call-arg]
+        strategy="iam",
+        provider_auth=ProviderAuthSubConfig(  # type: ignore[call-arg]
+            iam=IAMAuthSubConfig(  # type: ignore[call-arg]
+                region="eu-west-1",
+                profile="ops",
+                required_actions=["ec2:RunInstances"],
+                admin_arns=["arn:aws:iam::123456789012:role/OrbAdmin"],
+            )
+        ),
+    )
+
+    strategy = _build_iam_from_auth_config(auth_config)
+
+    assert strategy.region == "eu-west-1"
+    assert strategy.profile == "ops"
+    assert strategy.required_actions == ["ec2:RunInstances"]
+    assert strategy._admin_arns == frozenset({"arn:aws:iam::123456789012:role/orbadmin"})
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("env_value, expected", [(None, False), ("true", True)])
+def test_iam_from_auth_config_assume_permissions_needs_dev_env_var(
+    env_value, expected, monkeypatch
+):
+    """assume_permissions from config is honoured only with the dev-only env var."""
+    from orb.config.schemas.server_schema import AuthConfig, IAMAuthSubConfig, ProviderAuthSubConfig
+
+    if env_value is None:
+        monkeypatch.delenv("ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY", raising=False)
+    else:
+        monkeypatch.setenv("ORB_IAM_ASSUME_PERMISSIONS_DEV_ONLY", env_value)
+    auth_config = AuthConfig(  # type: ignore[call-arg]
+        strategy="iam",
+        provider_auth=ProviderAuthSubConfig(  # type: ignore[call-arg]
+            iam=IAMAuthSubConfig(assume_permissions=True)  # type: ignore[call-arg]
+        ),
+    )
+
+    strategy = _build_iam_from_auth_config(auth_config)
+
+    assert strategy._assume_permissions is expected

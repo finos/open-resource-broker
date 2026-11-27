@@ -820,3 +820,69 @@ async def test_jwks_cache_evicted_on_invalid_key_type():
             await strategy._get_public_key("ec-kid")
 
     assert mock_get.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# from_auth_config sub-config paths (real AuthConfig objects)
+# ---------------------------------------------------------------------------
+
+
+def _build_cognito_from_auth_config(auth_config):
+    from orb.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
+
+    with patch("boto3.client") as _mock:
+        _mock.return_value = MagicMock()
+        with patch(
+            "orb.infrastructure.di.container.get_container",
+            side_effect=Exception("no container"),
+        ):
+            return CognitoAuthStrategy.from_auth_config(auth_config)
+
+
+@pytest.mark.unit
+def test_cognito_from_auth_config_cognito_sub_config_none():
+    """provider_auth present without a cognito entry falls back to defaults."""
+    from orb.config.schemas.server_schema import AuthConfig, ProviderAuthSubConfig
+
+    auth_config = AuthConfig(  # type: ignore[call-arg]
+        strategy="cognito",
+        provider_auth=ProviderAuthSubConfig(),  # type: ignore[call-arg]
+    )
+
+    strategy = _build_cognito_from_auth_config(auth_config)
+
+    assert strategy.region == "us-east-1"
+    assert strategy.user_pool_id == ""
+    assert strategy.client_id == ""
+    assert strategy.jwks_url == (
+        "https://cognito-idp.us-east-1.amazonaws.com//.well-known/jwks.json"
+    )
+
+
+@pytest.mark.unit
+def test_cognito_from_auth_config_full_sub_config():
+    """Every Cognito sub-config field reaches the strategy."""
+    from orb.config.schemas.server_schema import (
+        AuthConfig,
+        CognitoAuthSubConfig,
+        ProviderAuthSubConfig,
+    )
+
+    auth_config = AuthConfig(  # type: ignore[call-arg]
+        strategy="cognito",
+        provider_auth=ProviderAuthSubConfig(  # type: ignore[call-arg]
+            cognito=CognitoAuthSubConfig(  # type: ignore[call-arg]
+                user_pool_id="eu-west-1_abc",
+                client_id="client-1",
+                region="eu-west-1",
+                jwks_url="https://example.com/jwks.json",
+            )
+        ),
+    )
+
+    strategy = _build_cognito_from_auth_config(auth_config)
+
+    assert strategy.user_pool_id == "eu-west-1_abc"
+    assert strategy.client_id == "client-1"
+    assert strategy.region == "eu-west-1"
+    assert strategy.jwks_url == "https://example.com/jwks.json"
