@@ -229,22 +229,28 @@ def _pending_pod() -> dict[str, Any]:
     }
 
 
-async def _timed_out_rewrite(handler_class: type[FakeCrHandler], client: FakeK8sClient) -> Any:
+async def _timed_out_rewrite(
+    handler_class: type[FakeCrHandler], client: FakeK8sClient
+) -> tuple[Any, list[asyncio.Task[Any]]]:
+    """Run the timeout rewrite; return its result and the tasks it scheduled (awaited)."""
     handler = handler_class(
         kubernetes_client=client,  # type: ignore[arg-type]
         config=FakeCrConfig(namespace="ns"),  # type: ignore[call-arg]
         logger=MagicMock(),
     )
+    before = asyncio.all_tasks()
     rewritten = handler.apply_pod_timeouts([_pending_pod()])
-    await asyncio.sleep(0.01)  # let a scheduled deletion task run
-    return rewritten
+    scheduled = list(asyncio.all_tasks() - before)
+    await asyncio.gather(*scheduled)
+    return rewritten, scheduled
 
 
 @pytest.mark.asyncio
 async def test_pending_timeout_never_deletes_a_pod() -> None:
     client = FakeK8sClient()
-    rewritten = await _timed_out_rewrite(FakeCrHandler, client)
+    rewritten, scheduled = await _timed_out_rewrite(FakeCrHandler, client)
     assert rewritten[0]["status"] == "terminated"  # the timeout did fire
+    assert scheduled == []  # no deletion was even scheduled
     assert client.forbidden_calls() == []
 
 
@@ -254,7 +260,8 @@ async def test_pending_timeout_would_delete_a_pod_if_the_handler_allowed_it() ->
         timeout_delete_enabled = True
 
     client = FakeK8sClient()
-    await _timed_out_rewrite(Allowing, client)
+    _, scheduled = await _timed_out_rewrite(Allowing, client)
+    assert len(scheduled) == 1
     assert "forbidden:core_v1.delete_namespaced_pod" in client.forbidden_calls()
 
 
