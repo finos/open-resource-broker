@@ -15,7 +15,8 @@ on:
       - 'src/orb/api/routers/**'          # route declarations (method/path/operationId)
       - 'src/orb/api/models/**'           # request/response models = spec schemas
       - 'src/orb/api/documentation/**'    # configure_openapi() shapes the schema
-      - 'src/orb/api/server.py'           # inline /health,/metrics,/info operations + router registration
+      - 'src/orb/api/server.py'           # router registration
+      - 'src/orb/api/system_routes.py'    # /health,/livez,/readyz,/metrics,/info operations
       - 'src/orb/api/dependencies.py'     # response-model deps wired into routes
       - 'dev-tools/release/export_openapi_spec.sh'  # the exporter itself
       - 'dev-tools/ci/check_csharp_lock*.sh'  # the C# lock guard
@@ -87,6 +88,7 @@ jobs:
               - 'src/orb/api/models/**'
               - 'src/orb/api/documentation/**'
               - 'src/orb/api/server.py'
+              - 'src/orb/api/system_routes.py'
               - 'src/orb/api/dependencies.py'
               - 'dev-tools/release/export_openapi_spec.sh'
               - 'dev-tools/ci/check_csharp_lock*.sh'
