@@ -389,7 +389,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             extension_class = self.extension_registry.get_extension_class(provider_type)
             return region_seed(extension_class, instance.config)
         except Exception as e:
-            self.logger.warning("Could not read the region of provider %s: %s", provider_type, e)
+            self.logger.warning("No region for %s: %s", provider_type, type(e).__name__)
             return {}
 
     def _apply_template_row_migration(

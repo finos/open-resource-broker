@@ -11,9 +11,22 @@ from typing import Any, Iterable, Optional
 _REGION_KEYS = ("region", "location")
 
 
+def _carries_region(source: Any) -> bool:
+    if source is None:
+        return False
+    if not isinstance(source, dict):
+        dump = getattr(source, "model_dump", None)
+        source = dump() if callable(dump) else {}
+    return any(source.get(key) not in (None, "") for key in _REGION_KEYS)
+
+
 def has_region_value(resolved: dict[str, Any]) -> bool:
-    """True when region or location holds a non-None, non-empty value."""
-    return any(resolved.get(key) not in (None, "") for key in _REGION_KEYS)
+    """True when region or location holds a non-None, non-empty value.
+
+    The Azure and GCP templates read a nested ``provider_config`` region or
+    location when the top-level one is empty, so a nested value counts too.
+    """
+    return _carries_region(resolved) or _carries_region(resolved.get("provider_config"))
 
 
 def sole_enabled_instance(providers: Optional[Iterable[Any]], provider_type: str) -> Optional[Any]:

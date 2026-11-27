@@ -270,6 +270,74 @@ def test_no_seed_from_a_selected_instance_of_another_type_without_an_azure_one(r
     assert "region" not in resolved
 
 
+def test_empty_location_in_a_layer_does_not_count_as_present(registry) -> None:
+    instance = _instance(
+        "azure-1", "azure", {"region": "eastus"}, template_defaults={"location": ""}
+    )
+    resolved = _service(registry, [instance]).resolve_template_defaults(
+        _azure_row(provider_name="azure-1")
+    )
+    assert resolved["location"] == "eastus"
+
+
+def test_empty_location_in_the_row_still_gets_the_seed(registry) -> None:
+    service = _service(registry, [_instance("azure-1", "azure", {"region": "eastus"})])
+    assert service.resolve_template_defaults(_azure_row(location=""))["location"] == "eastus"
+
+
+def test_seed_survives_a_migration_that_drops_the_location(registry) -> None:
+    def migration(row, defaults, merged):
+        return {k: v for k, v in merged.items() if k not in ("location", "region")}, None
+
+    service = _service(registry, [_instance("azure-1", "azure", {"region": "eastus"})])
+    service.provider_registry = SimpleNamespace(
+        get_template_row_migration=lambda _type: migration,
+        get_default_api=lambda _type: None,
+        is_provider_registered=lambda _type: True,
+    )
+    assert service.resolve_template_defaults(_azure_row())["location"] == "eastus"
+
+
+@pytest.mark.parametrize("key", ["region", "location"])
+def test_azure_nested_provider_config_location_is_not_overridden(registry, key) -> None:
+    from orb.providers.azure.domain.template.azure_template_aggregate import AzureTemplate
+
+    service = _service(registry, [_instance("azure-1", "azure", {"region": "eastus"})])
+    row = _azure_row(
+        provider_config={key: "westus"},
+        resource_group="rg",
+        vm_size="Standard_B2s",
+        ssh_key_name="k",
+    )
+    resolved = service.resolve_template_defaults(row)
+
+    assert resolved["provider_config"] == {key: "westus"}
+    assert "region" not in resolved
+    assert "location" not in resolved
+    assert _location_of(AzureTemplate, resolved) == "westus"
+
+
+def test_gcp_nested_provider_config_region_is_not_overridden(registry) -> None:
+    from orb.providers.gcp.domain.template.gcp_template_aggregate import GCPTemplate
+
+    instance = _instance("gcp-1", "gcp", {**GCP_CONFIG, "region": "us-central1"})
+    resolved = _service(registry, [instance]).resolve_template_defaults(
+        _gcp_row(provider_config={"region": "europe-west4"})
+    )
+
+    assert resolved["provider_config"] == {"region": "europe-west4"}
+    assert "region" not in resolved
+    assert _location_of(GCPTemplate, resolved) == "europe-west4"
+
+
+def _location_of(template_class, resolved: dict) -> str:
+    """The location the provider template ends up with for a resolved row."""
+    row = {k: v for k, v in resolved.items() if k != "provider_name"}
+    template = template_class.model_validate(row)
+    value = getattr(template, "location", None) or getattr(template, "region")
+    return getattr(value, "value", value)
+
+
 # --- provider contract -----------------------------------------------------
 
 
