@@ -91,7 +91,33 @@ which handler created it.  Per-template values, when present, win.
 |-------------------------------|--------|---------|--------------------------------------|------------------------------------------------------------------------------------------------------|
 | `pod_timeout_seconds`         | `int`  | `300`   | `ORB_K8S_POD_TIMEOUT_SECONDS`        | Maximum seconds a pod may stay `Pending` before being treated as terminal (fulfilment fails).        |
 | `delete_timed_out_pods`       | `bool` | `True`  | `ORB_K8S_DELETE_TIMED_OUT_PODS`      | When `True` (default), pods that have been `Pending` past `pod_timeout_seconds` are deleted immediately after their status is rewritten to `terminated`.  Set to `False` to preserve timed-out pods for operator inspection. |
+| `return_unreadable_timeout_seconds` | `int` | `3600` | `ORB_K8S_RETURN_UNREADABLE_TIMEOUT_SECONDS` | Maximum seconds, counted from when the return request was created, that a return waits for pods the cluster could not be asked about. Must be at least `1`. See [Unreadable returns](#unreadable-returns). |
 | `stale_cache_timeout_seconds` | `int`  | `600`   | `ORB_K8S_STALE_CACHE_TIMEOUT_SECONDS`| After the in-memory watch cache loses its watch task, stale reads may serve for this many seconds before the provider falls back to on-demand list calls. |
+
+### Unreadable returns
+
+A return reads the cluster to confirm its pods are gone. When the pod list for
+a namespace fails (API outage, timeout, missing permission), ORB cannot tell
+whether those pods still exist. The return stays in progress and the machines
+keep their stored state; nothing is closed out on a failed read. Once the read
+works again the return finishes as usual.
+
+If the pods stay unreadable for `return_unreadable_timeout_seconds`, counted
+from when the return request was created, the return request is marked
+`failed`. The unreadable machine ids are listed in the request status message
+and in the request metadata under `unreadable_resource_ids`
+(`orb requests status` shows the message; add `--verbose` to see the
+metadata). Machines that could be read are handled as
+normal, and the return only fails once none of them is still waiting to
+terminate.
+
+`failed` here means ORB could not confirm the outcome, not that deleting the
+pods failed. ORB does not delete anything on this path, and the pods may still
+be running and incurring cost. Check the cluster for the listed ids. Once the
+cluster is reachable, run `orb machines return --force <machine-id> ...` (or
+send `"force": true` through the REST API) to file a new return for them. A
+return that is already past the limit when its first read fails is failed on
+that read, so raise the setting for clusters with long API outages.
 
 ## Watch and reconciliation
 
@@ -269,6 +295,7 @@ export ORB_K8S_EMIT_LEGACY_LABELS="false"
 
 # Timing
 export ORB_K8S_POD_TIMEOUT_SECONDS="240"
+export ORB_K8S_RETURN_UNREADABLE_TIMEOUT_SECONDS="7200"
 export ORB_K8S_DELETE_TIMED_OUT_PODS="true"
 
 # Security audit (reject mode is on by default)
@@ -305,6 +332,7 @@ export ORB_K8S_NAMING__PREFIX="my-orb"
       ],
       "default_image_pull_secret": "orb-registry",
       "pod_timeout_seconds": 240,
+      "return_unreadable_timeout_seconds": 7200,
       "delete_timed_out_pods": true,
       "watch_enabled": true,
       "min_kubernetes_version": "1.28",

@@ -210,3 +210,29 @@ class TestRequiresFollowUpOutcome:
         assert result.data["instance_ids"] == ["fleet-aaa"]
         assert result.data["provider_data"]["follow_up_kind"] == "deployment_polling"
         assert result.data["provider_data"]["expected_terminal_state"] == "running"
+
+
+class TestUnreadableReturn:
+    def test_unreadable_facts_reach_the_envelope_metadata(self) -> None:
+        outcome = Accepted(
+            request_id="ret-1",
+            pending_resource_ids=["pod-a"],
+            metadata={
+                "instances": [{"instance_id": "pod-a", "status": "failed"}],
+                "unreadable_resource_ids": ["pod-a"],
+                "return_unreadable_timed_out": True,
+            },
+        )
+
+        result = _outcome_to_provider_result(outcome, fallback_operation="get_instance_status")
+
+        assert result.metadata["unreadable_resource_ids"] == ["pod-a"]
+        assert result.metadata["return_unreadable_timed_out"] is True
+        assert "fulfillment_final" not in result.data["provider_data"]
+
+    def test_other_accepted_outcomes_carry_nothing_extra(self) -> None:
+        outcome = Accepted(request_id="r", pending_resource_ids=["x"], metadata={})
+
+        result = _outcome_to_provider_result(outcome, fallback_operation="get_instance_status")
+
+        assert "unreadable_resource_ids" not in result.metadata

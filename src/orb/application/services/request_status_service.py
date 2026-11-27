@@ -206,13 +206,24 @@ class RequestStatusService:
                 f"awaiting termination (total in DB: {db_machine_count})",
             )
         elif failed_count > 0:
+            unreadable = self._timed_out_unreadable_ids(provider_metadata)
+            detail = (
+                f"; could not confirm termination of: {', '.join(unreadable)}" if unreadable else ""
+            )
             return (
                 RequestStatus.FAILED.value,
                 f"Return request failed: {failed_count} machines failed to terminate "
-                f"(total in DB: {db_machine_count})",
+                f"(total in DB: {db_machine_count}){detail}",
             )
         else:
             return RequestStatus.IN_PROGRESS.value, "Instances terminating"
+
+    @staticmethod
+    def _timed_out_unreadable_ids(provider_metadata: Optional[dict]) -> list[str]:
+        """Machine ids a provider gave up reading when it ended a return, else empty."""
+        if not provider_metadata or not provider_metadata.get("return_unreadable_timed_out"):
+            return []
+        return [str(i) for i in provider_metadata.get("unreadable_resource_ids") or []]
 
     def _publish_events(self, events: Optional[list]) -> None:
         """Publish the events a saved request returned.
@@ -319,7 +330,13 @@ class RequestStatusService:
                         return request
                     try:
                         updated_request, changed = self._build_status_update(
-                            current, status, message, fulfilment, now, provider_machines
+                            current,
+                            status,
+                            message,
+                            fulfilment,
+                            now,
+                            provider_machines,
+                            self._timed_out_unreadable_ids(provider_metadata),
                         )
                     except InvalidRequestStateError as exc:
                         # Illegal transition (e.g. terminal request, backward
@@ -405,6 +422,7 @@ class RequestStatusService:
         fulfilment: Optional[ProviderFulfilment],
         now: datetime,
         provider_machines: Optional[list[Machine]] = None,
+        unreadable_ids: Optional[list[str]] = None,
     ) -> Tuple[Request, bool]:
         """Apply the state machine to ``request``; return (new request, changed).
 
@@ -458,6 +476,14 @@ class RequestStatusService:
                     update={"successful_count": actual_count}
                 )
                 changed = True
+
+        # A return that ended because machines could not be read records which ones,
+        # so the operator can check the cluster for them.
+        if unreadable_ids and updated_request.status == RequestStatus.FAILED:
+            updated_request = updated_request.update_metadata(
+                {"unreadable_resource_ids": list(unreadable_ids)}
+            )
+            changed = True
 
         # Cache the latest ProviderFulfilment snapshot so DTO callers can surface it.
         if fulfilment is not None:

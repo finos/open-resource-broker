@@ -247,6 +247,8 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
       watchers continue to function during the transition.
     * ``pod_timeout_seconds`` — bound on how long a pod may stay
       ``Pending`` before being treated as terminal.
+    * ``return_unreadable_timeout_seconds`` — how long a return request may wait
+      for pods whose namespace could not be listed before it is marked failed.
     * ``stale_cache_timeout_seconds`` — once the in-process watch task is
       dead, the L1 cache is treated as stale after this many seconds and
       the provider falls back to on-demand list calls.
@@ -385,6 +387,15 @@ class K8sProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     pod_timeout_seconds: int = Field(
         300,
         description="Maximum seconds a pod may stay Pending before being treated as terminal.",
+    )
+    return_unreadable_timeout_seconds: int = Field(
+        3600,
+        ge=1,
+        description=(
+            "Maximum seconds, counted from when a return request was created, that a return "
+            "may wait for pods the cluster could not be asked about.  After that the return is "
+            "marked failed and the machine ids are recorded on it; no pod is deleted."
+        ),
     )
     delete_timed_out_pods: bool = Field(
         True,
