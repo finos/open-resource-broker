@@ -42,7 +42,13 @@ def _run(body: str) -> subprocess.CompletedProcess[str]:
 
 
 @pytest.mark.parametrize(
-    "module", ["orb.api.loopback_admin", "orb.api.middleware_stack", "orb.api.server"]
+    "module",
+    [
+        "orb.api.loopback_admin",
+        "orb.api.middleware_stack",
+        "orb.api.system_routes",
+        "orb.api.server",
+    ],
 )
 def test_module_imports_without_web_frameworks(module: str) -> None:
     result = _run(f"import importlib; importlib.import_module({module!r}); print('IMPORTED')")
