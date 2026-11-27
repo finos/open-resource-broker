@@ -1,0 +1,21 @@
+name: 'Reflex Version'
+description: >-
+  Resolve the reflex version pinned in uv.lock, for use in the SPA frontend
+  dependencies cache key. Fails when uv.lock names no reflex version or more
+  than one.
+
+outputs:
+  version:
+    description: 'reflex version from uv.lock'
+    value: ${{ steps.resolve.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve reflex version from uv.lock
+      id: resolve
+      shell: bash
+      run: |
+        version=$(uv run --no-project --python '>=3.11' python -I dev-tools/ci/uv_lock_version.py reflex uv.lock)
+        test -n "$version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"

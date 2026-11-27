@@ -11,8 +11,8 @@ if [[ -z "${ORB_EXPORT_SPEC_REEXEC:-}" ]] && command -v uv >/dev/null 2>&1; then
     exec uv run -- bash "$0" "$@"
 fi
 
-SOCK=/tmp/orb-spec.sock
 SPEC_TMP=$(mktemp -d)
+SOCK="$SPEC_TMP/orb.sock"
 
 cleanup() {
     if [[ -n "${SERVER_PID:-}" ]]; then

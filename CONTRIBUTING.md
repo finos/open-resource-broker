@@ -286,6 +286,23 @@ Additional hooks run via `make pre-commit-full` (manual stage):
 - `detect-secrets` — hardcoded secret detection
 - `validate-workflows` — GitHub Actions YAML validation
 
+### File-size baseline
+
+Python files under `src/` over 600 lines are listed with their line counts in
+`dev-tools/quality/file_size_baseline.json`. The recorded size is a ratchet: a file
+may only get smaller, and the recorded number must follow it down. The
+`Architecture Validation (file-sizes)` check fails when a file over 600 lines is not
+listed, grows, shrinks without the record being lowered, or is listed but no longer
+over 600 lines.
+
+When it fails after you shrink or split a file, run `make file-sizes-baseline` and
+commit the updated JSON. Growing a listed file, or adding a new oversized one, needs
+`make file-sizes-baseline-init` and a reason in the PR description; splitting the
+file is preferred.
+
+When two PRs change the same listed file, the second one must be rebased and the
+baseline regenerated before it merges; otherwise the merge queue ejects it.
+
 ### IDE Setup
 - **VS Code**: Install Ruff extension, settings already configured
 - **PyCharm**: Install Ruff plugin, enable format-on-save

@@ -81,14 +81,23 @@ repos:
         description: "Check Clean Architecture compliance"
         stages: [pre-push]
 
+      - id: export-openapi-spec
+        name: Export OpenAPI spec
+        entry: make sdk-go-export-spec
+        language: system
+        files: ^(src/orb/|dev-tools/release/export_openapi_spec\.sh$)
+        pass_filenames: false
+        description: "Regenerate sdk/spec/openapi.json; fails if the committed spec is stale"
+        stages: [pre-push]
+
       - id: check-file-sizes-arch
         name: Check File Sizes (Architecture)
         entry: make ci-arch-file-sizes
         language: system
         files: \.(py)$
         pass_filenames: false
-        description: "Check file sizes for architecture compliance"
-        stages: [manual]  # Optional check - run as warning only
+        description: "Fail when a file exceeds or drops below its recorded size in the file-size baseline"
+        stages: [manual]  # Manual stage; enforced against dev-tools/quality/file_size_baseline.json
 
       - id: security-scan
         name: Security Scan
@@ -159,5 +168,5 @@ repos:
         language: system
         files: \.(py)$
         pass_filenames: false
-        description: "Check for files that may violate Single Responsibility Principle"
-        stages: [manual]  # Optional check - run as warning only
+        description: "Fail when a file exceeds or drops below its recorded size in the file-size baseline"
+        stages: [manual]  # Manual stage; enforced against dev-tools/quality/file_size_baseline.json

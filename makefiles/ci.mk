@@ -23,6 +23,15 @@ ci-quality-radon:  ## Run radon complexity analysis
 	$(call run-tool,radon,cc $(PACKAGE) --min B --show-complexity)
 	$(call run-tool,radon,mi $(PACKAGE) --min B)
 
+ci-quality-custom-changed:  ## Run custom quality checks on Python files changed in a pull request
+	@# Needs the base ref (checkout with fetch-depth: 0). Without it a shallow
+	@# clone would diff nothing and pass; fail instead.
+	@test "$$GITHUB_EVENT_NAME" = "pull_request" || { echo "Only runs for pull requests (GITHUB_EVENT_NAME=pull_request)." >&2; exit 1; }
+	@git rev-parse --verify -q "origin/$$GITHUB_BASE_REF" >/dev/null || { echo "origin/$$GITHUB_BASE_REF not found: fetch full history." >&2; exit 1; }
+	@# NUL-delimited so paths with spaces survive; xargs -r skips an empty diff.
+	@git diff -z --name-only --diff-filter=d "origin/$$GITHUB_BASE_REF...HEAD" -- '*.py' \
+		| xargs -0 -r python3 ./dev-tools/quality/quality_check.py --strict --files
+
 ci-quality-pyright:  ## Run pyright type checking
 	@echo "Running pyright type check..."
 	$(call run-tool,pyright,)
@@ -49,7 +58,7 @@ ci-arch-imports:  ## Run import validation
 
 ci-arch-file-sizes:  ## Check file size compliance
 	@echo "Running file size checks..."
-	uv run --no-sync python ./dev-tools/quality/dev_tools_runner.py check-file-sizes --warn-only
+	uv run --no-sync python ./dev-tools/quality/dev_tools_runner.py check-file-sizes
 
 ci-arch-lint-imports:  ## Run import-linter layer-boundary contracts
 	@# In CI the venv is pre-populated by setup-uv-cached (group: arch).

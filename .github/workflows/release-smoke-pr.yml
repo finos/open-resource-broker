@@ -18,6 +18,8 @@ on:
       - 'tests/package_smoke/**'
       - 'tests/unit/deploy/test_wheel_contents.py'
       - '.github/actions/build-release-wheel/**'
+      - '.github/actions/reflex-version/**'
+      - 'dev-tools/ci/uv_lock_version.py'
       - '.github/workflows/release-smoke.yml'
       - '.github/workflows/release-smoke-pr.yml'
   workflow_dispatch:
