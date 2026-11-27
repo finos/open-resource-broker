@@ -44,7 +44,7 @@ allow_indirect_imports = True
 # All A1/A2/A3 baseline violations have been fixed by Epic E4 / ticket #1358:
 #   A1 — TemplateDTO moved to orb.application.dto.template
 #   A2 — same fix as A1
-#   A3 — MetricsCollector now injected via MetricsPort
+#   A3 — MetricsCollector now injected via the provider metrics port
 #
 # The circuit-breaker resilience leak has also been inverted: the orchestration
 # service now depends on orb.application.ports.resilience_port (a

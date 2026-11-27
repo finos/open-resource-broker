@@ -1,8 +1,10 @@
 """Integration tests for authentication flows."""
 
 import asyncio
+import time
 from unittest.mock import Mock
 
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 from starlette.datastructures import URL
@@ -137,23 +139,23 @@ class TestAuthenticationFlows:
 
     def test_expired_token_handling(self):
         """Test handling of expired tokens."""
-        # Create strategy with very short expiry
-        strategy = BearerTokenStrategy(
-            secret_key="test-secret-key-minimum-32-bytes!",
+        secret = "test-secret-key-minimum-32-bytes!"
+        strategy = BearerTokenStrategy(secret_key=secret, algorithm="HS256", enabled=True)
+
+        now = int(time.time())
+        token = jwt.encode(
+            {
+                "sub": "test-user",
+                "roles": ["user"],
+                "permissions": ["read"],
+                "type": "access",
+                "iat": now - 120,
+                "exp": now - 60,
+                "iss": "open-resource-broker",
+            },
+            secret,
             algorithm="HS256",
-            token_expiry=1,  # 1 second expiry
-            enabled=True,
         )
-
-        # Create token
-        token = strategy._create_access_token(
-            user_id="test-user", roles=["user"], permissions=["read"]
-        )
-
-        # Wait for token to expire
-        import time
-
-        time.sleep(2)
 
         # Test expired token validation
         result = asyncio.run(strategy.validate_token(token))
