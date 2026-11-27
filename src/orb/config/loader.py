@@ -439,6 +439,9 @@ class ConfigurationLoader:
                 "request.max_machines_per_request", "ORB_MAX_MACHINES_PER_REQUEST", val
             )
             config.setdefault("request", {})["max_machines_per_request"] = int(val)
+        if val := os.environ.get("ORB_CLI_UPDATE_CHECK"):
+            _warn_if_sdk_override("cli.update_check", "ORB_CLI_UPDATE_CHECK", val)
+            config.setdefault("cli", {})["update_check"] = val.lower() == "true"
         if val := os.environ.get("ORB_CONFIG_FILE"):
             _warn_if_sdk_override("config_file", "ORB_CONFIG_FILE", val)
             config["config_file"] = val

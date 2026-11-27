@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .cli_schema import CliConfig
 from .common_schema import (
     EventsConfig,
     NamingConfig,
@@ -45,6 +46,7 @@ class AppConfig(BaseModel):
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)  # type: ignore[call-arg]
     performance: PerformanceConfig = Field(default_factory=PerformanceConfig)  # type: ignore[call-arg]
     server: ServerConfig = Field(default_factory=ServerConfig)  # type: ignore[call-arg]
+    cli: CliConfig = Field(default_factory=CliConfig)
     ui: UIConfig = Field(default_factory=UIConfig)  # type: ignore[arg-type]
     native_spec: NativeSpecConfig = Field(default_factory=NativeSpecConfig)  # type: ignore[call-arg]
     environment: str = Field("development", description="Environment")
