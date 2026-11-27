@@ -178,3 +178,72 @@ def test_microvm_checks_apply_to_base_template_provider_api():
 
     assert "image_id" not in adapter.validate_field_values(microvm)
     assert "image_id" in adapter.validate_field_values(plain)
+
+
+def _version_lt_data(**template_overrides: Any) -> dict[str, Any]:
+    """Run _create_new_lt_version and return the LaunchTemplateData it sent."""
+    aws_client = MagicMock()
+    aws_client.get_selected_aws_provider_config.return_value = None
+    aws_client.ec2_client.create_launch_template_version.return_value = {
+        "LaunchTemplateVersion": {"VersionNumber": 2, "LaunchTemplateName": "user-lt"}
+    }
+    config_port = MagicMock()
+    config_port.get_resource_prefix.return_value = ""
+    manager = AWSLaunchTemplateManager(
+        aws_client=aws_client, logger=MagicMock(), config_port=config_port
+    )
+    template = _template(launch_template_id="lt-user", **template_overrides)
+
+    manager._create_new_lt_version(template, _request())
+
+    kwargs = aws_client.ec2_client.create_launch_template_version.call_args.kwargs
+    return kwargs["LaunchTemplateData"]
+
+
+def test_new_version_without_overrides_sends_no_monitoring_or_disk_settings():
+    lt_data = _version_lt_data()
+
+    assert "Monitoring" not in lt_data
+    assert "BlockDeviceMappings" not in lt_data
+
+
+def test_new_version_keeps_monitoring_disabled():
+    lt_data = _version_lt_data(monitoring_enabled=False)
+
+    assert lt_data["Monitoring"] == {"Enabled": False}
+
+
+def test_new_version_sends_monitoring_enabled():
+    assert _version_lt_data(monitoring_enabled=True)["Monitoring"] == {"Enabled": True}
+
+
+def test_new_version_disk_with_iops():
+    lt_data = _version_lt_data(machine_disk_size_gb=80, machine_disk_type="gp3", iops=5000)
+
+    assert lt_data["BlockDeviceMappings"] == [
+        {
+            "DeviceName": "/dev/xvda",
+            "Ebs": {
+                "VolumeSize": 80,
+                "VolumeType": "gp3",
+                "DeleteOnTermination": True,
+                "Iops": 5000,
+            },
+        }
+    ]
+
+
+def test_new_version_disk_without_iops():
+    ebs = _version_lt_data(machine_disk_size_gb=80, machine_disk_type="gp3")["BlockDeviceMappings"][
+        0
+    ]["Ebs"]
+
+    assert ebs == {"VolumeSize": 80, "VolumeType": "gp3", "DeleteOnTermination": True}
+
+
+def test_new_version_ignores_iops_for_volume_types_without_provisioned_iops():
+    ebs = _version_lt_data(machine_disk_size_gb=80, machine_disk_type="gp2", iops=5000)[
+        "BlockDeviceMappings"
+    ][0]["Ebs"]
+
+    assert "Iops" not in ebs
