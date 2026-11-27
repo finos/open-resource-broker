@@ -127,6 +127,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         "SpotFleet": "aws",
         "ASG": "aws",
         "RunInstances": "aws",
+        "MicroVM": "aws",
         "OCICompute": "oci",
     }
 
@@ -134,10 +135,8 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
     # Resolving a type from the provider configuration is for the other types.
     _UNCHANGED_TYPES: frozenset[str] = frozenset({"k8s", "oci"})
 
-    # Types whose validator is not run on the validate path yet.  The AWS
-    # adapter reads legacy field names only and would reject current AWS
-    # templates, so AWS validation stays as it was until its rules are updated.
-    _VALIDATE_PATH_PENDING: frozenset[str] = frozenset({"aws"})
+    # Types whose validators read the row as written, so it is not renamed first.
+    _AS_WRITTEN_TYPES: frozenset[str] = frozenset({"aws"})
 
     @staticmethod
     def _to_internal_fields(provider_type: str, row: Any) -> Any:
@@ -227,11 +226,9 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         if not provider_type:
             return []
         provider_type = str(provider_type)
-        if provider_type in self._VALIDATE_PATH_PENDING:
-            return []
 
         validated_row = domain_template
-        if provider_type not in self._UNCHANGED_TYPES:
+        if provider_type not in self._UNCHANGED_TYPES | self._AS_WRITTEN_TYPES:
             try:
                 validated_row = self._to_internal_fields(provider_type, domain_template)
             except Exception as e:

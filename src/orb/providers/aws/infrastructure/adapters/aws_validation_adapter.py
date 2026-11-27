@@ -1,5 +1,6 @@
 """AWS Validation Adapter - AWS-specific implementation of provider validation."""
 
+from enum import Enum
 from typing import Any
 
 from orb.domain.base.ports.logging_port import LoggingPort
@@ -12,6 +13,51 @@ from orb.providers.aws.configuration.validator import (
 
 # Static handler capability data — no runtime config needed.
 _HANDLER_CONFIG = AWSHandlerConfig()
+
+# A row reaches this adapter in either shape: snake_case attributes (a Template's
+# vars, or a mapped row) or camelCase keys (a HostFactory file row).
+_PROVIDER_API = ("provider_api", "providerApi")
+_FLEET_TYPE = ("fleet_type", "fleetType")
+_IMAGE = ("machine_image", "image_id", "imageId")
+_SUBNETS = ("subnet_ids", "subnetIds", "subnet_id", "subnetId")
+_SECURITY_GROUPS = (
+    "security_group_ids",
+    "securityGroupIds",
+    "security_group_id",
+    "securityGroupId",
+)
+_PERCENT_ON_DEMAND = ("percent_on_demand", "percentOnDemand")
+_MACHINE_TYPES = ("machine_types", "vmTypes", "vmType", "instance_type")
+
+# Accepted image forms: AMI id, SSM parameter path, and the ssm: / resolve:ssm: references.
+_IMAGE_PREFIXES = ("ami-", "/", "ssm:", "resolve:ssm:")
+# A MicroVM template names its image by ARN rather than by AMI.
+_MICROVM_IMAGE_PREFIXES = (*_IMAGE_PREFIXES, "arn:aws:")
+
+
+def _values(row: dict[str, Any], aliases: tuple[str, ...]) -> list[Any]:
+    """Return every distinct non-empty value held under any of the key aliases.
+
+    A row with defaults applied can carry the same field under two spellings (the
+    row's own camelCase key and a snake_case default), so each one is checked
+    rather than letting one hide the other.
+    """
+    found: list[Any] = []
+    for key in aliases:
+        value = row.get(key)
+        if value in (None, "", [], (), {}) or value in found:
+            continue
+        found.append(value)
+    return found
+
+
+def _as_list(values: list[Any]) -> list[str]:
+    """Flatten lists, tuples, dicts (keys) and comma-joined strings to distinct clean strings."""
+    items: list[str] = []
+    for value in values:
+        parts = value.split(",") if isinstance(value, str) else value
+        items.extend(str(part).strip() for part in parts if str(part).strip())
+    return list(dict.fromkeys(items))
 
 
 @injectable
@@ -174,28 +220,24 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
         validated_fields: list[str] = []
 
         try:
-            # Validate provider API
-            provider_api = template_config.get("provider_api")
-            if provider_api:
+            for provider_api in _as_list(_values(template_config, _PROVIDER_API)):
                 validated_fields.append("provider_api")
                 if not self.validate_provider_api(provider_api):
                     errors.append(f"Unsupported AWS provider API: {provider_api}")
                 else:
-                    # Validate fleet type compatibility if present
-                    fleet_type = template_config.get("fleet_type")
-                    if fleet_type:
-                        validated_fields.append("fleet_type")
-                        if not self.validate_fleet_type_for_api(fleet_type, provider_api):
-                            errors.append(
-                                f"Fleet type '{fleet_type}' is not compatible with AWS API '{provider_api}'"
-                            )
+                    self._validate_fleet_type(
+                        template_config, provider_api, errors, warnings, validated_fields
+                    )
 
-            # Validate AWS-specific fields
             self._validate_aws_specific_fields(template_config, errors, warnings, validated_fields)
 
         except Exception as e:
             self._logger.error("Error during AWS template validation: %s", e)
             errors.append(f"Validation error: {e!s}")
+
+        errors = list(dict.fromkeys(errors))
+        warnings = list(dict.fromkeys(warnings))
+        validated_fields = list(dict.fromkeys(validated_fields))
 
         return {
             "valid": len(errors) == 0,
@@ -203,6 +245,29 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
             "warnings": warnings,
             "validated_fields": validated_fields,
         }
+
+    def _validate_fleet_type(
+        self,
+        template_config: dict[str, Any],
+        provider_api: str,
+        errors: list[str],
+        warnings: list[str],
+        validated_fields: list[str],
+    ) -> None:
+        """Check the fleet type against the API's capabilities.
+
+        Only the fleet APIs read ``fleet_type``; on the other APIs a value is
+        ignored, so it is reported as a warning.
+        """
+        for raw in _values(template_config, _FLEET_TYPE):
+            fleet_type = str(raw.value if isinstance(raw, Enum) else raw)
+            validated_fields.append("fleet_type")
+            if not self.get_valid_fleet_types_for_api(provider_api):
+                warnings.append(f"Fleet type '{fleet_type}' is ignored by AWS API '{provider_api}'")
+            elif not self.validate_fleet_type_for_api(fleet_type, provider_api):
+                errors.append(
+                    f"Fleet type '{fleet_type}' is not compatible with AWS API '{provider_api}'"
+                )
 
     def _validate_aws_specific_fields(
         self,
@@ -220,44 +285,53 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
             warnings: List to append validation warnings to
             validated_fields: List to append validated field names to
         """
-        # AWS requires image_id (AMI ID or SSM parameter path)
-        image_id = template_config.get("image_id")
-        if not image_id:
+        # AWS requires an image: an AMI id, an SSM parameter path, or an ssm: reference.
+        images = [str(image) for image in _values(template_config, _IMAGE)]
+        microvm = "MicroVM" in _as_list(_values(template_config, _PROVIDER_API))
+        accepted = _MICROVM_IMAGE_PREFIXES if microvm else _IMAGE_PREFIXES
+        if not images:
             errors.append("image_id is required for AWS templates")
-        else:
+        for image in images:
             validated_fields.append("image_id")
-            if not image_id.startswith("/") and not image_id.startswith("ami-"):
-                errors.append(f"Invalid AWS AMI ID format: {image_id}")
+            if not image.startswith(accepted):
+                errors.append(f"Invalid AWS AMI ID format: {image}")
 
-        # Validate instance type format
-        instance_type = template_config.get("instance_type")
-        if instance_type:
+        machine_types = _as_list(_values(template_config, _MACHINE_TYPES))
+        if machine_types:
             validated_fields.append("instance_type")
-            if not self._is_valid_instance_type(instance_type):
-                warnings.append(f"Uncommon AWS instance type: {instance_type}")
+            warnings.extend(
+                f"Uncommon AWS instance type: {instance_type}"
+                for instance_type in machine_types
+                if not self._is_valid_instance_type(instance_type)
+            )
 
-        # Validate subnet IDs
-        subnet_ids = template_config.get("subnet_ids", [])
-        if subnet_ids:
-            validated_fields.append("subnet_ids")
-            for subnet_id in subnet_ids:
-                if not subnet_id.startswith("subnet-"):
-                    errors.append(f"Invalid AWS subnet ID format: {subnet_id}")
+        for aliases, field_name, prefix, label in (
+            (_SUBNETS, "subnet_ids", "subnet-", "subnet"),
+            (_SECURITY_GROUPS, "security_group_ids", "sg-", "security group"),
+        ):
+            ids = _as_list(_values(template_config, aliases))
+            if ids:
+                validated_fields.append(field_name)
+                errors.extend(
+                    f"Invalid AWS {label} ID format: {item}"
+                    for item in ids
+                    if not item.startswith(prefix)
+                )
 
-        # Validate security group IDs
-        security_group_ids = template_config.get("security_group_ids", [])
-        if security_group_ids:
-            validated_fields.append("security_group_ids")
-            for sg_id in security_group_ids:
-                if not sg_id.startswith("sg-"):
-                    errors.append(f"Invalid AWS security group ID format: {sg_id}")
-
-        # Validate spot configuration
-        percent_on_demand = template_config.get("percent_on_demand")
-        if percent_on_demand is not None:
+        for percent in _values(template_config, _PERCENT_ON_DEMAND):
             validated_fields.append("percent_on_demand")
-            if not (0 <= percent_on_demand <= 100):
+            if not self._percent_in_range(percent):
                 errors.append("percent_on_demand must be between 0 and 100")
+
+    @staticmethod
+    def _percent_in_range(value: Any) -> bool:
+        """True when *value* is a number, or a numeric string, from 0 to 100."""
+        if isinstance(value, bool):
+            return False
+        try:
+            return 0 <= float(value) <= 100
+        except (TypeError, ValueError):
+            return False
 
     def _is_valid_instance_type(self, instance_type: str) -> bool:
         """
