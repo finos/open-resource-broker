@@ -48,7 +48,7 @@ The scheduler type is a closed set today. Adding one means changing the source t
 1. Add a strategy class under `src/orb/infrastructure/scheduler/<name>/` that extends `BaseSchedulerStrategy`.
 2. Add a `create_<name>_strategy` factory, a `create_<name>_config` factory and a `register_<name>_scheduler` function to `registration.py`. Call the new function from `register_all_scheduler_types` and add it to the `registration_functions` map in `register_active_scheduler_only`.
 3. Add the name to the `Literal` of `SchedulerConfig.type` in `src/orb/config/schemas/scheduler_schema.py`. Without this, configuration validation rejects the name.
-4. Add the name to the `--scheduler` choices in `src/orb/cli/args.py`, to the `SCHEDULER_TYPE_*` constants in `src/orb/config/constants.py` and to `BUILT_IN_FORMATS` in `src/orb/api/documentation/openapi_config.py`.
+4. Add the name to the `--scheduler` choices in `src/orb/cli/parsers/parent_parsers.py` and `src/orb/cli/parsers/init.py`, to the `SCHEDULER_TYPE_*` constants in `src/orb/config/constants.py` and to `BUILT_IN_FORMATS` in `src/orb/api/documentation/openapi_config.py`.
 5. Add tests under `tests/unit/infrastructure/scheduler/` and update the user documentation.
 
 ## Selecting a scheduler

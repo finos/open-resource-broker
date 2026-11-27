@@ -230,7 +230,7 @@ def create_azure_config(raw: dict):
 
 **Location:** `src/orb/infrastructure/registry/cli_spec_registry.py`
 
-**What it does:** Supplies provider-specific CLI argument definitions, input validation, extraction of provider configuration from parsed arguments, provider instance naming and display formatting. The contract is the `ProviderCLISpecPort` protocol in `src/orb/providers/base/provider_cli_spec_port.py`. The shared `cli/args.py` and `interface/init_command_handler.py` iterate over `CLISpecRegistry.all()` rather than hard-coding provider flags.
+**What it does:** Supplies provider-specific CLI argument definitions, input validation, extraction of provider configuration from parsed arguments, provider instance naming and display formatting. The contract is the `ProviderCLISpecPort` protocol in `src/orb/providers/base/provider_cli_spec_port.py`. The shared `cli/parsers/` modules and `interface/init_command_handler.py` iterate over `CLISpecRegistry.all()` rather than hard-coding provider flags.
 
 **When to register:** `ProviderPlugin.initialize_provider()` registers the instance returned by your `cli_spec()` accessor. This happens during the DI bootstrap phase, before any request is handled.
 
@@ -494,12 +494,12 @@ Always dispatch on `OperationOutcome` exhaustively using `match` + `assert_never
 
 The following patterns must not appear in new provider code. Each one creates a coupling that prevents new providers from being added without editing shared infrastructure.
 
-### Do not edit `cli/args.py` for provider-specific flags
+### Do not edit `cli/args.py` or `cli/parsers/` for provider-specific flags
 
-`cli/args.py` iterates `CLISpecRegistry.all()`. Adding flags for a specific provider here leaks provider knowledge into shared code and means all users see flags that may not apply to their provider.
+The shared parser modules iterate `CLISpecRegistry.all()`. Adding flags for a specific provider here leaks provider knowledge into shared code and means all users see flags that may not apply to their provider.
 
 ```python
-# Wrong — in src/orb/cli/args.py
+# Wrong — in src/orb/cli/args.py or src/orb/cli/parsers/
 parser.add_argument("--azure-subscription-id", ...)
 
 
