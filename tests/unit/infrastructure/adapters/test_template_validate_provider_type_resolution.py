@@ -287,14 +287,20 @@ def test_microvm_resolves_to_aws(registry) -> None:
     assert errors == ["Invalid AWS subnet ID format: bad"]
 
 
-def test_single_aws_instance_is_not_assigned_to_a_row_with_another_providers_api(
-    registry,
-) -> None:
+def test_unstamped_foreign_api_on_an_aws_only_deployment_is_unsupported(registry) -> None:
     adapter = _adapter(registry, [_instance("aws-1", "aws")])
+    row = {"templateId": "t", "providerApi": "VMSS", "imageId": "ami-0abc"}
+    assert "Unsupported AWS provider API: VMSS" in adapter.validate_template_config(row)
+
+
+def test_aws_and_azure_deployment_never_reaches_the_single_instance_step(registry) -> None:
+    adapter = _adapter(registry, [_instance("aws-1", "aws"), _instance("azure-1", "azure")])
     spy = MagicMock(wraps=registry.create_validator)
     registry.create_validator = spy
     try:
-        errors = adapter.validate_template_config(_azure_row("VMSS"))
+        errors = adapter.validate_template_config(
+            {"templateId": "t", "providerApi": "Typo", "imageId": "ami-0abc"}
+        )
     finally:
         del registry.create_validator
     spy.assert_not_called()

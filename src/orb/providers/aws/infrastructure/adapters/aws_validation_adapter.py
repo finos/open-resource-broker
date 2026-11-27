@@ -32,7 +32,7 @@ _MACHINE_TYPES = ("machine_types", "vmTypes", "vmType", "instance_type")
 # Accepted image forms: AMI id, SSM parameter path, and the ssm: / resolve:ssm: references.
 _IMAGE_PREFIXES = ("ami-", "/", "ssm:", "resolve:ssm:")
 # A MicroVM template names its image by ARN rather than by AMI.
-_MICROVM_IMAGE_PREFIXES = (*_IMAGE_PREFIXES, "arn:")
+_MICROVM_IMAGE_PREFIXES = (*_IMAGE_PREFIXES, "arn:aws:")
 
 
 def _values(row: dict[str, Any], aliases: tuple[str, ...]) -> list[Any]:

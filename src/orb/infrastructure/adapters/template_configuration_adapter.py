@@ -168,8 +168,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
 
         The row's ``provider_name`` selects an enabled instance; failing that, a
         deployment with exactly one enabled instance has one answer.  Types in
-        ``_UNCHANGED_TYPES`` are never resolved this way, and a single AWS instance
-        is not assigned to a row that names an API of its own.
+        ``_UNCHANGED_TYPES`` are never resolved this way.
         """
         instances = self._enabled_instances()
         name = config.get("providerName") or config.get("provider_name")
@@ -177,10 +176,6 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         resolved = getattr(named, "type", None)
         if not resolved and len(instances) == 1:
             resolved = getattr(instances[0], "type", None)
-            # Every AWS API is resolved by the API map before this point, so a row
-            # that still carries an API belongs to another provider (or is a typo).
-            if str(resolved) == "aws" and (config.get("providerApi") or config.get("provider_api")):
-                return None
         if not resolved or str(resolved) in self._UNCHANGED_TYPES:
             return None
         return str(resolved)

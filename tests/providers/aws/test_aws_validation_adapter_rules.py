@@ -59,6 +59,8 @@ def test_microvm_image_may_be_an_arn(adapter) -> None:
     arn = "arn:aws:lambda:us-east-1:123456789012:microvm-image:my-worker"
     assert _errors(adapter, {"provider_api": "MicroVM", "machine_image": arn}) == []
     assert _errors(adapter, _row(image_id=arn))  # not an AMI reference on other APIs
+    other = "arn:other:thing"
+    assert _errors(adapter, {"provider_api": "MicroVM", "machine_image": other})
 
 
 @pytest.mark.parametrize("key", ["machine_image", "image_id", "imageId"])
