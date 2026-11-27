@@ -24,7 +24,9 @@ from orb.providers.k8s.validation.template_validator import K8sTemplateValidator
 
 def _adapter_with_k8s_validator() -> TemplateConfigurationAdapter:
     tm = MagicMock()
-    tm._registry.create_validator = lambda pt: K8sTemplateValidator() if pt == "k8s" else None
+    tm._registry.create_validator = lambda pt, config=None: (
+        K8sTemplateValidator() if pt == "k8s" else None
+    )
     return TemplateConfigurationAdapter(template_manager=tm, logger=MagicMock())
 
 

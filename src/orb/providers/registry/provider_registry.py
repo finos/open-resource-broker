@@ -494,17 +494,42 @@ class ProviderRegistry(BaseRegistry, ProviderRegistryPort):
         """
         return self.create_additional_component(provider_type, "resolver_factory")
 
-    def create_validator(self, provider_type: str) -> Optional[Any]:
+    def create_validator(self, provider_type: str, config: Any = None) -> Optional[Any]:
         """
         Create a template validator using registered factory.
 
         Args:
             provider_type: Type identifier for the provider
+            config: Provider instance configuration passed to the factory.
+                ``None`` calls the factory with no argument; an empty dict is a
+                real configuration and is passed through.
 
         Returns:
-            Created template validator instance or None if not registered
+            Created template validator instance or None if not registered or
+            the factory could not build one.  A factory failure is logged by
+            provider type and exception class only, never exception text or
+            configuration values.
         """
-        return self.create_additional_component(provider_type, "validator_factory")
+        factory = self._get_type_registration(provider_type).get_factory("validator_factory")
+        if factory is None:
+            return None
+
+        try:
+            validator = factory() if config is None else factory(config)
+        except Exception as exc:
+            if self._logger:
+                self._logger.warning(
+                    "Validator factory for provider type '%s' failed: %s",
+                    provider_type,
+                    type(exc).__name__,
+                )
+            return None
+
+        if validator is None and config is not None and self._logger:
+            self._logger.warning(
+                "Validator factory for provider type '%s' returned no validator", provider_type
+            )
+        return validator
 
     def unregister_provider(self, provider_type: str) -> bool:
         """

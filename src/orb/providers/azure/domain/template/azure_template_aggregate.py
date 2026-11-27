@@ -482,8 +482,9 @@ class AzureTemplate(Template):
             data["location"] = region
         data.pop("region", None)
 
+        # An explicit max_instances/max_machines wins over a defaulted max_number.
         if "max_number" in data:
-            if "max_instances" not in data:
+            if "max_instances" not in data and "max_machines" not in data:
                 data["max_instances"] = data["max_number"]
             data.pop("max_number", None)
 
