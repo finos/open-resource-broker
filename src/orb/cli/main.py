@@ -254,11 +254,13 @@ async def main() -> None:
             sys.exit(0)  # pragma: no cover
 
         if args.resource in ["templates", "template"] and args.action == "generate":
-            from orb.interface.templates_generate_handler import handle_templates_generate
+            from orb.cli.handler_wiring import register_template_handlers
+            from orb.cli.registry import bind
+            from orb.interface.templates_generate_handler import TemplatesGenerateHandler
 
-            # Attach container for early-dispatch parity with execute_command.
-            if not hasattr(args, "_container") or args._container is None:
-                args._container = get_container()
+            handle_templates_generate = bind(
+                TemplatesGenerateHandler, "handle", group=register_template_handlers
+            )
             try:
                 result = await handle_templates_generate(args)
                 if result.get("status") == "success":

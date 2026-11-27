@@ -478,7 +478,10 @@ async def test_get_request_status_cli_equals_rest_top_level_keys(scheduler_type:
 @pytest.mark.asyncio
 async def test_list_templates_cli_equals_rest_top_level_keys(scheduler_type: str) -> None:
     """CLI handle_list_templates and GET /api/v1/templates/ return the same top-level keys."""
-    from orb.interface.template_command_handlers import handle_list_templates
+    from orb.interface.template_command_handlers import TemplateReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_list_templates = handler_method(TemplateReadHandlers, "list_templates")
 
     strategy = _make_scheduler_strategy(scheduler_type)
     template_dto = _make_template_dto()
@@ -570,7 +573,10 @@ async def test_list_requests_cli_returns_dict(scheduler_type: str) -> None:
 async def test_list_templates_cli_returns_dict(scheduler_type: str) -> None:
     """handle_list_templates always returns a dict, never a bare list."""
     from orb.application.dto.interface_response import InterfaceResponse
-    from orb.interface.template_command_handlers import handle_list_templates
+    from orb.interface.template_command_handlers import TemplateReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_list_templates = handler_method(TemplateReadHandlers, "list_templates")
 
     strategy = _make_scheduler_strategy(scheduler_type)
     result = await _call_cli(handle_list_templates, _make_args(), strategy)

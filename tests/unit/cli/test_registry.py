@@ -21,11 +21,12 @@ def test_request_status_singular_resolves():
 
 def test_templates_validate_resolves_to_dedicated_handler():
     from orb.cli.registry import build_registry, lookup
-    from orb.interface.template_command_handlers import handle_validate_template
+    from orb.interface.template_command_handlers import TemplateReadHandlers
 
     build_registry()
     handler = lookup("templates", "validate")
-    assert handler is handle_validate_template
+    assert handler is not None
+    assert handler.target == (TemplateReadHandlers, "validate_template")  # type: ignore[attr-defined]
 
 
 def test_unknown_command_returns_none():

@@ -37,6 +37,7 @@ def _make_args(**kwargs) -> argparse.Namespace:
 
 
 def _make_container(**overrides):
+    from orb.application.ports.query_bus_port import QueryBusPort
     from orb.application.ports.scheduler_port import SchedulerPort
     from orb.application.services.orchestration.dtos import (
         CreateTemplateOutput,
@@ -47,7 +48,6 @@ def _make_container(**overrides):
         UpdateTemplateOutput,
         ValidateTemplateOutput,
     )
-    from orb.infrastructure.di.buses import QueryBus
 
     container = MagicMock()
 
@@ -89,7 +89,7 @@ def _make_container(**overrides):
     )
     refresh_orch = MagicMock(spec=RefreshTemplatesOrchestrator)
     refresh_orch.execute = AsyncMock(return_value=RefreshTemplatesOutput(templates=[]))
-    mock_query_bus = MagicMock(spec=QueryBus)
+    mock_query_bus = MagicMock(spec=QueryBusPort)
 
     dispatch = {
         ResponseFormattingService: mock_formatter,
@@ -102,7 +102,7 @@ def _make_container(**overrides):
         DeleteTemplateOrchestrator: delete_orch,
         ValidateTemplateOrchestrator: validate_orch,
         RefreshTemplatesOrchestrator: refresh_orch,
-        QueryBus: mock_query_bus,
+        QueryBusPort: mock_query_bus,
         **overrides,
     }
 
@@ -133,7 +133,10 @@ class TestHandleListTemplates:
     @pytest.mark.asyncio
     async def test_empty_result_prints_getting_started_help(self):
         """Empty template list → console.info called and getting_started help printed."""
-        from orb.interface.template_command_handlers import handle_list_templates
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_list_templates = handler_method(TemplateReadHandlers, "list_templates")
 
         container, mocks = _make_container()
         mocks["list_orch"].execute.return_value.__class__  # ensure mock
@@ -154,7 +157,10 @@ class TestHandleListTemplates:
     async def test_non_empty_result_does_not_print_help(self):
         """Non-empty template list → getting_started help NOT printed."""
         from orb.application.services.orchestration.dtos import ListTemplatesOutput
-        from orb.interface.template_command_handlers import handle_list_templates
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_list_templates = handler_method(TemplateReadHandlers, "list_templates")
 
         container, mocks = _make_container()
         mocks["list_orch"].execute = AsyncMock(
@@ -176,7 +182,10 @@ class TestHandleListTemplates:
             ListTemplatesInput,
             ListTemplatesOutput,
         )
-        from orb.interface.template_command_handlers import handle_list_templates
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_list_templates = handler_method(TemplateReadHandlers, "list_templates")
 
         container, mocks = _make_container()
         mocks["list_orch"].execute = AsyncMock(
@@ -202,7 +211,10 @@ class TestHandleListTemplates:
             ListTemplatesInput,
             ListTemplatesOutput,
         )
-        from orb.interface.template_command_handlers import handle_list_templates
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_list_templates = handler_method(TemplateReadHandlers, "list_templates")
 
         container, mocks = _make_container()
         mocks["list_orch"].execute = AsyncMock(return_value=ListTemplatesOutput(templates=[]))
@@ -230,7 +242,10 @@ class TestHandleGetTemplate:
     @pytest.mark.asyncio
     async def test_missing_template_id_returns_error(self):
         """No template_id → InterfaceResponse with exit_code=1."""
-        from orb.interface.template_command_handlers import handle_get_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_template = handler_method(TemplateReadHandlers, "get_template")
 
         container, mocks = _make_container()
         args = _make_args()
@@ -247,7 +262,10 @@ class TestHandleGetTemplate:
     async def test_flag_template_id_accepted(self):
         """flag_template_id attribute is accepted as template_id fallback."""
         from orb.application.services.orchestration.dtos import GetTemplateOutput
-        from orb.interface.template_command_handlers import handle_get_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_template = handler_method(TemplateReadHandlers, "get_template")
 
         container, mocks = _make_container()
         mocks["get_orch"].execute = AsyncMock(
@@ -264,7 +282,10 @@ class TestHandleGetTemplate:
     @pytest.mark.asyncio
     async def test_entity_not_found_returns_formatted_error(self):
         """EntityNotFoundError → formatter.format_error called."""
-        from orb.interface.template_command_handlers import handle_get_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_template = handler_method(TemplateReadHandlers, "get_template")
 
         container, mocks = _make_container()
         mocks["get_orch"].execute = AsyncMock(side_effect=EntityNotFoundError("template", "t1"))
@@ -280,7 +301,10 @@ class TestHandleGetTemplate:
     async def test_none_template_in_result_returns_not_found_response(self):
         """Orchestrator returns result.template=None → InterfaceResponse exit_code=1."""
         from orb.application.services.orchestration.dtos import GetTemplateOutput
-        from orb.interface.template_command_handlers import handle_get_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_template = handler_method(TemplateReadHandlers, "get_template")
 
         container, mocks = _make_container()
         mocks["get_orch"].execute = AsyncMock(return_value=GetTemplateOutput(template=None))
@@ -305,7 +329,10 @@ class TestHandleCreateTemplateErrors:
     @pytest.mark.asyncio
     async def test_file_not_found_returns_error(self, tmp_path):
         """Non-existent template file → InterfaceResponse exit_code=1."""
-        from orb.interface.template_command_handlers import handle_create_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_create_template = handler_method(TemplateWriteHandlers, "create_template")
 
         container, _ = _make_container()
         args = _make_args(file=str(tmp_path / "ghost.json"))
@@ -321,7 +348,10 @@ class TestHandleCreateTemplateErrors:
     @pytest.mark.asyncio
     async def test_invalid_json_returns_error(self, tmp_path):
         """Invalid JSON in template file → InterfaceResponse exit_code=1."""
-        from orb.interface.template_command_handlers import handle_create_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_create_template = handler_method(TemplateWriteHandlers, "create_template")
 
         bad_file = tmp_path / "bad.json"
         bad_file.write_text("not json {{{")
@@ -340,7 +370,10 @@ class TestHandleCreateTemplateErrors:
     @pytest.mark.asyncio
     async def test_missing_template_id_in_file_returns_error(self, tmp_path):
         """Template file without template_id → InterfaceResponse exit_code=1."""
-        from orb.interface.template_command_handlers import handle_create_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_create_template = handler_method(TemplateWriteHandlers, "create_template")
 
         data = {"provider_api": "EC2Fleet"}
         f = tmp_path / "t.json"
@@ -360,7 +393,10 @@ class TestHandleCreateTemplateErrors:
     @pytest.mark.asyncio
     async def test_missing_provider_api_in_file_returns_error(self, tmp_path):
         """Template file without provider_api → InterfaceResponse exit_code=1."""
-        from orb.interface.template_command_handlers import handle_create_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_create_template = handler_method(TemplateWriteHandlers, "create_template")
 
         data = {"template_id": "t1"}
         f = tmp_path / "t.json"
@@ -380,7 +416,10 @@ class TestHandleCreateTemplateErrors:
     @pytest.mark.asyncio
     async def test_no_file_arg_returns_error(self):
         """No file attr → InterfaceResponse exit_code=1."""
-        from orb.interface.template_command_handlers import handle_create_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_create_template = handler_method(TemplateWriteHandlers, "create_template")
 
         container, _ = _make_container()
         args = _make_args()
@@ -395,7 +434,10 @@ class TestHandleCreateTemplateErrors:
     @pytest.mark.asyncio
     async def test_duplicate_error_returns_conflict_response(self, tmp_path):
         """DuplicateError → InterfaceResponse exit_code=1 with 'already exists'."""
-        from orb.interface.template_command_handlers import handle_create_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_create_template = handler_method(TemplateWriteHandlers, "create_template")
 
         data = {"template_id": "t1", "provider_api": "EC2Fleet"}
         f = tmp_path / "t.json"
@@ -418,7 +460,10 @@ class TestHandleCreateTemplateErrors:
     async def test_validation_errors_return_error_response(self, tmp_path):
         """Orchestrator returns validation_errors → InterfaceResponse exit_code=1."""
         from orb.application.services.orchestration.dtos import CreateTemplateOutput
-        from orb.interface.template_command_handlers import handle_create_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_create_template = handler_method(TemplateWriteHandlers, "create_template")
 
         data = {"template_id": "t1", "provider_api": "EC2Fleet"}
         f = tmp_path / "t.json"
@@ -444,7 +489,10 @@ class TestHandleCreateTemplateErrors:
     @pytest.mark.asyncio
     async def test_dry_run_returns_dry_run_dict(self, tmp_path):
         """is_dry_run_active=True → dry-run dict returned without calling orchestrator."""
-        from orb.interface.template_command_handlers import handle_create_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_create_template = handler_method(TemplateWriteHandlers, "create_template")
 
         container, mocks = _make_container()
         args = _make_args(file=str(tmp_path / "t.json"))
@@ -468,7 +516,10 @@ class TestHandleDeleteTemplate:
     @pytest.mark.asyncio
     async def test_missing_template_id_returns_error(self):
         """No template_id → InterfaceResponse exit_code=1."""
-        from orb.interface.template_command_handlers import handle_delete_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_delete_template = handler_method(TemplateWriteHandlers, "delete_template")
 
         container, _ = _make_container()
         args = _make_args()
@@ -483,7 +534,10 @@ class TestHandleDeleteTemplate:
     @pytest.mark.asyncio
     async def test_dry_run_returns_dry_run_dict(self):
         """is_dry_run_active=True → dry-run dict without calling orchestrator."""
-        from orb.interface.template_command_handlers import handle_delete_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_delete_template = handler_method(TemplateWriteHandlers, "delete_template")
 
         container, mocks = _make_container()
         args = _make_args(template_id="t1")
@@ -499,7 +553,10 @@ class TestHandleDeleteTemplate:
     @pytest.mark.asyncio
     async def test_no_force_flag_returns_error(self):
         """force=False → format_error called about --force flag."""
-        from orb.interface.template_command_handlers import handle_delete_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_delete_template = handler_method(TemplateWriteHandlers, "delete_template")
 
         container, mocks = _make_container()
         args = _make_args(template_id="t1", force=False)
@@ -514,7 +571,10 @@ class TestHandleDeleteTemplate:
     @pytest.mark.asyncio
     async def test_entity_not_found_returns_not_found_response(self):
         """EntityNotFoundError → InterfaceResponse exit_code=1 not_found."""
-        from orb.interface.template_command_handlers import handle_delete_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_delete_template = handler_method(TemplateWriteHandlers, "delete_template")
 
         container, mocks = _make_container()
         mocks["delete_orch"].execute = AsyncMock(side_effect=EntityNotFoundError("template", "t1"))
@@ -532,7 +592,10 @@ class TestHandleDeleteTemplate:
     async def test_delete_failed_returns_error_response(self):
         """Orchestrator returns deleted=False → InterfaceResponse exit_code=1."""
         from orb.application.services.orchestration.dtos import DeleteTemplateOutput
-        from orb.interface.template_command_handlers import handle_delete_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_delete_template = handler_method(TemplateWriteHandlers, "delete_template")
 
         container, mocks = _make_container()
         mocks["delete_orch"].execute = AsyncMock(
@@ -559,7 +622,10 @@ class TestHandleValidateTemplate:
     @pytest.mark.asyncio
     async def test_no_args_returns_error(self):
         """No template_id, no file, no all → InterfaceResponse exit_code=1."""
-        from orb.interface.template_command_handlers import handle_validate_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_validate_template = handler_method(TemplateReadHandlers, "validate_template")
 
         container, _ = _make_container()
         args = _make_args()
@@ -573,7 +639,10 @@ class TestHandleValidateTemplate:
     @pytest.mark.asyncio
     async def test_template_id_path_happy(self):
         """template_id provided → ValidateTemplateOrchestrator called."""
-        from orb.interface.template_command_handlers import handle_validate_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_validate_template = handler_method(TemplateReadHandlers, "validate_template")
 
         container, mocks = _make_container()
         args = _make_args(template_id="t1")
@@ -586,7 +655,10 @@ class TestHandleValidateTemplate:
     @pytest.mark.asyncio
     async def test_template_id_entity_not_found_returns_error(self):
         """template_id path EntityNotFoundError → formatter.format_error."""
-        from orb.interface.template_command_handlers import handle_validate_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_validate_template = handler_method(TemplateReadHandlers, "validate_template")
 
         container, mocks = _make_container()
         mocks["validate_orch"].execute = AsyncMock(
@@ -603,7 +675,10 @@ class TestHandleValidateTemplate:
     @pytest.mark.asyncio
     async def test_file_not_found_returns_error(self, tmp_path):
         """Non-existent file → InterfaceResponse exit_code=1."""
-        from orb.interface.template_command_handlers import handle_validate_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_validate_template = handler_method(TemplateReadHandlers, "validate_template")
 
         container, _ = _make_container()
         args = _make_args(file=str(tmp_path / "ghost.json"))
@@ -617,7 +692,10 @@ class TestHandleValidateTemplate:
     @pytest.mark.asyncio
     async def test_file_json_path_happy(self, tmp_path):
         """Valid JSON file → ValidateTemplateOrchestrator called with config."""
-        from orb.interface.template_command_handlers import handle_validate_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_validate_template = handler_method(TemplateReadHandlers, "validate_template")
 
         data = {"template_id": "file-t1", "provider_api": "EC2Fleet"}
         f = tmp_path / "t.json"
@@ -640,7 +718,10 @@ class TestHandleValidateTemplate:
             ListTemplatesOutput,
             ValidateTemplateOutput,
         )
-        from orb.interface.template_command_handlers import handle_validate_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_validate_template = handler_method(TemplateReadHandlers, "validate_template")
 
         container, mocks = _make_container()
         mocks["list_orch"].execute = AsyncMock(
@@ -674,7 +755,10 @@ class TestHandleRefreshTemplates:
     @pytest.mark.asyncio
     async def test_calls_refresh_orchestrator_and_returns_formatter_result(self):
         """handle_refresh_templates calls RefreshTemplatesOrchestrator."""
-        from orb.interface.template_command_handlers import handle_refresh_templates
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_refresh_templates = handler_method(TemplateWriteHandlers, "refresh_templates")
 
         container, mocks = _make_container()
         args = _make_args(provider_name="aws-prod")
@@ -697,7 +781,12 @@ class TestHandleGetMultipleTemplates:
     @pytest.mark.asyncio
     async def test_no_ids_returns_error(self):
         """No template IDs provided → error dict returned."""
-        from orb.interface.template_command_handlers import handle_get_multiple_templates
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_multiple_templates = handler_method(
+            TemplateReadHandlers, "get_multiple_templates"
+        )
 
         container, _ = _make_container()
         args = _make_args()
@@ -709,13 +798,18 @@ class TestHandleGetMultipleTemplates:
 
     @pytest.mark.asyncio
     async def test_template_ids_forwarded_to_query_bus(self):
-        """template_ids list → QueryBus.execute called with GetMultipleTemplatesQuery."""
-        from orb.infrastructure.di.buses import QueryBus
-        from orb.interface.template_command_handlers import handle_get_multiple_templates
+        """template_ids list → QueryBusPort.execute called with GetMultipleTemplatesQuery."""
+        from orb.application.ports.query_bus_port import QueryBusPort
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
 
-        mock_qbus = MagicMock(spec=QueryBus)
+        handle_get_multiple_templates = handler_method(
+            TemplateReadHandlers, "get_multiple_templates"
+        )
 
-        # QueryBus returns whatever the query handler returns — mock it as a plain object
+        mock_qbus = MagicMock(spec=QueryBusPort)
+
+        # QueryBusPort returns whatever the query handler returns — mock it as a plain object
         mock_result = MagicMock()
         mock_result.templates = []
         mock_result.found_count = 0
@@ -728,7 +822,7 @@ class TestHandleGetMultipleTemplates:
         orig_side_effect = container.get.side_effect
 
         def _get(cls):
-            if cls is QueryBus:
+            if cls is QueryBusPort:
                 return mock_qbus
             return orig_side_effect(cls)
 
@@ -745,10 +839,15 @@ class TestHandleGetMultipleTemplates:
     @pytest.mark.asyncio
     async def test_flag_ids_also_accepted(self):
         """flag_ids attribute is accepted as an additional source of IDs."""
-        from orb.infrastructure.di.buses import QueryBus
-        from orb.interface.template_command_handlers import handle_get_multiple_templates
+        from orb.application.ports.query_bus_port import QueryBusPort
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
 
-        mock_qbus = MagicMock(spec=QueryBus)
+        handle_get_multiple_templates = handler_method(
+            TemplateReadHandlers, "get_multiple_templates"
+        )
+
+        mock_qbus = MagicMock(spec=QueryBusPort)
         mock_result = MagicMock()
         mock_result.templates = []
         mock_result.found_count = 0
@@ -760,7 +859,7 @@ class TestHandleGetMultipleTemplates:
         orig_side_effect = container.get.side_effect
 
         def _get(cls):
-            if cls is QueryBus:
+            if cls is QueryBusPort:
                 return mock_qbus
             return orig_side_effect(cls)
 

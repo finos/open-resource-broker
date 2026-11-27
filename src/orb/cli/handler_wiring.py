@@ -103,3 +103,59 @@ def register_machine_handlers(container: Any) -> None:
             formatter=c.get(ResponseFormattingService),
         ),
     )
+
+
+def register_template_handlers(container: Any) -> None:
+    """Register the template handler classes, including ``templates generate``."""
+    from orb.application.ports.query_bus_port import QueryBusPort
+    from orb.application.services.orchestration.create_template import CreateTemplateOrchestrator
+    from orb.application.services.orchestration.delete_template import DeleteTemplateOrchestrator
+    from orb.application.services.orchestration.get_template import GetTemplateOrchestrator
+    from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
+    from orb.application.services.orchestration.refresh_templates import (
+        RefreshTemplatesOrchestrator,
+    )
+    from orb.application.services.orchestration.update_template import UpdateTemplateOrchestrator
+    from orb.application.services.orchestration.validate_template import (
+        ValidateTemplateOrchestrator,
+    )
+    from orb.application.services.template_generation_service import TemplateGenerationService
+    from orb.domain.base.ports.console_port import ConsolePort
+    from orb.interface.response_formatting_service import ResponseFormattingService
+    from orb.interface.template_command_handlers import (
+        TemplateReadHandlers,
+        TemplateWriteHandlers,
+    )
+    from orb.interface.templates_generate_handler import TemplatesGenerateHandler
+
+    _register(
+        container,
+        TemplateReadHandlers,
+        lambda c: TemplateReadHandlers(
+            list_orchestrator=c.get(ListTemplatesOrchestrator),
+            get_orchestrator=c.get(GetTemplateOrchestrator),
+            validate_orchestrator=c.get(ValidateTemplateOrchestrator),
+            query_bus=c.get(QueryBusPort),
+            formatter=c.get(ResponseFormattingService),
+            console=c.get(ConsolePort),
+        ),
+    )
+    _register(
+        container,
+        TemplateWriteHandlers,
+        lambda c: TemplateWriteHandlers(
+            create_orchestrator=c.get(CreateTemplateOrchestrator),
+            update_orchestrator=c.get(UpdateTemplateOrchestrator),
+            delete_orchestrator=c.get(DeleteTemplateOrchestrator),
+            refresh_orchestrator=c.get(RefreshTemplatesOrchestrator),
+            formatter=c.get(ResponseFormattingService),
+        ),
+    )
+    _register(
+        container,
+        TemplatesGenerateHandler,
+        lambda c: TemplatesGenerateHandler(
+            template_service_provider=lambda: c.get(TemplateGenerationService),
+            console_provider=lambda: c.get(ConsolePort),
+        ),
+    )

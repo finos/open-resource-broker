@@ -78,7 +78,10 @@ class TestHandleListTemplatesForwardsParams:
     def test_handle_list_templates_forwards_limit_offset_and_provider_api(self):
         from orb.application.services.orchestration.dtos import ListTemplatesInput
         from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
-        from orb.interface.template_command_handlers import handle_list_templates
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_list_templates = handler_method(TemplateReadHandlers, "list_templates")
 
         mock_orch = MagicMock(spec=ListTemplatesOrchestrator)
         mock_orch.execute = AsyncMock(return_value=MagicMock(templates=["t1"]))
@@ -181,7 +184,10 @@ class TestHandleGetTemplateForwardsParams:
     def test_handle_get_template_forwards_provider_name(self):
         from orb.application.services.orchestration.dtos import GetTemplateInput
         from orb.application.services.orchestration.get_template import GetTemplateOrchestrator
-        from orb.interface.template_command_handlers import handle_get_template
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_template = handler_method(TemplateReadHandlers, "get_template")
 
         mock_template = MagicMock()
         mock_template.model_dump.return_value = {"template_id": "t1"}

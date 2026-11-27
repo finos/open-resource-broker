@@ -22,8 +22,8 @@ CLI_DIR = SRC_ORB / "cli"
 ALLOWED_GET_CONTAINER_CALLS: dict[tuple[str, str], int] = {
     ("main.py", "_drain_events"): 1,
     ("main.py", "_start_update_check"): 1,
-    # scheduler override and restore, plus the init and templates generate early paths
-    ("main.py", "main"): 4,
+    # scheduler override and restore, plus the init early path
+    ("main.py", "main"): 3,
     # bind() and the bus handler both resolve through this one helper
     ("registry.py", "_current_container"): 1,
     ("router.py", "execute_command"): 1,

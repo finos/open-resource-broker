@@ -22,7 +22,10 @@ from orb.interface.scheduler_command_handlers import handle_list_scheduler_strat
 from orb.interface.storage_command_handlers import handle_list_storage_strategies
 
 # Import CLI handlers
-from orb.interface.template_command_handlers import handle_list_templates
+from orb.interface.template_command_handlers import TemplateReadHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_list_templates = handler_method(TemplateReadHandlers, "list_templates")
 
 
 class TestCLIHandlerExecution:

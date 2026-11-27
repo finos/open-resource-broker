@@ -67,6 +67,8 @@ def bind(handler_cls: type[_H], method: str, *, group: GroupRegistrar) -> Handle
         return await getattr(handler, method)(args)
 
     _bound.__name__ = f"{handler_cls.__name__}.{method}"
+    # Lets tests and tooling see what a registry entry dispatches to.
+    _bound.__dict__["target"] = (handler_cls, method)
     return _bound
 
 
@@ -223,27 +225,32 @@ def build_registry() -> None:
     register("server", "ui-export", handle_server_ui_export)
 
     # --- templates ---
+    from orb.cli.handler_wiring import register_template_handlers
     from orb.interface.template_command_handlers import (
-        handle_create_template,
-        handle_delete_template,
-        handle_get_multiple_templates,
-        handle_get_template,
-        handle_list_templates,
-        handle_refresh_templates,
-        handle_update_template,
-        handle_validate_template,
+        TemplateReadHandlers,
+        TemplateWriteHandlers,
     )
-    from orb.interface.templates_generate_handler import handle_templates_generate
+    from orb.interface.templates_generate_handler import TemplatesGenerateHandler
 
-    register("templates", "list", handle_list_templates)
-    register("templates", "show", handle_get_template)
-    register("templates", "create", handle_create_template)
-    register("templates", "update", handle_update_template)
-    register("templates", "delete", handle_delete_template)
-    register("templates", "validate", handle_validate_template)
-    register("templates", "refresh", handle_refresh_templates)
-    register("templates", "generate", handle_templates_generate)
-    register("templates", "get-bulk", handle_get_multiple_templates)
+    def _template_queries(method: str) -> Handler:
+        return bind(TemplateReadHandlers, method, group=register_template_handlers)
+
+    def _template_commands(method: str) -> Handler:
+        return bind(TemplateWriteHandlers, method, group=register_template_handlers)
+
+    register("templates", "list", _template_queries("list_templates"))
+    register("templates", "show", _template_queries("get_template"))
+    register("templates", "create", _template_commands("create_template"))
+    register("templates", "update", _template_commands("update_template"))
+    register("templates", "delete", _template_commands("delete_template"))
+    register("templates", "validate", _template_queries("validate_template"))
+    register("templates", "refresh", _template_commands("refresh_templates"))
+    register(
+        "templates",
+        "generate",
+        bind(TemplatesGenerateHandler, "handle", group=register_template_handlers),
+    )
+    register("templates", "get-bulk", _template_queries("get_multiple_templates"))
 
     # --- requests ---
     from orb.cli.handler_wiring import register_request_handlers

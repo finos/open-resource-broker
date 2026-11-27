@@ -39,9 +39,8 @@ from orb.interface.system_command_handlers import (
 
 # Import specialized handlers by category
 from orb.interface.template_command_handlers import (
-    handle_get_template,
-    handle_list_templates,
-    handle_validate_template,
+    TemplateReadHandlers,
+    TemplateWriteHandlers,
 )
 
 __all__: list[str] = [
@@ -53,14 +52,14 @@ __all__: list[str] = [
     # Request handlers (class-based)
     "RequestWriteHandlers",
     "RequestReadHandlers",
-    "handle_get_template",
     "handle_list_providers",
     # Scheduler handlers (function-based)
     "handle_list_scheduler_strategies",
     # Storage handlers (function-based)
     "handle_list_storage_strategies",
-    # Template handlers (function-based)
-    "handle_list_templates",
+    # Template handlers (class-based)
+    "TemplateWriteHandlers",
+    "TemplateReadHandlers",
     "handle_provider_config",
     # System handlers (function-based)
     "handle_provider_health",
@@ -75,5 +74,4 @@ __all__: list[str] = [
     "handle_validate_provider_config",
     "handle_validate_scheduler_config",
     "handle_validate_storage_config",
-    "handle_validate_template",
 ]
