@@ -188,7 +188,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
             }
 
         price_type = template.price_type
-        percent_on_demand = getattr(template, "percent_on_demand", None)
+        percent_on_demand = template.percent_on_demand
         needs_spot_distribution = percent_on_demand is not None or price_type in (
             "spot",
             "heterogeneous",
@@ -306,7 +306,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
         self, template: AWSTemplate, requested_count: int
     ) -> dict[str, Any]:
         """Calculate on-demand / spot capacity split."""
-        percent_on_demand = getattr(template, "percent_on_demand", None)
+        percent_on_demand = template.percent_on_demand
         price_type = template.price_type
 
         if percent_on_demand is not None:

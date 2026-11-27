@@ -222,7 +222,9 @@ class AWSHandler(ProviderHandlerBase, ABC):
         """Extract instance IDs from API response if available."""
         return extractor(api_response)
 
-    def _resolve_provider_api(self, request: Any, aws_template: Any = None) -> str:
+    def _resolve_provider_api(
+        self, request: Request, aws_template: Optional[AWSTemplate] = None
+    ) -> str:
         """Resolve the provider_api value to stamp onto instance data.
 
         Priority order:
@@ -239,15 +241,13 @@ class AWSHandler(ProviderHandlerBase, ABC):
         Returns:
             Resolved provider_api string.
         """
-        if aws_template is not None:
-            value = getattr(aws_template, "provider_api", None)
-            if value:
-                return value.value if hasattr(value, "value") else str(value)
-        metadata = getattr(request, "metadata", None) or {}
-        value = metadata.get("provider_api")
+        value = aws_template.provider_api if aws_template is not None else None
+        if value:
+            return value.value if hasattr(value, "value") else str(value)
+        value = request.metadata.get("provider_api")
         if value:
             return value
-        value = getattr(request, "provider_api", None)
+        value = request.provider_api
         if value:
             return value
         return self._default_provider_api()

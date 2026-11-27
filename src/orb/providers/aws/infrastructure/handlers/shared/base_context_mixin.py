@@ -69,8 +69,8 @@ class BaseContextMixin:
             "has_subnets": bool(template.subnet_ids),
             "has_security_groups": bool(template.security_group_ids),
             # Configuration flags
-            "has_instance_types": bool(getattr(template, "machine_types", None)),
-            "has_allocation_strategy": bool(getattr(template, "allocation_strategy", None)),
+            "has_instance_types": bool(template.machine_types),
+            "has_allocation_strategy": bool(template.allocation_strategy),
             # Optional configuration flags
             "has_key_name": hasattr(template, "machine_ssh_key") and bool(template.machine_ssh_key),
             "has_user_data": hasattr(template, "machine_bootstrap")

@@ -239,7 +239,7 @@ class MicroVMHandler(AWSHandler):
         """Check the status of MicroVMs for a request."""
         microvm_ids = request.resource_ids
         if not microvm_ids:
-            provider_data = getattr(request, "provider_data", None) or {}
+            provider_data = request.provider_data
             microvm_ids = provider_data.get("microvm_ids", [])
 
         if not microvm_ids:

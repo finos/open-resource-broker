@@ -277,7 +277,7 @@ class AWSTemplate(Template):
 
         # Promote AWS-specific fields from provider_config dict (DTO round-trip path).
         # provider_config is injected by TemplateDTO.from_domain via AWSTemplateDTOConfig.
-        _pc = getattr(self, "provider_config", None)
+        _pc = self.provider_config
         if isinstance(_pc, dict):
             if not self.fleet_type:
                 _ft = _pc.get("fleet_type")

@@ -152,7 +152,7 @@ class AWSLaunchTemplateSweepService:
             self._logger.warning("Could not resolve the AWS account id: %s", exc)
             account_id = None
         return {
-            "region": getattr(self._aws_client, "region_name", None),
+            "region": self._aws_client.region_name,
             "account_id": account_id,
         }
 

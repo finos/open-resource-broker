@@ -69,7 +69,10 @@ def ec2(moto_aws):
 
 @pytest.fixture
 def aws_client(moto_aws):
-    return _make_aws_client()
+    client = _make_aws_client()
+    # AWSClient sets region_name in __init__, so a spec'd double does not carry it.
+    client.region_name = REGION
+    return client
 
 
 def test_an_unused_orb_template_is_deleted_and_everything_else_is_kept(

@@ -466,7 +466,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     )
                 if lt_state == LTNetworkingState.NO_NETWORKING:
                     # LT has no networking — safe to inject at API level.
-                    if getattr(aws_template, "subnet_id", None):
+                    if aws_template.subnet_id:
                         params["SubnetId"] = aws_template.subnet_id
                     elif len(user_subnets) == 1:
                         params["SubnetId"] = user_subnets[0]
@@ -564,12 +564,12 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             resource_id = (
                 request.provider_data.get("reservation_id")
                 if hasattr(request, "provider_data") and request.provider_data
-                else (request.resource_ids[0] if getattr(request, "resource_ids", None) else "")
+                else (request.resource_ids[0] if request.resource_ids else "")
             )
 
             # Fallback to metadata for backward compatibility
             if not resource_id:
-                metadata = getattr(request, "metadata", {}) or {}
+                metadata = request.metadata
                 resource_id = (
                     metadata.get("run_instances_resource_id")
                     or metadata.get("reservation_id")

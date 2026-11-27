@@ -129,6 +129,7 @@ class TestBaseContextMixin:
         """Test standard flag preparation."""
         # Add optional attributes
         self.template.machine_types = {"t3.medium": 1, "t3.large": 2}
+        self.template.allocation_strategy = "lowestPrice"
         self.template.machine_ssh_key = "my-key"
         self.template.machine_bootstrap = "#!/bin/bash"
         self.template.machine_role = "my-profile"
@@ -140,6 +141,7 @@ class TestBaseContextMixin:
         assert result["has_subnets"] is True
         assert result["has_security_groups"] is True
         assert result["has_instance_types"] is True
+        assert result["has_allocation_strategy"] is True
         assert result["has_key_name"] is True
         assert result["has_user_data"] is True
         assert result["has_instance_profile"] is True
@@ -150,7 +152,8 @@ class TestBaseContextMixin:
         """Test standard flag preparation with minimal template."""
         self.template.subnet_ids = None
         self.template.security_group_ids = None
-        self.template.instance_types = None
+        self.template.machine_types = {}
+        self.template.allocation_strategy = None
         self.template.machine_role = None
         self.template.machine_ssh_key = None
         self.template.machine_bootstrap = None
@@ -160,6 +163,7 @@ class TestBaseContextMixin:
         assert result["has_subnets"] is False
         assert result["has_security_groups"] is False
         assert result["has_instance_types"] is False
+        assert result["has_allocation_strategy"] is False
         assert result["has_key_name"] is False
         assert result["has_user_data"] is False
         assert result["has_instance_profile"] is False

@@ -7,7 +7,7 @@
   "interface_provider_direct_imports": 6,
   "circular_dependency_cycles": 5,
   "cli_infrastructure_direct_imports": 10,
-  "getattr_justification_aws": 82,
+  "getattr_justification_aws": 56,
   "getattr_justification_k8s": 294,
   "application_service_locator_sites": 0,
   "stdlib_logger_files_outside_boundary": 20,
