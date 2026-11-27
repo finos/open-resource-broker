@@ -176,7 +176,7 @@ async def test_status_read_reports_the_invalid_namespace_machine_separately() ->
         return_value=SimpleNamespace(instances=[], unreadable=set())
     )
 
-    _, unreadable, invalid, _ = await strategy._handler_registry._read_return_pods(
+    _, unreadable, invalid, fulfilment = await strategy._handler_registry._read_return_pods(
         handler,
         ["m-good", "m-bad"],
         SimpleNamespace(request_id="req-RET", provider_data={}),
@@ -185,6 +185,9 @@ async def test_status_read_reports_the_invalid_namespace_machine_separately() ->
 
     assert unreadable == set()
     assert invalid == {"m-bad"}
+    # The invalid machine is still on its way out: the read is not fulfilled.
+    assert fulfilment.state == "in_progress"
+    assert fulfilment.pending_count == 1
     handler.read_pods_for_return.assert_called_once_with("orb-team-a", "req-1", ["m-good"])
 
 

@@ -370,6 +370,7 @@ async def test_invalid_placement_is_held_while_a_valid_machine_is_unreadable(env
 
     held = await _status_aged(env, names, coords, age=60)
     assert {i["status"] for i in held.metadata["instances"]} == {"unknown"}
+    assert set(held.pending_resource_ids) == {env.name, BAD}
     assert held.metadata["invalid_placement_resource_ids"] == [BAD]
     assert held.metadata["unreadable_resource_ids"] == [env.name]
 
@@ -394,3 +395,4 @@ async def test_invalid_placement_is_held_while_a_valid_pod_is_leaving(
     assert isinstance(outcome, Accepted)
     assert "failed" not in {i["status"] for i in outcome.metadata["instances"]}
     assert _placeholder(outcome, BAD)["status"] == "unknown"
+    assert BAD in outcome.pending_resource_ids

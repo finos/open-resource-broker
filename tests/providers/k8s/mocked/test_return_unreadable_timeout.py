@@ -468,6 +468,9 @@ async def test_invalid_placement_fails_the_return_without_the_timeout(world: Wor
     assert request.status == RequestStatus.FAILED
     assert world.machine("pod-a").status == MachineStatus.TERMINATED
     assert world.machine("pod-bad").status == MachineStatus.FAILED
+    assert request.metadata["invalid_placement_resource_ids"] == ["pod-bad"]
+    assert "unreadable_resource_ids" not in request.metadata
+    assert world.request().metadata["invalid_placement_resource_ids"] == ["pod-bad"]
 
 
 @pytest.mark.integration
@@ -515,6 +518,8 @@ async def test_invalid_placement_fails_with_the_unreadable_machine_past_the_limi
 
     assert request.status == RequestStatus.FAILED
     assert {world.machine(n).status for n in ("pod-a", "pod-bad")} == {MachineStatus.FAILED}
+    assert request.metadata["unreadable_resource_ids"] == ["pod-a"]
+    assert request.metadata["invalid_placement_resource_ids"] == ["pod-bad"]
 
 
 @pytest.mark.integration

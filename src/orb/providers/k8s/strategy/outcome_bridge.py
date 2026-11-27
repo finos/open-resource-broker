@@ -24,7 +24,11 @@ __all__ = [
 ]
 
 
-_RETURN_ENVELOPE_KEYS = ("unreadable_resource_ids", "return_unreadable_timed_out")
+_RETURN_ENVELOPE_KEYS = (
+    "unreadable_resource_ids",
+    "invalid_placement_resource_ids",
+    "return_unreadable_timed_out",
+)
 
 
 def _to_domain_status(instance: Any) -> Any:
