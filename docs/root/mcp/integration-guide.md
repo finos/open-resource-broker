@@ -49,10 +49,13 @@ authenticated with the configured strategy (bearer token, IAM, Cognito, and so
 on) before it reaches a tool, and each tool enforces the same minimum role its
 REST equivalent requires — `request_machines`, `return_machines`,
 `cancel_request`, `stop_machines`, and `start_machines` require at least the
-`operator` role; the remaining tools require `viewer`.
+`operator` role. `get_provider_config`, a read tool that reports configuration
+file paths, also requires `operator`; the remaining tools require `viewer`.
 
 When `server.auth.enabled` is false, every caller is treated as an anonymous
-viewer, so the mutating tools listed above are refused for everyone. Bind to
+viewer, so the operator-role tools listed above, including the read-only
+`get_provider_config`, are refused for everyone over HTTP; over stdio, which has
+no caller identity, they still work. Bind to
 `127.0.0.1` (the default) unless authentication is enabled; binding to a
 non-loopback host with authentication disabled logs a warning. The stdio
 transport has no network boundary and is not affected by this configuration.

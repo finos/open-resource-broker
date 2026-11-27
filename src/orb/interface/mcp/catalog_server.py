@@ -198,7 +198,9 @@ def _error_result(message: str) -> mcp_types.CallToolResult:
 # Streamable HTTP transport has authenticated a caller. Mirrors the role each
 # operation's REST (or, for the provider/CLI-only tools, its intent) requires:
 # the mutating machine/request operations require "operator"; every read-only
-# tool requires "viewer", the same floor REST enforces on its read routes.
+# tool requires "viewer", the same floor REST enforces on its read routes,
+# except ``get_provider_config``, a read tool that reports configuration file
+# paths and so requires "operator".
 # Every catalog entry exposed on Interface.MCP must have an entry here —
 # ``test_mcp_catalog_server.py`` asserts this so a newly added tool fails that
 # test until classified, rather than defaulting to an open role. Irrelevant to
@@ -219,7 +221,7 @@ _MCP_TOOL_MIN_ROLE: dict[str, str] = {
     "validate_template": "viewer",
     "get_provider_health": "viewer",
     "list_providers": "viewer",
-    "get_provider_config": "viewer",
+    "get_provider_config": "operator",
     "get_provider_metrics": "viewer",
 }
 
@@ -347,7 +349,8 @@ def run_streamable_http(
     When auth is disabled (or ``server_config`` is not supplied), callers are
     treated as anonymous viewers — the same default REST's
     ``get_current_user`` falls back to — so read-only tools still work but
-    every mutating tool is refused for every caller. Binding to a
+    every mutating tool, and the read-only ``get_provider_config`` (it reports
+    file paths), is refused for every caller. Binding to a
     non-loopback host with auth disabled logs a warning, matching the REST
     server's posture for the same combination.
     """
@@ -403,7 +406,8 @@ def run_streamable_http(
             "SECURITY WARNING: MCP authentication is DISABLED and the server is bound to "
             "'%s' (non-loopback). Every caller is treated as an anonymous viewer, so "
             "mutating tools (request_machines, return_machines, cancel_request, "
-            "stop_machines, start_machines) are refused, but read-only tools are reachable "
+            "stop_machines, start_machines) and get_provider_config (a read tool that reports "
+            "file paths) are refused, but the other read-only tools are reachable "
             "without credentials. Enable authentication (server.auth.enabled=true) before "
             "exposing this transport on a network interface.",
             host,
