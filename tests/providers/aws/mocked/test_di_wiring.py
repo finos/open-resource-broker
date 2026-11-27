@@ -6,11 +6,6 @@ real bugs where template_defaults_service, fleet_role, and config_port were
 silently None due to DI wiring mistakes.
 """
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
 
 # ---------------------------------------------------------------------------
 # 1. DI container boots without errors

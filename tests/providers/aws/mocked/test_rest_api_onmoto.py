@@ -12,13 +12,9 @@ Moto limitations accounted for (same patches as test_sdk_onmoto.py):
 """
 
 import json
-import sys
-from pathlib import Path
 
 import pytest
 import pytest_asyncio
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tests.providers.aws.mocked.conftest import (
     _inject_moto_factory,

@@ -26,7 +26,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -34,8 +33,6 @@ from unittest.mock import MagicMock, patch
 import boto3
 import pytest
 from moto import mock_aws
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.aws_client import AWSClient

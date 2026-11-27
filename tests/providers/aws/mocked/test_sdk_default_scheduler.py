@@ -11,7 +11,6 @@ import json
 import logging
 import re
 import shutil
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -20,8 +19,6 @@ logger = logging.getLogger(__name__)
 import boto3
 import pytest
 from moto import mock_aws
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 REGION = "eu-west-2"
 REQUEST_ID_RE = re.compile(r"^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")

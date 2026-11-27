@@ -7,15 +7,12 @@ stored template is gone. Disallowed overrides fail before anything is persisted.
 
 import asyncio
 import json
-import sys
 import time
 from pathlib import Path
 from unittest.mock import patch
 
 import boto3
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tests.providers.aws.mocked.conftest import (
     _inject_moto_factory,

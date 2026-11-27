@@ -5,12 +5,8 @@ interface conforms to the schemas defined in tests/providers/aws/live/plugin_io_
 """
 
 import re
-import sys
-from pathlib import Path
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 try:
     import jsonschema

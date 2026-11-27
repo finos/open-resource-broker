@@ -2,13 +2,7 @@
 Basic functionality tests to verify core components work.
 """
 
-import os
-import sys
-
 import pytest
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 def test_decorator_imports():

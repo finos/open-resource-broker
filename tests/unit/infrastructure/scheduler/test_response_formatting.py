@@ -3,14 +3,10 @@
 No file I/O, no DI container, no AWS.
 """
 
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 try:
     import jsonschema

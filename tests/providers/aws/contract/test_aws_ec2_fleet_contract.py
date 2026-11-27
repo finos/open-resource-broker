@@ -11,13 +11,8 @@ suite skips as simulator limitations:
     instance IDs and the instances are observed terminated afterwards.
 """
 
-import sys
-from pathlib import Path
-
 import boto3
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate

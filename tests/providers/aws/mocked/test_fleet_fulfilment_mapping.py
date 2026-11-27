@@ -12,12 +12,7 @@ the ``running_count < target_units`` partial/in-progress path that the
 fulfilment state machine resolves.
 """
 
-import sys
-from pathlib import Path
-
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.domain.base.provider_fulfilment import CheckHostsStatusResult
 from tests.providers.aws.mocked.test_provision_lifecycle import (

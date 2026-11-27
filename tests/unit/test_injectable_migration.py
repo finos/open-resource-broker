@@ -1,13 +1,8 @@
 """Test script to verify the injectable decorator migration."""
 
-import os
-import sys
 import unittest
 from typing import Any
 from unittest.mock import Mock
-
-# Add src directory to path
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from orb.domain.base.ports import ConfigurationPort, LoggingPort
 from orb.infrastructure.di.container import DIContainer

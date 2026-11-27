@@ -6,16 +6,12 @@ idempotent release, and invalid subnet error handling.
 """
 
 import base64
-import sys
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import boto3
 import pytest
 from botocore.exceptions import ClientError
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError

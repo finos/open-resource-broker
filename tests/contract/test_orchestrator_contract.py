@@ -12,14 +12,10 @@ Operations covered:
 """
 
 import argparse
-import sys
-from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 try:
     from fastapi.testclient import TestClient

@@ -6,14 +6,11 @@ for validating ORB output at integration boundaries.
 
 import json
 import os
-import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tests.utilities.reset_singletons import reset_all_singletons
 

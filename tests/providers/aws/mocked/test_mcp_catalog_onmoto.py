@@ -17,8 +17,6 @@ inherited from ``tests.providers.aws.mocked.conftest``.
 from __future__ import annotations
 
 import json
-import sys
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -26,8 +24,6 @@ import mcp.types as mcp_types
 import pytest
 import pytest_asyncio
 from mcp.server.context import ServerRequestContext
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tests.providers.aws.mocked.conftest import (
     _inject_moto_factory,

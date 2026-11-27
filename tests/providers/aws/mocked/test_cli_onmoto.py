@@ -18,12 +18,9 @@ import contextlib
 import io
 import re
 import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tests.providers.aws.mocked.conftest import (
     _inject_moto_factory,

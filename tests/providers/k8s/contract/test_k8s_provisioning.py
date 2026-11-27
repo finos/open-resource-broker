@@ -1,11 +1,6 @@
 """K8s provisioning contract tests — inherits all scenarios from BaseProvisioningContract."""
 
-import sys
-from pathlib import Path
-
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 from orb.providers.k8s.domain.template.k8s_template_aggregate import (
     K8sResourceQuantities,

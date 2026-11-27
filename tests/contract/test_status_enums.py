@@ -6,12 +6,7 @@ valid scheduler output status for both the HF and default schedulers.
 These are pure unit tests — no I/O, no DI container, no moto.
 """
 
-import sys
-from pathlib import Path
-
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 # ---------------------------------------------------------------------------
 # Allowed output sets per scheduler (from plugin_io_schemas.py)

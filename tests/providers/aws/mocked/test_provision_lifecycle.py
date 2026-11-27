@@ -11,15 +11,11 @@ Moto limitations accounted for:
 - RunInstances: fully supported — instances are created and visible
 """
 
-import sys
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import boto3
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from orb.providers.aws.infrastructure.aws_client import AWSClient

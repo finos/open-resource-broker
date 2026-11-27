@@ -11,15 +11,12 @@ Covers the real-world template shape from customer deployments:
 """
 
 import json
-import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import boto3
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from orb.providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
