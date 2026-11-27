@@ -141,7 +141,8 @@ class TestAssertNeverExhaustiveness:
             case Failed():
                 return "failed"
             case _:
-                return assert_never(outcome)
+                assert_never(outcome)
+                raise AssertionError("unreachable: unhandled OperationOutcome")
 
     def test_accepted_classified(self):
         assert self._classify(Accepted(request_id="r")) == "accepted"
