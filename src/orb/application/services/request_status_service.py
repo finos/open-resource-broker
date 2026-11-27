@@ -207,9 +207,10 @@ class RequestStatusService:
             )
         elif failed_count > 0:
             unreadable = self._timed_out_unreadable_ids(provider_metadata)
+            invalid = self._invalid_placement_ids(provider_metadata)
             detail = (
                 f"; could not confirm termination of: {', '.join(unreadable)}" if unreadable else ""
-            )
+            ) + (f"; invalid stored placement: {', '.join(invalid)}" if invalid else "")
             return (
                 RequestStatus.FAILED.value,
                 f"Return request failed: {failed_count} machines failed to terminate "

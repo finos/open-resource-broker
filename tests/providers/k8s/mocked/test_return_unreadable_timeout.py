@@ -471,6 +471,7 @@ async def test_invalid_placement_fails_the_return_without_the_timeout(world: Wor
     assert request.metadata["invalid_placement_resource_ids"] == ["pod-bad"]
     assert "unreadable_resource_ids" not in request.metadata
     assert world.request().metadata["invalid_placement_resource_ids"] == ["pod-bad"]
+    assert "invalid stored placement: pod-bad" in (request.status_message or "")
 
 
 @pytest.mark.integration
@@ -483,6 +484,7 @@ async def test_invalid_placement_is_held_while_a_valid_pod_is_leaving(world: Wor
 
     assert waiting.status == RequestStatus.IN_PROGRESS
     assert world.machine("pod-bad").status == MachineStatus.SHUTTING_DOWN
+    assert "invalid_placement_resource_ids" not in world.request().metadata
 
     del world.core.pods[(NS, "pod-a")]  # the pod finishes
     request = await world.poll()
@@ -504,6 +506,7 @@ async def test_invalid_placement_is_held_while_a_valid_machine_is_unreadable(
 
     assert request.status == RequestStatus.IN_PROGRESS
     assert {world.machine(n).status for n in ("pod-a", "pod-bad")} == {MachineStatus.SHUTTING_DOWN}
+    assert "invalid_placement_resource_ids" not in world.request().metadata
 
 
 @pytest.mark.integration
@@ -520,6 +523,8 @@ async def test_invalid_placement_fails_with_the_unreadable_machine_past_the_limi
     assert {world.machine(n).status for n in ("pod-a", "pod-bad")} == {MachineStatus.FAILED}
     assert request.metadata["unreadable_resource_ids"] == ["pod-a"]
     assert request.metadata["invalid_placement_resource_ids"] == ["pod-bad"]
+    assert "pod-a" in (request.status_message or "")
+    assert "invalid stored placement: pod-bad" in (request.status_message or "")
 
 
 @pytest.mark.integration
