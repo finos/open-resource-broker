@@ -127,6 +127,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         "SpotFleet": "aws",
         "ASG": "aws",
         "RunInstances": "aws",
+        "MicroVM": "aws",
         "OCICompute": "oci",
     }
 
@@ -134,10 +135,8 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
     # Resolving a type from the provider configuration is for the other types.
     _UNCHANGED_TYPES: frozenset[str] = frozenset({"k8s", "oci"})
 
-    # Types whose validator is not run on the validate path yet.  The AWS
-    # adapter reads legacy field names only and would reject current AWS
-    # templates, so AWS validation stays as it was until its rules are updated.
-    _VALIDATE_PATH_PENDING: frozenset[str] = frozenset({"aws"})
+    # Types whose validators read the row as written, so it is not renamed first.
+    _AS_WRITTEN_TYPES: frozenset[str] = frozenset({"aws"})
 
     @staticmethod
     def _to_internal_fields(provider_type: str, row: Any) -> Any:
@@ -169,7 +168,8 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
 
         The row's ``provider_name`` selects an enabled instance; failing that, a
         deployment with exactly one enabled instance has one answer.  Types in
-        ``_UNCHANGED_TYPES`` are never resolved this way.
+        ``_UNCHANGED_TYPES`` are never resolved this way, and a single AWS instance
+        is not assigned to a row that names an API of its own.
         """
         instances = self._enabled_instances()
         name = config.get("providerName") or config.get("provider_name")
@@ -177,6 +177,10 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         resolved = getattr(named, "type", None)
         if not resolved and len(instances) == 1:
             resolved = getattr(instances[0], "type", None)
+            # Every AWS API is resolved by the API map before this point, so a row
+            # that still carries an API belongs to another provider (or is a typo).
+            if str(resolved) == "aws" and (config.get("providerApi") or config.get("provider_api")):
+                return None
         if not resolved or str(resolved) in self._UNCHANGED_TYPES:
             return None
         return str(resolved)
@@ -227,11 +231,9 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         if not provider_type:
             return []
         provider_type = str(provider_type)
-        if provider_type in self._VALIDATE_PATH_PENDING:
-            return []
 
         validated_row = domain_template
-        if provider_type not in self._UNCHANGED_TYPES:
+        if provider_type not in self._UNCHANGED_TYPES | self._AS_WRITTEN_TYPES:
             try:
                 validated_row = self._to_internal_fields(provider_type, domain_template)
             except Exception as e:

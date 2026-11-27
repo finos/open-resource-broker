@@ -234,11 +234,18 @@ def test_stamped_k8s_validator_is_called_with_one_argument(registry) -> None:
     spy.assert_called_once_with("k8s")
 
 
-# AWS is deferred: no validator is created however the type was resolved.
+# AWS rows are validated by the AWS adapter.
 
 
-def test_aws_pending_on_validate_path() -> None:
-    assert TemplateConfigurationAdapter._VALIDATE_PATH_PENDING == frozenset({"aws"})
+def _aws_row(**extra) -> dict:
+    return {
+        "template_id": "t",
+        "provider_api": "RunInstances",
+        "machine_image": "ami-0abc",
+        "subnet_ids": ["subnet-1"],
+        "security_group_ids": ["sg-1"],
+        **extra,
+    }
 
 
 @pytest.mark.parametrize(
@@ -246,37 +253,71 @@ def test_aws_pending_on_validate_path() -> None:
     [
         ({"provider_type": "aws"}, []),
         ({"provider_name": "aws-1"}, [_instance("aws-1", "aws"), _instance("a2", "azure")]),
-        ({"provider_api": "EC2Fleet"}, []),
-        ({}, [_instance("aws-1", "aws")]),
+        ({}, []),
     ],
-    ids=["stamped", "by-name", "by-api-map", "single-instance"],
+    ids=["stamped", "by-name", "by-api-map"],
 )
-def test_aws_resolved_by_any_step_never_creates_a_validator(registry, row, instances) -> None:
-    adapter = _adapter(registry, instances)
-    spy = MagicMock()
+def test_aws_resolved_by_any_step_creates_a_validator(registry, row, instances) -> None:
+    adapter = _adapter(registry, instances or [_instance("aws-1", "aws")])
+    spy = MagicMock(wraps=registry.create_validator)
     registry.create_validator = spy
     try:
-        errors = adapter.validate_template_config(
-            {"template_id": "t", "image_id": "i", "provider_api": "RunInstances", **row}
-        )
+        errors = adapter.validate_template_config(_aws_row(**row))
+    finally:
+        del registry.create_validator
+    assert spy.call_args.args[0] == "aws"
+    assert errors == []
+
+
+def test_aws_row_without_an_api_resolves_to_the_only_instance(registry) -> None:
+    adapter = _adapter(registry, [_instance("aws-1", "aws")])
+    errors = adapter.validate_template_config(_aws_row(provider_api=None, subnet_ids=["bad"]))
+    assert errors == ["Provider API is required", "Invalid AWS subnet ID format: bad"]
+
+
+def test_aws_row_with_bad_subnet_gets_the_provider_rule_error(registry) -> None:
+    adapter = _adapter(registry, [_instance("aws-1", "aws")])
+    errors = adapter.validate_template_config(_aws_row(subnet_ids=["bad"]))
+    assert errors == ["Invalid AWS subnet ID format: bad"]
+
+
+def test_microvm_resolves_to_aws(registry) -> None:
+    adapter = _adapter(registry, [_instance("aws-1", "aws"), _instance("azure-1", "azure")])
+    errors = adapter.validate_template_config(_aws_row(provider_api="MicroVM", subnet_ids=["bad"]))
+    assert errors == ["Invalid AWS subnet ID format: bad"]
+
+
+def test_single_aws_instance_is_not_assigned_to_a_row_with_another_providers_api(
+    registry,
+) -> None:
+    adapter = _adapter(registry, [_instance("aws-1", "aws")])
+    spy = MagicMock(wraps=registry.create_validator)
+    registry.create_validator = spy
+    try:
+        errors = adapter.validate_template_config(_azure_row("VMSS"))
     finally:
         del registry.create_validator
     spy.assert_not_called()
-    assert errors == []
+    assert not _has(errors, "AWS")
 
 
-def test_aws_row_with_bad_subnet_gets_no_provider_rule_error(registry) -> None:
+def test_row_naming_its_aws_instance_is_still_validated_as_aws(registry) -> None:
+    adapter = _adapter(registry, [_instance("aws-1", "aws"), _instance("azure-1", "azure")])
+    errors = adapter.validate_template_config(_azure_row("VMSS", provider_name="aws-1"))
+    assert "Unsupported AWS provider API: VMSS" in errors
+
+
+def test_aws_adapter_receives_the_row_unrenamed(registry) -> None:
     adapter = _adapter(registry, [_instance("aws-1", "aws")])
     errors = adapter.validate_template_config(
         {
-            "template_id": "t",
-            "image_id": "i",
-            "provider_api": "RunInstances",
-            "subnet_ids": ["bad"],
-            "provider_type": "aws",
+            "templateId": "t",
+            "providerApi": "RunInstances",
+            "imageId": "ami-0abc",
+            "subnetIds": ["bad"],
         }
     )
-    assert errors == []
+    assert errors == ["Invalid AWS subnet ID format: bad"]
 
 
 # HostFactory-format (camelCase) rows, as `templates validate --file` reads them.
