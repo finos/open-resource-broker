@@ -25,8 +25,8 @@ _CLI_FILES = collect_python_files(_CLI_DIR)
 # Remove entries as they are cleaned up.
 _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
     {
-        # cli/console.py now delegates to the adapter (cli → infrastructure is the
-        # correct direction after the I1 inversion fix in Epic E4).
+        # cli/console.py delegates to the console adapter (cli → infrastructure is the
+        # allowed direction).
         ("cli/console.py", "orb.infrastructure.adapters.console_adapter"),
         ("cli/console.py", "orb.infrastructure.constants"),
         ("cli/registry.py", "orb.infrastructure.error.decorators"),
@@ -37,7 +37,6 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         ("cli/main.py", "orb.infrastructure.mocking.dry_run_context"),
         ("cli/main.py", "orb.infrastructure.di.container"),
         ("cli/factories/provider_command_factory.py", "orb.infrastructure.utilities.json_utils"),
-        ("cli/args.py", "orb.infrastructure.registry.cli_spec_registry"),
         ("cli/parsers/common_args.py", "orb.infrastructure.registry.cli_spec_registry"),
     }
 )

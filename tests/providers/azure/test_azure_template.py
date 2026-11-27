@@ -80,8 +80,12 @@ class TestAzureTemplateConstruction:
         assert "--azure-subscription-id" in option_strings
         assert "--azure-resource-group" in option_strings
 
-        shared_args_path = Path(__file__).parents[3] / "src/orb/cli/args.py"
-        assert "--azure-" not in shared_args_path.read_text()
+        cli_dir = Path(__file__).parents[3] / "src/orb/cli"
+        parser_sources = [cli_dir / "args.py", *sorted((cli_dir / "parsers").rglob("*.py"))]
+        # Guard against a wrong path making the scan pass vacuously.
+        assert cli_dir / "parsers" / "common_args.py" in parser_sources
+        for source in parser_sources:
+            assert "--azure-" not in source.read_text(), source
 
     def test_minimal_template(self):
         t = AzureTemplate(**_BASE_FIELDS)
