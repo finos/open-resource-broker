@@ -193,7 +193,7 @@ class TestApplicationInitialize:
         app._container = MagicMock()
         app._container.is_lazy_loading_enabled.return_value = True
         app._config_manager = MagicMock()
-        app._config_manager.get.side_effect = RuntimeError("boom")
+        app._config_manager.get_typed.side_effect = RuntimeError("boom")
 
         loop = asyncio.new_event_loop()
         try:
@@ -201,6 +201,33 @@ class TestApplicationInitialize:
         finally:
             loop.close()
         assert result is False
+
+    def test_initialize_returns_false_on_exception_after_logging_is_configured(self):
+        """The failure path must not depend on whether an earlier test configured logging."""
+        from orb.bootstrap import Application
+        from orb.infrastructure.logging.logger import _LoggingState
+
+        _LoggingState.initialized = True
+        app = Application(skip_validation=True)
+        app._container = MagicMock()
+        app._container.is_lazy_loading_enabled.return_value = True
+        app._config_manager = MagicMock()
+        app._config_manager.get_typed.side_effect = RuntimeError("boom")
+
+        loop = asyncio.new_event_loop()
+        try:
+            result = loop.run_until_complete(app.initialize())
+        finally:
+            loop.close()
+        assert result is False
+
+    def test_reset_all_singletons_clears_logging_guard(self):
+        from orb.infrastructure.logging.logger import _LoggingState
+        from tests.utilities.reset_singletons import reset_all_singletons
+
+        _LoggingState.initialized = True
+        reset_all_singletons()
+        assert _LoggingState.initialized is False
 
     def test_shutdown_clears_initialized(self):
         from orb.bootstrap import Application

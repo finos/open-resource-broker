@@ -48,6 +48,16 @@ def _reset_circuit_breaker_states() -> None:
         pass  # Module absent in this environment; skip reset
 
 
+def _reset_logging_state() -> None:
+    """Clear the one-shot ``setup_logging`` guard so each test can configure logging afresh."""
+    try:
+        from orb.infrastructure.logging.logger import _LoggingState
+
+        _LoggingState.initialized = False
+    except ImportError:
+        pass  # logging module absent in this environment; skip reset
+
+
 def reset_provider_registry() -> None:
     try:
         from orb.infrastructure.registry.base_registry import BaseRegistry
@@ -115,6 +125,8 @@ def reset_all_singletons() -> None:
 
     # Reset circuit breaker shared state
     _reset_circuit_breaker_states()
+
+    _reset_logging_state()
 
     reset_provider_registry()
 
