@@ -8,6 +8,7 @@ holds each task until it completes and logs failures.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import Coroutine, Iterable
 from typing import Any
 
@@ -50,12 +51,12 @@ class BackgroundTasks:
             return
         exc = task.exception()
         if exc is not None:
-            try:
+            # A logger fault must not escape a loop callback; the logger itself
+            # failed, so there is nothing left to log to.
+            with contextlib.suppress(Exception):
                 self._logger.warning(
                     "Background task %s failed: %s", task.get_name(), type(exc).__name__
                 )
-            except Exception:  # a logger fault must not escape a loop callback
-                pass
 
     def cancel_all(self) -> None:
         """Cancel outstanding tasks; each is released by its done-callback."""
