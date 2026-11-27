@@ -253,6 +253,60 @@ def _count_interface_service_locators() -> int:
     return count
 
 
+def _container_parameters_in_source(source: str) -> int:
+    """Count parameters named ``*container`` (ignoring ``self``) in functions and lambdas."""
+    return sum(
+        1
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.arg)
+        and node.arg != "self"
+        and node.arg.lower().endswith("container")
+    )
+
+
+def _container_attribute_reads_in_source(source: str) -> int:
+    """Count ``<x>._container`` reads outside ``self`` and ``getattr(x, "_container", ...)``."""
+    count = 0
+    for node in ast.walk(ast.parse(source)):
+        if (
+            isinstance(node, ast.Attribute)
+            and node.attr == "_container"
+            and isinstance(node.ctx, ast.Load)
+            and not (isinstance(node.value, ast.Name) and node.value.id == "self")
+        ):
+            count += 1
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "getattr"
+            and len(node.args) >= 2
+            and isinstance(node.args[1], ast.Constant)
+            and node.args[1].value == "_container"
+        ):
+            count += 1
+    return count
+
+
+def _count_interface(counter) -> int:
+    total = 0
+    for f in collect_python_files(SRC_ORB / "interface"):
+        try:
+            total += counter(f.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+    return total
+
+
+def _count_interface_container_parameters() -> int:
+    """Count container-typed or container-named parameters under ``interface/``."""
+    return _count_interface(_container_parameters_in_source)
+
+
+def _count_interface_args_container_reads() -> int:
+    """Count ``args._container`` style reads under ``interface/``."""
+    return _count_interface(_container_attribute_reads_in_source)
+
+
 _SUPPRESSION = re.compile(
     r"#\s*(?:type:\s*ignore|pyright:\s*ignore|noqa|nosec)\b"
     r"(?:\s*\[[^\]]*\]|\s*:\s*[A-Za-z]+\d+(?:\s*,\s*[A-Za-z]+\d+)*)?"
@@ -349,6 +403,8 @@ _COUNTERS = {
     "application_service_locator_sites": _count_application_service_locators,
     "stdlib_logger_files_outside_boundary": _count_stdlib_logger_files,
     "interface_service_locator_sites": _count_interface_service_locators,
+    "interface_container_parameters": _count_interface_container_parameters,
+    "interface_args_container_reads": _count_interface_args_container_reads,
     "reasonless_suppressions": _count_reasonless_suppressions,
 }
 
@@ -392,6 +448,45 @@ class Handler:
     # two ContainerPort params, get + has + get on containers, get_container call
     assert _locator_sites_in_source(source) == 6
     assert _locator_sites_in_source("def f(port):\n    return port.get(1)\n") == 0
+
+
+@pytest.mark.unit
+@pytest.mark.architecture
+def test_container_parameter_counter_detects_each_form() -> None:
+    """Parameters named ``*container`` count in functions, methods, keyword-only and lambdas."""
+    source = """
+def helper(console, container):
+    return container
+
+
+class Handler:
+    def __init__(self, *, di_container, port):
+        self._container = di_container
+
+    def run(self, self_container=None):
+        return lambda c, container: container
+"""
+    assert _container_parameters_in_source(source) == 4
+    assert _container_parameters_in_source("def f(self, port):\n    return port\n") == 0
+
+
+@pytest.mark.unit
+@pytest.mark.architecture
+def test_args_container_read_counter_detects_each_form() -> None:
+    """``args._container`` reads and ``getattr(args, "_container")`` count; ``self`` and stores do not."""
+    source = """
+def a(args):
+    container = args._container
+    return getattr(args, "_container", None), getattr(args, "other", None)
+
+
+class Handler:
+    def run(self, args):
+        self._container = args.container
+        args._container = None
+        return self._container
+"""
+    assert _container_attribute_reads_in_source(source) == 2
 
 
 @pytest.mark.unit

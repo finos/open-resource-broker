@@ -29,7 +29,7 @@ _KNOWN_VIOLATIONS: frozenset[tuple[str, str]] = frozenset(
         # correct direction after the I1 inversion fix in Epic E4).
         ("cli/console.py", "orb.infrastructure.adapters.console_adapter"),
         ("cli/console.py", "orb.infrastructure.constants"),
-        ("cli/registry.py", "orb.infrastructure.di.buses"),
+        ("cli/registry.py", "orb.infrastructure.error.decorators"),
         ("cli/registry.py", "orb.infrastructure.di.container"),
         ("cli/router.py", "orb.infrastructure.di.container"),
         ("cli/response_formatter.py", "orb.infrastructure.logging.logger"),

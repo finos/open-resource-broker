@@ -7,9 +7,14 @@ Replaces the 3-tier dispatch in CLICommandFactoryOrchestrator._route_command.
 from __future__ import annotations
 
 import argparse
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 
 Handler = Callable[[argparse.Namespace], Any]
+
+# Registers a command group's handler classes in a container; idempotent.
+GroupRegistrar = Callable[[Any], None]
+
+_H = TypeVar("_H")
 
 # Singular → plural aliases
 _ALIASES: dict[str, str] = {
@@ -34,6 +39,37 @@ def lookup(resource: str, action: str) -> Handler | None:
     return _REGISTRY.get((resolved, action))
 
 
+def _current_container() -> Any:
+    """Return the process-wide container (the single dispatch-time lookup in this module)."""
+    from orb.infrastructure.di.container import get_container
+
+    return get_container()
+
+
+def bind(handler_cls: type[_H], method: str, *, group: GroupRegistrar) -> Handler:
+    """Return a CLI handler that runs ``handler_cls.method`` on a container-built instance.
+
+    The handler class is registered through ``group`` on the current container and
+    resolved at dispatch time, so importing the registry never builds a container.
+    Only the resolution is wrapped by the interface exception decorator; the
+    awaited method keeps its own, so a failure is handled once.
+    """
+    from orb.infrastructure.error.decorators import handle_interface_exceptions
+
+    @handle_interface_exceptions(context=f"{handler_cls.__name__}.{method}", interface_type="cli")
+    def _resolve() -> _H:
+        container = _current_container()
+        group(container)
+        return container.get(handler_cls)
+
+    async def _bound(args: argparse.Namespace) -> Any:
+        handler = _resolve()
+        return await getattr(handler, method)(args)
+
+    _bound.__name__ = f"{handler_cls.__name__}.{method}"
+    return _bound
+
+
 def _make_bus_handler(factory_method_name: str) -> Handler:
     """Create an async handler that calls the named factory method and dispatches to the bus."""
 
@@ -41,9 +77,9 @@ def _make_bus_handler(factory_method_name: str) -> Handler:
         import inspect
 
         from orb.application.dto.base import BaseCommand
+        from orb.application.ports.command_bus_port import CommandBusPort
+        from orb.application.ports.query_bus_port import QueryBusPort
         from orb.cli.factories.cli_command_factory_orchestrator import CLICommandFactoryOrchestrator
-        from orb.infrastructure.di.buses import CommandBus, QueryBus
-        from orb.infrastructure.di.container import get_container
 
         orchestrator = CLICommandFactoryOrchestrator()
 
@@ -67,11 +103,11 @@ def _make_bus_handler(factory_method_name: str) -> Handler:
                 kwargs[k] = args_dict[f"flag_{k}"]
         cqrs_obj = factory_fn(**kwargs)
 
-        container = get_container()
+        container = _current_container()
         if isinstance(cqrs_obj, BaseCommand):
-            return await container.get(CommandBus).execute(cqrs_obj)  # type: ignore[arg-type]
+            return await container.get(CommandBusPort).execute(cqrs_obj)  # type: ignore[arg-type]
         else:
-            return await container.get(QueryBus).execute(cqrs_obj)
+            return await container.get(QueryBusPort).execute(cqrs_obj)
 
     _handler.__name__ = f"bus_handler_{factory_method_name}"
     return _handler
