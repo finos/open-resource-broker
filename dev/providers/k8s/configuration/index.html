@@ -3921,6 +3921,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Timing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unreadable-returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unreadable returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -6449,6 +6466,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Timing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unreadable-returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unreadable returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -6825,6 +6859,13 @@ which handler created it.  Per-template values, when present, win.</p>
 <td>When <code>True</code> (default), pods that have been <code>Pending</code> past <code>pod_timeout_seconds</code> are deleted immediately after their status is rewritten to <code>terminated</code>.  Set to <code>False</code> to preserve timed-out pods for operator inspection.</td>
 </tr>
 <tr>
+<td><code>return_unreadable_timeout_seconds</code></td>
+<td><code>int</code></td>
+<td><code>3600</code></td>
+<td><code>ORB_K8S_RETURN_UNREADABLE_TIMEOUT_SECONDS</code></td>
+<td>Maximum seconds, counted from when the return request was created, that a return waits for pods the cluster could not be asked about. Must be at least <code>1</code>. See <a href="#unreadable-returns">Unreadable returns</a>.</td>
+</tr>
+<tr>
 <td><code>stale_cache_timeout_seconds</code></td>
 <td><code>int</code></td>
 <td><code>600</code></td>
@@ -6833,6 +6874,27 @@ which handler created it.  Per-template values, when present, win.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="unreadable-returns">Unreadable returns<a class="headerlink" href="#unreadable-returns" title="Permanent link">&para;</a></h3>
+<p>A return reads the cluster to confirm its pods are gone. When the pod list for
+a namespace fails (API outage, timeout, missing permission), ORB cannot tell
+whether those pods still exist. The return stays in progress and the machines
+keep their stored state; nothing is closed out on a failed read. Once the read
+works again the return finishes as usual.</p>
+<p>If the pods stay unreadable for <code>return_unreadable_timeout_seconds</code>, counted
+from when the return request was created, the return request is marked
+<code>failed</code>. The unreadable machine ids are listed in the request status message
+and in the request metadata under <code>unreadable_resource_ids</code>
+(<code>orb requests status</code> shows the message; add <code>--verbose</code> to see the
+metadata). Machines that could be read are handled as
+normal, and the return only fails once none of them is still waiting to
+terminate.</p>
+<p><code>failed</code> here means ORB could not confirm the outcome, not that deleting the
+pods failed. ORB does not delete anything on this path, and the pods may still
+be running and incurring cost. Check the cluster for the listed ids. Once the
+cluster is reachable, run <code>orb machines return --force &lt;machine-id&gt; ...</code> (or
+send <code>"force": true</code> through the REST API) to file a new return for them. A
+return that is already past the limit when its first read fails is failed on
+that read, so raise the setting for clusters with long API outages.</p>
 <h2 id="watch-and-reconciliation">Watch and reconciliation<a class="headerlink" href="#watch-and-reconciliation" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -7224,22 +7286,23 @@ overflow the per-kind budget.</p>
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
 <a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="c1"># Timing</span>
 <a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_POD_TIMEOUT_SECONDS</span><span class="o">=</span><span class="s2">&quot;240&quot;</span>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_DELETE_TIMED_OUT_PODS</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="c1"># Security audit (reject mode is on by default)</span>
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_REJECT_HIGH_RISK_POD_FIELDS</span><span class="o">=</span><span class="s2">&quot;false&quot;</span><span class="w">   </span><span class="c1"># opt out for privileged workloads</span>
-<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>
-<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="c1"># Reconciliation</span>
-<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_ORPHAN_GC_ENABLED</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
-<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_AUTO_CLEANUP_ORPHANS</span><span class="o">=</span><span class="s2">&quot;false&quot;</span>
-<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_PERIODIC_RESYNC_INTERVAL_SECONDS</span><span class="o">=</span><span class="s2">&quot;180&quot;</span>
-<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>
-<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="c1"># Opt-in features</span>
-<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_EVENTS_WATCH_ENABLED</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
-<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_INBOUND_AUTH_ENABLED</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
-<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>
-<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="c1"># Resource naming</span>
-<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_NAMING__PREFIX</span><span class="o">=</span><span class="s2">&quot;my-orb&quot;</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_RETURN_UNREADABLE_TIMEOUT_SECONDS</span><span class="o">=</span><span class="s2">&quot;7200&quot;</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_DELETE_TIMED_OUT_PODS</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="c1"># Security audit (reject mode is on by default)</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_REJECT_HIGH_RISK_POD_FIELDS</span><span class="o">=</span><span class="s2">&quot;false&quot;</span><span class="w">   </span><span class="c1"># opt out for privileged workloads</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="c1"># Reconciliation</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_ORPHAN_GC_ENABLED</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_AUTO_CLEANUP_ORPHANS</span><span class="o">=</span><span class="s2">&quot;false&quot;</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_PERIODIC_RESYNC_INTERVAL_SECONDS</span><span class="o">=</span><span class="s2">&quot;180&quot;</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="c1"># Opt-in features</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_EVENTS_WATCH_ENABLED</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_INBOUND_AUTH_ENABLED</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="c1"># Resource naming</span>
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ORB_K8S_NAMING__PREFIX</span><span class="o">=</span><span class="s2">&quot;my-orb&quot;</span>
 </code></pre></div>
 <h2 id="worked-example">Worked example<a class="headerlink" href="#worked-example" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
@@ -7257,23 +7320,24 @@ overflow the per-kind budget.</p>
 <a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">      </span><span class="p">],</span>
 <a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">      </span><span class="nt">&quot;default_image_pull_secret&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;orb-registry&quot;</span><span class="p">,</span>
 <a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">      </span><span class="nt">&quot;pod_timeout_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">240</span><span class="p">,</span>
-<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">      </span><span class="nt">&quot;delete_timed_out_pods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">      </span><span class="nt">&quot;watch_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">      </span><span class="nt">&quot;min_kubernetes_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.28&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">      </span><span class="nt">&quot;orb_instance_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;orb-prod&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">      </span><span class="nt">&quot;orphan_gc_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">      </span><span class="nt">&quot;orphan_gc_interval_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">,</span>
-<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">      </span><span class="nt">&quot;auto_cleanup_orphans&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">      </span><span class="nt">&quot;periodic_resync_interval_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">180</span><span class="p">,</span>
-<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">      </span><span class="nt">&quot;events_watch_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">      </span><span class="nt">&quot;reject_high_risk_pod_fields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">      </span><span class="nt">&quot;naming&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">        </span><span class="nt">&quot;prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;orb&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="w">        </span><span class="nt">&quot;uuid_chars&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span>
-<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="w">      </span><span class="p">}</span>
-<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="p">}</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">      </span><span class="nt">&quot;return_unreadable_timeout_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">7200</span><span class="p">,</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">      </span><span class="nt">&quot;delete_timed_out_pods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">      </span><span class="nt">&quot;watch_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">      </span><span class="nt">&quot;min_kubernetes_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.28&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">      </span><span class="nt">&quot;orb_instance_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;orb-prod&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">      </span><span class="nt">&quot;orphan_gc_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">      </span><span class="nt">&quot;orphan_gc_interval_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">,</span>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">      </span><span class="nt">&quot;auto_cleanup_orphans&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">      </span><span class="nt">&quot;periodic_resync_interval_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">180</span><span class="p">,</span>
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">      </span><span class="nt">&quot;events_watch_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">      </span><span class="nt">&quot;reject_high_risk_pod_fields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">      </span><span class="nt">&quot;naming&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="w">        </span><span class="nt">&quot;prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;orb&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="w">        </span><span class="nt">&quot;uuid_chars&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span>
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="w">      </span><span class="p">}</span>
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="p">}</span>
 </code></pre></div>
 <p>This is the configuration of a production deployment that:</p>
 <ul>
