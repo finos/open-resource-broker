@@ -315,6 +315,7 @@ dev = [
     "pg8000>=1.31.0",
     "kmock>=0.7",
     "filelock>=4.1.0",  # cross-worker lock in live Kubernetes tests
+    "defusedxml>=0.7.1,<1.0.0",  # SDK license gate parses registry XML
     # --- toolchain from dependency-groups.docs ---
     "mkdocs>=1.5.0,<2.0.0",
     "mkdocs-material>=9.1.0,<10.0.0",
@@ -458,6 +459,7 @@ test = [
     # k8s HTTP-level mock server (test-only, not shipped with the package)
     "kmock>=0.7",
     "filelock>=4.1.0",  # cross-worker lock in live Kubernetes tests
+    "defusedxml>=0.7.1,<1.0.0",  # SDK license gate parses registry XML
 ]
 
 docs = [
