@@ -42,6 +42,8 @@ _orb() {
                         '1:action:(status list show cancel)' \
                         '--status[Filter by request status]:status:' \
                         '--limit[Limit number of results]:limit:' \
+                        '--start-time[Created at or after (ISO-8601)]:time:' \
+                        '--end-time[Created at or before (ISO-8601)]:time:' \
                         '*::request_args:_files'
                     ;;
                 providers)

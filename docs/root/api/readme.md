@@ -30,7 +30,7 @@ The API supports multiple authentication methods:
 - `DELETE /machines/{id}` - Terminate machine
 
 #### Requests
-- `GET /requests` - List provisioning requests
+- `GET /requests` - List provisioning requests. Optional `start_time` and `end_time` query parameters keep only requests created within the range (inclusive, ISO-8601; no offset means UTC, a date-only value is midnight UTC). A malformed value or a start after the end returns 400, and they cannot be combined with `sync=true`.
 - `GET /requests/{id}` - Get request status
 - `POST /requests/{id}/cancel` - Cancel request
 - `POST /requests/{id}/confirm-terminated` - Confirm return-request machines are terminated (operator role)

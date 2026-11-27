@@ -523,7 +523,13 @@ public sealed class OrbClient : IAsyncDisposable
     /// <para>
     /// Exposes the canonical list-filter set shared across all SDKs: status,
     /// limit, offset, sync, cursor, q, sort, providerName, providerType,
-    /// templateId, requestType, filterExpressions.
+    /// templateId, requestType, filterExpressions, startTime, endTime.
+    /// </para>
+    /// <para>
+    /// startTime and endTime are inclusive bounds on created_at, sent as UTC with
+    /// six fractional digits. They follow cancellationToken so existing positional
+    /// calls keep compiling; the compiled signature changed, so callers rebuilt
+    /// against this version need a recompile.
     /// </para>
     /// </summary>
     public async Task<RequestStatusResponse> ListRequestsAsync(
@@ -531,7 +537,8 @@ public sealed class OrbClient : IAsyncDisposable
         bool? sync = null, string? cursor = null, string? q = null, string? sort = null,
         string? providerName = null, string? providerType = null, string? templateId = null,
         string? requestType = null, IEnumerable<string>? filterExpressions = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        DateTimeOffset? startTime = null, DateTimeOffset? endTime = null)
     {
         var qp = new Dictionary<string, string>();
         if (status != null) qp["status"] = status;
@@ -546,8 +553,13 @@ public sealed class OrbClient : IAsyncDisposable
         if (templateId != null) qp["template_id"] = templateId;
         if (requestType != null) qp["request_type"] = requestType;
         if (filterExpressions != null) qp["filter_expressions"] = string.Join(",", filterExpressions);
+        if (startTime.HasValue) qp["start_time"] = FormatRequestTime(startTime.Value);
+        if (endTime.HasValue) qp["end_time"] = FormatRequestTime(endTime.Value);
         return await GetAsync<RequestStatusResponse>("/api/v1/requests/", qp, ct).ConfigureAwait(false);
     }
+
+    private static string FormatRequestTime(DateTimeOffset t) =>
+        t.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
     /// listReturnRequests — GET /api/v1/requests/return

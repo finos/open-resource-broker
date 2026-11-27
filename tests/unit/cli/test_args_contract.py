@@ -158,6 +158,38 @@ async def test_requests_list_offset_forwarded_to_orchestrator():
 
 
 @pytest.mark.asyncio
+async def test_requests_list_time_range_forwarded_as_strings():
+    from unittest.mock import AsyncMock, MagicMock
+
+    from orb.application.dto.interface_response import InterfaceResponse
+    from orb.application.services.orchestration.dtos import ListRequestsOutput
+    from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
+    from orb.interface.request_command_handlers import handle_list_requests
+    from orb.interface.response_formatting_service import ResponseFormattingService
+
+    container = MagicMock()
+    list_req_orch = AsyncMock(spec=ListRequestsOrchestrator)
+    list_req_orch.execute.return_value = ListRequestsOutput(requests=[])
+    formatter = MagicMock(spec=ResponseFormattingService)
+    formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
+    container.get.side_effect = lambda t: {
+        ListRequestsOrchestrator: list_req_orch,
+        ResponseFormattingService: formatter,
+    }.get(t, MagicMock())
+
+    parser, sp = _make_subparsers()
+    add_request_actions(sp)
+    ns = parser.parse_args(
+        ["list", "--start-time", "2026-11-01", "--end-time", "2026-11-02T00:00:00Z"]
+    )
+    ns._container = container
+    await handle_list_requests(ns)
+
+    call_input = list_req_orch.execute.call_args[0][0]
+    assert (call_input.start_time, call_input.end_time) == ("2026-11-01", "2026-11-02T00:00:00Z")
+
+
+@pytest.mark.asyncio
 async def test_requests_list_status_forwarded_to_orchestrator():
     from unittest.mock import AsyncMock, MagicMock
 
@@ -263,6 +295,8 @@ def test_parse_args_uses_build_parser():
         ("machines", "start", "--machine-id", "-m"),
         ("requests", "show", "--request-id", "-r"),
         ("requests", "cancel", "--request-id", "-r"),
+        ("requests", "list", "--start-time", None),
+        ("requests", "list", "--end-time", None),
         ("templates", "validate", "--template-id", "-t"),
     ],
 )

@@ -96,3 +96,17 @@ class TestGenerateZshCompletion:
 
     def test_idempotent_on_repeated_calls(self):
         assert generate_zsh_completion() == generate_zsh_completion()
+
+
+@pytest.mark.unit
+class TestRequestsListTimeRangeFlags:
+    def test_bash_offers_range_flags(self):
+        result = generate_bash_completion()
+        block = result.split('"requests list")', 1)[1].split(";;", 1)[0]
+        assert "--start-time" in block
+        assert "--end-time" in block
+
+    def test_zsh_offers_range_flags(self):
+        result = generate_zsh_completion()
+        assert "'--start-time[" in result
+        assert "'--end-time[" in result

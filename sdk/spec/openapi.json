@@ -1324,6 +1324,42 @@
               "default": [],
               "title": "Filter Expressions"
             }
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only requests created at or after the given time, inclusive. ISO-8601: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+HH:MM]; no offset means UTC and a date-only value is midnight UTC. A malformed value is rejected with 400.",
+              "title": "Start Time"
+            },
+            "description": "Only requests created at or after the given time, inclusive. ISO-8601: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+HH:MM]; no offset means UTC and a date-only value is midnight UTC. A malformed value is rejected with 400."
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only requests created at or before the given time, inclusive. ISO-8601: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+HH:MM]; no offset means UTC and a date-only value is midnight UTC. A malformed value is rejected with 400.",
+              "title": "End Time"
+            },
+            "description": "Only requests created at or before the given time, inclusive. ISO-8601: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+HH:MM]; no offset means UTC and a date-only value is midnight UTC. A malformed value is rejected with 400."
           }
         ],
         "responses": {

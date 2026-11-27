@@ -40,6 +40,11 @@ _TERMINAL_REQUEST_STATUSES: tuple[str, ...] = (
 )
 
 
+def _iso(value: Any) -> Optional[str]:
+    """ISO-8601 string for a datetime; strings and None pass through."""
+    return value.isoformat() if hasattr(value, "isoformat") else value
+
+
 class ORBClient:
     """
     Main SDK interface for Open Resource Broker operations.
@@ -717,6 +722,9 @@ class ORBClient:
                 provider_name=kwargs.get("provider_name") or self._config.provider_name,
                 provider_type=kwargs.get("provider_type") or self._config.provider_type,
                 filter_expressions=kwargs.get("filter_expressions") or [],
+                # A datetime or an ISO-8601 string; a naive datetime is read as UTC.
+                start_time=_iso(kwargs.get("start_time")),
+                end_time=_iso(kwargs.get("end_time")),
             ),
             format=kwargs.get("format"),
         )

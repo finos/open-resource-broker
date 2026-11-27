@@ -692,6 +692,21 @@ func WithRequestType(rt string) ListRequestsOption {
 	return func(q url.Values) { q.Set("request_type", rt) }
 }
 
+// requestTimeLayout is UTC with exactly six fractional digits. RFC3339Nano trims
+// trailing zeros and can emit more digits than the server accepts on every
+// supported Python version.
+const requestTimeLayout = "2006-01-02T15:04:05.000000Z07:00"
+
+// WithRequestStartTime keeps only requests created at or after t (inclusive).
+func WithRequestStartTime(t time.Time) ListRequestsOption {
+	return func(q url.Values) { q.Set("start_time", t.UTC().Format(requestTimeLayout)) }
+}
+
+// WithRequestEndTime keeps only requests created at or before t (inclusive).
+func WithRequestEndTime(t time.Time) ListRequestsOption {
+	return func(q url.Values) { q.Set("end_time", t.UTC().Format(requestTimeLayout)) }
+}
+
 // ListRequests returns all requests, optionally filtered.
 func (c *Client) ListRequests(ctx context.Context, opts ...ListRequestsOption) ([]Request, error) {
 	q := url.Values{}

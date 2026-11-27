@@ -433,3 +433,61 @@ async def test_call_tool_format_argument_selects_another_format_and_rejects_unkn
     assert chosen.is_error is False
     assert json.loads(chosen.content[0].text)["marker"] == "other-format"
     assert unknown.is_error is True
+
+
+# --------------------------------------------------------------------------- #
+# list_requests creation-time range                                           #
+# --------------------------------------------------------------------------- #
+
+
+def test_list_requests_schema_advertises_the_range_as_strings() -> None:
+    from orb.application.services.orchestration.dtos import ListRequestsInput
+
+    props = schema_from_input_dto(ListRequestsInput)["properties"]
+    assert props["start_time"]["type"] == ["string", "null"]
+    assert props["end_time"]["type"] == ["string", "null"]
+
+
+@pytest.mark.asyncio
+async def test_list_requests_tool_passes_the_range_to_the_orchestrator() -> None:
+    from orb.application.services.orchestration.dtos import ListRequestsOutput
+    from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
+
+    orchestrator = AsyncMock(spec=ListRequestsOrchestrator)
+    orchestrator.execute.return_value = ListRequestsOutput(requests=[])
+    container = MagicMock(spec=DIContainer)
+    container.get.side_effect = lambda cls: {
+        ListRequestsOrchestrator: orchestrator,
+        ResponseFormattingService: MagicMock(spec=ResponseFormattingService),
+    }.get(cls)
+
+    server = build_server(container)
+    await _call_tool(
+        server, "list_requests", {"start_time": "2026-11-01", "end_time": "2026-11-02T00:00:00Z"}
+    )
+
+    dto = orchestrator.execute.call_args[0][0]
+    assert (dto.start_time, dto.end_time) == ("2026-11-01", "2026-11-02T00:00:00Z")
+
+
+@pytest.mark.asyncio
+async def test_list_requests_tool_bad_timestamp_is_an_error_naming_the_formats() -> None:
+    from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
+    from orb.infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
+    # A real orchestrator, so the validation message is the genuine one
+    orchestrator = ListRequestsOrchestrator(MagicMock(), MagicMock(), MagicMock())
+    container = MagicMock(spec=DIContainer)
+    container.get.side_effect = lambda cls: {
+        ListRequestsOrchestrator: orchestrator,
+        ResponseFormattingService: ResponseFormattingService(
+            DefaultSchedulerStrategy(logger=MagicMock())
+        ),
+    }.get(cls)
+
+    server = build_server(container)
+    tool_result = await _call_tool(server, "list_requests", {"start_time": "yesterday"})
+
+    assert tool_result.is_error is True
+    assert "start_time is not a valid timestamp" in tool_result.content[0].text
+    assert "YYYY-MM-DD" in tool_result.content[0].text

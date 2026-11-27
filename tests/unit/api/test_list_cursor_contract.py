@@ -186,3 +186,95 @@ class TestListCursorContract:
         body = client.get("/requests/", params={"limit": 4, "cursor": cursor}).json()
 
         assert body["requests"] == newest_first[2:6]
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestListDateRange:
+    def test_range_narrows_rows_and_total(self, client_and_rows) -> None:
+        client, rows = client_and_rows
+        by_minute = {
+            int((r.created_at - BASE).total_seconds() // 60): str(r.request_id) for r in rows
+        }
+
+        body = client.get(
+            "/requests/",
+            params={"start_time": "2026-05-01T00:02:00Z", "end_time": "2026-05-01T00:04:00+00:00"},
+        ).json()
+
+        assert sorted(body["requests"]) == sorted(by_minute[m] for m in (2, 3, 4))
+        assert body["total_count"] == 3
+
+    def test_cursor_walk_stays_inside_the_range(self, client_and_rows) -> None:
+        client, rows = client_and_rows
+        in_range = {
+            str(r.request_id)
+            for r in rows
+            if BASE + timedelta(minutes=1) <= r.created_at <= BASE + timedelta(minutes=5)
+        }
+        seen: list[str] = []
+        cursor = None
+        while True:
+            params = {
+                "limit": 2,
+                "start_time": "2026-05-01T00:01:00Z",
+                "end_time": "2026-05-01T00:05:00Z",
+            }
+            if cursor:
+                params["cursor"] = cursor
+            body = client.get("/requests/", params=params).json()
+            assert body["total_count"] == len(in_range)
+            seen.extend(body["requests"])
+            cursor = body["next_cursor"]
+            if cursor is None:
+                break
+
+        assert len(seen) == len(set(seen))
+        assert set(seen) == in_range
+
+    def test_date_only_end_excludes_that_day(self, client_and_rows) -> None:
+        client, rows = client_and_rows
+        body = client.get("/requests/", params={"end_time": "2026-05-01"}).json()
+        # Midnight UTC: only the row created exactly then, not the rest of the day
+        assert body["requests"] == [str(rows[0].request_id)]
+
+    def test_blank_bounds_mean_unset(self, client_and_rows) -> None:
+        client, rows = client_and_rows
+        body = client.get("/requests/", params={"start_time": "", "end_time": " "}).json()
+        assert body["total_count"] == len(rows)
+
+    @pytest.mark.parametrize("param", ["start_time", "end_time"])
+    def test_malformed_bound_is_400(self, client_and_rows, param) -> None:
+        client, _ = client_and_rows
+        assert client.get("/requests/", params={param: "last tuesday"}).status_code == 400
+
+    @pytest.mark.parametrize("param", ["start_time", "end_time"])
+    @pytest.mark.parametrize("extreme", ["0001-01-01T00:00:00+05:00", "9999-12-31T23:59:59-05:00"])
+    def test_bound_outside_the_datetime_range_after_utc_conversion_is_400(
+        self, client_and_rows, param, extreme
+    ) -> None:
+        client, _ = client_and_rows
+        assert client.get("/requests/", params={param: extreme}).status_code == 400
+
+    def test_inverted_range_is_400(self, client_and_rows) -> None:
+        client, _ = client_and_rows
+        response = client.get(
+            "/requests/", params={"start_time": "2026-05-02", "end_time": "2026-05-01"}
+        )
+        assert response.status_code == 400
+
+    def test_sync_with_range_is_400(self, client_and_rows) -> None:
+        client, _ = client_and_rows
+        response = client.get("/requests/", params={"sync": "true", "start_time": "2026-05-01"})
+        assert response.status_code == 400
+
+    def test_cursor_from_another_range_is_400(self, client_and_rows) -> None:
+        client, _ = client_and_rows
+        cursor = client.get(
+            "/requests/", params={"limit": 2, "start_time": "2026-05-01T00:00:00Z"}
+        ).json()["next_cursor"]
+        response = client.get(
+            "/requests/",
+            params={"limit": 2, "start_time": "2026-05-01T00:01:00Z", "cursor": cursor},
+        )
+        assert response.status_code == 400

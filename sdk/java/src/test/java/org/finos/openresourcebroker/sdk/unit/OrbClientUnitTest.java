@@ -7,6 +7,7 @@ import okhttp3.mockwebserver.RecordedRequest;
 
 import org.finos.openresourcebroker.sdk.auth.AwsSigV4Auth;
 import org.finos.openresourcebroker.sdk.auth.BearerTokenAuth;
+import org.finos.openresourcebroker.sdk.client.ListRequestsParams;
 import org.finos.openresourcebroker.sdk.client.OrbApiException;
 import org.finos.openresourcebroker.sdk.client.OrbClient;
 import org.finos.openresourcebroker.sdk.client.OrbNotFoundException;
@@ -846,5 +847,37 @@ class OrbClientUnitTest {
                     "should wrap the parse failure: " + ex);
             assertEquals(1, connections.get(), "malformed responses must not be retried");
         }
+    }
+
+    @Test
+    void testListRequests_sendsTimeRangeWhenSet() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"requests\": []}"));
+
+        client.listRequests(new ListRequestsParams()
+                .startTime("2026-11-01T00:00:00Z")
+                .endTime("2026-11-02T00:00:00.000000Z"));
+
+        RecordedRequest recorded = server.takeRequest(5, TimeUnit.SECONDS);
+        assertNotNull(recorded);
+        assertEquals("2026-11-01T00:00:00Z", recorded.getRequestUrl().queryParameter("start_time"));
+        assertEquals("2026-11-02T00:00:00.000000Z", recorded.getRequestUrl().queryParameter("end_time"));
+    }
+
+    @Test
+    void testListRequests_omitsTimeRangeWhenUnset() throws Exception {
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"requests\": []}"));
+
+        client.listRequests(new ListRequestsParams().status("pending"));
+
+        RecordedRequest recorded = server.takeRequest(5, TimeUnit.SECONDS);
+        assertNotNull(recorded);
+        assertNull(recorded.getRequestUrl().queryParameter("start_time"));
+        assertNull(recorded.getRequestUrl().queryParameter("end_time"));
     }
 }

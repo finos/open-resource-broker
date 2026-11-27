@@ -10,6 +10,7 @@ semantics.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from orb.application.base.handlers import BaseQueryHandler
@@ -356,6 +357,13 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, Paginated[RequestD
                             )
                         ]
 
+                    if query.start_time or query.end_time:
+                        requests = [
+                            r
+                            for r in requests
+                            if self._in_range(r.created_at, query.start_time, query.end_time)
+                        ]
+
                     total_count = len(requests)
 
                     limit: Optional[int] = None
@@ -431,6 +439,17 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, Paginated[RequestD
             raise
 
     @staticmethod
+    def _in_range(
+        created_at: Optional[datetime], start: Optional[datetime], end: Optional[datetime]
+    ) -> bool:
+        """True when created_at lies within the inclusive bounds; naive values are UTC."""
+        if created_at is None:
+            return False
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        return (start is None or created_at >= start) and (end is None or created_at <= end)
+
+    @staticmethod
     def _push_down(uow: Any, query: ListRequestsQuery, spec: Optional[SortSpec]) -> Any:
         """The page from the database, or None when this query must page in process.
 
@@ -443,6 +462,8 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, Paginated[RequestD
             or query.limit <= 0
             or getattr(query, "q", None)
             or query.filter_expressions
+            or query.start_time
+            or query.end_time
             or (query.offset and query.after is None)
         ):
             return None

@@ -7,6 +7,9 @@ handler and encodes the next cursor from the handler's reported
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from typing import Optional
+
 from orb.application.dto.queries import SyncAndListActiveRequestsQuery
 from orb.application.ports.command_bus_port import CommandBusPort
 from orb.application.ports.query_bus_port import QueryBusPort
@@ -25,8 +28,26 @@ from orb.application.services.orchestration.page_cursor import (
 )
 from orb.domain.base.exceptions import ValidationError
 from orb.domain.base.ports.logging_port import LoggingPort
+from orb.domain.base.utils import parse_iso_datetime
 
 _DEFAULT_SORT = "-created_at"
+
+_TIME_FORMAT_HINT = (
+    "ISO-8601 as accepted by Python datetime.fromisoformat; "
+    "use YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+HH:MM]"
+)
+
+
+def _parse_bound(name: str, value: Optional[str]) -> Optional[datetime]:
+    """Parse one range bound to aware UTC; blank means unset."""
+    if value is None or not value.strip():
+        return None
+    try:
+        return parse_iso_datetime(value).astimezone(timezone.utc)
+    except (ValueError, OverflowError):
+        # OverflowError: a non-UTC offset at the datetime limits has no UTC form
+        # The offending value is not echoed back to the caller or the log.
+        raise ValidationError(f"{name} is not a valid timestamp: {_TIME_FORMAT_HINT}") from None
 
 
 class ListRequestsOrchestrator(OrchestratorBase[ListRequestsInput, ListRequestsOutput]):
@@ -50,6 +71,13 @@ class ListRequestsOrchestrator(OrchestratorBase[ListRequestsInput, ListRequestsO
         if input.sync and (input.q or input.sort):
             raise ValidationError("q and sort are not supported with sync=true")
 
+        start_time = _parse_bound("start_time", input.start_time)
+        end_time = _parse_bound("end_time", input.end_time)
+        if input.sync and (start_time or end_time):
+            raise ValidationError("start_time and end_time are not supported with sync=true")
+        if start_time and end_time and start_time > end_time:
+            raise ValidationError("start_time must not be after end_time")
+
         sort = input.sort if input.sort else _DEFAULT_SORT
         fingerprint = query_fingerprint(
             "requests",
@@ -62,6 +90,8 @@ class ListRequestsOrchestrator(OrchestratorBase[ListRequestsInput, ListRequestsO
             filter_expressions=input.filter_expressions,
             sync=input.sync,
             sort=sort,
+            start_time=start_time.isoformat() if start_time else None,
+            end_time=end_time.isoformat() if end_time else None,
         )
         decoded = decode_page_cursor(input.cursor, fingerprint, sort)
         offset = decoded.offset if decoded else input.offset
@@ -93,6 +123,8 @@ class ListRequestsOrchestrator(OrchestratorBase[ListRequestsInput, ListRequestsO
                 q=input.q,
                 sort=sort,
                 after=decoded.position if decoded else None,
+                start_time=start_time,
+                end_time=end_time,
             )
 
         result = await self._dispatch("ListRequests", self._query_bus.execute(query))

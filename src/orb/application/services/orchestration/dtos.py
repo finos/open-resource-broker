@@ -122,6 +122,10 @@ class ListRequestsInput:
     q: Optional[str] = None
     sort: Optional[str] = None
     cursor: Optional[str] = None
+    # Inclusive ISO-8601 bounds on created_at. Kept as strings so every surface
+    # (REST, CLI, MCP, SDK) binds them the same way; parsed once in the orchestrator.
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)

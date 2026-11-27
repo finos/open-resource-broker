@@ -1,5 +1,6 @@
 """Request-related queries for CQRS implementation."""
 
+from datetime import datetime
 from typing import Optional
 
 from orb.application.dto.base import BaseQuery
@@ -21,6 +22,9 @@ class ListRequestsQuery(BaseQuery):
     sort: Optional[str] = None
     # Keyset position (sort text, id) of the last row of the previous page
     after: Optional[tuple[str, str]] = None
+    # Inclusive bounds on created_at; timezone-aware UTC
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
 
 
 class GetRequestMetricsQuery(BaseQuery):

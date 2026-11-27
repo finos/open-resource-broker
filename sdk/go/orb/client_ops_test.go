@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
+	"time"
 
 	"github.com/finos/open-resource-broker/sdk/go/orb"
 )
@@ -385,5 +387,43 @@ func TestGetProviderSchema(t *testing.T) {
 	}
 	if schema["type"] != "object" {
 		t.Fatalf("expected type=object in schema")
+	}
+}
+
+func TestListRequestsTimeRange(t *testing.T) {
+	var got url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"requests": []any{}})
+	}))
+	defer srv.Close()
+
+	c, err := orb.NewClient(orb.WithBaseURL(srv.URL), orb.WithAuth(orb.WithNoAuth()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	// A non-UTC zone: the bound must be sent as the equivalent UTC instant.
+	zone := time.FixedZone("plus2", 2*60*60)
+	start := time.Date(2026, 11, 1, 12, 0, 0, 500000000, zone)
+	end := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	if _, err := c.ListRequests(context.Background(),
+		orb.WithRequestStartTime(start), orb.WithRequestEndTime(end)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v := got.Get("start_time"); v != "2026-11-01T10:00:00.500000Z" {
+		t.Fatalf("start_time = %q", v)
+	}
+	if v := got.Get("end_time"); v != "2026-11-02T00:00:00.000000Z" {
+		t.Fatalf("end_time = %q", v)
+	}
+
+	if _, err := c.ListRequests(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Has("start_time") || got.Has("end_time") {
+		t.Fatalf("range sent when unset: %v", got)
 	}
 }

@@ -19,6 +19,10 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/FINOS.OpenResourceBroker/FINOS.OpenResourceBroker.csproj" />
+    <!-- Test projects that use the generated model types directly must reference
+         the generated project themselves (the client references it with
+         PrivateAssets="all", so the models do not flow transitively). -->
+    <ProjectReference Include="../../generated/src/OpenResourceBroker.Sdk/OpenResourceBroker.Sdk.csproj" />
   </ItemGroup>
 
 </Project>
