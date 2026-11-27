@@ -85,6 +85,63 @@ class TestBuildSystemTags:
         assert d["orb:created-at"]  # non-empty
 
 
+class TestResourceIdTag:
+    def test_resource_id_adds_the_tag(self):
+        tags = build_system_tags("req-1", "tmpl-1", "ASG", resource_id="orb-asg-req-1")
+        assert _tag_dict(tags)["orb:resource-id"] == "orb-asg-req-1"
+        assert {t["Key"] for t in tags} == ORB_SYSTEM_KEYS | {"orb:resource-id"}
+
+    def test_no_resource_id_emits_no_tag(self):
+        assert "orb:resource-id" not in _tag_dict(build_system_tags("req-1", "tmpl-1", "ASG"))
+        assert "orb:resource-id" not in _tag_dict(
+            build_system_tags("req-1", "tmpl-1", "ASG", resource_id=None)
+        )
+
+    def test_build_resource_tags_passes_resource_id_through(self):
+        tags = build_resource_tags(
+            config_port=_make_config_port(),
+            request_id="req-1",
+            template_id="tmpl-1",
+            resource_prefix_key="asg",
+            provider_api="ASG",
+            resource_id="orb-asg-req-1",
+        )
+        assert _tag_dict(tags)["orb:resource-id"] == "orb-asg-req-1"
+
+    def test_build_resource_tags_without_resource_id_emits_no_tag(self):
+        tags = build_resource_tags(
+            config_port=_make_config_port(),
+            request_id="req-1",
+            template_id="tmpl-1",
+            resource_prefix_key="asg",
+            provider_api="ASG",
+        )
+        assert "orb:resource-id" not in _tag_dict(tags)
+
+    def test_user_supplied_resource_id_tag_is_replaced_by_the_system_value(self):
+        tags = build_resource_tags(
+            config_port=_make_config_port(),
+            request_id="req-1",
+            template_id="tmpl-1",
+            resource_prefix_key="asg",
+            provider_api="ASG",
+            template_tags={"orb:resource-id": "spoofed", "env": "prod"},
+            resource_id="orb-asg-req-1",
+        )
+        assert [t["Value"] for t in tags if t["Key"] == "orb:resource-id"] == ["orb-asg-req-1"]
+
+    def test_user_supplied_resource_id_tag_is_stripped_without_a_system_value(self):
+        tags = build_resource_tags(
+            config_port=_make_config_port(),
+            request_id="req-1",
+            template_id="tmpl-1",
+            resource_prefix_key="asg",
+            provider_api="ASG",
+            template_tags={"orb:resource-id": "spoofed"},
+        )
+        assert "orb:resource-id" not in _tag_dict(tags)
+
+
 class TestBuildResourceTagsReservedNamespace:
     def test_orb_prefixed_template_tag_raises(self):
         cp = _make_config_port()
@@ -258,6 +315,41 @@ class TestASGHandlerTags:
         warning_calls = handler._logger.warning.call_args_list
         assert any("orb:" in str(call) for call in warning_calls)
 
+    def test_tag_asg_resource_id_is_the_asg_name(self):
+        handler = self._make_handler()
+        template = _make_template()
+        template.tags = None
+
+        handler._tag_asg("orb-asg-req-123", template, "req-123")
+
+        tags = handler._retry_with_backoff.call_args[1]["Tags"]
+        resource_id_tags = [t for t in tags if t["Key"] == "orb:resource-id"]
+        assert len(resource_id_tags) == 1
+        assert resource_id_tags[0]["Value"] == "orb-asg-req-123"
+        assert resource_id_tags[0]["PropagateAtLaunch"] is True
+        assert resource_id_tags[0]["ResourceId"] == "orb-asg-req-123"
+        assert resource_id_tags[0]["ResourceType"] == "auto-scaling-group"
+
+    def test_tag_asg_user_resource_id_tag_cannot_override_the_asg_name(self):
+        handler = self._make_handler()
+        template = _make_template()
+        template.tags = {"orb:resource-id": "spoofed"}
+
+        handler._tag_asg("orb-asg-req-123", template, "req-123")
+
+        tags = handler._retry_with_backoff.call_args[1]["Tags"]
+        assert [t["Value"] for t in tags if t["Key"] == "orb:resource-id"] == ["orb-asg-req-123"]
+
+    def test_tag_asg_failure_is_logged_and_does_not_raise(self):
+        handler = self._make_handler()
+        handler._retry_with_backoff.side_effect = RuntimeError("denied")
+        template = _make_template()
+        template.tags = None
+
+        handler._tag_asg("orb-asg-req-123", template, "req-123")
+
+        handler._logger.warning.assert_called_once()
+
     def assertLogs(self, logger_name, level):
         import unittest
 
@@ -333,6 +425,13 @@ class TestEC2FleetHandlerTags:
         keys = {t["Key"] for t in inst_spec["Tags"]}
         assert ORB_SYSTEM_KEYS.issubset(keys)
 
+    def test_no_resource_id_tag_on_any_spec(self):
+        handler = self._make_handler()
+        for fleet_type in (AWSFleetType.MAINTAIN, AWSFleetType.REQUEST, AWSFleetType.INSTANT):
+            config = self._call_legacy(handler, fleet_type=fleet_type)
+            for spec in config["TagSpecifications"]:
+                assert "orb:resource-id" not in {t["Key"] for t in spec["Tags"]}
+
 
 # ---------------------------------------------------------------------------
 # SpotFleet handler tag tests
@@ -379,6 +478,12 @@ class TestSpotFleetHandlerTags:
         config = self._call_legacy(handler)
         resource_types = {s["ResourceType"] for s in config["TagSpecifications"]}
         assert "instance" not in resource_types
+
+    def test_no_resource_id_tag(self):
+        handler = self._make_handler()
+        config = self._call_legacy(handler)
+        for spec in config["TagSpecifications"]:
+            assert "orb:resource-id" not in {t["Key"] for t in spec["Tags"]}
 
     def test_only_spot_fleet_request_resource_type(self):
         """SpotFleet TagSpecifications should only contain 'spot-fleet-request'."""
@@ -432,3 +537,22 @@ class TestLaunchTemplateManagerTags:
         tags = manager._create_instance_tags(self._make_template(), self._make_request())
         keys = {t["Key"] for t in tags}
         assert ORB_SYSTEM_KEYS.issubset(keys)
+
+    def test_instance_tags_carry_no_resource_id(self):
+        manager = self._make_manager()
+        tags = manager._create_instance_tags(self._make_template(), self._make_request())
+        assert "orb:resource-id" not in _tag_dict(tags)
+
+    def test_launch_template_tags_carry_the_given_resource_id(self):
+        manager = self._make_manager()
+        tags = manager._create_launch_template_tags(
+            self._make_template(), self._make_request(), resource_id="lt-0abc"
+        )
+        d = _tag_dict(tags)
+        assert d["orb:resource-id"] == "lt-0abc"
+        assert d["orb:provider-api"] == "LaunchTemplate"
+
+    def test_launch_template_tags_without_resource_id_carry_none(self):
+        manager = self._make_manager()
+        tags = manager._create_launch_template_tags(self._make_template(), self._make_request())
+        assert "orb:resource-id" not in _tag_dict(tags)

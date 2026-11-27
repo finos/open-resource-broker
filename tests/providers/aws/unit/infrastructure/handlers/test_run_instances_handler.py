@@ -528,6 +528,26 @@ class TestRunInstancesHandlerNetworkingInject:
             assert params["SecurityGroupIds"] == ["sg-1"]
 
 
+class TestRunInstancesTags:
+    def test_legacy_params_carry_no_resource_id_tag(self):
+        handler = _handler_with_config_port()
+        handler.launch_template_manager.inspect_launch_template.return_value = LTInspection(
+            networking=LTNetworkingState.NO_NETWORKING, sets_market_options=False
+        )
+        aws_template = _make_aws_template(subnet_ids=["subnet-1"], security_group_ids=["sg-1"])
+
+        params = handler._create_run_instances_params_legacy(
+            aws_template, _make_request_for_params(), "lt-abc", "$Latest"
+        )
+
+        tag_specs = params["TagSpecifications"]
+        assert tag_specs
+        for spec in tag_specs:
+            keys = {t["Key"] for t in spec["Tags"]}
+            assert "orb:request-id" in keys
+            assert "orb:resource-id" not in keys
+
+
 class TestRunInstancesTeardownClassification:
     """Intentional teardown is not a launch failure."""
 

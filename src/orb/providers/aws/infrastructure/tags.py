@@ -23,6 +23,8 @@ def build_system_tags(
     template_id: str,
     provider_api: str,
     created_at: str | None = None,
+    *,
+    resource_id: str | None = None,
 ) -> list[dict[str, str]]:
     """Return the list of ``{"Key": k, "Value": v}`` dicts for all ORB system tags.
 
@@ -31,18 +33,25 @@ def build_system_tags(
         template_id:  The ORB template UUID.
         provider_api: The AWS API used (e.g. ``"SpotFleet"``, ``"EC2Fleet"``).
         created_at:   Optional ISO-8601 UTC timestamp.  Defaults to *now*.
+        resource_id:  Optional name or ID of the ORB-created resource the tags are
+                      applied to (or that owns the tagged resource).  When given,
+                      an ``orb:resource-id`` tag is added; when omitted, no such
+                      tag is emitted.
 
     Returns:
         A list of tag dicts ready to be embedded in an AWS API call.
     """
     ts = created_at or datetime.now(timezone.utc).isoformat()
-    return [
+    tags = [
         {"Key": "orb:managed-by", "Value": "open-resource-broker"},
         {"Key": "orb:request-id", "Value": str(request_id)},
         {"Key": "orb:template-id", "Value": str(template_id)},
         {"Key": "orb:provider-api", "Value": provider_api},
         {"Key": "orb:created-at", "Value": ts},
     ]
+    if resource_id:
+        tags.append({"Key": "orb:resource-id", "Value": str(resource_id)})
+    return tags
 
 
 def build_resource_tags(
@@ -53,6 +62,8 @@ def build_resource_tags(
     provider_api: str,
     template_tags: dict[str, Any] | None = None,
     logger: LoggingPort | None = None,
+    *,
+    resource_id: str | None = None,
 ) -> list[dict[str, str]]:
     """Build the flat tag list for an AWS resource.
 
@@ -68,6 +79,8 @@ def build_resource_tags(
         provider_api:       AWS API label for the system tag (e.g. ``"EC2Fleet"``).
         template_tags:      Optional dict of user-supplied tags from the template.
         logger:             Optional LoggingPort for warnings about stripped keys.
+        resource_id:        Optional name or ID of the ORB-created resource; adds
+                            an ``orb:resource-id`` system tag when given.
 
     Returns:
         Merged list of ``{"Key": k, "Value": v}`` dicts ready for AWS API calls.
@@ -93,6 +106,7 @@ def build_resource_tags(
             request_id=request_id,
             template_id=template_id,
             provider_api=provider_api,
+            resource_id=resource_id,
         ),
     )
 

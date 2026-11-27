@@ -368,3 +368,38 @@ class TestASGAcquireAsyncPolling:
         assert result["success"] is True
         assert result["provider_data"]["requires_async_polling"] is True
         assert result["provider_data"]["resource_type"] == "asg"
+
+
+class TestASGCreateTagging:
+    def test_user_native_spec_tags_are_kept_and_the_group_is_topped_up_with_resource_id(self):
+        """A native spec's own Tags reach create; the post-create call adds orb:resource-id."""
+        handler = _make_handler()
+        config_port = MagicMock()
+        config_port.get_resource_prefix.return_value = "orb-"
+        handler.config_port = config_port
+        handler.launch_template_manager.create_or_update_launch_template.return_value = MagicMock(
+            template_id="lt-1", version="1"
+        )
+        user_tags = [{"Key": "team", "Value": "a", "PropagateAtLaunch": True}]
+        handler._config_builder = MagicMock()
+        handler._config_builder.build.return_value = {
+            "AutoScalingGroupName": "orb-req-1",
+            "Tags": user_tags,
+        }
+        handler._retry_with_backoff = MagicMock()
+        aws_template = MagicMock()
+        aws_template.template_id = "tmpl-1"
+        aws_template.tags = None
+        aws_template.instance_protection = None
+        aws_template.lifecycle_hooks = None
+        request = MagicMock()
+        request.request_id = "req-1"
+
+        handler._create_asg_internal(request, aws_template)
+
+        calls = {
+            c.kwargs["operation_name"]: c.kwargs for c in handler._retry_with_backoff.call_args_list
+        }
+        assert calls["create_auto_scaling_group"]["Tags"] == user_tags
+        tagged = {t["Key"]: t["Value"] for t in calls["create_or_update_tags"]["Tags"]}
+        assert tagged["orb:resource-id"] == "orb-req-1"

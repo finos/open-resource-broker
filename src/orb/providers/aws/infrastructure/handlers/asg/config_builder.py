@@ -256,11 +256,13 @@ class ASGConfigBuilder(BaseConfigBuilder):
             else []
         )
 
+        asg_name = f"{self._config_port.get_resource_prefix('asg')}{request.request_id}"
         tag_context = self._build_tag_context(
             request_id=str(request.request_id),
             template_id=str(template.template_id),
             provider_api="ASG",
             template_tags=template.tags,
+            resource_id=asg_name,
         )
 
         return {
@@ -274,7 +276,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
             "security_group_ids": template.security_group_ids or [],
             "tags": template.tags or {},
             "price_type": template.price_type,
-            "asg_name": f"{self._config_port.get_resource_prefix('asg')}{request.request_id}",
+            "asg_name": asg_name,
             "min_size": 0,
             "max_size": request.requested_count * 2,
             "default_cooldown": 300,

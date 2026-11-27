@@ -375,3 +375,74 @@ def test_calculate_capacity_distribution_all_on_demand_default():
     template = _make_template(price_type="ondemand", percent_on_demand=None)
     result = builder._calculate_capacity_distribution(template, 5)
     assert result == {"on_demand_count": 5, "spot_count": 0}
+
+
+# ---------------------------------------------------------------------------
+# orb:resource-id tag
+# ---------------------------------------------------------------------------
+
+
+def _tags_by_key(tags: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {t["Key"]: t for t in tags}
+
+
+def test_prepare_template_context_tags_carry_the_asg_name_as_resource_id():
+    config_port = MagicMock()
+    config_port.get_resource_prefix.return_value = "orb-"
+    builder = _make_builder(config_port=config_port)
+
+    context = builder._prepare_template_context(
+        _make_template(), _make_request(request_id="req-123")
+    )
+
+    base_tags = {t["key"]: t["value"] for t in context["base_tags"]}
+    assert base_tags["orb:resource-id"] == "orb-req-123"
+
+
+def test_rendered_default_asg_spec_tags_the_group_and_its_instances_with_the_asg_name():
+    from tests.providers.aws.template_defaults_support import DefaultSpecService
+
+    config_port = MagicMock()
+    config_port.get_resource_prefix.return_value = "orb-"
+    builder = ASGConfigBuilder(DefaultSpecService(), config_port, MagicMock())
+    template = _make_template(tags={"env": "prod"})
+
+    spec = builder.build("orb-req-123", template, _make_request(request_id="req-123"), "lt-1", "1")
+
+    tags = _tags_by_key(spec["Tags"])
+    assert tags["orb:resource-id"]["Value"] == "orb-req-123"
+    assert tags["orb:resource-id"]["PropagateAtLaunch"] is True
+    assert tags["orb:resource-id"]["ResourceId"] == "orb-req-123"
+    assert tags["orb:resource-id"]["ResourceType"] == "auto-scaling-group"
+    assert [t["Value"] for t in spec["Tags"] if t["Key"] == "orb:resource-id"] == ["orb-req-123"]
+    assert tags["env"]["Value"] == "prod"
+
+
+def test_native_asg_spec_keeps_its_own_tags_and_gains_no_resource_id_at_create_time():
+    # A user-supplied native spec is returned as written; the post-create tagging
+    # call in the handler is what adds orb:resource-id for that path.
+    builder = _make_builder(native_spec_service=MagicMock())
+    user_spec = {"Tags": [{"Key": "team", "Value": "a", "PropagateAtLaunch": True}]}
+    builder._process_native_spec = MagicMock(return_value=user_spec)  # type: ignore[method-assign]
+    builder._ensure_abis_in_native_spec = MagicMock()  # type: ignore[method-assign]
+
+    result = builder.build("orb-req-1", _make_template(), _make_request(), "lt-1", "1")
+
+    assert [t["Key"] for t in result["Tags"]] == ["team"]
+
+
+def test_legacy_asg_config_has_no_create_time_tags():
+    result = _make_builder().build("my-asg", _make_template(), _make_request(), "lt-1", "1")
+
+    assert "Tags" not in result
+
+
+def test_fleet_default_specs_carry_no_resource_id_tag():
+    from tests.providers.aws.template_defaults_support import fleet_payloads
+
+    payloads = fleet_payloads(_make_template())
+
+    for api in ("EC2Fleet", "SpotFleet"):
+        for payload in payloads[api]:
+            for spec in payload.get("TagSpecifications", []):
+                assert "orb:resource-id" not in {t["Key"] for t in spec["Tags"]}
