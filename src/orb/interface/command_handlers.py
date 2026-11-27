@@ -1,32 +1,22 @@
 """Command handlers orchestrator for the interface layer.
 
 This module provides a integrated interface to all command handlers organized by responsibility:
-- Template operations (handle_list_templates, handle_get_template, etc.)
-- Request operations (handle_get_request_status, handle_request_machines, etc.)
-- Storage operations (handle_list_storage_strategies, etc.)
-- Scheduler operations (handle_list_scheduler_strategies, etc.)
+- Template operations (TemplateReadHandlers, TemplateWriteHandlers)
+- Request operations (RequestReadHandlers, RequestWriteHandlers)
+- Machine operations (MachineHandlers)
+- Config, storage and scheduler operations (ConfigHandlers, StorageHandlers,
+  SchedulerHandlers)
 - System operations (handle_provider_health, etc.)
 """
 
 # Import base handler
 from orb.application.base.command_handler import CLICommandHandler
-from orb.interface.config_command_handlers import handle_validate_provider_config
+from orb.interface.config_command_handlers import ConfigHandlers
 from orb.interface.machine_command_handlers import MachineHandlers
 from orb.interface.request_command_handlers import RequestWriteHandlers
 from orb.interface.request_query_handlers import RequestReadHandlers
-from orb.interface.scheduler_command_handlers import (
-    handle_list_scheduler_strategies,
-    handle_show_scheduler_config,
-    handle_validate_scheduler_config,
-)
-from orb.interface.storage_command_handlers import (
-    handle_list_storage_strategies,
-    handle_show_storage_config,
-    handle_storage_health,
-    handle_storage_metrics,
-    handle_test_storage,
-    handle_validate_storage_config,
-)
+from orb.interface.scheduler_command_handlers import SchedulerHandlers
+from orb.interface.storage_command_handlers import StorageHandlers
 from orb.interface.system_command_handlers import (
     handle_execute_provider_operation,
     handle_list_providers,
@@ -53,10 +43,12 @@ __all__: list[str] = [
     "RequestWriteHandlers",
     "RequestReadHandlers",
     "handle_list_providers",
-    # Scheduler handlers (function-based)
-    "handle_list_scheduler_strategies",
-    # Storage handlers (function-based)
-    "handle_list_storage_strategies",
+    # Config handlers (class-based)
+    "ConfigHandlers",
+    # Scheduler handlers (class-based)
+    "SchedulerHandlers",
+    # Storage handlers (class-based)
+    "StorageHandlers",
     # Template handlers (class-based)
     "TemplateWriteHandlers",
     "TemplateReadHandlers",
@@ -66,12 +58,4 @@ __all__: list[str] = [
     "handle_provider_metrics",
     "handle_reload_provider_config",
     "handle_select_provider_strategy",
-    "handle_show_scheduler_config",
-    "handle_show_storage_config",
-    "handle_storage_health",
-    "handle_storage_metrics",
-    "handle_test_storage",
-    "handle_validate_provider_config",
-    "handle_validate_scheduler_config",
-    "handle_validate_storage_config",
 ]

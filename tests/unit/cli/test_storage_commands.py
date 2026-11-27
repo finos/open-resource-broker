@@ -5,14 +5,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from orb.interface.storage_command_handlers import (
-    handle_list_storage_strategies,
-    handle_show_storage_config,
-    handle_storage_health,
-    handle_storage_metrics,
-    handle_test_storage,
-    handle_validate_storage_config,
-)
+from orb.interface.storage_command_handlers import StorageHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_list_storage_strategies = handler_method(StorageHandlers, "list_storage_strategies")
+handle_show_storage_config = handler_method(StorageHandlers, "show_storage_config")
+handle_storage_health = handler_method(StorageHandlers, "storage_health")
+handle_storage_metrics = handler_method(StorageHandlers, "storage_metrics")
+handle_test_storage = handler_method(StorageHandlers, "test_storage")
+handle_validate_storage_config = handler_method(StorageHandlers, "validate_storage_config")
 
 
 class TestStorageCommandHandlers:
@@ -199,14 +200,15 @@ class TestStorageHandlerImports:
 
     def test_import_storage_handlers(self):
         """Test that all storage handlers can be imported."""
-        from orb.interface.storage_command_handlers import (
-            handle_list_storage_strategies,
-            handle_show_storage_config,
-            handle_storage_health,
-            handle_storage_metrics,
-            handle_test_storage,
-            handle_validate_storage_config,
-        )
+        from orb.interface.storage_command_handlers import StorageHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_list_storage_strategies = handler_method(StorageHandlers, "list_storage_strategies")
+        handle_show_storage_config = handler_method(StorageHandlers, "show_storage_config")
+        handle_storage_health = handler_method(StorageHandlers, "storage_health")
+        handle_storage_metrics = handler_method(StorageHandlers, "storage_metrics")
+        handle_test_storage = handler_method(StorageHandlers, "test_storage")
+        handle_validate_storage_config = handler_method(StorageHandlers, "validate_storage_config")
 
         assert callable(handle_list_storage_strategies)
         assert callable(handle_show_storage_config)

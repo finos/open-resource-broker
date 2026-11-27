@@ -290,45 +290,40 @@ def build_registry() -> None:
     register("machines", "get-bulk", _machines("get_multiple_machines"))
 
     # --- scheduler ---
-    from orb.interface.scheduler_command_handlers import (
-        handle_list_scheduler_strategies,
-        handle_show_scheduler_config,
-        handle_validate_scheduler_config,
-    )
+    from orb.cli.handler_wiring import register_scheduler_handlers
+    from orb.interface.scheduler_command_handlers import SchedulerHandlers
 
-    register("scheduler", "list", handle_list_scheduler_strategies)
-    register("scheduler", "show", handle_show_scheduler_config)
-    register("scheduler", "validate", handle_validate_scheduler_config)
+    def _scheduler(method: str) -> Handler:
+        return bind(SchedulerHandlers, method, group=register_scheduler_handlers)
+
+    register("scheduler", "list", _scheduler("list_scheduler_strategies"))
+    register("scheduler", "show", _scheduler("show_scheduler_config"))
+    register("scheduler", "validate", _scheduler("validate_scheduler_config"))
 
     # --- storage ---
-    from orb.interface.storage_command_handlers import (
-        handle_list_storage_strategies,
-        handle_show_storage_config,
-        handle_storage_health,
-        handle_storage_metrics,
-        handle_storage_migrate,
-        handle_test_storage,
-        handle_validate_storage_config,
-    )
+    from orb.cli.handler_wiring import register_storage_handlers
+    from orb.interface.storage_command_handlers import StorageHandlers
 
-    register("storage", "list", handle_list_storage_strategies)
-    register("storage", "show", handle_show_storage_config)
-    register("storage", "health", handle_storage_health)
-    register("storage", "metrics", handle_storage_metrics)
-    register("storage", "migrate", handle_storage_migrate)
-    register("storage", "test", handle_test_storage)
-    register("storage", "validate", handle_validate_storage_config)
+    def _storage(method: str) -> Handler:
+        return bind(StorageHandlers, method, group=register_storage_handlers)
+
+    register("storage", "list", _storage("list_storage_strategies"))
+    register("storage", "show", _storage("show_storage_config"))
+    register("storage", "health", _storage("storage_health"))
+    register("storage", "metrics", _storage("storage_metrics"))
+    register("storage", "migrate", _storage("storage_migrate"))
+    register("storage", "test", _storage("test_storage"))
+    register("storage", "validate", _storage("validate_storage_config"))
 
     # --- config ---
-    from orb.interface.config_command_handlers import (
-        handle_get_configuration,
-        handle_get_system_config,
-        handle_set_configuration,
-        handle_validate_provider_config,
-    )
+    from orb.cli.handler_wiring import register_config_handlers
+    from orb.interface.config_command_handlers import ConfigHandlers
 
-    register("config", "show", handle_get_system_config)
-    register("config", "get", handle_get_configuration)
-    register("config", "set", handle_set_configuration)
-    register("config", "validate", handle_validate_provider_config)
+    def _config(method: str) -> Handler:
+        return bind(ConfigHandlers, method, group=register_config_handlers)
+
+    register("config", "show", _config("get_system_config"))
+    register("config", "get", _config("get_configuration"))
+    register("config", "set", _config("set_configuration"))
+    register("config", "validate", _config("validate_provider_config"))
     register("config", "reload", handle_reload_provider_config)

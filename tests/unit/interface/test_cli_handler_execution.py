@@ -18,8 +18,14 @@ from tests.utilities.cli_handlers import handler_method
 
 handle_get_request_status = handler_method(RequestReadHandlers, "get_request_status")
 from orb.interface.response_formatting_service import ResponseFormattingService
-from orb.interface.scheduler_command_handlers import handle_list_scheduler_strategies
-from orb.interface.storage_command_handlers import handle_list_storage_strategies
+from orb.interface.scheduler_command_handlers import SchedulerHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_list_scheduler_strategies = handler_method(SchedulerHandlers, "list_scheduler_strategies")
+from orb.interface.storage_command_handlers import StorageHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_list_storage_strategies = handler_method(StorageHandlers, "list_storage_strategies")
 
 # Import CLI handlers
 from orb.interface.template_command_handlers import TemplateReadHandlers

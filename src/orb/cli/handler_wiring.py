@@ -159,3 +159,71 @@ def register_template_handlers(container: Any) -> None:
             console_provider=lambda: c.get(ConsolePort),
         ),
     )
+
+
+def register_config_handlers(container: Any) -> None:
+    """Register the config handler class."""
+    from orb.application.ports.command_bus_port import CommandBusPort
+    from orb.application.ports.query_bus_port import QueryBusPort
+    from orb.interface.config_command_handlers import ConfigHandlers
+    from orb.interface.response_formatting_service import ResponseFormattingService
+
+    _register(
+        container,
+        ConfigHandlers,
+        lambda c: ConfigHandlers(
+            query_bus=c.get(QueryBusPort),
+            command_bus=c.get(CommandBusPort),
+            formatter=c.get(ResponseFormattingService),
+        ),
+    )
+
+
+def register_scheduler_handlers(container: Any) -> None:
+    """Register the scheduler handler class."""
+    from orb.application.ports.query_bus_port import QueryBusPort
+    from orb.application.services.orchestration.get_scheduler_config import (
+        GetSchedulerConfigOrchestrator,
+    )
+    from orb.application.services.orchestration.list_scheduler_strategies import (
+        ListSchedulerStrategiesOrchestrator,
+    )
+    from orb.interface.response_formatting_service import ResponseFormattingService
+    from orb.interface.scheduler_command_handlers import SchedulerHandlers
+
+    _register(
+        container,
+        SchedulerHandlers,
+        lambda c: SchedulerHandlers(
+            list_orchestrator=c.get(ListSchedulerStrategiesOrchestrator),
+            config_orchestrator=c.get(GetSchedulerConfigOrchestrator),
+            query_bus=c.get(QueryBusPort),
+            formatter=c.get(ResponseFormattingService),
+        ),
+    )
+
+
+def register_storage_handlers(container: Any) -> None:
+    """Register the storage handler class."""
+    from orb.application.ports.query_bus_port import QueryBusPort
+    from orb.application.services.orchestration.get_storage_config import (
+        GetStorageConfigOrchestrator,
+    )
+    from orb.application.services.orchestration.list_storage_strategies import (
+        ListStorageStrategiesOrchestrator,
+    )
+    from orb.config.manager import ConfigurationManager
+    from orb.interface.response_formatting_service import ResponseFormattingService
+    from orb.interface.storage_command_handlers import StorageHandlers
+
+    _register(
+        container,
+        StorageHandlers,
+        lambda c: StorageHandlers(
+            list_orchestrator=c.get(ListStorageStrategiesOrchestrator),
+            config_orchestrator=c.get(GetStorageConfigOrchestrator),
+            query_bus_provider=lambda: c.get(QueryBusPort),
+            config_manager_provider=lambda: c.get(ConfigurationManager),
+            formatter=c.get(ResponseFormattingService),
+        ),
+    )

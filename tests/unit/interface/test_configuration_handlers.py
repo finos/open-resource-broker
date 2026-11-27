@@ -5,11 +5,11 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from orb.interface.command_handlers import (
-    handle_provider_config,
-    handle_reload_provider_config,
-    handle_validate_provider_config,
-)
+from orb.interface.command_handlers import handle_provider_config, handle_reload_provider_config
+from orb.interface.config_command_handlers import ConfigHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_validate_provider_config = handler_method(ConfigHandlers, "validate_provider_config")
 
 
 class TestProviderConfigHandlers:
@@ -46,7 +46,7 @@ class TestProviderConfigHandlers:
     @pytest.mark.asyncio
     async def test_handle_validate_provider_config(self):
         """Runs the validate query on the query bus and formats the result."""
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
         from orb.interface.response_formatting_service import ResponseFormattingService
 
         raw = {"validation": {"status": "valid", "errors": []}}
@@ -56,9 +56,9 @@ class TestProviderConfigHandlers:
         formatter.format_config.return_value = {"formatted": True}
         container = Mock()
         container.get.side_effect = lambda t: {
-            QueryBus: query_bus,
+            QueryBusPort: query_bus,
             ResponseFormattingService: formatter,
-        }[t]
+        }.get(t, Mock())
         args = Namespace(resource="config", action="validate", verbose=True, _container=container)
 
         result = await handle_validate_provider_config(args)
@@ -108,8 +108,11 @@ class TestConfigurationHandlerImports:
         from orb.interface.command_handlers import (
             handle_provider_config,
             handle_reload_provider_config,
-            handle_validate_provider_config,
         )
+        from orb.interface.config_command_handlers import ConfigHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_validate_provider_config = handler_method(ConfigHandlers, "validate_provider_config")
 
         # Verify all handlers are callable functions
         assert callable(handle_provider_config)

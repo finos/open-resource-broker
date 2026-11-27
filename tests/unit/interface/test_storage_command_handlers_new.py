@@ -16,14 +16,15 @@ from orb.application.services.orchestration.dtos import (
     ListStorageStrategiesOutput,
 )
 from orb.interface.response_formatting_service import ResponseFormattingService
-from orb.interface.storage_command_handlers import (
-    handle_list_storage_strategies,
-    handle_show_storage_config,
-    handle_storage_health,
-    handle_storage_metrics,
-    handle_storage_migrate,
-    handle_validate_storage_config,
-)
+from orb.interface.storage_command_handlers import StorageHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_list_storage_strategies = handler_method(StorageHandlers, "list_storage_strategies")
+handle_show_storage_config = handler_method(StorageHandlers, "show_storage_config")
+handle_storage_health = handler_method(StorageHandlers, "storage_health")
+handle_storage_metrics = handler_method(StorageHandlers, "storage_metrics")
+handle_storage_migrate = handler_method(StorageHandlers, "storage_migrate")
+handle_validate_storage_config = handler_method(StorageHandlers, "validate_storage_config")
 
 
 def _make_formatter() -> MagicMock:
@@ -154,16 +155,16 @@ class TestHandleValidateStorageConfig:
     async def test_query_path_used_when_health_query_available(self):
         """When the health query is importable, the real query bus path runs (not the
         static ImportError fallback)."""
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
         fmt = _make_formatter()
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_bus.execute.return_value = {"status": "healthy", "checks": 3}
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ResponseFormattingService: fmt,
-            QueryBus: mock_bus,
+            QueryBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(_container=container)
@@ -179,16 +180,16 @@ class TestHandleValidateStorageConfig:
     @pytest.mark.asyncio
     async def test_query_bus_exception_returns_error(self):
         """Exceptions from query execution are caught and formatted as errors."""
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
         fmt = _make_formatter()
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_bus.execute.side_effect = RuntimeError("storage down")
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ResponseFormattingService: fmt,
-            QueryBus: mock_bus,
+            QueryBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(_container=container)
@@ -204,17 +205,17 @@ class TestHandleValidateStorageConfig:
     async def test_successful_query_returns_success_response(self):
         """Successful query bus execution produces a success response built from the
         health payload."""
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
         fmt = _make_formatter()
         fmt.format_success.return_value = InterfaceResponse(data={"status": "healthy"})
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_bus.execute.return_value = {"status": "healthy"}
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ResponseFormattingService: fmt,
-            QueryBus: mock_bus,
+            QueryBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(_container=container)
@@ -247,16 +248,16 @@ class TestHandleStorageHealth:
     @pytest.mark.asyncio
     async def test_successful_health_check_returns_config(self):
         """Successful health query result is formatted via format_config."""
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
         fmt = _make_formatter()
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_bus.execute.return_value = {"status": "healthy", "details": {}}
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ResponseFormattingService: fmt,
-            QueryBus: mock_bus,
+            QueryBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(_container=container, strategy="json", verbose=False)
@@ -271,19 +272,19 @@ class TestHandleStorageHealth:
     @pytest.mark.asyncio
     async def test_non_dict_health_result_is_model_dumped(self):
         """When health result has model_dump, it is used."""
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
         fmt = _make_formatter()
         health_obj = MagicMock()
         health_obj.model_dump.return_value = {"status": "ok"}
 
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_bus.execute.return_value = health_obj
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ResponseFormattingService: fmt,
-            QueryBus: mock_bus,
+            QueryBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(_container=container, strategy=None, verbose=False)
@@ -395,13 +396,17 @@ class TestHandleStorageMigrate:
 
     @pytest.mark.asyncio
     async def test_unresolvable_config_fails_instead_of_using_alembic_default(self):
+        from orb.config.manager import ConfigurationManager
+
         fmt = _make_formatter()
         container = MagicMock()
 
         def _get(kind):
             if kind is ResponseFormattingService:
                 return fmt
-            raise RuntimeError("bad url postgresql://orb:hunter2@db:5432/orb")
+            if kind is ConfigurationManager:
+                raise RuntimeError("bad url postgresql://orb:hunter2@db:5432/orb")
+            return MagicMock()
 
         container.get.side_effect = _get
         args = Namespace(_container=container, migrate_subcommand="up")
@@ -646,16 +651,16 @@ class TestHandleStorageMetrics:
 
     @pytest.mark.asyncio
     async def test_successful_metrics_returns_config(self):
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
         fmt = _make_formatter()
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_bus.execute.return_value = {"total_requests": 42}
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ResponseFormattingService: fmt,
-            QueryBus: mock_bus,
+            QueryBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(_container=container)
@@ -669,19 +674,19 @@ class TestHandleStorageMetrics:
 
     @pytest.mark.asyncio
     async def test_non_dict_metrics_model_dump_called(self):
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
         fmt = _make_formatter()
         metrics_obj = MagicMock()
         metrics_obj.model_dump.return_value = {"metric_a": 1}
 
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_bus.execute.return_value = metrics_obj
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ResponseFormattingService: fmt,
-            QueryBus: mock_bus,
+            QueryBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(_container=container)

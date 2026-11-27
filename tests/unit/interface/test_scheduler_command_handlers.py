@@ -6,11 +6,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orb.application.dto.interface_response import InterfaceResponse
-from orb.interface.scheduler_command_handlers import (
-    handle_list_scheduler_strategies,
-    handle_show_scheduler_config,
-    handle_validate_scheduler_config,
-)
+from orb.interface.scheduler_command_handlers import SchedulerHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_list_scheduler_strategies = handler_method(SchedulerHandlers, "list_scheduler_strategies")
+handle_show_scheduler_config = handler_method(SchedulerHandlers, "show_scheduler_config")
+handle_validate_scheduler_config = handler_method(SchedulerHandlers, "validate_scheduler_config")
 
 
 class TestSchedulerCommandHandlers:
@@ -110,10 +111,15 @@ class TestSchedulerHandlerImports:
 
     def test_import_scheduler_handlers(self):
         """Test that all scheduler handlers can be imported."""
-        from orb.interface.scheduler_command_handlers import (
-            handle_list_scheduler_strategies,
-            handle_show_scheduler_config,
-            handle_validate_scheduler_config,
+        from orb.interface.scheduler_command_handlers import SchedulerHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_list_scheduler_strategies = handler_method(
+            SchedulerHandlers, "list_scheduler_strategies"
+        )
+        handle_show_scheduler_config = handler_method(SchedulerHandlers, "show_scheduler_config")
+        handle_validate_scheduler_config = handler_method(
+            SchedulerHandlers, "validate_scheduler_config"
         )
 
         assert callable(handle_list_scheduler_strategies)
