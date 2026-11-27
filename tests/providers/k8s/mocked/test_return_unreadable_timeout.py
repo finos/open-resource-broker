@@ -452,6 +452,92 @@ async def test_a_failed_return_is_not_rewritten_by_a_later_status_write(world: W
 
 
 # ---------------------------------------------------------------------------
+# A machine with an invalid stored placement
+# ---------------------------------------------------------------------------
+
+BAD = {"pod-bad": "Bad_NS"}  # a stored namespace that is not a valid DNS label
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_invalid_placement_fails_the_return_without_the_timeout(world: World) -> None:
+    world.add_return(["pod-a", "pod-bad"], placement=BAD)  # pod-a is already gone
+
+    request = await world.poll()
+
+    assert request.status == RequestStatus.FAILED
+    assert world.machine("pod-a").status == MachineStatus.TERMINATED
+    assert world.machine("pod-bad").status == MachineStatus.FAILED
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_invalid_placement_is_held_while_a_valid_pod_is_leaving(world: World) -> None:
+    world.add_return(["pod-a", "pod-bad"], placement=BAD)
+    world.add_pod("pod-a")
+
+    waiting = await world.poll()
+
+    assert waiting.status == RequestStatus.IN_PROGRESS
+    assert world.machine("pod-bad").status == MachineStatus.SHUTTING_DOWN
+
+    del world.core.pods[(NS, "pod-a")]  # the pod finishes
+    request = await world.poll()
+
+    assert request.status == RequestStatus.FAILED
+    assert world.machine("pod-a").status == MachineStatus.TERMINATED
+    assert world.machine("pod-bad").status == MachineStatus.FAILED
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_invalid_placement_is_held_while_a_valid_machine_is_unreadable(
+    world: World,
+) -> None:
+    world.add_return(["pod-a", "pod-bad"], age_seconds=UNDER_LIMIT, placement=BAD)
+    world.list_fails()
+
+    request = await world.poll()
+
+    assert request.status == RequestStatus.IN_PROGRESS
+    assert {world.machine(n).status for n in ("pod-a", "pod-bad")} == {MachineStatus.SHUTTING_DOWN}
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_invalid_placement_fails_with_the_unreadable_machine_past_the_limit(
+    world: World,
+) -> None:
+    world.add_return(["pod-a", "pod-bad"], age_seconds=PAST_LIMIT, placement=BAD)
+    world.list_fails()
+
+    request = await world.poll()
+
+    assert request.status == RequestStatus.FAILED
+    assert {world.machine(n).status for n in ("pod-a", "pod-bad")} == {MachineStatus.FAILED}
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_held_invalid_placement_is_not_completed_by_a_terminated_pod(
+    world: World,
+) -> None:
+    # pod-a is gone, pod-b cannot be read yet, pod-bad can never be read.
+    world.add_return(
+        ["pod-a", "pod-b", "pod-bad"],
+        age_seconds=UNDER_LIMIT,
+        placement={**BAD, "pod-b": "orb-team-c"},
+    )
+    world.core.list_errors["orb-team-c"] = ApiException(status=500)
+
+    request = await world.poll()
+
+    assert request.status == RequestStatus.IN_PROGRESS
+    assert world.machine("pod-a").status == MachineStatus.TERMINATED
+    assert world.machine("pod-bad").status == MachineStatus.SHUTTING_DOWN
+
+
+# ---------------------------------------------------------------------------
 # What the operator does next
 # ---------------------------------------------------------------------------
 

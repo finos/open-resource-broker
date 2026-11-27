@@ -9,6 +9,7 @@ namespace recorded at acquire time.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock
 
@@ -300,3 +301,96 @@ async def test_release_is_one_call_per_namespace_across_origins() -> None:
 
     release.assert_awaited_once()
     assert release.await_args_list[0].args[0] == ["a-0", "b-0"]
+
+
+# A stored namespace that is not a valid DNS label can never be read.
+BAD = "bad-1"
+BAD_COORDS = {BAD: {"provider_data": {"namespace": "Bad_NS"}, "request_id": ACQUIRE_ID}}
+
+
+def _placeholder(outcome: Any, machine_id: str) -> dict[str, Any]:
+    return next(i for i in outcome.metadata["instances"] if i["instance_id"] == machine_id)
+
+
+async def _status_aged(env: Env, names: list[str], coords: dict[str, Any], age: int) -> Any:
+    request = env.return_request().model_copy(
+        update={"created_at": datetime.now(timezone.utc) - timedelta(seconds=age)}
+    )
+    return await env.registry.get_status(names, request, machine_coordinates=coords)
+
+
+@pytest.mark.asyncio
+async def test_invalid_placement_fails_without_waiting_for_the_unreadable_timeout(
+    env: Env,
+) -> None:
+    coords = {**env.coords([env.name]), **BAD_COORDS}
+    outcome = await env.status([env.name, BAD], coords)
+
+    # The valid pod is gone; only the invalid machine is left, and it is failed at once.
+    assert _placeholder(outcome, BAD)["status"] == "failed"
+    assert _placeholder(outcome, env.name)["status"] == "terminated"
+    assert outcome.metadata["invalid_placement_resource_ids"] == [BAD]
+    assert "unreadable_resource_ids" not in outcome.metadata
+    assert "return_unreadable_timed_out" not in outcome.metadata
+    # The invalid machine's stored placement is carried back unchanged.
+    assert _placeholder(outcome, BAD)["provider_data"] == {"namespace": "Bad_NS"}
+    assert isinstance(outcome, Accepted)
+    assert BAD in outcome.pending_resource_ids
+
+
+@pytest.mark.asyncio
+async def test_a_return_with_an_invalid_placement_is_never_completed(env: Env) -> None:
+    # A terminated valid pod and an invalid id: the invalid id still counts as pending.
+    coords = {**env.coords([env.name]), **BAD_COORDS}
+    outcome = await env.status([env.name, BAD], coords, pod_names=[env.name, BAD])
+    assert not isinstance(outcome, Completed)
+    assert BAD in outcome.pending_resource_ids
+
+
+@pytest.mark.asyncio
+async def test_invalid_placement_only_return_is_not_completed(env: Env) -> None:
+    outcome = await env.status([BAD], BAD_COORDS)
+    assert not isinstance(outcome, Completed)
+    assert _placeholder(outcome, BAD)["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_unreadable_valid_machine_still_waits_for_the_timeout(env: Env) -> None:
+    env.core.list_errors[NS] = ApiException(status=500)
+    outcome = await env.status([env.name], env.coords([env.name]))
+    assert _placeholder(outcome, env.name)["status"] == "unknown"
+    assert "invalid_placement_resource_ids" not in outcome.metadata
+
+
+@pytest.mark.asyncio
+async def test_invalid_placement_is_held_while_a_valid_machine_is_unreadable(env: Env) -> None:
+    env.core.list_errors[NS] = ApiException(status=500)
+    coords = {**env.coords([env.name]), **BAD_COORDS}
+    names = [env.name, BAD]
+
+    held = await _status_aged(env, names, coords, age=60)
+    assert {i["status"] for i in held.metadata["instances"]} == {"unknown"}
+    assert held.metadata["invalid_placement_resource_ids"] == [BAD]
+    assert held.metadata["unreadable_resource_ids"] == [env.name]
+
+    over = await _status_aged(env, names, coords, age=2 * 3600)
+    assert {i["status"] for i in over.metadata["instances"]} == {"failed"}
+    assert over.metadata["return_unreadable_timed_out"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "pod",
+    [{"terminating": True}, {"phase": "Pending", "ready": False}, {"phase": "Running"}],
+    ids=["terminating", "pending", "running"],
+)
+async def test_invalid_placement_is_held_while_a_valid_pod_is_leaving(
+    env: Env, pod: dict[str, Any]
+) -> None:
+    name = env.add(**pod)
+    coords = {**env.coords([name]), **BAD_COORDS}
+    outcome = await env.status([name, BAD], coords)
+
+    assert isinstance(outcome, Accepted)
+    assert "failed" not in {i["status"] for i in outcome.metadata["instances"]}
+    assert _placeholder(outcome, BAD)["status"] == "unknown"

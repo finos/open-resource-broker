@@ -32,6 +32,7 @@ from orb.providers.k8s.infrastructure.handlers.shared.namespace_resolver import 
 )
 from orb.providers.k8s.infrastructure.handlers.statefulset_handler import K8sStatefulSetHandler
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+from orb.providers.k8s.services.return_placeholders import unreadable_placeholders
 from orb.providers.k8s.utilities.labels import K8sValidationError
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
@@ -456,20 +457,26 @@ class K8sHandlerRegistry:
         resource_ids: list[str],
         request: Request,
         machine_coordinates: Optional[dict[str, dict[str, Any]]],
-    ) -> tuple[list[dict[str, Any]], set[str], ProviderFulfilment]:
-        """List the returned pods per (namespace, origin request) group."""
+    ) -> tuple[list[dict[str, Any]], set[str], set[str], ProviderFulfilment]:
+        """List the returned pods per (namespace, origin request) group.
+
+        Returns the pods, the ids whose pods could not be listed, the ids whose
+        stored placement is invalid, and the fulfilment.
+        """
         instances: list[dict[str, Any]] = []
         unreadable: set[str] = set()
         groups, invalid_ids = self._group_by_placement(
             list(resource_ids), machine_coordinates, request
         )
-        unreadable.update(invalid_ids)
+        invalid = set(invalid_ids)
         for (namespace, origin), names in groups.items():
             result = await asyncio.to_thread(handler.read_pods_for_return, namespace, origin, names)
             instances.extend(result.instances)
             unreadable |= result.unreadable
-        pending = len(unreadable) + sum(
-            1 for i in instances if i.get("status") not in ("terminated", "unknown")
+        pending = (
+            len(unreadable)
+            + len(invalid)
+            + sum(1 for i in instances if i.get("status") not in ("terminated", "unknown"))
         )
         fulfilment = ProviderFulfilment(
             state="in_progress" if pending else "fulfilled",
@@ -477,7 +484,7 @@ class K8sHandlerRegistry:
             target_units=len(resource_ids),
             pending_count=pending,
         )
-        return instances, unreadable, fulfilment
+        return instances, unreadable, invalid, fulfilment
 
     async def get_status(
         self,
@@ -510,10 +517,11 @@ class K8sHandlerRegistry:
                 or getattr(getattr(request, "request_type", None), "value", None) == "return"
             )
             unreadable: set[str] = set()
+            invalid: set[str] = set()
             if is_return:
                 # A return request's own id labels no pod: read the returned pods
                 # by the request that created them, in the namespace they live in.
-                instances, unreadable, fulfilment = await self._read_return_pods(
+                instances, unreadable, invalid, fulfilment = await self._read_return_pods(
                     handler, list(resource_ids or []), request, machine_coordinates
                 )
             else:
@@ -561,7 +569,7 @@ class K8sHandlerRegistry:
                 [
                     mid
                     for mid in (resource_ids or [])
-                    if mid and mid not in live_ids and mid not in unreadable
+                    if mid and mid not in live_ids and mid not in unreadable and mid not in invalid
                 ]
                 if names_machines
                 else []
@@ -593,21 +601,21 @@ class K8sHandlerRegistry:
                     )
 
             unreadable_timed_out = False
-            if is_return and unreadable:
-                # Once the wait is over the unreadable machines are reported as
-                # failed so the return can end, but never while a readable pod
-                # is still on its way out: that return must finish first.
-                unreadable_timed_out = self._return_wait_is_over(request) and not any(
-                    i.get("status") not in ("terminated", "failed", "unknown") for i in instances
-                )
-                instances.extend(
-                    self._unreadable_placeholders(
-                        sorted(unreadable),
-                        machine_coordinates,
-                        synthetic_instance_type,
-                        status="failed" if unreadable_timed_out else "unknown",
+            if is_return and (unreadable or invalid):
+                # Machines whose pods could not be read, or whose stored placement
+                # is invalid, are reported as failed only once the return has
+                # settled, so a pod still on its way out can finish first.
+                settled = self._return_settled(request, instances, unreadable)
+                unreadable_timed_out = bool(unreadable) and settled
+                for ids, failed in ((unreadable, unreadable_timed_out), (invalid, settled)):
+                    instances.extend(
+                        unreadable_placeholders(
+                            sorted(ids),
+                            machine_coordinates,
+                            synthetic_instance_type,
+                            status="failed" if failed else "unknown",
+                        )
                     )
-                )
 
             metadata: dict[str, Any] = {
                 "provider_api": provider_api,
@@ -629,6 +637,14 @@ class K8sHandlerRegistry:
                 if unreadable:
                     # A failed list proves nothing: never close these out.
                     metadata["unreadable_resource_ids"] = sorted(unreadable)
+                if invalid:
+                    metadata["invalid_placement_resource_ids"] = sorted(invalid)
+                    self._logger.warning(
+                        "Kubernetes return has machines with an invalid placement: "
+                        "request_id=%s count=%d",
+                        request.request_id,
+                        len(invalid),
+                    )
                 if unreadable_timed_out:
                     metadata["return_unreadable_timed_out"] = True
                     self._logger.warning(
@@ -640,6 +656,7 @@ class K8sHandlerRegistry:
                 all_confirmed_gone = (
                     not non_terminal
                     and not unreadable
+                    and not invalid  # defensive: held invalid ids are already pending above
                     and any(i.get("status") == "terminated" for i in instances)
                 )
                 if all_confirmed_gone:
@@ -650,9 +667,9 @@ class K8sHandlerRegistry:
                     ]
                     return Completed(resource_ids=completed_ids, metadata=metadata)
                 # Otherwise still draining.
-                pending_ids = non_terminal + sorted(unreadable - set(non_terminal)) or list(
-                    resource_ids
-                )
+                pending_ids = non_terminal + sorted(
+                    (unreadable | invalid) - set(non_terminal)
+                ) or list(resource_ids)
                 return Accepted(
                     request_id=str(request.request_id),
                     pending_resource_ids=pending_ids,
@@ -696,36 +713,14 @@ class K8sHandlerRegistry:
         waited = (self._clock.now() - created).total_seconds()
         return waited >= self._config.return_unreadable_timeout_seconds
 
-    @staticmethod
-    def _unreadable_placeholders(
-        machine_ids: list[str],
-        machine_coordinates: Optional[dict[str, dict[str, Any]]],
-        instance_type: str,
-        status: str = "unknown",
-    ) -> list[dict[str, Any]]:
-        """One placeholder per machine whose pods could not be listed.
-
-        A machine the status sync is never told about is read as gone and closed
-        out, so each unreadable machine is reported with a status that changes
-        nothing. The sync overlays whatever a read reports onto the stored row,
-        so the stored placement is carried back; leaving it out would send the
-        next read to the default namespace. Addresses and tags are not carried:
-        they are refreshed by the next successful read.
-        """
-        return [
-            {
-                "instance_id": mid,
-                "resource_id": mid,
-                "instance_type": instance_type,
-                "image_id": "unknown",
-                "launch_time": None,
-                "status": status,
-                "provider_data": dict(
-                    ((machine_coordinates or {}).get(mid) or {}).get("provider_data") or {}
-                ),
-            }
-            for mid in machine_ids
-        ]
+    def _return_settled(
+        self, request: Request, instances: list[dict[str, Any]], unreadable: set[str]
+    ) -> bool:
+        """Whether no pod is still on its way out and no unreadable id is still inside its wait."""
+        draining = any(
+            i.get("status") not in ("terminated", "failed", "unknown") for i in instances
+        )
+        return (not unreadable or self._return_wait_is_over(request)) and not draining
 
     def _names_machines(self, handler: K8sHandlerBase, provider_api: str) -> bool:
         """Whether *handler*'s resource ids name machines (see ``resource_ids_name_machines``).
