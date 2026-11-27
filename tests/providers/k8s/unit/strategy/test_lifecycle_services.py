@@ -14,6 +14,7 @@ regression in an extracted unit is pinned to that unit.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -118,6 +119,29 @@ class TestWatchManagerLifecycle:
         )
         svc.stop_sync()
         assert completed["n"] == 1
+
+    @pytest.mark.asyncio
+    async def test_stop_sync_on_loop_thread_keeps_stop_task_referenced(self) -> None:
+        gate = asyncio.Event()
+
+        async def _stop() -> None:
+            await gate.wait()
+
+        manager = MagicMock()
+        manager.is_started.return_value = True
+        manager.stop = AsyncMock(side_effect=_stop)
+        svc = K8sWatchManagerLifecycle(
+            config=_config(),
+            logger=MagicMock(),
+            client_provider=MagicMock,
+            watch_manager=manager,
+        )
+        svc.stop_sync()
+        assert len(svc.background_tasks) == 1
+
+        gate.set()
+        await asyncio.sleep(0.01)
+        assert len(svc.background_tasks) == 0
 
 
 # ===========================================================================

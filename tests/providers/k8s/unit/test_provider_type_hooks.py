@@ -405,6 +405,51 @@ class TestPendingTimeoutDeletion:
             assert handler._schedule_timed_out_pod_deletions.call_count == expected
 
 
+class TestTimedOutDeletionTasks:
+    @pytest.mark.asyncio
+    async def test_deletion_task_is_referenced_until_finished(self, monkeypatch) -> None:
+        import asyncio
+
+        gate = asyncio.Event()
+
+        async def _slow_delete(*_a: Any, **_k: Any) -> None:
+            await gate.wait()
+
+        monkeypatch.setattr(
+            "orb.providers.k8s.reconciliation.timeout_gc.delete_timed_out_pod_async",
+            _slow_delete,
+        )
+        handler = K8sPodHandler(kubernetes_client=MagicMock(), config=_config(), logger=MagicMock())
+        timed_out = {"instance_id": "p", "name": "p", "provider_data": {"timed_out": True}}
+        handler._schedule_timed_out_pod_deletions([{"instance_id": "p"}], [timed_out])
+        assert len(handler.background_tasks) == 1
+
+        gate.set()
+        await asyncio.sleep(0.01)
+        assert len(handler.background_tasks) == 0
+
+    def test_cleanup_lets_a_deletion_finish_before_the_client_is_cleaned_up(self) -> None:
+        import asyncio
+
+        strategy = _strategy()
+        events: list[str] = []
+        strategy._kubernetes_client.cleanup.side_effect = lambda: events.append("client")
+        handler = K8sPodHandler(kubernetes_client=MagicMock(), config=_config(), logger=MagicMock())
+        strategy._handler_registry.handlers["Pod"] = handler
+
+        async def _delete() -> None:
+            await asyncio.sleep(0.02)
+            events.append("deleted")
+
+        loop = asyncio.new_event_loop()
+        try:
+            handler.background_tasks.spawn(loop, _delete(), name="k8s-delete-timed-out-pod-p")
+            strategy.cleanup()
+        finally:
+            loop.close()
+        assert events == ["deleted", "client"]
+
+
 class TestHealthCheckName:
     def test_check_name_is_configurable(self) -> None:
         from orb.providers.k8s.health import register_k8s_health_checks

@@ -40,6 +40,7 @@ from orb.providers.k8s.infrastructure.handlers.shared.pod_state_translator impor
 )
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
 from orb.providers.k8s.resilience.circuit_breaker import K8sCircuitBreaker
+from orb.providers.k8s.utilities.background_tasks import BackgroundTasks
 from orb.providers.k8s.utilities.pod_spec import request_id_label_selector
 from orb.providers.k8s.utilities.pod_spec_audit import audit_pod_spec
 from orb.providers.k8s.utilities.pod_state import (
@@ -115,6 +116,7 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
         self._kubernetes_client = kubernetes_client
         self._config = config
         self._logger = logger
+        self.background_tasks = BackgroundTasks(logger)
         self._max_retries = max_retries
         self._base_delay = base_delay
         self._max_delay = max_delay
@@ -554,14 +556,16 @@ class K8sHandlerBase(ProviderHandlerBase, ABC):
             if not pod_name:
                 continue
 
-            loop.create_task(
+            self.background_tasks.spawn(
+                loop,
                 delete_timed_out_pod_async(
                     core_v1,
                     name=pod_name,
                     namespace=namespace,
                     reason=reason,
                     logger=self._logger,
-                )
+                ),
+                name=f"k8s-delete-timed-out-pod-{pod_name}",
             )
 
     def is_not_found(self, exc: BaseException) -> bool:

@@ -68,6 +68,10 @@ from orb.providers.k8s.strategy.outcome_bridge import (
 )
 from orb.providers.k8s.strategy.reconciliation_lifecycle import K8sReconciliationLifecycle
 from orb.providers.k8s.strategy.watch_lifecycle import K8sWatchManagerLifecycle
+from orb.providers.k8s.utilities.background_tasks import (
+    BACKGROUND_DRAIN_TIMEOUT_SECONDS,
+    drain_all_sync,
+)
 from orb.providers.k8s.value_objects import KubernetesProviderApi
 from orb.providers.k8s.watch.events_watcher import K8sEventsWatcher, K8sNodeEventsCache
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
@@ -540,6 +544,20 @@ class K8sProviderStrategy(ProviderStrategy):
         except Exception as exc:
             self._logger.warning(
                 "Failed to stop Kubernetes events watcher during cleanup: %s", exc, exc_info=True
+            )
+
+        # Outstanding timed-out-pod deletions use the client, so they are
+        # drained (then cancelled on timeout) before it is cleaned up.  The
+        # watch stop task is left to finish on its own.
+        try:
+            drain_all_sync(
+                [h.background_tasks for h in list(self._handlers.values())],
+                self._logger,
+                timeout=BACKGROUND_DRAIN_TIMEOUT_SECONDS,
+            )
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to drain Kubernetes background tasks during cleanup: %s", exc, exc_info=True
             )
 
         # Stage 4: client cleanup.  Only clear ``_initialized`` when the
