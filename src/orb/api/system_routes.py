@@ -178,9 +178,9 @@ def register_system_routes(app: Any, server_config: Any, auth_port: Any) -> None
             "description": "REST API for Open Resource Broker",
         }
 
-    # Serve the favicon from a packaged resource rather than a path derived
-    # from __file__, so the route never touches request-controllable input
-    # and works regardless of install layout (editable, sdist, wheel).
+    # Serve the favicon from a packaged resource rather than a path built from
+    # the module location, so the route never touches request-controllable
+    # input and works regardless of install layout (editable, sdist, wheel).
     try:
         from importlib import resources as _resources
 

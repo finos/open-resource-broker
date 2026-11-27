@@ -32,7 +32,7 @@ _BLOCK_WEB_FRAMEWORKS = textwrap.dedent(
 
 
 def _run(body: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # noqa: S603
+    return subprocess.run(
         [sys.executable, "-I", "-c", _BLOCK_WEB_FRAMEWORKS + textwrap.dedent(body)],
         capture_output=True,
         text=True,

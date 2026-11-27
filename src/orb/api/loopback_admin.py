@@ -93,6 +93,7 @@ class _LoopbackAdminAuthWrapper:
             cls._reload_token_file(cls._token_file)
 
     def __init__(self, inner: Any) -> None:
+        """Wrap the real auth strategy *inner*."""
         self._inner = inner
         self._logger = get_logger(_LOGGER_NAME)
 
@@ -109,8 +110,8 @@ class _LoopbackAdminAuthWrapper:
                 candidate_bytes = candidate.encode("ascii") if candidate else b""
             except UnicodeEncodeError:
                 # Non-ASCII bearer token can never match the loopback secret;
-                # return UNAUTHENTICATED rather than crashing or silently skipping
-                # the auth stamp (which could constitute an auth bypass).
+                # answer with an invalid-credentials result rather than crashing or
+                # silently skipping the auth stamp (which could be an auth bypass).
                 return AuthResult(
                     status=AuthStatus.INVALID,
                     user_id=None,
@@ -146,9 +147,11 @@ class _LoopbackAdminAuthWrapper:
         return await self._inner.authenticate(context)
 
     def get_strategy_name(self) -> str:
+        """Return the wrapped strategy's name."""
         return self._inner.get_strategy_name()
 
     def is_enabled(self) -> bool:
+        """Return whether the wrapped strategy is enabled."""
         return self._inner.is_enabled()
 
     # Delegate all other attribute access to the inner strategy.
@@ -240,6 +243,7 @@ class _LoopbackAdminTokenMiddleware:
     """
 
     def __init__(self, app: Any) -> None:
+        """Wrap *app* in a Starlette base middleware that dispatches to ``_dispatch``."""
         from starlette.middleware.base import BaseHTTPMiddleware
 
         self._impl = BaseHTTPMiddleware(app, dispatch=self._dispatch)

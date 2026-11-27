@@ -35,6 +35,15 @@ from orb.api.system_routes import register_system_routes
 from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.logging.logger import get_logger, setup_audit_logger
 
+# Names imported from here by tests and callers but defined in the split modules.
+__all__ = [
+    "_LoopbackAdminAuthWrapper",
+    "_LoopbackAdminTokenMiddleware",
+    "_create_auth_strategy",
+    "_load_loopback_token",
+    "create_fastapi_app",
+]
+
 
 def _resolve_event_publisher() -> Any:
     """Return the shared event publisher, or None when it is unavailable."""
