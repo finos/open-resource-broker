@@ -6,7 +6,7 @@
     "src/orb/application/queries/request_query_handlers.py": 1037,
     "src/orb/application/services/provisioning_orchestration_service.py": 1018,
     "src/orb/application/services/template_defaults_service.py": 975,
-    "src/orb/cli/args.py": 1338,
+    "src/orb/cli/args.py": 669,
     "src/orb/config/loader.py": 625,
     "src/orb/config/managers/configuration_manager.py": 653,
     "src/orb/domain/request/aggregate.py": 803,
