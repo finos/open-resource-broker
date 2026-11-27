@@ -3,7 +3,7 @@
 Covers lines 503-535:
 - happy path with request_ids from various arg name variants
 - no IDs returns error dict
-- QueryBus.execute result serialization
+- QueryBusPort.execute result serialization
 """
 
 from __future__ import annotations
@@ -22,10 +22,10 @@ def _make_ns(**kwargs) -> argparse.Namespace:
 
 
 def _make_container_with_query_bus(result=None):
-    from orb.infrastructure.di.buses import QueryBus
+    from orb.application.ports.query_bus_port import QueryBusPort
 
     container = MagicMock()
-    query_bus = AsyncMock(spec=QueryBus)
+    query_bus = AsyncMock(spec=QueryBusPort)
     query_bus.execute.return_value = result or MagicMock(
         requests=[],
         found_count=0,
@@ -33,7 +33,7 @@ def _make_container_with_query_bus(result=None):
         total_requested=0,
     )
 
-    container.get.side_effect = lambda t: query_bus if t is QueryBus else MagicMock()
+    container.get.side_effect = lambda t: query_bus if t is QueryBusPort else MagicMock()
     return container, query_bus
 
 
@@ -42,7 +42,10 @@ class TestHandleGetMultipleRequests:
     @pytest.mark.asyncio
     async def test_no_ids_returns_error(self):
         """No request IDs in any arg → error dict returned."""
-        from orb.interface.request_command_handlers import handle_get_multiple_requests
+        from orb.interface.request_query_handlers import RequestReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_multiple_requests = handler_method(RequestReadHandlers, "get_multiple_requests")
 
         container, _ = _make_container_with_query_bus()
         args = _make_ns(_container=container)
@@ -55,8 +58,11 @@ class TestHandleGetMultipleRequests:
 
     @pytest.mark.asyncio
     async def test_request_ids_from_args_request_ids(self):
-        """IDs from args.request_ids are forwarded to QueryBus."""
-        from orb.interface.request_command_handlers import handle_get_multiple_requests
+        """IDs from args.request_ids are forwarded to QueryBusPort."""
+        from orb.interface.request_query_handlers import RequestReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_multiple_requests = handler_method(RequestReadHandlers, "get_multiple_requests")
 
         mock_result = MagicMock()
         mock_result.requests = []
@@ -78,8 +84,11 @@ class TestHandleGetMultipleRequests:
 
     @pytest.mark.asyncio
     async def test_request_ids_from_flag_request_ids(self):
-        """IDs from args.flag_request_ids are forwarded to QueryBus."""
-        from orb.interface.request_command_handlers import handle_get_multiple_requests
+        """IDs from args.flag_request_ids are forwarded to QueryBusPort."""
+        from orb.interface.request_query_handlers import RequestReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_multiple_requests = handler_method(RequestReadHandlers, "get_multiple_requests")
 
         mock_result = MagicMock()
         mock_result.requests = []
@@ -97,8 +106,11 @@ class TestHandleGetMultipleRequests:
 
     @pytest.mark.asyncio
     async def test_request_ids_from_flag_ids(self):
-        """IDs from args.flag_ids are forwarded to QueryBus."""
-        from orb.interface.request_command_handlers import handle_get_multiple_requests
+        """IDs from args.flag_ids are forwarded to QueryBusPort."""
+        from orb.interface.request_query_handlers import RequestReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_multiple_requests = handler_method(RequestReadHandlers, "get_multiple_requests")
 
         mock_result = MagicMock()
         mock_result.requests = []
@@ -117,7 +129,10 @@ class TestHandleGetMultipleRequests:
     @pytest.mark.asyncio
     async def test_include_machines_default_true(self):
         """include_machines defaults to True when not set in args."""
-        from orb.interface.request_command_handlers import handle_get_multiple_requests
+        from orb.interface.request_query_handlers import RequestReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_multiple_requests = handler_method(RequestReadHandlers, "get_multiple_requests")
 
         mock_result = MagicMock()
         mock_result.requests = []
@@ -136,7 +151,10 @@ class TestHandleGetMultipleRequests:
     @pytest.mark.asyncio
     async def test_include_machines_false_when_set(self):
         """include_machines=False is forwarded to query."""
-        from orb.interface.request_command_handlers import handle_get_multiple_requests
+        from orb.interface.request_query_handlers import RequestReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_multiple_requests = handler_method(RequestReadHandlers, "get_multiple_requests")
 
         mock_result = MagicMock()
         mock_result.requests = []
@@ -155,7 +173,10 @@ class TestHandleGetMultipleRequests:
     @pytest.mark.asyncio
     async def test_result_requests_serialized_with_model_dump(self):
         """Requests with model_dump are serialized via model_dump()."""
-        from orb.interface.request_command_handlers import handle_get_multiple_requests
+        from orb.interface.request_query_handlers import RequestReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_multiple_requests = handler_method(RequestReadHandlers, "get_multiple_requests")
 
         req = MagicMock()
         req.model_dump.return_value = {"request_id": "r-1", "status": "pending"}
@@ -177,7 +198,10 @@ class TestHandleGetMultipleRequests:
     @pytest.mark.asyncio
     async def test_result_not_found_ids_in_response(self):
         """not_found_ids list is included in the response."""
-        from orb.interface.request_command_handlers import handle_get_multiple_requests
+        from orb.interface.request_query_handlers import RequestReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_multiple_requests = handler_method(RequestReadHandlers, "get_multiple_requests")
 
         mock_result = MagicMock()
         mock_result.requests = []
@@ -195,7 +219,10 @@ class TestHandleGetMultipleRequests:
     @pytest.mark.asyncio
     async def test_combined_all_id_sources(self):
         """IDs from request_ids + flag_request_ids + flag_ids are all forwarded."""
-        from orb.interface.request_command_handlers import handle_get_multiple_requests
+        from orb.interface.request_query_handlers import RequestReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_multiple_requests = handler_method(RequestReadHandlers, "get_multiple_requests")
 
         mock_result = MagicMock()
         mock_result.requests = []

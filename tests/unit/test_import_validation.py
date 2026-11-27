@@ -18,11 +18,8 @@ class TestCriticalImports:
         from orb.domain.request.value_objects import RequestStatus
         from orb.infrastructure.logging.logger import get_logger
 
-        # Interface command handlers (function-based)
-        from orb.interface.command_handlers import (
-            CLICommandHandler,
-            handle_get_request_status,
-        )
+        # Interface command handlers
+        from orb.interface.command_handlers import CLICommandHandler, RequestReadHandlers
 
         # Verify classes and functions are importable
         assert Application is not None
@@ -30,7 +27,7 @@ class TestCriticalImports:
         assert DomainException is not None
         assert get_logger is not None
         assert CLICommandHandler is not None
-        assert handle_get_request_status is not None
+        assert RequestReadHandlers is not None
 
     def test_value_object_locations(self):
         """Test that value objects are in their correct locations after decomposition."""

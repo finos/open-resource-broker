@@ -110,7 +110,10 @@ class TestHandleGetReturnRequestsForwardsParams:
         from orb.application.services.orchestration.list_return_requests import (
             ListReturnRequestsOrchestrator,
         )
-        from orb.interface.request_command_handlers import handle_get_return_requests
+        from orb.interface.request_query_handlers import RequestReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_return_requests = handler_method(RequestReadHandlers, "get_return_requests")
 
         mock_orch = MagicMock(spec=ListReturnRequestsOrchestrator)
         mock_orch.execute = AsyncMock(return_value=MagicMock(requests=[]))

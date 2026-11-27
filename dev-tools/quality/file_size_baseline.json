@@ -19,7 +19,6 @@
     "src/orb/infrastructure/storage/sql/strategy.py": 921,
     "src/orb/infrastructure/template/configuration_manager.py": 854,
     "src/orb/interface/init_command_handler.py": 1032,
-    "src/orb/interface/request_command_handlers.py": 640,
     "src/orb/interface/server_command_handlers.py": 650,
     "src/orb/k8s_legacy/impl/watchers/events.py": 692,
     "src/orb/k8s_legacy/tests/unit/test_events.py": 1075,

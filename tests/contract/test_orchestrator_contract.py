@@ -324,7 +324,10 @@ async def test_list_machines_cli_equals_rest_top_level_keys(scheduler_type: str)
 @pytest.mark.asyncio
 async def test_list_requests_cli_equals_rest_top_level_keys(scheduler_type: str) -> None:
     """CLI handle_list_requests and GET /api/v1/requests/ return the same top-level keys."""
-    from orb.interface.request_command_handlers import handle_list_requests
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_list_requests = handler_method(RequestReadHandlers, "list_requests")
 
     strategy = _make_scheduler_strategy(scheduler_type)
     request_dict = _make_request_dict()
@@ -381,7 +384,10 @@ async def test_list_requests_cli_equals_rest_top_level_keys(scheduler_type: str)
 @pytest.mark.asyncio
 async def test_get_request_status_cli_equals_rest_top_level_keys(scheduler_type: str) -> None:
     """CLI handle_get_request_status and GET /api/v1/requests/{id}/status return same keys."""
-    from orb.interface.request_command_handlers import handle_get_request_status
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_get_request_status = handler_method(RequestReadHandlers, "get_request_status")
 
     req_id = "req-00000000-0000-0000-0000-000000000001"
     request_dto = _make_request_dto_obj()
@@ -541,7 +547,10 @@ async def test_list_machines_cli_returns_dict(scheduler_type: str) -> None:
 async def test_list_requests_cli_returns_dict(scheduler_type: str) -> None:
     """handle_list_requests always returns a dict, never a bare list."""
     from orb.application.dto.interface_response import InterfaceResponse
-    from orb.interface.request_command_handlers import handle_list_requests
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_list_requests = handler_method(RequestReadHandlers, "list_requests")
 
     strategy = _make_scheduler_strategy(scheduler_type)
     result = await _call_cli(handle_list_requests, _make_args(), strategy)

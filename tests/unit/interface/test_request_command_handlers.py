@@ -22,14 +22,16 @@ from orb.application.services.orchestration.list_return_requests import (
     ListReturnRequestsOrchestrator,
 )
 from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
-from orb.interface.request_command_handlers import (
-    handle_cancel_request,
-    handle_get_request_status,
-    handle_get_return_requests,
-    handle_list_requests,
-    handle_request_machines,
-    handle_request_return_machines,
-)
+from orb.interface.request_command_handlers import RequestWriteHandlers
+from orb.interface.request_query_handlers import RequestReadHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_cancel_request = handler_method(RequestWriteHandlers, "cancel_request")
+handle_get_request_status = handler_method(RequestReadHandlers, "get_request_status")
+handle_get_return_requests = handler_method(RequestReadHandlers, "get_return_requests")
+handle_list_requests = handler_method(RequestReadHandlers, "list_requests")
+handle_request_machines = handler_method(RequestWriteHandlers, "request_machines")
+handle_request_return_machines = handler_method(RequestWriteHandlers, "request_return_machines")
 
 
 def _make_namespace(**kwargs) -> argparse.Namespace:

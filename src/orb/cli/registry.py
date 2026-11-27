@@ -246,26 +246,24 @@ def build_registry() -> None:
     register("templates", "get-bulk", handle_get_multiple_templates)
 
     # --- requests ---
-    from orb.interface.request_command_handlers import (
-        handle_cancel_request,
-        handle_confirm_terminated,
-        handle_get_multiple_requests,
-        handle_get_request_status,
-        handle_get_return_requests,
-        handle_list_requests,
-        handle_request_machines,
-        handle_request_return_machines,
-        handle_watch_request_status,
-    )
+    from orb.cli.handler_wiring import register_request_handlers
+    from orb.interface.request_command_handlers import RequestWriteHandlers
+    from orb.interface.request_query_handlers import RequestReadHandlers
 
-    register("requests", "show", handle_get_request_status)
-    register("requests", "status", handle_get_request_status)
-    register("requests", "list", handle_list_requests)
-    register("requests", "cancel", handle_cancel_request)
-    register("requests", "confirm-terminated", handle_confirm_terminated)
-    register("requests", "list-returns", handle_get_return_requests)
-    register("requests", "watch", handle_watch_request_status)
-    register("requests", "get-bulk", handle_get_multiple_requests)
+    def _request_queries(method: str) -> Handler:
+        return bind(RequestReadHandlers, method, group=register_request_handlers)
+
+    def _request_commands(method: str) -> Handler:
+        return bind(RequestWriteHandlers, method, group=register_request_handlers)
+
+    register("requests", "show", _request_queries("get_request_status"))
+    register("requests", "status", _request_queries("get_request_status"))
+    register("requests", "list", _request_queries("list_requests"))
+    register("requests", "cancel", _request_commands("cancel_request"))
+    register("requests", "confirm-terminated", _request_commands("confirm_terminated"))
+    register("requests", "list-returns", _request_queries("get_return_requests"))
+    register("requests", "watch", _request_queries("watch_request_status"))
+    register("requests", "get-bulk", _request_queries("get_multiple_requests"))
 
     # --- machines ---
     from orb.interface.machine_command_handlers import (
@@ -280,9 +278,9 @@ def build_registry() -> None:
     register("machines", "list", handle_list_machines)
     register("machines", "show", handle_get_machine)
     register("machines", "status", handle_get_machine_status)
-    register("machines", "request", handle_request_machines)
-    register("machines", "return", handle_request_return_machines)
-    register("machines", "terminate", handle_request_return_machines)
+    register("machines", "request", _request_commands("request_machines"))
+    register("machines", "return", _request_commands("request_return_machines"))
+    register("machines", "terminate", _request_commands("request_return_machines"))
     register("machines", "stop", handle_stop_machines)
     register("machines", "start", handle_start_machines)
     register("machines", "get-bulk", handle_get_multiple_machines)

@@ -14,12 +14,8 @@ from orb.interface.config_command_handlers import handle_validate_provider_confi
 from orb.interface.machine_command_handlers import (
     handle_get_machine_status,
 )
-from orb.interface.request_command_handlers import (
-    handle_get_request_status,
-    handle_get_return_requests,
-    handle_request_machines,
-    handle_request_return_machines,
-)
+from orb.interface.request_command_handlers import RequestWriteHandlers
+from orb.interface.request_query_handlers import RequestReadHandlers
 from orb.interface.scheduler_command_handlers import (
     handle_list_scheduler_strategies,
     handle_show_scheduler_config,
@@ -54,9 +50,9 @@ __all__: list[str] = [
     # Base handler
     "CLICommandHandler",
     "handle_execute_provider_operation",
-    # Request handlers (function-based)
-    "handle_get_request_status",
-    "handle_get_return_requests",
+    # Request handlers (class-based)
+    "RequestWriteHandlers",
+    "RequestReadHandlers",
     "handle_get_machine_status",
     "handle_get_template",
     "handle_list_providers",
@@ -71,8 +67,6 @@ __all__: list[str] = [
     "handle_provider_health",
     "handle_provider_metrics",
     "handle_reload_provider_config",
-    "handle_request_machines",
-    "handle_request_return_machines",
     "handle_select_provider_strategy",
     "handle_show_scheduler_config",
     "handle_show_storage_config",

@@ -191,9 +191,9 @@ async def test_cli_command_handler_does_not_call_start_daemon_services() -> None
     # the CLI handler is free of the daemon-start call.
     import inspect
 
-    from orb.interface import request_command_handlers
+    from orb.interface import request_command_handlers, request_query_handlers
 
-    source = inspect.getsource(request_command_handlers)
-    assert "start_daemon_services" not in source, (
-        "CLI command handler request_command_handlers must not call start_daemon_services"
-    )
+    for module in (request_command_handlers, request_query_handlers):
+        assert "start_daemon_services" not in inspect.getsource(module), (
+            f"CLI command handler {module.__name__} must not call start_daemon_services"
+        )

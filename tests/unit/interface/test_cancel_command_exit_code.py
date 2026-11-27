@@ -12,7 +12,10 @@ from orb.application.ports.scheduler_port import SchedulerPort
 from orb.application.services.orchestration.cancel_request import CancelRequestOrchestrator
 from orb.application.services.orchestration.dtos import CancelRequestOutput
 from orb.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
-from orb.interface.request_command_handlers import handle_cancel_request
+from orb.interface.request_command_handlers import RequestWriteHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_cancel_request = handler_method(RequestWriteHandlers, "cancel_request")
 from orb.interface.response_formatting_service import ResponseFormattingService
 
 
@@ -35,7 +38,7 @@ def _container(status: str, cancel_effective: bool = False, provider_abort=None)
     container.get.side_effect = lambda key: {
         CancelRequestOrchestrator: orchestrator,
         ResponseFormattingService: formatter,
-    }[key]
+    }.get(key, MagicMock())
     return container
 
 
