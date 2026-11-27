@@ -2272,7 +2272,7 @@
           "Providers"
         ],
         "summary": "List Providers",
-        "description": "Returns all configured provider instances with name, type, enabled flag, capabilities, selection weight and priority, and a provider-specific config object.  Does not perform live connectivity probes; use GET /providers/health for live status.",
+        "description": "Returns all configured provider instances with name, type, enabled flag, capabilities, and selection weight and priority.  The provider-specific config is not populated and is always an empty object.  Does not perform live connectivity probes; use GET /providers/health for live status.",
         "operationId": "listProviders",
         "responses": {
           "200": {

@@ -555,6 +555,27 @@ class TestHandleProviderShow:
         assert exit_code(result) == 0
 
     @pytest.mark.asyncio
+    async def test_specific_provider_shows_full_configuration(self, tmp_path):
+        from orb.interface.provider_config_handler import handle_provider_show
+        from orb.interface.response_formatting_service import ResponseFormattingService
+
+        _write_config(tmp_path, _base_config())
+        container = _make_show_container()
+        formatter = container.get(ResponseFormattingService)
+        with patch(
+            "orb.interface.provider_config_handler.get_config_location",
+            return_value=tmp_path,
+        ):
+            args = _ns(provider_name="aws-default")
+            args._container = container
+            await handle_provider_show(args)
+
+        shown = formatter.format_provider_detail.call_args.args[0]
+        assert shown["name"] == "aws-default"
+        assert shown["config"]["Profile"] == "default"
+        assert shown["config"]["Region"] == "us-east-1"
+
+    @pytest.mark.asyncio
     async def test_specific_provider_not_found_returns_1(self, tmp_path):
         # TODO: CQRS violation — handler reads config.json directly
         from orb.interface.provider_config_handler import handle_provider_show

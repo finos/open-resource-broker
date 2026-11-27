@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock
 
@@ -22,6 +23,7 @@ from orb.application.queries.provider_handlers import (
     ListAvailableProvidersHandler,
 )
 from orb.application.services.provider_registry_service import ProviderHealthSnapshot
+from orb.domain.services.generic_filter_service import GenericFilterService
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -245,6 +247,44 @@ class TestListAvailableProvidersHandler:
         result = await h.execute_query(q)
         assert result["count"] == 1
         assert result["providers"][0]["type"] == "k8s"
+
+    @pytest.mark.asyncio
+    async def test_entries_carry_only_display_fields(self):
+        provider = self._make_provider("aws")
+        provider.config = {"profile": "prod-admin", "role_arn": "arn:aws:iam::123456789012:role/x"}
+        h = self._handler(providers=[provider])
+
+        result = await h.execute_query(ListAvailableProvidersQuery())
+
+        assert set(result["providers"][0]) == {
+            "name",
+            "type",
+            "status",
+            "capabilities",
+            "weight",
+            "priority",
+            "enabled",
+        }
+        rendered = json.dumps(result, default=str)
+        assert "prod-admin" not in rendered
+        assert "123456789012" not in rendered
+
+    @pytest.mark.asyncio
+    async def test_filter_cannot_probe_hidden_config_values(self):
+        provider = self._make_provider("aws")
+        provider.config = {"region": "eu-west-2"}
+        h = self._handler(providers=[provider])
+        h._generic_filter_service = GenericFilterService()
+
+        matching = await h.execute_query(
+            ListAvailableProvidersQuery(filter_expressions=["name=aws"])
+        )
+        probing = await h.execute_query(
+            ListAvailableProvidersQuery(filter_expressions=["config.region=eu-west-2"])
+        )
+
+        assert matching["count"] == 1
+        assert probing["count"] == 0
 
     @pytest.mark.asyncio
     async def test_config_read_failure_is_a_configuration_error(self):

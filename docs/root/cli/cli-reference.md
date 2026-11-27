@@ -796,6 +796,8 @@ Provider management and operations.
 
 List available providers.
 
+The list shows `name`, `type`, `status`, `capabilities`, `weight`, `priority` and `enabled` for each provider. It omits the per-provider `config`; use `orb providers show <name>` to see the full configuration.
+
 **Usage:**
 ```bash
 orb providers list [OPTIONS]
@@ -808,7 +810,7 @@ orb providers list [OPTIONS]
 
 #### `providers show`
 
-Show provider details.
+Show provider details, including the full provider configuration. This is a local command that reads `config.json`; REST, MCP and the SDKs have no equivalent.
 
 **Usage:**
 ```bash

@@ -295,9 +295,9 @@ async def get_provider_schema(
     summary="List Providers",
     description=(
         "Returns all configured provider instances with name, type, enabled flag, "
-        "capabilities, selection weight and priority, and a provider-specific config "
-        "object.  Does not perform live connectivity probes; use GET /providers/health "
-        "for live status."
+        "capabilities, and selection weight and priority.  The provider-specific "
+        "config is not populated and is always an empty object.  Does not perform "
+        "live connectivity probes; use GET /providers/health for live status."
     ),
     response_model=ProviderListResponse,
 )
@@ -310,8 +310,8 @@ async def list_providers(
     """Return all configured provider instances.
 
     Each entry includes ``name``, ``type``, ``enabled``, ``status``, ``capabilities``,
-    ``weight``, ``priority`` and ``config`` (the provider-specific configuration
-    keys, nested). ``total_count`` repeats ``count``.
+    ``weight`` and ``priority``. ``config`` is always ``{}``: provider configuration
+    is not returned by the list. ``total_count`` repeats ``count``.
     """
     result = await orchestrator.execute(ListProvidersInput())
     return render_rest("list_providers", formatter, result)

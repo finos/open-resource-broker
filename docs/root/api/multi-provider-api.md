@@ -587,23 +587,21 @@ POST /api/v1/providers/select
 # List all providers
 orb providers list
 
-# List providers with details
-orb providers list --long
-
-# List only enabled providers
-orb providers list --enabled-only
-
 # Filter by provider type
-orb providers list --type aws
+orb providers list --provider-type aws
 ```
 
 **Output:**
 ```
 NAME            TYPE    ENABLED  PRIORITY  WEIGHT  STATUS
-aws-us-east-1   aws     true     1         10      healthy
-aws-us-west-2   aws     true     2         5       healthy
+aws-us-east-1   aws     true     1         10      active
+aws-us-west-2   aws     true     2         5       active
 provider1-east-us   provider1   false    3         3       disabled
 ```
+
+The list shows a fixed set of display fields for each provider: `name`, `type`, `status`, `capabilities`, `weight`, `priority` and `enabled`. It does not include the provider `config` (profiles, role ARNs, kubeconfig paths and similar). `providers[].config` is always `{}` in REST and SDK responses and is absent from CLI JSON and MCP output. Filter expressions apply to the displayed fields only, so a filter such as `config.region=us-east-1` matches nothing.
+
+To see the full configuration of a provider, run `orb providers show <name>` on the host that holds the configuration file. This is a local CLI command that reads `config.json`; there is no REST, MCP or SDK equivalent.
 
 #### Show Provider Details
 ```bash

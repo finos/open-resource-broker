@@ -321,7 +321,7 @@ List available cloud providers.
 
 **Parameters**: None
 
-**Returns**: List of configured providers
+**Returns**: List of configured providers with `name`, `type`, `status`, `capabilities`, `weight`, `priority` and `enabled`. The per-provider `config` is not included.
 
 #### get_provider_config
 Get provider configuration details.
@@ -329,7 +329,7 @@ Get provider configuration details.
 **Parameters**:
 - `provider` (optional): Specific provider name
 
-**Returns**: Provider configuration
+**Returns**: A configuration summary (provider mode, active provider names and counts, default provider, configuration source, file paths and last-updated time), not per-provider configuration
 
 #### get_provider_metrics
 Get provider performance metrics.
