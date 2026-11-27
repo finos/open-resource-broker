@@ -116,7 +116,7 @@ async def test_a_readable_machine_still_leaving_defers_the_failure(
     live = {"instance_id": "pod-b", "resource_id": "pod-b", "status": status}
 
     async def read(*_args: Any) -> Any:
-        return [live], {"pod-a"}, MagicMock(state="in_progress")
+        return [live], {"pod-a"}, set(), MagicMock(state="in_progress")
 
     monkeypatch.setattr(registry, "_read_return_pods", read)
     coords = {**COORDS, "pod-b": COORDS["pod-a"]}

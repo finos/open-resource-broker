@@ -220,6 +220,7 @@ class TestUnreadableReturn:
             metadata={
                 "instances": [{"instance_id": "pod-a", "status": "failed"}],
                 "unreadable_resource_ids": ["pod-a"],
+                "invalid_placement_resource_ids": ["pod-b"],
                 "return_unreadable_timed_out": True,
             },
         )
@@ -227,6 +228,7 @@ class TestUnreadableReturn:
         result = _outcome_to_provider_result(outcome, fallback_operation="get_instance_status")
 
         assert result.metadata["unreadable_resource_ids"] == ["pod-a"]
+        assert result.metadata["invalid_placement_resource_ids"] == ["pod-b"]
         assert result.metadata["return_unreadable_timed_out"] is True
         assert "fulfillment_final" not in result.data["provider_data"]
 

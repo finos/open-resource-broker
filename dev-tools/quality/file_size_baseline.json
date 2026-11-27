@@ -57,7 +57,7 @@
     "src/orb/providers/k8s/infrastructure/handlers/base_handler.py": 898,
     "src/orb/providers/k8s/infrastructure/handlers/deployment_handler.py": 622,
     "src/orb/providers/k8s/registration.py": 838,
-    "src/orb/providers/k8s/services/handler_registry.py": 802,
+    "src/orb/providers/k8s/services/handler_registry.py": 797,
     "src/orb/providers/k8s/services/infrastructure_discovery_service.py": 1016,
     "src/orb/providers/k8s/strategy/k8s_provider_strategy.py": 1364,
     "src/orb/providers/k8s/watch/events_watcher.py": 625,

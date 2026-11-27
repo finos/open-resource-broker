@@ -207,9 +207,10 @@ class RequestStatusService:
             )
         elif failed_count > 0:
             unreadable = self._timed_out_unreadable_ids(provider_metadata)
+            invalid = self._invalid_placement_ids(provider_metadata)
             detail = (
                 f"; could not confirm termination of: {', '.join(unreadable)}" if unreadable else ""
-            )
+            ) + (f"; invalid stored placement: {', '.join(invalid)}" if invalid else "")
             return (
                 RequestStatus.FAILED.value,
                 f"Return request failed: {failed_count} machines failed to terminate "
@@ -224,6 +225,13 @@ class RequestStatusService:
         if not provider_metadata or not provider_metadata.get("return_unreadable_timed_out"):
             return []
         return [str(i) for i in provider_metadata.get("unreadable_resource_ids") or []]
+
+    @staticmethod
+    def _invalid_placement_ids(provider_metadata: Optional[dict]) -> list[str]:
+        """Machine ids a provider could not place for reading, else empty."""
+        return [
+            str(i) for i in (provider_metadata or {}).get("invalid_placement_resource_ids") or []
+        ]
 
     def _publish_events(self, events: Optional[list]) -> None:
         """Publish the events a saved request returned.
@@ -337,6 +345,7 @@ class RequestStatusService:
                             now,
                             provider_machines,
                             self._timed_out_unreadable_ids(provider_metadata),
+                            self._invalid_placement_ids(provider_metadata),
                         )
                     except InvalidRequestStateError as exc:
                         # Illegal transition (e.g. terminal request, backward
@@ -423,6 +432,7 @@ class RequestStatusService:
         now: datetime,
         provider_machines: Optional[list[Machine]] = None,
         unreadable_ids: Optional[list[str]] = None,
+        invalid_ids: Optional[list[str]] = None,
     ) -> Tuple[Request, bool]:
         """Apply the state machine to ``request``; return (new request, changed).
 
@@ -477,12 +487,16 @@ class RequestStatusService:
                 )
                 changed = True
 
-        # A return that ended because machines could not be read records which ones,
-        # so the operator can check the cluster for them.
-        if unreadable_ids and updated_request.status == RequestStatus.FAILED:
-            updated_request = updated_request.update_metadata(
-                {"unreadable_resource_ids": list(unreadable_ids)}
-            )
+        # A return that ended because machines could not be read, or have an
+        # invalid stored placement, records which ones so the operator can check
+        # the cluster for them.
+        unread = {
+            "unreadable_resource_ids": list(unreadable_ids or []),
+            "invalid_placement_resource_ids": list(invalid_ids or []),
+        }
+        unread = {k: v for k, v in unread.items() if v}
+        if unread and updated_request.status == RequestStatus.FAILED:
+            updated_request = updated_request.update_metadata(unread)
             changed = True
 
         # Cache the latest ProviderFulfilment snapshot so DTO callers can surface it.

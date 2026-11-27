@@ -170,20 +170,24 @@ async def test_return_with_invalid_stored_namespace_releases_only_the_rest() -> 
 
 
 @pytest.mark.asyncio
-async def test_status_read_marks_only_the_invalid_namespace_machine_unreadable() -> None:
+async def test_status_read_reports_the_invalid_namespace_machine_separately() -> None:
     strategy, handler = _strategy_with_mock_handler()
     handler.read_pods_for_return = MagicMock(
         return_value=SimpleNamespace(instances=[], unreadable=set())
     )
 
-    _, unreadable, _ = await strategy._handler_registry._read_return_pods(
+    _, unreadable, invalid, fulfilment = await strategy._handler_registry._read_return_pods(
         handler,
         ["m-good", "m-bad"],
         SimpleNamespace(request_id="req-RET", provider_data={}),
         _PLACEMENTS,
     )
 
-    assert unreadable == {"m-bad"}
+    assert unreadable == set()
+    assert invalid == {"m-bad"}
+    # The invalid machine is still on its way out: the read is not fulfilled.
+    assert fulfilment.state == "in_progress"
+    assert fulfilment.pending_count == 1
     handler.read_pods_for_return.assert_called_once_with("orb-team-a", "req-1", ["m-good"])
 
 
