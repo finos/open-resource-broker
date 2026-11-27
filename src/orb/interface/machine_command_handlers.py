@@ -1,316 +1,329 @@
 """Machine-related command handlers for the interface layer."""
 
+from __future__ import annotations
+
 import asyncio
 from typing import TYPE_CHECKING, Any
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.infrastructure.error.decorators import handle_interface_exceptions
 from orb.interface.pagination_hint import print_cursor_hint
-from orb.interface.response_formatting_service import ResponseFormattingService
 
 if TYPE_CHECKING:
     import argparse
 
-
-@handle_interface_exceptions(context="get_machine_status", interface_type="cli")
-async def handle_get_machine_status(
-    args: "argparse.Namespace",
-) -> dict[str, Any] | InterfaceResponse:
-    """
-    Get status details for specific machines by ID, or all machines with --all.
-
-    Args:
-        args: Argument namespace with machine_ids
-
-    Returns:
-        Machine status information for all requested machines
-    """
-    from orb.application.services.orchestration.dtos import GetMachineInput, ListMachinesInput
+    from orb.application.ports.query_bus_port import QueryBusPort
     from orb.application.services.orchestration.get_machine import GetMachineOrchestrator
     from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
+    from orb.application.services.orchestration.start_machines import StartMachinesOrchestrator
+    from orb.application.services.orchestration.stop_machines import StopMachinesOrchestrator
+    from orb.interface.response_formatting_service import ResponseFormattingService
 
-    container = args._container
-    formatter = container.get(ResponseFormattingService)
 
-    has_all = getattr(args, "all", False)
-    machine_ids_from_args = []
+class MachineHandlers:
+    """CLI handlers that list, inspect, start and stop machines."""
 
-    if hasattr(args, "machine_ids") and args.machine_ids:
-        machine_ids_from_args.extend(args.machine_ids)
-    if hasattr(args, "machine_ids_flag") and args.machine_ids_flag:
-        machine_ids_from_args.extend(args.machine_ids_flag)
+    def __init__(
+        self,
+        list_orchestrator: ListMachinesOrchestrator,
+        get_orchestrator: GetMachineOrchestrator,
+        stop_orchestrator: StopMachinesOrchestrator,
+        start_orchestrator: StartMachinesOrchestrator,
+        query_bus: QueryBusPort,
+        formatter: ResponseFormattingService,
+    ) -> None:
+        self._list_orchestrator = list_orchestrator
+        self._get_orchestrator = get_orchestrator
+        self._stop_orchestrator = stop_orchestrator
+        self._start_orchestrator = start_orchestrator
+        self._query_bus = query_bus
+        self._formatter = formatter
 
-    has_specific_ids = bool(machine_ids_from_args)
+    @handle_interface_exceptions(context="get_machine_status", interface_type="cli")
+    async def get_machine_status(
+        self, args: "argparse.Namespace"
+    ) -> dict[str, Any] | InterfaceResponse:
+        """
+        Get status details for specific machines by ID, or all machines with --all.
 
-    if has_all and has_specific_ids:
-        return InterfaceResponse(
-            data={
-                "error": "Cannot use --all with specific machine IDs",
-                "message": "Use either --all or specific IDs, not both",
-            },
-            exit_code=1,
+        Args:
+            args: Argument namespace with machine_ids
+
+        Returns:
+            Machine status information for all requested machines
+        """
+        from orb.application.services.orchestration.dtos import GetMachineInput, ListMachinesInput
+
+        formatter = self._formatter
+
+        has_all = getattr(args, "all", False)
+        machine_ids_from_args = []
+
+        if hasattr(args, "machine_ids") and args.machine_ids:
+            machine_ids_from_args.extend(args.machine_ids)
+        if hasattr(args, "machine_ids_flag") and args.machine_ids_flag:
+            machine_ids_from_args.extend(args.machine_ids_flag)
+
+        has_specific_ids = bool(machine_ids_from_args)
+
+        if has_all and has_specific_ids:
+            return InterfaceResponse(
+                data={
+                    "error": "Cannot use --all with specific machine IDs",
+                    "message": "Use either --all or specific IDs, not both",
+                },
+                exit_code=1,
+            )
+
+        if has_all:
+            orchestrator = self._list_orchestrator
+            _limit = getattr(args, "limit", None)
+            _offset = getattr(args, "offset", None)
+            result = await orchestrator.execute(
+                ListMachinesInput(
+                    status=getattr(args, "status", None),
+                    provider_name=getattr(args, "provider_name", None),
+                    provider_type=getattr(args, "provider_type", None),
+                    request_id=getattr(args, "request_id", None),
+                    limit=int(_limit) if _limit is not None else 100,
+                    offset=int(_offset) if _offset is not None else 0,
+                    cursor=getattr(args, "cursor", None),
+                    timestamp_format=getattr(args, "timestamp_format", None),
+                    filter_expressions=getattr(args, "filter", None) or [],
+                )
+            )
+            return formatter.format_machine_list(
+                result.machines,
+                total_count=result.total_count,
+                next_cursor=result.next_cursor,
+            )
+
+        if not machine_ids_from_args:
+            return InterfaceResponse(
+                data={"error": "No machine IDs provided", "message": "Machine IDs are required"},
+                exit_code=1,
+            )
+
+        orchestrator = self._get_orchestrator
+        results = await asyncio.gather(
+            *[
+                orchestrator.execute(GetMachineInput(machine_id=mid))
+                for mid in machine_ids_from_args
+            ],
+            return_exceptions=True,
         )
+        machine_dtos = [
+            r.machine for r in results if not isinstance(r, BaseException) and r.machine is not None
+        ]
 
-    if has_all:
-        orchestrator = container.get(ListMachinesOrchestrator)
+        return formatter.format_machine_list(machine_dtos)
+
+    @handle_interface_exceptions(context="list_machines", interface_type="cli")
+    async def list_machines(self, args: "argparse.Namespace") -> dict[str, Any] | InterfaceResponse:
+        """
+        List machines, optionally filtered by status, request ID, or provider, with pagination.
+
+        Args:
+            args: Argument namespace with filtering options
+
+        Returns:
+            Machines list formatted for scheduler compatibility
+        """
+        from orb.application.services.orchestration.dtos import ListMachinesInput
+        from orb.interface.catalog import OPERATION_CATALOG, Interface
+
+        entry = OPERATION_CATALOG["list_machines"]
+        orchestrator = self._list_orchestrator
+        formatter = self._formatter
+
         _limit = getattr(args, "limit", None)
         _offset = getattr(args, "offset", None)
+        limit: int = int(_limit) if _limit is not None else 100
+        offset: int = int(_offset) if _offset is not None else 0
         result = await orchestrator.execute(
             ListMachinesInput(
                 status=getattr(args, "status", None),
                 provider_name=getattr(args, "provider_name", None),
                 provider_type=getattr(args, "provider_type", None),
                 request_id=getattr(args, "request_id", None),
-                limit=int(_limit) if _limit is not None else 100,
-                offset=int(_offset) if _offset is not None else 0,
+                limit=limit,
+                offset=offset,
                 cursor=getattr(args, "cursor", None),
                 timestamp_format=getattr(args, "timestamp_format", None),
                 filter_expressions=getattr(args, "filter", None) or [],
             )
         )
-        return formatter.format_machine_list(
-            result.machines,
-            total_count=result.total_count,
-            next_cursor=result.next_cursor,
+        print_cursor_hint(args, result)
+        return entry.renderer_for(Interface.CLI)(formatter, result)
+
+    @handle_interface_exceptions(context="stop_machines", interface_type="cli")
+    async def stop_machines(self, args: "argparse.Namespace") -> dict[str, Any] | InterfaceResponse:
+        """
+        Stop machines by ID, or all machines with --all --force.
+
+        Args:
+            args: Argument namespace with machine_ids, all, and force flags
+
+        Returns:
+            Stop operation results
+        """
+        # Validation: --all requires --force
+        has_all = getattr(args, "all", False)
+        has_force = getattr(args, "force", False)
+        machine_ids_from_args = (getattr(args, "machine_ids", []) or []) + (
+            getattr(args, "machine_ids_flag", []) or []
         )
 
-    if not machine_ids_from_args:
-        return InterfaceResponse(
-            data={"error": "No machine IDs provided", "message": "Machine IDs are required"},
-            exit_code=1,
+        if has_all and not has_force:
+            return InterfaceResponse(
+                data={
+                    "error": "Cannot use --all without --force flag",
+                    "message": "Use --force with --all to confirm stopping all machines",
+                },
+                exit_code=1,
+            )
+
+        # Validation: Cannot use both --all and specific IDs
+        if has_all and machine_ids_from_args:
+            return InterfaceResponse(
+                data={
+                    "error": "Cannot use --all with specific machine IDs",
+                    "message": "Use either --all or specific IDs, not both",
+                },
+                exit_code=1,
+            )
+
+        # Validation: Must specify either --all or specific IDs
+        if not has_all and not machine_ids_from_args:
+            return InterfaceResponse(
+                data={
+                    "error": "No machines specified",
+                    "message": "Specify machine IDs or use --all --force",
+                },
+                exit_code=1,
+            )
+
+        from orb.application.services.orchestration.dtos import StopMachinesInput
+        from orb.interface.catalog import OPERATION_CATALOG, Interface
+
+        entry = OPERATION_CATALOG["stop_machines"]
+        orchestrator = self._stop_orchestrator
+        formatter = self._formatter
+        result = await orchestrator.execute(
+            StopMachinesInput(
+                machine_ids=machine_ids_from_args,
+                all_machines=has_all,
+                force=has_force,
+                provider_name=getattr(args, "provider_name", None),
+                provider_type=getattr(args, "provider_type", None),
+                filter_expressions=getattr(args, "filter", None) or [],
+            )
+        )
+        return entry.renderer_for(Interface.CLI)(formatter, result)
+
+    @handle_interface_exceptions(context="start_machines", interface_type="cli")
+    async def start_machines(
+        self, args: "argparse.Namespace"
+    ) -> dict[str, Any] | InterfaceResponse:
+        """
+        Start machines by ID, or all machines with --all.
+
+        Args:
+            args: Argument namespace with machine_ids and all flags
+
+        Returns:
+            Start operation results
+        """
+        # Validation: Cannot use both --all and specific IDs
+        has_all = getattr(args, "all", False)
+        machine_ids_from_args = (getattr(args, "machine_ids", []) or []) + (
+            getattr(args, "machine_ids_flag", []) or []
         )
 
-    orchestrator = container.get(GetMachineOrchestrator)
-    results = await asyncio.gather(
-        *[orchestrator.execute(GetMachineInput(machine_id=mid)) for mid in machine_ids_from_args],
-        return_exceptions=True,
-    )
-    machine_dtos = [
-        r.machine for r in results if not isinstance(r, BaseException) and r.machine is not None
-    ]
+        if has_all and machine_ids_from_args:
+            return InterfaceResponse(
+                data={
+                    "error": "Cannot use --all with specific machine IDs",
+                    "message": "Use either --all or specific IDs, not both",
+                },
+                exit_code=1,
+            )
 
-    return formatter.format_machine_list(machine_dtos)
+        # Validation: Must specify either --all or specific IDs
+        if not has_all and not machine_ids_from_args:
+            return InterfaceResponse(
+                data={
+                    "error": "No machines specified",
+                    "message": "Specify machine IDs or use --all",
+                },
+                exit_code=1,
+            )
 
+        from orb.application.services.orchestration.dtos import StartMachinesInput
+        from orb.interface.catalog import OPERATION_CATALOG, Interface
 
-@handle_interface_exceptions(context="list_machines", interface_type="cli")
-async def handle_list_machines(
-    args: "argparse.Namespace",
-) -> dict[str, Any] | InterfaceResponse:
-    """
-    List machines, optionally filtered by status, request ID, or provider, with pagination.
-
-    Args:
-        args: Argument namespace with filtering options
-
-    Returns:
-        Machines list formatted for scheduler compatibility
-    """
-    from orb.application.services.orchestration.dtos import ListMachinesInput
-    from orb.interface.catalog import OPERATION_CATALOG, Interface
-
-    entry = OPERATION_CATALOG["list_machines"]
-    container = args._container
-    orchestrator = container.get(entry.orchestrator)
-    formatter = container.get(ResponseFormattingService)
-
-    _limit = getattr(args, "limit", None)
-    _offset = getattr(args, "offset", None)
-    limit: int = int(_limit) if _limit is not None else 100
-    offset: int = int(_offset) if _offset is not None else 0
-    result = await orchestrator.execute(
-        ListMachinesInput(
-            status=getattr(args, "status", None),
-            provider_name=getattr(args, "provider_name", None),
-            provider_type=getattr(args, "provider_type", None),
-            request_id=getattr(args, "request_id", None),
-            limit=limit,
-            offset=offset,
-            cursor=getattr(args, "cursor", None),
-            timestamp_format=getattr(args, "timestamp_format", None),
-            filter_expressions=getattr(args, "filter", None) or [],
+        entry = OPERATION_CATALOG["start_machines"]
+        orchestrator = self._start_orchestrator
+        formatter = self._formatter
+        result = await orchestrator.execute(
+            StartMachinesInput(
+                machine_ids=machine_ids_from_args,
+                all_machines=has_all,
+                provider_name=getattr(args, "provider_name", None),
+                provider_type=getattr(args, "provider_type", None),
+                filter_expressions=getattr(args, "filter", None) or [],
+            )
         )
-    )
-    print_cursor_hint(args, result)
-    return entry.renderer_for(Interface.CLI)(formatter, result)
+        return entry.renderer_for(Interface.CLI)(formatter, result)
 
+    @handle_interface_exceptions(context="get_machine", interface_type="cli")
+    async def get_machine(self, args: "argparse.Namespace") -> dict[str, Any] | InterfaceResponse:
+        """Handle machines show — fetch a single machine and wrap in InterfaceResponse."""
+        from orb.application.services.orchestration.dtos import GetMachineInput
+        from orb.interface.catalog import OPERATION_CATALOG, Interface
 
-@handle_interface_exceptions(context="stop_machines", interface_type="cli")
-async def handle_stop_machines(
-    args: "argparse.Namespace",
-) -> dict[str, Any] | InterfaceResponse:
-    """
-    Stop machines by ID, or all machines with --all --force.
+        entry = OPERATION_CATALOG["get_machine"]
+        orchestrator = self._get_orchestrator
+        formatter = self._formatter
 
-    Args:
-        args: Argument namespace with machine_ids, all, and force flags
+        machine_id = getattr(args, "machine_id", None) or getattr(args, "flag_machine_id", None)
+        if not machine_id:
+            return formatter.format_error("Machine ID is required")
 
-    Returns:
-        Stop operation results
-    """
-    # Validation: --all requires --force
-    has_all = getattr(args, "all", False)
-    has_force = getattr(args, "force", False)
-    machine_ids_from_args = (getattr(args, "machine_ids", []) or []) + (
-        getattr(args, "machine_ids_flag", []) or []
-    )
+        result = await orchestrator.execute(GetMachineInput(machine_id=machine_id))
+        return entry.renderer_for(Interface.CLI)(formatter, result)
 
-    if has_all and not has_force:
-        return InterfaceResponse(
-            data={
-                "error": "Cannot use --all without --force flag",
-                "message": "Use --force with --all to confirm stopping all machines",
-            },
-            exit_code=1,
+    @handle_interface_exceptions(context="get_multiple_machines", interface_type="cli")
+    async def get_multiple_machines(
+        self, args: "argparse.Namespace"
+    ) -> dict[str, Any] | InterfaceResponse:
+        """Fetch multiple machines by ID via GetMultipleMachinesQuery through the query bus."""
+        from orb.application.dto.bulk_queries import GetMultipleMachinesQuery
+
+        machine_ids: list[str] = []
+        if hasattr(args, "machine_ids") and args.machine_ids:
+            machine_ids.extend(args.machine_ids)
+        if hasattr(args, "flag_machine_ids") and args.flag_machine_ids:
+            machine_ids.extend(args.flag_machine_ids)
+        if hasattr(args, "flag_ids") and args.flag_ids:
+            machine_ids.extend(args.flag_ids)
+
+        if not machine_ids:
+            return {
+                "error": "No machine IDs provided",
+                "message": "At least one machine ID required",
+            }
+
+        query = GetMultipleMachinesQuery(
+            machine_ids=[str(mid) for mid in machine_ids],
+            include_requests=bool(getattr(args, "include_requests", True)),
         )
-
-    # Validation: Cannot use both --all and specific IDs
-    if has_all and machine_ids_from_args:
-        return InterfaceResponse(
-            data={
-                "error": "Cannot use --all with specific machine IDs",
-                "message": "Use either --all or specific IDs, not both",
-            },
-            exit_code=1,
-        )
-
-    # Validation: Must specify either --all or specific IDs
-    if not has_all and not machine_ids_from_args:
-        return InterfaceResponse(
-            data={
-                "error": "No machines specified",
-                "message": "Specify machine IDs or use --all --force",
-            },
-            exit_code=1,
-        )
-
-    from orb.application.services.orchestration.dtos import StopMachinesInput
-    from orb.interface.catalog import OPERATION_CATALOG, Interface
-
-    entry = OPERATION_CATALOG["stop_machines"]
-    container = args._container
-    orchestrator = container.get(entry.orchestrator)
-    formatter = container.get(ResponseFormattingService)
-    result = await orchestrator.execute(
-        StopMachinesInput(
-            machine_ids=machine_ids_from_args,
-            all_machines=has_all,
-            force=has_force,
-            provider_name=getattr(args, "provider_name", None),
-            provider_type=getattr(args, "provider_type", None),
-            filter_expressions=getattr(args, "filter", None) or [],
-        )
-    )
-    return entry.renderer_for(Interface.CLI)(formatter, result)
-
-
-@handle_interface_exceptions(context="start_machines", interface_type="cli")
-async def handle_start_machines(
-    args: "argparse.Namespace",
-) -> dict[str, Any] | InterfaceResponse:
-    """
-    Start machines by ID, or all machines with --all.
-
-    Args:
-        args: Argument namespace with machine_ids and all flags
-
-    Returns:
-        Start operation results
-    """
-    # Validation: Cannot use both --all and specific IDs
-    has_all = getattr(args, "all", False)
-    machine_ids_from_args = (getattr(args, "machine_ids", []) or []) + (
-        getattr(args, "machine_ids_flag", []) or []
-    )
-
-    if has_all and machine_ids_from_args:
-        return InterfaceResponse(
-            data={
-                "error": "Cannot use --all with specific machine IDs",
-                "message": "Use either --all or specific IDs, not both",
-            },
-            exit_code=1,
-        )
-
-    # Validation: Must specify either --all or specific IDs
-    if not has_all and not machine_ids_from_args:
-        return InterfaceResponse(
-            data={
-                "error": "No machines specified",
-                "message": "Specify machine IDs or use --all",
-            },
-            exit_code=1,
-        )
-
-    from orb.application.services.orchestration.dtos import StartMachinesInput
-    from orb.interface.catalog import OPERATION_CATALOG, Interface
-
-    entry = OPERATION_CATALOG["start_machines"]
-    container = args._container
-    orchestrator = container.get(entry.orchestrator)
-    formatter = container.get(ResponseFormattingService)
-    result = await orchestrator.execute(
-        StartMachinesInput(
-            machine_ids=machine_ids_from_args,
-            all_machines=has_all,
-            provider_name=getattr(args, "provider_name", None),
-            provider_type=getattr(args, "provider_type", None),
-            filter_expressions=getattr(args, "filter", None) or [],
-        )
-    )
-    return entry.renderer_for(Interface.CLI)(formatter, result)
-
-
-@handle_interface_exceptions(context="get_machine", interface_type="cli")
-async def handle_get_machine(
-    args: "argparse.Namespace",
-) -> dict[str, Any] | InterfaceResponse:
-    """Handle machines show — fetch a single machine and wrap in InterfaceResponse."""
-    from orb.application.services.orchestration.dtos import GetMachineInput
-    from orb.interface.catalog import OPERATION_CATALOG, Interface
-
-    entry = OPERATION_CATALOG["get_machine"]
-    container = args._container
-    orchestrator = container.get(entry.orchestrator)
-    formatter = container.get(ResponseFormattingService)
-
-    machine_id = getattr(args, "machine_id", None) or getattr(args, "flag_machine_id", None)
-    if not machine_id:
-        return formatter.format_error("Machine ID is required")
-
-    result = await orchestrator.execute(GetMachineInput(machine_id=machine_id))
-    return entry.renderer_for(Interface.CLI)(formatter, result)
-
-
-@handle_interface_exceptions(context="get_multiple_machines", interface_type="cli")
-async def handle_get_multiple_machines(
-    args: "argparse.Namespace",
-) -> dict[str, Any] | InterfaceResponse:
-    """Fetch multiple machines by ID via GetMultipleMachinesQuery through the query bus."""
-    from orb.application.dto.bulk_queries import GetMultipleMachinesQuery
-    from orb.infrastructure.di.buses import QueryBus
-
-    container = args._container
-    machine_ids: list[str] = []
-    if hasattr(args, "machine_ids") and args.machine_ids:
-        machine_ids.extend(args.machine_ids)
-    if hasattr(args, "flag_machine_ids") and args.flag_machine_ids:
-        machine_ids.extend(args.flag_machine_ids)
-    if hasattr(args, "flag_ids") and args.flag_ids:
-        machine_ids.extend(args.flag_ids)
-
-    if not machine_ids:
-        return {"error": "No machine IDs provided", "message": "At least one machine ID required"}
-
-    query = GetMultipleMachinesQuery(
-        machine_ids=[str(mid) for mid in machine_ids],
-        include_requests=bool(getattr(args, "include_requests", True)),
-    )
-    result = await container.get(QueryBus).execute(query)
-    return {
-        "machines": [
-            m.model_dump() if hasattr(m, "model_dump") else vars(m) for m in result.machines
-        ],
-        "found_count": result.found_count,
-        "not_found_ids": result.not_found_ids,
-        "total_requested": result.total_requested,
-    }
+        result = await self._query_bus.execute(query)
+        return {
+            "machines": [
+                m.model_dump() if hasattr(m, "model_dump") else vars(m) for m in result.machines
+            ],
+            "found_count": result.found_count,
+            "not_found_ids": result.not_found_ids,
+            "total_requested": result.total_requested,
+        }

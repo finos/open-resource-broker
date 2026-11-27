@@ -362,7 +362,10 @@ class TestHandleConfigCommandHandlers:
 
     @pytest.mark.asyncio
     async def test_get_configuration_no_key_returns_error(self):
-        from orb.interface.config_command_handlers import handle_get_configuration
+        from orb.interface.config_command_handlers import ConfigHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_configuration = handler_method(ConfigHandlers, "get_configuration")
 
         fmt = _make_formatter()
         container = MagicMock()
@@ -376,7 +379,10 @@ class TestHandleConfigCommandHandlers:
 
     @pytest.mark.asyncio
     async def test_set_configuration_no_key_returns_error(self):
-        from orb.interface.config_command_handlers import handle_set_configuration
+        from orb.interface.config_command_handlers import ConfigHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_set_configuration = handler_method(ConfigHandlers, "set_configuration")
 
         fmt = _make_formatter()
         container = MagicMock()
@@ -390,7 +396,10 @@ class TestHandleConfigCommandHandlers:
 
     @pytest.mark.asyncio
     async def test_set_configuration_no_value_returns_error(self):
-        from orb.interface.config_command_handlers import handle_set_configuration
+        from orb.interface.config_command_handlers import ConfigHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_set_configuration = handler_method(ConfigHandlers, "set_configuration")
 
         fmt = _make_formatter()
         container = MagicMock()
@@ -404,18 +413,21 @@ class TestHandleConfigCommandHandlers:
 
     @pytest.mark.asyncio
     async def test_get_configuration_happy_path(self):
-        from orb.infrastructure.di.buses import QueryBus
-        from orb.interface.config_command_handlers import handle_get_configuration
+        from orb.application.ports.query_bus_port import QueryBusPort
+        from orb.interface.config_command_handlers import ConfigHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_configuration = handler_method(ConfigHandlers, "get_configuration")
 
         fmt = _make_formatter()
         fmt.format_config.return_value = InterfaceResponse(data={"key": "foo", "value": "bar"})
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_bus.execute.return_value = {"key": "foo", "value": "bar"}
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ResponseFormattingService: fmt,
-            QueryBus: mock_bus,
+            QueryBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(_container=container, key="foo", flag_key=None)
@@ -427,18 +439,21 @@ class TestHandleConfigCommandHandlers:
 
     @pytest.mark.asyncio
     async def test_set_configuration_happy_path(self):
-        from orb.infrastructure.di.buses import CommandBus
-        from orb.interface.config_command_handlers import handle_set_configuration
+        from orb.application.ports.command_bus_port import CommandBusPort
+        from orb.interface.config_command_handlers import ConfigHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_set_configuration = handler_method(ConfigHandlers, "set_configuration")
 
         fmt = _make_formatter()
         fmt.format_config.return_value = InterfaceResponse(data={"success": True})
-        mock_bus = AsyncMock(spec=CommandBus)
+        mock_bus = AsyncMock(spec=CommandBusPort)
         mock_bus.execute.return_value = {"success": True}
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ResponseFormattingService: fmt,
-            CommandBus: mock_bus,
+            CommandBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(_container=container, key="foo", value="bar")
@@ -449,19 +464,22 @@ class TestHandleConfigCommandHandlers:
 
     @pytest.mark.asyncio
     async def test_get_system_config_happy_path(self):
-        from orb.infrastructure.di.buses import QueryBus
-        from orb.interface.config_command_handlers import handle_get_system_config
+        from orb.application.ports.query_bus_port import QueryBusPort
+        from orb.interface.config_command_handlers import ConfigHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_get_system_config = handler_method(ConfigHandlers, "get_system_config")
 
         fmt = _make_formatter()
         mock_result = MagicMock()
         mock_result.model_dump.return_value = {"scheduler_type": "default"}
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_bus.execute.return_value = mock_result
 
         container = MagicMock()
         container.get.side_effect = lambda t: {
             ResponseFormattingService: fmt,
-            QueryBus: mock_bus,
+            QueryBusPort: mock_bus,
         }.get(t, MagicMock())
 
         args = Namespace(_container=container, verbose=False)

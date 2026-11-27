@@ -15,7 +15,10 @@ from orb.domain.request.termination_confirmation import (
     InstanceStillVisibleError,
     TerminationNotVerifiedError,
 )
-from orb.interface.request_command_handlers import handle_confirm_terminated
+from orb.interface.request_command_handlers import RequestWriteHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_confirm_terminated = handler_method(RequestWriteHandlers, "confirm_terminated")
 
 
 def _args(**overrides):

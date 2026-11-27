@@ -61,7 +61,10 @@ class TestHandleCreateTemplateValidateOnly:
     def test_validate_only_does_not_execute_command_bus(self, tmp_path):
         import asyncio
 
-        from orb.interface.template_command_handlers import handle_create_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_create_template = handler_method(TemplateWriteHandlers, "create_template")
 
         command_bus = MagicMock()
         command_bus.execute = AsyncMock()
@@ -92,7 +95,10 @@ class TestHandleCreateTemplateValidateOnly:
             CreateTemplateOrchestrator,
         )
         from orb.application.services.orchestration.dtos import CreateTemplateOutput
-        from orb.interface.template_command_handlers import handle_create_template
+        from orb.interface.template_command_handlers import TemplateWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_create_template = handler_method(TemplateWriteHandlers, "create_template")
 
         mock_orchestrator = MagicMock(spec=CreateTemplateOrchestrator)
         mock_orchestrator.execute = AsyncMock(

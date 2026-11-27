@@ -395,64 +395,75 @@ class TestMainK8sLegacyDispatch:
 # ---------------------------------------------------------------------------
 
 
+def _patch_generate_handler(monkeypatch, handler):
+    """Make ``bind`` hand back ``handler`` and return the ``bind`` mock for assertions."""
+    bind = MagicMock(return_value=handler)
+    monkeypatch.setattr("orb.cli.registry.bind", bind)
+    return bind
+
+
+def _assert_bound_to_templates_generate(bind):
+    from orb.cli.handler_wiring import register_template_handlers
+    from orb.interface.templates_generate_handler import TemplatesGenerateHandler
+
+    bind.assert_called_once_with(
+        TemplatesGenerateHandler, "handle", group=register_template_handlers
+    )
+
+
 class TestMainTemplatesGenerateDispatch:
     def test_success_exits_zero(self, monkeypatch):
         args = _base_args(resource="templates", action="generate")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
         monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
-        monkeypatch.setattr(cli_main, "get_container", MagicMock)
-        monkeypatch.setattr(
-            "orb.interface.templates_generate_handler.handle_templates_generate",
-            AsyncMock(return_value={"status": "success"}),
-        )
+        handler = AsyncMock(return_value={"status": "success"})
+        bind = _patch_generate_handler(monkeypatch, handler)
 
         with pytest.raises(SystemExit) as exc_info:
             _run(cli_main.main())
         assert exc_info.value.code == 0
+        _assert_bound_to_templates_generate(bind)
+        handler.assert_awaited_once_with(args)
 
     def test_failure_prints_error_and_exits_one(self, monkeypatch):
         args = _base_args(resource="templates", action="generate")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
         monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
-        monkeypatch.setattr(cli_main, "get_container", MagicMock)
-        monkeypatch.setattr(
-            "orb.interface.templates_generate_handler.handle_templates_generate",
-            AsyncMock(return_value={"status": "error", "message": "bad template"}),
-        )
+        handler = AsyncMock(return_value={"status": "error", "message": "bad template"})
+        bind = _patch_generate_handler(monkeypatch, handler)
 
         with pytest.raises(SystemExit) as exc_info:
             _run(cli_main.main())
         assert exc_info.value.code == 1
+        _assert_bound_to_templates_generate(bind)
+        handler.assert_awaited_once_with(args)
 
     def test_exception_prints_traceback_and_exits_one(self, monkeypatch):
         args = _base_args(resource="templates", action="generate")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
         monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
-        monkeypatch.setattr(cli_main, "get_container", MagicMock)
-        monkeypatch.setattr(
-            "orb.interface.templates_generate_handler.handle_templates_generate",
-            AsyncMock(side_effect=RuntimeError("template boom")),
-        )
+        handler = AsyncMock(side_effect=RuntimeError("template boom"))
+        bind = _patch_generate_handler(monkeypatch, handler)
 
         with pytest.raises(SystemExit) as exc_info:
             _run(cli_main.main())
         assert exc_info.value.code == 1
+        _assert_bound_to_templates_generate(bind)
+        handler.assert_awaited_once_with(args)
 
-    def test_reuses_existing_container_when_already_attached(self, monkeypatch):
+    def test_builds_the_container_before_the_guarded_dispatch(self, monkeypatch):
         args = _base_args(resource="templates", action="generate")
-        args._container = MagicMock()
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
         monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
         get_container_mock = MagicMock()
         monkeypatch.setattr(cli_main, "get_container", get_container_mock)
-        monkeypatch.setattr(
-            "orb.interface.templates_generate_handler.handle_templates_generate",
-            AsyncMock(return_value={"status": "success"}),
-        )
+        handler = AsyncMock(return_value={"status": "success"})
+        _patch_generate_handler(monkeypatch, handler)
 
         with pytest.raises(SystemExit):
             _run(cli_main.main())
-        get_container_mock.assert_not_called()
+        get_container_mock.assert_called_once_with()
+        assert not hasattr(args, "_container")
 
 
 # ---------------------------------------------------------------------------

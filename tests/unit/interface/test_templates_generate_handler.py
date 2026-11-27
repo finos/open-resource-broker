@@ -82,7 +82,10 @@ class TestHandleTemplatesGenerate:
     @pytest.mark.asyncio
     async def test_happy_path_returns_status_dict(self):
         """Successful generation returns a dict with 'status' and 'providers'."""
-        from orb.interface.templates_generate_handler import handle_templates_generate
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_templates_generate = handler_method(TemplatesGenerateHandler, "handle")
 
         created = _make_provider_result(status="created", filename="aws.json", templates_count=5)
         result = _make_generation_result(
@@ -110,7 +113,10 @@ class TestHandleTemplatesGenerate:
     @pytest.mark.asyncio
     async def test_skipped_files_list_populated(self):
         """Providers with status='skipped' appear in skipped_files list."""
-        from orb.interface.templates_generate_handler import handle_templates_generate
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_templates_generate = handler_method(TemplatesGenerateHandler, "handle")
 
         skipped = _make_provider_result(status="skipped", filename="aws.json")
         result = _make_generation_result(providers=[skipped], created_count=0)
@@ -129,7 +135,10 @@ class TestHandleTemplatesGenerate:
     async def test_provider_specific_args_forwarded_to_service(self):
         """provider_name, all_providers, force are forwarded via TemplateGenerationRequest."""
         from orb.application.dto.template_generation_dto import TemplateGenerationRequest
-        from orb.interface.templates_generate_handler import handle_templates_generate
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_templates_generate = handler_method(TemplatesGenerateHandler, "handle")
 
         result = _make_generation_result(providers=[])
         container, mock_svc, _ = _make_container()
@@ -160,7 +169,10 @@ class TestHandleTemplatesGenerate:
     async def test_no_args_attrs_uses_defaults(self):
         """Missing optional attrs fall back to None/False defaults."""
         from orb.application.dto.template_generation_dto import TemplateGenerationRequest
-        from orb.interface.templates_generate_handler import handle_templates_generate
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_templates_generate = handler_method(TemplatesGenerateHandler, "handle")
 
         result = _make_generation_result(providers=[])
         container, mock_svc, _ = _make_container()
@@ -187,7 +199,10 @@ class TestHandleTemplatesGenerateErrors:
     @pytest.mark.asyncio
     async def test_exception_returns_error_dict(self):
         """If generate_templates raises, the handler returns an error dict."""
-        from orb.interface.templates_generate_handler import handle_templates_generate
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_templates_generate = handler_method(TemplatesGenerateHandler, "handle")
 
         container, mock_svc, _ = _make_container()
         mock_svc.generate_templates = AsyncMock(side_effect=RuntimeError("service unavailable"))
@@ -204,7 +219,10 @@ class TestHandleTemplatesGenerateErrors:
     @pytest.mark.asyncio
     async def test_container_get_exception_returns_error_dict(self):
         """If DI container.get raises, the handler returns an error dict."""
-        from orb.interface.templates_generate_handler import handle_templates_generate
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_templates_generate = handler_method(TemplatesGenerateHandler, "handle")
 
         container = MagicMock()
         container.get.side_effect = KeyError("not registered")
@@ -227,19 +245,22 @@ class TestHandleTemplatesGenerateErrors:
 class TestPrintGenerationResults:
     def test_error_status_returns_immediately_no_console_call(self):
         """status='error' → _print_generation_results returns early, no console output."""
-        from orb.interface.templates_generate_handler import _print_generation_results
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
 
         result = _make_generation_result(status="error", providers=[])
         container, _, mock_console = _make_container()
 
-        _print_generation_results(result, container)
+        TemplatesGenerateHandler(
+            template_service_provider=MagicMock(),
+            console_provider=lambda: container.get(ConsolePort),
+        )._print_generation_results(result)
 
         mock_console.info.assert_not_called()
         mock_console.success.assert_not_called()
 
     def test_created_providers_calls_console_success(self):
         """created providers → console.success called with result.message."""
-        from orb.interface.templates_generate_handler import _print_generation_results
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
 
         created = _make_provider_result(status="created")
         result = _make_generation_result(
@@ -252,13 +273,16 @@ class TestPrintGenerationResults:
 
         container, _, mock_console = _make_container()
 
-        _print_generation_results(result, container)
+        TemplatesGenerateHandler(
+            template_service_provider=MagicMock(),
+            console_provider=lambda: container.get(ConsolePort),
+        )._print_generation_results(result)
 
         mock_console.success.assert_called_once_with("Generated 3 templates")
 
     def test_skipped_providers_prints_skipped_message(self):
         """skipped providers → info message about skipped files is printed."""
-        from orb.interface.templates_generate_handler import _print_generation_results
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
 
         skipped = _make_provider_result(status="skipped", filename="old.json")
         result = _make_generation_result(
@@ -269,7 +293,10 @@ class TestPrintGenerationResults:
 
         container, _, mock_console = _make_container()
 
-        _print_generation_results(result, container)
+        TemplatesGenerateHandler(
+            template_service_provider=MagicMock(),
+            console_provider=lambda: container.get(ConsolePort),
+        )._print_generation_results(result)
 
         # Should have printed info about skipped files
         calls = [str(c) for c in mock_console.info.call_args_list]
@@ -278,7 +305,7 @@ class TestPrintGenerationResults:
 
     def test_no_created_no_skipped_prints_nothing(self):
         """No providers at all → prints 'No templates generated'."""
-        from orb.interface.templates_generate_handler import _print_generation_results
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
 
         result = _make_generation_result(
             status="success",
@@ -288,13 +315,16 @@ class TestPrintGenerationResults:
 
         container, _, mock_console = _make_container()
 
-        _print_generation_results(result, container)
+        TemplatesGenerateHandler(
+            template_service_provider=MagicMock(),
+            console_provider=lambda: container.get(ConsolePort),
+        )._print_generation_results(result)
 
         mock_console.info.assert_called()
 
     def test_only_skipped_no_created_prints_no_new_templates(self):
         """Only skipped, no created → 'No new templates generated' message."""
-        from orb.interface.templates_generate_handler import _print_generation_results
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
 
         skipped = _make_provider_result(status="skipped")
         result = _make_generation_result(
@@ -305,8 +335,53 @@ class TestPrintGenerationResults:
 
         container, _, mock_console = _make_container()
 
-        _print_generation_results(result, container)
+        TemplatesGenerateHandler(
+            template_service_provider=MagicMock(),
+            console_provider=lambda: container.get(ConsolePort),
+        )._print_generation_results(result)
 
         calls = [str(c) for c in mock_console.info.call_args_list]
         combined = " ".join(calls)
         assert "No new templates" in combined or "already exist" in combined
+
+
+@pytest.mark.unit
+class TestProviderFailures:
+    """A collaborator that cannot be resolved is reported in the result, not raised."""
+
+    @pytest.mark.asyncio
+    async def test_service_that_cannot_be_resolved_is_reported_as_an_error(self):
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
+
+        def broken():
+            raise RuntimeError("service unavailable")
+
+        handler = TemplatesGenerateHandler(
+            template_service_provider=broken, console_provider=MagicMock()
+        )
+
+        out = await handler.handle(_make_args())
+
+        assert out == {"error": "service unavailable", "status": "error", "success": False}
+
+    @pytest.mark.asyncio
+    async def test_console_that_cannot_be_resolved_is_reported_as_an_error(self):
+        from orb.application.services.template_generation_service import TemplateGenerationService
+        from orb.interface.templates_generate_handler import TemplatesGenerateHandler
+
+        service = MagicMock(spec=TemplateGenerationService)
+        service.generate_templates = AsyncMock(
+            return_value=_make_generation_result(providers=[_make_provider_result()])
+        )
+
+        def broken():
+            raise RuntimeError("console unavailable")
+
+        handler = TemplatesGenerateHandler(
+            template_service_provider=lambda: service, console_provider=broken
+        )
+
+        out = await handler.handle(_make_args())
+
+        assert out["status"] == "error"
+        assert out["error"] == "console unavailable"

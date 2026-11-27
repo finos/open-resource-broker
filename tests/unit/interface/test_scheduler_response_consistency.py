@@ -109,7 +109,10 @@ async def test_cli_calls_format_request_status_response():
     args = _make_namespace(request_id="req-abc", all=False)
 
     args._container = container
-    from orb.interface.request_command_handlers import handle_get_request_status
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_get_request_status = handler_method(RequestReadHandlers, "get_request_status")
 
     result = await handle_get_request_status(args)
 
@@ -126,7 +129,10 @@ async def test_cli_format_receives_list():
     args = _make_namespace(request_id="req-abc", all=False)
 
     args._container = container
-    from orb.interface.request_command_handlers import handle_get_request_status
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_get_request_status = handler_method(RequestReadHandlers, "get_request_status")
 
     await handle_get_request_status(args)
 
@@ -143,7 +149,10 @@ async def test_cli_all_flag_delegates_to_scheduler():
     args = _make_namespace(all=True)
 
     args._container = container
-    from orb.interface.request_command_handlers import handle_get_request_status
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_get_request_status = handler_method(RequestReadHandlers, "get_request_status")
 
     result = await handle_get_request_status(args)
 
@@ -241,7 +250,10 @@ async def test_cli_request_machines_delegates_format_request_response():
     args = _make_namespace(template_id="t1", machine_count=1, metadata={})
 
     args._container = container
-    from orb.interface.request_command_handlers import handle_request_machines
+    from orb.interface.request_command_handlers import RequestWriteHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_request_machines = handler_method(RequestWriteHandlers, "request_machines")
 
     await handle_request_machines(args)
 
@@ -264,7 +276,10 @@ async def test_cli_passes_scheduler_return_value_through():
     args = _make_namespace(all=True)
 
     args._container = container
-    from orb.interface.request_command_handlers import handle_get_request_status
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_get_request_status = handler_method(RequestReadHandlers, "get_request_status")
 
     result = await handle_get_request_status(args)
 

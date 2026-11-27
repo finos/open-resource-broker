@@ -258,7 +258,10 @@ class TestFormatConversionInHandlers:
             ListTemplatesOrchestrator,
         )
         from orb.interface.response_formatting_service import ResponseFormattingService
-        from orb.interface.template_command_handlers import handle_list_templates
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_list_templates = handler_method(TemplateReadHandlers, "list_templates")
 
         container = MagicMock()
         formatter = MagicMock(spec=ResponseFormattingService)

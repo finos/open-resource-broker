@@ -13,13 +13,25 @@ from orb.application.services.orchestration.get_request_status import (
 from orb.application.services.orchestration.list_templates import ListTemplatesOrchestrator
 from orb.infrastructure.di.buses import QueryBus
 from orb.infrastructure.di.container import DIContainer
-from orb.interface.request_command_handlers import handle_get_request_status
+from orb.interface.request_query_handlers import RequestReadHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_get_request_status = handler_method(RequestReadHandlers, "get_request_status")
 from orb.interface.response_formatting_service import ResponseFormattingService
-from orb.interface.scheduler_command_handlers import handle_list_scheduler_strategies
-from orb.interface.storage_command_handlers import handle_list_storage_strategies
+from orb.interface.scheduler_command_handlers import SchedulerHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_list_scheduler_strategies = handler_method(SchedulerHandlers, "list_scheduler_strategies")
+from orb.interface.storage_command_handlers import StorageHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_list_storage_strategies = handler_method(StorageHandlers, "list_storage_strategies")
 
 # Import CLI handlers
-from orb.interface.template_command_handlers import handle_list_templates
+from orb.interface.template_command_handlers import TemplateReadHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_list_templates = handler_method(TemplateReadHandlers, "list_templates")
 
 
 class TestCLIHandlerExecution:

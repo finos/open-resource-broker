@@ -6,7 +6,6 @@ formatter.format_request_status or formatter.format_request_operation.
 """
 
 import argparse
-import importlib
 from functools import partial
 from unittest.mock import AsyncMock, MagicMock
 
@@ -27,7 +26,9 @@ from orb.application.services.orchestration.list_requests import ListRequestsOrc
 from orb.application.services.orchestration.list_return_requests import (
     ListReturnRequestsOrchestrator,
 )
+from orb.interface.request_query_handlers import RequestReadHandlers
 from orb.interface.response_formatting_service import ResponseFormattingService
+from tests.utilities.cli_handlers import handler_method
 
 
 def _make_namespace(**kwargs) -> argparse.Namespace:
@@ -91,12 +92,12 @@ def _mock_container_with_formatter():
     "handler_fn,args_factory,query_return",
     [
         (
-            "orb.interface.request_command_handlers.handle_get_request_status",
+            (RequestReadHandlers, "get_request_status"),
             partial(_make_namespace, all=True),
             [],
         ),
         (
-            "orb.interface.request_command_handlers.handle_list_requests",
+            (RequestReadHandlers, "list_requests"),
             _make_namespace,
             [],
         ),
@@ -105,9 +106,7 @@ def _mock_container_with_formatter():
 @pytest.mark.asyncio
 async def test_handler_delegates_to_scheduler(handler_fn, args_factory, query_return):
     """Every list/status handler must call formatter.format_request_status."""
-    module_path, fn_name = handler_fn.rsplit(".", 1)
-    module = importlib.import_module(module_path)
-    handler = getattr(module, fn_name)
+    handler = handler_method(*handler_fn)
 
     container, formatter = _mock_container_with_formatter()
 
@@ -126,7 +125,10 @@ async def test_get_return_requests_delegates_to_format_return_requests():
     getReturnRequests shape (machine/grace-period items), so the handler renders
     through format_return_requests rather than the request-status formatter.
     """
-    from orb.interface.request_command_handlers import handle_get_return_requests
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_get_return_requests = handler_method(RequestReadHandlers, "get_return_requests")
 
     container, formatter = _mock_container_with_formatter()
 
@@ -146,7 +148,10 @@ async def test_get_return_requests_delegates_to_format_return_requests():
 async def test_get_request_status_single_id_delegates_to_scheduler():
     """handle_get_request_status with a single request_id must delegate to formatter."""
     from orb.application.dto.interface_response import InterfaceResponse
-    from orb.interface.request_command_handlers import handle_get_request_status
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_get_request_status = handler_method(RequestReadHandlers, "get_request_status")
 
     container, formatter = _mock_container_with_formatter()
     formatter.format_request_status.return_value = InterfaceResponse(data={"requests": []})
@@ -181,7 +186,10 @@ async def test_get_request_status_single_id_delegates_to_scheduler():
 async def test_request_machines_delegates_format_request_response():
     """handle_request_machines must call formatter.format_request_operation."""
     from orb.application.dto.interface_response import InterfaceResponse
-    from orb.interface.request_command_handlers import handle_request_machines
+    from orb.interface.request_command_handlers import RequestWriteHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_request_machines = handler_method(RequestWriteHandlers, "request_machines")
 
     container, formatter = _mock_container_with_formatter()
     formatter.format_request_operation.return_value = InterfaceResponse(
@@ -212,7 +220,10 @@ async def test_request_machines_delegates_format_request_response():
 async def test_cancel_request_delegates_format_request_response():
     """handle_cancel_request must call formatter.format_request_operation."""
     from orb.application.dto.interface_response import InterfaceResponse
-    from orb.interface.request_command_handlers import handle_cancel_request
+    from orb.interface.request_command_handlers import RequestWriteHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_cancel_request = handler_method(RequestWriteHandlers, "cancel_request")
 
     container, formatter = _mock_container_with_formatter()
     formatter.format_request_operation.return_value = InterfaceResponse(
@@ -238,7 +249,10 @@ async def test_cancel_request_delegates_format_request_response():
 @pytest.mark.asyncio
 async def test_scheduler_port_retrieved_from_container():
     """Container must be asked for ResponseFormattingService — not bypassed."""
-    from orb.interface.request_command_handlers import handle_get_return_requests
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_get_return_requests = handler_method(RequestReadHandlers, "get_return_requests")
 
     container, _ = _mock_container_with_formatter()
 

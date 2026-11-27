@@ -78,7 +78,8 @@ class TestMakeBusHandler:
         mock_container = MagicMock()
 
         def _get(bus_type):
-            from orb.infrastructure.di.buses import CommandBus, QueryBus
+            from orb.application.ports.command_bus_port import CommandBusPort as CommandBus
+            from orb.application.ports.query_bus_port import QueryBusPort as QueryBus
 
             if bus_type == QueryBus:
                 return mock_query_bus
@@ -126,7 +127,8 @@ class TestMakeBusHandler:
         mock_container = MagicMock()
 
         def _get(bus_type):
-            from orb.infrastructure.di.buses import CommandBus, QueryBus
+            from orb.application.ports.command_bus_port import CommandBusPort as CommandBus
+            from orb.application.ports.query_bus_port import QueryBusPort as QueryBus
 
             if bus_type == CommandBus:
                 return mock_command_bus
@@ -178,7 +180,7 @@ class TestMakeBusHandler:
         mock_container = MagicMock()
 
         def _get(bus_type):
-            from orb.infrastructure.di.buses import QueryBus
+            from orb.application.ports.query_bus_port import QueryBusPort as QueryBus
 
             if bus_type == QueryBus:
                 return mock_query_bus

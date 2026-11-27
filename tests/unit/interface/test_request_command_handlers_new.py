@@ -21,15 +21,17 @@ from orb.application.services.orchestration.dtos import (
     ListReturnRequestsOutput,
     ReturnMachinesOutput,
 )
-from orb.interface.request_command_handlers import (
-    handle_cancel_request,
-    handle_get_multiple_requests,
-    handle_get_request_status,
-    handle_get_return_requests,
-    handle_list_requests,
-    handle_request_machines,
-    handle_request_return_machines,
-)
+from orb.interface.request_command_handlers import RequestWriteHandlers
+from orb.interface.request_query_handlers import RequestReadHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_cancel_request = handler_method(RequestWriteHandlers, "cancel_request")
+handle_get_multiple_requests = handler_method(RequestReadHandlers, "get_multiple_requests")
+handle_get_request_status = handler_method(RequestReadHandlers, "get_request_status")
+handle_get_return_requests = handler_method(RequestReadHandlers, "get_return_requests")
+handle_list_requests = handler_method(RequestReadHandlers, "list_requests")
+handle_request_machines = handler_method(RequestWriteHandlers, "request_machines")
+handle_request_return_machines = handler_method(RequestWriteHandlers, "request_return_machines")
 from orb.interface.response_formatting_service import ResponseFormattingService
 
 
@@ -707,9 +709,9 @@ class TestHandleGetMultipleRequests:
 
     @pytest.mark.asyncio
     async def test_happy_path_via_query_bus(self):
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_result = MagicMock()
         mock_result.requests = []
         mock_result.found_count = 0
@@ -718,7 +720,7 @@ class TestHandleGetMultipleRequests:
         mock_bus.execute.return_value = mock_result
 
         container = MagicMock()
-        container.get.side_effect = lambda t: {QueryBus: mock_bus}.get(t, MagicMock())
+        container.get.side_effect = lambda t: {QueryBusPort: mock_bus}.get(t, MagicMock())
 
         args = Namespace(
             _container=container,
@@ -735,9 +737,9 @@ class TestHandleGetMultipleRequests:
 
     @pytest.mark.asyncio
     async def test_flag_ids_merged(self):
-        from orb.infrastructure.di.buses import QueryBus
+        from orb.application.ports.query_bus_port import QueryBusPort
 
-        mock_bus = AsyncMock(spec=QueryBus)
+        mock_bus = AsyncMock(spec=QueryBusPort)
         mock_result = MagicMock()
         mock_result.requests = []
         mock_result.found_count = 0
@@ -746,7 +748,7 @@ class TestHandleGetMultipleRequests:
         mock_bus.execute.return_value = mock_result
 
         container = MagicMock()
-        container.get.side_effect = lambda t: {QueryBus: mock_bus}.get(t, MagicMock())
+        container.get.side_effect = lambda t: {QueryBusPort: mock_bus}.get(t, MagicMock())
 
         args = Namespace(
             _container=container,

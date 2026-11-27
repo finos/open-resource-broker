@@ -55,7 +55,10 @@ class TestRequestMachinesWait:
         args = _make_namespace(template_id="t1", machine_count=1, metadata={}, wait=False)
 
         args._container = container
-        from orb.interface.request_command_handlers import handle_request_machines
+        from orb.interface.request_command_handlers import RequestWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_request_machines = handler_method(RequestWriteHandlers, "request_machines")
 
         await handle_request_machines(args)
 
@@ -73,7 +76,10 @@ class TestRequestMachinesWait:
         args = _make_namespace(template_id="t1", machine_count=1, metadata={}, wait=True, timeout=0)
 
         args._container = container
-        from orb.interface.request_command_handlers import handle_request_machines
+        from orb.interface.request_command_handlers import RequestWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_request_machines = handler_method(RequestWriteHandlers, "request_machines")
 
         await handle_request_machines(args)
 
@@ -97,7 +103,10 @@ class TestRequestMachinesWait:
         )
 
         args._container = container
-        from orb.interface.request_command_handlers import handle_request_machines
+        from orb.interface.request_command_handlers import RequestWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_request_machines = handler_method(RequestWriteHandlers, "request_machines")
 
         result = await handle_request_machines(args)
 
@@ -117,7 +126,10 @@ class TestRequestMachinesWait:
         )
 
         args._container = container
-        from orb.interface.request_command_handlers import handle_request_machines
+        from orb.interface.request_command_handlers import RequestWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_request_machines = handler_method(RequestWriteHandlers, "request_machines")
 
         result = await handle_request_machines(args)
 
@@ -142,7 +154,10 @@ class TestRequestMachinesWait:
         )
 
         args._container = container
-        from orb.interface.request_command_handlers import handle_request_machines
+        from orb.interface.request_command_handlers import RequestWriteHandlers
+        from tests.utilities.cli_handlers import handler_method
+
+        handle_request_machines = handler_method(RequestWriteHandlers, "request_machines")
 
         result = await handle_request_machines(args)
 

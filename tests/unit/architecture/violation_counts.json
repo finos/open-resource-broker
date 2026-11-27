@@ -11,6 +11,8 @@
   "getattr_justification_k8s": 294,
   "application_service_locator_sites": 0,
   "stdlib_logger_files_outside_boundary": 20,
-  "interface_service_locator_sites": 142,
-  "reasonless_suppressions": 856
+  "interface_service_locator_sites": 60,
+  "reasonless_suppressions": 856,
+  "interface_container_parameters": 33,
+  "interface_args_container_reads": 22
 }

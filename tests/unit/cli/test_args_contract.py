@@ -134,7 +134,10 @@ async def test_requests_list_offset_forwarded_to_orchestrator():
     from orb.application.dto.interface_response import InterfaceResponse
     from orb.application.services.orchestration.dtos import ListRequestsOutput
     from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
-    from orb.interface.request_command_handlers import handle_list_requests
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_list_requests = handler_method(RequestReadHandlers, "list_requests")
     from orb.interface.response_formatting_service import ResponseFormattingService
 
     container = MagicMock()
@@ -164,7 +167,10 @@ async def test_requests_list_time_range_forwarded_as_strings():
     from orb.application.dto.interface_response import InterfaceResponse
     from orb.application.services.orchestration.dtos import ListRequestsOutput
     from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
-    from orb.interface.request_command_handlers import handle_list_requests
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_list_requests = handler_method(RequestReadHandlers, "list_requests")
     from orb.interface.response_formatting_service import ResponseFormattingService
 
     container = MagicMock()
@@ -196,7 +202,10 @@ async def test_requests_list_status_forwarded_to_orchestrator():
     from orb.application.dto.interface_response import InterfaceResponse
     from orb.application.services.orchestration.dtos import ListRequestsOutput
     from orb.application.services.orchestration.list_requests import ListRequestsOrchestrator
-    from orb.interface.request_command_handlers import handle_list_requests
+    from orb.interface.request_query_handlers import RequestReadHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_list_requests = handler_method(RequestReadHandlers, "list_requests")
     from orb.interface.response_formatting_service import ResponseFormattingService
 
     container = MagicMock()
@@ -329,7 +338,10 @@ async def test_stop_machines_uses_machine_ids_flag():
 
     from orb.application.services.orchestration.dtos import StopMachinesOutput
     from orb.application.services.orchestration.stop_machines import StopMachinesOrchestrator
-    from orb.interface.machine_command_handlers import handle_stop_machines
+    from orb.interface.machine_command_handlers import MachineHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_stop_machines = handler_method(MachineHandlers, "stop_machines")
     from orb.interface.response_formatting_service import ResponseFormattingService
 
     orch = AsyncMock(spec=StopMachinesOrchestrator)
@@ -359,7 +371,10 @@ async def test_start_machines_uses_machine_ids_flag():
 
     from orb.application.services.orchestration.dtos import StartMachinesOutput
     from orb.application.services.orchestration.start_machines import StartMachinesOrchestrator
-    from orb.interface.machine_command_handlers import handle_start_machines
+    from orb.interface.machine_command_handlers import MachineHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_start_machines = handler_method(MachineHandlers, "start_machines")
     from orb.interface.response_formatting_service import ResponseFormattingService
 
     orch = AsyncMock(spec=StartMachinesOrchestrator)
@@ -390,7 +405,10 @@ async def test_request_return_machines_uses_machine_ids_flag():
     from orb.application.dto.interface_response import InterfaceResponse
     from orb.application.services.orchestration.dtos import ReturnMachinesOutput
     from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
-    from orb.interface.request_command_handlers import handle_request_return_machines
+    from orb.interface.request_command_handlers import RequestWriteHandlers
+    from tests.utilities.cli_handlers import handler_method
+
+    handle_request_return_machines = handler_method(RequestWriteHandlers, "request_return_machines")
     from orb.interface.response_formatting_service import ResponseFormattingService
 
     orch = AsyncMock(spec=ReturnMachinesOrchestrator)

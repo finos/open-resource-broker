@@ -7,9 +7,14 @@ Replaces the 3-tier dispatch in CLICommandFactoryOrchestrator._route_command.
 from __future__ import annotations
 
 import argparse
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 
 Handler = Callable[[argparse.Namespace], Any]
+
+# Registers a command group's handler classes in a container; idempotent.
+GroupRegistrar = Callable[[Any], None]
+
+_H = TypeVar("_H")
 
 # Singular → plural aliases
 _ALIASES: dict[str, str] = {
@@ -34,6 +39,39 @@ def lookup(resource: str, action: str) -> Handler | None:
     return _REGISTRY.get((resolved, action))
 
 
+def _current_container() -> Any:
+    """Return the process-wide container (the single dispatch-time lookup in this module)."""
+    from orb.infrastructure.di.container import get_container
+
+    return get_container()
+
+
+def bind(handler_cls: type[_H], method: str, *, group: GroupRegistrar) -> Handler:
+    """Return a CLI handler that runs ``handler_cls.method`` on a container-built instance.
+
+    The handler class is registered through ``group`` on the current container and
+    resolved at dispatch time, so importing the registry never builds a container.
+    Only the resolution is wrapped by the interface exception decorator; the
+    awaited method keeps its own, so a failure is handled once.
+    """
+    from orb.infrastructure.error.decorators import handle_interface_exceptions
+
+    @handle_interface_exceptions(context=f"{handler_cls.__name__}.{method}", interface_type="cli")
+    def _resolve() -> _H:
+        container = _current_container()
+        group(container)
+        return container.get(handler_cls)
+
+    async def _bound(args: argparse.Namespace) -> Any:
+        handler = _resolve()
+        return await getattr(handler, method)(args)
+
+    _bound.__name__ = f"{handler_cls.__name__}.{method}"
+    # Lets tests and tooling see what a registry entry dispatches to.
+    _bound.__dict__["target"] = (handler_cls, method)
+    return _bound
+
+
 def _make_bus_handler(factory_method_name: str) -> Handler:
     """Create an async handler that calls the named factory method and dispatches to the bus."""
 
@@ -41,9 +79,9 @@ def _make_bus_handler(factory_method_name: str) -> Handler:
         import inspect
 
         from orb.application.dto.base import BaseCommand
+        from orb.application.ports.command_bus_port import CommandBusPort
+        from orb.application.ports.query_bus_port import QueryBusPort
         from orb.cli.factories.cli_command_factory_orchestrator import CLICommandFactoryOrchestrator
-        from orb.infrastructure.di.buses import CommandBus, QueryBus
-        from orb.infrastructure.di.container import get_container
 
         orchestrator = CLICommandFactoryOrchestrator()
 
@@ -67,11 +105,11 @@ def _make_bus_handler(factory_method_name: str) -> Handler:
                 kwargs[k] = args_dict[f"flag_{k}"]
         cqrs_obj = factory_fn(**kwargs)
 
-        container = get_container()
+        container = _current_container()
         if isinstance(cqrs_obj, BaseCommand):
-            return await container.get(CommandBus).execute(cqrs_obj)  # type: ignore[arg-type]
+            return await container.get(CommandBusPort).execute(cqrs_obj)  # type: ignore[arg-type]
         else:
-            return await container.get(QueryBus).execute(cqrs_obj)
+            return await container.get(QueryBusPort).execute(cqrs_obj)
 
     _handler.__name__ = f"bus_handler_{factory_method_name}"
     return _handler
@@ -187,110 +225,105 @@ def build_registry() -> None:
     register("server", "ui-export", handle_server_ui_export)
 
     # --- templates ---
+    from orb.cli.handler_wiring import register_template_handlers
     from orb.interface.template_command_handlers import (
-        handle_create_template,
-        handle_delete_template,
-        handle_get_multiple_templates,
-        handle_get_template,
-        handle_list_templates,
-        handle_refresh_templates,
-        handle_update_template,
-        handle_validate_template,
+        TemplateReadHandlers,
+        TemplateWriteHandlers,
     )
-    from orb.interface.templates_generate_handler import handle_templates_generate
+    from orb.interface.templates_generate_handler import TemplatesGenerateHandler
 
-    register("templates", "list", handle_list_templates)
-    register("templates", "show", handle_get_template)
-    register("templates", "create", handle_create_template)
-    register("templates", "update", handle_update_template)
-    register("templates", "delete", handle_delete_template)
-    register("templates", "validate", handle_validate_template)
-    register("templates", "refresh", handle_refresh_templates)
-    register("templates", "generate", handle_templates_generate)
-    register("templates", "get-bulk", handle_get_multiple_templates)
+    def _template_queries(method: str) -> Handler:
+        return bind(TemplateReadHandlers, method, group=register_template_handlers)
+
+    def _template_commands(method: str) -> Handler:
+        return bind(TemplateWriteHandlers, method, group=register_template_handlers)
+
+    register("templates", "list", _template_queries("list_templates"))
+    register("templates", "show", _template_queries("get_template"))
+    register("templates", "create", _template_commands("create_template"))
+    register("templates", "update", _template_commands("update_template"))
+    register("templates", "delete", _template_commands("delete_template"))
+    register("templates", "validate", _template_queries("validate_template"))
+    register("templates", "refresh", _template_commands("refresh_templates"))
+    register(
+        "templates",
+        "generate",
+        bind(TemplatesGenerateHandler, "handle", group=register_template_handlers),
+    )
+    register("templates", "get-bulk", _template_queries("get_multiple_templates"))
 
     # --- requests ---
-    from orb.interface.request_command_handlers import (
-        handle_cancel_request,
-        handle_confirm_terminated,
-        handle_get_multiple_requests,
-        handle_get_request_status,
-        handle_get_return_requests,
-        handle_list_requests,
-        handle_request_machines,
-        handle_request_return_machines,
-        handle_watch_request_status,
-    )
+    from orb.cli.handler_wiring import register_request_handlers
+    from orb.interface.request_command_handlers import RequestWriteHandlers
+    from orb.interface.request_query_handlers import RequestReadHandlers
 
-    register("requests", "show", handle_get_request_status)
-    register("requests", "status", handle_get_request_status)
-    register("requests", "list", handle_list_requests)
-    register("requests", "cancel", handle_cancel_request)
-    register("requests", "confirm-terminated", handle_confirm_terminated)
-    register("requests", "list-returns", handle_get_return_requests)
-    register("requests", "watch", handle_watch_request_status)
-    register("requests", "get-bulk", handle_get_multiple_requests)
+    def _request_queries(method: str) -> Handler:
+        return bind(RequestReadHandlers, method, group=register_request_handlers)
+
+    def _request_commands(method: str) -> Handler:
+        return bind(RequestWriteHandlers, method, group=register_request_handlers)
+
+    register("requests", "show", _request_queries("get_request_status"))
+    register("requests", "status", _request_queries("get_request_status"))
+    register("requests", "list", _request_queries("list_requests"))
+    register("requests", "cancel", _request_commands("cancel_request"))
+    register("requests", "confirm-terminated", _request_commands("confirm_terminated"))
+    register("requests", "list-returns", _request_queries("get_return_requests"))
+    register("requests", "watch", _request_queries("watch_request_status"))
+    register("requests", "get-bulk", _request_queries("get_multiple_requests"))
 
     # --- machines ---
-    from orb.interface.machine_command_handlers import (
-        handle_get_machine,
-        handle_get_machine_status,
-        handle_get_multiple_machines,
-        handle_list_machines,
-        handle_start_machines,
-        handle_stop_machines,
-    )
+    from orb.cli.handler_wiring import register_machine_handlers
+    from orb.interface.machine_command_handlers import MachineHandlers
 
-    register("machines", "list", handle_list_machines)
-    register("machines", "show", handle_get_machine)
-    register("machines", "status", handle_get_machine_status)
-    register("machines", "request", handle_request_machines)
-    register("machines", "return", handle_request_return_machines)
-    register("machines", "terminate", handle_request_return_machines)
-    register("machines", "stop", handle_stop_machines)
-    register("machines", "start", handle_start_machines)
-    register("machines", "get-bulk", handle_get_multiple_machines)
+    def _machines(method: str) -> Handler:
+        return bind(MachineHandlers, method, group=register_machine_handlers)
+
+    register("machines", "list", _machines("list_machines"))
+    register("machines", "show", _machines("get_machine"))
+    register("machines", "status", _machines("get_machine_status"))
+    register("machines", "request", _request_commands("request_machines"))
+    register("machines", "return", _request_commands("request_return_machines"))
+    register("machines", "terminate", _request_commands("request_return_machines"))
+    register("machines", "stop", _machines("stop_machines"))
+    register("machines", "start", _machines("start_machines"))
+    register("machines", "get-bulk", _machines("get_multiple_machines"))
 
     # --- scheduler ---
-    from orb.interface.scheduler_command_handlers import (
-        handle_list_scheduler_strategies,
-        handle_show_scheduler_config,
-        handle_validate_scheduler_config,
-    )
+    from orb.cli.handler_wiring import register_scheduler_handlers
+    from orb.interface.scheduler_command_handlers import SchedulerHandlers
 
-    register("scheduler", "list", handle_list_scheduler_strategies)
-    register("scheduler", "show", handle_show_scheduler_config)
-    register("scheduler", "validate", handle_validate_scheduler_config)
+    def _scheduler(method: str) -> Handler:
+        return bind(SchedulerHandlers, method, group=register_scheduler_handlers)
+
+    register("scheduler", "list", _scheduler("list_scheduler_strategies"))
+    register("scheduler", "show", _scheduler("show_scheduler_config"))
+    register("scheduler", "validate", _scheduler("validate_scheduler_config"))
 
     # --- storage ---
-    from orb.interface.storage_command_handlers import (
-        handle_list_storage_strategies,
-        handle_show_storage_config,
-        handle_storage_health,
-        handle_storage_metrics,
-        handle_storage_migrate,
-        handle_test_storage,
-        handle_validate_storage_config,
-    )
+    from orb.cli.handler_wiring import register_storage_handlers
+    from orb.interface.storage_command_handlers import StorageHandlers
 
-    register("storage", "list", handle_list_storage_strategies)
-    register("storage", "show", handle_show_storage_config)
-    register("storage", "health", handle_storage_health)
-    register("storage", "metrics", handle_storage_metrics)
-    register("storage", "migrate", handle_storage_migrate)
-    register("storage", "test", handle_test_storage)
-    register("storage", "validate", handle_validate_storage_config)
+    def _storage(method: str) -> Handler:
+        return bind(StorageHandlers, method, group=register_storage_handlers)
+
+    register("storage", "list", _storage("list_storage_strategies"))
+    register("storage", "show", _storage("show_storage_config"))
+    register("storage", "health", _storage("storage_health"))
+    register("storage", "metrics", _storage("storage_metrics"))
+    register("storage", "migrate", _storage("storage_migrate"))
+    register("storage", "test", _storage("test_storage"))
+    register("storage", "validate", _storage("validate_storage_config"))
 
     # --- config ---
-    from orb.interface.config_command_handlers import (
-        handle_get_configuration,
-        handle_get_system_config,
-        handle_set_configuration,
-        handle_validate_provider_config,
-    )
+    from orb.cli.handler_wiring import register_config_handlers
+    from orb.interface.config_command_handlers import ConfigHandlers
 
-    register("config", "show", handle_get_system_config)
-    register("config", "get", handle_get_configuration)
-    register("config", "set", handle_set_configuration)
-    register("config", "validate", handle_validate_provider_config)
+    def _config(method: str) -> Handler:
+        return bind(ConfigHandlers, method, group=register_config_handlers)
+
+    register("config", "show", _config("get_system_config"))
+    register("config", "get", _config("get_configuration"))
+    register("config", "set", _config("set_configuration"))
+    register("config", "validate", _config("validate_provider_config"))
     register("config", "reload", handle_reload_provider_config)

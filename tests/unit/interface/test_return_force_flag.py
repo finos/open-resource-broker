@@ -11,7 +11,10 @@ from orb.application.dto.interface_response import InterfaceResponse
 from orb.application.services.orchestration.dtos import ReturnMachinesOutput
 from orb.application.services.orchestration.return_machines import ReturnMachinesOrchestrator
 from orb.cli.args import build_parser
-from orb.interface.request_command_handlers import handle_request_return_machines
+from orb.interface.request_command_handlers import RequestWriteHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_request_return_machines = handler_method(RequestWriteHandlers, "request_return_machines")
 from orb.interface.response_formatting_service import ResponseFormattingService
 
 

@@ -11,7 +11,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orb.interface.template_command_handlers import handle_update_template
+from orb.interface.template_command_handlers import TemplateWriteHandlers
+from tests.utilities.cli_handlers import handler_method
+
+handle_update_template = handler_method(TemplateWriteHandlers, "update_template")
 
 _DRY_RUN_MODULE = importlib.import_module("orb.infrastructure.mocking.dry_run_context")
 
