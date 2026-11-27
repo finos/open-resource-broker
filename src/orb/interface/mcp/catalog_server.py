@@ -219,7 +219,7 @@ _MCP_TOOL_MIN_ROLE: dict[str, str] = {
     "validate_template": "viewer",
     "get_provider_health": "viewer",
     "list_providers": "viewer",
-    "get_provider_config": "viewer",
+    "get_provider_config": "operator",
     "get_provider_metrics": "viewer",
 }
 

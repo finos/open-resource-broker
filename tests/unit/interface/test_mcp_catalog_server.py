@@ -23,8 +23,12 @@ from orb.application.machine.dto import MachineDTO
 from orb.application.services.orchestration.acquire_machines import AcquireMachinesOrchestrator
 from orb.application.services.orchestration.dtos import (
     AcquireMachinesOutput,
+    GetProviderConfigOutput,
     ListMachinesInput,
     ListMachinesOutput,
+)
+from orb.application.services.orchestration.get_provider_config import (
+    GetProviderConfigOrchestrator,
 )
 from orb.application.services.orchestration.list_machines import ListMachinesOrchestrator
 from orb.infrastructure.di.container import DIContainer
@@ -333,6 +337,45 @@ async def test_call_tool_read_only_tool_allowed_for_viewer_role() -> None:
     tool_result = await _call_tool(server, "list_machines", {}, request=_http_request(["viewer"]))
 
     assert tool_result.is_error is False
+
+
+def _provider_config_container() -> tuple[MagicMock, AsyncMock]:
+    orchestrator = AsyncMock(spec=GetProviderConfigOrchestrator)
+    orchestrator.execute.return_value = GetProviderConfigOutput(
+        config={"config_file": "/etc/orb/config.json"}
+    )
+    container = MagicMock(spec=DIContainer)
+    container.get.side_effect = lambda cls: {
+        GetProviderConfigOrchestrator: orchestrator,
+        ResponseFormattingService: MagicMock(spec=ResponseFormattingService),
+    }.get(cls)
+    return container, orchestrator
+
+
+@pytest.mark.asyncio
+async def test_call_tool_denies_get_provider_config_for_viewer_role() -> None:
+    """The tool reports configuration file paths, so a viewer is refused."""
+    container, orchestrator = _provider_config_container()
+
+    tool_result = await _call_tool(
+        build_server(container), "get_provider_config", {}, request=_http_request(["viewer"])
+    )
+
+    assert tool_result.is_error is True
+    assert "insufficient permissions" in tool_result.content[0].text
+    orchestrator.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_call_tool_allows_get_provider_config_for_operator_role() -> None:
+    container, orchestrator = _provider_config_container()
+
+    tool_result = await _call_tool(
+        build_server(container), "get_provider_config", {}, request=_http_request(["operator"])
+    )
+
+    assert tool_result.is_error is False
+    orchestrator.execute.assert_called_once()
 
 
 @pytest.mark.asyncio

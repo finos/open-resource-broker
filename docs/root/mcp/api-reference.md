@@ -326,6 +326,8 @@ List available cloud providers.
 #### get_provider_config
 Get provider configuration details.
 
+**Required role**: `operator`
+
 **Parameters**:
 - `provider` (optional): Specific provider name
 
