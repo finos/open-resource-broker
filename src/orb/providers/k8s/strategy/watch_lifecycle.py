@@ -31,6 +31,7 @@ from typing import Any, Callable, Optional
 from orb.domain.base.ports import LoggingPort
 from orb.providers.k8s.configuration.config import K8sProviderConfig
 from orb.providers.k8s.infrastructure.k8s_client import K8sClient
+from orb.providers.k8s.utilities.background_tasks import BackgroundTasks
 from orb.providers.k8s.watch.multi_namespace import MultiNamespaceWatcher
 from orb.providers.k8s.watch.pod_state_cache import PodStateCache
 
@@ -48,6 +49,7 @@ class K8sWatchManagerLifecycle:
     ) -> None:
         self._config = config
         self._logger = logger
+        self.background_tasks = BackgroundTasks(logger)
         self._client_provider = client_provider
         # Watch fan-out.  Constructed lazily by :meth:`maybe_start` when
         # ``config.watch_enabled`` is True and no override has been
@@ -217,7 +219,7 @@ class K8sWatchManagerLifecycle:
                 "(cleanup called from the event-loop thread; "
                 "watchers may outlive this cleanup call)."
             )
-            loop.create_task(manager.stop())
+            self.background_tasks.spawn(loop, manager.stop(), name="k8s-watch-manager-stop")
             return
 
         # Foreign thread with a running loop — block with timeout.

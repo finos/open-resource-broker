@@ -542,6 +542,11 @@ class K8sProviderStrategy(ProviderStrategy):
                 "Failed to stop Kubernetes events watcher during cleanup: %s", exc, exc_info=True
             )
 
+        # Outstanding timed-out-pod deletions must not outlive the client
+        # they use.  The watch stop task is left to finish on its own.
+        for handler in list(self._handlers.values()):
+            handler.background_tasks.cancel_all()
+
         # Stage 4: client cleanup.  Only clear ``_initialized`` when the
         # client is successfully cleaned up — if this stage fails the
         # provider can still serve reads via the existing connection while
