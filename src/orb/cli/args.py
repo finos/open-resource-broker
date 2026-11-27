@@ -13,10 +13,9 @@ import sys
 import sys as _sys
 from typing import cast
 
-from orb.cli.parsers.common_args import add_provider_type_arg
+from orb.cli.parsers.common_args import add_provider_spec_arguments, add_provider_type_arg
 from orb.domain.machine.machine_status import MachineStatus
 from orb.domain.request.value_objects import RequestStatus
-from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
 
 try:
     import rich.console as _rich_console  # type: ignore[import-untyped,import-not-found]
@@ -553,8 +552,7 @@ def add_provider_actions(subparsers, pp: "ParentParsers | None" = None):
         description="Add a new provider instance to the configuration.",
         parents=[pp.common, pp.list, pp.provider_scope],
     )
-    for _spec in CLISpecRegistry.all().values():
-        _spec.add_arguments(providers_add)
+    add_provider_spec_arguments(providers_add)
     providers_add.add_argument("--name", help="Provider instance name")
     providers_add.add_argument("--discover", action="store_true", help="Discover infrastructure")
 
@@ -573,8 +571,7 @@ def add_provider_actions(subparsers, pp: "ParentParsers | None" = None):
         parents=[pp.common, pp.list, pp.provider_scope],
     )
     providers_update.add_argument("provider_name", help="Provider instance name")
-    for _spec in CLISpecRegistry.all().values():
-        _spec.add_arguments(providers_update)
+    add_provider_spec_arguments(providers_update)
 
     providers_set_default = subparsers.add_parser(
         "set-default",
@@ -855,8 +852,7 @@ For more information, visit: {DOCS_URL}
     )
     # Inject per-provider CLI flags (e.g. --aws-profile, --aws-region) so that
     # _get_default_config can use spec.extract_config() in non-interactive mode.
-    for _spec in CLISpecRegistry.all().values():
-        _spec.add_arguments(init_parser)
+    add_provider_spec_arguments(init_parser)
 
     # Templates
     templates_parser = subparsers.add_parser(

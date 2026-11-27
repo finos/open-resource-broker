@@ -6,7 +6,7 @@
   "storage_leaks_non_storage": 0,
   "interface_provider_direct_imports": 6,
   "circular_dependency_cycles": 5,
-  "cli_infrastructure_direct_imports": 10,
+  "cli_infrastructure_direct_imports": 9,
   "getattr_justification_aws": 56,
   "getattr_justification_k8s": 294,
   "application_service_locator_sites": 0,

@@ -17,7 +17,7 @@ the function falls back to an open-ended ``metavar`` so the CLI still builds.
 from __future__ import annotations
 
 import argparse
-from typing import Sequence
+from typing import Any, Sequence
 
 
 def add_provider_type_arg(
@@ -64,6 +64,12 @@ def add_provider_type_arg(
     parser.add_argument("--provider-type", **kwargs)
 
 
+def _cli_spec_registry() -> Any:
+    from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
+
+    return CLISpecRegistry
+
+
 def _registered_provider_types() -> list[str]:
     """Return the sorted list of provider types known to the CLI spec registry.
 
@@ -71,8 +77,12 @@ def _registered_provider_types() -> list[str]:
     in unit tests that skip the full bootstrap).
     """
     try:
-        from orb.infrastructure.registry.cli_spec_registry import CLISpecRegistry
-
-        return sorted(CLISpecRegistry.all().keys())
+        return sorted(_cli_spec_registry().all().keys())
     except Exception:  # pragma: no cover — defensive
         return []
+
+
+def add_provider_spec_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add every registered provider's CLI flags (e.g. ``--aws-profile``) to *parser*."""
+    for spec in _cli_spec_registry().all().values():
+        spec.add_arguments(parser)
