@@ -137,7 +137,7 @@ def register_template_handlers(container: Any) -> None:
             validate_orchestrator=c.get(ValidateTemplateOrchestrator),
             query_bus=c.get(QueryBusPort),
             formatter=c.get(ResponseFormattingService),
-            console=c.get(ConsolePort),
+            console_provider=lambda: c.get(ConsolePort),
         ),
     )
     _register(

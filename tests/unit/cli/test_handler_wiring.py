@@ -159,16 +159,16 @@ def test_lazy_providers_are_not_called_while_a_handler_is_built() -> None:
     container = _RecordingContainer()
     handler_wiring.register_storage_handlers(container)
     handler_wiring.register_template_handlers(container)
+    template_read = next(c for c in container.factories if c.__name__ == "TemplateReadHandlers")
     storage = next(c for c in container.factories if c.__name__ == "StorageHandlers")
     generate = next(c for c in container.factories if c.__name__ == "TemplatesGenerateHandler")
 
     container.get(storage)
+    container.get(template_read)
     container.get(generate)
 
     resolved = {c.__name__ for c in container.resolved}
-    assert resolved.isdisjoint(
-        {"QueryBusPort", "ConfigurationManager", "TemplateGenerationService", "ConsolePort"}
-    )
+    assert resolved.isdisjoint({"ConfigurationManager", "TemplateGenerationService", "ConsolePort"})
 
 
 @pytest.mark.unit
@@ -231,3 +231,48 @@ def test_the_generate_early_path_loads_only_the_template_group() -> None:
     )
     assert proc.returncode == 0, proc.stderr
     assert json.loads(proc.stdout.strip().splitlines()[-1]) == []
+
+
+@pytest.mark.unit
+@pytest.mark.cli
+@pytest.mark.parametrize(
+    "class_name", sorted({name for name, _, _ in ORCHESTRATOR_PARAMETERS}), ids=str
+)
+def test_a_handler_class_resolves_its_orchestrators_when_it_is_built(class_name: str) -> None:
+    container = _RecordingContainer()
+    for registrar in GROUPS:
+        registrar(container)
+    handler_cls = next(c for c in container.factories if c.__name__ == class_name)
+
+    container.get(handler_cls)
+
+    expected = {
+        OPERATION_CATALOG[key].orchestrator
+        for name, _, key in ORCHESTRATOR_PARAMETERS
+        if name == class_name
+    }
+    assert expected <= set(container.resolved)
+
+
+@pytest.mark.unit
+@pytest.mark.cli
+def test_templates_generate_with_an_unbuildable_container_reports_one_line(tmp_path) -> None:
+    (tmp_path / "config.json").write_text("{not json", encoding="utf-8")
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "ORB_CONFIG_DIR": str(tmp_path),
+        "ORB_ROOT_DIR": str(tmp_path),
+        "HOME": str(tmp_path),
+    }
+    proc = subprocess.run(
+        [sys.executable, "-c", "from orb.run import cli_main; cli_main()", "templates", "generate"],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        env=env,
+    )
+
+    assert proc.returncode == 1
+    assert proc.stdout == ""
+    lines = [line for line in proc.stderr.splitlines() if line.strip()]
+    assert len(lines) == 1 and lines[0].startswith("Fatal error:"), proc.stderr

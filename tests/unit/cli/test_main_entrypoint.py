@@ -451,7 +451,7 @@ class TestMainTemplatesGenerateDispatch:
         _assert_bound_to_templates_generate(bind)
         handler.assert_awaited_once_with(args)
 
-    def test_does_not_resolve_a_container_itself(self, monkeypatch):
+    def test_builds_the_container_before_the_guarded_dispatch(self, monkeypatch):
         args = _base_args(resource="templates", action="generate")
         monkeypatch.setattr(cli_main, "parse_args", lambda: (args, {}))
         monkeypatch.setattr("orb._environment.setup_environment", MagicMock())
@@ -462,7 +462,7 @@ class TestMainTemplatesGenerateDispatch:
 
         with pytest.raises(SystemExit):
             _run(cli_main.main())
-        get_container_mock.assert_not_called()
+        get_container_mock.assert_called_once_with()
         assert not hasattr(args, "_container")
 
 

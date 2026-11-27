@@ -7,7 +7,7 @@ using orchestrators for architectural consistency.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from orb.application.dto.interface_response import InterfaceResponse
 from orb.domain.base.exceptions import DuplicateError, EntityNotFoundError
@@ -42,14 +42,14 @@ class TemplateReadHandlers:
         validate_orchestrator: ValidateTemplateOrchestrator,
         query_bus: QueryBusPort,
         formatter: ResponseFormattingService,
-        console: ConsolePort,
+        console_provider: Callable[[], ConsolePort],
     ) -> None:
         self._list_orchestrator = list_orchestrator
         self._get_orchestrator = get_orchestrator
         self._validate_orchestrator = validate_orchestrator
         self._query_bus = query_bus
         self._formatter = formatter
-        self._console = console
+        self._console_provider = console_provider
 
     @handle_interface_exceptions(context="list_templates", interface_type="cli")
     async def list_templates(self, args: argparse.Namespace) -> dict[str, Any] | InterfaceResponse:
@@ -94,7 +94,7 @@ class TemplateReadHandlers:
         if not result.templates:
             from orb.cli.help_utils import print_getting_started_help
 
-            console = self._console
+            console = self._console_provider()
             console.info("")
             console.info("No templates found.")
             console.info("")

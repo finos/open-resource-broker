@@ -19,6 +19,7 @@ from tests.unit.architecture.conftest import SRC_ORB, collect_python_files
 EXPECTED_PROVIDERS: set[tuple[str, str, str]] = {
     ("StorageHandlers", "query_bus_provider", "QueryBusPort"),
     ("StorageHandlers", "config_manager_provider", "ConfigurationManager"),
+    ("TemplateReadHandlers", "console_provider", "ConsolePort"),
     ("TemplatesGenerateHandler", "template_service_provider", "TemplateGenerationService"),
     ("TemplatesGenerateHandler", "console_provider", "ConsolePort"),
 }

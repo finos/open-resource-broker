@@ -872,3 +872,46 @@ class TestHandleGetMultipleTemplates:
         mock_qbus.execute.assert_awaited_once()
         query_arg = mock_qbus.execute.call_args[0][0]
         assert "flag-t1" in query_arg.template_ids
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestConsoleIsResolvedOnlyWhenUsed:
+    """An unresolvable console must not affect commands that never print to it."""
+
+    @staticmethod
+    def _handler(**overrides):
+        from orb.interface.template_command_handlers import TemplateReadHandlers
+        from tests.utilities.cli_handlers import make_handler
+
+        def broken():
+            raise RuntimeError("console unavailable")
+
+        return make_handler(TemplateReadHandlers, console_provider=broken, **overrides)
+
+    async def test_list_with_templates_does_not_resolve_the_console(self):
+        from orb.application.services.orchestration.dtos import ListTemplatesOutput
+
+        orchestrator = AsyncMock()
+        orchestrator.execute.return_value = ListTemplatesOutput(
+            templates=[{"template_id": "t"}], total_count=1
+        )
+        formatter = MagicMock()
+        formatter.format_template_list.return_value = InterfaceResponse(data={"templates": []})
+        handler = self._handler(list_orchestrator=orchestrator, formatter=formatter)
+
+        result = await handler.list_templates(argparse.Namespace())
+
+        assert result.exit_code == 0
+
+    async def test_show_of_a_missing_template_keeps_its_specific_error(self):
+        from orb.domain.base.exceptions import EntityNotFoundError
+
+        orchestrator = AsyncMock()
+        orchestrator.execute.side_effect = EntityNotFoundError("Template", "nope")
+        formatter = MagicMock()
+        handler = self._handler(get_orchestrator=orchestrator, formatter=formatter)
+
+        await handler.get_template(argparse.Namespace(template_id="nope"))
+
+        formatter.format_error.assert_called_once_with("Template 'nope' not found")

@@ -261,6 +261,9 @@ async def main() -> None:
             handle_templates_generate = bind(
                 TemplatesGenerateHandler, "handle", group=register_template_handlers
             )
+            # Build the container before the guarded dispatch so a container that cannot
+            # be built is reported once by the outer handler, as it always was.
+            get_container()
             try:
                 result = await handle_templates_generate(args)
                 if result.get("status") == "success":
